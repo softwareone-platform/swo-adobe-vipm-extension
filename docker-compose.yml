@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  app:
+    container_name: adobe_vipm
+    build:
+      context: .
+      dockerfile: prod.Dockerfile
+    working_dir: /extension
+    command: /bin/bash
+    volumes: 
+      - ./adobe_vipm:/extension
+
+  bash:
+    container_name: adobe_vipm_bash
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    working_dir: /extension
+    command: bash
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/extension
+
+  app_test:
+    container_name: adobe_vipm_test
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    working_dir: /extension
+    command: bash -c "flake8 . && pytest"
+    volumes:
+      - .:/extension
+
+  format:
+    container_name: adobe_vipm_format
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    working_dir: /extension
+    command: bash -c "isort . && black ."
+    volumes:
+      - .:/extension
