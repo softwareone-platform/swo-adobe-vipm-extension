@@ -12,7 +12,12 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.12,<4"
 requests = "2.31.*"
+django = "4.2.*"
 
+[tool.poetry.group.devmock.dependencies]
+uvicorn = "^0.25.0"
+fastapi = "^0.108.0"
+lib-rql = "^2.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "7.4.*"
@@ -27,15 +32,39 @@ pytest-xdist = "3.5.*"
 pytest-cov = "4.1.*"
 flake8-black = "0.3.*"
 flake8-isort = "6.1.*"
+ipython = "8.*"
+pytest-mock = "3.12.*"
+pytest-django = "4.7.*"
+responses = "^0.24.1"
+freezegun = "^1.4.0"
+
+
+[tool.poetry.group.sdk.dependencies]
+typing-extensions = "^4.9.0"
+django-ninja = "^1.1.0"
+
+
+[tool.poetry.group.runtime.dependencies]
+click = "^8.1.7"
+gunicorn = "^21.2.0"
+watchfiles = "^0.21.0"
+
+[tool.poetry.scripts]
+swoext = 'swo.mpt.extensions.runtime.swoext:main'
+
+[tool.poetry.plugins."swo.mpt.ext"]
+"app_config" = "adobe_vipm.apps:ExtensionConfig"
+
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-
 [tool.pytest.ini_options]
 testpaths = "tests"
+pythonpath = "."
 addopts = "--cov=adobe_vipm --cov-report=term-missing --cov-report=html --cov-report=xml"
+DJANGO_SETTINGS_MODULE = "tests.django.settings"
 
 [tool.coverage.run]
 relative_files = true

@@ -6,7 +6,7 @@ RUN pip3 install poetry==$POETRY_VERSION
 WORKDIR /install_temp
 COPY pyproject.toml poetry.* /install_temp
 
-RUN poetry update && poetry install --with dev --no-root
+RUN poetry update && poetry install --with dev,devmock,runtime,sdk
 
 ADD ./adobe_vipm /extension
 

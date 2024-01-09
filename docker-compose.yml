@@ -7,9 +7,13 @@ services:
       context: .
       dockerfile: prod.Dockerfile
     working_dir: /extension
-    command: /bin/bash
+    command: swo run
     volumes: 
       - ./adobe_vipm:/extension
+    environment:
+      - EXT_ADOBE_CONFIG_FILE=/workspaces/swo-adobe-vipm-extension/adobe_vipm/adobe_config.json
+      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
+      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
 
   bash:
     container_name: adobe_vipm_bash
@@ -22,6 +26,10 @@ services:
     tty: true
     volumes:
       - .:/extension
+    environment:
+      - EXT_ADOBE_CONFIG_FILE=/workspaces/swo-adobe-vipm-extension/adobe_vipm/adobe_config.json
+      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
+      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
 
   app_test:
     container_name: adobe_vipm_test
@@ -32,6 +40,10 @@ services:
     command: bash -c "flake8 . && pytest"
     volumes:
       - .:/extension
+    environment:
+      - EXT_ADOBE_CONFIG_FILE=/workspaces/swo-adobe-vipm-extension/adobe_vipm/adobe_config.json
+      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
+      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
 
   format:
     container_name: adobe_vipm_format
@@ -42,3 +54,7 @@ services:
     command: bash -c "isort . && black ."
     volumes:
       - .:/extension
+    environment:
+      - EXT_ADOBE_CONFIG_FILE=/workspaces/swo-adobe-vipm-extension/adobe_vipm/adobe_config.json
+      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
+      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
