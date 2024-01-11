@@ -101,3 +101,36 @@ def get_order_item(order, sku):
         ),
         None,
     )
+
+
+def increment_retry_count(order):
+    updated_order = copy.deepcopy(order)
+    param = get_parameter(
+        updated_order,
+        "fulfillment",
+        "RetryCount",
+    )
+    param["value"] = str(int(param["value"]) + 1) if param["value"] else "1"
+    return updated_order
+
+
+def reset_retry_count(order):
+    updated_order = copy.deepcopy(order)
+    param = get_parameter(
+        updated_order,
+        "fulfillment",
+        "RetryCount",
+    )
+    param["value"] = "0"
+    return updated_order
+
+
+def get_retry_count(order):
+    return int(
+        get_parameter(
+            order,
+            "fulfillment",
+            "RetryCount",
+        ).get("value", "0")
+        or "0",
+    )

@@ -1,0 +1,20 @@
+{
+    "id": "BUY-1000-0001",
+    "href": "/accounts/buyers/BUY-1000-0001",
+    "name": "Old, Benton and Obrien Ltd",
+    "icon": "/static/BUY-1000-0001/icon.png",
+    "address": {
+        "country": "US",
+        "state": "CA",
+        "city": "San Jose",
+        "addressLine1": "3601 Lyon St",
+        "addressLine2": "",
+        "postCode": "94123"
+    },
+    "contact": {
+        "firstName": "Grant",
+        "lastName": "Brewer",
+        "email": "grant.brewer@ybo.com",
+        "phone": "+14082954078"
+    }
+}

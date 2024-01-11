@@ -147,10 +147,12 @@ def fulfillment_parameters_factory():
     def _fulfillment_parameters(
         order_id="",
         customer_id="",
+        retry_count="0",
     ):
         return [
             {"id": "PAR-1234-5678", "name": "CustomerId", "value": customer_id},
             {"id": "PAR-0909-8080", "name": "OrderId", "value": order_id},
+            {"id": "PAR-7771-1777", "name": "RetryCount", "value": retry_count},
         ]
 
     return _fulfillment_parameters

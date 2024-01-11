@@ -45,7 +45,7 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(reseller.credentials)
+        headers = self._get_headers(reseller.credentials, correlation_id=external_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=headers,
@@ -90,10 +90,10 @@ class AdobeClient:
 
         raise AdobeError(response.json())
 
-    def create_new_order(self, reseller_country, customer_id, payload):
+    def create_new_order(self, reseller_country, customer_id, order_id, payload):
         reseller: Reseller = self._config.get_reseller(reseller_country)
         payload["orderType"] = "NEW"
-        headers = self._get_headers(reseller.credentials)
+        headers = self._get_headers(reseller.credentials, correlation_id=order_id)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -135,14 +135,14 @@ class AdobeClient:
 
         raise AdobeError(response.json())
 
-    def _get_headers(self, credentials: Credentials):
+    def _get_headers(self, credentials: Credentials, correlation_id=None):
         return {
             "X-Api-Key": credentials.client_id,
             "Authorization": f"Bearer {self._get_auth_token(credentials).token}",
             "Accept": "application/json",
             "Content-Type": "application/json",
             "X-Request-Id": str(uuid4()),
-            "x-correlation-id": str(uuid4()),
+            "x-correlation-id": correlation_id or str(uuid4()),
         }
 
     def _refresh_auth_token(self, credentials: Credentials):

@@ -3,6 +3,12 @@ import logging
 from django.conf import settings
 
 from adobe_vipm.adobe.client import AdobeError, get_adobe_client
+from adobe_vipm.flows.constants import (
+    ORDER_STATUS_DESCRIPTION,
+    STATUS_PENDING,
+    STATUS_PROCESSED,
+    UNRECOVERABLE_ORDER_STATUSES,
+)
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
@@ -15,6 +21,8 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
     get_order_item,
+    get_retry_count,
+    increment_retry_count,
     is_purchase_order,
     set_adobe_order_id,
 )
@@ -39,7 +47,7 @@ def _fulfill_purchase_order(client, seller_country, order):
                 seller_country, customer_id, order
             )
             adobe_order = adobe_client.create_new_order(
-                seller_country, customer_id, preview_order
+                seller_country, customer_id, order["id"], preview_order
             )
             logger.info(
                 f'New order created for {order["id"]}: {adobe_order["orderId"]}'
@@ -61,10 +69,37 @@ def _fulfill_purchase_order(client, seller_country, order):
             customer_id,
             adobe_order_id,
         )
-        if adobe_order["status"] != "1000":
+        if adobe_order["status"] == STATUS_PENDING:
+            retry_count = get_retry_count(order)
+            max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
+            if retry_count < max_attemps:
+                order = increment_retry_count(order)
+                order = update_order(
+                    client, order["id"], {"parameters": order["parameters"]}
+                )
+                logger.info(
+                    f'Order {order["id"]} ({adobe_order_id}) '
+                    "is still processing on Adobe side, wait.",
+                )
+                return
             logger.info(
-                f'Order {order["id"]} ({adobe_order_id}) '
-                "is still processing on Adobe side, wait.",
+                f'The order {order["id"]} ({adobe_order_id}) '
+                f"has reached the maximum number ({max_attemps}) of attemps.",
+            )
+            fail_order(
+                client, order["id"], f"Max processing attemps reached ({max_attemps})"
+            )
+            return
+        elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
+            fail_order(
+                client, order["id"], ORDER_STATUS_DESCRIPTION[adobe_order["status"]]
+            )
+            return
+        elif adobe_order["status"] != STATUS_PROCESSED:
+            fail_order(
+                client,
+                order["id"],
+                f"Unexpected status ({adobe_order['status']}) received from Adobe.",
             )
             return
 
