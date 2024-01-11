@@ -1,8 +1,8 @@
 {
-    "id": "BUY-1000-0001",
-    "href": "/accounts/buyers/BUY-1000-0001",
-    "name": "Old, Benton and Obrien Ltd",
-    "icon": "/static/BUY-1000-0001/icon.png",
+    "id": "BUY-1000-0004",
+    "href": "/accounts/buyers/BUY-1000-0004",
+    "name": "Clean test for upsizing",
+    "icon": "/static/BUY-1000-0004/icon.png",
     "address": {
         "country": "US",
         "state": "CA",

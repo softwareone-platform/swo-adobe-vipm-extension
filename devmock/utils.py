@@ -23,6 +23,7 @@ def get_object_or_404(folder, obj_id):
 get_order_or_404 = functools.partial(get_object_or_404, ORDERS_FOLDER)
 get_buyer_or_404 = functools.partial(get_object_or_404, BUYERS_FOLDER)
 get_seller_or_404 = functools.partial(get_object_or_404, SELLERS_FOLDER)
+get_subscription_or_404 = functools.partial(get_object_or_404, SUBSCRIPTIONS_FOLDER)
 
 
 def save_order(order):

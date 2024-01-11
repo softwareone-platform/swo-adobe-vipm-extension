@@ -158,9 +158,9 @@ def test_create_customer_account_address_error(
         "adobe_vipm.flows.shared.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-    mocked_querying_order = mocker.patch(
-        "adobe_vipm.flows.shared.querying_order",
-        return_value={"querying": "order"},
+    mocked_query_order = mocker.patch(
+        "adobe_vipm.flows.shared.query_order",
+        return_value={"query": "order"},
     )
 
     updated_order = create_customer_account(
@@ -172,7 +172,7 @@ def test_create_customer_account_address_error(
     ordering_parameters = order_parameters_factory()
     address_param = next(filter(lambda x: x["name"] == "Address", ordering_parameters))
     address_param["error"] = str(adobe_error)
-    mocked_querying_order.assert_called_once_with(
+    mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
         {
@@ -222,9 +222,9 @@ def test_create_customer_account_fields_error(
         "adobe_vipm.flows.shared.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-    mocked_querying_order = mocker.patch(
-        "adobe_vipm.flows.shared.querying_order",
-        return_value={"querying": "order"},
+    mocked_query_order = mocker.patch(
+        "adobe_vipm.flows.shared.query_order",
+        return_value={"query": "order"},
     )
 
     updated_order = create_customer_account(
@@ -236,7 +236,7 @@ def test_create_customer_account_fields_error(
     ordering_parameters = order_parameters_factory()
     param = next(filter(lambda x: x["name"] == param_name, ordering_parameters))
     param["error"] = str(adobe_error)
-    mocked_querying_order.assert_called_once_with(
+    mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
         {
@@ -253,10 +253,7 @@ def test_create_customer_account_fields_error(
 def test_create_customer_account_other_error(
     mocker,
     order,
-    order_parameters_factory,
-    fulfillment_parameters_factory,
     adobe_error_factory,
-    settings,
 ):
     """
     Test unrecoverable error handling when create a customer account in Adobe.

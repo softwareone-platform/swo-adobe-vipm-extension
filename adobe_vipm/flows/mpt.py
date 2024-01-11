@@ -1,65 +1,75 @@
-from adobe_vipm.flows.errors import MPTError
+from adobe_vipm.flows.errors import wrap_http_error
 
 
-def get_seller(client, seller_id):
-    response = client.get(f"/sellers/{seller_id}")
-    if response.status_code == 200:
-        return response.json()
-    raise MPTError(response.json())
+@wrap_http_error
+def get_seller(mpt_client, seller_id):
+    response = mpt_client.get(f"/accounts/sellers/{seller_id}")
+    response.raise_for_status()
+    return response.json()
 
 
-def get_buyer(client, buyer_id):
-    response = client.get(f"/buyers/{buyer_id}")
-    if response.status_code == 200:
-        return response.json()
-    raise MPTError(response.json())
+@wrap_http_error
+def get_buyer(mpt_client, buyer_id):
+    response = mpt_client.get(f"/accounts/buyers/{buyer_id}")
+    response.raise_for_status()
+    return response.json()
 
 
-def update_order(client, order_id, payload):
-    response = client.put(
+@wrap_http_error
+def update_order(mpt_client, order_id, payload):
+    response = mpt_client.put(
         f"/commerce/orders/{order_id}",
         json=payload,
     )
-    if response.status_code == 200:
-        return response.json()
-    raise MPTError(response.json())
+    response.raise_for_status()
+    return response.json()
 
 
-def querying_order(client, order_id, payload):
-    response = client.post(
+@wrap_http_error
+def query_order(mpt_client, order_id, payload):
+    response = mpt_client.post(
         f"/commerce/orders/{order_id}/query",
         json=payload,
     )
-    if response.status_code == 200:
-        return response.json()
-    raise MPTError(response.json())
+    response.raise_for_status()
+    return response.json()
 
 
-def fail_order(client, order_id, reason):
-    response = client.post(
+@wrap_http_error
+def fail_order(mpt_client, order_id, reason):
+    response = mpt_client.post(
         f"/commerce/orders/{order_id}/fail",
         json={"reason": reason},
     )
-    if response.status_code == 200:
-        return response.json()
-    raise MPTError(response.json())
+    response.raise_for_status()
+    return response.json()
 
 
-def complete_order(client, order_id, template_id):
-    response = client.post(
+@wrap_http_error
+def complete_order(mpt_client, order_id, template_id):
+    response = mpt_client.post(
         f"/commerce/orders/{order_id}/complete",
         json={"template": {"id": template_id}},
     )
-    if response.status_code == 200:
-        return response.json()
-    raise MPTError(response.json())
+    response.raise_for_status()
+    return response.json()
 
 
-def create_subscription(client, order_id, payload):
-    response = client.post(
+@wrap_http_error
+def create_subscription(mpt_client, order_id, payload):
+    response = mpt_client.post(
         f"/commerce/orders/{order_id}/subscriptions",
         json=payload,
     )
-    if response.status_code == 201:
-        return response.json()
-    raise MPTError(response.json())
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def update_subscription(mpt_client, order_id, subscription_id, payload):
+    response = mpt_client.put(
+        f"/commerce/orders/{order_id}/subscriptions/{subscription_id}",
+        json=payload,
+    )
+    response.raise_for_status()
+    return response.json()

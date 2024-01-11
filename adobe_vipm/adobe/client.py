@@ -18,11 +18,11 @@ class AdobeClient:
         self._config: Config = Config()
         self._token_cache: Mapping[Credentials, APIToken] = {}
 
-    def create_customer_account(self, reseller_country, external_id, customer_data):
+    def create_customer_account(self, reseller_country, customer_id, customer_data):
         reseller: Reseller = self._config.get_reseller(reseller_country)
         payload = {
             "resellerId": reseller.id,
-            "externalReferenceId": external_id,
+            "externalReferenceId": customer_id,
             "companyProfile": {
                 "companyName": customer_data["CompanyName"],
                 "preferredLanguage": customer_data["PreferredLanguage"],
@@ -45,7 +45,7 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(reseller.credentials, correlation_id=external_id)
+        headers = self._get_headers(reseller.credentials, correlation_id=customer_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=headers,
@@ -54,12 +54,12 @@ class AdobeClient:
 
         if response.status_code == 201:
             created_customer = response.json()
-            customer_id = created_customer["customerId"]
+            adobe_customer_id = created_customer["customerId"]
             logger.info(
-                f"Customer {external_id} - {customer_data['CompanyName']} "
-                f"created successfully for reseller {reseller.id}: {customer_id}",
+                f"Customer {customer_id} - {customer_data['CompanyName']} "
+                f"created successfully for reseller {reseller.id}: {adobe_customer_id}",
             )
-            return customer_id
+            return adobe_customer_id
 
         raise AdobeError(response.json())
 
@@ -67,7 +67,7 @@ class AdobeClient:
         reseller: Reseller = self._config.get_reseller(reseller_country)
         payload = {
             "externalReferenceId": order["id"],
-            "currencyCode": "USD",
+            "currencyCode": "USD",  # TODO get the currency from the line item
             "orderType": "PREVIEW",
             "lineItems": [],
         }

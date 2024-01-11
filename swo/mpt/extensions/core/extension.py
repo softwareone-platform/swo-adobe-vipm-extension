@@ -1,15 +1,11 @@
-from typing import TypeVar
-
 from ninja import NinjaAPI
 
 from .events import EventsRegistry
 
-ExtensionType = TypeVar("ExtensionType", bound="Extension")
-
 
 class Extension:
     def __init__(
-        self: ExtensionType,
+        self,
         /,
     ) -> None:
         self.events: EventsRegistry = EventsRegistry()

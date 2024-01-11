@@ -20,7 +20,6 @@ class Command(BaseCommand):
         self.dispatcher.start()
 
         def shutdown(signum, frame):
-            print("shutdown invoked")
             self.shutdown_event.set()
 
         signal.signal(signal.SIGTERM, shutdown)

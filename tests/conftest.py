@@ -145,13 +145,11 @@ def order_parameters_factory():
 @pytest.fixture()
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
-        order_id="",
         customer_id="",
         retry_count="0",
     ):
         return [
             {"id": "PAR-1234-5678", "name": "CustomerId", "value": customer_id},
-            {"id": "PAR-0909-8080", "name": "OrderId", "value": order_id},
             {"id": "PAR-7771-1777", "name": "RetryCount", "value": retry_count},
         ]
 
@@ -159,12 +157,70 @@ def fulfillment_parameters_factory():
 
 
 @pytest.fixture()
-def order_factory(order_parameters_factory, fulfillment_parameters_factory):
+def items_factory():
+    def _items(
+        product_item_id="65304578C",
+        old_quantity=0,
+        quantity=170,
+    ):
+        return [
+            {
+                "lineNumber": 1,
+                "productItemId": product_item_id,
+                "oldQuantity": old_quantity,
+                "quantity": quantity,
+            },
+        ]
+
+    return _items
+
+
+@pytest.fixture()
+def subscriptions_factory(items_factory):
+    def _subscriptions(
+        subscription_id="SUB-1000-2000-3000",
+        adobe_subscription_id="ffe5d0e78b411fa199dd29401ba37bNA",
+        start_date="2024-01-11T08:53:37Z",
+        items=None,
+    ):
+        items = items_factory() if items is None else items
+        return [
+            {
+                "id": subscription_id,
+                "name": "Subscription for 65304578CA01A12",
+                "parameters": {
+                    "fulfillment": [
+                        {
+                            "name": "SubscriptionId",
+                            "value": adobe_subscription_id,
+                        }
+                    ]
+                },
+                "items": items,
+                "startDate": start_date,
+            }
+        ]
+
+    return _subscriptions
+
+
+@pytest.fixture()
+def order_factory(
+    order_parameters_factory, fulfillment_parameters_factory, items_factory
+):
     """
     Marketplace platform order for tests.
     """
 
-    def _order(order_parameters=None, fulfillment_parameters=None):
+    def _order(
+        order_type="Purchase",
+        order_parameters=None,
+        fulfillment_parameters=None,
+        agreement_fulfillment_parameters=None,
+        items=None,
+        subscriptions=None,
+        external_ids=None,
+    ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
         )
@@ -174,7 +230,10 @@ def order_factory(order_parameters_factory, fulfillment_parameters_factory):
             else fulfillment_parameters
         )
 
-        return {
+        items = items_factory() if items is None else items
+        subscriptions = [] if subscriptions is None else subscriptions
+
+        order = {
             "id": "ORD-0792-5000-2253-4210",
             "href": "/commerce/orders/ORD-0792-5000-2253-4210",
             "agreement": {
@@ -202,15 +261,16 @@ def order_factory(order_parameters_factory, fulfillment_parameters_factory):
                     "name": "Software LN",
                     "icon": "/static/SEL-9121-8944/icon.png",
                 },
-                "product": None,
-                "productId": "PRD-1111-1111-1111",
+                "product": {
+                    "id": "PRD-1111-1111-1111",
+                },
             },
-            "type": "Purchase",
-            "status": "Querying",
+            "type": order_type,
+            "status": "Processing",
             "clientReferenceNumber": None,
             "notes": "First order to try",
-            "items": [{"lineNumber": 1, "productItemId": "65304578C", "quantity": 170}],
-            "subscriptions": [],
+            "items": items,
+            "subscriptions": subscriptions,
             "parameters": {
                 "fulfillment": fulfillment_parameters,
                 "order": order_parameters,
@@ -223,6 +283,13 @@ def order_factory(order_parameters_factory, fulfillment_parameters_factory):
                 "updated": None,
             },
         }
+        if agreement_fulfillment_parameters:
+            order["agreement"]["parameters"] = {
+                "fulfillment": agreement_fulfillment_parameters,
+            }
+        if external_ids:
+            order["externalIDs"] = external_ids
+        return order
 
     return _order
 
