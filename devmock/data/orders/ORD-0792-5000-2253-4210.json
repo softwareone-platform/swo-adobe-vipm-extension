@@ -1,0 +1,128 @@
+{
+  "id": "ORD-0792-5000-2253-4210",
+  "href": "/commerce/orders/ORD-0792-5000-2253-4210",
+  "agreement": {
+    "id": "AGR-2119-4550-8674-5962",
+    "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
+    "icon": null,
+    "name": "Product Name 1",
+    "audit": {
+      "created": {
+        "at": "2023-12-14T18:02:16.9359",
+        "by": {
+          "id": "USR-0000-0001"
+        }
+      },
+      "updated": null
+    },
+    "licensee": null,
+    "buyer": {
+      "id": "BUY-3731-7971",
+      "href": "/accounts/buyers/BUY-3731-7971",
+      "name": "Adam Ruszczak",
+      "icon": "/static/BUY-3731-7971/icon.png"
+    },
+    "seller": {
+      "id": "SEL-9121-8944",
+      "href": "/accounts/sellers/SEL-9121-8944",
+      "name": "Software LN",
+      "icon": "/static/SEL-9121-8944/icon.png"
+    },
+    "product": {
+      "id": "PRD-1111-1111-1111"
+    }
+  },
+  "type": "Purchase",
+  "status": "Completed",
+  "clientReferenceNumber": null,
+  "notes": "First order to try",
+  "items": [
+    {
+      "lineNumber": 1,
+      "productItemId": "65304578C",
+      "quantity": 170
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "SUB-6125-8049-5372",
+      "name": "Subscription for 65304578CA01A12",
+      "parameters": {
+        "fulfillment": [
+          {
+            "name": "SubscriptionId",
+            "value": "7c39d883484e5197b31907f05cf87eNA"
+          }
+        ]
+      },
+      "items": [
+        {
+          "lineNumber": 1,
+          "productItemId": "65304578C",
+          "quantity": 170
+        }
+      ],
+      "startDate": "2024-01-10T09:32:16Z"
+    }
+  ],
+  "parameters": {
+    "fulfillment": [
+      {
+        "id": "PAR-1234-5678",
+        "name": "CustomerId",
+        "value": "P1005078352"
+      },
+      {
+        "id": "PAR-0909-8080",
+        "name": "OrderId",
+        "value": "P9201239660"
+      }
+    ],
+    "order": [
+      {
+        "id": "PAR-0000-0001",
+        "name": "CompanyName",
+        "value": "Test before demo"
+      },
+      {
+        "id": "PAR-0000-0002",
+        "name": "PreferredLanguage",
+        "value": "en-US"
+      },
+      {
+        "id": "PAR-0000-0002",
+        "name": "Address",
+        "value": {
+          "country": "US",
+          "state": "CA",
+          "city": "San Jose",
+          "addressLine1": "3601 Lyon St",
+          "addressLine2": "",
+          "postCode": "94123"
+        }
+      },
+      {
+        "id": "PAR-0000-0002",
+        "name": "Contact",
+        "value": {
+          "firstName": "Ciccio",
+          "lastName": "Faraone",
+          "email": "francesco.faraone@softwareone.com",
+          "phone": "+14082954078"
+        }
+      }
+    ]
+  },
+  "audit": {
+    "created": {
+      "at": "2023-12-14T18:02:16.9359",
+      "by": {
+        "id": "USR-0000-0001"
+      }
+    },
+    "updated": null
+  },
+  "template": {
+    "id": "TPL-3333-4444"
+  }
+}

@@ -1,7 +1,8 @@
 [flake8]
-exclude = .idea,.vscode,.git,venv,env
+exclude = .idea,.vscode,.git,venv,env,swo,devmock
 show-source = True
 max-line-length = 100
 application-import-names = adobe_vipm
 import-order-style = smarkets
 max-cognitive-complexity = 15
+ignore = PT004

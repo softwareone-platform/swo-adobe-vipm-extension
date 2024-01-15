@@ -1,0 +1,20 @@
+{
+    "id": "BUY-3731-7971",
+    "href": "/accounts/buyers/BUY-3731-7971",
+    "name": "Test before demo",
+    "icon": "/static/BUY-3731-7971/icon.png",
+    "address": {
+        "country": "US",
+        "state": "CA",
+        "city": "San Jose",
+        "addressLine1": "3601 Lyon St",
+        "addressLine2": "",
+        "postCode": "94123"
+    },
+    "contact": {
+        "firstName": "Ciccio",
+        "lastName": "Faraone",
+        "email": "francesco.faraone@softwareone.com",
+        "phone": "+14082954078"
+    }
+}

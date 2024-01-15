@@ -1,0 +1,20 @@
+{
+    "id": "SEL-1000-0001",
+    "href": "/accounts/sellers/SEL-1000-0001",
+    "name": "SoftwareOne USA",
+    "icon": "/static/SEL-1000-0001/icon.png",
+    "address": {
+        "country": "US",
+        "region": "WI",
+        "city": "Milwaukee",
+        "addressLine1": "320 E Buffalo St",
+        "addressLine2": "",
+        "postCode": "53202"
+    },
+    "contact": {
+        "firstName": "Victoria",
+        "lastName": "Kelly",
+        "email": "victoria.kelly@softwareone.com",
+        "phone": "+18004449890"
+    }
+}
