@@ -3,9 +3,10 @@ import logging
 from django.conf import settings
 
 from adobe_vipm.adobe.client import AdobeError, get_adobe_client
-from adobe_vipm.flows.mpt import fail_order, get_buyer, querying_order, update_order
+from adobe_vipm.flows.mpt import fail_order, get_buyer, query_order, update_order
 from adobe_vipm.flows.utils import (
     get_customer_data,
+    reset_retry_count,
     set_adobe_customer_id,
     set_customer_data,
     set_ordering_parameter_error,
@@ -63,7 +64,8 @@ def _handle_customer_error(client, order, e):
         ):
             order = set_ordering_parameter_error(order, "Contact", str(e))
 
-    querying_order(
+    order = reset_retry_count(order)
+    query_order(
         client,
         order["id"],
         {

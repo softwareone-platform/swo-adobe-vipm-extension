@@ -10,8 +10,9 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_buyer,
     get_seller,
-    querying_order,
+    query_order,
     update_order,
+    update_subscription,
 )
 
 
@@ -52,7 +53,7 @@ def test_fail_order_error(mpt_client, requests_mocker, mpt_error_factory):
 def test_get_buyer(mpt_client, requests_mocker):
     """Test the call to retrieve a buyer."""
     requests_mocker.get(
-        urljoin(mpt_client.base_url, "buyers/BUY-0000"),
+        urljoin(mpt_client.base_url, "accounts/buyers/BUY-0000"),
         json={"a": "buyer"},
     )
 
@@ -65,7 +66,7 @@ def test_get_buyer_error(mpt_client, requests_mocker, mpt_error_factory):
     Test the call to to retrieve a buyer when it fails.
     """
     requests_mocker.get(
-        urljoin(mpt_client.base_url, "buyers/BUY-0000"),
+        urljoin(mpt_client.base_url, "accounts/buyers/BUY-0000"),
         status=404,
         json=mpt_error_factory(404, "Not Found", "Buyer not found"),
     )
@@ -79,7 +80,7 @@ def test_get_buyer_error(mpt_client, requests_mocker, mpt_error_factory):
 def test_get_seller(mpt_client, requests_mocker):
     """Test the call to retrieve a seller."""
     requests_mocker.get(
-        urljoin(mpt_client.base_url, "sellers/SEL-0000"),
+        urljoin(mpt_client.base_url, "accounts/sellers/SEL-0000"),
         json={"a": "seller"},
     )
 
@@ -92,7 +93,7 @@ def test_get_seller_error(mpt_client, requests_mocker, mpt_error_factory):
     Test the call to to retrieve a seller when it fails.
     """
     requests_mocker.get(
-        urljoin(mpt_client.base_url, "sellers/SEL-0000"),
+        urljoin(mpt_client.base_url, "accounts/sellers/SEL-0000"),
         status=404,
         json=mpt_error_factory(404, "Not Found", "Buyer not found"),
     )
@@ -103,11 +104,11 @@ def test_get_seller_error(mpt_client, requests_mocker, mpt_error_factory):
     assert cv.value.status == 404
 
 
-def test_querying_order(mpt_client, requests_mocker):
+def test_query_order(mpt_client, requests_mocker):
     """Test the call to switch an order to Query."""
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/query"),
-        json={"querying": "order"},
+        json={"query": "order"},
         match=[
             matchers.json_params_matcher(
                 {
@@ -117,7 +118,7 @@ def test_querying_order(mpt_client, requests_mocker):
         ],
     )
 
-    query_order = querying_order(
+    qorder = query_order(
         mpt_client,
         "ORD-0000",
         {
@@ -126,10 +127,10 @@ def test_querying_order(mpt_client, requests_mocker):
             ],
         },
     )
-    assert query_order == {"querying": "order"}
+    assert qorder == {"query": "order"}
 
 
-def test_querying_order_error(mpt_client, requests_mocker, mpt_error_factory):
+def test_query_order_error(mpt_client, requests_mocker, mpt_error_factory):
     """
     Test the call to switch an order to Query when it fails.
     """
@@ -140,7 +141,7 @@ def test_querying_order_error(mpt_client, requests_mocker, mpt_error_factory):
     )
 
     with pytest.raises(MPTError) as cv:
-        querying_order(mpt_client, "ORD-0000", {})
+        query_order(mpt_client, "ORD-0000", {})
 
     assert cv.value.status == 404
 
@@ -256,5 +257,52 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
 
     with pytest.raises(MPTError) as cv:
         create_subscription(mpt_client, "ORD-0000", {})
+
+    assert cv.value.status == 404
+
+
+def test_update_subscription(mpt_client, requests_mocker):
+    """Test the call to update a subscription."""
+    requests_mocker.put(
+        urljoin(
+            mpt_client.base_url,
+            "commerce/orders/ORD-0000/subscriptions/SUB-1111",
+        ),
+        json={"updated": "subscription"},
+        match=[
+            matchers.json_params_matcher(
+                {
+                    "a": "sub-payload",
+                },
+            ),
+        ],
+    )
+
+    updated_subscription = update_subscription(
+        mpt_client,
+        "ORD-0000",
+        "SUB-1111",
+        {
+            "a": "sub-payload",
+        },
+    )
+    assert updated_subscription == {"updated": "subscription"}
+
+
+def test_update_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
+    """
+    Test the call to update a subscription when it fails.
+    """
+    requests_mocker.put(
+        urljoin(
+            mpt_client.base_url,
+            "commerce/orders/ORD-0000/subscriptions/SUB-1111",
+        ),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Order not found"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        update_subscription(mpt_client, "ORD-0000", "SUB-1111", {})
 
     assert cv.value.status == 404

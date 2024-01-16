@@ -6,12 +6,14 @@ from urllib.parse import unquote
 from fastapi import APIRouter, Body, Request
 
 from devmock.filters import OrdersFilter
+from devmock.models import Order, Subscription
 from devmock.settings import ORDERS_FOLDER
 from devmock.utils import (
     generate_random_id,
     get_buyer_or_404,
     get_order_or_404,
     get_seller_or_404,
+    get_subscription_or_404,
     save_order,
     save_subscription,
 )
@@ -48,12 +50,17 @@ def get_order(id: str):
 @router.put("/commerce/orders/{id}")
 def update_order(
     id: str,
-    parameters: Annotated[dict, Body()],
+    order: Order,
 ):
-    order = get_order_or_404(id)
-    order["parameters"] = parameters["parameters"]
-    save_order(order)
-    return order
+    current_order = get_order_or_404(id)
+    if order.parameters:
+        current_order["parameters"] = order.parameters
+    if order.external_ids:
+        current_order["externalIDs"] = (
+            current_order.get("externalIDs", {}) | order.external_ids
+        )
+    save_order(current_order)
+    return current_order
 
 
 @router.post("/commerce/orders/{id}/complete")
@@ -94,19 +101,16 @@ def inquire_order(
 )
 def create_subscription(
     id: str,
-    name: Annotated[str, Body()],
-    parameters: Annotated[dict, Body()],
-    items: Annotated[list, Body()],
-    startDate: Annotated[str, Body()],
+    subscription: Subscription,
 ):
     order = get_order_or_404(id)
     order_items = {item["lineNumber"]: item for item in order["items"]}
     subscription = {
         "id": generate_random_id("SUB", 12, 4),
-        "name": name,
-        "parameters": parameters,
-        "items": [order_items[item["lineNumber"]] for item in items],
-        "startDate": startDate,
+        "name": subscription.name,
+        "parameters": subscription.parameters,
+        "items": [order_items[item["lineNumber"]] for item in subscription.items],
+        "startDate": subscription.start_date,
     }
     order["subscriptions"].append(subscription)
     save_subscription(subscription)
@@ -114,11 +118,54 @@ def create_subscription(
     return subscription
 
 
-@router.get("/buyers/{id}")
+@router.get("/accounts/buyers/{id}")
 def get_buyer(id: str):
     return get_buyer_or_404(id)
 
 
-@router.get("/sellers/{id}")
+@router.get("/accounts/sellers/{id}")
 def get_seller(id: str):
     return get_seller_or_404(id)
+
+
+@router.put(
+    "/commerce/orders/{order_id}/subscriptions/{id}",
+)
+def update_subscription(
+    order_id: str,
+    id: str,
+    payload: Subscription,
+):
+    order = get_order_or_404(order_id)
+    subscription = get_subscription_or_404(id)
+
+    order_subscription = next(
+        filter(
+            lambda x: x["id"] == id,
+            order["subscriptions"],
+        ),
+        None,
+    )
+
+    for item in payload.items:
+        sub_item = next(
+            filter(
+                lambda x: x["lineNumber"] == item["lineNumber"],
+                subscription["items"],
+            ),
+            None,
+        )
+        order_sub_item = next(
+            filter(
+                lambda x: x["lineNumber"] == item["lineNumber"],
+                order_subscription["items"],
+            ),
+            None,
+        )
+        if sub_item:
+            sub_item["quantity"] = item["quantity"]
+            order_sub_item["quantity"] = item["quantity"]
+
+    save_subscription(subscription)
+    save_order(order)
+    return subscription

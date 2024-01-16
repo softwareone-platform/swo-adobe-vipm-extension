@@ -1,13 +1,15 @@
 import copy
 
 
-def get_parameter(order, parameter_type, parameter_name):
-    return next(
-        filter(
-            lambda x: x["name"] == parameter_name,
-            order["parameters"][parameter_type],
-        ),
-        {},
+def find_first(func, iterable, default=None):
+    return next(filter(func, iterable), default)
+
+
+def get_parameter(order, parameter_phase, parameter_name):
+    return find_first(
+        lambda x: x["name"] == parameter_name,
+        order["parameters"][parameter_phase],
+        default={},
     )
 
 
@@ -19,39 +21,40 @@ def is_purchase_order(order):
     ).get("value")
 
 
-def get_adobe_customer_id(order):
+def get_adobe_customer_id(source):
     return get_parameter(
-        order,
+        source,
         "fulfillment",
         "CustomerId",
     ).get("value")
 
 
 def set_adobe_customer_id(order, customer_id):
+    """
+    Create a copy of the order. Set the CustomerId
+    fulfillment parameter on the copy of the original order.
+    Return the copy of the original order with the
+    CustomerId parameter filled.
+    """
     updated_order = copy.deepcopy(order)
-    get_parameter(
+    customer_ff_param = get_parameter(
         updated_order,
         "fulfillment",
         "CustomerId",
-    )["value"] = customer_id
+    )
+    customer_ff_param["value"] = customer_id
     return updated_order
 
 
 def get_adobe_order_id(order):
-    return get_parameter(
-        order,
-        "fulfillment",
-        "OrderId",
-    ).get("value")
+    return order.get("externalIDs", {}).get("vendor")
 
 
 def set_adobe_order_id(order, adobe_order_id):
     updated_order = copy.deepcopy(order)
-    get_parameter(
-        updated_order,
-        "fulfillment",
-        "OrderId",
-    )["value"] = adobe_order_id
+    updated_order["externalIDs"] = updated_order.get("externalIDs", {}) | {
+        "vendor": adobe_order_id
+    }
     return updated_order
 
 
@@ -94,10 +97,69 @@ def set_ordering_parameter_error(order, param_name, error):
 
 
 def get_order_item(order, sku):
-    return next(
-        filter(
-            lambda item: sku.startswith(item["productItemId"]),
-            order["items"],
-        ),
-        None,
+    return find_first(
+        lambda item: sku.startswith(item["productItemId"]),
+        order["items"],
     )
+
+
+def increment_retry_count(order):
+    updated_order = copy.deepcopy(order)
+    param = get_parameter(
+        updated_order,
+        "fulfillment",
+        "RetryCount",
+    )
+    param["value"] = str(int(param["value"]) + 1) if param["value"] else "1"
+    return updated_order
+
+
+def reset_retry_count(order):
+    updated_order = copy.deepcopy(order)
+    param = get_parameter(
+        updated_order,
+        "fulfillment",
+        "RetryCount",
+    )
+    param["value"] = "0"
+    return updated_order
+
+
+def get_retry_count(order):
+    return int(
+        get_parameter(
+            order,
+            "fulfillment",
+            "RetryCount",
+        ).get("value", "0")
+        or "0",
+    )
+
+
+def is_upsizing_order(order):
+    return order["type"] == "Change" and all(
+        list(map(lambda item: item["quantity"] > item["oldQuantity"], order["items"]))
+    )
+
+
+def get_order_subscription(order, line_number, product_item_id):
+    for subscription in order["subscriptions"]:
+        item = find_first(
+            lambda x: x["lineNumber"] == line_number
+            and x["productItemId"] == product_item_id,
+            subscription["items"],
+        )
+
+        if item:
+            return subscription
+
+
+def update_subscription_item(subscription, line_number, product_item_id, quantity):
+    upd_subscription = copy.deepcopy(subscription)
+    item = find_first(
+        lambda x: x["lineNumber"] == line_number
+        and x["productItemId"] == product_item_id,
+        upd_subscription["items"],
+    )
+    item["quantity"] = quantity
+    return upd_subscription

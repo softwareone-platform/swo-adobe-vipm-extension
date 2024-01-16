@@ -23,7 +23,7 @@ def test_create_customer_account(
     """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
-        side_effect=["uuid-1", "uuid-2"],
+        return_value="uuid-1",
     )
     reseller_id = adobe_config_file["accounts"][0]["resellers"][0]["id"]
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
@@ -44,7 +44,7 @@ def test_create_customer_account(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": "uuid-2",
+                    "x-correlation-id": "external_id",
                 },
             ),
             matchers.json_params_matcher(
@@ -225,7 +225,7 @@ def test_create_new_order(
     """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
-        side_effect=["uuid-1", "uuid-2"],
+        return_value="uuid-1",
     )
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
     customer_id = "a-customer"
@@ -251,7 +251,7 @@ def test_create_new_order(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": "uuid-2",
+                    "x-correlation-id": "order_id",
                 },
             ),
             matchers.json_params_matcher(expected_body),
@@ -261,6 +261,7 @@ def test_create_new_order(
     new_order = client.create_new_order(
         reseller_country,
         customer_id,
+        "order_id",
         adobe_preview_order,
     )
     assert new_order == {
@@ -297,6 +298,7 @@ def test_create_new_order_bad_request(
         client.create_new_order(
             reseller_country,
             customer_id,
+            "order_id",
             adobe_preview_order,
         )
 
