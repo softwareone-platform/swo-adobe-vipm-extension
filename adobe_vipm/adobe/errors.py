@@ -1,19 +1,50 @@
+from functools import wraps
+from typing import Callable, TypeVar
+
+from requests import HTTPError
+
+T = TypeVar("T")
+
+
 class AdobeError(Exception):
-    INVALID_FIELDS = "1117"
-    INVALID_ADDRESS = "1118"
-    ACCOUNT_ALREADY_EXISTS = "1127"
+    pass
 
-    def __init__(self, payload):
-        self.payload = payload
-        self.code = payload["code"]
-        self.message = payload["message"]
-        self.details = payload.get("additionalDetails", [])
 
-    def __str__(self):
+class AdobeProductNotFoundError(AdobeError):
+    pass
+
+
+class CredentialsNotFoundError(AdobeError):
+    pass
+
+
+class ResellerNotFoundError(AdobeError):
+    pass
+
+
+class AdobeAPIError(AdobeError):
+    def __init__(self, payload: dict) -> None:
+        self.payload: dict = payload
+        self.code: str = payload["code"]
+        self.message: str = payload["message"]
+        self.details: list = payload.get("additionalDetails", [])
+
+    def __str__(self) -> str:
         message = f"{self.code} - {self.message}"
         if self.details:
             message = f"{message}: {', '.join(self.details)}"
         return message
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.payload)
+
+
+def wrap_http_error(func: Callable[..., T]):
+    @wraps(func)
+    def _wrapper(*args, **kwargs) -> T:
+        try:
+            return func(*args, **kwargs)
+        except HTTPError as e:
+            raise AdobeAPIError(e.response.json())
+
+    return _wrapper

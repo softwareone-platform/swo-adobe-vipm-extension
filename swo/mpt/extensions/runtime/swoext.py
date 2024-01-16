@@ -2,7 +2,7 @@ import click
 from django.utils.module_loading import import_string
 
 from swo.mpt.extensions.runtime import get_version
-from swo.mpt.extensions.runtime.initializer import initialize
+from swo.mpt.extensions.runtime.utils import show_banner
 
 
 def print_version(ctx, param, value):
@@ -23,7 +23,7 @@ def print_version(ctx, param, value):
 @click.pass_context
 def cli(ctx):
     """SoftwareOne Extension CLI"""
-    initialize()
+    show_banner()
 
 
 for cmd in map(
@@ -62,7 +62,7 @@ cli.add_command(make_django_command("shell", help="Open Django console"))
 
 
 def main():
-    cli(prog_name="swoext", standalone_mode=False)
+    cli(standalone_mode=False)
 
 
 if __name__ == "__main__":

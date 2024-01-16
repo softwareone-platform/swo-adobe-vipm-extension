@@ -10,19 +10,23 @@ def get_extension_variables():
     return vars
 
 
-def initialize():
-    os.environ.setdefault(
-        "DJANGO_SETTINGS_MODULE", "swo.mpt.extensions.runtime.djapp.conf.default"
-    )
+def initialize(options):
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "swo.mpt.extensions.runtime.djapp.conf.default")
     import django
     from django.conf import settings
+
+    logging_handler = "rich" if options.get("color") else "console"
+    logging_level = "DEBUG" if options.get("debug") else "INFO"
 
     app_config_name = get_extension_app_config_name()
     app_root_module, _ = app_config_name.split(".", 1)
     settings.INSTALLED_APPS.append(app_config_name)
+    settings.LOGGING["root"]["handlers"] = [logging_handler]
+    settings.LOGGING["loggers"]["swo.mpt.extensions.runtime"]["handlers"] = [logging_handler]
+    settings.LOGGING["loggers"]["swo.mpt.extensions.runtime"]["level"] = logging_level
     settings.LOGGING["loggers"][app_root_module] = {
-        "handlers": ["console"],
-        "level": "DEBUG",
+        "handlers": [logging_handler],
+        "level": logging_level,
         "propagate": False,
     }
     settings.EXTENSION_CONFIG.update(get_extension_variables())

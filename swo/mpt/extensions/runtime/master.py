@@ -30,9 +30,9 @@ class Master:
         "gunicorn": start_gunicorn,
     }
 
-    def __init__(self, reload=False):
+    def __init__(self, options):
         self.workers = {}
-        self.reload = reload
+        self.options = options
         self.stop_event = threading.Event()
         self.monitor_event = threading.Event()
         self.watch_filter = PythonFilter(ignore_paths=None)
@@ -60,7 +60,7 @@ class Master:
         self.monitor_thread.start()
 
     def start_worker_process(self, worker_type, target):
-        p = start_process(target, "function", (), {})
+        p = start_process(target, "function", (self.options,), {})
         self.workers[worker_type] = p
         logger.info(f"{worker_type.capitalize()} worker pid: {p.pid}")
 
@@ -70,12 +70,8 @@ class Master:
             for worker_type, p in self.workers.items():
                 if not p.is_alive():
                     if p.exitcode != 0:
-                        logger.info(
-                            f"Process of type {worker_type} is dead, restart it"
-                        )
-                        self.start_worker_process(
-                            worker_type, self.PROC_TARGETS[worker_type]
-                        )
+                        logger.info(f"Process of type {worker_type} is dead, restart it")
+                        self.start_worker_process(worker_type, self.PROC_TARGETS[worker_type])
                     else:
                         exited_workers.append(worker_type)
                         logger.info(f"{worker_type.capitalize()} worker exited")
@@ -89,9 +85,7 @@ class Master:
         self.monitor_thread.join()
         for worker_type, process in self.workers.items():
             process.stop(sigint_timeout=5, sigkill_timeout=1)
-            logger.info(
-                f"{worker_type.capitalize()} process with pid {process.pid} stopped."
-            )
+            logger.info(f"{worker_type.capitalize()} process with pid {process.pid} stopped.")
 
     def restart(self):
         self.stop()
@@ -108,7 +102,7 @@ class Master:
 
     def run(self):
         self.start()
-        if self.reload:
+        if self.options.get("reload"):
             for files_changed in self:
                 if files_changed:
                     logger.warning(

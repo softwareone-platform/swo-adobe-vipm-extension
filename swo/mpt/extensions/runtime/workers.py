@@ -24,14 +24,58 @@ class ExtensionWebApplication(BaseApplication):
         return self.application
 
 
-def start_event_consumer():
-    initialize()
+def start_event_consumer(options):
+    initialize(options)
     call_command("consume_events")
 
 
-def start_gunicorn():
-    initialize()
-    options = {
-        "bind": "0.0.0.0:8080",
+def start_gunicorn(options):
+    initialize(options)
+
+    logging_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+                "style": "{",
+            },
+            "rich": {
+                "format": "%(message)s",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "verbose",
+            },
+            "rich": {
+                "class": "rich.logging.RichHandler",
+                "formatter": "rich",
+                "log_time_format": lambda x: x.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                "rich_tracebacks": True,
+            },
+        },
+        "root": {
+            "handlers": ["rich" if options.get("color") else "console"],
+            "level": "INFO",
+        },
+        "loggers": {
+            "gunicorn.access": {
+                "handlers": ["rich" if options.get("color") else "console"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "gunicorn.error": {
+                "handlers": ["rich" if options.get("color") else "console"],
+                "level": "INFO",
+                "propagate": False,
+            },
+        },
     }
-    app = ExtensionWebApplication(get_wsgi_application(), options=options).run()
+
+    guni_options = {
+        "bind": options.get("bind", "0.0.0.0:8080"),
+        "logconfig_dict": logging_config,
+    }
+    ExtensionWebApplication(get_wsgi_application(), options=guni_options).run()

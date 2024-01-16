@@ -10,7 +10,7 @@ def test_credentials():
     """
     Check the Credentials dataclass is unmutable and hasheable.
     """
-    credentials = Credentials("client_id", "client_secret", "region")
+    credentials = Credentials("client_id", "client_secret", "region", "distributor_id")
     with pytest.raises(FrozenInstanceError):
         credentials.client_id = "new id"
     assert hash(credentials) is not None
@@ -20,7 +20,7 @@ def test_reseller():
     """
     Check the Reseller dataclass is unmutable and hasheable.
     """
-    credentials = Credentials("client_id", "client_secret", "region")
+    credentials = Credentials("client_id", "client_secret", "region", "distributor_id")
     r = Reseller("id", "country", credentials)
     with pytest.raises(FrozenInstanceError):
         r.id = "new id"
@@ -42,8 +42,6 @@ def test_api_token_is_expired():
     Test the is_expired method checks the token expires
     against the current date.
     """
-    assert (
-        APIToken("token", datetime.now() + timedelta(seconds=1)).is_expired() is False
-    )
+    assert APIToken("token", datetime.now() + timedelta(seconds=1)).is_expired() is False
 
     assert APIToken("token", datetime.now() - timedelta(seconds=1)).is_expired() is True

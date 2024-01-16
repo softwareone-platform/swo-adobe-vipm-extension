@@ -7,9 +7,26 @@ services:
       context: .
       dockerfile: prod.Dockerfile
     working_dir: /extension
-    command: swoext run
+    command: bash -c "poetry install --only-root && swoext run"
     volumes: 
-      - ./adobe_vipm:/extension
+      - .:/extension
+    environment:
+      - EXT_ADOBE_CONFIG_FILE=/extension/adobe_vipm/adobe_config.json
+      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
+      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
+      - MPT_API_BASE_URL=http://devmock:8000
+    depends_on:
+      - devmock
+
+  devmock:
+    container_name: adobe_vipm_devmock
+    build:
+      context: .
+      dockerfile: prod.Dockerfile
+    working_dir: /extension
+    command: uvicorn --host 0.0.0.0 devmock.app:app
+    volumes: 
+      - .:/extension
     environment:
       - EXT_ADOBE_CONFIG_FILE=/extension/adobe_vipm/adobe_config.json
       - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678

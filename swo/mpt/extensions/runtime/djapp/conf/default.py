@@ -131,25 +131,34 @@ LOGGING = {
             "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
             "style": "{",
         },
+        "rich": {
+            "format": "%(message)s",
+        },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "rich": {
+            "class": "rich.logging.RichHandler",
+            "formatter": "rich",
+            "log_time_format": lambda x: x.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+            "rich_tracebacks": True,
+        },
     },
     "root": {
-        "handlers": ["console"],
+        "handlers": ["rich"],
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["console"],
+            "handlers": ["rich"],
             "level": "INFO",
             "propagate": False,
         },
         "swo.mpt.extensions.runtime": {
-            "handlers": ["console"],
+            "handlers": ["rich"],
             "level": "DEBUG",
             "propagate": False,
         },

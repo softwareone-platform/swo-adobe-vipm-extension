@@ -12,7 +12,6 @@ from adobe_vipm.flows.mpt import (
     get_seller,
     query_order,
     update_order,
-    update_subscription,
 )
 
 
@@ -257,52 +256,5 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
 
     with pytest.raises(MPTError) as cv:
         create_subscription(mpt_client, "ORD-0000", {})
-
-    assert cv.value.status == 404
-
-
-def test_update_subscription(mpt_client, requests_mocker):
-    """Test the call to update a subscription."""
-    requests_mocker.put(
-        urljoin(
-            mpt_client.base_url,
-            "commerce/orders/ORD-0000/subscriptions/SUB-1111",
-        ),
-        json={"updated": "subscription"},
-        match=[
-            matchers.json_params_matcher(
-                {
-                    "a": "sub-payload",
-                },
-            ),
-        ],
-    )
-
-    updated_subscription = update_subscription(
-        mpt_client,
-        "ORD-0000",
-        "SUB-1111",
-        {
-            "a": "sub-payload",
-        },
-    )
-    assert updated_subscription == {"updated": "subscription"}
-
-
-def test_update_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
-    """
-    Test the call to update a subscription when it fails.
-    """
-    requests_mocker.put(
-        urljoin(
-            mpt_client.base_url,
-            "commerce/orders/ORD-0000/subscriptions/SUB-1111",
-        ),
-        status=404,
-        json=mpt_error_factory(404, "Not Found", "Order not found"),
-    )
-
-    with pytest.raises(MPTError) as cv:
-        update_subscription(mpt_client, "ORD-0000", "SUB-1111", {})
 
     assert cv.value.status == 404

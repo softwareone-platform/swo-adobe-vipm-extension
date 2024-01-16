@@ -1,27 +1,26 @@
-from typing import Any, Callable, Mapping, Sequence, TypeVar
+from typing import Any, Callable, MutableMapping, Sequence
 
 from typing_extensions import Annotated, Doc
 
 from .dataclasses import Event
 
-EventsRegistryType = TypeVar("EventsRegistryType", bound="EventsRegistry")
-EventListener = TypeVar("EventListener", bound=Callable[[Any, Event], None])
+EventListener = Callable[[Any, Event], None]
 
 
 class EventsRegistry:
     def __init__(
-        self: EventsRegistryType,
+        self,
     ) -> None:
-        self.listeners: Mapping[str, EventListener] = {}
+        self.listeners: MutableMapping[str, EventListener] = {}
 
     def listener(
-        self: EventsRegistryType,
+        self,
         event_type: Annotated[
             str,
             Doc("Unique identifier of the event type."),
         ],
         /,
-    ) -> EventListener:
+    ) -> Callable[[EventListener], EventListener]:
         """
         Unique identifier of the event type.
 
@@ -39,26 +38,26 @@ class EventsRegistry:
         ```
         """
 
-        def decorator(func: EventListener) -> None:
+        def decorator(func: EventListener) -> EventListener:
             self.listeners[event_type] = func
             return func
 
         return decorator
 
     def get_listener(
-        self: EventsRegistryType,
+        self,
         event_type: Annotated[
             str,
             Doc("Unique identifier of the event type."),
         ],
-    ) -> EventListener:
+    ) -> EventListener | None:
         return self.listeners.get(event_type)
 
-    def get_registered_types(self: EventsRegistryType) -> Sequence[str]:
+    def get_registered_types(self) -> Sequence[str]:
         return list(self.listeners.keys())
 
     def is_event_supported(
-        self: EventsRegistryType,
+        self,
         event_type: Annotated[
             str,
             Doc("Unique identifier of the event type."),
