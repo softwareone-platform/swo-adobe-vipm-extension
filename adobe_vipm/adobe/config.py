@@ -3,10 +3,15 @@ from typing import MutableMapping
 
 from django.conf import settings
 
-from adobe_vipm.adobe.dataclasses import AdobeProduct, Credentials, Reseller
+from adobe_vipm.adobe.dataclasses import (
+    AdobeProduct,
+    Credentials,
+    Distributor,
+    Reseller,
+)
 from adobe_vipm.adobe.errors import (
     AdobeProductNotFoundError,
-    CredentialsNotFoundError,
+    DistributorNotFoundError,
     ResellerNotFoundError,
 )
 
@@ -15,8 +20,8 @@ class Config:
     def __init__(self) -> None:
         self.config = self._load_config()
         self.resellers: MutableMapping[str, Reseller] = {}
-        self.credentials: MutableMapping[str, Credentials] = {}
         self.skus_mapping: MutableMapping[str, AdobeProduct] = {}
+        self.distributors: MutableMapping[str, Distributor] = {}
         self._parse_config()
 
     @property
@@ -39,12 +44,12 @@ class Config:
                 f"Reseller not found for country {country}.",
             )
 
-    def get_credentials(self, region: str) -> Credentials:
+    def get_distributor(self, region: str) -> Distributor:
         try:
-            return self.credentials[region]
+            return self.distributors[region]
         except KeyError:
-            raise CredentialsNotFoundError(
-                f"Credentials not found for region {region}.",
+            raise DistributorNotFoundError(
+                f"Distributor not found for region {region}.",
             )
 
     def get_adobe_product(self, product_item_id: str) -> AdobeProduct:
@@ -65,13 +70,19 @@ class Config:
                 region=account["region"],
                 distributor_id=account["distributor_id"],
             )
-            self.credentials[account["region"]] = credentials
+            distributor = Distributor(
+                id=account["distributor_id"],
+                region=account["region"],
+                currency=account["currency"],
+                credentials=credentials,
+            )
+            self.distributors[account["region"]] = distributor
             for reseller in account["resellers"]:
                 country = reseller["country"]
                 self.resellers[country] = Reseller(
                     id=reseller["id"],
                     country=country,
-                    credentials=credentials,
+                    distributor=distributor,
                 )
         for product in self.config["skus_mapping"]:
             self.skus_mapping[product["product_item_id"]] = AdobeProduct(
