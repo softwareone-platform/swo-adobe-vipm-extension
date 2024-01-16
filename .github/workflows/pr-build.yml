@@ -3,6 +3,7 @@ name: SWO Marketplace Extension PR build
 on:
   pull_request:
     branches: [ "main", "release/**" ]
+  push:
 
 permissions:
   contents: read
