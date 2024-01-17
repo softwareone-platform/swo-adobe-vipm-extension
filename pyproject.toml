@@ -65,9 +65,9 @@ testpaths = "tests"
 pythonpath = "."
 addopts = "--cov=adobe_vipm --cov-report=term-missing --cov-report=html --cov-report=xml"
 DJANGO_SETTINGS_MODULE = "tests.django.settings"
+log_cli = false
 
 [tool.coverage.run]
-relative_files = true
 branch = true
 
 [tool.isort]
