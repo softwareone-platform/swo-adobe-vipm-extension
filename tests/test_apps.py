@@ -4,3 +4,4 @@ from swo.mpt.extensions.core.extension import Extension
 
 def test_app_config():
     assert isinstance(ExtensionConfig.extension, Extension)
+    assert True # TODO: remove, just to trigger change
