@@ -2,6 +2,13 @@ from adobe_vipm.flows.errors import wrap_http_error
 
 
 @wrap_http_error
+def get_agreement(mpt_client, agreement_id):
+    response = mpt_client.get(f"/commerce/agreements/{agreement_id}")
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
 def get_seller(mpt_client, seller_id):
     response = mpt_client.get(f"/accounts/sellers/{seller_id}")
     response.raise_for_status()
@@ -59,16 +66,6 @@ def complete_order(mpt_client, order_id, template_id):
 def create_subscription(mpt_client, order_id, payload):
     response = mpt_client.post(
         f"/commerce/orders/{order_id}/subscriptions",
-        json=payload,
-    )
-    response.raise_for_status()
-    return response.json()
-
-
-@wrap_http_error
-def update_subscription(mpt_client, order_id, subscription_id, payload):
-    response = mpt_client.put(
-        f"/commerce/orders/{order_id}/subscriptions/{subscription_id}",
         json=payload,
     )
     response.raise_for_status()

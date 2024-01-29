@@ -54,17 +54,13 @@ class Dispatcher:
             skipped = []
             while len(self.queue) > 0:
                 event_type, event = self.queue.pop()
-                logger.debug(
-                    f"got event of type {event_type} ({event.id}) from queue..."
-                )
+                logger.debug(f"got event of type {event_type} ({event.id}) from queue...")
                 listener = self.registry.get_listener(event_type)
                 if (event.type, event.id) not in self.futures:
                     future = self.executor.submit(listener, self.client, event)
                     self.futures[(event.type, event.id)] = future
                     future.add_done_callback(
-                        functools.partial(
-                            done_callback, self.futures, (event.type, event.id)
-                        )
+                        functools.partial(done_callback, self.futures, (event.type, event.id))
                     )
                 else:
                     logger.info(

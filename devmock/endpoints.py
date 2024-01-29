@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 from typing import Annotated
@@ -10,10 +11,14 @@ from devmock.models import Order, Subscription
 from devmock.settings import ORDERS_FOLDER
 from devmock.utils import (
     generate_random_id,
-    get_buyer_or_404,
-    get_order_or_404,
-    get_seller_or_404,
-    get_subscription_or_404,
+    get_item_for_subscription,
+    get_reference,
+    load_agreement,
+    load_buyer,
+    load_order,
+    load_seller,
+    load_subscription,
+    save_agreement,
     save_order,
     save_subscription,
 )
@@ -27,7 +32,7 @@ def list_orders(request: Request):
     response = {
         "data": [],
     }
-    order_files = os.listdir(ORDERS_FOLDER)
+    order_files = glob.glob(os.path.join(ORDERS_FOLDER, "*.json"))
 
     for order_file in order_files:
         with open(os.path.join(ORDERS_FOLDER, order_file), "r") as f:
@@ -36,15 +41,13 @@ def list_orders(request: Request):
     filter_instance = OrdersFilter()
     filtered_orders, count, limit, offset = filter_instance.apply(query, orders)
     response["data"] = filtered_orders
-    response["$meta"] = {
-        "pagination": {"offset": offset, "limit": limit, "total": count}
-    }
+    response["$meta"] = {"pagination": {"offset": offset, "limit": limit, "total": count}}
     return response
 
 
 @router.get("/commerce/orders/{id}")
 def get_order(id: str):
-    return get_order_or_404(id)
+    return load_order(id)
 
 
 @router.put("/commerce/orders/{id}")
@@ -52,33 +55,54 @@ def update_order(
     id: str,
     order: Order,
 ):
-    current_order = get_order_or_404(id)
+    current_order = load_order(id)
     if order.parameters:
         current_order["parameters"] = order.parameters
     if order.external_ids:
-        current_order["externalIDs"] = (
-            current_order.get("externalIDs", {}) | order.external_ids
-        )
+        current_order["externalIDs"] = current_order.get("externalIDs", {}) | order.external_ids
     save_order(current_order)
     return current_order
 
 
 @router.post("/commerce/orders/{id}/complete")
-def complete_order(id: str, template: Annotated[dict, Body()]):
-    order = get_order_or_404(id)
-    order["template"] = template["template"]
-    order["status"] = "Completed"
-    save_order(order)
-    return order
+def complete_order(id: str, order: Order):
+    current_order = load_order(id)
+    agreement = load_agreement(current_order["agreement"]["id"])
+    agreement["parameters"] = current_order["parameters"]
+    current_order["template"] = order.template
+    current_order["status"] = "Completed"
+
+    subscriptions = {}
+
+    for subscription in current_order["subscriptions"]:
+        full_sub = load_subscription(subscription["id"])
+        subscriptions[full_sub["items"][0]["lineNumber"]] = full_sub
+
+    if current_order["type"] == "Change":
+        for item in current_order["items"]:
+            full_sub = subscriptions[item["lineNumber"]]
+            full_sub["items"][0]["quantity"] = item["quantity"]
+            save_subscription(full_sub)
+
+    if current_order["type"] == "Termination":
+        agreement["status"] = "Terminated"
+    else:
+        agreement["status"] = "Active"
+    save_agreement(agreement)
+    save_order(current_order)
+    return current_order
 
 
 @router.post("/commerce/orders/{id}/fail")
-def fail_order(id: str, reason: Annotated[str, Body()]):
-    order = get_order_or_404(id)
-    order["reason"] = reason
-    order["status"] = "Failed"
-    save_order(order)
-    return order
+def fail_order(id: str, order: Order):
+    current_order = load_order(id)
+    current_order["reason"] = order.reason
+    current_order["status"] = "Failed"
+    save_order(current_order)
+    agreement = load_agreement(current_order["agreement"]["id"])
+    agreement["status"] = "Active"
+    save_agreement(agreement)
+    return current_order
 
 
 @router.post("/commerce/orders/{id}/query")
@@ -87,7 +111,7 @@ def inquire_order(
     template: Annotated[dict, Body()],
     parameters: Annotated[dict, Body()],
 ):
-    order = get_order_or_404(id)
+    order = load_order(id)
     order["parameters"] = parameters
     order["template"] = template
     order["status"] = "Querying"
@@ -103,69 +127,40 @@ def create_subscription(
     id: str,
     subscription: Subscription,
 ):
-    order = get_order_or_404(id)
+    order = load_order(id)
+    agreement = load_agreement(order["agreement"]["id"])
+    if "subscriptions" not in agreement:
+        agreement["subscriptions"] = []
     order_items = {item["lineNumber"]: item for item in order["items"]}
     subscription = {
-        "id": generate_random_id("SUB", 12, 4),
+        "id": generate_random_id("SUB", 16, 4),
         "name": subscription.name,
         "parameters": subscription.parameters,
-        "items": [order_items[item["lineNumber"]] for item in subscription.items],
+        "items": [
+            get_item_for_subscription(order_items[item["lineNumber"]])
+            for item in subscription.items
+        ],
         "startDate": subscription.start_date,
     }
-    order["subscriptions"].append(subscription)
+    order["subscriptions"].append(get_reference(subscription))
+    agreement["subscriptions"].append(get_reference(subscription))
+
     save_subscription(subscription)
+    save_agreement(agreement)
     save_order(order)
     return subscription
 
 
 @router.get("/accounts/buyers/{id}")
 def get_buyer(id: str):
-    return get_buyer_or_404(id)
+    return load_buyer(id)
 
 
 @router.get("/accounts/sellers/{id}")
 def get_seller(id: str):
-    return get_seller_or_404(id)
+    return load_seller(id)
 
 
-@router.put(
-    "/commerce/orders/{order_id}/subscriptions/{id}",
-)
-def update_subscription(
-    order_id: str,
-    id: str,
-    payload: Subscription,
-):
-    order = get_order_or_404(order_id)
-    subscription = get_subscription_or_404(id)
-
-    order_subscription = next(
-        filter(
-            lambda x: x["id"] == id,
-            order["subscriptions"],
-        ),
-        None,
-    )
-
-    for item in payload.items:
-        sub_item = next(
-            filter(
-                lambda x: x["lineNumber"] == item["lineNumber"],
-                subscription["items"],
-            ),
-            None,
-        )
-        order_sub_item = next(
-            filter(
-                lambda x: x["lineNumber"] == item["lineNumber"],
-                order_subscription["items"],
-            ),
-            None,
-        )
-        if sub_item:
-            sub_item["quantity"] = item["quantity"]
-            order_sub_item["quantity"] = item["quantity"]
-
-    save_subscription(subscription)
-    save_order(order)
-    return subscription
+@router.get("/commerce/agreements/{id}")
+def get_agreement(id: str):
+    return load_agreement(id)

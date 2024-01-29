@@ -12,12 +12,14 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.12,<4"
 requests = "2.31.*"
-django = "4.2.*"
+django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
 
+# Remove when devmock is not needed anymore
 [tool.poetry.group.devmock.dependencies]
 uvicorn = "^0.25.0"
 fastapi = "^0.108.0"
 lib-rql = "^2.0.0"
+faker = "^22.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "7.4.*"
@@ -35,22 +37,31 @@ flake8-isort = "6.1.*"
 ipython = "8.*"
 pytest-mock = "3.12.*"
 pytest-django = "4.7.*"
-responses = "^0.24.1"
-freezegun = "^1.4.0"
+responses = "0.24.*"
+freezegun = "1.4.*"
+pytest-deadfixtures = "2.2.*"
+mypy = "1.8.*"
+types-requests = "2.31.*"
 
 
+# Move to the SDK when splitting
 [tool.poetry.group.sdk.dependencies]
 typing-extensions = "^4.9.0"
 django-ninja = "^1.1.0"
 
 
+# Move to runtime when splitting
 [tool.poetry.group.runtime.dependencies]
 click = "^8.1.7"
 gunicorn = "^21.2.0"
 watchfiles = "^0.21.0"
+pyfiglet = "^1.0.2"
+rich = "^13.7.0"
 
 [tool.poetry.scripts]
-swoext = 'swo.mpt.extensions.runtime.swoext:main'
+swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
+mockgendata = 'devmock.mockgendata:main' # Remove when devmock is not needed anymore
+
 
 [tool.poetry.plugins."swo.mpt.ext"]
 "app_config" = "adobe_vipm.apps:ExtensionConfig"
@@ -72,3 +83,13 @@ branch = true
 
 [tool.isort]
 profile = "black"
+
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+warn_no_return = false
+
+[[tool.mypy.overrides]]
+module = "django.*"
+ignore_missing_imports = true

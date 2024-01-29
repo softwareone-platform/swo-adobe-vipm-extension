@@ -163,4 +163,6 @@ cython_debug/
 */adobe_config.json
 .devcontainer/
 
-devmock/data/subscriptions/
+devmock/data/**
+
+TODO

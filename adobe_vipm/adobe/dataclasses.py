@@ -7,6 +7,7 @@ class Credentials:
     client_id: str
     client_secret: str
     region: str
+    distributor_id: str
 
 
 @dataclass(frozen=True)
@@ -23,3 +24,10 @@ class APIToken:
 
     def is_expired(self):
         return self.expires < datetime.now()
+
+
+@dataclass(frozen=True)
+class AdobeProduct:
+    sku: str
+    name: str
+    type: str

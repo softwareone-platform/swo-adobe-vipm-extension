@@ -5,7 +5,14 @@ import responses
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
+from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import APIToken, Credentials
+
+
+def get_reference(obj, fields=None):
+    return {
+        k: v for k, v in obj.items() if k in (fields or ("id", "href", "name", "icon", "product"))
+    }
 
 
 @pytest.fixture()
@@ -18,7 +25,7 @@ def requests_mocker():
 
 
 @pytest.fixture()
-def adobe_error_factory():
+def adobe_api_error_factory():
     """
     Generate an error message returned by Adobe.
     """
@@ -49,11 +56,17 @@ def adobe_config_file():
                 "region": "NA",
                 "client_id": "client_id",
                 "client_secret": "client_secret",
+                "distributor_id": "distributor_id",
                 "resellers": [{"id": "P1000040545", "country": "US"}],
             }
         ],
         "skus_mapping": [
-            {"product_item_id": "65304578C", "default_sku": "65304578CA01A12"}
+            {
+                "product_item_id": "65304578CA",
+                "name": "Test product",
+                "sku": "65304578CA01A12",
+                "type": "TEAM",
+            },
         ],
     }
 
@@ -67,10 +80,10 @@ def mock_adobe_config(mocker, adobe_config_file):
 
 
 @pytest.fixture()
-def customer_data():
+def account_data():
     """
-    Returns a customer data structure as it was retrieved from ordering
-    parameters.
+    Returns a adobe account data structure.
+
     """
     return {
         "CompanyName": "ACME Inc",
@@ -90,6 +103,16 @@ def customer_data():
             "phone": "+22003939393",
         },
     }
+
+
+@pytest.fixture()
+def customer_data(account_data):
+    return account_data
+
+
+@pytest.fixture()
+def reseller_data(account_data):
+    return account_data
 
 
 @pytest.fixture()
@@ -159,14 +182,17 @@ def fulfillment_parameters_factory():
 @pytest.fixture()
 def items_factory():
     def _items(
-        product_item_id="65304578C",
+        line_number=1,
+        product_item_id="65304578CA",
+        name="Awesome product",
         old_quantity=0,
         quantity=170,
     ):
         return [
             {
-                "lineNumber": 1,
+                "lineNumber": line_number,
                 "productItemId": product_item_id,
+                "name": name,
                 "oldQuantity": old_quantity,
                 "quantity": quantity,
             },
@@ -179,6 +205,7 @@ def items_factory():
 def subscriptions_factory(items_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
+        product_name="Awesome product",
         adobe_subscription_id="ffe5d0e78b411fa199dd29401ba37bNA",
         start_date="2024-01-11T08:53:37Z",
         items=None,
@@ -187,7 +214,7 @@ def subscriptions_factory(items_factory):
         return [
             {
                 "id": subscription_id,
-                "name": "Subscription for 65304578CA01A12",
+                "name": f"Subscription for {product_name}",
                 "parameters": {
                     "fulfillment": [
                         {
@@ -205,8 +232,41 @@ def subscriptions_factory(items_factory):
 
 
 @pytest.fixture()
+def agreement():
+    return {
+        "id": "AGR-2119-4550-8674-5962",
+        "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
+        "icon": None,
+        "name": "Product Name 1",
+        "audit": {
+            "created": {
+                "at": "2023-12-14T18:02:16.9359",
+                "by": {"id": "USR-0000-0001"},
+            },
+            "updated": None,
+        },
+        "licensee": None,
+        "buyer": {
+            "id": "BUY-3731-7971",
+            "href": "/accounts/buyers/BUY-3731-7971",
+            "name": "Adam Ruszczak",
+            "icon": "/static/BUY-3731-7971/icon.png",
+        },
+        "seller": {
+            "id": "SEL-9121-8944",
+            "href": "/accounts/sellers/SEL-9121-8944",
+            "name": "Software LN",
+            "icon": "/static/SEL-9121-8944/icon.png",
+        },
+        "product": {
+            "id": "PRD-1111-1111-1111",
+        },
+    }
+
+
+@pytest.fixture()
 def order_factory(
-    order_parameters_factory, fulfillment_parameters_factory, items_factory
+    agreement, order_parameters_factory, fulfillment_parameters_factory, items_factory
 ):
     """
     Marketplace platform order for tests.
@@ -216,7 +276,6 @@ def order_factory(
         order_type="Purchase",
         order_parameters=None,
         fulfillment_parameters=None,
-        agreement_fulfillment_parameters=None,
         items=None,
         subscriptions=None,
         external_ids=None,
@@ -236,35 +295,7 @@ def order_factory(
         order = {
             "id": "ORD-0792-5000-2253-4210",
             "href": "/commerce/orders/ORD-0792-5000-2253-4210",
-            "agreement": {
-                "id": "AGR-2119-4550-8674-5962",
-                "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
-                "icon": None,
-                "name": "Product Name 1",
-                "audit": {
-                    "created": {
-                        "at": "2023-12-14T18:02:16.9359",
-                        "by": {"id": "USR-0000-0001"},
-                    },
-                    "updated": None,
-                },
-                "licensee": None,
-                "buyer": {
-                    "id": "BUY-3731-7971",
-                    "href": "/accounts/buyers/BUY-3731-7971",
-                    "name": "Adam Ruszczak",
-                    "icon": "/static/BUY-3731-7971/icon.png",
-                },
-                "seller": {
-                    "id": "SEL-9121-8944",
-                    "href": "/accounts/sellers/SEL-9121-8944",
-                    "name": "Software LN",
-                    "icon": "/static/SEL-9121-8944/icon.png",
-                },
-                "product": {
-                    "id": "PRD-1111-1111-1111",
-                },
-            },
+            "agreement": get_reference(agreement),
             "type": order_type,
             "status": "Processing",
             "clientReferenceNumber": None,
@@ -283,10 +314,6 @@ def order_factory(
                 "updated": None,
             },
         }
-        if agreement_fulfillment_parameters:
-            order["agreement"]["parameters"] = {
-                "fulfillment": agreement_fulfillment_parameters,
-            }
         if external_ids:
             order["externalIDs"] = external_ids
         return order
@@ -348,22 +375,76 @@ def seller():
 
 
 @pytest.fixture()
-def adobe_preview_order():
-    """
-    An Adobe Preview Order response.
-    """
-    return {
-        "externalReferenceId": "external_id",
-        "currencyCode": "USD",
-        "orderType": "PREVIEW",
-        "lineItems": [
-            {
-                "extLineItemNumber": 1,
-                "offerId": "an-adobe-sku",
-                "quantity": 10,
+def adobe_items_factory():
+    def _items(
+        line_number=1,
+        offer_id="65304578CA01A12",
+        quantity=170,
+        subscription_id=None,
+    ):
+        item = {
+            "extLineItemNumber": line_number,
+            "offerId": offer_id,
+            "quantity": quantity,
+        }
+        if subscription_id:
+            item["subscriptionId"] = subscription_id
+        return [item]
+
+    return _items
+
+
+@pytest.fixture()
+def adobe_order_factory(adobe_items_factory):
+    def _order(
+        order_type,
+        currency_code="USD",
+        external_id="external_id",
+        items=None,
+        order_id=None,
+        reference_order_id=None,
+        status=None,
+    ):
+        order = {
+            "externalReferenceId": external_id,
+            "currencyCode": currency_code,
+            "orderType": order_type,
+            "lineItems": items or adobe_items_factory(),
+        }
+
+        if reference_order_id:
+            order["referenceOrderId"] = reference_order_id
+        if status:
+            order["status"] = status
+        if status in [STATUS_PENDING, STATUS_PROCESSED]:
+            order["orderId"] = order_id or "P0123456789"
+        return order
+
+    return _order
+
+
+@pytest.fixture()
+def adobe_subscription_factory():
+    def _subscription(
+        subscription_id=None,
+        offer_id=None,
+        current_quantity=10,
+        renewal_quantity=10,
+        autorenewal_enabled=True,
+    ):
+        return {
+            "subscriptionId": subscription_id or "a-sub-id",
+            "offerId": offer_id or "65304578CA01A12",
+            "currentQuantity": current_quantity,
+            "autoRenewal": {
+                "enabled": autorenewal_enabled,
+                "renewalQuantity": renewal_quantity,
             },
-        ],
-    }
+            "creationDate": "2019-05-20T22:49:55Z",
+            "status": "1000",
+        }
+
+    return _subscription
 
 
 @pytest.fixture()
@@ -378,6 +459,7 @@ def adobe_client_factory(adobe_config_file, mock_adobe_config):
             adobe_config_file["accounts"][0]["client_id"],
             adobe_config_file["accounts"][0]["client_secret"],
             adobe_config_file["accounts"][0]["region"],
+            adobe_config_file["accounts"][0]["distributor_id"],
         )
         api_token = APIToken(
             "a-token",

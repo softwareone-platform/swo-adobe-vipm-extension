@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 class Order(BaseModel):
     external_ids: dict | None = Field(default=None, alias="externalIDs")
     parameters: dict | None = None
+    reason: str | None = None
+    template: dict | None = None
 
 
 class Subscription(BaseModel):

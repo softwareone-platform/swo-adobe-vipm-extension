@@ -1,5 +1,16 @@
 import copy
 
+from adobe_vipm.flows.constants import (
+    ORDER_TYPE_PURCHASE,
+    PARAM_ADDRESS,
+    PARAM_COMPANY_NAME,
+    PARAM_CONTACT,
+    PARAM_CUSTOMER_ID,
+    PARAM_MEMBERSHIP_ID,
+    PARAM_PREFERRED_LANGUAGE,
+    PARAM_RETRY_COUNT,
+)
+
 
 def find_first(func, iterable, default=None):
     return next(filter(func, iterable), default)
@@ -14,10 +25,10 @@ def get_parameter(order, parameter_phase, parameter_name):
 
 
 def is_purchase_order(order):
-    return order["type"] == "Purchase" and not get_parameter(
+    return order["type"] == ORDER_TYPE_PURCHASE and not get_parameter(
         order,
         "fulfillment",
-        "MembershipId",
+        PARAM_MEMBERSHIP_ID,
     ).get("value")
 
 
@@ -25,7 +36,7 @@ def get_adobe_customer_id(source):
     return get_parameter(
         source,
         "fulfillment",
-        "CustomerId",
+        PARAM_CUSTOMER_ID,
     ).get("value")
 
 
@@ -40,7 +51,7 @@ def set_adobe_customer_id(order, customer_id):
     customer_ff_param = get_parameter(
         updated_order,
         "fulfillment",
-        "CustomerId",
+        PARAM_CUSTOMER_ID,
     )
     customer_ff_param["value"] = customer_id
     return updated_order
@@ -52,19 +63,17 @@ def get_adobe_order_id(order):
 
 def set_adobe_order_id(order, adobe_order_id):
     updated_order = copy.deepcopy(order)
-    updated_order["externalIDs"] = updated_order.get("externalIDs", {}) | {
-        "vendor": adobe_order_id
-    }
+    updated_order["externalIDs"] = updated_order.get("externalIDs", {}) | {"vendor": adobe_order_id}
     return updated_order
 
 
 def get_customer_data(order):
     customer_data = {}
     for param_name in (
-        "CompanyName",
-        "PreferredLanguage",
-        "Address",
-        "Contact",
+        PARAM_COMPANY_NAME,
+        PARAM_PREFERRED_LANGUAGE,
+        PARAM_ADDRESS,
+        PARAM_CONTACT,
     ):
         customer_data[param_name] = get_parameter(
             order,
@@ -96,9 +105,9 @@ def set_ordering_parameter_error(order, param_name, error):
     return updated_order
 
 
-def get_order_item(order, sku):
+def get_order_item(order, line_number):
     return find_first(
-        lambda item: sku.startswith(item["productItemId"]),
+        lambda item: line_number == item["lineNumber"],
         order["items"],
     )
 
@@ -108,7 +117,7 @@ def increment_retry_count(order):
     param = get_parameter(
         updated_order,
         "fulfillment",
-        "RetryCount",
+        PARAM_RETRY_COUNT,
     )
     param["value"] = str(int(param["value"]) + 1) if param["value"] else "1"
     return updated_order
@@ -119,7 +128,7 @@ def reset_retry_count(order):
     param = get_parameter(
         updated_order,
         "fulfillment",
-        "RetryCount",
+        PARAM_RETRY_COUNT,
     )
     param["value"] = "0"
     return updated_order
@@ -130,36 +139,18 @@ def get_retry_count(order):
         get_parameter(
             order,
             "fulfillment",
-            "RetryCount",
+            PARAM_RETRY_COUNT,
         ).get("value", "0")
         or "0",
-    )
-
-
-def is_upsizing_order(order):
-    return order["type"] == "Change" and all(
-        list(map(lambda item: item["quantity"] > item["oldQuantity"], order["items"]))
     )
 
 
 def get_order_subscription(order, line_number, product_item_id):
     for subscription in order["subscriptions"]:
         item = find_first(
-            lambda x: x["lineNumber"] == line_number
-            and x["productItemId"] == product_item_id,
+            lambda x: x["lineNumber"] == line_number and x["productItemId"] == product_item_id,
             subscription["items"],
         )
 
         if item:
             return subscription
-
-
-def update_subscription_item(subscription, line_number, product_item_id, quantity):
-    upd_subscription = copy.deepcopy(subscription)
-    item = find_first(
-        lambda x: x["lineNumber"] == line_number
-        and x["productItemId"] == product_item_id,
-        upd_subscription["items"],
-    )
-    item["quantity"] = quantity
-    return upd_subscription
