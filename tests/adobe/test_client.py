@@ -622,12 +622,13 @@ def test_create_return_order(
 
     client, credentials, api_token = adobe_client_factory()
 
-    order = order_factory(
-        items=items_factory(
-            old_quantity=10,
-            quantity=5,
-        )
+    order_items = items_factory(
+        old_quantity=10,
+        quantity=5,
     )
+
+    order = order_factory(items=order_items)
+    item_line_number = order_items[0]["lineNumber"]
 
     expected_body = adobe_order_factory(
         ORDER_TYPE_RETURN,
@@ -650,7 +651,7 @@ def test_create_return_order(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": f"{order['id']}-ret",
+                    "x-correlation-id": f"{order['id']}-{item_line_number}",
                 },
             ),
             matchers.json_params_matcher(expected_body),
