@@ -1,0 +1,11 @@
+ORDER_TYPE_PURCHASE = "Purchase"
+ORDER_TYPE_CHANGE = "Change"
+
+PARAM_ADDRESS = "Address"
+PARAM_COMPANY_NAME = "CompanyName"
+PARAM_CONTACT = "Contact"
+PARAM_CUSTOMER_ID = "CustomerId"
+PARAM_MEMBERSHIP_ID = "MembershipId"
+PARAM_PREFERRED_LANGUAGE = "PreferredLanguage"
+PARAM_RETRY_COUNT = "RetryCount"
+PARAM_SUBSCRIPTION_ID = "SubscriptionId"
