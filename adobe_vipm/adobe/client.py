@@ -269,6 +269,8 @@ class AdobeClient:
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
         product: AdobeProduct = self._config.get_adobe_product(returning_item["productItemId"])
+        line_number = returning_item["lineNumber"]
+        old_quantity = returning_item["oldQuantity"]
         payload = {
             "externalReferenceId": order["id"],
             "referenceOrderId": returning_order_id,
@@ -279,14 +281,14 @@ class AdobeClient:
 
         payload["lineItems"].append(
             {
-                "extLineItemNumber": returning_item["lineNumber"],
+                "extLineItemNumber": line_number,
                 "offerId": product.sku,
-                "quantity": returning_item["oldQuantity"],
+                "quantity": old_quantity,
             },
         )
 
         headers = self._get_headers(
-            reseller.distributor.credentials, correlation_id=f"{order['id']}-ret"
+            reseller.distributor.credentials, correlation_id=f"{order['id']}-{line_number}"
         )
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
