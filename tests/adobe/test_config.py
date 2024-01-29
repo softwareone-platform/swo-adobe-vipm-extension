@@ -3,10 +3,15 @@ import json
 import pytest
 
 from adobe_vipm.adobe.config import Config
-from adobe_vipm.adobe.dataclasses import AdobeProduct, Credentials, Reseller
+from adobe_vipm.adobe.dataclasses import (
+    AdobeProduct,
+    Credentials,
+    Distributor,
+    Reseller,
+)
 from adobe_vipm.adobe.errors import (
     AdobeProductNotFoundError,
-    CredentialsNotFoundError,
+    DistributorNotFoundError,
     ResellerNotFoundError,
 )
 
@@ -29,13 +34,21 @@ def test_get_reseller(mock_adobe_config, adobe_config_file):
     reseller_id = adobe_config_file["accounts"][0]["resellers"][0]["id"]
     client_id = adobe_config_file["accounts"][0]["client_id"]
     client_secret = adobe_config_file["accounts"][0]["client_secret"]
+    distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
+    currency = adobe_config_file["accounts"][0]["currency"]
+    region = adobe_config_file["accounts"][0]["region"]
 
     c = Config()
     reseller = c.get_reseller(reseller_country)
     assert isinstance(reseller, Reseller)
     assert reseller.id == reseller_id
-    assert reseller.credentials.client_id == client_id
-    assert reseller.credentials.client_secret == client_secret
+    assert isinstance(reseller.distributor, Distributor)
+    assert reseller.distributor.id == distributor_id
+    assert reseller.distributor.currency == currency
+    assert reseller.distributor.region == region
+    assert isinstance(reseller.distributor.credentials, Credentials)
+    assert reseller.distributor.credentials.client_id == client_id
+    assert reseller.distributor.credentials.client_secret == client_secret
 
 
 def test_get_reseller_not_found(mock_adobe_config):
@@ -50,35 +63,38 @@ def test_get_reseller_not_found(mock_adobe_config):
     assert str(cv.value) == "Reseller not found for country IT."
 
 
-def test_get_credentials(mock_adobe_config, adobe_config_file):
+def test_get_distributor(mock_adobe_config, adobe_config_file):
     """
-    Test the lookup the Credentials object by region.
+    Test the lookup the Distributor object by region.
     """
-    credentials_region = adobe_config_file["accounts"][0]["region"]
+    region = adobe_config_file["accounts"][0]["region"]
     client_id = adobe_config_file["accounts"][0]["client_id"]
     client_secret = adobe_config_file["accounts"][0]["client_secret"]
     distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
+    currency = adobe_config_file["accounts"][0]["currency"]
 
     c = Config()
-    credentials = c.get_credentials(credentials_region)
+    distributor = c.get_distributor(region)
 
-    assert isinstance(credentials, Credentials)
-    assert credentials.client_id == client_id
-    assert credentials.client_secret == client_secret
-    assert credentials.region == credentials_region
-    assert credentials.distributor_id == distributor_id
+    assert isinstance(distributor, Distributor)
+    assert distributor.id == distributor_id
+    assert distributor.region == region
+    assert distributor.currency == currency
+    assert isinstance(distributor.credentials, Credentials)
+    assert distributor.credentials.client_id == client_id
+    assert distributor.credentials.client_secret == client_secret
 
 
-def test_get_credentials_not_found(mock_adobe_config):
+def test_get_distributor_not_found(mock_adobe_config):
     """
-    Check that the lookup of the credentials raises `CredentialsNotFound`
-    if there is no credentials for a given region.
+    Check that the lookup of the Distributor raises `DistributorNotFound`
+    if there is no Distributor for a given region.
     """
     c = Config()
-    with pytest.raises(CredentialsNotFoundError) as cv:
-        assert c.get_credentials("MX")
+    with pytest.raises(DistributorNotFoundError) as cv:
+        assert c.get_distributor("MX")
 
-    assert str(cv.value) == "Credentials not found for region MX."
+    assert str(cv.value) == "Distributor not found for region MX."
 
 
 def test_get_adobe_product(mock_adobe_config, adobe_config_file):

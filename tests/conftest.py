@@ -57,6 +57,7 @@ def adobe_config_file():
                 "client_id": "client_id",
                 "client_secret": "client_secret",
                 "distributor_id": "distributor_id",
+                "currency": "USD",
                 "resellers": [{"id": "P1000040545", "country": "US"}],
             }
         ],

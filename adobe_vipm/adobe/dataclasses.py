@@ -11,10 +11,18 @@ class Credentials:
 
 
 @dataclass(frozen=True)
+class Distributor:
+    id: str
+    region: str
+    currency: str
+    credentials: Credentials
+
+
+@dataclass(frozen=True)
 class Reseller:
     id: str
     country: str
-    credentials: Credentials
+    distributor: Distributor
 
 
 @dataclass(frozen=True)

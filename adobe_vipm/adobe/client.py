@@ -14,7 +14,13 @@ from adobe_vipm.adobe.constants import (
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
-from adobe_vipm.adobe.dataclasses import AdobeProduct, APIToken, Credentials, Reseller
+from adobe_vipm.adobe.dataclasses import (
+    AdobeProduct,
+    APIToken,
+    Credentials,
+    Distributor,
+    Reseller,
+)
 from adobe_vipm.adobe.errors import wrap_http_error
 
 logger = logging.getLogger(__name__)
@@ -33,10 +39,10 @@ class AdobeClient:
         reseller_data: dict,
     ) -> str:
         """
-        Creates a reseller account under the regional account identified by `region`.
+        Creates a reseller account under the distributor account identified by `region`.
 
         Args:
-            region (str): Region to which the account is bounded to and into which
+            region (str): Region to which the distributor account is bounded to and into which
             the reseller must be created.
             reseller_id (str): Identifier of the reseller in the Marketplace platform.
             reseller_data (dict): Data of the reseller to create.
@@ -44,10 +50,10 @@ class AdobeClient:
         Returns:
             str: The identifier of the reseller in the Adobe VIP Markerplace.
         """
-        credentials: Credentials = self._config.get_credentials(region)
+        distributor: Distributor = self._config.get_distributor(region)
         payload = {
             "externalReferenceId": reseller_id,
-            "distributorId": credentials.distributor_id,
+            "distributorId": distributor.id,
             "companyProfile": {
                 "companyName": reseller_data["CompanyName"],
                 "preferredLanguage": reseller_data["PreferredLanguage"],
@@ -70,7 +76,7 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(credentials, correlation_id=reseller_id)
+        headers = self._get_headers(distributor.credentials, correlation_id=reseller_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/resellers"),
             headers=headers,
@@ -83,7 +89,8 @@ class AdobeClient:
         adobe_reseller_id = created_reseller["resellerId"]
         logger.info(
             f"Reseller {reseller_id} - {reseller_data['CompanyName']} "
-            f"created successfully in regional account {region}: {adobe_reseller_id}",
+            "created successfully in distributor account "
+            f"{distributor.id} ({region}): {adobe_reseller_id}",
         )
         return adobe_reseller_id
 
@@ -134,7 +141,7 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(reseller.credentials, correlation_id=customer_id)
+        headers = self._get_headers(reseller.distributor.credentials, correlation_id=customer_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=headers,
@@ -175,7 +182,7 @@ class AdobeClient:
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
         product: AdobeProduct = self._config.get_adobe_product(sku)
-        headers = self._get_headers(reseller.credentials)
+        headers = self._get_headers(reseller.distributor.credentials)
         response = requests.get(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -214,7 +221,7 @@ class AdobeClient:
             dict: The RETURN order or `None` if not found.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.credentials)
+        headers = self._get_headers(reseller.distributor.credentials)
         response = requests.get(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -265,7 +272,7 @@ class AdobeClient:
         payload = {
             "externalReferenceId": order["id"],
             "referenceOrderId": returning_order_id,
-            "currencyCode": "USD",  # TODO get the currency from the line item
+            "currencyCode": reseller.distributor.currency,
             "orderType": ORDER_TYPE_RETURN,
             "lineItems": [],
         }
@@ -278,7 +285,9 @@ class AdobeClient:
             },
         )
 
-        headers = self._get_headers(reseller.credentials, correlation_id=f"{order['id']}-ret")
+        headers = self._get_headers(
+            reseller.distributor.credentials, correlation_id=f"{order['id']}-ret"
+        )
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -315,7 +324,7 @@ class AdobeClient:
         reseller: Reseller = self._config.get_reseller(reseller_country)
         payload = {
             "externalReferenceId": order["id"],
-            "currencyCode": "USD",  # TODO get the currency from the line item
+            "currencyCode": reseller.distributor.currency,
             "orderType": ORDER_TYPE_PREVIEW,
             "lineItems": [],
         }
@@ -330,7 +339,7 @@ class AdobeClient:
                 }
             )
 
-        headers = self._get_headers(reseller.credentials)
+        headers = self._get_headers(reseller.distributor.credentials)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -363,13 +372,13 @@ class AdobeClient:
         reseller: Reseller = self._config.get_reseller(reseller_country)
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
-            "currencyCode": "USD",  # TODO get the currency from the line item
+            "currencyCode": reseller.distributor.currency,
             "orderType": ORDER_TYPE_NEW,
             "lineItems": adobe_preview_order["lineItems"],
         }
 
         headers = self._get_headers(
-            reseller.credentials,
+            reseller.distributor.credentials,
             correlation_id=adobe_preview_order["externalReferenceId"],
         )
         response = requests.post(
@@ -402,7 +411,7 @@ class AdobeClient:
             dict: The retrieved order.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.credentials)
+        headers = self._get_headers(reseller.distributor.credentials)
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
@@ -435,7 +444,7 @@ class AdobeClient:
             str: The retrieved subscription.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.credentials)
+        headers = self._get_headers(reseller.distributor.credentials)
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
