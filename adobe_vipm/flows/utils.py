@@ -145,8 +145,8 @@ def get_retry_count(order):
     )
 
 
-def get_order_subscription(order, line_number, product_item_id):
-    for subscription in order["subscriptions"]:
+def get_subscription_by_line_and_item_id(subscriptions, line_number, product_item_id):
+    for subscription in subscriptions:
         item = find_first(
             lambda x: x["lineNumber"] == line_number and x["productItemId"] == product_item_id,
             subscription["items"],

@@ -208,7 +208,7 @@ class AdobeClient:
         adobe_order_id: str,
     ) -> dict | None:
         """
-        Search for an order of type RETURN by the identified of the returned order.
+        Search for an order of type RETURN by the identifier of the returned order.
         The `reseller_country` is used to select the reseller and the Adobe credentials
         of the account to which the reseller belong to.
 
@@ -334,11 +334,21 @@ class AdobeClient:
 
         for item in order["items"]:
             product: AdobeProduct = self._config.get_adobe_product(item["productItemId"])
+            quantity = item["quantity"]
+            old_quantity = item["oldQuantity"]
+            if quantity > old_quantity:
+                # For purchasing new items (oldQuantity = 0) or upsizing items
+                # quantity it must send the delta (quantity - oldQuantity) since
+                # it is placing a new order.
+                # For downsizing items quantity it must send the actual quantity
+                # since the previous purchased quantity has been returned back
+                # through one or more RETURN orders.
+                quantity = quantity - old_quantity
             payload["lineItems"].append(
                 {
                     "extLineItemNumber": item["lineNumber"],
                     "offerId": product.sku,
-                    "quantity": item["quantity"],
+                    "quantity": quantity,
                 }
             )
 

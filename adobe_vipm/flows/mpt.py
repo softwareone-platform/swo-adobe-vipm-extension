@@ -1,6 +1,13 @@
 from adobe_vipm.flows.errors import wrap_http_error
 
 
+def _has_more_pages(response):
+    if not response:
+        return True
+    pagination = response["$meta"]["pagination"]
+    return pagination["total"] > pagination["limit"] + pagination["offset"]
+
+
 @wrap_http_error
 def get_agreement(mpt_client, agreement_id):
     response = mpt_client.get(f"/commerce/agreements/{agreement_id}")
@@ -70,3 +77,20 @@ def create_subscription(mpt_client, order_id, payload):
     )
     response.raise_for_status()
     return response.json()
+
+
+@wrap_http_error
+def get_order_subscriptions(mpt_client, order_id):
+    subscriptions = []
+    url = f"/commerce/orders/{order_id}/subscriptions?"
+    page = None
+    limit = 10
+    offset = 0
+    while _has_more_pages(page):
+        response = mpt_client.get(f"{url}limit={limit}&offset={offset}")
+        response.raise_for_status()
+        page = response.json()
+        subscriptions.extend(page["data"])
+        offset += limit
+
+    return subscriptions

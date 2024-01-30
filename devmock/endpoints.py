@@ -164,3 +164,21 @@ def get_seller(id: str):
 @router.get("/commerce/agreements/{id}")
 def get_agreement(id: str):
     return load_agreement(id)
+
+
+@router.get("/commerce/orders/{order_id}/subscriptions")
+def list_subscriptions(order_id: str, limit: int, offset: int):
+    subscriptions = []
+    response = {
+        "data": [],
+    }
+    order = load_order(order_id)
+
+    for subscription in order["subscriptions"]:
+        subscriptions.append(load_subscription(subscription["id"]))
+
+    response["data"] = subscriptions[offset : limit + offset]
+    response["$meta"] = {
+        "pagination": {"offset": offset, "limit": limit, "total": len(subscriptions)}
+    }
+    return response

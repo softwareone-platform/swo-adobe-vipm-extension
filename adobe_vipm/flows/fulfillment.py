@@ -17,6 +17,7 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_agreement,
     get_buyer,
+    get_order_subscriptions,
     get_seller,
     update_order,
 )
@@ -25,8 +26,8 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
     get_order_item,
-    get_order_subscription,
     get_retry_count,
+    get_subscription_by_line_and_item_id,
     increment_retry_count,
     is_purchase_order,
     reset_retry_count,
@@ -246,13 +247,15 @@ def _fulfill_change_order(mpt_client, seller_country, order):
     if not adobe_order:
         return
 
+    subscriptions = get_order_subscriptions(mpt_client, order["id"])
+
     for item in adobe_order["lineItems"]:
         order_item = get_order_item(
             order,
             item["extLineItemNumber"],
         )
-        order_subscription = get_order_subscription(
-            order,
+        order_subscription = get_subscription_by_line_and_item_id(
+            subscriptions,
             order_item["lineNumber"],
             order_item["productItemId"],
         )

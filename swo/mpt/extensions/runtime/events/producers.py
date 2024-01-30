@@ -3,7 +3,6 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from urllib.parse import urljoin
 
 import requests
 from django.conf import settings
@@ -60,9 +59,7 @@ class OrderEventProducer(EventProducer):
 
     def get_processing_orders(self):
         orders = []
-        rql_query = (
-            f"and(eq(agreement.product.id,{settings.PRODUCT_ID}),eq(status,Processing))"
-        )
+        rql_query = f"and(eq(agreement.product.id,{settings.PRODUCT_ID}),eq(status,Processing))"
         url = f"/commerce/orders?{rql_query}&order=events.created.at"
         page = None
         limit = 10
