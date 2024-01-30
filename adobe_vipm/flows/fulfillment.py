@@ -36,6 +36,26 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
+def _handle_retries(mpt_client, order, adobe_order_id):
+    retry_count = get_retry_count(order)
+    max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
+    if retry_count < max_attemps:
+        order = increment_retry_count(order)
+        order = update_order(mpt_client, order["id"], {"parameters": order["parameters"]})
+        logger.info(
+            f"Order {order['id']} ({adobe_order_id}) is still processing on Adobe side, wait.",
+        )
+        return
+    logger.info(
+        f'The order {order["id"]} ({adobe_order_id}) '
+        f"has reached the maximum number ({max_attemps}) of attemps.",
+    )
+    reason = f"Max processing attemps reached ({max_attemps})."
+    fail_order(mpt_client, order["id"], reason)
+    logger.warning(f"Order {order['id']} has been failed: {reason}.")
+    return
+
+
 def _complete_order(mpt_client, order):
     order = reset_retry_count(order)
     order = update_order(mpt_client, order["id"], {"parameters": order["parameters"]})
@@ -105,6 +125,7 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
         preview_order = adobe_client.create_preview_order(seller_country, customer_id, order)
 
         pending_return_orders = False
+        pending_order_ids = []
         for item in order["items"]:
             if item["oldQuantity"] <= item["quantity"]:
                 continue
@@ -134,9 +155,10 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
             pending_return_orders = (
                 pending_return_orders or return_order["status"] == STATUS_PENDING
             )
+            pending_order_ids.append(return_order["orderId"])
 
         if pending_return_orders:
-            logger.info(f"There are pending return order for order {order['id']}, retry later.")
+            _handle_retries(mpt_client, order, ", ".join(pending_order_ids))
             return None, None
 
         adobe_order = adobe_client.create_new_order(
@@ -165,23 +187,7 @@ def _check_adobe_order_fulfilled(mpt_client, seller_country, order, customer_id,
         adobe_order_id,
     )
     if adobe_order["status"] == STATUS_PENDING:
-        retry_count = get_retry_count(order)
-        max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
-        if retry_count < max_attemps:
-            order = increment_retry_count(order)
-            order = update_order(mpt_client, order["id"], {"parameters": order["parameters"]})
-            logger.info(
-                f'Order {order["id"]} ({adobe_order_id}) '
-                "is still processing on Adobe side, wait.",
-            )
-            return
-        logger.info(
-            f'The order {order["id"]} ({adobe_order_id}) '
-            f"has reached the maximum number ({max_attemps}) of attemps.",
-        )
-        reason = f"Max processing attemps reached ({max_attemps})."
-        fail_order(mpt_client, order["id"], reason)
-        logger.warning(f"Order {order['id']} has been failed: {reason}.")
+        _handle_retries(mpt_client, order, adobe_order_id)
         return
     elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
         reason = ORDER_STATUS_DESCRIPTION[adobe_order["status"]]
