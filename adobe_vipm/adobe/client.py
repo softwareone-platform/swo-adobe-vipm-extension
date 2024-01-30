@@ -98,7 +98,7 @@ class AdobeClient:
     def create_customer_account(
         self,
         reseller_country: str,
-        customer_id: str,
+        agreement_id: str,
         customer_data: dict,
     ) -> str:
         """
@@ -109,18 +109,19 @@ class AdobeClient:
         Args:
             reseller_country (str): The country of the reseller under which the account
             should be created.
-            customer_id (str): Identifier of the customer in the Marketplace platform.
+            agreement_id (str): id of the Marketplace platform agreement for this customer.
             customer_data (dict): Data of the customer to create.
 
         Returns:
             str: The identifier of the customer in the Adobe VIP Markerplace.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
+        company_name = f"{customer_data['CompanyName']} ({agreement_id})"
         payload = {
             "resellerId": reseller.id,
-            "externalReferenceId": customer_id,
+            "externalReferenceId": agreement_id,
             "companyProfile": {
-                "companyName": customer_data["CompanyName"],
+                "companyName": company_name,
                 "preferredLanguage": customer_data["PreferredLanguage"],
                 "address": {
                     "country": customer_data["Address"]["country"],
@@ -141,7 +142,7 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(reseller.distributor.credentials, correlation_id=customer_id)
+        headers = self._get_headers(reseller.distributor.credentials, correlation_id=agreement_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=headers,
@@ -153,7 +154,7 @@ class AdobeClient:
         created_customer = response.json()
         adobe_customer_id = created_customer["customerId"]
         logger.info(
-            f"Customer {customer_id} - {customer_data['CompanyName']} "
+            f"Customer {company_name} "
             f"created successfully for reseller {reseller.id}: {adobe_customer_id}",
         )
         return adobe_customer_id
