@@ -550,7 +550,19 @@ def test_downsizing_return_order_pending(
     fulfill_order(mocked_mpt_client, order)
 
     mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
-    mocked_update_order.assert_not_called()
+    mocked_update_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        {
+            "parameters": {
+                "fulfillment": fulfillment_parameters_factory(
+                    retry_count="1",
+                    customer_id="a-client-id",
+                ),
+                "order": [],
+            },
+        },
+    )
     mocked_complete_order.assert_not_called()
     mocked_adobe_client.create_return_order.assert_not_called()
 
