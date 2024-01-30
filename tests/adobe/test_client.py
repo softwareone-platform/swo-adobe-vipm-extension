@@ -216,12 +216,24 @@ def test_create_customer_account_bad_request(
     assert repr(cv.value) == str(error)
 
 
+@pytest.mark.parametrize(
+    ("quantity", "old_quantity", "expected_quantity"),
+    [
+        (10, 0, 10),
+        (10, 2, 8),
+        (5, 10, 5),
+    ],
+)
 def test_create_preview_order(
     mocker,
     requests_mocker,
     adobe_config_file,
-    order,
+    order_factory,
+    items_factory,
     adobe_client_factory,
+    quantity,
+    old_quantity,
+    expected_quantity,
 ):
     """
     Test the call to Adobe API to create a preview order.
@@ -235,6 +247,8 @@ def test_create_preview_order(
     customer_id = "a-customer"
 
     client, credentials, api_token = adobe_client_factory()
+
+    order = order_factory(items=items_factory(old_quantity=old_quantity, quantity=quantity))
 
     requests_mocker.post(
         urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
@@ -262,7 +276,7 @@ def test_create_preview_order(
                         {
                             "extLineItemNumber": order["items"][0]["lineNumber"],
                             "offerId": adobe_full_sku,
-                            "quantity": order["items"][0]["quantity"],
+                            "quantity": expected_quantity,
                         },
                     ],
                 },

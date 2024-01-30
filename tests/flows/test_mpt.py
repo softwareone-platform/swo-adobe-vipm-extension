@@ -1,7 +1,7 @@
 from urllib.parse import urljoin
 
 import pytest
-from responses import matchers
+from responses import Response, matchers
 
 from adobe_vipm.flows.errors import MPTError
 from adobe_vipm.flows.mpt import (
@@ -9,6 +9,7 @@ from adobe_vipm.flows.mpt import (
     create_subscription,
     fail_order,
     get_buyer,
+    get_order_subscriptions,
     get_seller,
     query_order,
     update_order,
@@ -256,5 +257,68 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
 
     with pytest.raises(MPTError) as cv:
         create_subscription(mpt_client, "ORD-0000", {})
+
+    assert cv.value.status == 404
+
+
+def test_get_order_subscriptions(mpt_client, requests_mocker):
+    """
+    Test the call to retrieve all the subscriptions of an order.
+    """
+
+    subscriptions = [{"id": f"SUB-{i}"} for i in range(20)]
+
+    page1 = Response(
+        "GET",
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions?limit=10&offset=0"),
+        status=200,
+        match=[matchers.query_param_matcher({"limit": "10", "offset": "0"})],
+        json={
+            "$meta": {
+                "pagination": {
+                    "total": 20,
+                    "limit": 10,
+                    "offset": 0,
+                },
+            },
+            "data": subscriptions[0:10],
+        },
+    )
+
+    page2 = Response(
+        "GET",
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions?limit=10&offset=10"),
+        status=200,
+        match=[matchers.query_param_matcher({"limit": "10", "offset": "10"})],
+        json={
+            "$meta": {
+                "pagination": {
+                    "total": 20,
+                    "limit": 10,
+                    "offset": 10,
+                },
+            },
+            "data": subscriptions[10:],
+        },
+    )
+
+    requests_mocker.add(page1)
+    requests_mocker.add(page2)
+
+    assert get_order_subscriptions(mpt_client, "ORD-0000") == subscriptions
+
+
+def test_get_order_subscriptions_error(mpt_client, requests_mocker, mpt_error_factory):
+    """
+    Test the call to retrieve all the subscriptions of an order when it fails.
+    """
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions"),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Order not found"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        get_order_subscriptions(mpt_client, "ORD-0000")
 
     assert cv.value.status == 404

@@ -16,7 +16,6 @@ def test_upsizing(
     seller,
     order_factory,
     items_factory,
-    order_parameters_factory,
     fulfillment_parameters_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -60,15 +59,15 @@ def test_upsizing(
         order_parameters=[],
     )
 
+    subscriptions = subscriptions_factory(items=items_factory(quantity=10))
+
     updated_change_order = order_factory(
         order_type="Change",
         items=items_factory(
             old_quantity=10,
             quantity=20,
         ),
-        subscriptions=subscriptions_factory(
-            items=items_factory(quantity=10),
-        ),
+        subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
         ),
@@ -84,6 +83,10 @@ def test_upsizing(
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
+        return_value=subscriptions,
     )
 
     fulfill_order(mocked_mpt_client, processing_change_order)
@@ -304,15 +307,15 @@ def test_downsizing(
         return_value=mocked_adobe_client,
     )
 
+    subscriptions = subscriptions_factory(items=items_factory(quantity=20))
+
     updated_order = order_factory(
         order_type="Change",
         items=items_factory(
             old_quantity=20,
             quantity=10,
         ),
-        subscriptions=subscriptions_factory(
-            items=items_factory(quantity=20),
-        ),
+        subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
         ),
@@ -340,6 +343,10 @@ def test_downsizing(
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
+        return_value=subscriptions,
     )
 
     fulfill_order(mocked_mpt_client, processing_order)
@@ -439,15 +446,15 @@ def test_downsizing_return_order_exists(
         order_parameters=[],
     )
 
+    subscriptions = subscriptions_factory(items=items_factory(quantity=20))
+
     updated_order = order_factory(
         order_type="Change",
         items=items_factory(
             old_quantity=20,
             quantity=10,
         ),
-        subscriptions=subscriptions_factory(
-            items=items_factory(quantity=20),
-        ),
+        subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
         ),
@@ -462,6 +469,10 @@ def test_downsizing_return_order_exists(
     )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
+        return_value=subscriptions,
     )
 
     fulfill_order(mocked_mpt_client, processing_order)
@@ -898,6 +909,10 @@ def test_mixed(
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
+        return_value=order_subscriptions,
     )
 
     fulfill_order(mocked_mpt_client, processing_change_order)
