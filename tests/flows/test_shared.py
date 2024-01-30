@@ -43,7 +43,7 @@ def test_create_customer_account(
 
     mocked_adobe_client.create_customer_account.assert_called_once_with(
         "US",
-        buyer["id"],
+        order["agreement"]["id"],
         {param["name"]: param["value"] for param in order_parameters_factory()},
     )
     mocked_update_order.assert_called_once_with(
@@ -98,7 +98,7 @@ def test_create_customer_account_empty_order_parameters(
 
     mocked_adobe_client.create_customer_account.assert_called_once_with(
         "US",
-        buyer["id"],
+        order["agreement"]["id"],
         {param["name"]: param["value"] for param in order_parameters_factory()},
     )
 

@@ -81,7 +81,7 @@ def create_customer_account(client, seller_country, buyer, order):
     adobe_client = get_adobe_client()
     try:
         customer_data, order = _get_customer_data(client, buyer, order)
-        external_id = buyer["id"]
+        external_id = order["agreement"]["id"]
         customer_id = adobe_client.create_customer_account(
             seller_country, external_id, customer_data
         )

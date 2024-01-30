@@ -135,6 +135,8 @@ def test_create_customer_account(
 
     client, credentials, api_token = adobe_client_factory()
 
+    company_name = f"{customer_data['CompanyName']} (external_id)"
+
     requests_mocker.post(
         urljoin(adobe_config_file["api_base_url"], "/v3/customers"),
         status=201,
@@ -157,7 +159,7 @@ def test_create_customer_account(
                     "resellerId": reseller_id,
                     "externalReferenceId": "external_id",
                     "companyProfile": {
-                        "companyName": customer_data["CompanyName"],
+                        "companyName": company_name,
                         "preferredLanguage": customer_data["PreferredLanguage"],
                         "address": {
                             "country": customer_data["Address"]["country"],
