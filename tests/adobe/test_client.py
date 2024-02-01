@@ -530,7 +530,13 @@ def test_get_subscription_not_found(
     assert cv.value.code == "404"
 
 
-def test_search_last_order_by_sku(requests_mocker, adobe_client_factory, adobe_config_file):
+def test_search_new_and_returned_orders_by_sku_line_number(
+    requests_mocker,
+    adobe_client_factory,
+    adobe_config_file,
+    adobe_order_factory,
+    adobe_items_factory,
+):
     """
     Tests the call to search the last processed order by SKU for a given
     customer.
@@ -538,9 +544,51 @@ def test_search_last_order_by_sku(requests_mocker, adobe_client_factory, adobe_c
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
     customer_id = "a-customer"
     product_item_id = adobe_config_file["skus_mapping"][0]["product_item_id"]
-    sku = adobe_config_file["skus_mapping"][0]["sku"]
 
     client, credentials, api_token = adobe_client_factory()
+
+    new_order_0 = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        order_id="sku-not-contained",
+        items=adobe_items_factory(offer_id="another-sku"),
+        external_id="ORD-0000",
+        status=STATUS_PROCESSED,
+    )
+    new_order_1 = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        order_id="order-already-returned",
+        external_id="ORD-1111",
+        status=STATUS_PROCESSED,
+    )
+    new_order_2 = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        order_id="order-to-return",
+        external_id="ORD-2222",
+        status=STATUS_PROCESSED,
+    )
+
+    new_order_3 = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        order_id="another-order-to-return",
+        external_id="ORD-3333",
+        status=STATUS_PROCESSED,
+    )
+
+    return_order_1 = adobe_order_factory(
+        ORDER_TYPE_RETURN,
+        order_id="returned-order",
+        reference_order_id="order-already-returned",
+        external_id="ORD-1111-1",
+        status=STATUS_PROCESSED,
+    )
+
+    return_order_3 = adobe_order_factory(
+        ORDER_TYPE_RETURN,
+        order_id="prev-returned-order",
+        reference_order_id="prev-order-already-returned",
+        external_id="ORD-4444-1",
+        status=STATUS_PROCESSED,
+    )
 
     requests_mocker.get(
         urljoin(
@@ -548,7 +596,11 @@ def test_search_last_order_by_sku(requests_mocker, adobe_client_factory, adobe_c
             f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
-        json={"count": 1, "items": [{"an": "order"}]},
+        json={
+            "totalCount": 3,
+            "items": [new_order_0, new_order_1, new_order_2, new_order_3],
+            "links": {},
+        },
         match=[
             matchers.header_matcher(
                 {
@@ -560,20 +612,126 @@ def test_search_last_order_by_sku(requests_mocker, adobe_client_factory, adobe_c
             ),
             matchers.query_param_matcher(
                 {
-                    "offer-id": sku,
-                    "order-type": "NEW",
+                    "order-type": ORDER_TYPE_NEW,
                     "status": STATUS_PROCESSED,
+                    "limit": 100,
+                    "offset": 0,
                 },
             ),
         ],
     )
 
-    assert client.search_last_order_by_sku(reseller_country, customer_id, product_item_id) == {
-        "an": "order"
-    }
+    requests_mocker.get(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=200,
+        json={
+            "totalCount": 1,
+            "items": [return_order_1],
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+            matchers.query_param_matcher(
+                {
+                    "reference-order-id": new_order_1["orderId"],
+                    "offer-id": new_order_1["lineItems"][0]["offerId"],
+                    "order-type": ORDER_TYPE_RETURN,
+                    "status": [STATUS_PROCESSED, STATUS_PENDING],
+                    "limit": 1,
+                    "offset": 0,
+                },
+            ),
+        ],
+    )
+
+    requests_mocker.get(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=200,
+        json={
+            "totalCount": 0,
+            "items": [],
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+            matchers.query_param_matcher(
+                {
+                    "reference-order-id": new_order_2["orderId"],
+                    "offer-id": new_order_2["lineItems"][0]["offerId"],
+                    "order-type": ORDER_TYPE_RETURN,
+                    "status": [STATUS_PROCESSED, STATUS_PENDING],
+                    "limit": 1,
+                    "offset": 0,
+                },
+            ),
+        ],
+    )
+
+    requests_mocker.get(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=200,
+        json={
+            "totalCount": 1,
+            "items": [return_order_3],
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+            matchers.query_param_matcher(
+                {
+                    "reference-order-id": new_order_3["orderId"],
+                    "offer-id": new_order_3["lineItems"][0]["offerId"],
+                    "order-type": ORDER_TYPE_RETURN,
+                    "status": [STATUS_PROCESSED, STATUS_PENDING],
+                    "limit": 1,
+                    "offset": 0,
+                },
+            ),
+        ],
+    )
+
+    result = client.search_new_and_returned_orders_by_sku_line_number(
+        reseller_country,
+        customer_id,
+        product_item_id,
+        1,
+    )
+
+    assert result == [
+        (new_order_1, new_order_1["lineItems"][0], return_order_1),
+        (new_order_2, new_order_2["lineItems"][0], None),
+        (new_order_3, new_order_3["lineItems"][0], None),
+    ]
 
 
-def test_search_last_order_by_sku_not_found(
+def test_search_new_and_returned_orders_by_sku_line_number_not_found(
     requests_mocker, adobe_client_factory, adobe_config_file
 ):
     """
@@ -583,7 +741,6 @@ def test_search_last_order_by_sku_not_found(
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
     customer_id = "a-customer"
     product_item_id = adobe_config_file["skus_mapping"][0]["product_item_id"]
-    sku = adobe_config_file["skus_mapping"][0]["sku"]
 
     client, credentials, api_token = adobe_client_factory()
 
@@ -593,7 +750,7 @@ def test_search_last_order_by_sku_not_found(
             f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
-        json={"count": 0, "items": []},
+        json={"totalCount": 0, "items": [], "links": {}},
         match=[
             matchers.header_matcher(
                 {
@@ -605,15 +762,23 @@ def test_search_last_order_by_sku_not_found(
             ),
             matchers.query_param_matcher(
                 {
-                    "offer-id": sku,
-                    "order-type": "NEW",
+                    "order-type": ORDER_TYPE_NEW,
                     "status": STATUS_PROCESSED,
+                    "limit": 100,
+                    "offset": 0,
                 },
             ),
         ],
     )
 
-    assert client.search_last_order_by_sku(reseller_country, customer_id, product_item_id) is None
+    results = client.search_new_and_returned_orders_by_sku_line_number(
+        reseller_country,
+        customer_id,
+        product_item_id,
+        1,
+    )
+
+    assert results == []
 
 
 def test_create_return_order(
@@ -623,8 +788,6 @@ def test_create_return_order(
     adobe_config_file,
     adobe_order_factory,
     adobe_items_factory,
-    order_factory,
-    items_factory,
 ):
     """
     Test the call to Adobe API to create a return order.
@@ -638,19 +801,24 @@ def test_create_return_order(
 
     client, credentials, api_token = adobe_client_factory()
 
-    order_items = items_factory(
-        old_quantity=10,
-        quantity=5,
+    returning_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        external_id="ORD-1234",
+        order_id="returning-order-id",
+        status=STATUS_PROCESSED,
     )
 
-    order = order_factory(items=order_items)
-    item_line_number = order_items[0]["lineNumber"]
+    returning_item = returning_order["lineItems"][0]
+
+    expected_external_id = (
+        f"{returning_order['externalReferenceId']}-{returning_item['extLineItemNumber']}"
+    )
 
     expected_body = adobe_order_factory(
         ORDER_TYPE_RETURN,
-        reference_order_id="prev-order",
-        external_id=order["id"],
-        items=adobe_items_factory(quantity=10),
+        reference_order_id=returning_order["orderId"],
+        external_id=expected_external_id,
+        items=adobe_items_factory(),
     )
 
     requests_mocker.post(
@@ -667,7 +835,7 @@ def test_create_return_order(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": f"{order['id']}-{item_line_number}",
+                    "x-correlation-id": expected_external_id,
                 },
             ),
             matchers.json_params_matcher(expected_body),
@@ -677,9 +845,8 @@ def test_create_return_order(
     return_order = client.create_return_order(
         reseller_country,
         customer_id,
-        "prev-order",
-        order,
-        order["items"][0],
+        returning_order,
+        returning_item,
     )
     assert return_order == {
         "orderId": "adobe-order-id",
@@ -690,7 +857,7 @@ def test_create_return_order_bad_request(
     requests_mocker,
     adobe_client_factory,
     adobe_config_file,
-    order_factory,
+    adobe_order_factory,
     adobe_api_error_factory,
 ):
     """
@@ -708,101 +875,17 @@ def test_create_return_order_bad_request(
         status=400,
         json=error,
     )
-    order = order_factory()
+    returning_order = adobe_order_factory(ORDER_TYPE_NEW, status=STATUS_PROCESSED)
+
     with pytest.raises(AdobeError) as cv:
         client.create_return_order(
             reseller_country,
             customer_id,
-            "adobe_order_id",
-            order,
-            order["items"][0],
+            returning_order,
+            returning_order["lineItems"][0],
         )
 
     assert repr(cv.value) == str(error)
-
-
-def test_search_last_return_order_by_order(
-    requests_mocker, adobe_client_factory, adobe_config_file
-):
-    """
-    Tests the call to search the last processed return order by the returned
-    order id for a given customer.
-    """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
-    customer_id = "a-customer"
-    adobe_order_id = "an-order-id"
-
-    client, credentials, api_token = adobe_client_factory()
-
-    requests_mocker.get(
-        urljoin(
-            adobe_config_file["api_base_url"],
-            f"/v3/customers/{customer_id}/orders",
-        ),
-        status=200,
-        json={"count": 1, "items": [{"an": "order"}]},
-        match=[
-            matchers.header_matcher(
-                {
-                    "X-Api-Key": credentials.client_id,
-                    "Authorization": f"Bearer {api_token.token}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                },
-            ),
-            matchers.query_string_matcher(
-                "reference-order-id=an-order-id&order-type=RETURN"
-                f"&status={STATUS_PROCESSED}&status={STATUS_PENDING}",
-            ),
-        ],
-    )
-
-    assert client.search_last_return_order_by_order(
-        reseller_country,
-        customer_id,
-        adobe_order_id,
-    ) == {"an": "order"}
-
-
-def test_search_last_return_order_by_order_not_found(
-    requests_mocker, adobe_client_factory, adobe_config_file
-):
-    """
-    Tests the call to search the last processed return order by the returned
-    order id for a given customer when no order is found.
-    """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
-    customer_id = "a-customer"
-    adobe_order_id = "an-order-id"
-
-    client, credentials, api_token = adobe_client_factory()
-
-    requests_mocker.get(
-        urljoin(
-            adobe_config_file["api_base_url"],
-            f"/v3/customers/{customer_id}/orders",
-        ),
-        status=200,
-        json={"count": 0, "items": []},
-        match=[
-            matchers.header_matcher(
-                {
-                    "X-Api-Key": credentials.client_id,
-                    "Authorization": f"Bearer {api_token.token}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                },
-            ),
-            matchers.query_string_matcher(
-                "reference-order-id=an-order-id&order-type=RETURN&status=1000&status=1002",
-            ),
-        ],
-    )
-
-    assert (
-        client.search_last_return_order_by_order(reseller_country, customer_id, adobe_order_id)
-        is None
-    )
 
 
 def test_get_auth_token(requests_mocker, mock_adobe_config, adobe_config_file):

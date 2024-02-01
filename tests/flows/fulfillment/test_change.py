@@ -279,7 +279,7 @@ def test_downsizing(
         return_value=seller,
     )
 
-    last_adobe_order_for_sku = adobe_order_factory(
+    order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
         status=STATUS_PROCESSED,
         order_id="P0000000",
@@ -296,8 +296,9 @@ def test_downsizing(
     )
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.search_last_order_by_sku.return_value = last_adobe_order_for_sku
-    mocked_adobe_client.search_last_return_order_by_order.return_value = None
+    mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.return_value = [
+        (order_to_return, order_to_return["lineItems"][0], None),
+    ]
     mocked_adobe_client.create_return_order.return_value = adobe_return_order
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocked_adobe_client.create_new_order.return_value = adobe_order
@@ -357,9 +358,8 @@ def test_downsizing(
     mocked_adobe_client.create_return_order.assert_called_once_with(
         seller_country,
         "a-client-id",
-        last_adobe_order_for_sku["orderId"],
-        processing_order,
-        items_factory(old_quantity=20, quantity=10)[0],
+        order_to_return,
+        order_to_return["lineItems"][0],
     )
 
     assert mocked_update_order.mock_calls[0].args == (
@@ -404,7 +404,7 @@ def test_downsizing_return_order_exists(
         return_value=seller,
     )
 
-    last_adobe_order_for_sku = adobe_order_factory(
+    order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
         status=STATUS_PROCESSED,
         order_id="P0000000",
@@ -423,8 +423,9 @@ def test_downsizing_return_order_exists(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocked_adobe_client.search_last_order_by_sku.return_value = last_adobe_order_for_sku
-    mocked_adobe_client.search_last_return_order_by_order.return_value = adobe_return_order
+    mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.return_value = [
+        (order_to_return, order_to_return["lineItems"][0], adobe_return_order),
+    ]
     mocked_adobe_client.create_new_order.return_value = adobe_order
     mocked_adobe_client.get_order.return_value = adobe_order
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
@@ -518,7 +519,7 @@ def test_downsizing_return_order_pending(
         return_value=seller,
     )
 
-    last_adobe_order_for_sku = adobe_order_factory(
+    order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
         status=STATUS_PROCESSED,
         order_id="P0000000",
@@ -531,8 +532,9 @@ def test_downsizing_return_order_pending(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocked_adobe_client.search_last_order_by_sku.return_value = last_adobe_order_for_sku
-    mocked_adobe_client.search_last_return_order_by_order.return_value = adobe_return_order
+    mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.return_value = [
+        (order_to_return, order_to_return["lineItems"][0], adobe_return_order),
+    ]
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_adobe_client",
@@ -676,7 +678,7 @@ def test_downsizing_create_new_order_error(
         return_value=seller,
     )
 
-    last_adobe_order_for_sku = adobe_order_factory(
+    order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
         status=STATUS_PROCESSED,
         order_id="P0000000",
@@ -690,7 +692,7 @@ def test_downsizing_create_new_order_error(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocked_adobe_client.search_last_order_by_sku.return_value = last_adobe_order_for_sku
+    mocked_adobe_client.search_last_order_by_sku.return_value = order_to_return
     mocked_adobe_client.search_last_return_order_by_order.return_value = None
     mocked_adobe_client.create_return_order.return_value = adobe_return_order
     mocked_adobe_client.create_new_order.side_effect = adobe_error
@@ -797,7 +799,7 @@ def test_mixed(
         quantity=10,
     )
 
-    last_adobe_order_for_sku = adobe_order_factory(
+    order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
         status=STATUS_PROCESSED,
         order_id="P0000000",
@@ -824,7 +826,7 @@ def test_mixed(
     )
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.search_last_order_by_sku.return_value = last_adobe_order_for_sku
+    mocked_adobe_client.search_last_order_by_sku.return_value = order_to_return
     mocked_adobe_client.search_last_return_order_by_order.return_value = None
     mocked_adobe_client.create_return_order.return_value = adobe_return_order
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order

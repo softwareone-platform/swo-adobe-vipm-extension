@@ -300,7 +300,7 @@ def gen_purchase_order(
     for idx, sku in enumerate(skus, start=1):
         product = get_product_by_sku(sku)
         old_quantity = 0
-        quantity = random.randint(1, 5)
+        quantity = random.randint(2, 5)
         item = {
             "id": f"ITM-1111-1111-1111-{idx:04d}",
             "name": product["name"],
@@ -372,7 +372,10 @@ def gen_change_order(fake, agreement_id, skus, change_type):
                     (1, new_item["oldQuantity"] - 1),
                 ],
             )
-        new_item["quantity"] = random.randint(*rand_prm)
+        try:
+            new_item["quantity"] = random.randint(*rand_prm)
+        except ValueError:
+            pass
         items.append(new_item)
     if skus:
         for idx, sku in enumerate(skus, start=line_number + 1):

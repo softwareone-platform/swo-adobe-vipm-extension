@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
-from typing import MutableMapping
-from urllib.parse import urljoin
+from typing import List, MutableMapping, Tuple
+from urllib.parse import urlencode, urljoin
 from uuid import uuid4
 
 import requests
@@ -22,6 +22,7 @@ from adobe_vipm.adobe.dataclasses import (
     Reseller,
 )
 from adobe_vipm.adobe.errors import wrap_http_error
+from adobe_vipm.adobe.utils import get_actual_sku, get_item_to_return
 
 logger = logging.getLogger(__name__)
 
@@ -160,15 +161,17 @@ class AdobeClient:
         return adobe_customer_id
 
     @wrap_http_error
-    def search_last_order_by_sku(
+    def search_new_and_returned_orders_by_sku_line_number(
         self,
         reseller_country: str,
         customer_id: str,
         sku: str,
-    ) -> dict | None:
+        line_number: int,
+    ) -> List[Tuple[dict, dict, dict | None]]:
         """
-        Search for the last order placed by the customer identified by `customer_id`
-        for a given adobe product `sku`.
+        Search all the NEW orders placed by the customer identified by `customer_id`
+        for a a given `sku` and `line_number` and the corresponding RETURN order
+        if it exists.
         The `reseller_country` is used to select the reseller and the Adobe credentials
         of the account to which the reseller belong to.
 
@@ -176,76 +179,94 @@ class AdobeClient:
             reseller_country (str): The country of the reseller to which the customer account
             belongs to.
             customer_id (str): Identifier of the customer that placed the order.
-            sku (str): The SKU of the product to search for.
+            sku (str): The SKU to search for.
+            line_number (int): the line number to search for.
 
         Returns:
-            dict: The last order found for the given SKU or `None` if not found.
-        """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
-        product: AdobeProduct = self._config.get_adobe_product(sku)
-        headers = self._get_headers(reseller.distributor.credentials)
-        response = requests.get(
-            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
-            headers=headers,
-            params={
-                "offer-id": product.sku,
-                "order-type": "NEW",
-                "status": STATUS_PROCESSED,
-            },
-        )
-
-        response.raise_for_status()
-        data = response.json()
-
-        if data["count"] > 0:
-            return data["items"][0]
-
-    @wrap_http_error
-    def search_last_return_order_by_order(
-        self,
-        reseller_country: str,
-        customer_id: str,
-        adobe_order_id: str,
-    ) -> dict | None:
-        """
-        Search for an order of type RETURN by the identifier of the returned order.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
-
-        Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
-            customer_id (str): Identifier of the customer that placed the order.
-            adobe_order_id (str): Identifier of the order that should have been returned.
-
-        Returns:
-            dict: The RETURN order or `None` if not found.
+            list: Return a list of three values tuple with the NEW order the item identified
+            by the pair sku, line_number and the RETURN order if it exists or None.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
         headers = self._get_headers(reseller.distributor.credentials)
-        response = requests.get(
-            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
-            headers=headers,
-            params={
-                "reference-order-id": adobe_order_id,
-                "order-type": "RETURN",
-                "status": (STATUS_PROCESSED, STATUS_PENDING),
-            },
-        )
 
-        response.raise_for_status()
-        data = response.json()
+        orders = []
+        orders_base_url = f"/v3/customers/{customer_id}/orders"
 
-        if data["count"] > 0:
-            return data["items"][0]
+        new_orders_params = {
+            "order-type": ORDER_TYPE_NEW,
+            "status": STATUS_PROCESSED,
+            "limit": 100,
+            "offset": 0,
+        }
+
+        new_orders_next_url = f"{orders_base_url}?{urlencode(new_orders_params)}"
+
+        while new_orders_next_url:
+            new_orders_response = requests.get(
+                urljoin(self._config.api_base_url, new_orders_next_url),
+                headers=headers,
+            )
+            new_orders_response.raise_for_status()
+            new_orders_page = new_orders_response.json()
+            for order in new_orders_page["items"]:
+                actual_sku = get_actual_sku(order["lineItems"], sku)
+                if not actual_sku:
+                    continue
+
+                logger.debug(f"Found order to return for sku {actual_sku}: {order['orderId']}")
+
+                item_to_return = get_item_to_return(order["lineItems"], line_number)
+                external_id = f"{order['externalReferenceId']}-{line_number}"
+
+                returned_orders_response = requests.get(
+                    urljoin(self._config.api_base_url, orders_base_url),
+                    headers=headers,
+                    params={
+                        "reference-order-id": order["orderId"],
+                        "offer-id": actual_sku,
+                        "order-type": ORDER_TYPE_RETURN,
+                        "status": [STATUS_PROCESSED, STATUS_PENDING],
+                        "limit": 1,
+                        "offset": 0,
+                    },
+                )
+                returned_orders_response.raise_for_status()
+                returned_orders_page = returned_orders_response.json()
+                if returned_orders_page["totalCount"] == 0:
+                    logger.debug(
+                        f"No return order found for order {order['orderId']} "
+                        f"and external_id {external_id}",
+                    )
+                    orders.append((order, item_to_return, None))
+                    continue
+
+                return_order = returned_orders_page["items"][0]
+
+                if return_order["externalReferenceId"] != external_id:
+                    logger.debug(
+                        f"No return order found for order {order['orderId']} "
+                        f"and external_id {external_id}",
+                    )
+                    orders.append((order, item_to_return, None))
+                    continue
+
+                logger.debug(
+                    f"Return order found for order {order['orderId']} "
+                    f"and external_id {external_id}",
+                )
+
+                orders.append((order, item_to_return, return_order))
+
+            new_orders_next_url = new_orders_page["links"].get("next", {}).get("uri")
+
+        return orders
 
     @wrap_http_error
     def create_return_order(
         self,
         reseller_country: str,
         customer_id: str,
-        returning_order_id: str,
-        order: dict,
+        returning_order: dict,
         returning_item: dict,
     ) -> dict:
         """
@@ -258,23 +279,20 @@ class AdobeClient:
             reseller_country (str): The country of the reseller to which the customer account
             belongs to.
             customer_id (str): Identifier of the customer that place the RETURN order.
-            returning_order_id (str): Identifier of the purchase order that must be
-            returned.
-            order (dict): The change order of the Marketplace platform that contains
-            the item that must be returned.
-            returning_item (dict): The item of the order of the Marketplace platform
-            that must be returned.
+            returning_order (dict): The order that contains the item to return.
+            returning_item (dict): The item that must be returned.
 
         Returns:
             dict: The RETURN order.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
-        product: AdobeProduct = self._config.get_adobe_product(returning_item["productItemId"])
-        line_number = returning_item["lineNumber"]
-        old_quantity = returning_item["oldQuantity"]
+        line_number = returning_item["extLineItemNumber"]
+        quantity = returning_item["quantity"]
+        sku = returning_item["offerId"]
+        external_id = f"{returning_order['externalReferenceId']}-{line_number}"
         payload = {
-            "externalReferenceId": order["id"],
-            "referenceOrderId": returning_order_id,
+            "externalReferenceId": external_id,
+            "referenceOrderId": returning_order["orderId"],
             "currencyCode": reseller.distributor.currency,
             "orderType": ORDER_TYPE_RETURN,
             "lineItems": [],
@@ -283,13 +301,14 @@ class AdobeClient:
         payload["lineItems"].append(
             {
                 "extLineItemNumber": line_number,
-                "offerId": product.sku,
-                "quantity": old_quantity,
+                "offerId": sku,
+                "quantity": quantity,
             },
         )
 
         headers = self._get_headers(
-            reseller.distributor.credentials, correlation_id=f"{order['id']}-{line_number}"
+            reseller.distributor.credentials,
+            correlation_id=external_id,
         )
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
@@ -336,6 +355,7 @@ class AdobeClient:
             product: AdobeProduct = self._config.get_adobe_product(item["productItemId"])
             quantity = item["quantity"]
             old_quantity = item["oldQuantity"]
+
             if quantity > old_quantity:
                 # For purchasing new items (oldQuantity = 0) or upsizing items
                 # quantity it must send the delta (quantity - oldQuantity) since
