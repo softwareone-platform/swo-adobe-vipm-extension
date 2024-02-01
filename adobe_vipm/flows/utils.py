@@ -10,10 +10,7 @@ from adobe_vipm.flows.constants import (
     PARAM_PREFERRED_LANGUAGE,
     PARAM_RETRY_COUNT,
 )
-
-
-def find_first(func, iterable, default=None):
-    return next(filter(func, iterable), default)
+from adobe_vipm.utils import find_first
 
 
 def get_parameter(order, parameter_phase, parameter_name):

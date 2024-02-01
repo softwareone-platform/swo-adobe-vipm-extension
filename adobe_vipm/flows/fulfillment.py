@@ -37,14 +37,15 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def _handle_retries(mpt_client, order, adobe_order_id):
+def _handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
     retry_count = get_retry_count(order)
     max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
     if retry_count < max_attemps:
         order = increment_retry_count(order)
         order = update_order(mpt_client, order["id"], {"parameters": order["parameters"]})
         logger.info(
-            f"Order {order['id']} ({adobe_order_id}) is still processing on Adobe side, wait.",
+            f"Order {order['id']} ({adobe_order_id}: {adobe_order_type}) "
+            "is still processing on Adobe side, wait.",
         )
         return
     logger.info(
@@ -125,41 +126,34 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
     try:
         preview_order = adobe_client.create_preview_order(seller_country, customer_id, order)
 
-        pending_return_orders = False
         pending_order_ids = []
         for item in order["items"]:
             if item["oldQuantity"] <= item["quantity"]:
                 continue
-            last_order = adobe_client.search_last_order_by_sku(
+            orders_4_item = adobe_client.search_new_and_returned_orders_by_sku_line_number(
                 seller_country,
                 customer_id,
                 item["productItemId"],
+                item["lineNumber"],
             )
-            logger.debug(f"Order to return for item {item['productItemId']}: {last_order}")
-            # TODO handle last order not found
-            return_order = adobe_client.search_last_return_order_by_order(
-                seller_country,
-                customer_id,
-                last_order["orderId"],
-            )
-            if not return_order:
-                logger.debug(f"Return order not found for {item['productItemId']}")
-                return_order = adobe_client.create_return_order(
-                    seller_country,
-                    customer_id,
-                    last_order["orderId"],
-                    order,
-                    item,
-                )
-                logger.debug(f"Return order created for a return order for item: {item}")
+            for order_to_return, item_to_return, return_order in orders_4_item:
+                if not return_order:
+                    logger.debug(f"Return order not found for {item['productItemId']}")
+                    return_order = adobe_client.create_return_order(
+                        seller_country,
+                        customer_id,
+                        order_to_return,
+                        item_to_return,
+                    )
+                    logger.debug(f"Return order created for a return order for item: {item}")
 
-            pending_return_orders = (
-                pending_return_orders or return_order["status"] == STATUS_PENDING
-            )
-            pending_order_ids.append(return_order["orderId"])
+                if return_order["status"] == STATUS_PENDING:
+                    pending_order_ids.append(return_order["orderId"])
 
-        if pending_return_orders:
-            _handle_retries(mpt_client, order, ", ".join(pending_order_ids))
+        if pending_order_ids:
+            _handle_retries(
+                mpt_client, order, ", ".join(pending_order_ids), adobe_order_type="RETURN"
+            )
             return None, None
 
         adobe_order = adobe_client.create_new_order(

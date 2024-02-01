@@ -1,7 +1,7 @@
 from urllib.parse import urljoin
 
 import pytest
-from responses import Response, matchers
+from responses import matchers
 
 from adobe_vipm.flows.errors import MPTError
 from adobe_vipm.flows.mpt import (
@@ -268,9 +268,8 @@ def test_get_order_subscriptions(mpt_client, requests_mocker):
 
     subscriptions = [{"id": f"SUB-{i}"} for i in range(20)]
 
-    page1 = Response(
-        "GET",
-        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions?limit=10&offset=0"),
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions"),
         status=200,
         match=[matchers.query_param_matcher({"limit": "10", "offset": "0"})],
         json={
@@ -285,9 +284,8 @@ def test_get_order_subscriptions(mpt_client, requests_mocker):
         },
     )
 
-    page2 = Response(
-        "GET",
-        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions?limit=10&offset=10"),
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions"),
         status=200,
         match=[matchers.query_param_matcher({"limit": "10", "offset": "10"})],
         json={
@@ -301,9 +299,6 @@ def test_get_order_subscriptions(mpt_client, requests_mocker):
             "data": subscriptions[10:],
         },
     )
-
-    requests_mocker.add(page1)
-    requests_mocker.add(page2)
 
     assert get_order_subscriptions(mpt_client, "ORD-0000") == subscriptions
 
