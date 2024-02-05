@@ -52,6 +52,12 @@ django-ninja = "^1.1.0"
 
 # Move to runtime when splitting
 [tool.poetry.group.runtime.dependencies]
+azure-monitor-opentelemetry-exporter = "^1.0.0b21"
+opentelemetry-api = "^1.22.0"
+opentelemetry-sdk = "^1.22.0"
+opentelemetry-instrumentation-django = "^0.43b0"
+opentelemetry-instrumentation-requests = "^0.43b0"
+opentelemetry-instrumentation-logging = "^0.43b0"
 click = "^8.1.7"
 gunicorn = "^21.2.0"
 watchfiles = "^0.21.0"

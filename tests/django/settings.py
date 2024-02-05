@@ -156,6 +156,16 @@ LOGGING = {
     },
 }
 
+# OpenTelemetry configuration
+SERVICE_NAME = os.getenv("SERVICE_NAME", "Swo.Extensions.AdobeVIPM")
+USE_APPLICATIONINSIGHTS = os.getenv("USE_APPLICATIONINSIGHTS", "False").lower() in (
+    "true",
+    "1",
+    "t",
+)
+APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
+LOGGING_ATTEMPT_GETTER = os.getenv("LOGGING_ATTEMPT_GETTER", "adobe_vipm.utils.get_attempt_count")
+
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
 PRODUCT_ID = os.getenv("PRODUCT_ID", "PRD-1111-1111-1111")

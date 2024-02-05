@@ -116,6 +116,7 @@ def increment_retry_count(order):
         "fulfillment",
         PARAM_RETRY_COUNT,
     )
+
     param["value"] = str(int(param["value"]) + 1) if param["value"] else "1"
     return updated_order
 

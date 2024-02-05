@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from swo.mpt.extensions.core.events.dataclasses import Event
 from swo.mpt.extensions.core.events.registry import EventsRegistry
-from swo.mpt.extensions.runtime.events.utils import setup_client
+from swo.mpt.extensions.runtime.events.utils import setup_client, wrap_for_trace
 from swo.mpt.extensions.runtime.utils import get_events_registry
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class Dispatcher:
             while len(self.queue) > 0:
                 event_type, event = self.queue.pop()
                 logger.debug(f"got event of type {event_type} ({event.id}) from queue...")
-                listener = self.registry.get_listener(event_type)
+                listener = wrap_for_trace(self.registry.get_listener(event_type), event_type)
                 if (event.type, event.id) not in self.futures:
                     future = self.executor.submit(listener, self.client, event)
                     self.futures[(event.type, event.id)] = future
