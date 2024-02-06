@@ -17,7 +17,7 @@ django = "4.2.*" # should it be a dependency of the extension ? it is already a 
 # Remove when devmock is not needed anymore
 [tool.poetry.group.devmock.dependencies]
 uvicorn = "^0.25.0"
-fastapi = "^0.108.0"
+fastapi = "^0.109.0"
 lib-rql = "^2.0.0"
 faker = "^22.2.0"
 
