@@ -3,11 +3,18 @@ import json
 import os
 import random
 from datetime import UTC, datetime
+from functools import partial
 
 import click
-from click import ClickException, Option, UsageError
+from click import Abort, ClickException, Option, UsageError
 from faker import Faker
+from rich import box
+from rich.console import Console
+from rich.highlighter import ReprHighlighter as _ReprHighlighter
+from rich.table import Table
+from rich.theme import Theme
 
+from devmock.exceptions import NotFoundException
 from devmock.utils import (
     cleanup_data_folder,
     generate_random_id,
@@ -45,6 +52,37 @@ ADOBE_CONFIG = json.load(
 )
 
 
+class ReprHighlighter(_ReprHighlighter):
+    accounts_prefixes = ("ACC", "BUY", "LCE", "MOD", "SEL", "USR", "AUSR", "UGR")
+    catalog_prefixes = (
+        "PRD",
+        "ITM",
+        "IGR",
+        "PGR",
+        "MED",
+        "DOC",
+        "TCS",
+        "TPL",
+        "WHO",
+        "PRC",
+        "LST",
+        "AUT",
+        "UNT",
+    )
+    commerce_prefixes = ("AGR", "ORD", "SUB", "REQ")
+    aux_prefixes = ("FIL", "MSG")
+    all_prefixes = (*accounts_prefixes, *catalog_prefixes, *commerce_prefixes, *aux_prefixes)
+    highlights = _ReprHighlighter.highlights + [
+        rf"(?P<mpt_id>(?:{'|'.join(all_prefixes)})(?:-\d{{4}})*)"
+    ]
+
+
+console = Console(
+    highlighter=ReprHighlighter(),
+    theme=Theme({"repr.mpt_id": "bold light_salmon3"}),
+)
+
+
 class MutuallyExclusiveOption(Option):
     def __init__(self, *args, **kwargs):
         self.mutually_exclusive = set(kwargs.pop("mutually_exclusive", []))
@@ -70,7 +108,7 @@ def get_product_by_sku(sku):
     try:
         return next(filter(lambda x: x["product_item_id"] == sku, ADOBE_CONFIG["skus_mapping"]))
     except StopIteration:
-        raise Exception(f"Invalid SKU provided: {sku}")
+        raise ClickException(f"Invalid SKU provided: {sku}")
 
 
 def gen_param(
@@ -158,6 +196,7 @@ def gen_seller(fake):
         "audit": gen_audit(fake),
     }
     save_seller(seller)
+    console.print(f"[green]✓[/green] Seller {seller_id} - {seller['name']} generated")
     return seller
 
 
@@ -178,6 +217,7 @@ def gen_licensee(fake, buyer, seller):
         "seller": get_reference(seller),
     }
     save_licensee(licensee)
+    console.print(f"[green]✓[/green] Licensee {lic_id} - {licensee['name']} generated")
     return licensee
 
 
@@ -198,6 +238,7 @@ def gen_account(fake, acc_type="Client"):
         "groups": [],
     }
     save_account(account)
+    console.print(f"[green]✓[/green] Account {acc_id} - {account['name']} generated")
     return account
 
 
@@ -218,33 +259,8 @@ def gen_buyer(fake, client):
         "account": get_reference(client),
     }
     save_buyer(buyer)
+    console.print(f"[green]✓[/green] Buyer {buyer_id} - {buyer['name']} generated")
     return buyer
-
-
-def gen_subscription(item):
-    sub_id = generate_random_id("SUB", 16, 4)
-    sub = {
-        "id": sub_id,
-        "href": f"/commerce/subscriptions/{sub_id}",
-        "name": f"Subscription for {item['name']}",
-        "status": "Updating",
-        "startDate": "2023-06-05T19:08:42.3656851+02:00",
-        "renewalDate": "2024-07-20T09:50:59.1139069+02:00",
-        "terms": {"period": "1m", "commitment": "1y"},
-        "price": {
-            "margin": 0.01,
-            "markup": 0.011,
-            "SPxM": 1708.12,
-            "SPxY": 20504.00,
-            "PPxM": 7.12,
-            "PPxY": 88.00,
-            "defaultMarkup": 0.15,
-            "currency": "USD",
-        },
-        "items": [item],
-    }
-    save_subscription(sub)
-    return sub
 
 
 def gen_agreement(fake):
@@ -281,9 +297,8 @@ def gen_agreement(fake):
         },
         "audit": gen_audit(fake),
     }
-    save_buyer(buyer)
-    save_seller(seller)
     save_agreement(agreement)
+    console.print(f"[green]✓[/green] Agreement {agr_id} - {agreement['name']} generated")
     return agreement
 
 
@@ -310,6 +325,9 @@ def gen_purchase_order(
             "productItemId": sku,
         }
         items.append(item)
+        console.print(
+            f"[green]✓[/green] Item {idx} - {product['name']} generated: quantity = {quantity}",
+        )
 
     order = {
         "id": order_id,
@@ -343,6 +361,8 @@ def gen_purchase_order(
 def gen_change_order(fake, agreement_id, skus, change_type):
     order_id = generate_random_id("ORD", 16, 4)
     agreement = load_agreement(agreement_id)
+    if agreement["status"] != "Active":
+        raise ClickException("Agreement must be Active in order to generate a Change order.")
     items = []
     subscriptions = []
     if change_type == "both" and len(agreement.get("subscriptions", [])) < 2:
@@ -353,6 +373,8 @@ def gen_change_order(fake, agreement_id, skus, change_type):
 
     for line_number, subscription in enumerate(agreement["subscriptions"], start=1):
         sub_data = load_subscription(subscription["id"])
+        sub_data["status"] = "Updating"
+        save_subscription(sub_data)
         subscriptions.append(get_reference(sub_data))
         item = sub_data["items"][0]
         new_item = copy.copy(item)
@@ -374,8 +396,15 @@ def gen_change_order(fake, agreement_id, skus, change_type):
             )
         try:
             new_item["quantity"] = random.randint(*rand_prm)
+            console.print(
+                f"[green]✓[/green] Item {line_number} - {new_item['name']} updated: "
+                f"quantity = {new_item['oldQuantity']} -> {new_item['quantity']}",
+            )
         except ValueError:
-            pass
+            console.print(
+                f"[orange]✓[/orange] Item {line_number} - {new_item['name']} unchanged: "
+                f"quantity = {new_item['oldQuantity']} -> {new_item['quantity']}",
+            )
         items.append(new_item)
     if skus:
         for idx, sku in enumerate(skus, start=line_number + 1):
@@ -390,11 +419,57 @@ def gen_change_order(fake, agreement_id, skus, change_type):
                 "lineNumber": idx,
                 "productItemId": sku,
             }
+            console.print(
+                f"[green]✓[/green] Item {idx} - {product['name']} added: quantity = {quantity}",
+            )
             items.append(item)
 
     order = {
         "id": order_id,
         "type": "Change",
+        "status": "Processing",
+        "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
+        "items": items,
+        "subscriptions": subscriptions,
+        "audit": gen_audit(fake),
+        "parameters": agreement["parameters"],
+    }
+    agreement["status"] = "Updating"
+    save_agreement(agreement)
+    save_order(order)
+    return order
+
+
+def gen_termination_order(fake, agreement_id, subscriptions_ids):
+    agreement = load_agreement(agreement_id)
+    if agreement["status"] != "Active":
+        raise ClickException("Agreement must be Active in order to generate a Termination order.")
+    agreement_sub_ids = [sub["id"] for sub in agreement["subscriptions"]]
+    subscriptions_ids = subscriptions_ids or agreement_sub_ids
+    invalid_sub_ids = list(set(subscriptions_ids) - set(agreement_sub_ids))
+    if invalid_sub_ids:
+        raise ClickException(
+            f"The subscriptions {','.join(invalid_sub_ids)} are not part of the "
+            f"agreement {agreement_id}."
+        )
+
+    order_id = generate_random_id("ORD", 16, 4)
+    subscriptions = []
+    items = []
+    for sub_id in subscriptions_ids:
+        sub_data = load_subscription(sub_id)
+        sub_data["status"] = "Terminating"
+        save_subscription(sub_data)
+        item = sub_data["items"][0]
+        new_item = copy.copy(item)
+        new_item["oldQuantity"] = item["quantity"]
+        new_item["quantity"] = 0
+        items.append(new_item)
+        subscriptions.append(get_reference(sub_data))
+
+    order = {
+        "id": order_id,
+        "type": "Termination",
         "status": "Processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
         "items": items,
@@ -437,13 +512,21 @@ def purchase(customer_id, order_id, locale, skus):
     Generate a purchase order for the provided Adobe (partial) SKUs.
     """
     fake = Faker(locale)
-    order = gen_purchase_order(
-        fake,
-        skus,
-        customer_id,
-        order_id,
+    with console.status(
+        "[magenta]Generating purchase order...",
+        spinner="bouncingBall",
+        spinner_style="yellow",
+    ):
+        order = gen_purchase_order(
+            fake,
+            skus,
+            customer_id,
+            order_id,
+        )
+    console.print(
+        "[bold green]New 'Purchase' order has been "
+        f"generated for skus {', '.join(skus)}: {order['id']}",
     )
-    print(f"Order {order['id']} generated!")
 
 
 @cli.command()
@@ -483,23 +566,114 @@ def change(locale, agreement_id, skus, upsize_only, downsize_only):
         change_type = "upsize"
     if downsize_only:
         change_type = "downsize"
-    order = gen_change_order(fake, agreement_id, skus, change_type)
-    click.secho(
-        "New 'Change' order has been " f"generated for agreement {agreement_id}: {order['id']}",
-        fg="green",
+    with console.status(
+        "[magenta]Generating change order...",
+        spinner="bouncingBall",
+        spinner_style="yellow",
+    ):
+        order = gen_change_order(fake, agreement_id, skus, change_type)
+    console.print(
+        f"[bold green]New 'Change' order has been generated for agreement {agreement_id}: "
+        f"{order['id']}",
     )
 
 
 @cli.command()
+@click.argument(
+    "agreement_id",
+    metavar="[AGREEMENT_ID]",
+    nargs=1,
+    required=True,
+)
+@click.argument(
+    "subscriptions",
+    metavar="[SUBSCRIPTION_ID ...]",
+    nargs=-1,
+    required=False,
+)
+@click.option("--locale", default="en_US")
+def terminate(locale, agreement_id, subscriptions):
+    """
+    Generate a termination order for an Agreement or one or more
+    Subscriptions within an Agreement.
+    """
+    fake = Faker(locale)
+    with console.status(
+        "[magenta]Generating change order...",
+        spinner="bouncingBall",
+        spinner_style="yellow",
+    ):
+        order = gen_termination_order(fake, agreement_id, subscriptions)
+    if not subscriptions:
+        console.print(
+            "[bold green]New 'Termination' order has been generated "
+            f"for agreement {agreement_id}: {order['id']}",
+        )
+    else:
+        console.print(
+            "[bold green]New 'Termination' order has been "
+            f"generated for subscriptions {', '.join(subscriptions)} "
+            f"({agreement_id}): {order['id']}",
+        )
+
+
+@cli.command()
 def cleanup():
+    """
+    Remove all the content of the data folder.
+    """
     cleanup_data_folder()
+
+
+@cli.command()
+@click.argument(
+    "search_terms",
+    metavar="[SEARCH TERM ...]",
+    nargs=-1,
+    required=True,
+)
+def sku(search_terms):
+    """
+    Search a product by name in SKUs mapping given a search term.
+    """
+    table = Table(
+        title="Adobe VIP MP Products",
+        box=box.ROUNDED,
+        border_style="blue",
+        header_style="deep_sky_blue1",
+        expand=False,
+    )
+    table.add_column("SKU")
+    table.add_column("Name", min_width=55)
+    table.add_column("Type")
+
+    conds = []
+
+    def filter_fn(search_term, item):
+        return search_term.lower() in item["name"].lower()
+
+    for search_term in search_terms:
+        conds.append(partial(filter_fn, search_term))
+
+    for item in filter(
+        lambda i: any([fn(i) for fn in conds]),
+        ADOBE_CONFIG["skus_mapping"],
+    ):
+        table.add_row(item["product_item_id"], item["name"], item["type"])
+
+    console.print()
+    console.print(table)
 
 
 def main():
     try:
         cli(standalone_mode=False)
-    except Exception as e:
-        click.secho(str(e), fg="red")
+    except (ClickException, NotFoundException) as e:
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+    except Abort:
+        pass
+    except Exception:
+        console.print_exception()
 
 
 if __name__ == "__main__":

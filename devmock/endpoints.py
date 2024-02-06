@@ -74,7 +74,7 @@ def complete_order(id: str, order: Order):
 
     subscriptions = {}
 
-    for subscription in current_order["subscriptions"]:
+    for subscription in agreement["subscriptions"]:
         full_sub = load_subscription(subscription["id"])
         subscriptions[full_sub["items"][0]["lineNumber"]] = full_sub
 
@@ -82,12 +82,22 @@ def complete_order(id: str, order: Order):
         for item in current_order["items"]:
             full_sub = subscriptions[item["lineNumber"]]
             full_sub["items"][0]["quantity"] = item["quantity"]
+            full_sub["status"] = "Active"
             save_subscription(full_sub)
-
-    if current_order["type"] == "Termination":
-        agreement["status"] = "Terminated"
+        agreement["status"] = "Active"
+    elif current_order["type"] == "Termination":
+        for item in current_order["items"]:
+            full_sub = subscriptions[item["lineNumber"]]
+            full_sub["items"][0]["quantity"] = item["quantity"]
+            full_sub["status"] = "Terminated"
+            save_subscription(full_sub)
+        if all(map(lambda x: x["status"] == "Terminated", subscriptions.values())):
+            agreement["status"] = "Terminated"
+        else:
+            agreement["status"] = "Active"
     else:
         agreement["status"] = "Active"
+
     save_agreement(agreement)
     save_order(current_order)
     return current_order
@@ -141,6 +151,7 @@ def create_subscription(
             for item in subscription.items
         ],
         "startDate": subscription.start_date,
+        "status": "Active",
     }
     order["subscriptions"].append(get_reference(subscription))
     agreement["subscriptions"].append(get_reference(subscription))

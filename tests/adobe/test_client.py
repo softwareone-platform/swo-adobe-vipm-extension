@@ -11,6 +11,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_RETURN,
+    STATUS_ORDER_INACTIVE_CUSTOMER,
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
@@ -574,6 +575,13 @@ def test_search_new_and_returned_orders_by_sku_line_number(
         status=STATUS_PROCESSED,
     )
 
+    new_order_4 = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        order_id="order-on-inactive-customer",
+        external_id="ORD-4444",
+        status=STATUS_ORDER_INACTIVE_CUSTOMER,
+    )
+
     return_order_1 = adobe_order_factory(
         ORDER_TYPE_RETURN,
         order_id="returned-order",
@@ -598,7 +606,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
         status=200,
         json={
             "totalCount": 3,
-            "items": [new_order_0, new_order_1, new_order_2, new_order_3],
+            "items": [new_order_0, new_order_1, new_order_2, new_order_3, new_order_4],
             "links": {},
         },
         match=[
@@ -613,7 +621,6 @@ def test_search_new_and_returned_orders_by_sku_line_number(
             matchers.query_param_matcher(
                 {
                     "order-type": ORDER_TYPE_NEW,
-                    "status": STATUS_PROCESSED,
                     "limit": 100,
                     "offset": 0,
                 },
@@ -763,7 +770,6 @@ def test_search_new_and_returned_orders_by_sku_line_number_not_found(
             matchers.query_param_matcher(
                 {
                     "order-type": ORDER_TYPE_NEW,
-                    "status": STATUS_PROCESSED,
                     "limit": 100,
                     "offset": 0,
                 },

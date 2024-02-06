@@ -20,6 +20,7 @@ uvicorn = "^0.25.0"
 fastapi = "^0.109.0"
 lib-rql = "^2.0.0"
 faker = "^22.2.0"
+rich = "^13.7.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "7.4.*"
@@ -98,4 +99,12 @@ warn_no_return = false
 
 [[tool.mypy.overrides]]
 module = "django.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyfiglet.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "gunicorn.*"
 ignore_missing_imports = true

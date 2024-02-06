@@ -138,7 +138,7 @@ LOGGING = {
             "style": "{",
         },
         "rich": {
-            "format": "(pid={process:d} thread={thread:d}) {message}",
+            "format": "{message}",
             "style": "{",
         },
     },
@@ -148,7 +148,7 @@ LOGGING = {
             "formatter": "verbose",
         },
         "rich": {
-            "class": "rich.logging.RichHandler",
+            "class": "swo.mpt.extensions.runtime.logging.RichHandler",
             "formatter": "rich",
             "log_time_format": lambda x: x.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
             "rich_tracebacks": True,

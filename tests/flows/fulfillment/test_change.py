@@ -262,12 +262,11 @@ def test_downsizing(
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
-    adobe_subscription_factory,
 ):
     """
     Tests the processing of a change order (downsizing) including:
-        * search adobe last order by sku that must be referenced in return order
-        * adobe return order creation
+        * search adobe orders by sku that must be referenced in return orders
+        * adobe return orders creation
         * adobe preview order creation
         * adobe new order creation
         * order completion
@@ -692,8 +691,9 @@ def test_downsizing_create_new_order_error(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocked_adobe_client.search_last_order_by_sku.return_value = order_to_return
-    mocked_adobe_client.search_last_return_order_by_order.return_value = None
+    mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.return_value = [
+        (order_to_return, order_to_return["lineItems"][0], None),
+    ]
     mocked_adobe_client.create_return_order.return_value = adobe_return_order
     mocked_adobe_client.create_new_order.side_effect = adobe_error
 
@@ -826,8 +826,9 @@ def test_mixed(
     )
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.search_last_order_by_sku.return_value = order_to_return
-    mocked_adobe_client.search_last_return_order_by_order.return_value = None
+    mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.return_value = [
+        (order_to_return, order_to_return["lineItems"][0], None),
+    ]
     mocked_adobe_client.create_return_order.return_value = adobe_return_order
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocked_adobe_client.create_new_order.return_value = adobe_order

@@ -1,5 +1,8 @@
 import os
 
+import rich
+from rich.theme import Theme
+
 from swo.mpt.extensions.runtime.events.utils import instrument_logging
 from swo.mpt.extensions.runtime.utils import get_extension_app_config_name
 
@@ -12,6 +15,8 @@ def get_extension_variables():
 
 
 def initialize(options):
+    rich.reconfigure(theme=Theme({"repr.mpt_id": "bold light_salmon3"}))
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "swo.mpt.extensions.runtime.djapp.conf.default")
     import django
     from django.conf import settings

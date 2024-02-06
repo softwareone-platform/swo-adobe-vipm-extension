@@ -11,6 +11,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_RETURN,
+    STATUS_ORDER_CANCELLED,
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
@@ -194,7 +195,6 @@ class AdobeClient:
 
         new_orders_params = {
             "order-type": ORDER_TYPE_NEW,
-            "status": STATUS_PROCESSED,
             "limit": 100,
             "offset": 0,
         }
@@ -209,6 +209,8 @@ class AdobeClient:
             new_orders_response.raise_for_status()
             new_orders_page = new_orders_response.json()
             for order in new_orders_page["items"]:
+                if order["status"] not in [STATUS_PROCESSED, STATUS_ORDER_CANCELLED]:
+                    continue
                 actual_sku = get_actual_sku(order["lineItems"], sku)
                 if not actual_sku:
                     continue

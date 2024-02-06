@@ -152,3 +152,12 @@ def get_subscription_by_line_and_item_id(subscriptions, line_number, product_ite
 
         if item:
             return subscription
+
+
+def has_downsizing_items(order):
+    return bool(
+        find_first(
+            lambda x: x["quantity"] < x["oldQuantity"],
+            order["items"],
+        ),
+    )
