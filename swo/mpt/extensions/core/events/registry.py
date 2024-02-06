@@ -1,8 +1,6 @@
 from typing import Any, Callable, MutableMapping, Sequence
 
-from typing_extensions import Annotated, Doc
-
-from .dataclasses import Event
+from .dataclasses import Event, EventType
 
 EventListener = Callable[[Any, Event], None]
 
@@ -15,10 +13,7 @@ class EventsRegistry:
 
     def listener(
         self,
-        event_type: Annotated[
-            str,
-            Doc("Unique identifier of the event type."),
-        ],
+        event_type: EventType,
         /,
     ) -> Callable[[EventListener], EventListener]:
         """
@@ -46,10 +41,7 @@ class EventsRegistry:
 
     def get_listener(
         self,
-        event_type: Annotated[
-            str,
-            Doc("Unique identifier of the event type."),
-        ],
+        event_type: EventType,
     ) -> EventListener | None:
         return self.listeners.get(event_type)
 
@@ -58,9 +50,6 @@ class EventsRegistry:
 
     def is_event_supported(
         self,
-        event_type: Annotated[
-            str,
-            Doc("Unique identifier of the event type."),
-        ],
+        event_type: EventType,
     ) -> bool:
         return event_type in self.listeners

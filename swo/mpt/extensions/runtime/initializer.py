@@ -1,5 +1,6 @@
 import os
 
+from swo.mpt.extensions.runtime.events.utils import instrument_logging
 from swo.mpt.extensions.runtime.utils import get_extension_app_config_name
 
 
@@ -30,4 +31,7 @@ def initialize(options):
         "propagate": False,
     }
     settings.EXTENSION_CONFIG.update(get_extension_variables())
+
+    instrument_logging()
+
     django.setup()
