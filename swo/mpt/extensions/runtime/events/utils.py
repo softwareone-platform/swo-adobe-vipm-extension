@@ -11,7 +11,7 @@ from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from requests import Session as _Session
 from requests.adapters import HTTPAdapter, Retry
 
@@ -62,12 +62,9 @@ def instrument_logging():
         }
     )
 
-    if settings.USE_APPLICATIONINSIGHTS:
-        exporter = AzureMonitorTraceExporter(
-            connection_string=settings.APPLICATIONINSIGHTS_CONNECTION_STRING
-        )
-    else:
-        exporter = ConsoleSpanExporter()
+    exporter = AzureMonitorTraceExporter(
+        connection_string=settings.APPLICATIONINSIGHTS_CONNECTION_STRING
+    )
 
     trace_provider = TracerProvider(resource=resource)
     trace_provider.add_span_processor(BatchSpanProcessor(exporter))
