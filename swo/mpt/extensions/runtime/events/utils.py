@@ -80,7 +80,7 @@ def instrument_logging():
 
 def wrap_for_trace(func, event_type):
     @wraps(func)
-    def wrapper(client, event):
+    def opentelemetry_wrapper(client, event):
         tracer = trace.get_tracer(event_type)
         object_id = event.id
 
@@ -102,4 +102,11 @@ def wrap_for_trace(func, event_type):
                     span.set_attribute("order.id", object_id)
                     span.set_attribute("attempt", attempt)
 
-    return wrapper
+    @wraps(func)
+    def wrapper(client, event):
+        try:
+            func(client, event)
+        except Exception:
+            logger.exception("Unhandled exception!")
+
+    return opentelemetry_wrapper if settings.USE_APPLICATIONINSIGHTS else wrapper

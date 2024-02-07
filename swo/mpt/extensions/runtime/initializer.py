@@ -32,6 +32,7 @@ def initialize(options):
     }
     settings.EXTENSION_CONFIG.update(get_extension_variables())
 
-    instrument_logging()
+    if settings.USE_APPLICATIONINSIGHTS:
+        instrument_logging()
 
     django.setup()
