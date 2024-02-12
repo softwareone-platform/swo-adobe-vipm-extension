@@ -1,4 +1,4 @@
-name: SWO Marketplace Extension PR build
+name: PR build and merge
 
 on:
   pull_request:
@@ -23,28 +23,28 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Build test containers
+    - name: 'Build test containers'
       run: docker-compose build app_test
 
-    - name: Run validation & test
+    - name: 'Run validation & test'
       run: docker-compose run --service-ports app_test
 
-    - name: Fix coverage paths for SonarCloud
+    - name: 'Fix coverage paths for SonarCloud'
       run: |
         sed -i 's/\/extension\/adobe_vipm/\/github\/workspace\/adobe_vipm/g' coverage.xml
 
-    - name: SonarCloud Scan
+    - name: 'Run SonarCloud Scan'
       uses: SonarSource/sonarcloud-github-action@master
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-    - name: SonarQube Quality Gate check
+    - name: 'Run SonarQube Quality Gate check'
       uses: sonarsource/sonarqube-quality-gate-action@master
       timeout-minutes: 5
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-    - name: Stop containers
+    - name: 'Stop containers'
       if: always()
       run: docker-compose down
