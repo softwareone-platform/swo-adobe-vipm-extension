@@ -103,13 +103,13 @@ aio = ["aiohttp (>=3.0)"]
 
 [[package]]
 name = "azure-monitor-opentelemetry-exporter"
-version = "1.0.0b21"
+version = "1.0.0b22"
 description = "Microsoft Azure Monitor Opentelemetry Exporter Client Library for Python"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "azure-monitor-opentelemetry-exporter-1.0.0b21.tar.gz", hash = "sha256:2669f583728c1f46ba81f7d0d7e3614838c31f17c2686b2a74ce0c7f3ecdd420"},
-    {file = "azure_monitor_opentelemetry_exporter-1.0.0b21-py2.py3-none-any.whl", hash = "sha256:fb0ace7666b6bf815b2469b0ade07c0cc3e0c0381299f6e5812d5d8d32229f6e"},
+    {file = "azure-monitor-opentelemetry-exporter-1.0.0b22.tar.gz", hash = "sha256:84edad0f142c4c007e2bf93eb4c0fdf79f81ad301d34ccd975a5fd239ecb4eb2"},
+    {file = "azure_monitor_opentelemetry_exporter-1.0.0b22-py2.py3-none-any.whl", hash = "sha256:959fcf9832c9e9720eafc6952f08592c87492cc18169dfb85bc9fc994c58db9b"},
 ]
 
 [package.dependencies]
