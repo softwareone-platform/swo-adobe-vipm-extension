@@ -10,7 +10,11 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_ORDER_STATUSES,
 )
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.flows.constants import ORDER_TYPE_CHANGE, PARAM_SUBSCRIPTION_ID
+from adobe_vipm.flows.constants import (
+    ORDER_TYPE_CHANGE,
+    ORDER_TYPE_TERMINATION,
+    PARAM_SUBSCRIPTION_ID,
+)
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
@@ -28,6 +32,7 @@ from adobe_vipm.flows.utils import (
     get_order_item,
     get_retry_count,
     get_subscription_by_line_and_item_id,
+    has_downsizing_items,
     increment_retry_count,
     is_purchase_order,
     reset_retry_count,
@@ -97,6 +102,41 @@ def _create_subscription(mpt_client, seller_country, customer_id, order, item):
     )
 
 
+def _place_return_orders(mpt_client, seller_country, customer_id, order):
+    adobe_client = get_adobe_client()
+    completed_order_ids = []
+    pending_order_ids = []
+    for item in order["items"]:
+        if item["oldQuantity"] <= item["quantity"]:
+            continue
+        orders_4_item = adobe_client.search_new_and_returned_orders_by_sku_line_number(
+            seller_country,
+            customer_id,
+            item["productItemId"],
+            item["lineNumber"],
+        )
+        for order_to_return, item_to_return, return_order in orders_4_item:
+            if not return_order:
+                logger.debug(f"Return order not found for {item['productItemId']}")
+                return_order = adobe_client.create_return_order(
+                    seller_country,
+                    customer_id,
+                    order_to_return,
+                    item_to_return,
+                )
+                logger.debug(f"Return order created for a return order for item: {item}")
+            if return_order["status"] == STATUS_PENDING:
+                pending_order_ids.append(return_order["orderId"])
+            else:
+                completed_order_ids.append(return_order["orderId"])
+
+    if pending_order_ids:
+        _handle_retries(mpt_client, order, ", ".join(pending_order_ids), adobe_order_type="RETURN")
+        return None
+
+    return completed_order_ids
+
+
 def _place_new_order(mpt_client, seller_country, customer_id, order):
     adobe_client = get_adobe_client()
     adobe_order = None
@@ -125,36 +165,16 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
     adobe_order = None
     try:
         preview_order = adobe_client.create_preview_order(seller_country, customer_id, order)
-
-        pending_order_ids = []
-        for item in order["items"]:
-            if item["oldQuantity"] <= item["quantity"]:
-                continue
-            orders_4_item = adobe_client.search_new_and_returned_orders_by_sku_line_number(
+        if has_downsizing_items(order):
+            completed_return_orders = _place_return_orders(
+                mpt_client,
                 seller_country,
                 customer_id,
-                item["productItemId"],
-                item["lineNumber"],
+                order,
             )
-            for order_to_return, item_to_return, return_order in orders_4_item:
-                if not return_order:
-                    logger.debug(f"Return order not found for {item['productItemId']}")
-                    return_order = adobe_client.create_return_order(
-                        seller_country,
-                        customer_id,
-                        order_to_return,
-                        item_to_return,
-                    )
-                    logger.debug(f"Return order created for a return order for item: {item}")
 
-                if return_order["status"] == STATUS_PENDING:
-                    pending_order_ids.append(return_order["orderId"])
-
-        if pending_order_ids:
-            _handle_retries(
-                mpt_client, order, ", ".join(pending_order_ids), adobe_order_type="RETURN"
-            )
-            return None, None
+            if not completed_return_orders:
+                return None, None
 
         adobe_order = adobe_client.create_new_order(
             seller_country,
@@ -259,6 +279,14 @@ def _fulfill_change_order(mpt_client, seller_country, order):
     _complete_order(mpt_client, order)
 
 
+def _fulfill_termination_order(mpt_client, seller_country, order):
+    customer_id = get_adobe_customer_id(order)
+
+    completed_return_orders = _place_return_orders(mpt_client, seller_country, customer_id, order)
+    if completed_return_orders:
+        _complete_order(mpt_client, order)
+
+
 def fulfill_order(client, order):
     logger.info(f'Start processing {order["type"]} order {order["id"]}')
     agreement = get_agreement(client, order["agreement"]["id"])
@@ -267,5 +295,7 @@ def fulfill_order(client, order):
     seller_country = seller["address"]["country"]
     if is_purchase_order(order):
         _fulfill_purchase_order(client, seller_country, agreement, order)
-    elif order["type"] == ORDER_TYPE_CHANGE:  # pragma: no branch
+    elif order["type"] == ORDER_TYPE_CHANGE:
         _fulfill_change_order(client, seller_country, order)
+    elif order["type"] == ORDER_TYPE_TERMINATION:  # pragma: no branch
+        _fulfill_termination_order(client, seller_country, order)

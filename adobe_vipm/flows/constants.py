@@ -1,5 +1,6 @@
 ORDER_TYPE_PURCHASE = "Purchase"
 ORDER_TYPE_CHANGE = "Change"
+ORDER_TYPE_TERMINATION = "Termination"
 
 PARAM_ADDRESS = "Address"
 PARAM_COMPANY_NAME = "CompanyName"

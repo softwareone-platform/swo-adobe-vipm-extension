@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: prod.Dockerfile
     working_dir: /extension
-    command: bash -c "poetry install --only-root && swoext run"
+    command: bash -c "poetry install --only-root && swoext run --no-color"
     volumes: 
       - .:/extension
     environment:
