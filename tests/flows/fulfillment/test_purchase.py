@@ -35,7 +35,6 @@ def test_no_customer(
 
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
 
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocker.patch("adobe_vipm.flows.fulfillment.get_buyer", return_value=buyer)
     mocked_get_seller = mocker.patch("adobe_vipm.flows.fulfillment.get_seller", return_value=seller)
     mocked_create_customer_account = mocker.patch(
@@ -184,7 +183,6 @@ def test_customer_already_created(
     Tests the processing of a purchase order with the customer already created.
     Adobe returns that the order is still processing.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -352,7 +350,6 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
     on Adobe side. The RetryCount fullfilment paramter must be incremented.
     The purchase order will not be completed and the processing will be stopped.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -410,7 +407,6 @@ def test_customer_already_created_order_already_created_max_retries_reached(
     attemps has been reached.
     The order will be failed with a message saying that this maximum has been reached.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -461,7 +457,6 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
     Tests the processing of a purchase order when the Adobe order has been processed unsuccessfully.
     The purchase order will be failed and with a message that describe the error returned by Adobe.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -509,7 +504,6 @@ def test_customer_already_created_order_already_created_unexpected_status(
     The purchase order will be failed and with a message that explain that Adobe returned an
     unexpected error.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,

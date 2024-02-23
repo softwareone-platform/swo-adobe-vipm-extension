@@ -28,7 +28,6 @@ def test_upsizing(
     Tests a change order in case of upsizing.
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -143,7 +142,6 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
     Tests the processing of an change order (upsizing) that has been placed in the previous
     attemp and still pending.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -272,7 +270,6 @@ def test_downsizing(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -394,7 +391,6 @@ def test_downsizing_return_order_exists(
     The return order will not be placed again.
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -507,7 +503,6 @@ def test_downsizing_return_order_pending(
     The return order will not be placed again.
     The new order will not be placed yet.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -591,7 +586,6 @@ def test_downsizing_new_order_pending(
     The return order will not be placed again.
     The RetryCount parameter will be set to 1.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -748,7 +742,6 @@ def test_mixed(
         * subscription creation for new item
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,

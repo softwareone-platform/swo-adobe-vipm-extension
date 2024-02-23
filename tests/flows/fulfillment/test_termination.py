@@ -28,7 +28,6 @@ def test_termination(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -115,7 +114,6 @@ def test_termination_return_order_pending(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -197,7 +195,6 @@ def test_termination_out_window(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,

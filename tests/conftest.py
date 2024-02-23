@@ -9,12 +9,6 @@ from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import APIToken, Credentials
 
 
-def get_reference(obj, fields=None):
-    return {
-        k: v for k, v in obj.items() if k in (fields or ("id", "href", "name", "icon", "product"))
-    }
-
-
 @pytest.fixture()
 def requests_mocker():
     """
@@ -297,7 +291,7 @@ def order_factory(
         order = {
             "id": "ORD-0792-5000-2253-4210",
             "href": "/commerce/orders/ORD-0792-5000-2253-4210",
-            "agreement": get_reference(agreement),
+            "agreement": agreement,
             "type": order_type,
             "status": "Processing",
             "clientReferenceNumber": None,
