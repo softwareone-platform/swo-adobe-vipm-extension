@@ -289,6 +289,7 @@ def test_create_preview_order(
         reseller_country,
         customer_id,
         order,
+        order["items"],
     )
     assert preview_order == {
         "orderId": "adobe-order-id",
@@ -323,6 +324,7 @@ def test_create_preview_order_bad_request(
             reseller_country,
             customer_id,
             order,
+            order["items"],
         )
 
     assert repr(cv.value) == str(error)
@@ -892,6 +894,92 @@ def test_create_return_order_bad_request(
         )
 
     assert repr(cv.value) == str(error)
+
+
+@pytest.mark.parametrize(
+    "update_params",
+    [
+        {"auto_renewal": True},
+        {"auto_renewal": False},
+        {"auto_renewal": True, "quantity": 3},
+        {"auto_renewal": False, "quantity": 6},
+        {"quantity": 3},
+        {"quantity": 6},
+    ],
+)
+def test_update_subscription(
+    requests_mocker, adobe_client_factory, adobe_config_file, update_params
+):
+    """
+    Tests the update of a subscription.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    customer_id = "a-customer"
+    sub_id = "a-sub-id"
+
+    client, credentials, api_token = adobe_client_factory()
+
+    body_to_match = {
+        "autoRenewal": {
+            "enabled": update_params.get("auto_renewal", True),
+        },
+    }
+    if "quantity" in update_params:
+        body_to_match["autoRenewal"]["quantity"] = update_params["quantity"]
+
+    requests_mocker.patch(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
+        ),
+        status=200,
+        json={"a": "subscription"},
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+            matchers.json_params_matcher(body_to_match),
+        ],
+    )
+
+    assert client.update_subscription(
+        reseller_country,
+        customer_id,
+        sub_id,
+        **update_params,
+    ) == {"a": "subscription"}
+
+
+def test_update_subscription_not_found(
+    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+):
+    """
+    Tests the update of a subscription when it doesn't exist.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    customer_id = "a-customer"
+    sub_id = "a-sub-id"
+
+    client, _, _ = adobe_client_factory()
+
+    requests_mocker.patch(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
+        ),
+        status=404,
+        json=adobe_api_error_factory("404", "Not Found"),
+    )
+
+    with pytest.raises(AdobeError) as cv:
+        client.update_subscription(reseller_country, customer_id, sub_id, quantity=10)
+
+    assert cv.value.code == "404"
 
 
 def test_get_auth_token(requests_mocker, mock_adobe_config, adobe_config_file):

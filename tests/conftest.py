@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import responses
@@ -207,10 +207,11 @@ def subscriptions_factory(items_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
         product_name="Awesome product",
-        adobe_subscription_id="ffe5d0e78b411fa199dd29401ba37bNA",
-        start_date="2024-01-11T08:53:37Z",
+        adobe_subscription_id="a-sub-id",
+        start_date=None,
         items=None,
     ):
+        start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
         items = items_factory() if items is None else items
         return [
             {

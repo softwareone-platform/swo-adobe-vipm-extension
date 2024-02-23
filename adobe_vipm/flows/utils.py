@@ -1,6 +1,8 @@
 import copy
+from datetime import UTC, datetime
 
 from adobe_vipm.flows.constants import (
+    CANCELLATION_WINDOW_DAYS,
     ORDER_TYPE_PURCHASE,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
@@ -9,14 +11,16 @@ from adobe_vipm.flows.constants import (
     PARAM_MEMBERSHIP_ID,
     PARAM_PREFERRED_LANGUAGE,
     PARAM_RETRY_COUNT,
+    PARAM_SUBSCRIPTION_ID,
 )
+from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.utils import find_first
 
 
-def get_parameter(order, parameter_phase, parameter_name):
+def get_parameter(object, parameter_phase, parameter_name):
     return find_first(
         lambda x: x["name"] == parameter_name,
-        order["parameters"][parameter_phase],
+        object["parameters"][parameter_phase],
         default={},
     )
 
@@ -143,7 +147,7 @@ def get_retry_count(order):
     )
 
 
-def get_subscription_by_line_and_item_id(subscriptions, line_number, product_item_id):
+def get_subscription_by_line_and_item_id(subscriptions, product_item_id, line_number):
     for subscription in subscriptions:
         item = find_first(
             lambda x: x["lineNumber"] == line_number and x["productItemId"] == product_item_id,
@@ -154,10 +158,42 @@ def get_subscription_by_line_and_item_id(subscriptions, line_number, product_ite
             return subscription
 
 
-def has_downsizing_items(order):
-    return bool(
-        find_first(
-            lambda x: x["quantity"] < x["oldQuantity"],
-            order["items"],
-        ),
+def get_adobe_subscription_id(source):
+    return get_parameter(
+        source,
+        "fulfillment",
+        PARAM_SUBSCRIPTION_ID,
+    ).get("value")
+
+
+def in_cancellation_window(order, item):
+    subscription = get_subscription_by_line_and_item_id(
+        order["subscriptions"],
+        item["productItemId"],
+        item["lineNumber"],
+    )
+    creation_date = datetime.fromisoformat(subscription["startDate"])
+    delta = datetime.now(UTC) - creation_date
+    return delta.days < CANCELLATION_WINDOW_DAYS
+
+
+def group_items_by_type(order):
+    upsizing_items = filter(
+        lambda item: item["quantity"] > item["oldQuantity"],
+        order["items"],
+    )
+    downsizing_items_in_window = filter(
+        lambda item: item["quantity"] < item["oldQuantity"] and in_cancellation_window(order, item),
+        order["items"],
+    )
+    downsizing_items_out_window = filter(
+        lambda item: item["quantity"] < item["oldQuantity"]
+        and not in_cancellation_window(order, item),
+        order["items"],
+    )
+
+    return ItemGroups(
+        list(upsizing_items),
+        list(downsizing_items_in_window),
+        list(downsizing_items_out_window),
     )

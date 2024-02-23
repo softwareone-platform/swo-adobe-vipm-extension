@@ -91,6 +91,9 @@ def test_no_customer(
     )
 
     order = order_factory()
+    order_with_customer_param = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
+    )
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -106,9 +109,8 @@ def test_no_customer(
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         seller_country,
         "a-client-id",
-        order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
-        ),
+        order_with_customer_param,
+        order_with_customer_param["items"],
     )
 
     assert mocked_update_order.mock_calls[0].args == (
@@ -227,9 +229,8 @@ def test_customer_already_created(
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         seller_country,
         "a-client-id",
-        order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
-        ),
+        order,
+        order["items"],
     )
 
     assert mocked_update_order.mock_calls[0].args == (

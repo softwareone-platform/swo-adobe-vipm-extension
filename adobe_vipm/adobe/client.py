@@ -326,6 +326,7 @@ class AdobeClient:
         reseller_country: str,
         customer_id: str,
         order: dict,
+        items: list,
     ) -> dict:
         """
         Creates an order of type PREVIEW for a given Marketplace platform order.
@@ -353,7 +354,7 @@ class AdobeClient:
             "lineItems": [],
         }
 
-        for item in order["items"]:
+        for item in items:
             product: AdobeProduct = self._config.get_adobe_product(item["productItemId"])
             quantity = item["quantity"]
             old_quantity = item["oldQuantity"]
@@ -486,6 +487,56 @@ class AdobeClient:
                 f"/v3/customers/{customer_id}/subscriptions/{subscription_id}",
             ),
             headers=headers,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def update_subscription(
+        self,
+        reseller_country: str,
+        customer_id: str,
+        subscription_id: str,
+        auto_renewal: bool = True,
+        quantity: int | None = None,
+    ) -> dict:
+        """
+        Update a subscription either to reduce the quantity on the anniversary date either
+        to switch auto renewal off.
+        The `reseller_country` is used to select the reseller and the Adobe credentials
+        of the account to which the reseller belong to.
+
+        Args:
+            reseller_country (str): The country of the reseller to which the customer account
+            belongs to.
+            customer_id (str): Identifier of the customer to which the subscription belongs to.
+            subscription_id (str): Identifier of the subscription that must be retrieved.
+            auto_renewal (boolean): Set if the subscription must be auto renewed on the anniversary
+            date or not. Default to True.
+            quantity: The quantity of licenses that must be renewed on the anniversary date. Default
+            to None mean to leave it unchanged.
+
+        Returns:
+            str: The retrieved subscription.
+        """
+        reseller: Reseller = self._config.get_reseller(reseller_country)
+        headers = self._get_headers(reseller.distributor.credentials)
+        payload = {
+            "autoRenewal": {
+                "enabled": auto_renewal,
+            },
+        }
+        if quantity:
+            payload["autoRenewal"]["quantity"] = quantity
+
+        response = requests.patch(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/customers/{customer_id}/subscriptions/{subscription_id}",
+            ),
+            headers=headers,
+            json=payload,
         )
 
         response.raise_for_status()
