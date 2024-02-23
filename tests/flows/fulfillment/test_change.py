@@ -87,10 +87,6 @@ def test_upsizing(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
-        return_value=subscriptions,
-    )
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 
@@ -349,10 +345,6 @@ def test_downsizing(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
-        return_value=subscriptions,
-    )
 
     fulfill_order(mocked_mpt_client, processing_order)
 
@@ -475,10 +467,6 @@ def test_downsizing_return_order_exists(
     )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
-        return_value=subscriptions,
     )
 
     fulfill_order(mocked_mpt_client, processing_order)
@@ -951,10 +939,6 @@ def test_mixed(
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_order_subscriptions",
-        return_value=order_subscriptions,
     )
 
     fulfill_order(mocked_mpt_client, processing_change_order)

@@ -77,25 +77,3 @@ def create_subscription(mpt_client, order_id, payload):
     )
     response.raise_for_status()
     return response.json()
-
-
-@wrap_http_error
-def get_order_subscriptions(mpt_client, order_id):
-    subscriptions = []
-    page = None
-    limit = 10
-    offset = 0
-    while _has_more_pages(page):
-        response = mpt_client.get(
-            f"/commerce/orders/{order_id}/subscriptions",
-            params={
-                "limit": limit,
-                "offset": offset,
-            },
-        )
-        response.raise_for_status()
-        page = response.json()
-        subscriptions.extend(page["data"])
-        offset += limit
-
-    return subscriptions
