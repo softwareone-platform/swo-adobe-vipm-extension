@@ -36,7 +36,15 @@ def list_orders(request: Request):
 
     for order_file in order_files:
         with open(os.path.join(ORDERS_FOLDER, order_file), "r") as f:
-            orders.append(json.load(f))
+            order = json.load(f)
+            agreement = load_agreement(order["agreement"]["id"])
+            order["agreement"] = agreement
+            subscriptions = [
+                load_subscription(subscription["id"]) for subscription in order["subscriptions"]
+            ]
+            order["subscriptions"] = subscriptions
+            orders.append(order)
+
     query = unquote(request.scope.get("query_string", b"").decode())
     filter_instance = OrdersFilter()
     filtered_orders, count, limit, offset = filter_instance.apply(query, orders)

@@ -1,9 +1,10 @@
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import Callable, ParamSpec, TypeVar
 
 from requests import HTTPError
 
-T = TypeVar("T")
+Param = ParamSpec("Param")
+RetType = TypeVar("RetType")
 
 
 class AdobeError(Exception):
@@ -39,9 +40,9 @@ class AdobeAPIError(AdobeError):
         return str(self.payload)
 
 
-def wrap_http_error(func: Callable[..., T]):
+def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
     @wraps(func)
-    def _wrapper(*args, **kwargs) -> T:
+    def _wrapper(*args: Param.args, **kwargs: Param.kwargs) -> RetType:
         try:
             return func(*args, **kwargs)
         except HTTPError as e:

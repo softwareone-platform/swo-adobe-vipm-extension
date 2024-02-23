@@ -19,9 +19,7 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
-    get_agreement,
     get_buyer,
-    get_order_subscriptions,
     get_seller,
     update_order,
 )
@@ -29,10 +27,11 @@ from adobe_vipm.flows.shared import create_customer_account
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
+    get_adobe_subscription_id,
     get_order_item,
     get_retry_count,
     get_subscription_by_line_and_item_id,
-    has_downsizing_items,
+    group_items_by_type,
     increment_retry_count,
     is_purchase_order,
     reset_retry_count,
@@ -102,13 +101,44 @@ def _create_subscription(mpt_client, seller_country, customer_id, order, item):
     )
 
 
-def _place_return_orders(mpt_client, seller_country, customer_id, order):
+def _update_adobe_subscriptions(seller_country, customer_id, order, items):
+    adobe_client = get_adobe_client()
+    for item in items:
+        subcription = get_subscription_by_line_and_item_id(
+            order["subscriptions"],
+            item["productItemId"],
+            item["lineNumber"],
+        )
+        adobe_sub_id = get_adobe_subscription_id(subcription)
+        adobe_subscription = adobe_client.get_subscription(
+            seller_country,
+            customer_id,
+            adobe_sub_id,
+        )
+        if order["type"] == ORDER_TYPE_TERMINATION and adobe_subscription["autoRenewal"]["enabled"]:
+            adobe_client.update_subscription(
+                seller_country,
+                customer_id,
+                adobe_sub_id,
+                auto_renewal=False,
+            )
+        if (
+            order["type"] == ORDER_TYPE_CHANGE
+            and adobe_subscription["autoRenewal"]["renewalQuantity"] != item["quantity"]
+        ):
+            adobe_client.update_subscription(
+                seller_country,
+                customer_id,
+                adobe_sub_id,
+                quantity=item["quantity"],
+            )
+
+
+def _place_return_orders(mpt_client, seller_country, customer_id, order, items):
     adobe_client = get_adobe_client()
     completed_order_ids = []
     pending_order_ids = []
-    for item in order["items"]:
-        if item["oldQuantity"] <= item["quantity"]:
-            continue
+    for item in items:
         orders_4_item = adobe_client.search_new_and_returned_orders_by_sku_line_number(
             seller_country,
             customer_id,
@@ -141,7 +171,9 @@ def _place_new_order(mpt_client, seller_country, customer_id, order):
     adobe_client = get_adobe_client()
     adobe_order = None
     try:
-        preview_order = adobe_client.create_preview_order(seller_country, customer_id, order)
+        preview_order = adobe_client.create_preview_order(
+            seller_country, customer_id, order, order["items"]
+        )
         adobe_order = adobe_client.create_new_order(
             seller_country,
             customer_id,
@@ -163,14 +195,29 @@ def _place_new_order(mpt_client, seller_country, customer_id, order):
 def _place_change_order(mpt_client, seller_country, customer_id, order):
     adobe_client = get_adobe_client()
     adobe_order = None
+    grouped_items = group_items_by_type(order)
+
     try:
-        preview_order = adobe_client.create_preview_order(seller_country, customer_id, order)
-        if has_downsizing_items(order):
+        preview_order = adobe_client.create_preview_order(
+            seller_country,
+            customer_id,
+            order,
+            grouped_items.upsizing + grouped_items.downsizing_in_win,
+        )
+        if grouped_items.downsizing_out_win:
+            _update_adobe_subscriptions(
+                seller_country,
+                customer_id,
+                order,
+                grouped_items.downsizing_out_win,
+            )
+        if grouped_items.downsizing_in_win:
             completed_return_orders = _place_return_orders(
                 mpt_client,
                 seller_country,
                 customer_id,
                 order,
+                grouped_items.downsizing_in_win,
             )
 
             if not completed_return_orders:
@@ -217,8 +264,8 @@ def _check_adobe_order_fulfilled(mpt_client, seller_country, order, customer_id,
     return adobe_order
 
 
-def _fulfill_purchase_order(mpt_client, seller_country, agreement, order):
-    buyer_id = agreement["buyer"]["id"]
+def _fulfill_purchase_order(mpt_client, seller_country, order):
+    buyer_id = order["agreement"]["buyer"]["id"]
     buyer = get_buyer(mpt_client, buyer_id)
     customer_id = get_adobe_customer_id(order)
     if not customer_id:
@@ -261,17 +308,15 @@ def _fulfill_change_order(mpt_client, seller_country, order):
     if not adobe_order:
         return
 
-    subscriptions = get_order_subscriptions(mpt_client, order["id"])
-
     for item in adobe_order["lineItems"]:
         order_item = get_order_item(
             order,
             item["extLineItemNumber"],
         )
         order_subscription = get_subscription_by_line_and_item_id(
-            subscriptions,
-            order_item["lineNumber"],
+            order["subscriptions"],
             order_item["productItemId"],
+            order_item["lineNumber"],
         )
         if not order_subscription:
             _create_subscription(mpt_client, seller_country, customer_id, order, item)
@@ -282,19 +327,34 @@ def _fulfill_change_order(mpt_client, seller_country, order):
 def _fulfill_termination_order(mpt_client, seller_country, order):
     customer_id = get_adobe_customer_id(order)
 
-    completed_return_orders = _place_return_orders(mpt_client, seller_country, customer_id, order)
-    if completed_return_orders:
+    grouped_items = group_items_by_type(order)
+    if grouped_items.downsizing_out_win:
+        _update_adobe_subscriptions(
+            seller_country, customer_id, order, grouped_items.downsizing_out_win
+        )
+
+    has_orders_to_return = bool(grouped_items.upsizing + grouped_items.downsizing_in_win)
+    completed_return_orders = None
+
+    if has_orders_to_return:
+        completed_return_orders = _place_return_orders(
+            mpt_client,
+            seller_country,
+            customer_id,
+            order,
+            grouped_items.upsizing + grouped_items.downsizing_in_win,
+        )
+    if not has_orders_to_return or has_orders_to_return and completed_return_orders:
         _complete_order(mpt_client, order)
 
 
 def fulfill_order(client, order):
     logger.info(f'Start processing {order["type"]} order {order["id"]}')
-    agreement = get_agreement(client, order["agreement"]["id"])
-    seller_id = agreement["seller"]["id"]
+    seller_id = order["agreement"]["seller"]["id"]
     seller = get_seller(client, seller_id)
     seller_country = seller["address"]["country"]
     if is_purchase_order(order):
-        _fulfill_purchase_order(client, seller_country, agreement, order)
+        _fulfill_purchase_order(client, seller_country, order)
     elif order["type"] == ORDER_TYPE_CHANGE:
         _fulfill_change_order(client, seller_country, order)
     elif order["type"] == ORDER_TYPE_TERMINATION:  # pragma: no branch

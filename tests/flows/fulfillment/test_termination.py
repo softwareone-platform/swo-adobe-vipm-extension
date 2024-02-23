@@ -1,10 +1,12 @@
+from datetime import UTC, datetime, timedelta
+
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_RETURN,
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
-from adobe_vipm.flows.constants import ORDER_TYPE_TERMINATION
+from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS, ORDER_TYPE_TERMINATION
 from adobe_vipm.flows.fulfillment import fulfill_order
 
 
@@ -16,6 +18,7 @@ def test_termination(
     order_factory,
     items_factory,
     fulfillment_parameters_factory,
+    subscriptions_factory,
     adobe_order_factory,
 ):
     """
@@ -25,7 +28,6 @@ def test_termination(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -57,6 +59,7 @@ def test_termination(
             old_quantity=20,
             quantity=10,
         ),
+        subscriptions=subscriptions_factory(items=items_factory(quantity=10)),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
         ),
@@ -100,6 +103,7 @@ def test_termination_return_order_pending(
     seller,
     order_factory,
     items_factory,
+    subscriptions_factory,
     fulfillment_parameters_factory,
     adobe_order_factory,
 ):
@@ -110,7 +114,6 @@ def test_termination_return_order_pending(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_get_seller = mocker.patch(
         "adobe_vipm.flows.fulfillment.get_seller",
         return_value=seller,
@@ -142,6 +145,7 @@ def test_termination_return_order_pending(
             old_quantity=20,
             quantity=10,
         ),
+        subscriptions=subscriptions_factory(items=items_factory(quantity=10)),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
         ),
@@ -172,3 +176,80 @@ def test_termination_return_order_pending(
     )
 
     mocked_complete_order.assert_not_called()
+
+
+def test_termination_out_window(
+    mocker,
+    settings,
+    agreement,
+    seller,
+    order_factory,
+    items_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_subscription_factory,
+):
+    """
+    Tests the processing of a termination order outside the cancellation window:
+        * update subscription auto renewal
+        * order completion
+    """
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
+    mocked_get_seller = mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_seller",
+        return_value=seller,
+    )
+
+    adobe_subscription = adobe_subscription_factory()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    processing_order = order_factory(
+        order_type=ORDER_TYPE_TERMINATION,
+        items=items_factory(
+            old_quantity=20,
+            quantity=10,
+        ),
+        subscriptions=subscriptions_factory(
+            items=items_factory(),
+            start_date=datetime.now(UTC) - timedelta(days=CANCELLATION_WINDOW_DAYS + 1),
+        ),
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+        ),
+        order_parameters=[],
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.update_order",
+        return_value=processing_order,
+    )
+
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.complete_order",
+    )
+
+    fulfill_order(mocked_mpt_client, processing_order)
+
+    seller_country = seller["address"]["country"]
+
+    mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
+    mocked_adobe_client.update_subscription.assert_called_once_with(
+        seller_country,
+        "a-client-id",
+        adobe_subscription["subscriptionId"],
+        auto_renewal=False,
+    )
+
+    mocked_complete_order.assert_called_once_with(
+        mocked_mpt_client,
+        processing_order["id"],
+        "TPL-1111",
+    )

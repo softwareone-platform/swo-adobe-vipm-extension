@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import responses
@@ -7,12 +7,6 @@ from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import APIToken, Credentials
-
-
-def get_reference(obj, fields=None):
-    return {
-        k: v for k, v in obj.items() if k in (fields or ("id", "href", "name", "icon", "product"))
-    }
 
 
 @pytest.fixture()
@@ -207,10 +201,11 @@ def subscriptions_factory(items_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
         product_name="Awesome product",
-        adobe_subscription_id="ffe5d0e78b411fa199dd29401ba37bNA",
-        start_date="2024-01-11T08:53:37Z",
+        adobe_subscription_id="a-sub-id",
+        start_date=None,
         items=None,
     ):
+        start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
         items = items_factory() if items is None else items
         return [
             {
@@ -296,7 +291,7 @@ def order_factory(
         order = {
             "id": "ORD-0792-5000-2253-4210",
             "href": "/commerce/orders/ORD-0792-5000-2253-4210",
-            "agreement": get_reference(agreement),
+            "agreement": agreement,
             "type": order_type,
             "status": "Processing",
             "clientReferenceNumber": None,
