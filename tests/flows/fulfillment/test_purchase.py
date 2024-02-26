@@ -15,7 +15,6 @@ from adobe_vipm.flows.fulfillment import fulfill_order
 def test_no_customer(
     mocker,
     settings,
-    agreement,
     buyer,
     seller,
     order_factory,
@@ -108,7 +107,7 @@ def test_no_customer(
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         seller_country,
         "a-client-id",
-        order_with_customer_param,
+        order_with_customer_param["id"],
         order_with_customer_param["items"],
     )
 
@@ -172,7 +171,6 @@ def test_no_customer(
 
 def test_customer_already_created(
     mocker,
-    agreement,
     seller,
     order_factory,
     order_parameters_factory,
@@ -227,7 +225,7 @@ def test_customer_already_created(
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         seller_country,
         "a-client-id",
-        order,
+        order["id"],
         order["items"],
     )
 
@@ -338,7 +336,6 @@ def test_create_adobe_preview_order_error(
 
 def test_customer_and_order_already_created_adobe_order_not_ready(
     mocker,
-    agreement,
     seller,
     order_factory,
     order_parameters_factory,
@@ -397,7 +394,6 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
 
 def test_customer_already_created_order_already_created_max_retries_reached(
     mocker,
-    agreement,
     seller,
     order_factory,
     fulfillment_parameters_factory,
@@ -447,7 +443,6 @@ def test_customer_already_created_order_already_created_max_retries_reached(
 )
 def test_customer_already_created_order_already_created_unrecoverable_status(
     mocker,
-    agreement,
     seller,
     order_factory,
     fulfillment_parameters_factory,
@@ -493,7 +488,6 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
 
 def test_customer_already_created_order_already_created_unexpected_status(
     mocker,
-    agreement,
     seller,
     order_factory,
     fulfillment_parameters_factory,

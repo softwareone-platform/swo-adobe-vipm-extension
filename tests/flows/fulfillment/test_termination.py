@@ -13,7 +13,6 @@ from adobe_vipm.flows.fulfillment import fulfill_order
 def test_termination(
     mocker,
     settings,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -99,7 +98,6 @@ def test_termination(
 def test_termination_return_order_pending(
     mocker,
     settings,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -181,7 +179,6 @@ def test_termination_return_order_pending(
 def test_termination_out_window(
     mocker,
     settings,
-    agreement,
     seller,
     order_factory,
     items_factory,

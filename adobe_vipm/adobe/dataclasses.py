@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import List
 
 
 @dataclass(frozen=True)
@@ -39,3 +40,13 @@ class AdobeProduct:
     sku: str
     name: str
     type: str
+
+
+@dataclass(frozen=True)
+class Country:
+    code: str
+    name: str
+    states_or_provinces: List[str]
+    currencies: List[str]
+    pricelist_region: str
+    postal_code_format_regex: str

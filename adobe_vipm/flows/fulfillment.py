@@ -172,7 +172,7 @@ def _place_new_order(mpt_client, seller_country, customer_id, order):
     adobe_order = None
     try:
         preview_order = adobe_client.create_preview_order(
-            seller_country, customer_id, order, order["items"]
+            seller_country, customer_id, order["id"], order["items"]
         )
         adobe_order = adobe_client.create_new_order(
             seller_country,
@@ -201,7 +201,7 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
         preview_order = adobe_client.create_preview_order(
             seller_country,
             customer_id,
-            order,
+            order["id"],
             grouped_items.upsizing + grouped_items.downsizing_in_win,
         )
         if grouped_items.downsizing_out_win:

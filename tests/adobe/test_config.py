@@ -5,12 +5,14 @@ import pytest
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.dataclasses import (
     AdobeProduct,
+    Country,
     Credentials,
     Distributor,
     Reseller,
 )
 from adobe_vipm.adobe.errors import (
     AdobeProductNotFoundError,
+    CountryNotFoundError,
     DistributorNotFoundError,
     ResellerNotFoundError,
 )
@@ -24,6 +26,7 @@ def test_properties(mock_adobe_config, adobe_config_file):
     assert c.api_base_url == adobe_config_file["api_base_url"]
     assert c.auth_endpoint_url == adobe_config_file["authentication_endpoint_url"]
     assert c.api_scopes == ",".join(adobe_config_file["scopes"])
+    assert c.language_codes == ["en-US"]
 
 
 def test_get_reseller(mock_adobe_config, adobe_config_file):
@@ -94,20 +97,20 @@ def test_get_distributor_not_found(mock_adobe_config):
     with pytest.raises(DistributorNotFoundError) as cv:
         assert c.get_distributor("MX")
 
-    assert str(cv.value) == "Distributor not found for region MX."
+    assert str(cv.value) == "Distributor not found for pricelist region MX."
 
 
 def test_get_adobe_product(mock_adobe_config, adobe_config_file):
     """
     Test the lookup the Product object by product item identifier.
     """
-    product_item_id = adobe_config_file["skus_mapping"][0]["product_item_id"]
+    vendor_external_id = adobe_config_file["skus_mapping"][0]["vendor_external_id"]
     name = adobe_config_file["skus_mapping"][0]["name"]
     sku = adobe_config_file["skus_mapping"][0]["sku"]
     type = adobe_config_file["skus_mapping"][0]["type"]
 
     c = Config()
-    product = c.get_adobe_product(product_item_id)
+    product = c.get_adobe_product(vendor_external_id)
     assert isinstance(product, AdobeProduct)
     assert product.sku == sku
     assert product.name == name
@@ -124,6 +127,34 @@ def test_get_adobe_product_not_found(mock_adobe_config):
         assert c.get_adobe_product("not-found")
 
     assert str(cv.value) == "AdobeProduct with id not-found not found."
+
+
+def test_get_country(mock_adobe_config, adobe_config_file):
+    """
+    Test the lookup the Country object by country code (ISO 3166-2).
+    """
+
+    c = Config()
+    country = c.get_country("US")
+    assert isinstance(country, Country)
+    assert country.code == "US"
+    assert country.currencies == ["USD"]
+    assert country.name == "United States"
+    assert len(country.states_or_provinces) == 55
+    assert country.pricelist_region == "NA"
+    assert country.postal_code_format_regex == "^[\\d]{5}(?:-[\\d]{4})?$"
+
+
+def test_get_country_not_found(mock_adobe_config):
+    """
+    Check that the lookup of the country raises `CountryNotFoundError`
+    if there is no country for a given country code (ISO 3166-2).
+    """
+    c = Config()
+    with pytest.raises(CountryNotFoundError) as cv:
+        assert c.get_country("not-found")
+
+    assert str(cv.value) == "Country with code not-found not found."
 
 
 def test_load_config(mocker, adobe_config_file, settings):

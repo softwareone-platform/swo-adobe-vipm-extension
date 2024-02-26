@@ -15,7 +15,6 @@ from adobe_vipm.flows.fulfillment import fulfill_order
 def test_upsizing(
     mocker,
     settings,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -95,7 +94,7 @@ def test_upsizing(
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         seller_country,
         "a-client-id",
-        processing_change_order,
+        processing_change_order["id"],
         processing_change_order["items"],
     )
 
@@ -131,7 +130,6 @@ def test_upsizing(
 
 def test_upsizing_order_already_created_adobe_order_not_ready(
     mocker,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -252,7 +250,6 @@ def test_upsizing_create_adobe_preview_order_error(
 def test_downsizing(
     mocker,
     settings,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -375,7 +372,6 @@ def test_downsizing(
 def test_downsizing_return_order_exists(
     mocker,
     settings,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -489,7 +485,6 @@ def test_downsizing_return_order_exists(
 
 def test_downsizing_return_order_pending(
     mocker,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -572,7 +567,6 @@ def test_downsizing_return_order_pending(
 
 def test_downsizing_new_order_pending(
     mocker,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -723,7 +717,6 @@ def test_downsizing_create_new_order_error(
 def test_mixed(
     mocker,
     settings,
-    agreement,
     seller,
     order_factory,
     items_factory,
@@ -839,19 +832,19 @@ def test_mixed(
 
     downsizing_items = items_factory(
         line_number=1,
-        product_item_id="sku-downsized",
+        vendor_external_id="sku-downsized",
         old_quantity=10,
         quantity=8,
     )
     upsizing_items = items_factory(
         line_number=2,
-        product_item_id="sku-upsized",
+        vendor_external_id="sku-upsized",
         old_quantity=10,
         quantity=12,
     )
     new_items = items_factory(
         line_number=3,
-        product_item_id="sku-new",
+        vendor_external_id="sku-new",
         name="New cool product",
         old_quantity=0,
         quantity=5,
@@ -859,7 +852,7 @@ def test_mixed(
 
     downsizing_items_out_of_window = items_factory(
         line_number=4,
-        product_item_id="sku-downsize-out",
+        vendor_external_id="sku-downsize-out",
         old_quantity=10,
         quantity=8,
     )
@@ -874,7 +867,7 @@ def test_mixed(
             adobe_subscription_id="sub-1",
             items=items_factory(
                 line_number=1,
-                product_item_id="sku-downsized",
+                vendor_external_id="sku-downsized",
                 quantity=10,
             ),
         )
@@ -883,7 +876,7 @@ def test_mixed(
             adobe_subscription_id="sub-2",
             items=items_factory(
                 line_number=2,
-                product_item_id="sku-upsized",
+                vendor_external_id="sku-upsized",
                 quantity=10,
             ),
         )
@@ -892,7 +885,7 @@ def test_mixed(
             adobe_subscription_id="sub-4",
             items=items_factory(
                 line_number=4,
-                product_item_id="sku-downsize-out",
+                vendor_external_id="sku-downsize-out",
                 quantity=10,
             ),
             start_date=datetime.now(UTC) - timedelta(days=CANCELLATION_WINDOW_DAYS + 1),
@@ -942,7 +935,7 @@ def test_mixed(
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         seller_country,
         "a-client-id",
-        processing_change_order,
+        processing_change_order["id"],
         preview_order_items,
     )
     mocked_adobe_client.update_subscription.assert_called_once_with(
