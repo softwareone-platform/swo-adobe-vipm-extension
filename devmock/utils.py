@@ -3,7 +3,10 @@ import glob
 import json
 import os
 import random
+from datetime import datetime
 from textwrap import wrap
+
+import jwt
 
 from devmock.exceptions import NotFoundException
 from devmock.settings import (
@@ -14,6 +17,8 @@ from devmock.settings import (
     ORDERS_FOLDER,
     SELLERS_FOLDER,
     SUBSCRIPTIONS_FOLDER,
+    WEBHOOK_ID,
+    WEBHOOK_JWT_SECRET,
 )
 
 DEFAULT_FIELDS = ["id", "href", "name", "icon"]
@@ -83,3 +88,18 @@ def get_reference(obj, fields=None):
 
 def get_item_for_subscription(item):
     return {k: v for k, v in item.items() if k != "oldQuantity"}
+
+
+def gen_jwt_token():
+    nbf = int(datetime.now().timestamp())
+    exp = nbf + 300
+    return jwt.encode(
+        {
+            "aud": "adobe-vipm.ext.test.s1.com",
+            "nbf": nbf,
+            "exp": exp,
+            "wid": WEBHOOK_ID,
+        },
+        WEBHOOK_JWT_SECRET,
+        algorithm="HS256",
+    )

@@ -1,15 +1,18 @@
 import glob
 import json
 import os
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import unquote
 
+import requests
 from fastapi import APIRouter, Body, Request
+from fastapi.responses import JSONResponse
 
 from devmock.filters import OrdersFilter
 from devmock.models import Order, Subscription
-from devmock.settings import ORDERS_FOLDER
+from devmock.settings import ORDERS_FOLDER, WEBHOOK_ENDPOINT
 from devmock.utils import (
+    gen_jwt_token,
     generate_random_id,
     get_item_for_subscription,
     get_reference,
@@ -201,3 +204,18 @@ def list_subscriptions(order_id: str, limit: int, offset: int):
         "pagination": {"offset": offset, "limit": limit, "total": len(subscriptions)}
     }
     return response
+
+
+@router.post("/commerce/orders/{order_id}/validate")
+def validate_draft_order(order_id: str, body: Any = Body(None)):  # noqa: B008
+    resp = requests.post(
+        WEBHOOK_ENDPOINT,
+        headers={
+            "authorization": f"JWT {gen_jwt_token()}",
+        },
+        json=body,
+    )
+    return JSONResponse(
+        resp.json() if resp.headers["content-type"] == "application/json" else resp.text,
+        status_code=resp.status_code,
+    )
