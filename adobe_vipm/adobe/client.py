@@ -325,7 +325,7 @@ class AdobeClient:
         self,
         reseller_country: str,
         customer_id: str,
-        order: dict,
+        order_id: str,
         items: list,
     ) -> dict:
         """
@@ -340,15 +340,16 @@ class AdobeClient:
             reseller_country (str): The country of the reseller to which the customer account
             belongs to.
             customer_id (str): Identifier of the customer that place the PREVIEW order.
-            order (dict): The order of the Marketplace platform for which the PREVIEW
+            order_id: The identifier of the Marketplace platform order for which the PREVIEW
             order must be created.
+            items: The list of order items for which creating the preview order.
 
         Returns:
             dict: The PREVIEW order.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
         payload = {
-            "externalReferenceId": order["id"],
+            "externalReferenceId": order_id,
             "currencyCode": reseller.distributor.currency,
             "orderType": ORDER_TYPE_PREVIEW,
             "lineItems": [],

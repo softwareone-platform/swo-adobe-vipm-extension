@@ -288,7 +288,7 @@ def test_create_preview_order(
     preview_order = client.create_preview_order(
         reseller_country,
         customer_id,
-        order,
+        order["id"],
         order["items"],
     )
     assert preview_order == {
@@ -323,7 +323,7 @@ def test_create_preview_order_bad_request(
         client.create_preview_order(
             reseller_country,
             customer_id,
-            order,
+            order["id"],
             order["items"],
         )
 
@@ -546,7 +546,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
     """
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
     customer_id = "a-customer"
-    product_item_id = adobe_config_file["skus_mapping"][0]["product_item_id"]
+    vendor_external_id = adobe_config_file["skus_mapping"][0]["vendor_external_id"]
 
     client, credentials, api_token = adobe_client_factory()
 
@@ -729,7 +729,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
     result = client.search_new_and_returned_orders_by_sku_line_number(
         reseller_country,
         customer_id,
-        product_item_id,
+        vendor_external_id,
         1,
     )
 
@@ -749,7 +749,7 @@ def test_search_new_and_returned_orders_by_sku_line_number_not_found(
     """
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
     customer_id = "a-customer"
-    product_item_id = adobe_config_file["skus_mapping"][0]["product_item_id"]
+    vendor_external_id = adobe_config_file["skus_mapping"][0]["vendor_external_id"]
 
     client, credentials, api_token = adobe_client_factory()
 
@@ -782,7 +782,7 @@ def test_search_new_and_returned_orders_by_sku_line_number_not_found(
     results = client.search_new_and_returned_orders_by_sku_line_number(
         reseller_country,
         customer_id,
-        product_item_id,
+        vendor_external_id,
         1,
     )
 

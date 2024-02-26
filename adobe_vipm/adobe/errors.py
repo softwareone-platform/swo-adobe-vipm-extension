@@ -23,6 +23,10 @@ class ResellerNotFoundError(AdobeError):
     pass
 
 
+class CountryNotFoundError(AdobeError):
+    pass
+
+
 class AdobeAPIError(AdobeError):
     def __init__(self, payload: dict) -> None:
         self.payload: dict = payload

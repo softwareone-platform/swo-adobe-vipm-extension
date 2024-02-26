@@ -106,7 +106,7 @@ class MutuallyExclusiveOption(Option):
 
 def get_product_by_sku(sku):
     try:
-        return next(filter(lambda x: x["product_item_id"] == sku, ADOBE_CONFIG["skus_mapping"]))
+        return next(filter(lambda x: x["vendor_external_id"] == sku, ADOBE_CONFIG["skus_mapping"]))
     except StopIteration:
         raise ClickException(f"Invalid SKU provided: {sku}")
 
@@ -659,7 +659,7 @@ def sku(search_terms):
         lambda i: any([fn(i) for fn in conds]),
         ADOBE_CONFIG["skus_mapping"],
     ):
-        table.add_row(item["product_item_id"], item["name"], item["type"])
+        table.add_row(item["vendor_external_id"], item["name"], item["type"])
 
     console.print()
     console.print(table)

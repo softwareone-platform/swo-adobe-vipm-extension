@@ -1,16 +1,18 @@
 import json
-from typing import MutableMapping
+from typing import List, MutableMapping
 
 from django.conf import settings
 
 from adobe_vipm.adobe.dataclasses import (
     AdobeProduct,
+    Country,
     Credentials,
     Distributor,
     Reseller,
 )
 from adobe_vipm.adobe.errors import (
     AdobeProductNotFoundError,
+    CountryNotFoundError,
     DistributorNotFoundError,
     ResellerNotFoundError,
 )
@@ -22,6 +24,7 @@ class Config:
         self.resellers: MutableMapping[str, Reseller] = {}
         self.skus_mapping: MutableMapping[str, AdobeProduct] = {}
         self.distributors: MutableMapping[str, Distributor] = {}
+        self.countries: MutableMapping[str, Country] = {}
         self._parse_config()
 
     @property
@@ -36,6 +39,10 @@ class Config:
     def api_scopes(self) -> str:
         return ",".join(self.config["scopes"])
 
+    @property
+    def language_codes(self) -> List[str]:
+        return self.config["language_codes"]
+
     def get_reseller(self, country: str) -> Reseller:
         try:
             return self.resellers[country]
@@ -49,14 +56,22 @@ class Config:
             return self.distributors[region]
         except KeyError:
             raise DistributorNotFoundError(
-                f"Distributor not found for region {region}.",
+                f"Distributor not found for pricelist region {region}.",
             )
 
-    def get_adobe_product(self, product_item_id: str) -> AdobeProduct:
+    def get_adobe_product(self, vendor_external_id: str) -> AdobeProduct:
         try:
-            return self.skus_mapping[product_item_id]
+            return self.skus_mapping[vendor_external_id]
         except KeyError:
-            raise AdobeProductNotFoundError(f"AdobeProduct with id {product_item_id} not found.")
+            raise AdobeProductNotFoundError(f"AdobeProduct with id {vendor_external_id} not found.")
+
+    def get_country(self, code: str) -> Country:
+        try:
+            return self.countries[code]
+        except KeyError:
+            raise CountryNotFoundError(
+                f"Country with code {code} not found.",
+            )
 
     def _load_config(self):
         with open(settings.EXTENSION_CONFIG["ADOBE_CONFIG_FILE"], "r") as f:
@@ -85,8 +100,10 @@ class Config:
                     distributor=distributor,
                 )
         for product in self.config["skus_mapping"]:
-            self.skus_mapping[product["product_item_id"]] = AdobeProduct(
+            self.skus_mapping[product["vendor_external_id"]] = AdobeProduct(
                 sku=product["sku"],
                 name=product["name"],
                 type=product["type"],
             )
+        for country in self.config["countries"]:
+            self.countries[country["code"]] = Country(**country)

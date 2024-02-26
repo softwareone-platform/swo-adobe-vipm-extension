@@ -147,10 +147,10 @@ def get_retry_count(order):
     )
 
 
-def get_subscription_by_line_and_item_id(subscriptions, product_item_id, line_number):
+def get_subscription_by_line_and_item_id(subscriptions, vendor_external_id, line_number):
     for subscription in subscriptions:
         item = find_first(
-            lambda x: x["lineNumber"] == line_number and x["productItemId"] == product_item_id,
+            lambda x: x["lineNumber"] == line_number and x["productItemId"] == vendor_external_id,
             subscription["items"],
         )
 
