@@ -46,3 +46,8 @@ SELLERS_FOLDER = os.path.join(
     "data",
     "sellers",
 )
+
+
+WEBHOOK_ENDPOINT = "http://localhost:8080/v1/orders/validate"
+WEBHOOK_JWT_SECRET = "change-me"
+WEBHOOK_ID = "WBH-1234-5678"
