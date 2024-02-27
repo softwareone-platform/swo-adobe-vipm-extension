@@ -17,10 +17,10 @@ from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.utils import find_first
 
 
-def get_parameter(object, parameter_phase, parameter_name):
+def get_parameter(order, parameter_phase, param_external_id):
     return find_first(
-        lambda x: x["name"] == parameter_name,
-        object["parameters"][parameter_phase],
+        lambda x: x["externalId"] == param_external_id,
+        order["parameters"][parameter_phase],
         default={},
     )
 
@@ -59,27 +59,27 @@ def set_adobe_customer_id(order, customer_id):
 
 
 def get_adobe_order_id(order):
-    return order.get("externalIDs", {}).get("vendor")
+    return order.get("externalIds", {}).get("vendor")
 
 
 def set_adobe_order_id(order, adobe_order_id):
     updated_order = copy.deepcopy(order)
-    updated_order["externalIDs"] = updated_order.get("externalIDs", {}) | {"vendor": adobe_order_id}
+    updated_order["externalIds"] = updated_order.get("externalIds", {}) | {"vendor": adobe_order_id}
     return updated_order
 
 
 def get_customer_data(order):
     customer_data = {}
-    for param_name in (
+    for param_external_id in (
         PARAM_COMPANY_NAME,
         PARAM_PREFERRED_LANGUAGE,
         PARAM_ADDRESS,
         PARAM_CONTACT,
     ):
-        customer_data[param_name] = get_parameter(
+        customer_data[param_external_id] = get_parameter(
             order,
-            "order",
-            param_name,
+            "ordering",
+            param_external_id,
         ).get("value")
 
     return customer_data
@@ -87,29 +87,29 @@ def get_customer_data(order):
 
 def set_customer_data(order, customer_data):
     updated_order = copy.deepcopy(order)
-    for param_name, value in customer_data.items():
+    for param_external_id, value in customer_data.items():
         get_parameter(
             updated_order,
-            "order",
-            param_name,
+            "ordering",
+            param_external_id,
         )["value"] = value
     return updated_order
 
 
-def set_ordering_parameter_error(order, param_name, error):
+def set_ordering_parameter_error(order, param_external_id, error):
     updated_order = copy.deepcopy(order)
     get_parameter(
         updated_order,
-        "order",
-        param_name,
+        "ordering",
+        param_external_id,
     )["error"] = error
     return updated_order
 
 
-def get_order_item(order, line_number):
+def get_order_item(order, line_id):
     return find_first(
-        lambda item: line_number == item["lineNumber"],
-        order["items"],
+        lambda item: line_id == item["id"],
+        order["lines"],
     )
 
 
@@ -147,11 +147,11 @@ def get_retry_count(order):
     )
 
 
-def get_subscription_by_line_and_item_id(subscriptions, vendor_external_id, line_number):
+def get_subscription_by_line_and_item_id(subscriptions, vendor_external_id, line_id):
     for subscription in subscriptions:
         item = find_first(
-            lambda x: x["lineNumber"] == line_number and x["productItemId"] == vendor_external_id,
-            subscription["items"],
+            lambda x: x["id"] == line_id and x["item"]["id"] == vendor_external_id,
+            subscription["lines"],
         )
 
         if item:
@@ -166,11 +166,11 @@ def get_adobe_subscription_id(source):
     ).get("value")
 
 
-def in_cancellation_window(order, item):
+def in_cancellation_window(order, line):
     subscription = get_subscription_by_line_and_item_id(
         order["subscriptions"],
-        item["productItemId"],
-        item["lineNumber"],
+        line["item"]["id"],
+        line["id"],
     )
     creation_date = datetime.fromisoformat(subscription["startDate"])
     delta = datetime.now(UTC) - creation_date
@@ -179,17 +179,17 @@ def in_cancellation_window(order, item):
 
 def group_items_by_type(order):
     upsizing_items = filter(
-        lambda item: item["quantity"] > item["oldQuantity"],
-        order["items"],
+        lambda line: line["quantity"] > line["oldQuantity"],
+        order["lines"],
     )
     downsizing_items_in_window = filter(
-        lambda item: item["quantity"] < item["oldQuantity"] and in_cancellation_window(order, item),
-        order["items"],
+        lambda line: line["quantity"] < line["oldQuantity"] and in_cancellation_window(order, line),
+        order["lines"],
     )
     downsizing_items_out_window = filter(
-        lambda item: item["quantity"] < item["oldQuantity"]
-        and not in_cancellation_window(order, item),
-        order["items"],
+        lambda line: line["quantity"] < line["oldQuantity"]
+        and not in_cancellation_window(order, line),
+        order["lines"],
     )
 
     return ItemGroups(

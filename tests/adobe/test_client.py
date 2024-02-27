@@ -60,23 +60,23 @@ def test_create_reseller_account(
                     "distributorId": distributor_id,
                     "externalReferenceId": "external_id",
                     "companyProfile": {
-                        "companyName": reseller_data["CompanyName"],
-                        "preferredLanguage": reseller_data["PreferredLanguage"],
+                        "companyName": reseller_data["companyName"],
+                        "preferredLanguage": reseller_data["preferredLanguage"],
                         "address": {
-                            "country": reseller_data["Address"]["country"],
-                            "region": reseller_data["Address"]["state"],
-                            "city": reseller_data["Address"]["city"],
-                            "addressLine1": reseller_data["Address"]["addressLine1"],
-                            "addressLine2": reseller_data["Address"]["addressLine2"],
-                            "postalCode": reseller_data["Address"]["postCode"],
-                            "phoneNumber": reseller_data["Contact"]["phone"],
+                            "country": reseller_data["address"]["country"],
+                            "region": reseller_data["address"]["state"],
+                            "city": reseller_data["address"]["city"],
+                            "addressLine1": reseller_data["address"]["addressLine1"],
+                            "addressLine2": reseller_data["address"]["addressLine2"],
+                            "postalCode": reseller_data["address"]["postCode"],
+                            "phoneNumber": reseller_data["contact"]["phoneNumber"],
                         },
                         "contacts": [
                             {
-                                "firstName": reseller_data["Contact"]["firstName"],
-                                "lastName": reseller_data["Contact"]["lastName"],
-                                "email": reseller_data["Contact"]["email"],
-                                "phoneNumber": reseller_data["Contact"]["phone"],
+                                "firstName": reseller_data["contact"]["firstName"],
+                                "lastName": reseller_data["contact"]["lastName"],
+                                "email": reseller_data["contact"]["email"],
+                                "phoneNumber": reseller_data["contact"]["phoneNumber"],
                             }
                         ],
                     },
@@ -136,7 +136,7 @@ def test_create_customer_account(
 
     client, credentials, api_token = adobe_client_factory()
 
-    company_name = f"{customer_data['CompanyName']} (external_id)"
+    company_name = f"{customer_data['companyName']} (external_id)"
 
     requests_mocker.post(
         urljoin(adobe_config_file["api_base_url"], "/v3/customers"),
@@ -161,22 +161,22 @@ def test_create_customer_account(
                     "externalReferenceId": "external_id",
                     "companyProfile": {
                         "companyName": company_name,
-                        "preferredLanguage": customer_data["PreferredLanguage"],
+                        "preferredLanguage": customer_data["preferredLanguage"],
                         "address": {
-                            "country": customer_data["Address"]["country"],
-                            "region": customer_data["Address"]["state"],
-                            "city": customer_data["Address"]["city"],
-                            "addressLine1": customer_data["Address"]["addressLine1"],
-                            "addressLine2": customer_data["Address"]["addressLine2"],
-                            "postalCode": customer_data["Address"]["postCode"],
-                            "phoneNumber": customer_data["Contact"]["phone"],
+                            "country": customer_data["address"]["country"],
+                            "region": customer_data["address"]["state"],
+                            "city": customer_data["address"]["city"],
+                            "addressLine1": customer_data["address"]["addressLine1"],
+                            "addressLine2": customer_data["address"]["addressLine2"],
+                            "postalCode": customer_data["address"]["postCode"],
+                            "phoneNumber": customer_data["contact"]["phoneNumber"],
                         },
                         "contacts": [
                             {
-                                "firstName": customer_data["Contact"]["firstName"],
-                                "lastName": customer_data["Contact"]["lastName"],
-                                "email": customer_data["Contact"]["email"],
-                                "phoneNumber": customer_data["Contact"]["phone"],
+                                "firstName": customer_data["contact"]["firstName"],
+                                "lastName": customer_data["contact"]["lastName"],
+                                "email": customer_data["contact"]["email"],
+                                "phoneNumber": customer_data["contact"]["phoneNumber"],
                             }
                         ],
                     },
@@ -230,7 +230,7 @@ def test_create_preview_order(
     requests_mocker,
     adobe_config_file,
     order_factory,
-    items_factory,
+    lines_factory,
     adobe_client_factory,
     quantity,
     old_quantity,
@@ -249,7 +249,7 @@ def test_create_preview_order(
 
     client, credentials, api_token = adobe_client_factory()
 
-    order = order_factory(items=items_factory(old_quantity=old_quantity, quantity=quantity))
+    order = order_factory(lines=lines_factory(old_quantity=old_quantity, quantity=quantity))
 
     requests_mocker.post(
         urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
@@ -275,7 +275,7 @@ def test_create_preview_order(
                     "orderType": "PREVIEW",
                     "lineItems": [
                         {
-                            "extLineItemNumber": order["items"][0]["lineNumber"],
+                            "extLineItemNumber": order["lines"][0]["id"],
                             "offerId": adobe_full_sku,
                             "quantity": expected_quantity,
                         },
@@ -289,7 +289,7 @@ def test_create_preview_order(
         reseller_country,
         customer_id,
         order["id"],
-        order["items"],
+        order["lines"],
     )
     assert preview_order == {
         "orderId": "adobe-order-id",
@@ -324,7 +324,7 @@ def test_create_preview_order_bad_request(
             reseller_country,
             customer_id,
             order["id"],
-            order["items"],
+            order["lines"],
         )
 
     assert repr(cv.value) == str(error)

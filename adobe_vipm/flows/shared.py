@@ -47,7 +47,11 @@ def _get_customer_data(client, buyer, order):
                 },
             },
         )
-        order = update_order(client, order["id"], {"parameters": order["parameters"]})
+        order = update_order(
+            client,
+            order["id"],
+            parameters=order["parameters"],
+        )
         customer_data = get_customer_data(order)
     return customer_data, order
 
@@ -70,10 +74,8 @@ def _handle_customer_error(client, order, e):
     query_order(
         client,
         order["id"],
-        {
-            "parameters": order["parameters"],
-            "template": {"id": settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"]},
-        },
+        parameters=order["parameters"],
+        templateId=settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"],
     )
 
 
@@ -86,7 +88,7 @@ def create_customer_account(client, seller_country, buyer, order):
             seller_country, external_id, customer_data
         )
         order = set_adobe_customer_id(order, customer_id)
-        return update_order(client, order["id"], {"parameters": order["parameters"]})
+        return update_order(client, order["id"], parameters=order["parameters"])
     except AdobeError as e:
         logger.error(repr(e))
         _handle_customer_error(client, order, e)

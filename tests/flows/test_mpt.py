@@ -1,3 +1,4 @@
+import copy
 from urllib.parse import urljoin
 
 import pytest
@@ -10,16 +11,20 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_buyer,
     get_seller,
+    pack_structured_parameters,
     query_order,
     update_order,
 )
 
 
-def test_fail_order(mpt_client, requests_mocker):
+def test_fail_order(mpt_client, requests_mocker, order_factory):
     """Test the call to switch an order to Failed."""
+    order = order_factory()
+    returned_order = copy.deepcopy(order)
+    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/fail"),
-        json={"failed": "order"},
+        json=returned_order,
         match=[
             matchers.json_params_matcher(
                 {
@@ -30,7 +35,7 @@ def test_fail_order(mpt_client, requests_mocker):
     )
 
     failed_order = fail_order(mpt_client, "ORD-0000", "a-reason")
-    assert failed_order == {"failed": "order"}
+    assert failed_order == order
 
 
 def test_fail_order_error(mpt_client, requests_mocker, mpt_error_factory):
@@ -46,7 +51,7 @@ def test_fail_order_error(mpt_client, requests_mocker, mpt_error_factory):
     with pytest.raises(MPTError) as cv:
         fail_order(mpt_client, "ORD-0000", "a-reason")
 
-    assert cv.value.status == 404
+    assert cv.value.payload["status"] == 404
 
 
 def test_get_buyer(mpt_client, requests_mocker):
@@ -73,7 +78,7 @@ def test_get_buyer_error(mpt_client, requests_mocker, mpt_error_factory):
     with pytest.raises(MPTError) as cv:
         get_buyer(mpt_client, "BUY-0000")
 
-    assert cv.value.status == 404
+    assert cv.value.payload["status"] == 404
 
 
 def test_get_seller(mpt_client, requests_mocker):
@@ -100,18 +105,30 @@ def test_get_seller_error(mpt_client, requests_mocker, mpt_error_factory):
     with pytest.raises(MPTError) as cv:
         get_seller(mpt_client, "SEL-0000")
 
-    assert cv.value.status == 404
+    assert cv.value.payload["status"] == 404
 
 
-def test_query_order(mpt_client, requests_mocker):
+def test_query_order(mpt_client, requests_mocker, order_factory):
     """Test the call to switch an order to Query."""
+    order = order_factory()
+    returned_order = copy.deepcopy(order)
+    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/query"),
-        json={"query": "order"},
+        json=returned_order,
         match=[
             matchers.json_params_matcher(
                 {
-                    "parameters": [{"name": "a-param", "value": "a-value"}],
+                    "parameters": {
+                        "ordering": [
+                            {
+                                "externalId": "a-param",
+                                "name": "a-param",
+                                "value": "a-value",
+                                "type": "SingleLineText",
+                            }
+                        ],
+                    },
                 },
             ),
         ],
@@ -120,13 +137,18 @@ def test_query_order(mpt_client, requests_mocker):
     qorder = query_order(
         mpt_client,
         "ORD-0000",
-        {
-            "parameters": [
-                {"name": "a-param", "value": "a-value"},
-            ],
+        parameters={
+            "ordering": [
+                {
+                    "externalId": "a-param",
+                    "name": "a-param",
+                    "value": "a-value",
+                    "type": "SingleLineText",
+                }
+            ]
         },
     )
-    assert qorder == {"query": "order"}
+    assert qorder == order
 
 
 def test_query_order_error(mpt_client, requests_mocker, mpt_error_factory):
@@ -140,20 +162,32 @@ def test_query_order_error(mpt_client, requests_mocker, mpt_error_factory):
     )
 
     with pytest.raises(MPTError) as cv:
-        query_order(mpt_client, "ORD-0000", {})
+        query_order(mpt_client, "ORD-0000", parameters={})
 
-    assert cv.value.status == 404
+    assert cv.value.payload["status"] == 404
 
 
-def test_update_order(mpt_client, requests_mocker):
+def test_update_order(mpt_client, requests_mocker, order_factory):
     """Test the call to update an order."""
+    order = order_factory()
+    returned_order = copy.deepcopy(order)
+    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.put(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000"),
-        json={"updated": "order"},
+        json=returned_order,
         match=[
             matchers.json_params_matcher(
                 {
-                    "parameters": [{"name": "a-param", "value": "a-value"}],
+                    "parameters": {
+                        "ordering": [
+                            {
+                                "externalId": "a-param",
+                                "name": "a-param",
+                                "value": "a-value",
+                                "type": "SingleLineText",
+                            }
+                        ],
+                    },
                 },
             ),
         ],
@@ -162,13 +196,18 @@ def test_update_order(mpt_client, requests_mocker):
     updated_order = update_order(
         mpt_client,
         "ORD-0000",
-        {
-            "parameters": [
-                {"name": "a-param", "value": "a-value"},
-            ],
+        parameters={
+            "ordering": [
+                {
+                    "externalId": "a-param",
+                    "name": "a-param",
+                    "value": "a-value",
+                    "type": "SingleLineText",
+                }
+            ]
         },
     )
-    assert updated_order == {"updated": "order"}
+    assert updated_order == order
 
 
 def test_update_order_error(mpt_client, requests_mocker, mpt_error_factory):
@@ -182,20 +221,23 @@ def test_update_order_error(mpt_client, requests_mocker, mpt_error_factory):
     )
 
     with pytest.raises(MPTError) as cv:
-        update_order(mpt_client, "ORD-0000", {})
+        update_order(mpt_client, "ORD-0000", parameters={})
 
-    assert cv.value.status == 404
+    assert cv.value.payload["status"] == 404
 
 
-def test_complete_order(mpt_client, requests_mocker):
+def test_complete_order(mpt_client, requests_mocker, order_factory):
     """Test the call to switch an order to Completed."""
+    order = order_factory()
+    returned_order = copy.deepcopy(order)
+    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/complete"),
-        json={"completed": "order"},
+        json=returned_order,
         match=[
             matchers.json_params_matcher(
                 {
-                    "template": {"id": "template_id"},
+                    "template": {"id": "templateId"},
                 },
             ),
         ],
@@ -204,9 +246,9 @@ def test_complete_order(mpt_client, requests_mocker):
     completed_order = complete_order(
         mpt_client,
         "ORD-0000",
-        "template_id",
+        "templateId",
     )
-    assert completed_order == {"completed": "order"}
+    assert completed_order == order
 
 
 def test_complete_order_error(mpt_client, requests_mocker, mpt_error_factory):
@@ -220,28 +262,29 @@ def test_complete_order_error(mpt_client, requests_mocker, mpt_error_factory):
     )
 
     with pytest.raises(MPTError) as cv:
-        complete_order(mpt_client, "ORD-0000", {})
+        complete_order(mpt_client, "ORD-0000", "templateId")
 
-    assert cv.value.status == 404
+    assert cv.value.payload["status"] == 404
 
 
-def test_create_subscription(mpt_client, requests_mocker):
+def test_create_subscription(mpt_client, requests_mocker, subscriptions_factory):
     """Test the call to create a subscription."""
+    subscription = subscriptions_factory()[0]
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions"),
-        json={"a": "subscription"},
+        json=subscription,
         status=201,
         match=[
-            matchers.json_params_matcher({"subscription": "payload"}),
+            matchers.json_params_matcher(subscription),
         ],
     )
 
-    subscription = create_subscription(
+    created_subscription = create_subscription(
         mpt_client,
         "ORD-0000",
-        {"subscription": "payload"},
+        subscription,
     )
-    assert subscription == {"a": "subscription"}
+    assert created_subscription == subscription
 
 
 def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
@@ -257,4 +300,4 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
     with pytest.raises(MPTError) as cv:
         create_subscription(mpt_client, "ORD-0000", {})
 
-    assert cv.value.status == 404
+    assert cv.value.payload["status"] == 404

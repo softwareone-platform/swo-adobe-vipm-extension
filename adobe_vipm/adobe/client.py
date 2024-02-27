@@ -57,23 +57,23 @@ class AdobeClient:
             "externalReferenceId": reseller_id,
             "distributorId": distributor.id,
             "companyProfile": {
-                "companyName": reseller_data["CompanyName"],
-                "preferredLanguage": reseller_data["PreferredLanguage"],
+                "companyName": reseller_data["companyName"],
+                "preferredLanguage": reseller_data["preferredLanguage"],
                 "address": {
-                    "country": reseller_data["Address"]["country"],
-                    "region": reseller_data["Address"]["state"],
-                    "city": reseller_data["Address"]["city"],
-                    "addressLine1": reseller_data["Address"]["addressLine1"],
-                    "addressLine2": reseller_data["Address"]["addressLine2"],
-                    "postalCode": reseller_data["Address"]["postCode"],
-                    "phoneNumber": reseller_data["Contact"]["phone"],
+                    "country": reseller_data["address"]["country"],
+                    "region": reseller_data["address"]["state"],
+                    "city": reseller_data["address"]["city"],
+                    "addressLine1": reseller_data["address"]["addressLine1"],
+                    "addressLine2": reseller_data["address"]["addressLine2"],
+                    "postalCode": reseller_data["address"]["postCode"],
+                    "phoneNumber": reseller_data["contact"]["phoneNumber"],
                 },
                 "contacts": [
                     {
-                        "firstName": reseller_data["Contact"]["firstName"],
-                        "lastName": reseller_data["Contact"]["lastName"],
-                        "email": reseller_data["Contact"]["email"],
-                        "phoneNumber": reseller_data["Contact"]["phone"],
+                        "firstName": reseller_data["contact"]["firstName"],
+                        "lastName": reseller_data["contact"]["lastName"],
+                        "email": reseller_data["contact"]["email"],
+                        "phoneNumber": reseller_data["contact"]["phoneNumber"],
                     }
                 ],
             },
@@ -90,7 +90,7 @@ class AdobeClient:
         created_reseller = response.json()
         adobe_reseller_id = created_reseller["resellerId"]
         logger.info(
-            f"Reseller {reseller_id} - {reseller_data['CompanyName']} "
+            f"Reseller {reseller_id} - {reseller_data['companyName']} "
             "created successfully in distributor account "
             f"{distributor.id} ({region}): {adobe_reseller_id}",
         )
@@ -118,28 +118,28 @@ class AdobeClient:
             str: The identifier of the customer in the Adobe VIP Markerplace.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
-        company_name = f"{customer_data['CompanyName']} ({agreement_id})"
+        company_name: str = f"{customer_data['companyName']} ({agreement_id})"
         payload = {
             "resellerId": reseller.id,
             "externalReferenceId": agreement_id,
             "companyProfile": {
                 "companyName": company_name,
-                "preferredLanguage": customer_data["PreferredLanguage"],
+                "preferredLanguage": customer_data["preferredLanguage"],
                 "address": {
-                    "country": customer_data["Address"]["country"],
-                    "region": customer_data["Address"]["state"],
-                    "city": customer_data["Address"]["city"],
-                    "addressLine1": customer_data["Address"]["addressLine1"],
-                    "addressLine2": customer_data["Address"]["addressLine2"],
-                    "postalCode": customer_data["Address"]["postCode"],
-                    "phoneNumber": customer_data["Contact"]["phone"],
+                    "country": customer_data["address"]["country"],
+                    "region": customer_data["address"]["state"],
+                    "city": customer_data["address"]["city"],
+                    "addressLine1": customer_data["address"]["addressLine1"],
+                    "addressLine2": customer_data["address"]["addressLine2"],
+                    "postalCode": customer_data["address"]["postCode"],
+                    "phoneNumber": customer_data["contact"]["phoneNumber"],
                 },
                 "contacts": [
                     {
-                        "firstName": customer_data["Contact"]["firstName"],
-                        "lastName": customer_data["Contact"]["lastName"],
-                        "email": customer_data["Contact"]["email"],
-                        "phoneNumber": customer_data["Contact"]["phone"],
+                        "firstName": customer_data["contact"]["firstName"],
+                        "lastName": customer_data["contact"]["lastName"],
+                        "email": customer_data["contact"]["email"],
+                        "phoneNumber": customer_data["contact"]["phoneNumber"],
                     }
                 ],
             },
@@ -326,11 +326,11 @@ class AdobeClient:
         reseller_country: str,
         customer_id: str,
         order_id: str,
-        items: list,
+        lines: list,
     ) -> dict:
         """
         Creates an order of type PREVIEW for a given Marketplace platform order.
-        Creating a PREVIEW order allows to validate the order items and eventually
+        Creating a PREVIEW order allows to validate the order lines and eventually
         obtaining from Adobe replacement SKUs to get the best discount level
         the customer is elegible for.
         The `reseller_country` is used to select the reseller and the Adobe credentials
@@ -355,22 +355,22 @@ class AdobeClient:
             "lineItems": [],
         }
 
-        for item in items:
-            product: AdobeProduct = self._config.get_adobe_product(item["productItemId"])
-            quantity = item["quantity"]
-            old_quantity = item["oldQuantity"]
+        for line in lines:
+            product: AdobeProduct = self._config.get_adobe_product(line["item"]["id"])
+            quantity = line["quantity"]
+            old_quantity = line["oldQuantity"]
 
             if quantity > old_quantity:
-                # For purchasing new items (oldQuantity = 0) or upsizing items
+                # For purchasing new lines (oldQuantity = 0) or upsizing lines
                 # quantity it must send the delta (quantity - oldQuantity) since
                 # it is placing a new order.
-                # For downsizing items quantity it must send the actual quantity
+                # For downsizing lines quantity it must send the actual quantity
                 # since the previous purchased quantity has been returned back
                 # through one or more RETURN orders.
                 quantity = quantity - old_quantity
             payload["lineItems"].append(
                 {
-                    "extLineItemNumber": item["lineNumber"],
+                    "extLineItemNumber": line["id"],
                     "offerId": product.sku,
                     "quantity": quantity,
                 }

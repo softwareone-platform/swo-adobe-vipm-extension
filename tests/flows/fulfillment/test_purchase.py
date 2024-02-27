@@ -10,6 +10,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.fulfillment import fulfill_order
+from adobe_vipm.flows.mpt import pack_structured_parameters
 
 
 def test_no_customer(
@@ -17,6 +18,7 @@ def test_no_customer(
     settings,
     buyer,
     seller,
+    agreement,
     order_factory,
     order_parameters_factory,
     fulfillment_parameters_factory,
@@ -34,8 +36,8 @@ def test_no_customer(
 
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
 
+    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocker.patch("adobe_vipm.flows.fulfillment.get_buyer", return_value=buyer)
-    mocked_get_seller = mocker.patch("adobe_vipm.flows.fulfillment.get_seller", return_value=seller)
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.create_customer_account",
         return_value=order_factory(
@@ -61,6 +63,7 @@ def test_no_customer(
         "adobe_vipm.flows.fulfillment.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+
     mocked_mpt_client = mocker.MagicMock()
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.update_order",
@@ -89,6 +92,7 @@ def test_no_customer(
     )
 
     order = order_factory()
+    order["parameters"] = pack_structured_parameters(order["parameters"])
     order_with_customer_param = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
@@ -97,7 +101,6 @@ def test_no_customer(
 
     seller_country = seller["address"]["country"]
 
-    mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
     mocked_create_customer_account.assert_called_once_with(
         mocked_mpt_client,
         seller_country,
@@ -108,31 +111,31 @@ def test_no_customer(
         seller_country,
         "a-client-id",
         order_with_customer_param["id"],
-        order_with_customer_param["items"],
+        order_with_customer_param["lines"],
     )
 
     assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
         order["id"],
-        {
-            "externalIDs": {
-                "vendor": adobe_order["orderId"],
-            },
-        },
     )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "externalIds": {
+            "vendor": adobe_order["orderId"],
+        },
+    }
     assert mocked_update_order.mock_calls[1].args == (
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "fulfillment": fulfillment_parameters_factory(
-                    customer_id="a-client-id",
-                    retry_count="0",
-                ),
-                "order": order_parameters_factory(),
-            },
-        },
     )
+    assert mocked_update_order.mock_calls[1].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+            ),
+            "ordering": order_parameters_factory(),
+        },
+    }
     mocked_create_subscription.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -141,14 +144,14 @@ def test_no_customer(
             "parameters": {
                 "fulfillment": [
                     {
-                        "name": "SubscriptionId",
+                        "externalId": "subscriptionId",
                         "value": adobe_subscription["subscriptionId"],
                     },
                 ],
             },
-            "items": [
+            "lines": [
                 {
-                    "lineNumber": 1,
+                    "id": 1,
                 },
             ],
             "startDate": adobe_subscription["creationDate"],
@@ -172,6 +175,7 @@ def test_no_customer(
 def test_customer_already_created(
     mocker,
     seller,
+    agreement,
     order_factory,
     order_parameters_factory,
     fulfillment_parameters_factory,
@@ -181,10 +185,7 @@ def test_customer_already_created(
     Tests the processing of a purchase order with the customer already created.
     Adobe returns that the order is still processing.
     """
-    mocked_get_seller = mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_seller",
-        return_value=seller,
-    )
+    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.create_customer_account",
     )
@@ -215,42 +216,42 @@ def test_customer_already_created(
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
+    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
     seller_country = seller["address"]["country"]
 
-    mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
     mocked_create_customer_account.assert_not_called()
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         seller_country,
         "a-client-id",
         order["id"],
-        order["items"],
+        order["lines"],
     )
 
     assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
         order["id"],
-        {
-            "externalIDs": {
-                "vendor": adobe_order["orderId"],
-            },
-        },
     )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "externalIds": {
+            "vendor": adobe_order["orderId"],
+        },
+    }
     assert mocked_update_order.mock_calls[1].args == (
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "fulfillment": fulfillment_parameters_factory(
-                    customer_id="a-client-id",
-                    retry_count="1",
-                ),
-                "order": order_parameters_factory(),
-            },
-        },
     )
+    assert mocked_update_order.mock_calls[1].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="1",
+            ),
+            "ordering": order_parameters_factory(),
+        },
+    }
 
 
 def test_create_customer_fails(
@@ -262,10 +263,6 @@ def test_create_customer_fails(
     Tests the processing of a purchase order. It fails on customer creation no
     order will be placed.
     """
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_seller",
-        return_value=seller,
-    )
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.create_customer_account",
         return_value=None,
@@ -278,6 +275,7 @@ def test_create_customer_fails(
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory()
+    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -297,10 +295,6 @@ def test_create_adobe_preview_order_error(
     Tests the processing of a purchase order. It fails on adobe preview
     order creation. The purchase order will be failed.
     """
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_seller",
-        return_value=seller,
-    )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.create_customer_account",
         return_value=None,
@@ -324,6 +318,7 @@ def test_create_adobe_preview_order_error(
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
+    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -347,10 +342,6 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
     on Adobe side. The RetryCount fullfilment paramter must be incremented.
     The purchase order will not be completed and the processing will be stopped.
     """
-    mocked_get_seller = mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_seller",
-        return_value=seller,
-    )
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.update_order",
     )
@@ -371,22 +362,20 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
         ),
         external_ids={"vendor": "an-order-id"},
     )
+    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
-    mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
     mocked_adobe_client.get_subscription.assert_not_called()
     mocked_update_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "order": order_parameters_factory(),
-                "fulfillment": fulfillment_parameters_factory(
-                    customer_id="a-client-id",
-                    retry_count="1",
-                ),
-            }
+        parameters={
+            "ordering": order_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="1",
+            ),
         },
     )
     mocked_complete_order.assert_not_called()
@@ -403,10 +392,6 @@ def test_customer_already_created_order_already_created_max_retries_reached(
     attemps has been reached.
     The order will be failed with a message saying that this maximum has been reached.
     """
-    mocked_get_seller = mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_seller",
-        return_value=seller,
-    )
     mocked_fail_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.fail_order",
     )
@@ -425,10 +410,10 @@ def test_customer_already_created_order_already_created_max_retries_reached(
         ),
         external_ids={"vendor": "an-order-id"},
     )
+    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
-    mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
     mocked_adobe_client.get_subscription.assert_not_called()
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
@@ -452,10 +437,6 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
     Tests the processing of a purchase order when the Adobe order has been processed unsuccessfully.
     The purchase order will be failed and with a message that describe the error returned by Adobe.
     """
-    mocked_get_seller = mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_seller",
-        return_value=seller,
-    )
     mocked_fail_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.fail_order",
     )
@@ -474,10 +455,10 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
         ),
         external_ids={"vendor": "an-order-id"},
     )
+    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
-    mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
     mocked_adobe_client.get_subscription.assert_not_called()
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
@@ -498,10 +479,6 @@ def test_customer_already_created_order_already_created_unexpected_status(
     The purchase order will be failed and with a message that explain that Adobe returned an
     unexpected error.
     """
-    mocked_get_seller = mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_seller",
-        return_value=seller,
-    )
     mocked_fail_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.fail_order",
     )
@@ -520,10 +497,10 @@ def test_customer_already_created_order_already_created_unexpected_status(
         ),
         external_ids={"vendor": "an-order-id"},
     )
+    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
-    mocked_get_seller.assert_called_once_with(mocked_mpt_client, seller["id"])
     mocked_adobe_client.get_subscription.assert_not_called()
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,

@@ -148,9 +148,9 @@ def account_data():
 
     """
     return {
-        "CompanyName": "ACME Inc",
-        "PreferredLanguage": "en-US",
-        "Address": {
+        "companyName": "ACME Inc",
+        "preferredLanguage": "en-US",
+        "address": {
             "country": "US",
             "state": "CA",
             "city": "Irvine",
@@ -158,11 +158,11 @@ def account_data():
             "addressLine2": "Line 2",
             "postCode": "08010",
         },
-        "Contact": {
+        "contact": {
             "firstName": "First Name",
             "lastName": "Last Name",
             "email": "test@example.com",
-            "phone": "+22003939393",
+            "phoneNumber": "+22003939393",
         },
     }
 
@@ -204,22 +204,30 @@ def order_parameters_factory():
         return [
             {
                 "id": "PAR-0000-0001",
-                "name": "CompanyName",
+                "name": "Company Name",
+                "externalId": "companyName",
+                "type": "SingleLineText",
                 "value": company_name,
             },
             {
                 "id": "PAR-0000-0002",
-                "name": "PreferredLanguage",
+                "name": "Preferred Language",
+                "externalId": "preferredLanguage",
+                "type": "Choice",
                 "value": preferred_language,
             },
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
+                "externalId": "address",
+                "type": "Address",
                 "value": address,
             },
             {
                 "id": "PAR-0000-0002",
                 "name": "Contact",
+                "externalId": "contact",
+                "type": "Contact",
                 "value": contact,
             },
         ]
@@ -234,17 +242,29 @@ def fulfillment_parameters_factory():
         retry_count="0",
     ):
         return [
-            {"id": "PAR-1234-5678", "name": "CustomerId", "value": customer_id},
-            {"id": "PAR-7771-1777", "name": "RetryCount", "value": retry_count},
+            {
+                "id": "PAR-1234-5678",
+                "name": "Customer Id",
+                "externalId": "customerId",
+                "type": "SingleLineText",
+                "value": customer_id,
+            },
+            {
+                "id": "PAR-7771-1777",
+                "name": "Retry Count",
+                "externalId": "retryCount",
+                "type": "SingleLineText",
+                "value": retry_count,
+            },
         ]
 
     return _fulfillment_parameters
 
 
 @pytest.fixture()
-def items_factory():
+def lines_factory():
     def _items(
-        line_number=1,
+        line_id=1,
         vendor_external_id="65304578CA",
         name="Awesome product",
         old_quantity=0,
@@ -252,9 +272,11 @@ def items_factory():
     ):
         return [
             {
-                "lineNumber": line_number,
-                "productItemId": vendor_external_id,
-                "name": name,
+                "id": line_id,
+                "item": {
+                    "id": vendor_external_id,
+                    "name": name,
+                },
                 "oldQuantity": old_quantity,
                 "quantity": quantity,
             },
@@ -264,16 +286,16 @@ def items_factory():
 
 
 @pytest.fixture()
-def subscriptions_factory(items_factory):
+def subscriptions_factory(lines_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
         product_name="Awesome product",
         adobe_subscription_id="a-sub-id",
         start_date=None,
-        items=None,
+        lines=None,
     ):
         start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
-        items = items_factory() if items is None else items
+        lines = lines_factory() if lines is None else lines
         return [
             {
                 "id": subscription_id,
@@ -281,12 +303,14 @@ def subscriptions_factory(items_factory):
                 "parameters": {
                     "fulfillment": [
                         {
-                            "name": "SubscriptionId",
+                            "name": "Subscription Id",
+                            "externalId": "subscriptionId",
+                            "type": "SingleLineText",
                             "value": adobe_subscription_id,
                         }
                     ]
                 },
-                "items": items,
+                "lines": lines,
                 "startDate": start_date,
             }
         ]
@@ -320,6 +344,9 @@ def agreement():
             "href": "/accounts/sellers/SEL-9121-8944",
             "name": "Software LN",
             "icon": "/static/SEL-9121-8944/icon.png",
+            "address": {
+                "country": "US",
+            },
         },
         "product": {
             "id": "PRD-1111-1111-1111",
@@ -329,17 +356,17 @@ def agreement():
 
 @pytest.fixture()
 def order_factory(
-    agreement, order_parameters_factory, fulfillment_parameters_factory, items_factory
+    agreement, order_parameters_factory, fulfillment_parameters_factory, lines_factory
 ):
     """
     Marketplace platform order for tests.
     """
 
     def _order(
-        order_type="Purchase",
+        order_type="purchase",
         order_parameters=None,
         fulfillment_parameters=None,
-        items=None,
+        lines=None,
         subscriptions=None,
         external_ids=None,
     ):
@@ -352,7 +379,7 @@ def order_factory(
             else fulfillment_parameters
         )
 
-        items = items_factory() if items is None else items
+        lines = lines_factory() if lines is None else lines
         subscriptions = [] if subscriptions is None else subscriptions
 
         order = {
@@ -363,11 +390,11 @@ def order_factory(
             "status": "Processing",
             "clientReferenceNumber": None,
             "notes": "First order to try",
-            "items": items,
+            "lines": lines,
             "subscriptions": subscriptions,
             "parameters": {
                 "fulfillment": fulfillment_parameters,
-                "order": order_parameters,
+                "ordering": order_parameters,
             },
             "audit": {
                 "created": {
@@ -378,7 +405,7 @@ def order_factory(
             },
         }
         if external_ids:
-            order["externalIDs"] = external_ids
+            order["externalIds"] = external_ids
         return order
 
     return _order

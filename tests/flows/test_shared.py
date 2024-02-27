@@ -31,7 +31,7 @@ def test_create_customer_account(
     )
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.shared.update_order",
-        return_value={"updated": "order"},
+        return_value=copy.deepcopy(order),
     )
 
     updated_order = create_customer_account(
@@ -44,19 +44,18 @@ def test_create_customer_account(
     mocked_adobe_client.create_customer_account.assert_called_once_with(
         "US",
         order["agreement"]["id"],
-        {param["name"]: param["value"] for param in order_parameters_factory()},
+        {param["externalId"]: param["value"] for param in order_parameters_factory()},
     )
+
     mocked_update_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "order": order_parameters_factory(),
-                "fulfillment": fulfillment_parameters_factory(customer_id="adobe-customer-id"),
-            }
+        parameters={
+            "ordering": order_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(customer_id="adobe-customer-id"),
         },
     )
-    assert updated_order == {"updated": "order"}
+    assert updated_order == order
 
 
 def test_create_customer_account_empty_order_parameters(
@@ -82,7 +81,7 @@ def test_create_customer_account_empty_order_parameters(
         return_value=copy.deepcopy(order),
     )
 
-    order["parameters"]["order"] = order_parameters_factory(
+    order["parameters"]["ordering"] = order_parameters_factory(
         company_name="",
         preferred_language="",
         address={},
@@ -99,32 +98,30 @@ def test_create_customer_account_empty_order_parameters(
     mocked_adobe_client.create_customer_account.assert_called_once_with(
         "US",
         order["agreement"]["id"],
-        {param["name"]: param["value"] for param in order_parameters_factory()},
+        {param["externalId"]: param["value"] for param in order_parameters_factory()},
     )
 
     assert mocked_update_order.call_count == 2
-
     assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "order": order_parameters_factory(),
-                "fulfillment": fulfillment_parameters_factory(),
-            }
-        },
     )
-
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "ordering": order_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(),
+        },
+    }
     assert mocked_update_order.mock_calls[1].args == (
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "order": order_parameters_factory(),
-                "fulfillment": fulfillment_parameters_factory(customer_id="adobe-customer-id"),
-            }
-        },
     )
+    assert mocked_update_order.mock_calls[1].kwargs == {
+        "parameters": {
+            "ordering": order_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(customer_id="adobe-customer-id"),
+        },
+    }
 
 
 def test_create_customer_account_address_error(
@@ -156,7 +153,7 @@ def test_create_customer_account_address_error(
     )
     mocked_query_order = mocker.patch(
         "adobe_vipm.flows.shared.query_order",
-        return_value={"query": "order"},
+        return_value=copy.deepcopy(order),
     )
 
     updated_order = create_customer_account(
@@ -172,23 +169,21 @@ def test_create_customer_account_address_error(
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "order": ordering_parameters,
-                "fulfillment": fulfillment_parameters_factory(),
-            },
-            "template": {"id": "TPL-0000"},
+        parameters={
+            "ordering": ordering_parameters,
+            "fulfillment": fulfillment_parameters_factory(),
         },
+        templateId="TPL-0000",
     )
     assert updated_order is None
 
 
 @pytest.mark.parametrize(
-    ("param_name", "error_details"),
+    ("param_external_id", "error_details"),
     [
-        ("Contact", "companyProfile.contacts[0].firstName"),
-        ("CompanyName", "companyProfile.companyName"),
-        ("PreferredLanguage", "companyProfile.preferredLanguage"),
+        ("contact", "companyProfile.contacts[0].firstName"),
+        ("companyName", "companyProfile.companyName"),
+        ("preferredLanguage", "companyProfile.preferredLanguage"),
     ],
 )
 def test_create_customer_account_fields_error(
@@ -199,7 +194,7 @@ def test_create_customer_account_fields_error(
     fulfillment_parameters_factory,
     adobe_api_error_factory,
     settings,
-    param_name,
+    param_external_id,
     error_details,
 ):
     """
@@ -222,7 +217,7 @@ def test_create_customer_account_fields_error(
     )
     mocked_query_order = mocker.patch(
         "adobe_vipm.flows.shared.query_order",
-        return_value={"query": "order"},
+        return_value=copy.deepcopy(order),
     )
 
     updated_order = create_customer_account(
@@ -233,18 +228,16 @@ def test_create_customer_account_fields_error(
     )
 
     ordering_parameters = order_parameters_factory()
-    param = next(filter(lambda x: x["name"] == param_name, ordering_parameters))
+    param = next(filter(lambda x: x["externalId"] == param_external_id, ordering_parameters))
     param["error"] = str(adobe_error)
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        {
-            "parameters": {
-                "order": ordering_parameters,
-                "fulfillment": fulfillment_parameters_factory(),
-            },
-            "template": {"id": "TPL-0000"},
+        parameters={
+            "ordering": ordering_parameters,
+            "fulfillment": fulfillment_parameters_factory(),
         },
+        templateId="TPL-0000",
     )
     assert updated_order is None
 
@@ -273,7 +266,7 @@ def test_create_customer_account_other_error(
     )
     mocked_fail_order = mocker.patch(
         "adobe_vipm.flows.shared.fail_order",
-        return_value={"failed": "order"},
+        return_value=copy.deepcopy(order),
     )
 
     updated_order = create_customer_account(
