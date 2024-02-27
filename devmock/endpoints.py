@@ -207,7 +207,7 @@ def list_subscriptions(order_id: str, limit: int, offset: int):
 
 
 @router.post("/commerce/orders/{order_id}/validate")
-def validate_draft_order(order_id: str, body: Any = Body(None)):  # noqa: B008
+def validate_draft_order(order_id: str, body: Any = Body(None)):
     resp = requests.post(
         WEBHOOK_ENDPOINT,
         headers={

@@ -91,6 +91,7 @@ branch = true
 
 [tool.isort]
 profile = "black"
+known_third_party = ["swo"]
 
 [tool.black]
 line-length = 100

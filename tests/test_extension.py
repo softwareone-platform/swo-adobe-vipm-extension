@@ -1,5 +1,6 @@
-from adobe_vipm.extension import ext, process_order
 from swo.mpt.extensions.core.events import Event
+
+from adobe_vipm.extension import ext, process_order
 
 
 def test_listener_registered():

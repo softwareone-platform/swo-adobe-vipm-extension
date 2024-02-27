@@ -2,7 +2,5 @@
 exclude = .idea,.vscode,.git,venv,env,swo,devmock
 show-source = True
 max-line-length = 100
-application-import-names = adobe_vipm
-import-order-style = smarkets
 max-cognitive-complexity = 15
-extend-ignore = PT004, E203
+extend-ignore = PT004, E203, B008
