@@ -1,6 +1,7 @@
 import copy
 from datetime import UTC, datetime
 
+from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
     ORDER_TYPE_PURCHASE,
@@ -17,10 +18,10 @@ from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.utils import find_first
 
 
-def get_parameter(order, parameter_phase, param_external_id):
+def get_parameter(source, parameter_phase, param_external_id):
     return find_first(
         lambda x: x["externalId"] == param_external_id,
-        order["parameters"][parameter_phase],
+        source["parameters"][parameter_phase],
         default={},
     )
 
@@ -108,7 +109,7 @@ def set_ordering_parameter_error(order, param_external_id, error):
 
 def get_order_item(order, line_id):
     return find_first(
-        lambda item: line_id == item["id"],
+        lambda item: line_id == to_adobe_line_id(item["id"]),
         order["lines"],
     )
 

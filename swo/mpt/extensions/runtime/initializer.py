@@ -2,7 +2,6 @@ import os
 
 import rich
 from rich.theme import Theme
-
 from swo.mpt.extensions.runtime.events.utils import instrument_logging
 from swo.mpt.extensions.runtime.utils import get_extension_app_config_name
 

@@ -6,7 +6,6 @@ from contextlib import contextmanager
 
 import requests
 from django.conf import settings
-
 from swo.mpt.extensions.core.events import Event
 from swo.mpt.extensions.runtime.events.utils import setup_client
 

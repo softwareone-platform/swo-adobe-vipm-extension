@@ -23,7 +23,7 @@ from adobe_vipm.adobe.dataclasses import (
     Reseller,
 )
 from adobe_vipm.adobe.errors import wrap_http_error
-from adobe_vipm.adobe.utils import get_actual_sku, get_item_to_return
+from adobe_vipm.adobe.utils import get_actual_sku, get_item_to_return, to_adobe_line_id
 
 logger = logging.getLogger(__name__)
 
@@ -370,7 +370,7 @@ class AdobeClient:
                 quantity = quantity - old_quantity
             payload["lineItems"].append(
                 {
-                    "extLineItemNumber": line["id"],
+                    "extLineItemNumber": to_adobe_line_id(line["id"]),
                     "offerId": product.sku,
                     "quantity": quantity,
                 }

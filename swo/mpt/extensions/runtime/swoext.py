@@ -1,6 +1,5 @@
 import click
 from django.utils.module_loading import import_string
-
 from swo.mpt.extensions.runtime import get_version
 from swo.mpt.extensions.runtime.utils import show_banner
 

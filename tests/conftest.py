@@ -272,7 +272,7 @@ def lines_factory():
     ):
         return [
             {
-                "id": line_id,
+                "id": f"ALI-1234-1234-1234-{line_id:04d}",
                 "item": {
                     "id": vendor_external_id,
                     "name": name,

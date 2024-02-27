@@ -17,6 +17,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Credentials
 from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.utils import to_adobe_line_id
 
 
 def test_create_reseller_account(
@@ -275,7 +276,7 @@ def test_create_preview_order(
                     "orderType": "PREVIEW",
                     "lineItems": [
                         {
-                            "extLineItemNumber": order["lines"][0]["id"],
+                            "extLineItemNumber": to_adobe_line_id(order["lines"][0]["id"]),
                             "offerId": adobe_full_sku,
                             "quantity": expected_quantity,
                         },
