@@ -29,7 +29,7 @@ def test_termination(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -75,9 +75,7 @@ def test_termination(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, processing_order)
 
@@ -116,7 +114,7 @@ def test_termination_return_order_pending(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -162,9 +160,7 @@ def test_termination_return_order_pending(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, processing_order)
 
@@ -198,7 +194,7 @@ def test_termination_out_window(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     adobe_subscription = adobe_subscription_factory()
 
@@ -236,9 +232,7 @@ def test_termination_out_window(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, processing_order)
 

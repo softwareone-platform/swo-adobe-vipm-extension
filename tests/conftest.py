@@ -129,6 +129,14 @@ def adobe_config_file():
                 "pricelist_region": "NA",
                 "postal_code_format_regex": "^[\\d]{5}(?:-[\\d]{4})?$",
             },
+            {
+                "code": "VU",
+                "name": "Vanuatu",
+                "currencies": ["USD"],
+                "states_or_provinces": ["00", "01", "SEE", "TOB", "TAE", "MAP", "PAM", "SAM"],
+                "pricelist_region": "AP",
+                "postal_code_format_regex": "",
+            },
         ],
     }
 
@@ -156,13 +164,16 @@ def account_data():
             "city": "Irvine",
             "addressLine1": "Test street",
             "addressLine2": "Line 2",
-            "postalCode": "08010",
+            "postCode": "08010",
         },
         "contact": {
             "firstName": "First Name",
             "lastName": "Last Name",
             "email": "test@example.com",
-            "phoneNumber": "+22003939393",
+            "phone": {
+                "prefix": "+1",
+                "number": "4082954078",
+            },
         },
     }
 
@@ -192,44 +203,66 @@ def order_parameters_factory():
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postalCode": "94123",
+                "postCode": "94123",
             }
         if contact is None:
             contact = {
                 "firstName": "Cic",
                 "lastName": "Faraone",
                 "email": "francesco.faraone@softwareone.com",
-                "phoneNumber": "+14082954078",
-                "countryCode": "US",
+                "phone": {
+                    "prefix": "+1",
+                    "number": "4082954078",
+                },
             }
         return [
             {
                 "id": "PAR-0000-0001",
+                "title": "Company Name",
                 "name": "Company Name",
                 "externalId": "companyName",
                 "type": "SingleLineText",
                 "value": company_name,
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
             },
             {
                 "id": "PAR-0000-0002",
+                "title": "Preferred Language",
                 "name": "Preferred Language",
                 "externalId": "preferredLanguage",
                 "type": "Choice",
                 "value": preferred_language,
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
             },
             {
                 "id": "PAR-0000-0002",
+                "title": "Customer Address",
                 "name": "Address",
                 "externalId": "address",
                 "type": "Address",
                 "value": address,
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
             },
             {
                 "id": "PAR-0000-0002",
+                "title": "Customer Contact",
                 "name": "Contact",
                 "externalId": "contact",
                 "type": "Contact",
                 "value": contact,
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
             },
         ]
 
@@ -480,7 +513,10 @@ def seller():
             "firstName": "Francesco",
             "lastName": "Faraone",
             "email": "francesco.faraone@softwareone.com",
-            "phone": "+14082954078",
+            "phone": {
+                "prefix": "+1",
+                "number": "4082954078",
+            },
         },
     }
 

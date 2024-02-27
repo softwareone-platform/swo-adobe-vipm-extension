@@ -27,3 +27,15 @@ def wrap_http_error(func):
             raise MPTError(e.response.json())
 
     return _wrapper
+
+
+class ValidationError:
+    def __init__(self, id, message):
+        self.id = id
+        self.message = message
+
+    def to_dict(self, **kwargs):
+        return {
+            "id": self.id,
+            "message": self.message.format(**kwargs),
+        }

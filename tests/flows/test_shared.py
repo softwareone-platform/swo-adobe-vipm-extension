@@ -8,6 +8,12 @@ from adobe_vipm.adobe.constants import (
     STATUS_INVALID_FIELDS,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.flows.constants import (
+    ERR_ADOBE_ADDRESS,
+    ERR_ADOBE_COMPANY_NAME,
+    ERR_ADOBE_CONTACT,
+    ERR_ADOBE_PREFERRED_LANGUAGE,
+)
 from adobe_vipm.flows.shared import create_customer_account
 from adobe_vipm.flows.utils import set_adobe_customer_id
 
@@ -167,7 +173,12 @@ def test_create_customer_account_address_error(
 
     ordering_parameters = order_parameters_factory()
     address_param = next(filter(lambda x: x["name"] == "Address", ordering_parameters))
-    address_param["error"] = str(adobe_error)
+    address_param["error"] = ERR_ADOBE_ADDRESS.to_dict(
+        title=address_param["title"],
+        details=str(adobe_error),
+    )
+    address_param["constraints"]["hidden"] = False
+    address_param["constraints"]["optional"] = False
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -181,11 +192,11 @@ def test_create_customer_account_address_error(
 
 
 @pytest.mark.parametrize(
-    ("param_external_id", "error_details"),
+    ("param_external_id", "error_constant", "error_details"),
     [
-        ("contact", "companyProfile.contacts[0].firstName"),
-        ("companyName", "companyProfile.companyName"),
-        ("preferredLanguage", "companyProfile.preferredLanguage"),
+        ("contact", ERR_ADOBE_CONTACT, "companyProfile.contacts[0].firstName"),
+        ("companyName", ERR_ADOBE_COMPANY_NAME, "companyProfile.companyName"),
+        ("preferredLanguage", ERR_ADOBE_PREFERRED_LANGUAGE, "companyProfile.preferredLanguage"),
     ],
 )
 def test_create_customer_account_fields_error(
@@ -197,6 +208,7 @@ def test_create_customer_account_fields_error(
     adobe_api_error_factory,
     settings,
     param_external_id,
+    error_constant,
     error_details,
 ):
     """
@@ -231,7 +243,12 @@ def test_create_customer_account_fields_error(
 
     ordering_parameters = order_parameters_factory()
     param = next(filter(lambda x: x["externalId"] == param_external_id, ordering_parameters))
-    param["error"] = str(adobe_error)
+    param["error"] = error_constant.to_dict(
+        title=param["title"],
+        details=str(adobe_error),
+    )
+    param["constraints"]["hidden"] = False
+    param["constraints"]["optional"] = False
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],

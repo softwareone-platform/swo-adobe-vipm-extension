@@ -51,7 +51,7 @@ MIDDLEWARE = [
     "swo.mpt.extensions.runtime.djapp.middleware.MPTClientMiddleware",
 ]
 
-ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
+# ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
 
 TEMPLATES = [
     {

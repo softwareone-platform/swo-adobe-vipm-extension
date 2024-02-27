@@ -54,7 +54,7 @@ services:
       context: .
       dockerfile: dev.Dockerfile
     working_dir: /extension
-    command: bash -c "flake8 . && pytest"
+    command: bash -c "flake8 . && poetry install && pytest"
     volumes:
       - .:/extension
     environment:

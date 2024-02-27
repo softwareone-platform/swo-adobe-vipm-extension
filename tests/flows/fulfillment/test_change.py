@@ -29,7 +29,7 @@ def test_upsizing(
     Tests a change order in case of upsizing.
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
     adobe_order = adobe_order_factory(
@@ -85,9 +85,7 @@ def test_upsizing(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, processing_change_order)
 
     seller_country = seller["address"]["country"]
@@ -131,7 +129,6 @@ def test_upsizing(
 
 def test_upsizing_order_already_created_adobe_order_not_ready(
     mocker,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -143,7 +140,7 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
     Tests the processing of an change order (upsizing) that has been placed in the previous
     attemp and still pending.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.update_order",
     )
@@ -174,9 +171,7 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
         external_ids={"vendor": adobe_order["orderId"]},
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.get_subscription.assert_not_called()
@@ -207,7 +202,7 @@ def test_upsizing_create_adobe_preview_order_error(
     Tests the processing of a change order (upsizing) when the Adobe preview order
     creation fails. The change order will be failed.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     adobe_error = AdobeError(
         adobe_api_error_factory("9999", "Error while creating a preview order")
@@ -236,9 +231,7 @@ def test_upsizing_create_adobe_preview_order_error(
         order_parameters=[],
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_fail_order.assert_called_once_with(
@@ -270,7 +263,7 @@ def test_downsizing(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -340,9 +333,7 @@ def test_downsizing(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, processing_order)
 
     seller_country = seller["address"]["country"]
@@ -374,7 +365,6 @@ def test_downsizing(
 def test_downsizing_return_order_exists(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -391,7 +381,7 @@ def test_downsizing_return_order_exists(
     The return order will not be placed again.
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -462,9 +452,8 @@ def test_downsizing_return_order_exists(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
+
     fulfill_order(mocked_mpt_client, processing_order)
 
     assert mocked_update_order.mock_calls[0].args == (
@@ -487,7 +476,6 @@ def test_downsizing_return_order_exists(
 
 def test_downsizing_return_order_pending(
     mocker,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -502,7 +490,7 @@ def test_downsizing_return_order_pending(
     The return order will not be placed again.
     The new order will not be placed yet.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -546,9 +534,7 @@ def test_downsizing_return_order_pending(
         order_parameters=[],
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_update_order.assert_called_once_with(
@@ -583,7 +569,7 @@ def test_downsizing_new_order_pending(
     The return order will not be placed again.
     The RetryCount parameter will be set to 1.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     adobe_order = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -620,9 +606,7 @@ def test_downsizing_new_order_pending(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.create_return_order.assert_not_called()
@@ -658,7 +642,7 @@ def test_downsizing_create_new_order_error(
 
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -703,9 +687,7 @@ def test_downsizing_create_new_order_error(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -739,7 +721,7 @@ def test_mixed(
         * subscription creation for new item
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
 
     adobe_preview_order_items = (
         adobe_items_factory(
@@ -927,7 +909,7 @@ def test_mixed(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch("adobe_vipm.flows.fulfillment.get_product_items", return_value=product_items)
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=product_items)
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 

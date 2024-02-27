@@ -6,14 +6,25 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import STATUS_INVALID_ADDRESS, STATUS_INVALID_FIELDS
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_ADDRESS,
+    ERR_ADOBE_COMPANY_NAME,
+    ERR_ADOBE_CONTACT,
+    ERR_ADOBE_PREFERRED_LANGUAGE,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_PREFERRED_LANGUAGE,
 )
-from adobe_vipm.flows.mpt import fail_order, query_order, update_order
+from adobe_vipm.flows.mpt import (
+    fail_order,
+    get_agreement,
+    get_product_items,
+    query_order,
+    update_order,
+)
 from adobe_vipm.flows.utils import (
     get_customer_data,
+    get_parameter,
     reset_retry_count,
     set_adobe_customer_id,
     set_customer_data,
@@ -23,10 +34,33 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def _get_customer_data(client, buyer, order):
+def _populate_order_lines(client, lines):
+    item_ids = set([line["item"]["id"] for line in lines])
+
+    product_items = get_product_items(client, settings.PRODUCT_ID, item_ids)
+    id_sku_mapping = {
+        pi["id"]: pi["externalIds"]["vendor"]
+        for pi in product_items
+        if pi.get("externalIds", {}).get("vendor")
+    }
+
+    for line in lines:
+        line["item"]["externalIds"] = {"vendor": id_sku_mapping[line["item"]["id"]]}
+
+    return lines
+
+
+def populate_order_info(client, order):
+    if "lines" in order:  # pragma: no branch
+        order["lines"] = _populate_order_lines(client, order["lines"])
+    order["agreement"] = get_agreement(client, order["agreement"]["id"])
+
+    return order
+
+
+def prepare_customer_data(client, order, buyer):
     customer_data = get_customer_data(order)
     if not all(customer_data.values()):
-        phone_number = f"{buyer['contact']['phone']['prefix']}{buyer['contact']['phone']['number']}"
         order = set_customer_data(
             order,
             {
@@ -38,14 +72,13 @@ def _get_customer_data(client, buyer, order):
                     "city": buyer["address"]["city"],
                     "addressLine1": buyer["address"]["addressLine1"],
                     "addressLine2": buyer["address"]["addressLine2"],
-                    "postalCode": buyer["address"]["postCode"],
+                    "postCode": buyer["address"]["postCode"],
                 },
                 PARAM_CONTACT: {
                     "firstName": buyer["contact"]["firstName"],
                     "lastName": buyer["contact"]["lastName"],
                     "email": buyer["contact"]["email"],
-                    "phoneNumber": phone_number,
-                    "countryCode": buyer["address"]["country"],
+                    "phone": buyer["contact"]["phone"],
                 },
             },
         )
@@ -55,7 +88,7 @@ def _get_customer_data(client, buyer, order):
             parameters=order["parameters"],
         )
         customer_data = get_customer_data(order)
-    return customer_data, order
+    return order, customer_data
 
 
 def _handle_customer_error(client, order, e):
@@ -63,14 +96,34 @@ def _handle_customer_error(client, order, e):
         fail_order(client, order["id"], str(e))
         return
     if e.code == STATUS_INVALID_ADDRESS:
-        order = set_ordering_parameter_error(order, PARAM_ADDRESS, str(e))
+        param = get_parameter(order, "ordering", PARAM_ADDRESS)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_ADDRESS,
+            ERR_ADOBE_ADDRESS.to_dict(title=param["title"], details=str(e)),
+        )
     else:
         if "companyProfile.companyName" in e.details:
-            order = set_ordering_parameter_error(order, PARAM_COMPANY_NAME, str(e))
+            param = get_parameter(order, "ordering", PARAM_COMPANY_NAME)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_COMPANY_NAME,
+                ERR_ADOBE_COMPANY_NAME.to_dict(title=param["title"], details=str(e)),
+            )
         if "companyProfile.preferredLanguage" in e.details:
-            order = set_ordering_parameter_error(order, PARAM_PREFERRED_LANGUAGE, str(e))
+            param = get_parameter(order, "ordering", PARAM_PREFERRED_LANGUAGE)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_PREFERRED_LANGUAGE,
+                ERR_ADOBE_PREFERRED_LANGUAGE.to_dict(title=param["title"], details=str(e)),
+            )
         if len(list(filter(lambda x: x.startswith("companyProfile.contacts[0]"), e.details))):
-            order = set_ordering_parameter_error(order, PARAM_CONTACT, str(e))
+            param = get_parameter(order, "ordering", PARAM_CONTACT)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_CONTACT,
+                ERR_ADOBE_CONTACT.to_dict(title=param["title"], details=str(e)),
+            )
 
     order = reset_retry_count(order)
     query_order(
@@ -84,7 +137,7 @@ def _handle_customer_error(client, order, e):
 def create_customer_account(client, seller_country, buyer, order):
     adobe_client = get_adobe_client()
     try:
-        customer_data, order = _get_customer_data(client, buyer, order)
+        order, customer_data = prepare_customer_data(client, order, buyer)
         external_id = order["agreement"]["id"]
         customer_id = adobe_client.create_customer_account(
             seller_country, external_id, customer_data

@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "swo.mpt.extensions.runtime.djapp.apps.DjAppConfig",
+    "adobe_vipm.apps.ExtensionConfig",
 ]
 
 MIDDLEWARE = [
@@ -48,6 +49,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "swo.mpt.extensions.runtime.djapp.middleware.MPTClientMiddleware",
 ]
 
 ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
@@ -68,18 +70,11 @@ TEMPLATES = [
     },
 ]
 
-# WSGI_APPLICATION = "pippo.wsgi.application"
-
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+DATABASES = {}
 
 
 # Password validation

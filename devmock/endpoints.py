@@ -211,7 +211,7 @@ def validate_draft_order(order_id: str, body: Any = Body(None)):
     resp = requests.post(
         WEBHOOK_ENDPOINT,
         headers={
-            "authorization": f"JWT {gen_jwt_token()}",
+            "authorization": f"Bearer {gen_jwt_token()}",
         },
         json=body,
     )

@@ -17,7 +17,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Credentials
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.adobe.utils import to_adobe_line_id
+from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
 
 
 def test_create_reseller_account(
@@ -69,15 +69,15 @@ def test_create_reseller_account(
                             "city": reseller_data["address"]["city"],
                             "addressLine1": reseller_data["address"]["addressLine1"],
                             "addressLine2": reseller_data["address"]["addressLine2"],
-                            "postalCode": reseller_data["address"]["postalCode"],
-                            "phoneNumber": reseller_data["contact"]["phoneNumber"],
+                            "postalCode": reseller_data["address"]["postCode"],
+                            "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
                         },
                         "contacts": [
                             {
                                 "firstName": reseller_data["contact"]["firstName"],
                                 "lastName": reseller_data["contact"]["lastName"],
                                 "email": reseller_data["contact"]["email"],
-                                "phoneNumber": reseller_data["contact"]["phoneNumber"],
+                                "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
                             }
                         ],
                     },
@@ -169,15 +169,15 @@ def test_create_customer_account(
                             "city": customer_data["address"]["city"],
                             "addressLine1": customer_data["address"]["addressLine1"],
                             "addressLine2": customer_data["address"]["addressLine2"],
-                            "postalCode": customer_data["address"]["postalCode"],
-                            "phoneNumber": customer_data["contact"]["phoneNumber"],
+                            "postalCode": customer_data["address"]["postCode"],
+                            "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
                         },
                         "contacts": [
                             {
                                 "firstName": customer_data["contact"]["firstName"],
                                 "lastName": customer_data["contact"]["lastName"],
                                 "email": customer_data["contact"]["email"],
-                                "phoneNumber": customer_data["contact"]["phoneNumber"],
+                                "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
                             }
                         ],
                     },

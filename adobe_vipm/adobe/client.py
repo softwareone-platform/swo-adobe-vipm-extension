@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import requests
 
-from adobe_vipm.adobe.config import Config
+from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
@@ -23,14 +23,19 @@ from adobe_vipm.adobe.dataclasses import (
     Reseller,
 )
 from adobe_vipm.adobe.errors import wrap_http_error
-from adobe_vipm.adobe.utils import get_actual_sku, get_item_to_return, to_adobe_line_id
+from adobe_vipm.adobe.utils import (
+    get_actual_sku,
+    get_item_to_return,
+    join_phone_number,
+    to_adobe_line_id,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class AdobeClient:
     def __init__(self) -> None:
-        self._config: Config = Config()
+        self._config: Config = get_config()
         self._token_cache: MutableMapping[Credentials, APIToken] = {}
 
     @wrap_http_error
@@ -65,15 +70,15 @@ class AdobeClient:
                     "city": reseller_data["address"]["city"],
                     "addressLine1": reseller_data["address"]["addressLine1"],
                     "addressLine2": reseller_data["address"]["addressLine2"],
-                    "postalCode": reseller_data["address"]["postalCode"],
-                    "phoneNumber": reseller_data["contact"]["phoneNumber"],
+                    "postalCode": reseller_data["address"]["postCode"],
+                    "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
                 },
                 "contacts": [
                     {
                         "firstName": reseller_data["contact"]["firstName"],
                         "lastName": reseller_data["contact"]["lastName"],
                         "email": reseller_data["contact"]["email"],
-                        "phoneNumber": reseller_data["contact"]["phoneNumber"],
+                        "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
                     }
                 ],
             },
@@ -131,15 +136,15 @@ class AdobeClient:
                     "city": customer_data["address"]["city"],
                     "addressLine1": customer_data["address"]["addressLine1"],
                     "addressLine2": customer_data["address"]["addressLine2"],
-                    "postalCode": customer_data["address"]["postalCode"],
-                    "phoneNumber": customer_data["contact"]["phoneNumber"],
+                    "postalCode": customer_data["address"]["postCode"],
+                    "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
                 },
                 "contacts": [
                     {
                         "firstName": customer_data["contact"]["firstName"],
                         "lastName": customer_data["contact"]["lastName"],
                         "email": customer_data["contact"]["email"],
-                        "phoneNumber": customer_data["contact"]["phoneNumber"],
+                        "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
                     }
                 ],
             },
