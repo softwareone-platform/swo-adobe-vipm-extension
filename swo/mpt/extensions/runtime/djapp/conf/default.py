@@ -48,6 +48,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "swo.mpt.extensions.runtime.djapp.middleware.MPTClientMiddleware",
 ]
 
 ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
@@ -127,7 +128,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SERVICE_NAME = os.getenv("SERVICE_NAME", "Swo.Extensions.SwoDefaultExtensions")
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
 LOGGING_ATTEMPT_GETTER = os.getenv("LOGGING_ATTEMPT_GETTER", "adobe_vipm.utils.get_attempt_count")
-USE_APPLICATIONINSIGHTS = (APPLICATIONINSIGHTS_CONNECTION_STRING != "")
+USE_APPLICATIONINSIGHTS = APPLICATIONINSIGHTS_CONNECTION_STRING != ""
 
 LOGGING = {
     "version": 1,
