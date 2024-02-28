@@ -21,6 +21,7 @@ def test_upsizing(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -88,6 +89,9 @@ def test_upsizing(
     processing_change_order["parameters"] = pack_structured_parameters(
         processing_change_order["parameters"]
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     fulfill_order(mocked_mpt_client, processing_change_order)
 
     seller_country = seller["address"]["country"]
@@ -136,6 +140,7 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     adobe_order_factory,
 ):
     """
@@ -174,6 +179,9 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
     )
 
     order["parameters"] = pack_structured_parameters(order["parameters"])
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.get_subscription.assert_not_called()
@@ -196,6 +204,7 @@ def test_upsizing_create_adobe_preview_order_error(
     agreement,
     order_factory,
     lines_factory,
+    product_item_factory,
     fulfillment_parameters_factory,
     adobe_api_error_factory,
 ):
@@ -232,6 +241,10 @@ def test_upsizing_create_adobe_preview_order_error(
         order_parameters=[],
     )
     order["parameters"] = pack_structured_parameters(order["parameters"])
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     fulfill_order(mocked_mpt_client, order)
 
     mocked_fail_order.assert_called_once_with(
@@ -249,6 +262,7 @@ def test_downsizing(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -333,6 +347,9 @@ def test_downsizing(
     )
 
     processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     fulfill_order(mocked_mpt_client, processing_order)
 
     seller_country = seller["address"]["country"]
@@ -368,6 +385,7 @@ def test_downsizing_return_order_exists(
     agreement,
     order_factory,
     lines_factory,
+    product_item_factory,
     fulfillment_parameters_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -452,6 +470,9 @@ def test_downsizing_return_order_exists(
     )
 
     processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     fulfill_order(mocked_mpt_client, processing_order)
 
     assert mocked_update_order.mock_calls[0].args == (
@@ -478,6 +499,7 @@ def test_downsizing_return_order_pending(
     agreement,
     order_factory,
     lines_factory,
+    product_item_factory,
     fulfillment_parameters_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -533,6 +555,9 @@ def test_downsizing_return_order_pending(
     )
 
     order["parameters"] = pack_structured_parameters(order["parameters"])
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     fulfill_order(mocked_mpt_client, order)
 
     mocked_update_order.assert_called_once_with(
@@ -556,6 +581,7 @@ def test_downsizing_new_order_pending(
     agreement,
     order_factory,
     lines_factory,
+    product_item_factory,
     fulfillment_parameters_factory,
     adobe_order_factory,
 ):
@@ -604,6 +630,9 @@ def test_downsizing_new_order_pending(
     )
 
     order["parameters"] = pack_structured_parameters(order["parameters"])
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.create_return_order.assert_not_called()
@@ -628,6 +657,7 @@ def test_downsizing_create_new_order_error(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_api_error_factory,
@@ -683,6 +713,10 @@ def test_downsizing_create_new_order_error(
 
     mocked_mpt_client = mocker.MagicMock()
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     order["parameters"] = pack_structured_parameters(order["parameters"])
     fulfill_order(mocked_mpt_client, order)
 
@@ -701,6 +735,7 @@ def test_mixed(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -809,19 +844,16 @@ def test_mixed(
 
     downsizing_items = lines_factory(
         line_id=1,
-        vendor_external_id="sku-downsized",
         old_quantity=10,
         quantity=8,
     )
     upsizing_items = lines_factory(
         line_id=2,
-        vendor_external_id="sku-upsized",
         old_quantity=10,
         quantity=12,
     )
     new_items = lines_factory(
         line_id=3,
-        vendor_external_id="sku-new",
         name="New cool product",
         old_quantity=0,
         quantity=5,
@@ -829,10 +861,15 @@ def test_mixed(
 
     downsizing_items_out_of_window = lines_factory(
         line_id=4,
-        vendor_external_id="sku-downsize-out",
         old_quantity=10,
         quantity=8,
     )
+    product_items = [
+        product_item_factory(item_id=1, vendor_external_id="sku-downsized"),
+        product_item_factory(item_id=2, vendor_external_id="sku-upsized"),
+        product_item_factory(item_id=3, vendor_external_id="sku-new"),
+        product_item_factory(item_id=4, vendor_external_id="sku-downsize-out"),
+    ]
 
     order_items = upsizing_items + new_items + downsizing_items + downsizing_items_out_of_window
 
@@ -844,7 +881,6 @@ def test_mixed(
             adobe_subscription_id="sub-1",
             lines=lines_factory(
                 line_id=1,
-                vendor_external_id="sku-downsized",
                 quantity=10,
             ),
         )
@@ -853,7 +889,6 @@ def test_mixed(
             adobe_subscription_id="sub-2",
             lines=lines_factory(
                 line_id=2,
-                vendor_external_id="sku-upsized",
                 quantity=10,
             ),
         )
@@ -862,7 +897,6 @@ def test_mixed(
             adobe_subscription_id="sub-4",
             lines=lines_factory(
                 line_id=4,
-                vendor_external_id="sku-downsize-out",
                 quantity=10,
             ),
             start_date=datetime.now(UTC) - timedelta(days=CANCELLATION_WINDOW_DAYS + 1),
@@ -903,6 +937,8 @@ def test_mixed(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
+
+    mocker.patch("adobe_vipm.flows.fulfillment.get_product_items", return_value=product_items)
 
     processing_change_order["parameters"] = pack_structured_parameters(
         processing_change_order["parameters"]

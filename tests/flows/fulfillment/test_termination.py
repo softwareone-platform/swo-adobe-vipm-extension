@@ -18,6 +18,7 @@ def test_termination(
     agreement,
     order_factory,
     lines_factory,
+    product_item_factory,
     fulfillment_parameters_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -75,6 +76,10 @@ def test_termination(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
     fulfill_order(mocked_mpt_client, processing_order)
 
@@ -101,6 +106,7 @@ def test_termination_return_order_pending(
     agreement,
     order_factory,
     lines_factory,
+    product_item_factory,
     subscriptions_factory,
     fulfillment_parameters_factory,
     adobe_order_factory,
@@ -158,6 +164,10 @@ def test_termination_return_order_pending(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
     fulfill_order(mocked_mpt_client, processing_order)
 
@@ -180,6 +190,7 @@ def test_termination_out_window(
     agreement,
     order_factory,
     lines_factory,
+    product_item_factory,
     fulfillment_parameters_factory,
     subscriptions_factory,
     adobe_subscription_factory,
@@ -226,6 +237,10 @@ def test_termination_out_window(
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
 
     processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])

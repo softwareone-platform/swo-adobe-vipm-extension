@@ -21,6 +21,7 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_agreement,
     get_buyer,
+    get_product_items,
     unpack_structured_parameters,
     update_order,
 )
@@ -349,10 +350,35 @@ def _fulfill_termination_order(mpt_client, seller_country, order):
         _complete_order(mpt_client, order)
 
 
-def fulfill_order(client, order):
-    logger.info(f'Start processing {order["type"]} order {order["id"]}')
+def _populate_order_lines(client, lines):
+    item_ids = set([line["item"]["id"] for line in lines])
+
+    product_items = get_product_items(client, settings.PRODUCT_ID, item_ids)
+    id_sku_mapping = {
+        pi["id"]: pi["externalIds"]["vendor"]
+        for pi in product_items
+        if pi.get("externalIds", {}).get("vendor")
+    }
+
+    for line in lines:
+        line["item"]["externalIds"] = {"vendor": id_sku_mapping[line["item"]["id"]]}
+
+    return lines
+
+
+def _populate_order_info(client, order):
     if "parameters" in order:
         order["parameters"] = unpack_structured_parameters(order["parameters"])
+
+    if "lines" in order:
+        order["lines"] = _populate_order_lines(client, order["lines"])
+
+    return order
+
+
+def fulfill_order(client, order):
+    logger.info(f'Start processing {order["type"]} order {order["id"]}')
+    order = _populate_order_info(client, order)
     agreement = get_agreement(client, order["agreement"]["id"])
     order["agreement"] = agreement
     seller_country = agreement["seller"]["address"]["country"]
