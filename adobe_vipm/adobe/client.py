@@ -356,7 +356,9 @@ class AdobeClient:
         }
 
         for line in lines:
-            product: AdobeProduct = self._config.get_adobe_product(line["item"]["id"])
+            product: AdobeProduct = self._config.get_adobe_product(
+                line["item"]["externalIds"]["vendor"]
+            )
             quantity = line["quantity"]
             old_quantity = line["oldQuantity"]
 

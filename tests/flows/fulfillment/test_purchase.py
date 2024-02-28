@@ -22,6 +22,7 @@ def test_no_customer(
     order_factory,
     order_parameters_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     adobe_order_factory,
     adobe_items_factory,
     adobe_subscription_factory,
@@ -89,6 +90,10 @@ def test_no_customer(
     )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
 
     order = order_factory()
@@ -179,6 +184,7 @@ def test_customer_already_created(
     order_factory,
     order_parameters_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     adobe_order_factory,
 ):
     """
@@ -213,6 +219,9 @@ def test_customer_already_created(
         ),
     )
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
@@ -258,6 +267,7 @@ def test_create_customer_fails(
     mocker,
     seller,
     order_factory,
+    product_item_factory,
 ):
     """
     Tests the processing of a purchase order. It fails on customer creation no
@@ -274,6 +284,10 @@ def test_create_customer_fails(
     )
     mocked_mpt_client = mocker.MagicMock()
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     order = order_factory()
     order["parameters"] = pack_structured_parameters(order["parameters"])
 
@@ -289,6 +303,7 @@ def test_create_adobe_preview_order_error(
     seller,
     order_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
     adobe_api_error_factory,
 ):
     """
@@ -315,6 +330,10 @@ def test_create_adobe_preview_order_error(
 
     mocked_mpt_client = mocker.MagicMock()
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
@@ -335,6 +354,7 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
     order_factory,
     order_parameters_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
 ):
     """
     Tests the continuation of processing a purchase order since in the
@@ -364,6 +384,10 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
     )
     order["parameters"] = pack_structured_parameters(order["parameters"])
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.get_subscription.assert_not_called()
@@ -386,6 +410,7 @@ def test_customer_already_created_order_already_created_max_retries_reached(
     seller,
     order_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
 ):
     """
     Tests the processing of a purchase order when the allowed maximum number of
@@ -412,6 +437,10 @@ def test_customer_already_created_order_already_created_max_retries_reached(
     )
     order["parameters"] = pack_structured_parameters(order["parameters"])
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.get_subscription.assert_not_called()
@@ -430,6 +459,7 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
     mocker,
     seller,
     order_factory,
+    product_item_factory,
     fulfillment_parameters_factory,
     order_status,
 ):
@@ -457,6 +487,10 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
     )
     order["parameters"] = pack_structured_parameters(order["parameters"])
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
+
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.get_subscription.assert_not_called()
@@ -472,6 +506,7 @@ def test_customer_already_created_order_already_created_unexpected_status(
     seller,
     order_factory,
     fulfillment_parameters_factory,
+    product_item_factory,
 ):
     """
     Tests the processing of a purchase order when the Adobe order has been processed unsuccessfully
@@ -498,6 +533,10 @@ def test_customer_already_created_order_already_created_unexpected_status(
         external_ids={"vendor": "an-order-id"},
     )
     order["parameters"] = pack_structured_parameters(order["parameters"])
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
+    )
 
     fulfill_order(mocked_mpt_client, order)
 

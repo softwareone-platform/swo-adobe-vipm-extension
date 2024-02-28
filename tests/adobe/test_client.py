@@ -251,6 +251,7 @@ def test_create_preview_order(
     client, credentials, api_token = adobe_client_factory()
 
     order = order_factory(lines=lines_factory(old_quantity=old_quantity, quantity=quantity))
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
 
     requests_mocker.post(
         urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
@@ -307,6 +308,7 @@ def test_create_preview_order_bad_request(
     """
     Test the call to Adobe API to create a preview order when the response is 400 bad request.
     """
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
     customer_id = "a-customer"
 

@@ -265,7 +265,6 @@ def fulfillment_parameters_factory():
 def lines_factory():
     def _items(
         line_id=1,
-        vendor_external_id="65304578CA",
         name="Awesome product",
         old_quantity=0,
         quantity=170,
@@ -274,7 +273,7 @@ def lines_factory():
             {
                 "id": f"ALI-1234-1234-1234-{line_id:04d}",
                 "item": {
-                    "id": vendor_external_id,
+                    "id": f"ITM-1234-1234-1234-{line_id:04d}",
                     "name": name,
                 },
                 "oldQuantity": old_quantity,
@@ -283,6 +282,24 @@ def lines_factory():
         ]
 
     return _items
+
+
+@pytest.fixture()
+def product_item_factory():
+    def _product_item(
+        item_id=1,
+        vendor_external_id="65304578CA",
+        name="Item for sale",
+    ):
+        return {
+            "id": f"ITM-1234-1234-1234-{item_id:04d}",
+            "name": name,
+            "externalIds": {
+                "vendor": vendor_external_id,
+            },
+        }
+
+    return _product_item
 
 
 @pytest.fixture()
@@ -585,3 +602,13 @@ def mpt_error_factory():
         return error
 
     return _mpt_error
+
+
+@pytest.fixture()
+def mpt_list_response():
+    def _wrap_response(objects_list):
+        return {
+            "data": objects_list,
+        }
+
+    return _wrap_response
