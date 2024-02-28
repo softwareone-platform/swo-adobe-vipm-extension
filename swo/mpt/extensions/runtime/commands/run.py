@@ -1,5 +1,4 @@
 import click
-
 from swo.mpt.extensions.runtime.master import Master
 
 

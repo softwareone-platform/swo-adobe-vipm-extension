@@ -2,7 +2,6 @@ import signal
 from threading import Event
 
 from django.core.management.base import BaseCommand
-
 from swo.mpt.extensions.runtime.events.dispatcher import Dispatcher
 from swo.mpt.extensions.runtime.events.producers import OrderEventProducer
 

@@ -11,3 +11,11 @@ def get_item_to_return(items, line_number):
         lambda adb_item: adb_item["extLineItemNumber"] == line_number,
         items,
     )
+
+
+def to_adobe_line_id(mpt_line_id: str) -> int:
+    """
+    Converts Marketplace Line id to integer by extracting sequencial part of the line id
+    Example: ALI-1234-1234-1234-0001 --> 1
+    """
+    return int(mpt_line_id.split("-")[-1])

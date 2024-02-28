@@ -4,11 +4,10 @@ import threading
 import time
 from pathlib import Path
 
+from swo.mpt.extensions.runtime.workers import start_event_consumer, start_gunicorn
 from watchfiles import watch
 from watchfiles.filters import PythonFilter
 from watchfiles.run import start_process
-
-from swo.mpt.extensions.runtime.workers import start_event_consumer, start_gunicorn
 
 logger = logging.getLogger(__name__)
 
