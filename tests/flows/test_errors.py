@@ -7,5 +7,5 @@ def test_simple_error(mpt_error_factory):
     """
     error_data = mpt_error_factory(500, "Internal Server Error", "Oops!")
     error = MPTError(error_data)
-    assert str(error) == "500 Internal Server Error: Oops!"
+    assert str(error) == "500 Internal Server Error trace: 1234567890 errors: Oops!"
     assert repr(error) == str(error_data)

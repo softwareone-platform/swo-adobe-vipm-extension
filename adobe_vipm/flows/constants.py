@@ -11,9 +11,4 @@ PARAM_PREFERRED_LANGUAGE = "preferredLanguage"
 PARAM_RETRY_COUNT = "retryCount"
 PARAM_SUBSCRIPTION_ID = "subscriptionId"
 
-STRUCTURED_PARAMETERS = (
-    "Address",
-    "Contact",
-)
-
 CANCELLATION_WINDOW_DAYS = 14

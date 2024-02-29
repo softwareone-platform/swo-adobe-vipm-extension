@@ -1,4 +1,3 @@
-import copy
 from urllib.parse import urljoin
 
 import pytest
@@ -12,7 +11,6 @@ from adobe_vipm.flows.mpt import (
     get_buyer,
     get_product_items,
     get_seller,
-    pack_structured_parameters,
     query_order,
     update_order,
 )
@@ -21,11 +19,9 @@ from adobe_vipm.flows.mpt import (
 def test_fail_order(mpt_client, requests_mocker, order_factory):
     """Test the call to switch an order to Failed."""
     order = order_factory()
-    returned_order = copy.deepcopy(order)
-    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/fail"),
-        json=returned_order,
+        json=order,
         match=[
             matchers.json_params_matcher(
                 {
@@ -112,11 +108,9 @@ def test_get_seller_error(mpt_client, requests_mocker, mpt_error_factory):
 def test_query_order(mpt_client, requests_mocker, order_factory):
     """Test the call to switch an order to Query."""
     order = order_factory()
-    returned_order = copy.deepcopy(order)
-    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/query"),
-        json=returned_order,
+        json=order,
         match=[
             matchers.json_params_matcher(
                 {
@@ -171,11 +165,9 @@ def test_query_order_error(mpt_client, requests_mocker, mpt_error_factory):
 def test_update_order(mpt_client, requests_mocker, order_factory):
     """Test the call to update an order."""
     order = order_factory()
-    returned_order = copy.deepcopy(order)
-    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.put(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000"),
-        json=returned_order,
+        json=order,
         match=[
             matchers.json_params_matcher(
                 {
@@ -230,11 +222,9 @@ def test_update_order_error(mpt_client, requests_mocker, mpt_error_factory):
 def test_complete_order(mpt_client, requests_mocker, order_factory):
     """Test the call to switch an order to Completed."""
     order = order_factory()
-    returned_order = copy.deepcopy(order)
-    returned_order["parameters"] = pack_structured_parameters(returned_order["parameters"])
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/complete"),
-        json=returned_order,
+        json=order,
         match=[
             matchers.json_params_matcher(
                 {

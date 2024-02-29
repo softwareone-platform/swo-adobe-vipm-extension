@@ -10,7 +10,6 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.fulfillment import fulfill_order
-from adobe_vipm.flows.mpt import pack_structured_parameters
 
 
 def test_no_customer(
@@ -97,7 +96,6 @@ def test_no_customer(
     )
 
     order = order_factory()
-    order["parameters"] = pack_structured_parameters(order["parameters"])
     order_with_customer_param = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
@@ -225,7 +223,6 @@ def test_customer_already_created(
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -289,7 +286,6 @@ def test_create_customer_fails(
     )
 
     order = order_factory()
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -337,7 +333,6 @@ def test_create_adobe_preview_order_error(
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -382,7 +377,6 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
         ),
         external_ids={"vendor": "an-order-id"},
     )
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
@@ -435,7 +429,6 @@ def test_customer_already_created_order_already_created_max_retries_reached(
         ),
         external_ids={"vendor": "an-order-id"},
     )
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
@@ -485,7 +478,6 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
         ),
         external_ids={"vendor": "an-order-id"},
     )
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
@@ -532,7 +524,6 @@ def test_customer_already_created_order_already_created_unexpected_status(
         ),
         external_ids={"vendor": "an-order-id"},
     )
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]

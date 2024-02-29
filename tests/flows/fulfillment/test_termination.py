@@ -8,7 +8,6 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS, ORDER_TYPE_TERMINATION
 from adobe_vipm.flows.fulfillment import fulfill_order
-from adobe_vipm.flows.mpt import pack_structured_parameters
 
 
 def test_termination(
@@ -80,7 +79,6 @@ def test_termination(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
 
-    processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
     fulfill_order(mocked_mpt_client, processing_order)
 
     seller_country = seller["address"]["country"]
@@ -168,7 +166,6 @@ def test_termination_return_order_pending(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
 
-    processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
     fulfill_order(mocked_mpt_client, processing_order)
 
     seller_country = seller["address"]["country"]
@@ -243,7 +240,6 @@ def test_termination_out_window(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
 
-    processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
     fulfill_order(mocked_mpt_client, processing_order)
 
     seller_country = seller["address"]["country"]
