@@ -22,7 +22,6 @@ from adobe_vipm.flows.mpt import (
     get_agreement,
     get_buyer,
     get_product_items,
-    unpack_structured_parameters,
     update_order,
 )
 from adobe_vipm.flows.shared import create_customer_account
@@ -367,9 +366,6 @@ def _populate_order_lines(client, lines):
 
 
 def _populate_order_info(client, order):
-    if "parameters" in order:
-        order["parameters"] = unpack_structured_parameters(order["parameters"])
-
     if "lines" in order:
         order["lines"] = _populate_order_lines(client, order["lines"])
 

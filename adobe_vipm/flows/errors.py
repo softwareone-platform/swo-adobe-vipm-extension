@@ -8,10 +8,11 @@ class MPTError(Exception):
         self.payload = payload
         self.status = payload["status"]
         self.title = payload["title"]
-        self.details = payload["details"]
+        self.trace_id = payload["traceId"]
+        self.errors = payload.get("errors")
 
     def __str__(self):
-        return f"{self.status} {self.title}: {self.details}"
+        return f"{self.status} {self.title} trace: {self.trace_id} errors: {self.errors}"
 
     def __repr__(self):
         return str(self.payload)

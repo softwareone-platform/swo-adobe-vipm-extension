@@ -10,7 +10,6 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS
 from adobe_vipm.flows.fulfillment import fulfill_order
-from adobe_vipm.flows.mpt import pack_structured_parameters
 
 
 def test_upsizing(
@@ -86,9 +85,6 @@ def test_upsizing(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    processing_change_order["parameters"] = pack_structured_parameters(
-        processing_change_order["parameters"]
-    )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
@@ -178,7 +174,6 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
         external_ids={"vendor": adobe_order["orderId"]},
     )
 
-    order["parameters"] = pack_structured_parameters(order["parameters"])
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
@@ -240,7 +235,6 @@ def test_upsizing_create_adobe_preview_order_error(
         ),
         order_parameters=[],
     )
-    order["parameters"] = pack_structured_parameters(order["parameters"])
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
@@ -346,7 +340,6 @@ def test_downsizing(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
@@ -469,7 +462,6 @@ def test_downsizing_return_order_exists(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    processing_order["parameters"] = pack_structured_parameters(processing_order["parameters"])
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
@@ -554,7 +546,6 @@ def test_downsizing_return_order_pending(
         order_parameters=[],
     )
 
-    order["parameters"] = pack_structured_parameters(order["parameters"])
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
@@ -629,7 +620,6 @@ def test_downsizing_new_order_pending(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    order["parameters"] = pack_structured_parameters(order["parameters"])
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
@@ -717,7 +707,6 @@ def test_downsizing_create_new_order_error(
         "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
     )
 
-    order["parameters"] = pack_structured_parameters(order["parameters"])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_fail_order.assert_called_once_with(
@@ -940,9 +929,6 @@ def test_mixed(
 
     mocker.patch("adobe_vipm.flows.fulfillment.get_product_items", return_value=product_items)
 
-    processing_change_order["parameters"] = pack_structured_parameters(
-        processing_change_order["parameters"]
-    )
     fulfill_order(mocked_mpt_client, processing_change_order)
 
     seller_country = seller["address"]["country"]
