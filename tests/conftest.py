@@ -156,7 +156,7 @@ def account_data():
             "city": "Irvine",
             "addressLine1": "Test street",
             "addressLine2": "Line 2",
-            "postCode": "08010",
+            "postalCode": "08010",
         },
         "contact": {
             "firstName": "First Name",
@@ -192,14 +192,15 @@ def order_parameters_factory():
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postCode": "94123",
+                "postalCode": "94123",
             }
         if contact is None:
             contact = {
                 "firstName": "Cic",
                 "lastName": "Faraone",
                 "email": "francesco.faraone@softwareone.com",
-                "phone": "+14082954078",
+                "phoneNumber": "+14082954078",
+                "countryCode": "US",
             }
         return [
             {
@@ -452,7 +453,10 @@ def buyer():
             "firstName": "Cic",
             "lastName": "Faraone",
             "email": "francesco.faraone@softwareone.com",
-            "phone": "+14082954078",
+            "phone": {
+                "prefix": "+1",
+                "number": "4082954078",
+            },
         },
     }
 
