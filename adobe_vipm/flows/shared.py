@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 def _get_customer_data(client, buyer, order):
     customer_data = get_customer_data(order)
     if not all(customer_data.values()):
+        phone_number = f"{buyer['contact']['phone']['prefix']}{buyer['contact']['phone']['number']}"
         order = set_customer_data(
             order,
             {
@@ -37,17 +38,18 @@ def _get_customer_data(client, buyer, order):
                     "city": buyer["address"]["city"],
                     "addressLine1": buyer["address"]["addressLine1"],
                     "addressLine2": buyer["address"]["addressLine2"],
-                    "postCode": buyer["address"]["postCode"],
+                    "postalCode": buyer["address"]["postCode"],
                 },
                 PARAM_CONTACT: {
                     "firstName": buyer["contact"]["firstName"],
                     "lastName": buyer["contact"]["lastName"],
                     "email": buyer["contact"]["email"],
-                    "phone": buyer["contact"]["phone"],
+                    "phoneNumber": phone_number,
+                    "countryCode": buyer["address"]["country"],
                 },
             },
         )
-        order = update_order(
+        update_order(
             client,
             order["id"],
             parameters=order["parameters"],
@@ -88,7 +90,8 @@ def create_customer_account(client, seller_country, buyer, order):
             seller_country, external_id, customer_data
         )
         order = set_adobe_customer_id(order, customer_id)
-        return update_order(client, order["id"], parameters=order["parameters"])
+        update_order(client, order["id"], parameters=order["parameters"])
+        return order
     except AdobeError as e:
         logger.error(repr(e))
         _handle_customer_error(client, order, e)

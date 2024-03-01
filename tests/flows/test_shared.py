@@ -9,6 +9,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.shared import create_customer_account
+from adobe_vipm.flows.utils import set_adobe_customer_id
 
 
 def test_create_customer_account(
@@ -33,6 +34,7 @@ def test_create_customer_account(
         "adobe_vipm.flows.shared.update_order",
         return_value=copy.deepcopy(order),
     )
+    order = set_adobe_customer_id(order, "adobe-customer-id")
 
     updated_order = create_customer_account(
         mocked_mpt_client,

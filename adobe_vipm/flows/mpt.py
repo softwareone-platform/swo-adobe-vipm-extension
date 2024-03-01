@@ -1,5 +1,4 @@
 import copy
-import json
 import logging
 
 from adobe_vipm.flows.errors import wrap_http_error
@@ -31,8 +30,6 @@ def get_buyer(mpt_client, buyer_id):
 @wrap_http_error
 def update_order(mpt_client, order_id, **kwargs):
     json_body = copy.deepcopy(kwargs)
-
-    logger.info(f"Update order: {json.dumps(json_body)}")
 
     response = mpt_client.put(
         f"/commerce/orders/{order_id}",
