@@ -312,7 +312,9 @@ def fulfillment_parameters_factory():
 
 
 @pytest.fixture()
-def lines_factory():
+def lines_factory(agreement):
+    agreement_id = agreement["id"].split("-", 1)[1]
+
     def _items(
         line_id=1,
         name="Awesome product",
@@ -321,7 +323,7 @@ def lines_factory():
     ):
         return [
             {
-                "id": f"ALI-1234-1234-1234-{line_id:04d}",
+                "id": f"ALI-{agreement_id}-{line_id:04d}",
                 "item": {
                     "id": f"ITM-1234-1234-1234-{line_id:04d}",
                     "name": name,

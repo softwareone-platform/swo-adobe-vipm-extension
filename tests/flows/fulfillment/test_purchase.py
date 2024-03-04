@@ -152,7 +152,7 @@ def test_no_customer(
             },
             "lines": [
                 {
-                    "id": 1,
+                    "id": order["lines"][0]["id"],
                 },
             ],
             "startDate": adobe_subscription["creationDate"],
