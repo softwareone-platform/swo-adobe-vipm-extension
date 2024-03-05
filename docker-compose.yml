@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: prod.Dockerfile
     working_dir: /extension
-    command: bash -c "poetry install --only-root && swoext run --no-color"
+    command: swoext run --no-color
     volumes: 
       - .:/extension
     env_file:
@@ -49,7 +49,7 @@ services:
       context: .
       dockerfile: dev.Dockerfile
     working_dir: /extension
-    command: bash -c "flake8 . && poetry install && pytest"
+    command: bash -c "flake8 . && pytest"
     volumes:
       - .:/extension
     env_file:
