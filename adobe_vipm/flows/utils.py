@@ -99,11 +99,14 @@ def set_customer_data(order, customer_data):
 
 def set_ordering_parameter_error(order, param_external_id, error):
     updated_order = copy.deepcopy(order)
-    get_parameter(
+    param = get_parameter(
         updated_order,
         "ordering",
         param_external_id,
-    )["error"] = error
+    )
+    param["error"] = error
+    param["constraints"]["hidden"] = False
+    param["constraints"]["optional"] = False
     return updated_order
 
 

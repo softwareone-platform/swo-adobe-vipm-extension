@@ -711,6 +711,21 @@ files = [
 ]
 
 [[package]]
+name = "ipdb"
+version = "0.13.13"
+description = "IPython-enabled pdb"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+files = [
+    {file = "ipdb-0.13.13-py3-none-any.whl", hash = "sha256:45529994741c4ab6d2388bfa5d7b725c2cf7fe9deffabdb8a6113aa5ed449ed4"},
+    {file = "ipdb-0.13.13.tar.gz", hash = "sha256:e3ac6018ef05126d442af680aad863006ec19d02290561ac88b8b1c0b0cfc726"},
+]
+
+[package.dependencies]
+decorator = {version = "*", markers = "python_version >= \"3.11\""}
+ipython = {version = ">=7.31.1", markers = "python_version >= \"3.11\""}
+
+[[package]]
 name = "ipython"
 version = "8.21.0"
 description = "IPython: Productive Interactive Computing"
@@ -2065,4 +2080,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4"
-content-hash = "96b45330eb806a6cd50998b4edca5c1e40bb54205aab100ebc9510899c1010cb"
+content-hash = "3060b5c67899c6752a63b169fefe09a820ba9307385a4d6480cb8f3136746e73"

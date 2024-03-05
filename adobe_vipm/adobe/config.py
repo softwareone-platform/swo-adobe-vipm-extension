@@ -43,6 +43,10 @@ class Config:
     def language_codes(self) -> List[str]:
         return self.config["language_codes"]
 
+    @property
+    def country_codes(self) -> List[str]:
+        return list(self.countries.keys())
+
     def get_reseller(self, country: str) -> Reseller:
         try:
             return self.resellers[country]
@@ -107,3 +111,13 @@ class Config:
             )
         for country in self.config["countries"]:
             self.countries[country["code"]] = Country(**country)
+
+
+_CONFIG = None
+
+
+def get_config():
+    global _CONFIG
+    if not _CONFIG:
+        _CONFIG = Config()
+    return _CONFIG

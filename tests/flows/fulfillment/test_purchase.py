@@ -36,7 +36,7 @@ def test_no_customer(
 
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
 
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
     mocker.patch("adobe_vipm.flows.fulfillment.get_buyer", return_value=buyer)
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.create_customer_account",
@@ -91,9 +91,7 @@ def test_no_customer(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     order = order_factory()
     order_with_customer_param = order_factory(
@@ -189,7 +187,7 @@ def test_customer_already_created(
     Tests the processing of a purchase order with the customer already created.
     Adobe returns that the order is still processing.
     """
-    mocker.patch("adobe_vipm.flows.fulfillment.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.create_customer_account",
     )
@@ -217,9 +215,7 @@ def test_customer_already_created(
         ),
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
@@ -281,9 +277,7 @@ def test_create_customer_fails(
     )
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     order = order_factory()
 
@@ -326,9 +320,7 @@ def test_create_adobe_preview_order_error(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
@@ -345,7 +337,6 @@ def test_create_adobe_preview_order_error(
 
 def test_customer_and_order_already_created_adobe_order_not_ready(
     mocker,
-    seller,
     order_factory,
     order_parameters_factory,
     fulfillment_parameters_factory,
@@ -378,9 +369,7 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
         external_ids={"vendor": "an-order-id"},
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -430,9 +419,7 @@ def test_customer_already_created_order_already_created_max_retries_reached(
         external_ids={"vendor": "an-order-id"},
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -479,9 +466,7 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
         external_ids={"vendor": "an-order-id"},
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -525,9 +510,7 @@ def test_customer_already_created_order_already_created_unexpected_status(
         external_ids={"vendor": "an-order-id"},
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_product_items", return_value=[product_item_factory()]
-    )
+    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
 
     fulfill_order(mocked_mpt_client, order)
 

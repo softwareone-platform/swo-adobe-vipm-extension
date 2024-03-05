@@ -123,6 +123,7 @@ def gen_param(
     param = {
         "id": par_id,
         "name": name,
+        "title": name,
         "constraints": {
             "readonly": readonly,
             "hidden": hidden,
@@ -162,7 +163,10 @@ def gen_contact(fake):
         "firstName": fake.first_name(),
         "lastName": fake.last_name(),
         "email": fake.email(),
-        "phone": f"{fake.country_calling_code()}{fake.msisdn()}",
+        "phone": {
+            "prefix": fake.country_calling_code(),
+            "number": fake.msisdn(),
+        },
         "countryCode": fake.country_code(),
     }
 
