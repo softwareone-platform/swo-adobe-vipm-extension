@@ -51,7 +51,7 @@ MIDDLEWARE = [
     "swo.mpt.extensions.runtime.djapp.middleware.MPTClientMiddleware",
 ]
 
-# ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
+ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
 
 TEMPLATES = [
     {
@@ -69,18 +69,12 @@ TEMPLATES = [
     },
 ]
 
-# WSGI_APPLICATION = "pippo.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+DATABASES = {}
 
 
 # Password validation
@@ -173,9 +167,16 @@ LOGGING = {
     },
 }
 
+# Proxy settings
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# MPT settings
+
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
-PRODUCT_ID = os.getenv("PRODUCT_ID", "PRD-1111-1111-1111")
+MPT_PRODUCT_ID = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
+
 ORDERS_API_POLLING_INTERVAL_SECS = 30
 
 EXTENSION_CONFIG = {}

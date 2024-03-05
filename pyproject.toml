@@ -50,6 +50,7 @@ types-requests = "2.31.*"
 [tool.poetry.group.sdk.dependencies]
 typing-extensions = "^4.9.0"
 django-ninja = "^1.1.0"
+pyjwt = "^2.8.0"
 
 
 # Move to runtime when splitting
@@ -65,7 +66,6 @@ gunicorn = "^21.2.0"
 watchfiles = "^0.21.0"
 pyfiglet = "^1.0.2"
 rich = "^13.7.0"
-pyjwt = "^2.8.0"
 
 [tool.poetry.scripts]
 swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
