@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+import jwt
 import pytest
 import responses
 
@@ -667,3 +668,20 @@ def mpt_list_response():
         }
 
     return _wrap_response
+
+
+@pytest.fixture()
+def jwt_token(settings):
+    iat = nbf = int(datetime.now().timestamp())
+    exp = nbf + 300
+    return jwt.encode(
+        {
+            "iss": "mpt",
+            "aud": "adobe.ext.s1.com",
+            "iat": iat,
+            "nbf": nbf,
+            "exp": exp,
+        },
+        settings.EXTENSION_CONFIG["WEBHOOK_SECRET"],
+        algorithm="HS256",
+    )

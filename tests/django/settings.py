@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-6r_%9ku+bg0=@xw1ah$wh+liwbsyhwpn#6alt*ppjn8t_uyp-u
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -151,6 +151,10 @@ LOGGING = {
     },
 }
 
+# Proxy settings
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # OpenTelemetry configuration
 SERVICE_NAME = os.getenv("SERVICE_NAME", "Swo.Extensions.AdobeVIPM")
 USE_APPLICATIONINSIGHTS = os.getenv("USE_APPLICATIONINSIGHTS", "False").lower() in (
@@ -163,10 +167,11 @@ LOGGING_ATTEMPT_GETTER = os.getenv("LOGGING_ATTEMPT_GETTER", "adobe_vipm.utils.g
 
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
-PRODUCT_ID = os.getenv("PRODUCT_ID", "PRD-1111-1111-1111")
+MPT_PRODUCT_ID = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
 ORDERS_API_POLLING_INTERVAL_SECS = 30
 
 EXTENSION_CONFIG = {
     "ADOBE_API_BASE_URL": "https://api.adobe",
     "ADOBE_AUTH_ENDPOINT_URL": "https://authenticate.adobe",
+    "WEBHOOK_SECRET": "super-secure-secret",
 }

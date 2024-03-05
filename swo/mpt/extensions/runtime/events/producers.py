@@ -58,7 +58,7 @@ class OrderEventProducer(EventProducer):
 
     def get_processing_orders(self):
         orders = []
-        rql_query = f"and(eq(agreement.product.id,{settings.PRODUCT_ID}),eq(status,processing))"
+        rql_query = f"and(eq(agreement.product.id,{settings.MPT_PRODUCT_ID}),eq(status,processing))"
         url = f"/commerce/orders?{rql_query}&select=parameters,lines,subscriptions&order=audit.created.at"
         page = None
         limit = 10

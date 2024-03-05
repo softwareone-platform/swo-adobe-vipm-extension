@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 def _populate_order_lines(client, lines):
     item_ids = set([line["item"]["id"] for line in lines])
 
-    product_items = get_product_items(client, settings.PRODUCT_ID, item_ids)
+    product_items = get_product_items(client, settings.MPT_PRODUCT_ID, item_ids)
     id_sku_mapping = {
         pi["id"]: pi["externalIds"]["vendor"]
         for pi in product_items
