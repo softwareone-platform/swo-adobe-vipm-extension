@@ -7,14 +7,15 @@ from typing import List
 class Credentials:
     client_id: str
     client_secret: str
-    region: str
+    country: str
     distributor_id: str
 
 
 @dataclass(frozen=True)
 class Distributor:
     id: str
-    region: str
+    country: str
+    pricelist_region: str
     currency: str
     credentials: Credentials
 

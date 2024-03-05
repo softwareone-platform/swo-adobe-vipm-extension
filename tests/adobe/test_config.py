@@ -29,17 +29,17 @@ def test_properties(mock_adobe_config, adobe_config_file):
     assert c.language_codes == ["en-US"]
 
 
-def test_get_reseller(mock_adobe_config, adobe_config_file):
+def test_get_reseller(mock_adobe_config, adobe_credentials_file, adobe_config_file):
     """
     Test the lookup the Reseller object by country.
     """
     reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
     reseller_id = adobe_config_file["accounts"][0]["resellers"][0]["id"]
-    client_id = adobe_config_file["accounts"][0]["client_id"]
-    client_secret = adobe_config_file["accounts"][0]["client_secret"]
+    client_id = adobe_credentials_file[0]["client_id"]
+    client_secret = adobe_credentials_file[0]["client_secret"]
     distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
     currency = adobe_config_file["accounts"][0]["currency"]
-    region = adobe_config_file["accounts"][0]["region"]
+    pricelist_region = adobe_config_file["accounts"][0]["pricelist_region"]
 
     c = Config()
     reseller = c.get_reseller(reseller_country)
@@ -48,7 +48,7 @@ def test_get_reseller(mock_adobe_config, adobe_config_file):
     assert isinstance(reseller.distributor, Distributor)
     assert reseller.distributor.id == distributor_id
     assert reseller.distributor.currency == currency
-    assert reseller.distributor.region == region
+    assert reseller.distributor.pricelist_region == pricelist_region
     assert isinstance(reseller.distributor.credentials, Credentials)
     assert reseller.distributor.credentials.client_id == client_id
     assert reseller.distributor.credentials.client_secret == client_secret
@@ -66,22 +66,24 @@ def test_get_reseller_not_found(mock_adobe_config):
     assert str(cv.value) == "Reseller not found for country IT."
 
 
-def test_get_distributor(mock_adobe_config, adobe_config_file):
+def test_get_distributor(mock_adobe_config, adobe_credentials_file, adobe_config_file):
     """
-    Test the lookup the Distributor object by region.
+    Test the lookup the Distributor object by country.
     """
-    region = adobe_config_file["accounts"][0]["region"]
-    client_id = adobe_config_file["accounts"][0]["client_id"]
-    client_secret = adobe_config_file["accounts"][0]["client_secret"]
+    country = adobe_config_file["accounts"][0]["country"]
+    client_id = adobe_credentials_file[0]["client_id"]
+    client_secret = adobe_credentials_file[0]["client_secret"]
     distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
     currency = adobe_config_file["accounts"][0]["currency"]
+    pricelist_region = adobe_config_file["accounts"][0]["pricelist_region"]
 
     c = Config()
-    distributor = c.get_distributor(region)
+    distributor = c.get_distributor(country)
 
     assert isinstance(distributor, Distributor)
     assert distributor.id == distributor_id
-    assert distributor.region == region
+    assert distributor.country == country
+    assert distributor.pricelist_region == pricelist_region
     assert distributor.currency == currency
     assert isinstance(distributor.credentials, Credentials)
     assert distributor.credentials.client_id == client_id
@@ -91,13 +93,13 @@ def test_get_distributor(mock_adobe_config, adobe_config_file):
 def test_get_distributor_not_found(mock_adobe_config):
     """
     Check that the lookup of the Distributor raises `DistributorNotFound`
-    if there is no Distributor for a given region.
+    if there is no Distributor for a given country.
     """
     c = Config()
     with pytest.raises(DistributorNotFoundError) as cv:
-        assert c.get_distributor("MX")
+        assert c.get_distributor("ES")
 
-    assert str(cv.value) == "Distributor not found for pricelist region MX."
+    assert str(cv.value) == "Distributor not found for country ES."
 
 
 def test_get_adobe_product(mock_adobe_config, adobe_config_file):
@@ -157,8 +159,15 @@ def test_get_country_not_found(mock_adobe_config):
     assert str(cv.value) == "Country with code not-found not found."
 
 
-def test_load_config(mocker, adobe_config_file, settings):
-    settings.EXTENSION_CONFIG["ADOBE_CONFIG_FILE"] = "a-file.json"
-    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(adobe_config_file)))
+def test_load_data(mocker, adobe_credentials_file, adobe_config_file, settings):
+    settings.EXTENSION_CONFIG["ADOBE_CREDENTIALS_FILE"] = "a-file.json"
+    m_join = mocker.MagicMock()
+    m_join.open = mocker.mock_open(read_data=json.dumps(adobe_config_file))
+    m_files = mocker.MagicMock()
+    m_files.joinpath.return_value = m_join
+    mocked_files = mocker.patch("adobe_vipm.adobe.config.files", return_value=m_files)
+    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(adobe_credentials_file)))
     c = Config()
-    assert c.config == adobe_config_file
+    assert c.credentials == adobe_credentials_file
+    mocked_files.assert_called_once_with("adobe_vipm")
+    m_files.joinpath.assert_called_once_with("adobe_config.json")

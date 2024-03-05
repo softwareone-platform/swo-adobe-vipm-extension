@@ -35,7 +35,7 @@ def test_create_reseller_account(
         return_value="uuid-1",
     )
     distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
-    region = adobe_config_file["accounts"][0]["region"]
+    country = adobe_config_file["accounts"][0]["country"]
 
     client, credentials, api_token = adobe_client_factory()
 
@@ -86,7 +86,7 @@ def test_create_reseller_account(
         ],
     )
 
-    reseller_id = client.create_reseller_account(region, "external_id", reseller_data)
+    reseller_id = client.create_reseller_account(country, "external_id", reseller_data)
     assert reseller_id == "a-reseller-id"
 
 
@@ -100,7 +100,7 @@ def test_create_reseller_account_bad_request(
     """
     Test the call to Adobe API to create a reseller when the response is 400 bad request.
     """
-    region = adobe_config_file["accounts"][0]["region"]
+    country = adobe_config_file["accounts"][0]["country"]
 
     client, _, _ = adobe_client_factory()
 
@@ -113,7 +113,7 @@ def test_create_reseller_account_bad_request(
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.create_reseller_account(region, "external_id", reseller_data)
+        client.create_reseller_account(country, "external_id", reseller_data)
 
     assert repr(cv.value) == str(error)
 

@@ -171,4 +171,7 @@ MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
 PRODUCT_ID = os.getenv("PRODUCT_ID", "PRD-1111-1111-1111")
 ORDERS_API_POLLING_INTERVAL_SECS = 30
 
-EXTENSION_CONFIG = {}
+EXTENSION_CONFIG = {
+    "ADOBE_API_BASE_URL": "https://api.adobe",
+    "ADOBE_AUTH_ENDPOINT_URL": "https://authenticate.adobe",
+}

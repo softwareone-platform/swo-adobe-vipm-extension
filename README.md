@@ -2,34 +2,40 @@
 # SoftwareONE Adobe VIP Marketplace Extension
 Extension integrates Adobe VIP Marketplace Extension with the SoftwareONE Marketplace
 
+# Create environment file
+```
+$ cp .env.sample .env
+```
+
+
 # Local run
 ```
-docker-compose build app
-docker-compose run --service-ports app
+$ docker-compose build app
+$ docker-compose run --service-ports app
 ```
 
 # Run tests
 ```
-docker-compose build app_test
-docker-compose run --service-ports app_test
+$ docker-compose build app_test
+$ docker-compose run --service-ports app_test
 ```
 
 # Run devmock and generate test data
 
 1. Build and run bash command for container
 ```
-docker-compose build bash
-docker-compose run --service-ports bash
+$ docker-compose build bash
+$ docker-compose run --service-ports bash
 ```
 
 2. Install dependencies for devmock inside the container
 ```
-poetry install
+$ poetry install
 ```
 
 3. Generate order using `mockgendata` command
 ```
-mockgendata purchase <cutted-sku>
+$ mockgendata purchase <cutted-sku>
 ```
 
 For more information about the `mockgendata` command use the `--help option`
@@ -37,6 +43,6 @@ For generating order use the cutted form of the Adobe SKU, removing last 5 symbo
 
 4. Run the app in another console session to process the generated fake order
 ```
-docker-compose build app
-docker-compose run --service-ports app
+$ docker-compose build app
+$ docker-compose run --service-ports app
 ```
