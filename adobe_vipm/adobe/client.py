@@ -41,12 +41,12 @@ class AdobeClient:
     @wrap_http_error
     def create_reseller_account(
         self,
-        region: str,
+        country: str,
         reseller_id: str,
         reseller_data: dict,
     ) -> str:
         """
-        Creates a reseller account under the distributor account identified by `region`.
+        Creates a reseller account under the distributor account identified by `country`.
 
         Args:
             region (str): Region to which the distributor account is bounded to and into which
@@ -57,7 +57,7 @@ class AdobeClient:
         Returns:
             str: The identifier of the reseller in the Adobe VIP Markerplace.
         """
-        distributor: Distributor = self._config.get_distributor(region)
+        distributor: Distributor = self._config.get_distributor(country)
         payload = {
             "externalReferenceId": reseller_id,
             "distributorId": distributor.id,
@@ -97,7 +97,7 @@ class AdobeClient:
         logger.info(
             f"Reseller {reseller_id} - {reseller_data['companyName']} "
             "created successfully in distributor account "
-            f"{distributor.id} ({region}): {adobe_reseller_id}",
+            f"{distributor.id} ({country}): {adobe_reseller_id}",
         )
         return adobe_reseller_id
 

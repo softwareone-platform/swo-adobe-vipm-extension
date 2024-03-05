@@ -1,4 +1,5 @@
 import json
+from importlib.resources import files
 from typing import List, MutableMapping
 
 from django.conf import settings
@@ -19,7 +20,10 @@ from adobe_vipm.adobe.errors import (
 
 
 class Config:
+    REQUIRED_API_SCOPES = ["openid", "AdobeID", "read_organizations"]
+
     def __init__(self) -> None:
+        self.credentials = self._load_credentials()
         self.config = self._load_config()
         self.resellers: MutableMapping[str, Reseller] = {}
         self.skus_mapping: MutableMapping[str, AdobeProduct] = {}
@@ -29,15 +33,15 @@ class Config:
 
     @property
     def auth_endpoint_url(self) -> str:
-        return self.config["authentication_endpoint_url"]
+        return settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"]
 
     @property
     def api_base_url(self) -> str:
-        return self.config["api_base_url"]
+        return settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"]
 
     @property
     def api_scopes(self) -> str:
-        return ",".join(self.config["scopes"])
+        return ",".join(self.REQUIRED_API_SCOPES)
 
     @property
     def language_codes(self) -> List[str]:
@@ -55,12 +59,12 @@ class Config:
                 f"Reseller not found for country {country}.",
             )
 
-    def get_distributor(self, region: str) -> Distributor:
+    def get_distributor(self, country: str) -> Distributor:
         try:
-            return self.distributors[region]
+            return self.distributors[country]
         except KeyError:
             raise DistributorNotFoundError(
-                f"Distributor not found for pricelist region {region}.",
+                f"Distributor not found for country {country}.",
             )
 
     def get_adobe_product(self, vendor_external_id: str) -> AdobeProduct:
@@ -77,25 +81,34 @@ class Config:
                 f"Country with code {code} not found.",
             )
 
+    @classmethod
+    def _load_credentials(self):
+        with open(settings.EXTENSION_CONFIG["ADOBE_CREDENTIALS_FILE"], "r") as f:
+            return json.load(f)
+
+    @classmethod
     def _load_config(self):
-        with open(settings.EXTENSION_CONFIG["ADOBE_CONFIG_FILE"], "r") as f:
+        with files("adobe_vipm").joinpath("adobe_config.json").open("r", encoding="utf-8") as f:
             return json.load(f)
 
     def _parse_config(self):
+        credentials_map = {cred["country"]: cred for cred in self.credentials}
         for account in self.config["accounts"]:
+            country = account["country"]
             credentials = Credentials(
-                client_id=account["client_id"],
-                client_secret=account["client_secret"],
-                region=account["region"],
+                client_id=credentials_map[country]["client_id"],
+                client_secret=credentials_map[country]["client_secret"],
+                country=country,
                 distributor_id=account["distributor_id"],
             )
             distributor = Distributor(
                 id=account["distributor_id"],
-                region=account["region"],
+                country=country,
+                pricelist_region=account["pricelist_region"],
                 currency=account["currency"],
                 credentials=credentials,
             )
-            self.distributors[account["region"]] = distributor
+            self.distributors[country] = distributor
             for reseller in account["resellers"]:
                 country = reseller["country"]
                 self.resellers[country] = Reseller(

@@ -48,9 +48,8 @@ def adobe_config_file():
         "language_codes": ["en-US"],
         "accounts": [
             {
-                "region": "NA",
-                "client_id": "client_id",
-                "client_secret": "client_secret",
+                "pricelist_region": "NA",
+                "country": "US",
                 "distributor_id": "distributor_id",
                 "currency": "USD",
                 "resellers": [{"id": "P1000040545", "country": "US"}],
@@ -142,10 +141,26 @@ def adobe_config_file():
 
 
 @pytest.fixture()
-def mock_adobe_config(mocker, adobe_config_file):
+def adobe_credentials_file():
     """
-    Mock the Adobe Config object to load test data from the adobe_config_file fixture.
+    Return an Adobe VIP Marketplace credentials file
     """
+    return [
+        {
+            "country": "US",
+            "client_id": "client_id",
+            "client_secret": "client_secret",
+        },
+    ]
+
+
+@pytest.fixture()
+def mock_adobe_config(mocker, adobe_credentials_file, adobe_config_file):
+    """
+    Mock the Adobe Config object to load test data from the adobe_credentials and
+    adobe_config_file fixtures.
+    """
+    mocker.patch.object(Config, "_load_credentials", return_value=adobe_credentials_file)
     mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
 
 
@@ -595,7 +610,7 @@ def adobe_subscription_factory():
 
 
 @pytest.fixture()
-def adobe_client_factory(adobe_config_file, mock_adobe_config):
+def adobe_client_factory(adobe_credentials_file, adobe_config_file, mock_adobe_config):
     """
     Returns a factory that allow the creation of an instance
     of the AdobeClient with a fake token ready for tests.
@@ -603,9 +618,9 @@ def adobe_client_factory(adobe_config_file, mock_adobe_config):
 
     def _factory():
         credentials = Credentials(
-            adobe_config_file["accounts"][0]["client_id"],
-            adobe_config_file["accounts"][0]["client_secret"],
-            adobe_config_file["accounts"][0]["region"],
+            adobe_credentials_file[0]["client_id"],
+            adobe_credentials_file[0]["client_secret"],
+            adobe_config_file["accounts"][0]["country"],
             adobe_config_file["accounts"][0]["distributor_id"],
         )
         api_token = APIToken(

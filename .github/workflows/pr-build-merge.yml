@@ -23,6 +23,9 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: 'Create environment file'
+      run: touch .env
+
     - name: 'Build test containers'
       run: docker-compose build app_test
 

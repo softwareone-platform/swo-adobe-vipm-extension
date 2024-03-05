@@ -10,10 +10,9 @@ services:
     command: bash -c "poetry install --only-root && swoext run --no-color"
     volumes: 
       - .:/extension
+    env_file:
+      - .env
     environment:
-      - EXT_ADOBE_CONFIG_FILE=/extension/adobe_vipm/adobe_config.json
-      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
-      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
       - MPT_API_BASE_URL=http://devmock:8000
     depends_on:
       - devmock
@@ -27,10 +26,8 @@ services:
     command: uvicorn --host 0.0.0.0 devmock.app:app
     volumes: 
       - .:/extension
-    environment:
-      - EXT_ADOBE_CONFIG_FILE=/extension/adobe_vipm/adobe_config.json
-      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
-      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
+    env_file:
+      - .env
 
   bash:
     container_name: adobe_vipm_bash
@@ -43,10 +40,8 @@ services:
     tty: true
     volumes:
       - .:/extension
-    environment:
-      - EXT_ADOBE_CONFIG_FILE=/extension/adobe_vipm/adobe_config.json
-      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
-      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
+    env_file:
+      - .env
 
   app_test:
     container_name: adobe_vipm_test
@@ -57,10 +52,8 @@ services:
     command: bash -c "flake8 . && poetry install && pytest"
     volumes:
       - .:/extension
-    environment:
-      - EXT_ADOBE_CONFIG_FILE=/extension/adobe_vipm/adobe_config.json
-      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
-      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
+    env_file:
+      - .env
 
   format:
     container_name: adobe_vipm_format
@@ -71,7 +64,5 @@ services:
     command: bash -c "isort . && black ."
     volumes:
       - .:/extension
-    environment:
-      - EXT_ADOBE_CONFIG_FILE=/extension/adobe_vipm/adobe_config.json
-      - EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
-      - EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
+    env_file:
+      - .env
