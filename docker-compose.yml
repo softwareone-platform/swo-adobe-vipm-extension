@@ -12,8 +12,6 @@ services:
       - .:/extension
     env_file:
       - .env
-    environment:
-      - MPT_API_BASE_URL=http://devmock:8000
     depends_on:
       - devmock
 
