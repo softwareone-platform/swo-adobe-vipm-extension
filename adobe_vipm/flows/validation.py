@@ -38,13 +38,13 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import get_buyer
 from adobe_vipm.flows.shared import populate_order_info, prepare_customer_data
-from adobe_vipm.flows.utils import get_parameter, set_ordering_parameter_error
+from adobe_vipm.flows.utils import get_ordering_parameter, set_ordering_parameter_error
 
 logger = logging.getLogger(__name__)
 
 
 def validate_company_name(order, customer_data):
-    param = get_parameter(order, "ordering", PARAM_COMPANY_NAME)
+    param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     name = customer_data[PARAM_COMPANY_NAME]
     if not (MINLEN_COMPANY_NAME <= len(name) <= MAXLEN_COMPANY_NAME):
         order = set_ordering_parameter_error(
@@ -65,7 +65,7 @@ def validate_company_name(order, customer_data):
 
 def validate_preferred_language(order, customer_data):
     config = get_config()
-    param = get_parameter(order, "ordering", PARAM_PREFERRED_LANGUAGE)
+    param = get_ordering_parameter(order, PARAM_PREFERRED_LANGUAGE)
     if customer_data[PARAM_PREFERRED_LANGUAGE] not in config.language_codes:
         order = set_ordering_parameter_error(
             order,
@@ -81,7 +81,7 @@ def validate_preferred_language(order, customer_data):
 
 def validate_address(order, customer_data):
     config = get_config()
-    param = get_parameter(order, "ordering", PARAM_ADDRESS)
+    param = get_ordering_parameter(order, PARAM_ADDRESS)
     address = customer_data[PARAM_ADDRESS]
     errors = []
 
@@ -130,7 +130,7 @@ def validate_address(order, customer_data):
 
 def validate_contact(order, customer_data):
     contact = customer_data[PARAM_CONTACT]
-    param = get_parameter(order, "ordering", PARAM_CONTACT)
+    param = get_ordering_parameter(order, PARAM_CONTACT)
     errors = []
 
     if not REGEX_FIRST_LAST_NAME.match(contact["firstName"]):

@@ -281,7 +281,6 @@ def test_create_customer_fails(
 
 def test_create_adobe_preview_order_error(
     mocker,
-    seller,
     order_factory,
     fulfillment_parameters_factory,
     adobe_api_error_factory,
@@ -331,7 +330,7 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
 ):
     """
     Tests the continuation of processing a purchase order since in the
-    previous attemp the order has been created but not still processed
+    previous attemp the order has been created but not yet processed
     on Adobe side. The RetryCount fullfilment paramter must be incremented.
     The purchase order will not be completed and the processing will be stopped.
     """
@@ -419,7 +418,6 @@ def test_customer_already_created_order_already_created_max_retries_reached(
 )
 def test_customer_already_created_order_already_created_unrecoverable_status(
     mocker,
-    seller,
     order_factory,
     fulfillment_parameters_factory,
     order_status,

@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timedelta
+from hashlib import sha256
 from urllib.parse import urljoin
 
 import pytest
@@ -139,6 +141,32 @@ def test_create_customer_account(
 
     company_name = f"{customer_data['companyName']} (external_id)"
 
+    payload = {
+        "resellerId": reseller_id,
+        "externalReferenceId": "external_id",
+        "companyProfile": {
+            "companyName": company_name,
+            "preferredLanguage": customer_data["preferredLanguage"],
+            "address": {
+                "country": customer_data["address"]["country"],
+                "region": customer_data["address"]["state"],
+                "city": customer_data["address"]["city"],
+                "addressLine1": customer_data["address"]["addressLine1"],
+                "addressLine2": customer_data["address"]["addressLine2"],
+                "postalCode": customer_data["address"]["postalCode"],
+                "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
+            },
+            "contacts": [
+                {
+                    "firstName": customer_data["contact"]["firstName"],
+                    "lastName": customer_data["contact"]["lastName"],
+                    "email": customer_data["contact"]["email"],
+                    "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
+                }
+            ],
+        },
+    }
+    correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
     requests_mocker.post(
         urljoin(adobe_config_file["api_base_url"], "/v3/customers"),
         status=201,
@@ -153,36 +181,10 @@ def test_create_customer_account(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": "external_id",
+                    "x-correlation-id": correlation_id,
                 },
             ),
-            matchers.json_params_matcher(
-                {
-                    "resellerId": reseller_id,
-                    "externalReferenceId": "external_id",
-                    "companyProfile": {
-                        "companyName": company_name,
-                        "preferredLanguage": customer_data["preferredLanguage"],
-                        "address": {
-                            "country": customer_data["address"]["country"],
-                            "region": customer_data["address"]["state"],
-                            "city": customer_data["address"]["city"],
-                            "addressLine1": customer_data["address"]["addressLine1"],
-                            "addressLine2": customer_data["address"]["addressLine2"],
-                            "postalCode": customer_data["address"]["postalCode"],
-                            "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
-                        },
-                        "contacts": [
-                            {
-                                "firstName": customer_data["contact"]["firstName"],
-                                "lastName": customer_data["contact"]["lastName"],
-                                "email": customer_data["contact"]["email"],
-                                "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
-                            }
-                        ],
-                    },
-                },
-            ),
+            matchers.json_params_matcher(payload),
         ],
     )
 
@@ -733,7 +735,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
         reseller_country,
         customer_id,
         vendor_external_id,
-        1,
+        "ALI-2119-4550-8674-5962-0001",
     )
 
     assert result == [
@@ -786,7 +788,7 @@ def test_search_new_and_returned_orders_by_sku_line_number_not_found(
         reseller_country,
         customer_id,
         vendor_external_id,
-        1,
+        "ALI-2119-4550-8674-5962-0001",
     )
 
     assert results == []
@@ -981,6 +983,209 @@ def test_update_subscription_not_found(
 
     with pytest.raises(AdobeError) as cv:
         client.update_subscription(reseller_country, customer_id, sub_id, quantity=10)
+
+    assert cv.value.code == "404"
+
+
+def test_preview_transfer(requests_mocker, adobe_client_factory, adobe_config_file):
+    """
+    Tests the retrieval subscriptions for a transfer given a membership id.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    membership_id = "a-membership-id"
+
+    client, credentials, api_token = adobe_client_factory()
+
+    requests_mocker.get(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/memberships/{membership_id}/offers",
+        ),
+        status=200,
+        json={"a": "transfer-preview"},
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+        ],
+    )
+
+    assert client.preview_transfer(reseller_country, membership_id) == {"a": "transfer-preview"}
+
+
+def test_preview_transfer_not_found(
+    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+):
+    """
+    Tests the retrieval subscriptions for a transfer given a membership id when they don't exist.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    membership_id = "a-membership-id"
+
+    client, _, _ = adobe_client_factory()
+
+    requests_mocker.get(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/memberships/{membership_id}/offers",
+        ),
+        status=404,
+        json=adobe_api_error_factory("404", "Not Found"),
+    )
+
+    with pytest.raises(AdobeError) as cv:
+        client.preview_transfer(reseller_country, membership_id)
+
+    assert cv.value.code == "404"
+
+
+def test_create_transfer(
+    mocker,
+    requests_mocker,
+    adobe_client_factory,
+    adobe_config_file,
+):
+    """
+    Test the call to Adobe API to create a transfer order.
+    """
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    reseller_id = adobe_config_file["accounts"][0]["resellers"][0]["id"]
+    membership_id = "a-membership-id"
+    order_id = "an-order-id"
+
+    client, credentials, api_token = adobe_client_factory()
+
+    requests_mocker.post(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/memberships/{membership_id}/transfers",
+        ),
+        status=202,
+        json={
+            "tansferId": "adobe-transfer-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": order_id,
+                },
+            ),
+            matchers.json_params_matcher({"resellerId": reseller_id}),
+        ],
+    )
+
+    new_transfer = client.create_transfer(
+        reseller_country,
+        order_id,
+        membership_id,
+    )
+    assert new_transfer == {
+        "tansferId": "adobe-transfer-id",
+    }
+
+
+def test_create_transfer_bad_request(
+    requests_mocker,
+    adobe_client_factory,
+    adobe_config_file,
+    adobe_order_factory,
+    adobe_api_error_factory,
+):
+    """
+    Test the call to Adobe API to create a transfer order when the response is 400 bad request.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    membership_id = "a-membership-id"
+
+    client, _, _ = adobe_client_factory()
+
+    error = adobe_api_error_factory("1234", "An error")
+
+    requests_mocker.post(
+        urljoin(adobe_config_file["api_base_url"], f"/v3/memberships/{membership_id}/transfers"),
+        status=400,
+        json=error,
+    )
+
+    with pytest.raises(AdobeError) as cv:
+        client.create_transfer(
+            reseller_country,
+            "an-order-id",
+            membership_id,
+        )
+
+    assert repr(cv.value) == str(error)
+
+
+def test_get_transfer(requests_mocker, adobe_client_factory, adobe_config_file):
+    """
+    Tests the retrieval of a transfer order.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    membership_id = "a-membership-id"
+    transfer_id = "a-transfer-id"
+
+    client, credentials, api_token = adobe_client_factory()
+
+    requests_mocker.get(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/memberships/{membership_id}/transfers/{transfer_id}",
+        ),
+        status=200,
+        json={"a": "transfer"},
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+        ],
+    )
+
+    assert client.get_transfer(reseller_country, membership_id, transfer_id) == {"a": "transfer"}
+
+
+def test_get_transfer_not_found(
+    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+):
+    """
+    Tests the retrieval of a transfer when it doesn't exist.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    membership_id = "a-membership-id"
+    transfer_id = "a-transfer-id"
+
+    client, _, _ = adobe_client_factory()
+
+    requests_mocker.get(
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/memberships/{membership_id}/transfers/{transfer_id}",
+        ),
+        status=404,
+        json=adobe_api_error_factory("404", "Not Found"),
+    )
+
+    with pytest.raises(AdobeError) as cv:
+        client.get_transfer(reseller_country, membership_id, transfer_id)
 
     assert cv.value.code == "404"
 
