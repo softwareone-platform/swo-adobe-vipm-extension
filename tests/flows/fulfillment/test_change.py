@@ -953,7 +953,7 @@ def test_mixed(
             },
             "lines": [
                 {
-                    "id": 3,
+                    "id": processing_change_order["lines"][1]["id"],
                 },
             ],
             "startDate": adobe_new_sub["creationDate"],

@@ -13,6 +13,7 @@ from devmock.settings import (
     ACCOUNTS_FOLDER,
     AGREEMENTS_FOLDER,
     BUYERS_FOLDER,
+    ITEMS_FOLDER,
     LICENSEES_FOLDER,
     ORDERS_FOLDER,
     SELLERS_FOLDER,
@@ -36,10 +37,11 @@ load_buyer = functools.partial(load_object, BUYERS_FOLDER, "buyer")
 load_seller = functools.partial(load_object, SELLERS_FOLDER, "seller")
 load_subscription = functools.partial(load_object, SUBSCRIPTIONS_FOLDER, "subscription")
 load_agreement = functools.partial(load_object, AGREEMENTS_FOLDER, "agreement")
+load_items = functools.partial(load_object, ITEMS_FOLDER, "items")
 
 
-def save_object(folder, obj):
-    obj_id = obj["id"]
+def save_object(folder, obj, obj_id=None):
+    obj_id = obj_id or obj["id"]
     obj_file = os.path.join(folder, f"{obj_id}.json")
     json.dump(obj, open(obj_file, "w"), indent=2)
 
@@ -51,6 +53,7 @@ save_seller = functools.partial(save_object, SELLERS_FOLDER)
 save_agreement = functools.partial(save_object, AGREEMENTS_FOLDER)
 save_account = functools.partial(save_object, ACCOUNTS_FOLDER)
 save_licensee = functools.partial(save_object, LICENSEES_FOLDER)
+save_items = functools.partial(save_object, ITEMS_FOLDER)
 
 
 def generate_random_id(
@@ -68,6 +71,10 @@ def generate_random_id(
     return f'{prefix}-{"-".join(wrap(number, sep_frequency))}'
 
 
+def base_id_from(mpt_obj_id):
+    return mpt_obj_id.split("-", 1)[1]
+
+
 def cleanup_data_folder():
     for folder in [
         ACCOUNTS_FOLDER,
@@ -77,6 +84,7 @@ def cleanup_data_folder():
         ORDERS_FOLDER,
         SELLERS_FOLDER,
         SUBSCRIPTIONS_FOLDER,
+        ITEMS_FOLDER,
     ]:
         for f in glob.glob(os.path.join(folder, "*.json")):
             os.remove(f)
@@ -86,8 +94,8 @@ def get_reference(obj, fields=None):
     return {k: v for k, v in obj.items() if k in (fields or DEFAULT_FIELDS)}
 
 
-def get_item_for_subscription(item):
-    return {k: v for k, v in item.items() if k != "oldQuantity"}
+def get_line_for_subscription(line):
+    return {k: v for k, v in line.items() if k != "oldQuantity"}
 
 
 def gen_jwt_token():

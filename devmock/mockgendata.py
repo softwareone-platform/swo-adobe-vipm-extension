@@ -16,14 +16,17 @@ from rich.theme import Theme
 
 from devmock.exceptions import NotFoundException
 from devmock.utils import (
+    base_id_from,
     cleanup_data_folder,
     generate_random_id,
     get_reference,
     load_agreement,
+    load_items,
     load_subscription,
     save_account,
     save_agreement,
     save_buyer,
+    save_items,
     save_licensee,
     save_order,
     save_seller,
@@ -113,6 +116,7 @@ def get_product_by_sku(sku):
 
 def gen_param(
     name,
+    external_id,
     value=None,
     readonly=False,
     hidden=False,
@@ -122,8 +126,8 @@ def gen_param(
     par_id = generate_random_id("PRM", 16, 4)
     param = {
         "id": par_id,
-        "name": name,
         "title": name,
+        "externalId": external_id,
         "constraints": {
             "readonly": readonly,
             "hidden": hidden,
@@ -167,7 +171,6 @@ def gen_contact(fake):
             "prefix": fake.country_calling_code(),
             "number": fake.msisdn(),
         },
-        "countryCode": fake.country_code(),
     }
 
 
@@ -267,7 +270,7 @@ def gen_buyer(fake, client):
     return buyer
 
 
-def gen_agreement(fake):
+def gen_agreement(fake, product_id):
     agr_id = generate_random_id("AGR", 12, 4)
     client = gen_account(fake)
     buyer = gen_buyer(fake, client)
@@ -283,12 +286,12 @@ def gen_agreement(fake):
         "client": get_reference(client),
         "licensee": get_reference(licensee),
         "buyer": get_reference(buyer, DEFAULT_FIELDS),
-        "seller": get_reference(seller, DEFAULT_FIELDS),
+        "seller": seller,
         "product": {
-            "id": "PRD-1111-1111-1111",
-            "href": "/catalog/products/PRD-1111-1111-1111",
+            "id": product_id,
+            "href": f"/catalog/products/{product_id}",
             "name": "Adobe VIP Marketplace for Commercial",
-            "icon": "/static/PRD-1111-1111-1111/logo.png",
+            "icon": f"/static/{product_id}/logo.png",
         },
         "price": {
             "PPxY": 150,
@@ -313,61 +316,79 @@ def gen_purchase_order(
     adobe_order_id,
 ):
     order_id = generate_random_id("ORD", 16, 4)
-    agreement = gen_agreement(fake)
+    product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
+    agreement = gen_agreement(fake, product_id)
     items = []
+    lines = []
     subscriptions = []
     for idx, sku in enumerate(skus, start=1):
         product = get_product_by_sku(sku)
         old_quantity = 0
         quantity = random.randint(2, 5)
         item = {
-            "id": f"ITM-1111-1111-1111-{idx:04d}",
+            "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
             "name": product["name"],
-            "quantity": quantity,
-            "oldQuantity": old_quantity,
-            "lineNumber": idx,
-            "productItemId": sku,
+            "externalIds": {
+                "vendor": sku,
+            },
         }
         items.append(item)
+
+        lines.append(
+            {
+                "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
+                "item": item,
+                "quantity": quantity,
+                "oldQuantity": old_quantity,
+            }
+        )
         console.print(
             f"[green]✓[/green] Item {idx} - {product['name']} generated: quantity = {quantity}",
         )
 
     order = {
         "id": order_id,
-        "type": "Purchase",
-        "status": "Processing",
+        "type": "purchase",
+        "status": "processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
         "subscriptions": [get_reference(sub) for sub in subscriptions],
-        "items": items,
+        "lines": lines,
         "audit": gen_audit(fake),
         "parameters": {
-            "order": [
-                gen_param("CompanyName"),
-                gen_param("PreferredLanguage"),
-                gen_param("Address"),
-                gen_param("Contact"),
+            "ordering": [
+                gen_param("CompanyName", "companyName"),
+                gen_param("PreferredLanguage", "preferredLanguage"),
+                gen_param("Address", "address"),
+                gen_param("Contact", "contact"),
+                gen_param("AgreementType", "agreementType", value="New"),
             ],
             "fulfillment": [
-                gen_param("RetryCount", "0", hidden=True),
-                gen_param("CustomerId", value=customer_id),
+                gen_param(
+                    "RetryCount",
+                    "retryCount",
+                    "0",
+                    hidden=True,
+                ),
+                gen_param("CustomerId", "customerId", value=customer_id),
             ],
         },
     }
     if adobe_order_id:
-        order["externalIDs"] = {
+        order["externalIds"] = {
             "vendor": adobe_order_id,
         }
     save_order(order)
+    save_items(items, obj_id=product_id)
     return order
 
 
 def gen_change_order(fake, agreement_id, skus, change_type):
     order_id = generate_random_id("ORD", 16, 4)
     agreement = load_agreement(agreement_id)
+    product_id = agreement["product"]["id"]
     if agreement["status"] != "Active":
         raise ClickException("Agreement must be Active in order to generate a Change order.")
-    items = []
+    lines = []
     subscriptions = []
     if change_type == "both" and len(agreement.get("subscriptions", [])) < 2:
         raise ClickException(
@@ -377,76 +398,91 @@ def gen_change_order(fake, agreement_id, skus, change_type):
 
     for line_number, subscription in enumerate(agreement["subscriptions"], start=1):
         sub_data = load_subscription(subscription["id"])
-        sub_data["status"] = "Updating"
+        sub_data["status"] = "updating"
         save_subscription(sub_data)
         subscriptions.append(get_reference(sub_data))
-        item = sub_data["items"][0]
-        new_item = copy.copy(item)
-        new_item["oldQuantity"] = item["quantity"]
+        line = sub_data["lines"][0]
+        new_line = copy.copy(line)
+        new_line["oldQuantity"] = line["quantity"]
         if change_type == "upsize":
             rand_prm = (new_item["oldQuantity"] + 1, 9)
         elif change_type == "downsize":
-            rand_prm = (1, new_item["oldQuantity"] - 1)
+            rand_prm = (1, new_line["oldQuantity"] - 1)
         elif line_number == 1:
-            rand_prm = (new_item["oldQuantity"] + 1, 9)
+            rand_prm = (new_line["oldQuantity"] + 1, 9)
         elif line_number == 2:
-            rand_prm = (1, new_item["oldQuantity"] - 1)
+            rand_prm = (1, new_line["oldQuantity"] - 1)
         else:
             rand_prm = random.choice(
                 [
-                    (new_item["oldQuantity"] + 1, 9),
-                    (1, new_item["oldQuantity"] - 1),
+                    (new_line["oldQuantity"] + 1, 9),
+                    (1, new_line["oldQuantity"] - 1),
                 ],
             )
         try:
-            new_item["quantity"] = random.randint(*rand_prm)
+            new_line["quantity"] = random.randint(*rand_prm)
             console.print(
-                f"[green]✓[/green] Item {line_number} - {new_item['name']} updated: "
-                f"quantity = {new_item['oldQuantity']} -> {new_item['quantity']}",
+                f"[green]✓[/green] Item {line_number} - {new_line['item']['name']} updated: "
+                f"quantity = {new_line['oldQuantity']} -> {new_line['quantity']}",
             )
         except ValueError:
             console.print(
-                f"[orange]✓[/orange] Item {line_number} - {new_item['name']} unchanged: "
-                f"quantity = {new_item['oldQuantity']} -> {new_item['quantity']}",
+                f"[orange]✓[/orange] Item {line_number} - {new_line['item']['name']} unchanged: "
+                f"quantity = {new_item['oldQuantity']} -> {new_line['quantity']}",
             )
-        items.append(new_item)
+        lines.append(new_line)
+
+    new_items = []
     if skus:
         for idx, sku in enumerate(skus, start=line_number + 1):
             product = get_product_by_sku(sku)
             old_quantity = 0
             quantity = random.randint(1, 5)
             item = {
-                "id": f"ITM-1111-1111-1111-{idx:04d}",
+                "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
                 "name": product["name"],
-                "quantity": quantity,
-                "oldQuantity": old_quantity,
-                "lineNumber": idx,
-                "productItemId": sku,
+                "externalIds": {
+                    "vendor": sku,
+                },
             }
+            new_items.append(item)
+
+            lines.append(
+                {
+                    "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
+                    "item": item,
+                    "quantity": quantity,
+                    "oldQuantity": old_quantity,
+                }
+            )
             console.print(
                 f"[green]✓[/green] Item {idx} - {product['name']} added: quantity = {quantity}",
             )
-            items.append(item)
+            lines.append(line)
 
     order = {
         "id": order_id,
-        "type": "Change",
-        "status": "Processing",
+        "type": "change",
+        "status": "processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
-        "items": items,
+        "lines": lines,
         "subscriptions": subscriptions,
         "audit": gen_audit(fake),
         "parameters": agreement["parameters"],
     }
-    agreement["status"] = "Updating"
+    agreement["status"] = "updating"
     save_agreement(agreement)
     save_order(order)
+
+    items = load_items(product_id)
+    items.extend(new_items)
+    save_items(items, obj_id=product_id)
     return order
 
 
 def gen_termination_order(fake, agreement_id, subscriptions_ids):
     agreement = load_agreement(agreement_id)
-    if agreement["status"] != "Active":
+    if agreement["status"] != "active":
         raise ClickException("Agreement must be Active in order to generate a Termination order.")
     agreement_sub_ids = [sub["id"] for sub in agreement["subscriptions"]]
     subscriptions_ids = subscriptions_ids or agreement_sub_ids
@@ -459,29 +495,29 @@ def gen_termination_order(fake, agreement_id, subscriptions_ids):
 
     order_id = generate_random_id("ORD", 16, 4)
     subscriptions = []
-    items = []
+    lines = []
     for sub_id in subscriptions_ids:
         sub_data = load_subscription(sub_id)
-        sub_data["status"] = "Terminating"
+        sub_data["status"] = "terminating"
         save_subscription(sub_data)
-        item = sub_data["items"][0]
-        new_item = copy.copy(item)
-        new_item["oldQuantity"] = item["quantity"]
-        new_item["quantity"] = 0
-        items.append(new_item)
+        line = sub_data["lines"][0]
+        new_line = copy.copy(line)
+        new_line["oldQuantity"] = line["quantity"]
+        new_line["quantity"] = 0
+        lines.append(new_line)
         subscriptions.append(get_reference(sub_data))
 
     order = {
         "id": order_id,
-        "type": "Termination",
-        "status": "Processing",
+        "type": "termination",
+        "status": "processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
-        "items": items,
+        "lines": lines,
         "subscriptions": subscriptions,
         "audit": gen_audit(fake),
         "parameters": agreement["parameters"],
     }
-    agreement["status"] = "Updating"
+    agreement["status"] = "updating"
     save_agreement(agreement)
     save_order(order)
     return order

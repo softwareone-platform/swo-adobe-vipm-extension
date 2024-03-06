@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from urllib.parse import unquote
 
 import requests
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Body, Query, Request
 from fastapi.responses import JSONResponse
 
 from devmock.filters import OrdersFilter
@@ -14,10 +14,11 @@ from devmock.settings import ORDERS_FOLDER, WEBHOOK_ENDPOINT
 from devmock.utils import (
     gen_jwt_token,
     generate_random_id,
-    get_item_for_subscription,
+    get_line_for_subscription,
     get_reference,
     load_agreement,
     load_buyer,
+    load_items,
     load_order,
     load_seller,
     load_subscription,
@@ -70,7 +71,7 @@ def update_order(
     if order.parameters:
         current_order["parameters"] = order.parameters
     if order.external_ids:
-        current_order["externalIDs"] = current_order.get("externalIDs", {}) | order.external_ids
+        current_order["externalIds"] = current_order.get("externalIds", {}) | order.external_ids
     save_order(current_order)
     return current_order
 
@@ -81,33 +82,33 @@ def complete_order(id: str, order: Order):
     agreement = load_agreement(current_order["agreement"]["id"])
     agreement["parameters"] = current_order["parameters"]
     current_order["template"] = order.template
-    current_order["status"] = "Completed"
+    current_order["status"] = "completed"
 
     subscriptions = {}
 
     for subscription in agreement["subscriptions"]:
         full_sub = load_subscription(subscription["id"])
-        subscriptions[full_sub["items"][0]["lineNumber"]] = full_sub
+        subscriptions[full_sub["lines"][0]["id"]] = full_sub
 
-    if current_order["type"] == "Change":
-        for item in current_order["items"]:
-            full_sub = subscriptions[item["lineNumber"]]
-            full_sub["items"][0]["quantity"] = item["quantity"]
-            full_sub["status"] = "Active"
+    if current_order["type"] == "change":
+        for line in current_order["lines"]:
+            full_sub = subscriptions[line["id"]]
+            full_sub["lines"][0]["quantity"] = line["quantity"]
+            full_sub["status"] = "active"
             save_subscription(full_sub)
-        agreement["status"] = "Active"
-    elif current_order["type"] == "Termination":
-        for item in current_order["items"]:
-            full_sub = subscriptions[item["lineNumber"]]
-            full_sub["items"][0]["quantity"] = item["quantity"]
-            full_sub["status"] = "Terminated"
+        agreement["status"] = "active"
+    elif current_order["type"] == "termination":
+        for line in current_order["lines"]:
+            full_sub = subscriptions[line["id"]]
+            full_sub["lines"][0]["quantity"] = line["quantity"]
+            full_sub["status"] = "terminated"
             save_subscription(full_sub)
-        if all(map(lambda x: x["status"] == "Terminated", subscriptions.values())):
-            agreement["status"] = "Terminated"
+        if all(map(lambda x: x["status"] == "terminated", subscriptions.values())):
+            agreement["status"] = "terminated"
         else:
-            agreement["status"] = "Active"
+            agreement["status"] = "active"
     else:
-        agreement["status"] = "Active"
+        agreement["status"] = "active"
 
     save_agreement(agreement)
     save_order(current_order)
@@ -118,10 +119,10 @@ def complete_order(id: str, order: Order):
 def fail_order(id: str, order: Order):
     current_order = load_order(id)
     current_order["reason"] = order.reason
-    current_order["status"] = "Failed"
+    current_order["status"] = "failed"
     save_order(current_order)
     agreement = load_agreement(current_order["agreement"]["id"])
-    agreement["status"] = "Active"
+    agreement["status"] = "active"
     save_agreement(agreement)
     return current_order
 
@@ -129,12 +130,12 @@ def fail_order(id: str, order: Order):
 @router.post("/commerce/orders/{id}/query")
 def inquire_order(
     id: str,
-    template: Annotated[dict, Body()],
+    templateId: Annotated[str, Body()],
     parameters: Annotated[dict, Body()],
 ):
     order = load_order(id)
     order["parameters"] = parameters
-    order["template"] = template
+    order["templateId"] = template
     order["status"] = "Querying"
     save_order(order)
     return order
@@ -152,17 +153,16 @@ def create_subscription(
     agreement = load_agreement(order["agreement"]["id"])
     if "subscriptions" not in agreement:
         agreement["subscriptions"] = []
-    order_items = {item["lineNumber"]: item for item in order["items"]}
+    order_lines = {line["id"]: line for line in order["lines"]}
     subscription = {
         "id": generate_random_id("SUB", 16, 4),
         "name": subscription.name,
         "parameters": subscription.parameters,
-        "items": [
-            get_item_for_subscription(order_items[item["lineNumber"]])
-            for item in subscription.items
+        "lines": [
+            get_line_for_subscription(order_lines[line["id"]]) for line in subscription.lines
         ],
         "startDate": subscription.start_date,
-        "status": "Active",
+        "status": "active",
     }
     order["subscriptions"].append(get_reference(subscription))
     agreement["subscriptions"].append(get_reference(subscription))
@@ -219,3 +219,13 @@ def validate_draft_order(order_id: str, body: Any = Body(None)):
         resp.json() if resp.headers["content-type"] == "application/json" else resp.text,
         status_code=resp.status_code,
     )
+
+
+@router.get("/product-items")
+def list_product_items(product_id: Annotated[str | None, Query(alias="product.id")] = None):
+    items = load_items(product_id)
+
+    return {
+        "$meta": {"offset": 0, "limit": 10, "total": len(items)},
+        "data": items,
+    }

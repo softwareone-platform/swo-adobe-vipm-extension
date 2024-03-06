@@ -48,6 +48,13 @@ SELLERS_FOLDER = os.path.join(
 )
 
 
+ITEMS_FOLDER = os.path.join(
+    os.path.dirname(__file__),
+    "data",
+    "items",
+)
+
+
 WEBHOOK_ENDPOINT = "http://localhost:8080/api/v1/orders/validate"
 WEBHOOK_JWT_SECRET = "change-me"
 WEBHOOK_ID = "WBH-1234-5678"

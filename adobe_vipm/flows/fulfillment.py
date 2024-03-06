@@ -10,6 +10,7 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_ORDER_STATUSES,
 )
 from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.utils import to_mpt_line_id
 from adobe_vipm.flows.constants import (
     ORDER_TYPE_CHANGE,
     ORDER_TYPE_TERMINATION,
@@ -88,7 +89,7 @@ def _create_subscription(mpt_client, seller_country, customer_id, order, item):
         },
         "lines": [
             {
-                "id": item["extLineItemNumber"],
+                "id": to_mpt_line_id(order["agreement"]["id"], item["extLineItemNumber"]),
             },
         ],
         "startDate": adobe_subscription["creationDate"],

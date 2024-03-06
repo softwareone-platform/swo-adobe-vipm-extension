@@ -11,5 +11,5 @@ class Order(BaseModel):
 class Subscription(BaseModel):
     name: str | None = None
     parameters: dict | None = None
-    items: list | None = None
+    lines: list | None = None
     start_date: str | None = Field(default=None, alias="startDate")
