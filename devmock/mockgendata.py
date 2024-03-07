@@ -21,12 +21,10 @@ from devmock.utils import (
     generate_random_id,
     get_reference,
     load_agreement,
-    load_items,
     load_subscription,
     save_account,
     save_agreement,
     save_buyer,
-    save_items,
     save_licensee,
     save_order,
     save_seller,
@@ -181,7 +179,7 @@ def gen_address(fake):
     return {
         "addressLine1": fake.street_address(),
         "addressLine2": fake.secondary_address(),
-        "postalCode": postcode,
+        "postCode": postcode,
         "city": fake.city(),
         "state": state,
         "country": country,
@@ -318,26 +316,23 @@ def gen_purchase_order(
     order_id = generate_random_id("ORD", 16, 4)
     product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
     agreement = gen_agreement(fake, product_id)
-    items = []
     lines = []
     subscriptions = []
     for idx, sku in enumerate(skus, start=1):
         product = get_product_by_sku(sku)
         old_quantity = 0
         quantity = random.randint(2, 5)
-        item = {
-            "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
-            "name": product["name"],
-            "externalIds": {
-                "vendor": sku,
-            },
-        }
-        items.append(item)
 
         lines.append(
             {
                 "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
-                "item": item,
+                "item": {
+                    "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
+                    "name": product["name"],
+                    "externalIds": {
+                        "vendor": sku,
+                    },
+                },
                 "quantity": quantity,
                 "oldQuantity": old_quantity,
             }
@@ -378,7 +373,6 @@ def gen_purchase_order(
             "vendor": adobe_order_id,
         }
     save_order(order)
-    save_items(items, obj_id=product_id)
     return order
 
 
@@ -432,25 +426,22 @@ def gen_change_order(fake, agreement_id, skus, change_type):
             )
         lines.append(new_line)
 
-    new_items = []
     if skus:
         for idx, sku in enumerate(skus, start=line_number + 1):
             product = get_product_by_sku(sku)
             old_quantity = 0
             quantity = random.randint(1, 5)
-            item = {
-                "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
-                "name": product["name"],
-                "externalIds": {
-                    "vendor": sku,
-                },
-            }
-            new_items.append(item)
 
             lines.append(
                 {
                     "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
-                    "item": item,
+                    "item": {
+                        "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
+                        "name": product["name"],
+                        "externalIds": {
+                            "vendor": sku,
+                        },
+                    },
                     "quantity": quantity,
                     "oldQuantity": old_quantity,
                 }
@@ -473,9 +464,6 @@ def gen_change_order(fake, agreement_id, skus, change_type):
     save_agreement(agreement)
     save_order(order)
 
-    items = load_items(product_id)
-    items.extend(new_items)
-    save_items(items, obj_id=product_id)
     return order
 
 

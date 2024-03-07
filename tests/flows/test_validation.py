@@ -585,10 +585,6 @@ def test_validate_order(mocker, caplog, order_factory, buyer, customer_data):
     order = order_factory()
     m_client = mocker.MagicMock()
 
-    m_populate_order_info = mocker.patch(
-        "adobe_vipm.flows.validation.populate_order_info",
-        return_value=order,
-    )
     m_get_buyer = mocker.patch("adobe_vipm.flows.validation.get_buyer", return_value=buyer)
     m_prepare_customer_data = mocker.patch(
         "adobe_vipm.flows.validation.prepare_customer_data", return_value=(order, customer_data)
@@ -605,7 +601,6 @@ def test_validate_order(mocker, caplog, order_factory, buyer, customer_data):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    m_populate_order_info.assert_called_once_with(m_client, order)
     m_get_buyer.assert_called_once_with(m_client, order["agreement"]["buyer"]["id"])
     m_prepare_customer_data.assert_called_once_with(m_client, order, buyer)
     m_validate_customer_data.assert_called_once_with(order, customer_data)

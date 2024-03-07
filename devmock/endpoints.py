@@ -18,7 +18,6 @@ from devmock.utils import (
     get_reference,
     load_agreement,
     load_buyer,
-    load_items,
     load_order,
     load_seller,
     load_subscription,
@@ -219,13 +218,3 @@ def validate_draft_order(order_id: str, body: Any = Body(None)):
         resp.json() if resp.headers["content-type"] == "application/json" else resp.text,
         status_code=resp.status_code,
     )
-
-
-@router.get("/product-items")
-def list_product_items(product_id: Annotated[str | None, Query(alias="product.id")] = None):
-    items = load_items(product_id)
-
-    return {
-        "$meta": {"offset": 0, "limit": 10, "total": len(items)},
-        "data": items,
-    }

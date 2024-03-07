@@ -77,14 +77,3 @@ def create_subscription(mpt_client, order_id, subscription):
     )
     response.raise_for_status()
     return response.json()
-
-
-@wrap_http_error
-def get_product_items(mpt_client, product_id, item_ids):
-    item_filter = f"product.id={product_id}&in(id,({','.join(item_ids)}))"
-
-    response = mpt_client.get(f"/product-items?{item_filter}")
-    response.raise_for_status()
-    data = response.json()
-
-    return data["data"]
