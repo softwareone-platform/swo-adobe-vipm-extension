@@ -181,7 +181,7 @@ def gen_address(fake):
     return {
         "addressLine1": fake.street_address(),
         "addressLine2": fake.secondary_address(),
-        "postCode": postcode,
+        "postalCode": postcode,
         "city": fake.city(),
         "state": state,
         "country": country,
