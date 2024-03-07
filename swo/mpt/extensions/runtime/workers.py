@@ -36,7 +36,7 @@ def start_gunicorn(options):
         "disable_existing_loggers": False,
         "formatters": {
             "verbose": {
-                "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+                "format": "{asctime} {name} {levelname} (pid: {process}) {message}",
                 "style": "{",
             },
             "rich": {

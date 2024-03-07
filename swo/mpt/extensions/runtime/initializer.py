@@ -25,6 +25,7 @@ def initialize(options):
 
     app_config_name = get_extension_app_config_name()
     app_root_module, _ = app_config_name.split(".", 1)
+    settings.DEBUG = options.get("debug", False)
     settings.INSTALLED_APPS.append(app_config_name)
     settings.LOGGING["root"]["handlers"] = [logging_handler]
     settings.LOGGING["loggers"]["swo.mpt.extensions.runtime"]["handlers"] = [logging_handler]
