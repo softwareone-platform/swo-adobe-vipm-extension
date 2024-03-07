@@ -53,6 +53,7 @@ def _populate_order_lines(client, lines):
 def populate_order_info(client, order):
     if "lines" in order:  # pragma: no branch
         order["lines"] = _populate_order_lines(client, order["lines"])
+
     order["agreement"] = get_agreement(client, order["agreement"]["id"])
 
     return order
@@ -72,7 +73,7 @@ def prepare_customer_data(client, order, buyer):
                     "city": buyer["address"]["city"],
                     "addressLine1": buyer["address"]["addressLine1"],
                     "addressLine2": buyer["address"]["addressLine2"],
-                    "postCode": buyer["address"]["postCode"],
+                    "postalCode": buyer["address"]["postCode"],
                 },
                 PARAM_CONTACT: {
                     "firstName": buyer["contact"]["firstName"],

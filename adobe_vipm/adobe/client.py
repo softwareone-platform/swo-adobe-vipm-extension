@@ -70,7 +70,7 @@ class AdobeClient:
                     "city": reseller_data["address"]["city"],
                     "addressLine1": reseller_data["address"]["addressLine1"],
                     "addressLine2": reseller_data["address"]["addressLine2"],
-                    "postalCode": reseller_data["address"]["postCode"],
+                    "postalCode": reseller_data["address"]["postalCode"],
                     "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
                 },
                 "contacts": [
@@ -136,7 +136,7 @@ class AdobeClient:
                     "city": customer_data["address"]["city"],
                     "addressLine1": customer_data["address"]["addressLine1"],
                     "addressLine2": customer_data["address"]["addressLine2"],
-                    "postalCode": customer_data["address"]["postCode"],
+                    "postalCode": customer_data["address"]["postalCode"],
                     "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
                 },
                 "contacts": [

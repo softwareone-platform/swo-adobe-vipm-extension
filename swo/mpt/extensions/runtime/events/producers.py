@@ -70,14 +70,17 @@ class OrderEventProducer(EventProducer):
                     headers={"Authorization": f"Bearer {settings.MPT_API_TOKEN}"},
                 )
             except requests.RequestException:
+                logger.exception("Cannot retrieve orders")
                 return []
 
             if response.status_code == 200:
                 page = response.json()
                 orders.extend(page["data"])
             else:
+                logger.warning(f"Order API error: {response.status_code} {response.content}")
                 return []
             offset += limit
+
         return orders
 
     def has_more_pages(self, orders):

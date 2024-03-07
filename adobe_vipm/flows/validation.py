@@ -102,12 +102,12 @@ def validate_address(order, customer_data):
         errors.append(ERR_STATE_OR_PROVINCE)
 
     if country.postal_code_format_regex and not re.match(
-        country.postal_code_format_regex, address["postCode"]
+        country.postal_code_format_regex, address["postalCode"]
     ):
         errors.append(ERR_POSTAL_CODE_FORMAT)
 
     for field, max_len, err_msg in (
-        ("postCode", MAXLEN_POSTAL_CODE, ERR_POSTAL_CODE_LENGTH),
+        ("postalCode", MAXLEN_POSTAL_CODE, ERR_POSTAL_CODE_LENGTH),
         ("addressLine1", MAXLEN_ADDRESS_LINE_1, ERR_ADDRESS_LINE_1_LENGTH),
         ("addressLine2", MAXLEN_ADDRESS_LINE_2, ERR_ADDRESS_LINE_2_LENGTH),
         ("city", MAXLEN_CITY, ERR_CITY_LENGTH),

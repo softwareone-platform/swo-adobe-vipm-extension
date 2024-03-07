@@ -191,7 +191,7 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
                 "city": "Barcelona",
                 "addressLine1": "Plaza Catalunya 1",
                 "addressLine2": "1o 1a",
-                "postCode": "08001",
+                "postalCode": "08001",
             },
         )
     )
@@ -226,7 +226,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postCode": "94123",
+                "postalCode": "94123",
             },
         )
     )
@@ -262,7 +262,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postCode": "9412312",
+                "postalCode": "9412312",
             },
         )
     )
@@ -298,7 +298,7 @@ def test_validate_address_invalid_postal_code_length(order_factory, order_parame
                 "city": "Lalala",
                 "addressLine1": "Blah blah",
                 "addressLine2": "",
-                "postCode": "9" * 41,
+                "postalCode": "9" * 41,
             },
         )
     )
@@ -334,7 +334,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
                 "city": "C" * 41,
                 "addressLine1": "1" * 61,
                 "addressLine2": "2" * 61,
-                "postCode": "",
+                "postalCode": "",
             },
         )
     )
