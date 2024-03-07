@@ -9,7 +9,6 @@ from adobe_vipm.flows.mpt import (
     create_subscription,
     fail_order,
     get_buyer,
-    get_product_items,
     get_seller,
     query_order,
     update_order,
@@ -292,25 +291,3 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
         create_subscription(mpt_client, "ORD-0000", {})
 
     assert cv.value.payload["status"] == 404
-
-
-def test_get_product_items(
-    mpt_client, requests_mocker, settings, product_item_factory, mpt_list_response
-):
-    """Test the call to create a subscription."""
-    item = product_item_factory()
-
-    requests_mocker.get(
-        urljoin(
-            mpt_client.base_url,
-            f"product-items?product.id={settings.MPT_PRODUCT_ID}"
-            f"&in(externalIds.vendor,({item['id']}))",
-        ),
-        json=mpt_list_response([item]),
-        status=200,
-    )
-
-    product_items = get_product_items(
-        mpt_client, settings.MPT_PRODUCT_ID, [it["id"] for it in [item]]
-    )
-    assert product_items == [item]

@@ -20,7 +20,6 @@ def test_upsizing(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
-    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -84,8 +83,6 @@ def test_upsizing(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
-
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, processing_change_order)
 
     seller_country = seller["address"]["country"]
@@ -133,7 +130,6 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
-    product_item_factory,
     adobe_order_factory,
 ):
     """
@@ -170,8 +166,6 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
     )
-
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.get_subscription.assert_not_called()
@@ -194,7 +188,6 @@ def test_upsizing_create_adobe_preview_order_error(
     agreement,
     order_factory,
     lines_factory,
-    product_item_factory,
     fulfillment_parameters_factory,
     adobe_api_error_factory,
 ):
@@ -230,8 +223,6 @@ def test_upsizing_create_adobe_preview_order_error(
         ),
         order_parameters=[],
     )
-
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_fail_order.assert_called_once_with(
@@ -249,7 +240,6 @@ def test_downsizing(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
-    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -332,8 +322,6 @@ def test_downsizing(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
-
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, processing_order)
 
     seller_country = seller["address"]["country"]
@@ -368,7 +356,6 @@ def test_downsizing_return_order_exists(
     agreement,
     order_factory,
     lines_factory,
-    product_item_factory,
     fulfillment_parameters_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -452,8 +439,6 @@ def test_downsizing_return_order_exists(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
 
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
-
     fulfill_order(mocked_mpt_client, processing_order)
 
     assert mocked_update_order.mock_calls[0].args == (
@@ -479,7 +464,6 @@ def test_downsizing_return_order_pending(
     agreement,
     order_factory,
     lines_factory,
-    product_item_factory,
     fulfillment_parameters_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -533,8 +517,6 @@ def test_downsizing_return_order_pending(
         ),
         order_parameters=[],
     )
-
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_update_order.assert_called_once_with(
@@ -558,7 +540,6 @@ def test_downsizing_new_order_pending(
     agreement,
     order_factory,
     lines_factory,
-    product_item_factory,
     fulfillment_parameters_factory,
     adobe_order_factory,
 ):
@@ -605,8 +586,6 @@ def test_downsizing_new_order_pending(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
-
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
     fulfill_order(mocked_mpt_client, order)
 
     mocked_adobe_client.create_return_order.assert_not_called()
@@ -631,7 +610,6 @@ def test_downsizing_create_new_order_error(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
-    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_api_error_factory,
@@ -687,8 +665,6 @@ def test_downsizing_create_new_order_error(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=[product_item_factory()])
-
     fulfill_order(mocked_mpt_client, order)
 
     mocked_fail_order.assert_called_once_with(
@@ -706,7 +682,6 @@ def test_mixed(
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
-    product_item_factory,
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -835,12 +810,6 @@ def test_mixed(
         old_quantity=10,
         quantity=8,
     )
-    product_items = [
-        product_item_factory(item_id=1, vendor_external_id="sku-downsized"),
-        product_item_factory(item_id=2, vendor_external_id="sku-upsized"),
-        product_item_factory(item_id=3, vendor_external_id="sku-new"),
-        product_item_factory(item_id=4, vendor_external_id="sku-downsize-out"),
-    ]
 
     order_items = upsizing_items + new_items + downsizing_items + downsizing_items_out_of_window
 
@@ -908,8 +877,6 @@ def test_mixed(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.complete_order",
     )
-
-    mocker.patch("adobe_vipm.flows.shared.get_product_items", return_value=product_items)
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 

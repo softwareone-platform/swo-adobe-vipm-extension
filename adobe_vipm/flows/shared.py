@@ -15,13 +15,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_PREFERRED_LANGUAGE,
 )
-from adobe_vipm.flows.mpt import (
-    fail_order,
-    get_agreement,
-    get_product_items,
-    query_order,
-    update_order,
-)
+from adobe_vipm.flows.mpt import fail_order, get_agreement, query_order, update_order
 from adobe_vipm.flows.utils import (
     get_customer_data,
     get_parameter,
@@ -34,26 +28,7 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def _populate_order_lines(client, lines):
-    item_ids = set([line["item"]["id"] for line in lines])
-
-    product_items = get_product_items(client, settings.MPT_PRODUCT_ID, item_ids)
-    id_sku_mapping = {
-        pi["id"]: pi["externalIds"]["vendor"]
-        for pi in product_items
-        if pi.get("externalIds", {}).get("vendor")
-    }
-
-    for line in lines:
-        line["item"]["externalIds"] = {"vendor": id_sku_mapping[line["item"]["id"]]}
-
-    return lines
-
-
 def populate_order_info(client, order):
-    if "lines" in order:  # pragma: no branch
-        order["lines"] = _populate_order_lines(client, order["lines"])
-
     order["agreement"] = get_agreement(client, order["agreement"]["id"])
 
     return order

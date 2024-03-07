@@ -327,6 +327,9 @@ def lines_factory(agreement):
                 "item": {
                     "id": f"ITM-1234-1234-1234-{line_id:04d}",
                     "name": name,
+                    "externalIds": {
+                        "vendor": "65304578CA",
+                    },
                 },
                 "oldQuantity": old_quantity,
                 "quantity": quantity,
@@ -334,24 +337,6 @@ def lines_factory(agreement):
         ]
 
     return _items
-
-
-@pytest.fixture()
-def product_item_factory():
-    def _product_item(
-        item_id=1,
-        vendor_external_id="65304578CA",
-        name="Item for sale",
-    ):
-        return {
-            "id": f"ITM-1234-1234-1234-{item_id:04d}",
-            "name": name,
-            "externalIds": {
-                "vendor": vendor_external_id,
-            },
-        }
-
-    return _product_item
 
 
 @pytest.fixture()
