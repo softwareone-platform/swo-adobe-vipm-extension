@@ -237,7 +237,7 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
     adobe_order_id = adobe_order["orderId"]
     order = set_adobe_order_id(order, adobe_order_id)
     logger.debug(f'Updating the order {order["id"]} to save order id into vendor external id')
-    order = update_order(mpt_client, order["id"], externalIds=order["externalIds"])
+    update_order(mpt_client, order["id"], externalIds=order["externalIds"])
     return order, adobe_order
 
 
