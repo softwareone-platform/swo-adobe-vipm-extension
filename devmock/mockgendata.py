@@ -386,8 +386,8 @@ def gen_change_order(fake, agreement_id, skus, change_type):
     order_id = generate_random_id("ORD", 16, 4)
     agreement = load_agreement(agreement_id)
     product_id = agreement["product"]["id"]
-    if agreement["status"] != "Active":
-        raise ClickException("Agreement must be Active in order to generate a Change order.")
+    if agreement["status"] != "active":
+        raise ClickException("Agreement must be 'active' in order to generate a Change order.")
     lines = []
     subscriptions = []
     if change_type == "both" and len(agreement.get("subscriptions", [])) < 2:
@@ -405,7 +405,7 @@ def gen_change_order(fake, agreement_id, skus, change_type):
         new_line = copy.copy(line)
         new_line["oldQuantity"] = line["quantity"]
         if change_type == "upsize":
-            rand_prm = (new_item["oldQuantity"] + 1, 9)
+            rand_prm = (new_line["oldQuantity"] + 1, 9)
         elif change_type == "downsize":
             rand_prm = (1, new_line["oldQuantity"] - 1)
         elif line_number == 1:
@@ -458,7 +458,6 @@ def gen_change_order(fake, agreement_id, skus, change_type):
             console.print(
                 f"[green]✓[/green] Item {idx} - {product['name']} added: quantity = {quantity}",
             )
-            lines.append(line)
 
     order = {
         "id": order_id,
@@ -483,7 +482,7 @@ def gen_change_order(fake, agreement_id, skus, change_type):
 def gen_termination_order(fake, agreement_id, subscriptions_ids):
     agreement = load_agreement(agreement_id)
     if agreement["status"] != "active":
-        raise ClickException("Agreement must be Active in order to generate a Termination order.")
+        raise ClickException("Agreement must be 'active' in order to generate a Termination order.")
     agreement_sub_ids = [sub["id"] for sub in agreement["subscriptions"]]
     subscriptions_ids = subscriptions_ids or agreement_sub_ids
     invalid_sub_ids = list(set(subscriptions_ids) - set(agreement_sub_ids))
