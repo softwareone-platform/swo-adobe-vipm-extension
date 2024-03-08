@@ -53,7 +53,7 @@ def query_order(mpt_client, order_id, **kwargs):
 def fail_order(mpt_client, order_id, reason):
     response = mpt_client.post(
         f"/commerce/orders/{order_id}/fail",
-        json={"reason": reason},
+        json={"statusNotes": reason},
     )
     response.raise_for_status()
     return response.json()
