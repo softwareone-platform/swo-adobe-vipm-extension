@@ -24,7 +24,7 @@ def test_fail_order(mpt_client, requests_mocker, order_factory):
         match=[
             matchers.json_params_matcher(
                 {
-                    "reason": "a-reason",
+                    "statusNotes": "a-reason",
                 },
             ),
         ],
