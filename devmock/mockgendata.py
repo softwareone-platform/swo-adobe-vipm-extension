@@ -21,10 +21,12 @@ from devmock.utils import (
     generate_random_id,
     get_reference,
     load_agreement,
+    load_item,
     load_subscription,
     save_account,
     save_agreement,
     save_buyer,
+    save_item,
     save_licensee,
     save_order,
     save_seller,
@@ -319,26 +321,19 @@ def gen_purchase_order(
     lines = []
     subscriptions = []
     for idx, sku in enumerate(skus, start=1):
-        product = get_product_by_sku(sku)
         old_quantity = 0
         quantity = random.randint(2, 5)
-
+        item = load_item(sku)
         lines.append(
             {
                 "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
-                "item": {
-                    "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
-                    "name": product["name"],
-                    "externalIds": {
-                        "vendor": sku,
-                    },
-                },
+                "item": get_reference(item, ["id", "name", "externalIds"]),
                 "quantity": quantity,
                 "oldQuantity": old_quantity,
             }
         )
         console.print(
-            f"[green]✓[/green] Item {idx} - {product['name']} generated: quantity = {quantity}",
+            f"[green]✓[/green] Item {idx} - {item['name']} generated: quantity = {quantity}",
         )
 
     order = {
@@ -428,26 +423,20 @@ def gen_change_order(fake, agreement_id, skus, change_type):
 
     if skus:
         for idx, sku in enumerate(skus, start=line_number + 1):
-            product = get_product_by_sku(sku)
+            item = load_item(sku)
             old_quantity = 0
             quantity = random.randint(1, 5)
 
             lines.append(
                 {
                     "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
-                    "item": {
-                        "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
-                        "name": product["name"],
-                        "externalIds": {
-                            "vendor": sku,
-                        },
-                    },
+                    "item": get_reference(item, ["id", "name", "extenalIds"]),
                     "quantity": quantity,
                     "oldQuantity": old_quantity,
                 }
             )
             console.print(
-                f"[green]✓[/green] Item {idx} - {product['name']} added: quantity = {quantity}",
+                f"[green]✓[/green] Item {idx} - {item['name']} added: quantity = {quantity}",
             )
 
     order = {
@@ -567,6 +556,32 @@ def gen_transfer_order(
     }
     save_order(order)
     return order
+
+
+def gen_items(fake):
+    product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111")
+    item_base_id = base_id_from(product_id)
+    for idx, item in enumerate(ADOBE_CONFIG["skus_mapping"], start=1):
+        item_id = f"ITM-{item_base_id}-{idx:04d}"
+        prod_item = {
+            "id": item_id,
+            "href": f"/product-items/{item_id}",
+            "name": item["name"],
+            "description": item["name"],
+            "externalIds": {
+                "vendor": item["vendor_external_id"],
+            },
+            "status": "published",
+            "product": {
+                "id": product_id,
+                "name": "Adobe VIP Marketplace for Commercial",
+            },
+            "audit": gen_audit(fake)
+        }
+        save_item(prod_item, item["vendor_external_id"])
+        console.print(
+            f"[green]✓[/green] Item {item_id} - {item['name']} generated",
+        )
 
 
 @click.group()
@@ -738,6 +753,18 @@ def terminate(locale, agreement_id, subscriptions):
             f"({agreement_id}): {order['id']}",
         )
 
+
+@cli.command("product-items")
+@click.option("--locale", default="en_US")
+def product_items(locale):
+    with console.status(
+        "[magenta]Generating product items...",
+        spinner="bouncingBall",
+        spinner_style="yellow",
+    ):
+        fake = Faker(locale)
+        gen_items(fake)
+        console.print("[bold green]Product items have been generated ")
 
 @cli.command()
 def cleanup():

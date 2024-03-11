@@ -342,30 +342,51 @@ def fulfillment_parameters_factory():
 
 
 @pytest.fixture()
+def items_factory():
+    def _items(
+        item_id=1,
+        name="Awesome product",
+        external_vendor_id="65304578CA",
+    ):
+        return [
+            {
+                "id": f"ITM-1234-1234-1234-{item_id:04d}",
+                "name": name,
+                "externalIds": {
+                    "vendor": external_vendor_id,
+                },
+            },
+        ]
+
+    return _items
+
+
+@pytest.fixture()
 def lines_factory(agreement):
     agreement_id = agreement["id"].split("-", 1)[1]
 
     def _items(
         line_id=1,
+        item_id=1,
         name="Awesome product",
         old_quantity=0,
         quantity=170,
         external_vendor_id="65304578CA",
     ):
-        return [
-            {
-                "id": f"ALI-{agreement_id}-{line_id:04d}",
-                "item": {
-                    "id": f"ITM-1234-1234-1234-{line_id:04d}",
-                    "name": name,
-                    "externalIds": {
-                        "vendor": external_vendor_id,
-                    },
+        line = {
+            "item": {
+                "id": f"ITM-1234-1234-1234-{item_id:04d}",
+                "name": name,
+                "externalIds": {
+                    "vendor": external_vendor_id,
                 },
-                "oldQuantity": old_quantity,
-                "quantity": quantity,
             },
-        ]
+            "oldQuantity": old_quantity,
+            "quantity": quantity,
+        }
+        if line_id:
+            line["id"] = f"ALI-{agreement_id}-{line_id:04d}"
+        return [line]
 
     return _items
 

@@ -8,10 +8,11 @@ import requests
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from devmock.filters import OrdersFilter
+from devmock.filters import ItemsFilter, OrdersFilter
 from devmock.models import Order, Subscription
-from devmock.settings import ORDERS_FOLDER, WEBHOOK_ENDPOINT
+from devmock.settings import ITEMS_FOLDER, ORDERS_FOLDER, WEBHOOK_ENDPOINT
 from devmock.utils import (
+    base_id_from,
     gen_jwt_token,
     generate_random_id,
     get_line_for_subscription,
@@ -66,7 +67,6 @@ def update_order(
     id: str,
     order: Order,
 ):
-    print(order.model_dump_json())
     current_order = load_order(id)
     if order.parameters:
         current_order["parameters"] = order.parameters
@@ -207,15 +207,50 @@ def list_subscriptions(order_id: str, limit: int, offset: int):
 
 
 @router.post("/commerce/orders/{order_id}/validate")
-def validate_draft_order(order_id: str, body: Any = Body(None)):
+def validate_draft_order(order_id: str, order: Order):
+    current_order = load_order(order_id)
+    agreement = get_agreement(current_order["agreement"]["id"])
+    if order.parameters:
+        current_order["parameters"] = order.parameters
+        save_order(current_order)
     resp = requests.post(
         WEBHOOK_ENDPOINT,
         headers={
             "authorization": f"Bearer {gen_jwt_token()}",
         },
-        json=body,
+        json=current_order,
     )
+    if resp.status_code == 200:
+        validated_order = resp.json()
+        current_order["parameters"] = validated_order["parameters"]
+        current_order["lines"] = []
+        for idx, line in enumerate(validated_order["lines"], start=1):
+            line["id"] = f"ALI-{base_id_from(agreement['id'])}-{idx:04d}"
+            current_order["lines"].append(line)
+        save_order(current_order, order_id)
+        return JSONResponse(current_order)
     return JSONResponse(
         resp.json() if resp.headers["content-type"] == "application/json" else resp.text,
         status_code=resp.status_code,
     )
+
+
+@router.get("/product-items")
+def list_product_items(request: Request):
+    items = []
+    response = {
+        "data": [],
+    }
+    items_files = glob.glob(os.path.join(ITEMS_FOLDER, "*.json"))
+
+    for item_file in items_files:
+        with open(os.path.join(ITEMS_FOLDER, item_file), "r") as f:
+            item = json.load(f)
+            items.append(item)
+
+    query = unquote(request.scope.get("query_string", b"").decode())
+    filter_instance = ItemsFilter()
+    filtered_items, count, limit, offset = filter_instance.apply(query, items)
+    response["data"] = filtered_items
+    response["$meta"] = {"pagination": {"offset": offset, "limit": limit, "total": count}}
+    return response

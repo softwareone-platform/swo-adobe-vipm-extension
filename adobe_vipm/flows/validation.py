@@ -1,12 +1,16 @@
 import logging
 import re
 
+from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import join_phone_number
 from adobe_vipm.flows.constants import (
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
+    ERR_ADOBE_MEMBERSHIP_ID,
+    ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_CITY_LENGTH,
     ERR_COMPANY_NAME_CHARS,
     ERR_COMPANY_NAME_LENGTH,
@@ -27,18 +31,24 @@ from adobe_vipm.flows.constants import (
     MAXLEN_PHONE_NUMBER,
     MAXLEN_POSTAL_CODE,
     MINLEN_COMPANY_NAME,
-    ORDER_TYPE_PURCHASE,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    PARAM_MEMBERSHIP_ID,
     PARAM_PREFERRED_LANGUAGE,
     REGEX_COMPANY_NAME,
     REGEX_EMAIL,
     REGEX_FIRST_LAST_NAME,
 )
-from adobe_vipm.flows.mpt import get_buyer
+from adobe_vipm.flows.mpt import get_buyer, get_product_items_by_skus
 from adobe_vipm.flows.shared import populate_order_info, prepare_customer_data
-from adobe_vipm.flows.utils import get_ordering_parameter, set_ordering_parameter_error
+from adobe_vipm.flows.utils import (
+    get_adobe_membership_id,
+    get_ordering_parameter,
+    is_purchase_order,
+    is_transfer_order,
+    set_ordering_parameter_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,14 +189,68 @@ def validate_customer_data(order, customer_data):
     return has_errors, order
 
 
-def validate_order(client, order):
-    order = populate_order_info(client, order)
+def validate_transfer(mpt_client, order):
+    seller_country = order["agreement"]["seller"]["address"]["country"]
+    membership_id = get_adobe_membership_id(order)
+    adobe_client = get_adobe_client()
+    transfer_preview = None
+    try:
+        transfer_preview = adobe_client.preview_transfer(
+            seller_country,
+            membership_id,
+        )
+    except AdobeAPIError as e:
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["title"], details=str(e)),
+        )
+        return True, order
+
+    returned_skus = [item["offerId"][:10] for item in transfer_preview["items"]]
+
+    items_map = {
+        item["externalIds"]["vendor"]: item
+        for item in get_product_items_by_skus(
+            mpt_client, order["agreement"]["product"]["id"], returned_skus
+        )
+    }
+    lines = []
+    for adobe_line in transfer_preview["items"]:
+        item = items_map.get(adobe_line["offerId"][:10])
+        if not item:
+            param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_MEMBERSHIP_ID,
+                ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
+                    title=param["title"],
+                    item_sku=adobe_line["offerId"][:10],
+                ),
+            )
+            return True, order
+        lines.append(
+            {
+                "item": item,
+                "quantity": adobe_line["quantity"],
+                "oldQuantity": 0,
+            },
+        )
+    order["lines"] = lines
+    return False, order
+
+
+def validate_order(mpt_client, order):
+    order = populate_order_info(mpt_client, order)
     has_errors = False
-    if order["type"] == ORDER_TYPE_PURCHASE:  # pragma: no branch
+    if is_purchase_order(order):
         buyer_id = order["agreement"]["buyer"]["id"]
-        buyer = get_buyer(client, buyer_id)
-        order, customer_data = prepare_customer_data(client, order, buyer)
+        buyer = get_buyer(mpt_client, buyer_id)
+        order, customer_data = prepare_customer_data(mpt_client, order, buyer)
         has_errors, order = validate_customer_data(order, customer_data)
+    elif is_transfer_order(order):  # pragma: no branch
+        has_errors, order = validate_transfer(mpt_client, order)
 
     logger.info(
         f"Validation of order {order['id']} succeeded with{'out' if not has_errors else ''} errors"

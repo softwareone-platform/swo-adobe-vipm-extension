@@ -2,10 +2,18 @@ import logging
 
 import pytest
 
+from adobe_vipm.adobe.constants import (
+    STATUS_TRANSFER_INVALID_MEMBERSHIP,
+    STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+    UNRECOVERABLE_TRANSFER_STATUSES,
+)
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
+    ERR_ADOBE_MEMBERSHIP_ID,
+    ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_CITY_LENGTH,
     ERR_COMPANY_NAME_CHARS,
     ERR_COMPANY_NAME_LENGTH,
@@ -22,6 +30,7 @@ from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    PARAM_MEMBERSHIP_ID,
     PARAM_PREFERRED_LANGUAGE,
 )
 from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
@@ -32,6 +41,7 @@ from adobe_vipm.flows.validation import (
     validate_customer_data,
     validate_order,
     validate_preferred_language,
+    validate_transfer,
 )
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
@@ -53,7 +63,9 @@ def test_validate_company_name(order_factory, order_parameters_factory, company_
     """
     Tests the validation of the Company name when it is valid.
     """
-    order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
+    order = order_factory(
+        order_parameters=order_parameters_factory(company_name=company_name)
+    )
     customer_data = get_customer_data(order)
 
     has_error, order = validate_company_name(order, customer_data)
@@ -77,7 +89,9 @@ def test_validate_company_name_invalid_length(
     """
     Tests the validation of the Company name when it is invalid due to length.
     """
-    order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
+    order = order_factory(
+        order_parameters=order_parameters_factory(company_name=company_name)
+    )
     customer_data = get_customer_data(order)
     has_error, order = validate_company_name(order, customer_data)
 
@@ -98,11 +112,15 @@ def test_validate_company_name_invalid_length(
         "Star * of the Sky",
     ],
 )
-def test_validate_company_name_invalid_chars(order_factory, order_parameters_factory, company_name):
+def test_validate_company_name_invalid_chars(
+    order_factory, order_parameters_factory, company_name
+):
     """
     Tests the validation of the Company name when it is invalid due to chars.
     """
-    order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
+    order = order_factory(
+        order_parameters=order_parameters_factory(company_name=company_name)
+    )
     customer_data = get_customer_data(order)
     has_error, order = validate_company_name(order, customer_data)
 
@@ -118,7 +136,9 @@ def test_validate_preferred_language(order_factory, order_parameters_factory):
     """
     Tests the validation of the preferred language when it is valid.
     """
-    order = order_factory(order_parameters=order_parameters_factory(preferred_language="en-US"))
+    order = order_factory(
+        order_parameters=order_parameters_factory(preferred_language="en-US")
+    )
     customer_data = get_customer_data(order)
 
     has_error, order = validate_preferred_language(order, customer_data)
@@ -139,7 +159,9 @@ def test_validate_preferred_language_invalid(
     """
     Tests the validation of the preferred language when it is invalid.
     """
-    order = order_factory(order_parameters=order_parameters_factory(preferred_language="invalid"))
+    order = order_factory(
+        order_parameters=order_parameters_factory(preferred_language="invalid")
+    )
     customer_data = get_customer_data(order)
 
     has_error, order = validate_preferred_language(order, customer_data)
@@ -279,7 +301,9 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
     assert param["constraints"]["optional"] is False
 
 
-def test_validate_address_invalid_postal_code_length(order_factory, order_parameters_factory):
+def test_validate_address_invalid_postal_code_length(
+    order_factory, order_parameters_factory
+):
     """
     Tests the validation of an address when the postal code doesn't match
     the expected length.
@@ -567,14 +591,17 @@ def test_validate_customer_data_invalid(mocker, no_validating_fn):
     assert has_errors is True
 
 
-def test_validate_order(mocker, caplog, order_factory, buyer, customer_data):
+def test_validate_purchase_order(mocker, caplog, order_factory, buyer, customer_data):
     """Tests the validate order entrypoint function when it validates."""
     order = order_factory()
     m_client = mocker.MagicMock()
 
-    m_get_buyer = mocker.patch("adobe_vipm.flows.validation.get_buyer", return_value=buyer)
+    m_get_buyer = mocker.patch(
+        "adobe_vipm.flows.validation.get_buyer", return_value=buyer
+    )
     m_prepare_customer_data = mocker.patch(
-        "adobe_vipm.flows.validation.prepare_customer_data", return_value=(order, customer_data)
+        "adobe_vipm.flows.validation.prepare_customer_data",
+        return_value=(order, customer_data),
     )
     m_validate_customer_data = mocker.patch(
         "adobe_vipm.flows.validation.validate_customer_data",
@@ -593,7 +620,7 @@ def test_validate_order(mocker, caplog, order_factory, buyer, customer_data):
     m_validate_customer_data.assert_called_once_with(order, customer_data)
 
 
-def test_validate_order_no_validate(mocker, caplog, order_factory):
+def test_validate_purchase_order_no_validate(mocker, caplog, order_factory):
     """Tests the validate order entrypoint function when doesn't validate."""
     order = order_factory()
     m_client = mocker.MagicMock()
@@ -612,4 +639,169 @@ def test_validate_order_no_validate(mocker, caplog, order_factory):
     with caplog.at_level(logging.INFO):
         validate_order(m_client, order)
 
-    assert caplog.records[0].message == (f"Validation of order {order['id']} succeeded with errors")
+    assert caplog.records[0].message == (
+        f"Validation of order {order['id']} succeeded with errors"
+    )
+
+
+def test_validate_transfer(
+    mocker,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    adobe_preview_transfer_factory,
+    lines_factory,
+):
+    m_client = mocker.MagicMock()
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    product_items = items_factory()
+    adobe_preview_transfer = adobe_preview_transfer_factory()
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mocker.patch(
+        "adobe_vipm.flows.validation.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_get_product_items_by_skus = mocker.patch(
+        "adobe_vipm.flows.validation.get_product_items_by_skus",
+        return_value=product_items,
+    )
+
+    has_errors, validated_order = validate_transfer(m_client, order)
+
+    assert has_errors is False
+    assert validated_order["lines"] == lines_factory(line_id=None)
+
+    mocked_get_product_items_by_skus.assert_called_once_with(
+        m_client,
+        order["agreement"]["product"]["id"],
+        [adobe_preview_transfer["items"][0]["offerId"][:10]],
+    )
+
+
+@pytest.mark.parametrize(
+    "status_code",
+    [
+        STATUS_TRANSFER_INVALID_MEMBERSHIP,
+        STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+    ]
+    + UNRECOVERABLE_TRANSFER_STATUSES,
+)
+def test_validate_transfer_membership_error(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    adobe_api_error_factory,
+    status_code,
+):
+    m_client = mocker.MagicMock()
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    api_error = AdobeAPIError(
+        adobe_api_error_factory(status_code, "An error"),
+    )
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.side_effect = api_error
+    mocker.patch(
+        "adobe_vipm.flows.validation.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    has_errors, validated_order = validate_transfer(m_client, order)
+
+    assert has_errors is True
+
+    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+        title=param["title"],
+        details=str(api_error),
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["optional"] is False
+
+
+def test_validate_transfer_unknown_item(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    adobe_preview_transfer_factory,
+):
+    m_client = mocker.MagicMock()
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    adobe_preview_transfer = adobe_preview_transfer_factory()
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mocker.patch(
+        "adobe_vipm.flows.validation.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.validation.get_product_items_by_skus",
+        return_value=[],
+    )
+
+    has_errors, validated_order = validate_transfer(m_client, order)
+
+    assert has_errors is True
+    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
+        title=param["title"],
+        item_sku=adobe_preview_transfer["items"][0]["offerId"][:10],
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["optional"] is False
+
+
+def test_validate_transfer_order(
+    mocker,
+    caplog,
+    order_factory,
+    transfer_order_parameters_factory,
+):
+    """Tests the validate order entrypoint function for transfer orders when it validates."""
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    m_client = mocker.MagicMock()
+
+    m_validate_transfer = mocker.patch(
+        "adobe_vipm.flows.validation.validate_transfer",
+        return_value=(False, order),
+    )
+
+    with caplog.at_level(logging.INFO):
+        assert validate_order(m_client, order) == order
+
+    assert caplog.records[0].message == (
+        f"Validation of order {order['id']} succeeded without errors"
+    )
+
+    m_validate_transfer.assert_called_once_with(
+        m_client,
+        order,
+    )
+
+
+def test_validate_transfer_order_no_validate(
+    mocker, caplog, order_factory, transfer_order_parameters_factory
+):
+    """Tests the validate order entrypoint function for transfers when doesn't validate."""
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    m_client = mocker.MagicMock()
+
+    mocker.patch("adobe_vipm.flows.validation.populate_order_info", return_value=order)
+    mocker.patch("adobe_vipm.flows.validation.get_buyer")
+    mocker.patch(
+        "adobe_vipm.flows.validation.prepare_customer_data",
+        return_value=(order, mocker.MagicMock()),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.validate_transfer",
+        return_value=(True, order),
+    )
+
+    with caplog.at_level(logging.INFO):
+        validate_order(m_client, order)
+
+    assert caplog.records[0].message == (
+        f"Validation of order {order['id']} succeeded with errors"
+    )

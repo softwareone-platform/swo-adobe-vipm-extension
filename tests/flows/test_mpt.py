@@ -9,6 +9,7 @@ from adobe_vipm.flows.mpt import (
     create_subscription,
     fail_order,
     get_buyer,
+    get_product_items_by_skus,
     get_seller,
     query_order,
     update_order,
@@ -291,3 +292,67 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
         create_subscription(mpt_client, "ORD-0000", {})
 
     assert cv.value.payload["status"] == 404
+
+
+def test_get_product_items_by_skus(mpt_client, requests_mocker):
+    """
+    Tests the call to retrieve all the item of a given product
+    that matches a list of vendor SKUs.
+    """
+    product_id = "PRD-1234-5678"
+    skus = ["sku1", "sku2"]
+    rql_query = f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    url = f"product-items?{rql_query}"
+    page1_url = f"{url}&limit=10&offset=0"
+    page2_url = f"{url}&limit=10&offset=10"
+    data = [{"id": f"ITM-{idx}"} for idx in range(13)]
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, page1_url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 0,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": data[:10]
+        },
+    )
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, page2_url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 10,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": data[10:],
+        },
+    )
+
+    assert get_product_items_by_skus(mpt_client, product_id, skus) == data
+
+
+def test_get_product_items_by_skus_error(mpt_client, requests_mocker, mpt_error_factory):
+    """
+    Tests the call to retrieve all the item of a given product
+    that matches a list of vendor SKUs.
+    """
+    product_id = "PRD-1234-5678"
+    skus = ["sku1", "sku2"]
+    rql_query = f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    url = f"product-items?{rql_query}&limit=10&offset=0"
+
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, url),
+        status=500,
+        json=mpt_error_factory(500, "Internal server error", "Whatever"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        get_product_items_by_skus(mpt_client, product_id, skus)
+
+    assert cv.value.payload["status"] == 500

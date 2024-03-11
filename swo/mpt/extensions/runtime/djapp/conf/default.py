@@ -161,7 +161,7 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "swo.mpt.extensions.runtime": {
+        "swo.mpt": {
             "handlers": ["rich"],
             "level": "DEBUG",
             "propagate": False,

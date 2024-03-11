@@ -41,6 +41,11 @@ ERR_ADOBE_PREFERRED_LANGUAGE = ValidationError("VIPMA002", ADOBE_ERR_MSG)
 ERR_ADOBE_ADDRESS = ValidationError("VIPMA003", ADOBE_ERR_MSG)
 ERR_ADOBE_CONTACT = ValidationError("VIPMA004", ADOBE_ERR_MSG)
 ERR_ADOBE_MEMBERSHIP_ID = ValidationError("VIPMA005", ADOBE_ERR_MSG)
+ERR_ADOBE_MEMBERSHIP_ID_ITEM = ValidationError(
+    "VIPMA006",
+    "The provided `{title}` contains the item with SKU `{item_sku}` "
+    "that is not part of the product definition.",
+)
 
 ERR_COMPANY_NAME_LENGTH = ValidationError(
     "VIPMV001",
@@ -61,6 +66,7 @@ ERR_ADDRESS = ValidationError(
     "VIPMV004",
     "The `{title}` contains invalid components: {errors}.",
 )
+
 ERR_COUNTRY_CODE = "The provided `Country` is not valid"
 ERR_STATE_OR_PROVINCE = "The provided `State/Region` is not valid"
 ERR_POSTAL_CODE_FORMAT = "The provided `ZIP/Postal code` is not valid"

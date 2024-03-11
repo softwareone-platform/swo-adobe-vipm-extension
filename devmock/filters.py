@@ -60,3 +60,14 @@ class OrdersFilter(FilterClass):
             "type": FilterTypes.DATETIME,
         },
     ]
+
+
+class ItemsFilter(FilterClass):
+    FILTERS = [
+        {
+            "filter": "product.id",
+        },
+        {
+            "filter": "externalIds.vendor",
+        },
+    ]

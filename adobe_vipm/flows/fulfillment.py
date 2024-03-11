@@ -259,7 +259,6 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
 
 def _check_adobe_order_fulfilled(mpt_client, seller_country, order, customer_id, adobe_order_id):
     adobe_client = get_adobe_client()
-    adobe_order = None
     adobe_order = adobe_client.get_order(
         seller_country,
         customer_id,
