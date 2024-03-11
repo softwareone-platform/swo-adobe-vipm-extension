@@ -348,6 +348,12 @@ def test_downsizing(
         processing_order["id"],
         "TPL-1111",
     )
+    mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.assert_called_once_with(
+        seller_country,
+        "a-client-id",
+        processing_order["lines"][0]["item"]["externalIds"]["vendor"],
+        processing_order["lines"][0]["id"],
+    )
 
 
 def test_downsizing_return_order_exists(
@@ -792,23 +798,27 @@ def test_mixed(
         line_id=1,
         old_quantity=10,
         quantity=8,
+        external_vendor_id="sku-downsized",
     )
     upsizing_items = lines_factory(
         line_id=2,
         old_quantity=10,
         quantity=12,
+        external_vendor_id="sku-upsized",
     )
     new_items = lines_factory(
         line_id=3,
         name="New cool product",
         old_quantity=0,
         quantity=5,
+        external_vendor_id="sku-new",
     )
 
     downsizing_items_out_of_window = lines_factory(
         line_id=4,
         old_quantity=10,
         quantity=8,
+        external_vendor_id="sku-downsize-out",
     )
 
     order_items = upsizing_items + new_items + downsizing_items + downsizing_items_out_of_window
@@ -822,6 +832,7 @@ def test_mixed(
             lines=lines_factory(
                 line_id=1,
                 quantity=10,
+                external_vendor_id="sku-downsized",
             ),
         )
         + subscriptions_factory(
@@ -830,6 +841,7 @@ def test_mixed(
             lines=lines_factory(
                 line_id=2,
                 quantity=10,
+                external_vendor_id="sku-upsized",
             ),
         )
         + subscriptions_factory(
@@ -838,6 +850,7 @@ def test_mixed(
             lines=lines_factory(
                 line_id=4,
                 quantity=10,
+                external_vendor_id="sku-downsize-out",
             ),
             start_date=datetime.now(UTC) - timedelta(days=CANCELLATION_WINDOW_DAYS + 1),
         )

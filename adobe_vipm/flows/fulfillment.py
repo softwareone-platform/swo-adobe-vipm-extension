@@ -7,13 +7,16 @@ from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     STATUS_PENDING,
     STATUS_PROCESSED,
+    STATUS_TRANSFER_INVALID_MEMBERSHIP,
+    STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_ORDER_STATUSES,
 )
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.adobe.utils import to_mpt_line_id
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_MEMBERSHIP_ID,
     ORDER_TYPE_CHANGE,
     ORDER_TYPE_TERMINATION,
+    PARAM_MEMBERSHIP_ID,
     PARAM_SUBSCRIPTION_ID,
 )
 from adobe_vipm.flows.mpt import (
@@ -21,21 +24,28 @@ from adobe_vipm.flows.mpt import (
     create_subscription,
     fail_order,
     get_buyer,
+    query_order,
     update_order,
 )
 from adobe_vipm.flows.shared import create_customer_account, populate_order_info
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
+    get_adobe_membership_id,
     get_adobe_order_id,
     get_adobe_subscription_id,
-    get_order_item,
+    get_order_line,
+    get_order_line_by_sku,
+    get_ordering_parameter,
     get_retry_count,
     get_subscription_by_line_and_item_id,
     group_items_by_type,
     increment_retry_count,
     is_purchase_order,
+    is_transfer_order,
     reset_retry_count,
+    set_adobe_customer_id,
     set_adobe_order_id,
+    set_ordering_parameter_error,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,7 +56,7 @@ def _handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
     max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
     if retry_count < max_attemps:
         order = increment_retry_count(order)
-        order = update_order(mpt_client, order["id"], parameters=order["parameters"])
+        update_order(mpt_client, order["id"], parameters=order["parameters"])
         logger.info(
             f"Order {order['id']} ({adobe_order_id}: {adobe_order_type}) "
             "is still processing on Adobe side, wait.",
@@ -64,7 +74,7 @@ def _handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
 
 def _complete_order(mpt_client, order):
     order = reset_retry_count(order)
-    order = update_order(mpt_client, order["id"], parameters=order["parameters"])
+    update_order(mpt_client, order["id"], parameters=order["parameters"])
     complete_order(mpt_client, order["id"], settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"])
     logger.info(f'Order {order["id"]} has been completed successfully')
 
@@ -76,7 +86,9 @@ def _create_subscription(mpt_client, seller_country, customer_id, order, item):
         customer_id,
         item["subscriptionId"],
     )
-    order_line = get_order_item(order, item["extLineItemNumber"])
+
+    order_line = get_order_line_by_sku(order, item["offerId"])
+
     subscription = {
         "name": f"Subscription for {order_line['item']['name']}",
         "parameters": {
@@ -89,7 +101,7 @@ def _create_subscription(mpt_client, seller_country, customer_id, order, item):
         },
         "lines": [
             {
-                "id": to_mpt_line_id(order["agreement"]["id"], item["extLineItemNumber"]),
+                "id": order_line["id"],
             },
         ],
         "startDate": adobe_subscription["creationDate"],
@@ -142,7 +154,7 @@ def _place_return_orders(mpt_client, seller_country, customer_id, order, lines):
         orders_4_item = adobe_client.search_new_and_returned_orders_by_sku_line_number(
             seller_country,
             customer_id,
-            line["item"]["id"],
+            line["item"]["externalIds"]["vendor"],
             line["id"],
         )
         for order_to_return, item_to_return, return_order in orders_4_item:
@@ -183,20 +195,24 @@ def _place_new_order(mpt_client, seller_country, customer_id, order):
     except AdobeError as e:
         fail_order(mpt_client, order["id"], str(e))
         logger.warning(f"Order {order['id']} has been failed: {str(e)}.")
-        return None, None
+        return None
 
     adobe_order_id = adobe_order["orderId"]
     order = set_adobe_order_id(order, adobe_order_id)
     logger.debug(f'Updating the order {order["id"]} to save order id into vendor external id')
     update_order(mpt_client, order["id"], externalIds=order["externalIds"])
-    return order, adobe_order
+    return order
 
 
 def _place_change_order(mpt_client, seller_country, customer_id, order):
     adobe_client = get_adobe_client()
     adobe_order = None
     grouped_items = group_items_by_type(order)
-
+    logger.debug(
+        f"item groups: up={grouped_items.upsizing}, "
+        f"downin={grouped_items.downsizing_in_win}, "
+        f"downout={grouped_items.downsizing_out_win}",
+    )
     try:
         preview_order = adobe_client.create_preview_order(
             seller_country,
@@ -221,7 +237,7 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
             )
 
             if not completed_return_orders:
-                return None, None
+                return None
 
         adobe_order = adobe_client.create_new_order(
             seller_country,
@@ -232,17 +248,18 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
     except AdobeError as e:
         fail_order(mpt_client, order["id"], str(e))
         logger.warning(f"Order {order['id']} has been failed: {str(e)}.")
-        return None, None
+        return None
 
     adobe_order_id = adobe_order["orderId"]
     order = set_adobe_order_id(order, adobe_order_id)
     logger.debug(f'Updating the order {order["id"]} to save order id into vendor external id')
     update_order(mpt_client, order["id"], externalIds=order["externalIds"])
-    return order, adobe_order
+    return order
 
 
 def _check_adobe_order_fulfilled(mpt_client, seller_country, order, customer_id, adobe_order_id):
     adobe_client = get_adobe_client()
+    adobe_order = None
     adobe_order = adobe_client.get_order(
         seller_country,
         customer_id,
@@ -276,7 +293,7 @@ def _fulfill_purchase_order(mpt_client, seller_country, order):
     customer_id = get_adobe_customer_id(order)
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
-        order, adobe_order = _place_new_order(mpt_client, seller_country, customer_id, order)
+        order = _place_new_order(mpt_client, seller_country, customer_id, order)
         if not order:
             return
     adobe_order_id = order["externalIds"]["vendor"]
@@ -296,7 +313,7 @@ def _fulfill_change_order(mpt_client, seller_country, order):
     customer_id = get_adobe_customer_id(order)
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
-        order, adobe_order = _place_change_order(mpt_client, seller_country, customer_id, order)
+        order = _place_change_order(mpt_client, seller_country, customer_id, order)
         if not order:
             return
 
@@ -309,14 +326,14 @@ def _fulfill_change_order(mpt_client, seller_country, order):
         return
 
     for item in adobe_order["lineItems"]:
-        order_item = get_order_item(
+        order_line = get_order_line(
             order,
             item["extLineItemNumber"],
         )
         order_subscription = get_subscription_by_line_and_item_id(
             order["subscriptions"],
-            order_item["item"]["id"],
-            order_item["id"],
+            order_line["item"]["id"],
+            order_line["id"],
         )
         if not order_subscription:
             _create_subscription(mpt_client, seller_country, customer_id, order, item)
@@ -334,18 +351,137 @@ def _fulfill_termination_order(mpt_client, seller_country, order):
         )
 
     has_orders_to_return = bool(grouped_items.upsizing + grouped_items.downsizing_in_win)
-    completed_return_orders = None
-
-    if has_orders_to_return:
-        completed_return_orders = _place_return_orders(
-            mpt_client,
-            seller_country,
-            customer_id,
-            order,
-            grouped_items.upsizing + grouped_items.downsizing_in_win,
-        )
-    if not has_orders_to_return or has_orders_to_return and completed_return_orders:
+    if not has_orders_to_return:
         _complete_order(mpt_client, order)
+        return
+
+    if _place_return_orders(
+        mpt_client,
+        seller_country,
+        customer_id,
+        order,
+        grouped_items.upsizing + grouped_items.downsizing_in_win,
+    ):
+        _complete_order(mpt_client, order)
+
+
+def _handle_transfer_preview_error(client, order, e):
+    if e.code in (
+        STATUS_TRANSFER_INVALID_MEMBERSHIP,
+        STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+    ):
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["title"], details=str(e)),
+        )
+        query_order(
+            client,
+            order["id"],
+            parameters=order["parameters"],
+            templateId=settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"],
+        )
+        return
+
+    fail_order(client, order["id"], str(e))
+
+
+def _check_transfer(mpt_client, seller_country, order, membership_id):
+    adobe_client = get_adobe_client()
+    transfer_preview = None
+    try:
+        transfer_preview = adobe_client.preview_transfer(seller_country, membership_id)
+    except AdobeError as e:
+        _handle_transfer_preview_error(mpt_client, order, e)
+        logger.warning(f"Transfer order {order['id']} has been failed: {str(e)}.")
+        return False
+
+    adobe_lines = sorted(
+        [(item["offerId"][:10], item["quantity"]) for item in transfer_preview["items"]],
+        key=lambda i: i[0],
+    )
+
+    order_lines = sorted(
+        [(line["item"]["externalIds"]["vendor"], line["quantity"]) for line in order["lines"]],
+        key=lambda i: i[0],
+    )
+    if adobe_lines != order_lines:
+        reason = (
+            "The items owned by the given membership don't "
+            f"match the order (sku or quantity): {','.join([line[0] for line in adobe_lines])}."
+        )
+        fail_order(mpt_client, order["id"], reason)
+        logger.warning(f"Transfer 0rder {order['id']} has been failed: {reason}.")
+        return False
+    return True
+
+
+def _place_transfer_order(mpt_client, seller_country, order, membership_id):
+    adobe_client = get_adobe_client()
+    adobe_transfer_order = None
+    try:
+        adobe_transfer_order = adobe_client.create_transfer(
+            seller_country, order["id"], membership_id
+        )
+    except AdobeError as e:
+        fail_order(mpt_client, order["id"], str(e))
+        logger.warning(f"Transfer order {order['id']} has been failed: {str(e)}.")
+        return None
+
+    adobe_transfer_order_id = adobe_transfer_order["transferId"]
+    order = set_adobe_order_id(order, adobe_transfer_order_id)
+    logger.debug(
+        f'Updating the order {order["id"]} to save transfer order id into vendor external id'
+    )
+    update_order(mpt_client, order["id"], externalIds=order["externalIds"])
+    return order
+
+
+def _check_adobe_transfer_order_fulfilled(
+    mpt_client, seller_country, order, membership_id, adobe_transfer_id
+):
+    adobe_client = get_adobe_client()
+    adobe_order = adobe_client.get_transfer(
+        seller_country,
+        membership_id,
+        adobe_transfer_id,
+    )
+    if adobe_order["status"] == STATUS_PENDING:
+        _handle_retries(mpt_client, order, adobe_transfer_id)
+        return
+    elif adobe_order["status"] != STATUS_PROCESSED:
+        reason = f"Unexpected status ({adobe_order['status']}) received from Adobe."
+        fail_order(mpt_client, order["id"], reason)
+        logger.warning(f"Transfer {order['id']} has been failed: {reason}.")
+        return
+    return adobe_order
+
+
+def _fulfill_transfer_order(mpt_client, seller_country, order):
+    membership_id = get_adobe_membership_id(order)
+    adobe_order_id = get_adobe_order_id(order)
+    if not adobe_order_id:
+        if not _check_transfer(mpt_client, seller_country, order, membership_id):
+            return
+
+        order = _place_transfer_order(mpt_client, seller_country, order, membership_id)
+        if not order:
+            return
+
+        adobe_order_id = order["externalIds"]["vendor"]
+
+    adobe_transfer_order = _check_adobe_transfer_order_fulfilled(
+        mpt_client, seller_country, order, membership_id, adobe_order_id
+    )
+    if not adobe_transfer_order:
+        return
+
+    customer_id = adobe_transfer_order["customerId"]
+    order = set_adobe_customer_id(order, customer_id)
+    for item in adobe_transfer_order["lineItems"]:
+        _create_subscription(mpt_client, seller_country, customer_id, order, item)
+    _complete_order(mpt_client, order)
 
 
 def fulfill_order(client, order):
@@ -354,6 +490,8 @@ def fulfill_order(client, order):
     seller_country = order["agreement"]["seller"]["address"]["country"]
     if is_purchase_order(order):
         _fulfill_purchase_order(client, seller_country, order)
+    elif is_transfer_order(order):
+        _fulfill_transfer_order(client, seller_country, order)
     elif order["type"] == ORDER_TYPE_CHANGE:
         _fulfill_change_order(client, seller_country, order)
     elif order["type"] == ORDER_TYPE_TERMINATION:  # pragma: no branch

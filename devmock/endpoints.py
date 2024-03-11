@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from urllib.parse import unquote
 
 import requests
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
 from devmock.filters import OrdersFilter
@@ -66,6 +66,7 @@ def update_order(
     id: str,
     order: Order,
 ):
+    print(order.model_dump_json())
     current_order = load_order(id)
     if order.parameters:
         current_order["parameters"] = order.parameters
@@ -134,8 +135,8 @@ def inquire_order(
 ):
     order = load_order(id)
     order["parameters"] = parameters
-    order["templateId"] = template
-    order["status"] = "Querying"
+    order["templateId"] = templateId
+    order["status"] = "querying"
     save_order(order)
     return order
 

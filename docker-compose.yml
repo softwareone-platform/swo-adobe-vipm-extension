@@ -47,7 +47,7 @@ services:
       context: .
       dockerfile: dev.Dockerfile
     working_dir: /extension
-    command: bash -c "flake8 . && pytest"
+    command: bash -c "ruff . && pytest"
     volumes:
       - .:/extension
     env_file:

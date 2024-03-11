@@ -2,7 +2,7 @@
 name = "swo-adobe-vimp-extension"
 version = "0.1.0"
 description = "Adobe VIP Marketplace extension for SWO Marketplace Platform"
-authors = ["Apache Software License 2.0"]
+authors = ["SoftwareOne AG"]
 license = "Apache-2.0 license"
 packages = [
     { include = "adobe_vipm" }
@@ -11,61 +11,53 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.12,<4"
-requests = "2.31.*"
 django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
+requests = "2.31.*"
 
-# Remove when devmock is not needed anymore
-[tool.poetry.group.devmock.dependencies]
-uvicorn = "^0.25.0"
+[tool.poetry.group.devmock.dependencies] # Remove when devmock is not needed anymore
+faker = "^22.2.0"
 fastapi = "^0.109.0"
 lib-rql = "^2.0.0"
-faker = "^22.2.0"
 rich = "^13.7.0"
+uvicorn = "^0.25.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "7.4.*"
-black = "23.12.*"
+freezegun = "1.4.*"
 ipdb = "0.13.*"
-isort = "5.13.*"
-flake8 = "6.1.*"
-flake8-pytest-style = "1.7.*"
-flake8-bugbear = "23.12.*"
-flake8-debugger = "4.1.*"
+ipython = "8.*"
+mypy = "1.8.*"
+poetry-plugin-sort = "0.2.*"
+pre-commit = "3.6.*"
+pytest = "7.4.*"
+pytest-cov = "4.1.*"
+pytest-deadfixtures = "2.2.*"
+pytest-django = "4.7.*"
+pytest-mock = "3.12.*"
 pytest-randomly = "3.15.*"
 pytest-xdist = "3.5.*"
-pytest-cov = "4.1.*"
-flake8-black = "0.3.*"
-flake8-isort = "6.1.*"
-ipython = "8.*"
-pytest-mock = "3.12.*"
-pytest-django = "4.7.*"
 responses = "0.24.*"
-freezegun = "1.4.*"
-pytest-deadfixtures = "2.2.*"
-mypy = "1.8.*"
+ruff = "0.3.*"
 types-requests = "2.31.*"
 
-
-# Move to the SDK when splitting
-[tool.poetry.group.sdk.dependencies]
-typing-extensions = "^4.9.0"
+[tool.poetry.group.sdk.dependencies] # Move to the SDK when splitting
 django-ninja = "^1.1.0"
 pyjwt = "^2.8.0"
+typing-extensions = "^4.9.0"
 
 
-# Move to runtime when splitting
-[tool.poetry.group.runtime.dependencies]
+[tool.poetry.group.runtime.dependencies] # Move to runtime when splitting
 azure-monitor-opentelemetry-exporter = "^1.0.0b21"
-opentelemetry-api = "^1.22.0"
-opentelemetry-sdk = "^1.22.0"
-opentelemetry-instrumentation-django = "^0.43b0"
-opentelemetry-instrumentation-requests = "^0.43b0"
-opentelemetry-instrumentation-logging = "^0.43b0"
 click = "^8.1.7"
+debugpy = "^1.8.1"
 gunicorn = "^21.2.0"
-watchfiles = "^0.21.0"
+opentelemetry-api = "^1.22.0"
+opentelemetry-instrumentation-django = "^0.43b0"
+opentelemetry-instrumentation-logging = "^0.43b0"
+opentelemetry-instrumentation-requests = "^0.43b0"
+opentelemetry-sdk = "^1.22.0"
 pyfiglet = "^1.0.2"
 rich = "^13.7.0"
+watchfiles = "^0.21.0"
 
 [tool.poetry.scripts]
 swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
@@ -94,12 +86,35 @@ filterwarnings = [
 [tool.coverage.run]
 branch = true
 
-[tool.isort]
-profile = "black"
-known_third_party = ["swo"]
+[tool.ruff]
+extend-exclude = [".vscode", ".devcontainer", "swo", "devmock"]
+output-format = "full"
 
-[tool.black]
-line-length = 100
+[tool.ruff.lint]
+
+select = [
+    "E",  # w errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade,
+    "PT",  # flake8-pytest-style
+    "T10",  # flake8-pytest-style
+]
+ignore = [
+    "PT004", # fixture '{name}' does not return anything, add leading underscore
+    "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
+    "B008",  # do not perform function calls in argument defaults
+    "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+]
+
+[tool.ruff.lint.isort]
+known-third-party = ["swo"]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 100
 
 [tool.mypy]
 warn_no_return = false

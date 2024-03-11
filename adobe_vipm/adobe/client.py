@@ -1,5 +1,7 @@
+import json
 import logging
 from datetime import datetime, timedelta
+from hashlib import sha256
 from typing import List, MutableMapping, Tuple
 from urllib.parse import urlencode, urljoin
 from uuid import uuid4
@@ -149,7 +151,8 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(reseller.distributor.credentials, correlation_id=agreement_id)
+        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+        headers = self._get_headers(reseller.distributor.credentials, correlation_id=correlation_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=headers,
@@ -172,7 +175,7 @@ class AdobeClient:
         reseller_country: str,
         customer_id: str,
         sku: str,
-        line_number: int,
+        mpt_line_id: str,
     ) -> List[Tuple[dict, dict, dict | None]]:
         """
         Search all the NEW orders placed by the customer identified by `customer_id`
@@ -194,6 +197,8 @@ class AdobeClient:
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
         headers = self._get_headers(reseller.distributor.credentials)
+
+        line_number = to_adobe_line_id(mpt_line_id)
 
         orders = []
         orders_base_url = f"/v3/customers/{customer_id}/orders"
@@ -545,6 +550,106 @@ class AdobeClient:
             ),
             headers=headers,
             json=payload,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def preview_transfer(
+        self,
+        reseller_country: str,
+        membership_id: str,
+    ):
+        """
+        Retrieves the subscriptions owned by a given membership identifier of the
+        Adobe VIP program that will be transferred to the Adobe VIP Marketplace program.
+
+        Args:
+            reseller_country (str): The country of the reseller to select the credentials
+            to access the Adobe VIP Marketplace API.
+            membership_id (str): The membership identifier.
+
+        Returns:
+            dict: a transfer preview object.
+        """
+        reseller: Reseller = self._config.get_reseller(reseller_country)
+        headers = self._get_headers(reseller.distributor.credentials)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/memberships/{membership_id}/offers",
+            ),
+            headers=headers,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def create_transfer(
+        self,
+        reseller_country: str,
+        order_id: str,
+        membership_id: str,
+    ):
+        """
+        Creates a transfer order to move the subscriptions owned by a given
+        membership identifier from the Adobe VIP program to the Adobe VIP Marketplace
+        program.
+
+        Args:
+            reseller_country (str): The country of the reseller under which such customer
+            and its subscriptions will be transferred.
+            order_id (str): Identifier of the MPT transfer order
+            membership_id (str): The membership identifier.
+
+        Returns:
+            dict: a transfer object.
+        """
+        reseller: Reseller = self._config.get_reseller(reseller_country)
+        headers = self._get_headers(reseller.distributor.credentials, correlation_id=order_id)
+        response = requests.post(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/memberships/{membership_id}/transfers",
+            ),
+            headers=headers,
+            json={
+                "resellerId": reseller.id,
+            },
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def get_transfer(
+        self,
+        reseller_country: str,
+        membership_id: str,
+        transfer_id: str,
+    ):
+        """
+        Retrieve a transfer object by the membership and transfer identifiers.
+
+        Args:
+            reseller_country (str): The country of the reseller to select the credentials
+            to access the Adobe VIP Marketplace API.
+            membership_id (str): The membership identifier.
+            transfer_id (str): The transfer identifier.
+
+        Returns:
+            _type_: A transfer object.
+        """
+        reseller: Reseller = self._config.get_reseller(reseller_country)
+        headers = self._get_headers(reseller.distributor.credentials)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/memberships/{membership_id}/transfers/{transfer_id}",
+            ),
+            headers=headers,
         )
 
         response.raise_for_status()

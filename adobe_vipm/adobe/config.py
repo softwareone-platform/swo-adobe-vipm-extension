@@ -83,7 +83,7 @@ class Config:
 
     @classmethod
     def _load_credentials(self):
-        with open(settings.EXTENSION_CONFIG["ADOBE_CREDENTIALS_FILE"], "r") as f:
+        with open(settings.EXTENSION_CONFIG["ADOBE_CREDENTIALS_FILE"]) as f:
             return json.load(f)
 
     @classmethod

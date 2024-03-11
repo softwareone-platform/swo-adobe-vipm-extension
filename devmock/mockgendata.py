@@ -422,7 +422,7 @@ def gen_change_order(fake, agreement_id, skus, change_type):
         except ValueError:
             console.print(
                 f"[orange]✓[/orange] Item {line_number} - {new_line['item']['name']} unchanged: "
-                f"quantity = {new_item['oldQuantity']} -> {new_line['quantity']}",
+                f"quantity = {new_line['oldQuantity']} -> {new_line['quantity']}",
             )
         lines.append(new_line)
 
@@ -510,6 +510,65 @@ def gen_termination_order(fake, agreement_id, subscriptions_ids):
     return order
 
 
+def gen_transfer_order(
+    fake,
+    skus,
+    membership_id,
+):
+    order_id = generate_random_id("ORD", 16, 4)
+    product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
+    agreement = gen_agreement(fake, product_id)
+    lines = []
+    for idx, line in enumerate(skus, start=1):
+        sku, quantity = line
+        product = get_product_by_sku(sku)
+        old_quantity = 0
+        lines.append(
+            {
+                "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
+                "item": {
+                    "id": f"ITM-{base_id_from(product_id)}-{idx:04d}",
+                    "name": product["name"],
+                    "externalIds": {
+                        "vendor": sku,
+                    },
+                },
+                "quantity": quantity,
+                "oldQuantity": old_quantity,
+            }
+        )
+        console.print(
+            f"[green]✓[/green] Item {idx} - {product['name']} generated: quantity = {quantity}",
+        )
+
+    order = {
+        "id": order_id,
+        "type": "purchase",
+        "status": "processing" if skus else "draft",
+        "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
+        "subscriptions": [],
+        "lines": lines,
+        "audit": gen_audit(fake),
+        "parameters": {
+            "ordering": [
+                gen_param("AgreementType", "agreementType", value="Migrate"),
+                gen_param("Membership Id", "membershipId", value=membership_id),
+            ],
+            "fulfillment": [
+                gen_param(
+                    "RetryCount",
+                    "retryCount",
+                    "0",
+                    hidden=True,
+                ),
+                gen_param("CustomerId", "customerId"),
+            ],
+        },
+    }
+    save_order(order)
+    return order
+
+
 @click.group()
 def cli():
     pass
@@ -554,6 +613,42 @@ def purchase(customer_id, order_id, locale, skus):
         "[bold green]New 'Purchase' order has been "
         f"generated for skus {', '.join(skus)}: {order['id']}",
     )
+
+
+@cli.command()
+@click.argument(
+    "membership_id",
+    metavar="[MEMBERSHIP ID]",
+    nargs=1,
+)
+@click.option(
+    "--line",
+    "-l",
+    "lines",
+    type=(str, int),
+    multiple=True,
+)
+@click.option("--locale", default="en_US")
+def transfer(membership_id, locale, lines):
+    """
+    Generate a transfer order optionally including the provided Adobe (partial) SKUs.
+    """
+    fake = Faker(locale)
+    with console.status(
+        "[magenta]Generating transfer order...",
+        spinner="bouncingBall",
+        spinner_style="yellow",
+    ):
+        skus = [line[0] for line in lines]
+        order = gen_transfer_order(
+            fake,
+            lines,
+            membership_id,
+        )
+    msg = f"[bold green]New 'Transfer' order has been generated: {order['id']}"
+    if skus:
+        msg = f"{msg} ({', '.join(skus)})"
+    console.print(f"{msg}.")
 
 
 @cli.command()
@@ -670,6 +765,7 @@ def sku(search_terms):
         header_style="deep_sky_blue1",
         expand=False,
     )
+    table.add_column("Vendor Ext. Id")
     table.add_column("SKU")
     table.add_column("Name", min_width=55)
     table.add_column("Type")
@@ -686,7 +782,7 @@ def sku(search_terms):
         lambda i: any([fn(i) for fn in conds]),
         ADOBE_CONFIG["skus_mapping"],
     ):
-        table.add_row(item["vendor_external_id"], item["name"], item["type"])
+        table.add_row(item["vendor_external_id"], item["sku"], item["name"], item["type"])
 
     console.print()
     console.print(table)

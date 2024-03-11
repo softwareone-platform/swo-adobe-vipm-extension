@@ -90,6 +90,12 @@ def test_termination(
         processing_order["id"],
         "TPL-1111",
     )
+    mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.assert_called_once_with(
+        seller_country,
+        "a-client-id",
+        processing_order["lines"][0]["item"]["externalIds"]["vendor"],
+        processing_order["lines"][0]["id"],
+    )
 
 
 def test_termination_return_order_pending(

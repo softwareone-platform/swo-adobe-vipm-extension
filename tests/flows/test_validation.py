@@ -24,7 +24,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_PREFERRED_LANGUAGE,
 )
-from adobe_vipm.flows.utils import get_customer_data, get_parameter
+from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
 from adobe_vipm.flows.validation import (
     validate_address,
     validate_company_name,
@@ -60,7 +60,7 @@ def test_validate_company_name(order_factory, order_parameters_factory, company_
 
     assert has_error is False
 
-    param = get_parameter(order, "ordering", PARAM_COMPANY_NAME)
+    param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     assert "error" not in param
 
 
@@ -83,7 +83,7 @@ def test_validate_company_name_invalid_length(
 
     assert has_error is True
 
-    param = get_parameter(order, "ordering", PARAM_COMPANY_NAME)
+    param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_LENGTH.to_dict(title=param["title"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["optional"] is False
@@ -108,7 +108,7 @@ def test_validate_company_name_invalid_chars(order_factory, order_parameters_fac
 
     assert has_error is True
 
-    param = get_parameter(order, "ordering", PARAM_COMPANY_NAME)
+    param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["title"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["optional"] is False
@@ -125,9 +125,8 @@ def test_validate_preferred_language(order_factory, order_parameters_factory):
 
     assert has_error is False
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_PREFERRED_LANGUAGE,
     )
     assert "error" not in param
@@ -147,9 +146,8 @@ def test_validate_preferred_language_invalid(
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_PREFERRED_LANGUAGE,
     )
     assert param["error"] == ERR_PREFERRED_LANGUAGE.to_dict(
@@ -171,9 +169,8 @@ def test_validate_address(order_factory):
 
     assert has_error is False
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_ADDRESS,
     )
     assert "error" not in param
@@ -201,9 +198,8 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -236,9 +232,8 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -272,9 +267,8 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -308,9 +302,8 @@ def test_validate_address_invalid_postal_code_length(order_factory, order_parame
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -344,9 +337,8 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_ADDRESS,
     )
 
@@ -375,9 +367,8 @@ def test_validate_contact(order_factory):
 
     assert has_error is False
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_CONTACT,
     )
     assert "error" not in param
@@ -402,9 +393,8 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -434,9 +424,8 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -466,9 +455,8 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -502,9 +490,8 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
 
     assert has_error is True
 
-    param = get_parameter(
+    param = get_ordering_parameter(
         order,
-        "ordering",
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(

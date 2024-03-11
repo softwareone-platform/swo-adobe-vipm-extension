@@ -8,6 +8,15 @@ from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import APIToken, Credentials
+from adobe_vipm.flows.constants import (
+    PARAM_ADDRESS,
+    PARAM_COMPANY_NAME,
+    PARAM_CONTACT,
+    PARAM_CUSTOMER_ID,
+    PARAM_MEMBERSHIP_ID,
+    PARAM_PREFERRED_LANGUAGE,
+    PARAM_RETRY_COUNT,
+)
 
 
 @pytest.fixture()
@@ -236,7 +245,7 @@ def order_parameters_factory():
                 "id": "PAR-0000-0001",
                 "title": "Company Name",
                 "name": "Company Name",
-                "externalId": "companyName",
+                "externalId": PARAM_COMPANY_NAME,
                 "type": "SingleLineText",
                 "value": company_name,
                 "constraints": {
@@ -248,7 +257,7 @@ def order_parameters_factory():
                 "id": "PAR-0000-0002",
                 "title": "Preferred Language",
                 "name": "Preferred Language",
-                "externalId": "preferredLanguage",
+                "externalId": PARAM_PREFERRED_LANGUAGE,
                 "type": "Choice",
                 "value": preferred_language,
                 "constraints": {
@@ -260,7 +269,7 @@ def order_parameters_factory():
                 "id": "PAR-0000-0002",
                 "title": "Customer Address",
                 "name": "Address",
-                "externalId": "address",
+                "externalId": PARAM_ADDRESS,
                 "type": "Address",
                 "value": address,
                 "constraints": {
@@ -269,12 +278,33 @@ def order_parameters_factory():
                 },
             },
             {
-                "id": "PAR-0000-0002",
+                "id": "PAR-0000-0003",
                 "title": "Customer Contact",
                 "name": "Contact",
-                "externalId": "contact",
+                "externalId": PARAM_CONTACT,
                 "type": "Contact",
                 "value": contact,
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
+            },
+        ]
+
+    return _order_parameters
+
+
+@pytest.fixture()
+def transfer_order_parameters_factory():
+    def _order_parameters(membership_id="a-membership-id"):
+        return [
+            {
+                "id": "PAR-0000-0004",
+                "title": "Membership Id",
+                "name": "Membership Id",
+                "externalId": PARAM_MEMBERSHIP_ID,
+                "type": "SingleLineText",
+                "value": membership_id,
                 "constraints": {
                     "hidden": False,
                     "optional": False,
@@ -295,14 +325,14 @@ def fulfillment_parameters_factory():
             {
                 "id": "PAR-1234-5678",
                 "name": "Customer Id",
-                "externalId": "customerId",
+                "externalId": PARAM_CUSTOMER_ID,
                 "type": "SingleLineText",
                 "value": customer_id,
             },
             {
                 "id": "PAR-7771-1777",
                 "name": "Retry Count",
-                "externalId": "retryCount",
+                "externalId": PARAM_RETRY_COUNT,
                 "type": "SingleLineText",
                 "value": retry_count,
             },
@@ -320,6 +350,7 @@ def lines_factory(agreement):
         name="Awesome product",
         old_quantity=0,
         quantity=170,
+        external_vendor_id="65304578CA",
     ):
         return [
             {
@@ -328,7 +359,7 @@ def lines_factory(agreement):
                     "id": f"ITM-1234-1234-1234-{line_id:04d}",
                     "name": name,
                     "externalIds": {
-                        "vendor": "65304578CA",
+                        "vendor": external_vendor_id,
                     },
                 },
                 "oldQuantity": old_quantity,
@@ -595,6 +626,38 @@ def adobe_subscription_factory():
         }
 
     return _subscription
+
+
+@pytest.fixture()
+def adobe_preview_transfer_factory(adobe_items_factory):
+    def _preview(items=None):
+        items = items or adobe_items_factory()
+        return {
+            "totalCount": len(items),
+            "items": items,
+        }
+
+    return _preview
+
+
+@pytest.fixture()
+def adobe_transfer_factory(adobe_items_factory):
+    def _transfer(
+        transfer_id="a-transfer-id",
+        customer_id="",
+        status=STATUS_PENDING,
+        items=None,
+    ):
+        transfer = {
+            "transferId": transfer_id,
+            "customerId": customer_id,
+            "status": status,
+            "lineItems": items or adobe_items_factory(),
+        }
+
+        return transfer
+
+    return _transfer
 
 
 @pytest.fixture()
