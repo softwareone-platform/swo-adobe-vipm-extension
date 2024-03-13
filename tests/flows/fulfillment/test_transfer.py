@@ -106,11 +106,12 @@ def test_transfer(
             "parameters": {
                 "fulfillment": [
                     {
-                        "externalId": "subscriptionId",
-                        "value": adobe_subscription["subscriptionId"],
+                        "externalId": "adobeSKU",
+                        "value": adobe_subscription["offerId"],
                     },
                 ],
             },
+            "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
             "lines": [
                 {
                     "id": order["lines"][0]["id"],
