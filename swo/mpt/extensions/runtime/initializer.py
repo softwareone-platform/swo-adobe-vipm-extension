@@ -28,8 +28,8 @@ def initialize(options):
     settings.DEBUG = options.get("debug", False)
     settings.INSTALLED_APPS.append(app_config_name)
     settings.LOGGING["root"]["handlers"] = [logging_handler]
-    settings.LOGGING["loggers"]["swo.mpt.extensions.runtime"]["handlers"] = [logging_handler]
-    settings.LOGGING["loggers"]["swo.mpt.extensions.runtime"]["level"] = logging_level
+    settings.LOGGING["loggers"]["swo.mpt"]["handlers"] = [logging_handler]
+    settings.LOGGING["loggers"]["swo.mpt"]["level"] = logging_level
     settings.LOGGING["loggers"][app_root_module] = {
         "handlers": [logging_handler],
         "level": logging_level,

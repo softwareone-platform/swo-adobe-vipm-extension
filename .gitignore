@@ -162,7 +162,9 @@ cython_debug/
 
 adobe_credentials.json
 .devcontainer/
+.vscode
 
 devmock/data/**/*.json
 
 .DS_Store
+.ruff_cache

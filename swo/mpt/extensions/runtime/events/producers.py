@@ -50,7 +50,7 @@ class OrderEventProducer(EventProducer):
 
     def produce_events(self):
         while self.running:
-            with self.sleep(settings.ORDERS_API_POLLING_INTERVAL_SECS):
+            with self.sleep(settings.MPT_ORDERS_API_POLLING_INTERVAL_SECS):
                 orders = self.get_processing_orders()
                 logger.info(f"{len(orders)} orders found for processing...")
                 for order in orders:

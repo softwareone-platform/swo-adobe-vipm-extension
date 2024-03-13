@@ -7,5 +7,4 @@ urlpatterns = [
 ]
 
 if (extension := get_extension()) and (api_urls := extension.api.urls):
-    print(f"Adding api urls: {api_urls}")
     urlpatterns.append(path("api/", api_urls))

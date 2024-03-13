@@ -37,7 +37,7 @@ load_buyer = functools.partial(load_object, BUYERS_FOLDER, "buyer")
 load_seller = functools.partial(load_object, SELLERS_FOLDER, "seller")
 load_subscription = functools.partial(load_object, SUBSCRIPTIONS_FOLDER, "subscription")
 load_agreement = functools.partial(load_object, AGREEMENTS_FOLDER, "agreement")
-load_items = functools.partial(load_object, ITEMS_FOLDER, "items")
+load_item = functools.partial(load_object, ITEMS_FOLDER, "items")
 
 
 def save_object(folder, obj, obj_id=None):
@@ -53,7 +53,7 @@ save_seller = functools.partial(save_object, SELLERS_FOLDER)
 save_agreement = functools.partial(save_object, AGREEMENTS_FOLDER)
 save_account = functools.partial(save_object, ACCOUNTS_FOLDER)
 save_licensee = functools.partial(save_object, LICENSEES_FOLDER)
-save_items = functools.partial(save_object, ITEMS_FOLDER)
+save_item = functools.partial(save_object, ITEMS_FOLDER)
 
 
 def generate_random_id(
@@ -103,7 +103,7 @@ def gen_jwt_token():
     exp = nbf + 300
     return jwt.encode(
         {
-            "aud": "adobe-vipm.ext.test.s1.com",
+            "aud": "localhost:8080",
             "nbf": nbf,
             "exp": exp,
             "wid": WEBHOOK_ID,
