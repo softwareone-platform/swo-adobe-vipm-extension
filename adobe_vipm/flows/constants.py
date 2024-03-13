@@ -82,7 +82,9 @@ ERR_ADDRESS_LINE_2_LENGTH = (
     "The provided `Address line 2` is too long, the maximum "
     f"length is {MAXLEN_ADDRESS_LINE_2} characters"
 )
-ERR_CITY_LENGTH = f"The provided `City` is too long, the maximum length is {MAXLEN_CITY} characters"
+ERR_CITY_LENGTH = (
+    f"The provided `City` is too long, the maximum length is {MAXLEN_CITY} characters"
+)
 ERR_CONTACT = ValidationError(
     "VIPMV005",
     "The `{title}` contains invalid components: {errors}.",

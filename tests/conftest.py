@@ -143,7 +143,16 @@ def adobe_config_file():
                 "code": "VU",
                 "name": "Vanuatu",
                 "currencies": ["USD"],
-                "states_or_provinces": ["00", "01", "SEE", "TOB", "TAE", "MAP", "PAM", "SAM"],
+                "states_or_provinces": [
+                    "00",
+                    "01",
+                    "SEE",
+                    "TOB",
+                    "TAE",
+                    "MAP",
+                    "PAM",
+                    "SAM",
+                ],
                 "pricelist_region": "AP",
                 "postal_code_format_regex": "",
             },
@@ -171,7 +180,9 @@ def mock_adobe_config(mocker, adobe_credentials_file, adobe_config_file):
     Mock the Adobe Config object to load test data from the adobe_credentials and
     adobe_config_file fixtures.
     """
-    mocker.patch.object(Config, "_load_credentials", return_value=adobe_credentials_file)
+    mocker.patch.object(
+        Config, "_load_credentials", return_value=adobe_credentials_file
+    )
     mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
 
 
@@ -402,7 +413,9 @@ def subscriptions_factory(lines_factory):
         start_date=None,
         lines=None,
     ):
-        start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
+        start_date = (
+            start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
+        )
         lines = lines_factory() if lines is None else lines
         return [
             {
@@ -731,7 +744,12 @@ def mpt_error_factory():
     """
 
     def _mpt_error(status, title, errors):
-        error = {"status": status, "title": title, "errors": errors, "traceId": "1234567890"}
+        error = {
+            "status": status,
+            "title": title,
+            "errors": errors,
+            "traceId": "1234567890",
+        }
         return error
 
     return _mpt_error

@@ -72,14 +72,18 @@ def test_create_reseller_account(
                             "addressLine1": reseller_data["address"]["addressLine1"],
                             "addressLine2": reseller_data["address"]["addressLine2"],
                             "postalCode": reseller_data["address"]["postalCode"],
-                            "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
+                            "phoneNumber": join_phone_number(
+                                reseller_data["contact"]["phone"]
+                            ),
                         },
                         "contacts": [
                             {
                                 "firstName": reseller_data["contact"]["firstName"],
                                 "lastName": reseller_data["contact"]["lastName"],
                                 "email": reseller_data["contact"]["email"],
-                                "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
+                                "phoneNumber": join_phone_number(
+                                    reseller_data["contact"]["phone"]
+                                ),
                             }
                         ],
                     },
@@ -188,7 +192,9 @@ def test_create_customer_account(
         ],
     )
 
-    customer_id = client.create_customer_account(reseller_country, "external_id", customer_data)
+    customer_id = client.create_customer_account(
+        reseller_country, "external_id", customer_data
+    )
     assert customer_id == "A-customer-id"
 
 
@@ -252,11 +258,15 @@ def test_create_preview_order(
 
     client, credentials, api_token = adobe_client_factory()
 
-    order = order_factory(lines=lines_factory(old_quantity=old_quantity, quantity=quantity))
+    order = order_factory(
+        lines=lines_factory(old_quantity=old_quantity, quantity=quantity)
+    )
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
         status=200,
         json={
             "orderId": "adobe-order-id",
@@ -279,7 +289,9 @@ def test_create_preview_order(
                     "orderType": "PREVIEW",
                     "lineItems": [
                         {
-                            "extLineItemNumber": to_adobe_line_id(order["lines"][0]["id"]),
+                            "extLineItemNumber": to_adobe_line_id(
+                                order["lines"][0]["id"]
+                            ),
                             "offerId": adobe_full_sku,
                             "quantity": expected_quantity,
                         },
@@ -319,7 +331,9 @@ def test_create_preview_order_bad_request(
     error = adobe_api_error_factory("1234", "An error")
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
         status=400,
         json=error,
     )
@@ -357,7 +371,9 @@ def test_create_new_order(
     adobe_order = adobe_order_factory(ORDER_TYPE_NEW, external_id="mpt-order-id")
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
         status=202,
         json={
             "orderId": "adobe-order-id",
@@ -405,7 +421,9 @@ def test_create_new_order_bad_request(
     error = adobe_api_error_factory("1234", "An error")
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
         status=400,
         json=error,
     )
@@ -508,7 +526,9 @@ def test_get_subscription(requests_mocker, adobe_client_factory, adobe_config_fi
         ],
     )
 
-    assert client.get_subscription(reseller_country, customer_id, sub_id) == {"a": "subscription"}
+    assert client.get_subscription(reseller_country, customer_id, sub_id) == {
+        "a": "subscription"
+    }
 
 
 def test_get_subscription_not_found(
@@ -823,9 +843,9 @@ def test_create_return_order(
 
     returning_item = returning_order["lineItems"][0]
 
-    expected_external_id = (
-        f"{returning_order['externalReferenceId']}-{returning_item['extLineItemNumber']}"
-    )
+    extReferenceId = returning_order["externalReferenceId"]
+    extItemNumber = returning_item["extLineItemNumber"]
+    expected_external_id = f"{extReferenceId}-{extItemNumber}"
 
     expected_body = adobe_order_factory(
         ORDER_TYPE_RETURN,
@@ -835,7 +855,9 @@ def test_create_return_order(
     )
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
         status=202,
         json={
             "orderId": "adobe-order-id",
@@ -884,7 +906,9 @@ def test_create_return_order_bad_request(
     error = adobe_api_error_factory("1234", "An error")
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"),
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
         status=400,
         json=error,
     )
@@ -1015,7 +1039,9 @@ def test_preview_transfer(requests_mocker, adobe_client_factory, adobe_config_fi
         ],
     )
 
-    assert client.preview_transfer(reseller_country, membership_id) == {"a": "transfer-preview"}
+    assert client.preview_transfer(reseller_country, membership_id) == {
+        "a": "transfer-preview"
+    }
 
 
 def test_preview_transfer_not_found(
@@ -1116,7 +1142,10 @@ def test_create_transfer_bad_request(
     error = adobe_api_error_factory("1234", "An error")
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], f"/v3/memberships/{membership_id}/transfers"),
+        urljoin(
+            adobe_config_file["api_base_url"],
+            f"/v3/memberships/{membership_id}/transfers",
+        ),
         status=400,
         json=error,
     )
@@ -1160,7 +1189,9 @@ def test_get_transfer(requests_mocker, adobe_client_factory, adobe_config_file):
         ],
     )
 
-    assert client.get_transfer(reseller_country, membership_id, transfer_id) == {"a": "transfer"}
+    assert client.get_transfer(reseller_country, membership_id, transfer_id) == {
+        "a": "transfer"
+    }
 
 
 def test_get_transfer_not_found(

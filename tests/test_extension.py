@@ -35,7 +35,9 @@ def test_process_order_validation(client, mocker, order_factory, jwt_token):
         {"id": "my_err_id", "message": "my_msg"},
     )
     order = order_factory()
-    m_validate = mocker.patch("adobe_vipm.extension.validate_order", return_value=validated_order)
+    m_validate = mocker.patch(
+        "adobe_vipm.extension.validate_order", return_value=validated_order
+    )
     resp = client.post(
         "/api/v1/orders/validate",
         content_type="application/json",
@@ -52,7 +54,8 @@ def test_process_order_validation(client, mocker, order_factory, jwt_token):
 
 def test_process_order_validation_error(client, mocker, jwt_token):
     mocker.patch(
-        "adobe_vipm.extension.validate_order", side_effect=Exception("A super duper error")
+        "adobe_vipm.extension.validate_order",
+        side_effect=Exception("A super duper error"),
     )
     resp = client.post(
         "/api/v1/orders/validate",

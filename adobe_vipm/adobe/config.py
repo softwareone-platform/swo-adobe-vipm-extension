@@ -71,7 +71,9 @@ class Config:
         try:
             return self.skus_mapping[vendor_external_id]
         except KeyError:
-            raise AdobeProductNotFoundError(f"AdobeProduct with id {vendor_external_id} not found.")
+            raise AdobeProductNotFoundError(
+                f"AdobeProduct with id {vendor_external_id} not found."
+            )
 
     def get_country(self, code: str) -> Country:
         try:
@@ -88,7 +90,9 @@ class Config:
 
     @classmethod
     def _load_config(self):
-        with files("adobe_vipm").joinpath("adobe_config.json").open("r", encoding="utf-8") as f:
+        with files("adobe_vipm").joinpath("adobe_config.json").open(
+            "r", encoding="utf-8"
+        ) as f:
             return json.load(f)
 
     def _parse_config(self):

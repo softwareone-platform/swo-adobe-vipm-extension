@@ -788,7 +788,10 @@ def test_mixed(
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocked_adobe_client.create_new_order.return_value = adobe_order
     mocked_adobe_client.get_order.return_value = adobe_order
-    mocked_adobe_client.get_subscription.side_effect = [adobe_sub_to_update, adobe_new_sub]
+    mocked_adobe_client.get_subscription.side_effect = [
+        adobe_sub_to_update,
+        adobe_new_sub,
+    ]
     mocker.patch(
         "adobe_vipm.flows.fulfillment.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -821,7 +824,9 @@ def test_mixed(
         external_vendor_id="sku-downsize-out",
     )
 
-    order_items = upsizing_items + new_items + downsizing_items + downsizing_items_out_of_window
+    order_items = (
+        upsizing_items + new_items + downsizing_items + downsizing_items_out_of_window
+    )
 
     preview_order_items = upsizing_items + new_items + downsizing_items
 

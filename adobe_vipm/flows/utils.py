@@ -151,7 +151,9 @@ def set_adobe_order_id(order, adobe_order_id):
         dict: The updated order with the vendor external id attribute set.
     """
     updated_order = copy.deepcopy(order)
-    updated_order["externalIds"] = updated_order.get("externalIds", {}) | {"vendor": adobe_order_id}
+    updated_order["externalIds"] = updated_order.get("externalIds", {}) | {
+        "vendor": adobe_order_id
+    }
     return updated_order
 
 
@@ -402,7 +404,8 @@ def group_items_by_type(order):
         order["lines"],
     )
     downsizing_items_in_window = filter(
-        lambda line: line["quantity"] < line["oldQuantity"] and in_cancellation_window(order, line),
+        lambda line: line["quantity"] < line["oldQuantity"]
+        and in_cancellation_window(order, line),
         order["lines"],
     )
     downsizing_items_out_window = filter(

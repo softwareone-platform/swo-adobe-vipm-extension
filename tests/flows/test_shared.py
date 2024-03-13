@@ -60,7 +60,9 @@ def test_create_customer_account(
         order["id"],
         parameters={
             "ordering": order_parameters_factory(),
-            "fulfillment": fulfillment_parameters_factory(customer_id="adobe-customer-id"),
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="adobe-customer-id"
+            ),
         },
     )
     assert updated_order == order
@@ -127,7 +129,9 @@ def test_create_customer_account_empty_order_parameters(
     assert mocked_update_order.mock_calls[1].kwargs == {
         "parameters": {
             "ordering": order_parameters_factory(),
-            "fulfillment": fulfillment_parameters_factory(customer_id="adobe-customer-id"),
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="adobe-customer-id"
+            ),
         },
     }
 
@@ -196,7 +200,11 @@ def test_create_customer_account_address_error(
     [
         ("contact", ERR_ADOBE_CONTACT, "companyProfile.contacts[0].firstName"),
         ("companyName", ERR_ADOBE_COMPANY_NAME, "companyProfile.companyName"),
-        ("preferredLanguage", ERR_ADOBE_PREFERRED_LANGUAGE, "companyProfile.preferredLanguage"),
+        (
+            "preferredLanguage",
+            ERR_ADOBE_PREFERRED_LANGUAGE,
+            "companyProfile.preferredLanguage",
+        ),
     ],
 )
 def test_create_customer_account_fields_error(
@@ -242,7 +250,9 @@ def test_create_customer_account_fields_error(
     )
 
     ordering_parameters = order_parameters_factory()
-    param = next(filter(lambda x: x["externalId"] == param_external_id, ordering_parameters))
+    param = next(
+        filter(lambda x: x["externalId"] == param_external_id, ordering_parameters)
+    )
     param["error"] = error_constant.to_dict(
         title=param["title"],
         details=str(adobe_error),

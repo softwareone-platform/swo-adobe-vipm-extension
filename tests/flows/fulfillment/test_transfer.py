@@ -59,7 +59,9 @@ def test_transfer(
 
     mocked_mpt_client = mocker.MagicMock()
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.update_order")
-    mocked_create_subscription = mocker.patch("adobe_vipm.flows.fulfillment.create_subscription")
+    mocked_create_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.create_subscription"
+    )
     mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.complete_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())

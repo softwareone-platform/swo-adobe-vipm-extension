@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+
 import os
 from pathlib import Path
 
@@ -162,10 +163,18 @@ USE_APPLICATIONINSIGHTS = os.getenv("USE_APPLICATIONINSIGHTS", "False").lower() 
     "1",
     "t",
 )
-APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
-LOGGING_ATTEMPT_GETTER = os.getenv("LOGGING_ATTEMPT_GETTER", "adobe_vipm.utils.get_attempt_count")
+APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv(
+    "APPLICATIONINSIGHTS_CONNECTION_STRING", ""
+)
+LOGGING_ATTEMPT_GETTER = os.getenv(
+    "LOGGING_ATTEMPT_GETTER", "adobe_vipm.utils.get_attempt_count"
+)
 
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
+MPT_LOGIN_DOMAIN = os.getenv("MPT_LOGIN_DOMAIN", "devmock:8000")
+MPT_AUTH0_CLIENT_ID = os.getenv("MPT_AUTH0_CLIENT_ID", "change-me!")
+MPT_USERNAME = os.getenv("MPT_USERNAME", "change-me!!!")
+MPT_PASSWORD = os.getenv("MPT_PASSWORD", "change-me!!!")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
 MPT_PRODUCT_ID = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
 MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30

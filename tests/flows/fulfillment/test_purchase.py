@@ -40,7 +40,9 @@ def test_no_customer(
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.create_customer_account",
         return_value=order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id"),
+            fulfillment_parameters=fulfillment_parameters_factory(
+                customer_id="a-client-id"
+            ),
         ),
     )
 
