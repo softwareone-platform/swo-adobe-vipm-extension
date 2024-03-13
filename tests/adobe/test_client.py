@@ -843,8 +843,8 @@ def test_create_return_order(
 
     returning_item = returning_order["lineItems"][0]
 
-    extReferenceId = returning_order['externalReferenceId']
-    extItemNumber = returning_item['extLineItemNumber']
+    extReferenceId = returning_order["externalReferenceId"]
+    extItemNumber = returning_item["extLineItemNumber"]
     expected_external_id = f"{extReferenceId}-{extItemNumber}"
 
     expected_body = adobe_order_factory(
