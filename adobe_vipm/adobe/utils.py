@@ -21,14 +21,6 @@ def to_adobe_line_id(mpt_line_id: str) -> int:
     return int(mpt_line_id.split("-")[-1])
 
 
-def to_mpt_line_id(agreement_id: str, adobe_ext_line_id: int) -> str:
-    """
-    Converts Adobe line id (integer) to line id by adding agreement base id and 4 sequence digits
-    """
-    base_id = agreement_id.split("-", 1)[1]
-    return f"ALI-{base_id}-{adobe_ext_line_id:04d}"
-
-
 def join_phone_number(phone: dict) -> str:
     """
     Returns a phone number string from a Phone object.

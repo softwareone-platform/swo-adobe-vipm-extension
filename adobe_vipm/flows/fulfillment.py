@@ -16,8 +16,8 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ORDER_TYPE_CHANGE,
     ORDER_TYPE_TERMINATION,
+    PARAM_ADOBE_SKU,
     PARAM_MEMBERSHIP_ID,
-    PARAM_SUBSCRIPTION_ID,
 )
 from adobe_vipm.flows.mpt import (
     complete_order,
@@ -94,10 +94,13 @@ def _create_subscription(mpt_client, seller_country, customer_id, order, item):
         "parameters": {
             "fulfillment": [
                 {
-                    "externalId": PARAM_SUBSCRIPTION_ID,
-                    "value": item["subscriptionId"],
+                    "externalId": PARAM_ADOBE_SKU,
+                    "value": item["offerId"],
                 }
             ]
+        },
+        "externalIds": {
+            "vendor": item["subscriptionId"],
         },
         "lines": [
             {

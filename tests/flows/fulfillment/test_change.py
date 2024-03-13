@@ -926,11 +926,12 @@ def test_mixed(
             "parameters": {
                 "fulfillment": [
                     {
-                        "externalId": "subscriptionId",
-                        "value": adobe_new_sub["subscriptionId"],
+                        "externalId": "adobeSKU",
+                        "value": adobe_new_sub["offerId"],
                     },
                 ],
             },
+            "externalIds": {"vendor": adobe_new_sub["subscriptionId"]},
             "lines": [
                 {
                     "id": processing_change_order["lines"][1]["id"],
