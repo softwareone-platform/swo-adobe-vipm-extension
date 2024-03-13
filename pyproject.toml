@@ -13,13 +13,14 @@ readme = "README.md"
 python = ">=3.12,<4"
 django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
 requests = "2.31.*"
+auth0-python = "4.7.*"
 
 [tool.poetry.group.devmock.dependencies] # Remove when devmock is not needed anymore
-faker = "^22.2.0"
-fastapi = "^0.109.0"
-lib-rql = "^2.0.0"
-rich = "^13.7.0"
-uvicorn = "^0.25.0"
+faker = "22.2.*"
+fastapi = "0.109.*"
+lib-rql = "2.0.*"
+rich = "13.7.*"
+uvicorn = "0.25.*"
 
 [tool.poetry.group.dev.dependencies]
 freezegun = "1.4.*"
@@ -40,24 +41,24 @@ ruff = "0.3.*"
 types-requests = "2.31.*"
 
 [tool.poetry.group.sdk.dependencies] # Move to the SDK when splitting
-django-ninja = "^1.1.0"
-pyjwt = "^2.8.0"
-typing-extensions = "^4.9.0"
+django-ninja = "1.1.*"
+pyjwt = "2.8.*"
+typing-extensions = "4.9.*"
 
 
 [tool.poetry.group.runtime.dependencies] # Move to runtime when splitting
-azure-monitor-opentelemetry-exporter = "^1.0.0b21"
-click = "^8.1.7"
-debugpy = "^1.8.1"
-gunicorn = "^21.2.0"
-opentelemetry-api = "^1.22.0"
+azure-monitor-opentelemetry-exporter = "1.0.*"
+click = "8.1.*"
+debugpy = "1.8.*"
+gunicorn = "21.2.*"
+opentelemetry-api = "1.22.*"
 opentelemetry-instrumentation-django = "^0.43b0"
 opentelemetry-instrumentation-logging = "^0.43b0"
 opentelemetry-instrumentation-requests = "^0.43b0"
-opentelemetry-sdk = "^1.22.0"
-pyfiglet = "^1.0.2"
-rich = "^13.7.0"
-watchfiles = "^0.21.0"
+opentelemetry-sdk = "1.22.*"
+pyfiglet = "1.0.*"
+rich = "13.7.*"
+watchfiles = "0.21.*"
 
 [tool.poetry.scripts]
 swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting

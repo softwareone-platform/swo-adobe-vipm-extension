@@ -642,6 +642,7 @@ def test_validate_purchase_order_no_validate(mocker, caplog, order_factory):
     assert caplog.records[0].message == (
         f"Validation of order {order['id']} succeeded with errors"
     )
+<<<<<<< HEAD
 
 
 def test_validate_transfer(

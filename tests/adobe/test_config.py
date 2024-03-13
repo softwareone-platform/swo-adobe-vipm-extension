@@ -166,7 +166,9 @@ def test_load_data(mocker, adobe_credentials_file, adobe_config_file, settings):
     m_files = mocker.MagicMock()
     m_files.joinpath.return_value = m_join
     mocked_files = mocker.patch("adobe_vipm.adobe.config.files", return_value=m_files)
-    mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(adobe_credentials_file)))
+    mocker.patch(
+        "builtins.open", mocker.mock_open(read_data=json.dumps(adobe_credentials_file))
+    )
     c = Config()
     assert c.credentials == adobe_credentials_file
     mocked_files.assert_called_once_with("adobe_vipm")

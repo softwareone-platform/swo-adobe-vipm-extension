@@ -80,7 +80,9 @@ class AdobeClient:
                         "firstName": reseller_data["contact"]["firstName"],
                         "lastName": reseller_data["contact"]["lastName"],
                         "email": reseller_data["contact"]["email"],
-                        "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
+                        "phoneNumber": join_phone_number(
+                            reseller_data["contact"]["phone"]
+                        ),
                     }
                 ],
             },
@@ -146,13 +148,17 @@ class AdobeClient:
                         "firstName": customer_data["contact"]["firstName"],
                         "lastName": customer_data["contact"]["lastName"],
                         "email": customer_data["contact"]["email"],
-                        "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
+                        "phoneNumber": join_phone_number(
+                            customer_data["contact"]["phone"]
+                        ),
                     }
                 ],
             },
         }
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
-        headers = self._get_headers(reseller.distributor.credentials, correlation_id=correlation_id)
+        headers = self._get_headers(
+            reseller.distributor.credentials, correlation_id=correlation_id
+        )
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=headers,
@@ -225,7 +231,9 @@ class AdobeClient:
                 if not actual_sku:
                     continue
 
-                logger.debug(f"Found order to return for sku {actual_sku}: {order['orderId']}")
+                logger.debug(
+                    f"Found order to return for sku {actual_sku}: {order['orderId']}"
+                )
 
                 item_to_return = get_item_to_return(order["lineItems"], line_number)
                 external_id = f"{order['externalReferenceId']}-{line_number}"
@@ -608,7 +616,9 @@ class AdobeClient:
             dict: a transfer object.
         """
         reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.distributor.credentials, correlation_id=order_id)
+        headers = self._get_headers(
+            reseller.distributor.credentials, correlation_id=order_id
+        )
         response = requests.post(
             urljoin(
                 self._config.api_base_url,
@@ -686,7 +696,9 @@ class AdobeClient:
             token_info = response.json()
             self._token_cache[credentials] = APIToken(
                 token=token_info["access_token"],
-                expires=(datetime.now() + timedelta(seconds=token_info["expires_in"] - 180)),
+                expires=(
+                    datetime.now() + timedelta(seconds=token_info["expires_in"] - 180)
+                ),
             )
         response.raise_for_status()
 

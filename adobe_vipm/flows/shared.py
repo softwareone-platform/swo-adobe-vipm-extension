@@ -117,9 +117,15 @@ def _handle_customer_error(client, order, e):
             order = set_ordering_parameter_error(
                 order,
                 PARAM_PREFERRED_LANGUAGE,
-                ERR_ADOBE_PREFERRED_LANGUAGE.to_dict(title=param["title"], details=str(e)),
+                ERR_ADOBE_PREFERRED_LANGUAGE.to_dict(
+                    title=param["title"], details=str(e)
+                ),
             )
-        if len(list(filter(lambda x: x.startswith("companyProfile.contacts[0]"), e.details))):
+        if len(
+            list(
+                filter(lambda x: x.startswith("companyProfile.contacts[0]"), e.details)
+            )
+        ):
             param = get_ordering_parameter(order, PARAM_CONTACT)
             order = set_ordering_parameter_error(
                 order,

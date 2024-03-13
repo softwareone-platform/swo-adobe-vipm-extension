@@ -75,7 +75,9 @@ def _handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
 def _complete_order(mpt_client, order):
     order = reset_retry_count(order)
     update_order(mpt_client, order["id"], parameters=order["parameters"])
-    complete_order(mpt_client, order["id"], settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"])
+    complete_order(
+        mpt_client, order["id"], settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"]
+    )
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
@@ -127,7 +129,10 @@ def _update_adobe_subscriptions(seller_country, customer_id, order, lines):
             customer_id,
             adobe_sub_id,
         )
-        if order["type"] == ORDER_TYPE_TERMINATION and adobe_subscription["autoRenewal"]["enabled"]:
+        if (
+            order["type"] == ORDER_TYPE_TERMINATION
+            and adobe_subscription["autoRenewal"]["enabled"]
+        ):
             adobe_client.update_subscription(
                 seller_country,
                 customer_id,
@@ -166,14 +171,18 @@ def _place_return_orders(mpt_client, seller_country, customer_id, order, lines):
                     order_to_return,
                     item_to_return,
                 )
-                logger.debug(f"Return order created for a return order for item: {line}")
+                logger.debug(
+                    f"Return order created for a return order for item: {line}"
+                )
             if return_order["status"] == STATUS_PENDING:
                 pending_order_ids.append(return_order["orderId"])
             else:
                 completed_order_ids.append(return_order["orderId"])
 
     if pending_order_ids:
-        _handle_retries(mpt_client, order, ", ".join(pending_order_ids), adobe_order_type="RETURN")
+        _handle_retries(
+            mpt_client, order, ", ".join(pending_order_ids), adobe_order_type="RETURN"
+        )
         return None
 
     return completed_order_ids
@@ -199,7 +208,9 @@ def _place_new_order(mpt_client, seller_country, customer_id, order):
 
     adobe_order_id = adobe_order["orderId"]
     order = set_adobe_order_id(order, adobe_order_id)
-    logger.debug(f'Updating the order {order["id"]} to save order id into vendor external id')
+    logger.debug(
+        f'Updating the order {order["id"]} to save order id into vendor external id'
+    )
     update_order(mpt_client, order["id"], externalIds=order["externalIds"])
     return order
 
@@ -252,12 +263,16 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
 
     adobe_order_id = adobe_order["orderId"]
     order = set_adobe_order_id(order, adobe_order_id)
-    logger.debug(f'Updating the order {order["id"]} to save order id into vendor external id')
+    logger.debug(
+        f'Updating the order {order["id"]} to save order id into vendor external id'
+    )
     update_order(mpt_client, order["id"], externalIds=order["externalIds"])
     return order
 
 
-def _check_adobe_order_fulfilled(mpt_client, seller_country, order, customer_id, adobe_order_id):
+def _check_adobe_order_fulfilled(
+    mpt_client, seller_country, order, customer_id, adobe_order_id
+):
     adobe_client = get_adobe_client()
     adobe_order = adobe_client.get_order(
         seller_country,
@@ -349,7 +364,9 @@ def _fulfill_termination_order(mpt_client, seller_country, order):
             seller_country, customer_id, order, grouped_items.downsizing_out_win
         )
 
-    has_orders_to_return = bool(grouped_items.upsizing + grouped_items.downsizing_in_win)
+    has_orders_to_return = bool(
+        grouped_items.upsizing + grouped_items.downsizing_in_win
+    )
     if not has_orders_to_return:
         _complete_order(mpt_client, order)
         return
@@ -397,12 +414,18 @@ def _check_transfer(mpt_client, seller_country, order, membership_id):
         return False
 
     adobe_lines = sorted(
-        [(item["offerId"][:10], item["quantity"]) for item in transfer_preview["items"]],
+        [
+            (item["offerId"][:10], item["quantity"])
+            for item in transfer_preview["items"]
+        ],
         key=lambda i: i[0],
     )
 
     order_lines = sorted(
-        [(line["item"]["externalIds"]["vendor"], line["quantity"]) for line in order["lines"]],
+        [
+            (line["item"]["externalIds"]["vendor"], line["quantity"])
+            for line in order["lines"]
+        ],
         key=lambda i: i[0],
     )
     if adobe_lines != order_lines:
