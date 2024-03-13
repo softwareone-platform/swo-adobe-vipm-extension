@@ -162,6 +162,7 @@ def create_subscription(
             get_line_for_subscription(order_lines[line["id"]]) for line in subscription.lines
         ],
         "startDate": subscription.start_date,
+        "externalIds": subscription.external_ids,
         "status": "active",
     }
     order["subscriptions"].append(get_reference(subscription))

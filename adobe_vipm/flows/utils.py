@@ -15,7 +15,6 @@ from adobe_vipm.flows.constants import (
     PARAM_PHASE_ORDERING,
     PARAM_PREFERRED_LANGUAGE,
     PARAM_RETRY_COUNT,
-    PARAM_SUBSCRIPTION_ID,
 )
 from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.utils import find_first
@@ -347,21 +346,17 @@ def get_subscription_by_line_and_item_id(subscriptions, item_id, line_id):
             return subscription
 
 
-def get_adobe_subscription_id(source):
+def get_adobe_subscription_id(subscription):
     """
-    Return the value of the subscription id fullfilment parameter.
+    Return the value of the subscription id from the subscription.
 
     Args:
-        source (dict): the source business object from which the parameter
-        should be extracted.
-
+        subscription (dict): the subscription object from which extract
+        the adobe subscription id.
     Returns:
         str: the value of the subscription id parameter if found, None otherwise.
     """
-    return get_fulfillment_parameter(
-        source,
-        PARAM_SUBSCRIPTION_ID,
-    ).get("value")
+    return subscription.get("externalIds", {}).get("vendor")
 
 
 def in_cancellation_window(order, line):

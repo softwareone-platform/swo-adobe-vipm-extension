@@ -12,4 +12,5 @@ class Subscription(BaseModel):
     name: str | None = None
     parameters: dict | None = None
     lines: list | None = None
+    external_ids: dict | None = Field(default=None, alias="externalIds")
     start_date: str | None = Field(default=None, alias="startDate")

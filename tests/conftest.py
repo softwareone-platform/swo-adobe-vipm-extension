@@ -10,6 +10,7 @@ from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import APIToken, Credentials
 from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
+    PARAM_ADOBE_SKU,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
@@ -376,6 +377,7 @@ def subscriptions_factory(lines_factory):
         subscription_id="SUB-1000-2000-3000",
         product_name="Awesome product",
         adobe_subscription_id="a-sub-id",
+        adobe_sku="65304578CA01A12",
         start_date=None,
         lines=None,
     ):
@@ -388,12 +390,16 @@ def subscriptions_factory(lines_factory):
                 "parameters": {
                     "fulfillment": [
                         {
-                            "name": "Subscription Id",
-                            "externalId": "subscriptionId",
+                            "name": "Adobe SKU",
+                            "title": "Adobe SKU",
+                            "externalId": PARAM_ADOBE_SKU,
                             "type": "SingleLineText",
-                            "value": adobe_subscription_id,
+                            "value": adobe_sku,
                         }
                     ]
+                },
+                "externalIds": {
+                    "vendor": adobe_subscription_id,
                 },
                 "lines": lines,
                 "startDate": start_date,
