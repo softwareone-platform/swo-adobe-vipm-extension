@@ -176,7 +176,7 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # MPT settings
 
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
-MPT_LOGIN_DOMAIN = os.getenv("MPT_LOGIN_DOMAIN", "http://login.localhost:8000")
+MPT_LOGIN_URL = os.getenv("MPT_LOGIN_URL", "http://login.localhost:8000")
 MPT_AUTH0_CLIENT_ID = os.getenv("MPT_AUTH0_CLIENT_ID", "change-me!")
 MPT_USERNAME = os.getenv("MPT_USERNAME", "change-me!!!")
 MPT_PASSWORD = os.getenv("MPT_PASSWORD", "change-me!!!")

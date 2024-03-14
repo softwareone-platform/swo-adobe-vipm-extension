@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -8,7 +10,17 @@ app = FastAPI(
     title="SoftwareOne Marketplace platform - Devmock",
 )
 
+@app.post("/oauth/token")
+def authentication():
+    return {
+        "token_type": "Fake",
+        "access_token": secrets.token_hex(16),
+    }
+
+
 app.include_router(router, prefix="/v1")
+
+
 
 
 @app.exception_handler(DevmockException)

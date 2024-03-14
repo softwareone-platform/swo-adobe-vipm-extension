@@ -338,6 +338,14 @@ def test_downsizing(
         processing_order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": processing_order["parameters"],
+    }
+
+    assert mocked_update_order.mock_calls[1].args == (
+        mocked_mpt_client,
+        processing_order["id"],
+    )
+    assert mocked_update_order.mock_calls[1].kwargs == {
         "externalIds": {
             "vendor": adobe_order["orderId"],
         },
@@ -452,6 +460,14 @@ def test_downsizing_return_order_exists(
         processing_order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": processing_order["parameters"],
+    }
+
+    assert mocked_update_order.mock_calls[1].args == (
+        mocked_mpt_client,
+        processing_order["id"],
+    )
+    assert mocked_update_order.mock_calls[1].kwargs == {
         "externalIds": {
             "vendor": adobe_order["orderId"],
         },
@@ -918,6 +934,15 @@ def test_mixed(
         processing_change_order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": processing_change_order["parameters"],
+    }
+
+    assert mocked_update_order.mock_calls[1].args == (
+        mocked_mpt_client,
+        processing_change_order["id"],
+    )
+
+    assert mocked_update_order.mock_calls[1].kwargs == {
         "externalIds": {
             "vendor": adobe_order["orderId"],
         },

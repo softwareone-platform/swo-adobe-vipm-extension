@@ -1,4 +1,4 @@
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from auth0.authentication import GetToken
 
 from requests import Session
@@ -6,7 +6,7 @@ from requests.adapters import HTTPAdapter, Retry
 
 
 class MPTClient(Session):
-    def __init__(self, base_url, login_domain, auth0_client_id, username, passwd):
+    def __init__(self, base_url, login_url, auth0_client_id, username, passwd):
         super().__init__()
         retries = Retry(
             total=5,
@@ -18,10 +18,15 @@ class MPTClient(Session):
             {"User-Agent": "swo-extensions/1.0"}
         )
         self.base_url = f"{base_url}/" if base_url[-1] != "/" else base_url
-        self.token = GetToken(login_domain, auth0_client_id)
+
+        login_endpoint_info = urlparse(login_url)
+
+        self.token = GetToken(login_endpoint_info.netloc, auth0_client_id, protocol=login_endpoint_info.scheme)
+
         self.username = username
         self.passwd = passwd
         self._api_token = None
+
 
     def authorize(self):
         token_response = self.token.login(

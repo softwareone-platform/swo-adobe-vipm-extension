@@ -16,14 +16,6 @@ from adobe_vipm.flows.mpt import (
 )
 
 
-@pytest.fixture(autouse=True)
-def mock_authorization(requests_mocker, settings):
-    requests_mocker.post(
-        urljoin(f"https://{settings.MPT_LOGIN_DOMAIN}", "/oauth/token"),
-        json={"token_type": "Bearer", "access_token": "1234-12345"},
-    )
-
-
 def test_fail_order(mpt_client, requests_mocker, order_factory):
     """Test the call to switch an order to Failed."""
     order = order_factory()
