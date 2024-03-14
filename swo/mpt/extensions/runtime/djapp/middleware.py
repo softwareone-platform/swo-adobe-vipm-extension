@@ -16,7 +16,7 @@ class MPTClientMiddleware:
                 settings.MPT_LOGIN_URL,
                 settings.MPT_AUTH0_CLIENT_ID,
                 settings.MPT_USERNAME,
-                settings.MPT_PASSWORD,
+                settings.MPT_API_TOKEN,  # w/a replace with MPT_PASSWORD later
             )
         request.client = _CLIENT
         response = self.get_response(request)
