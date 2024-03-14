@@ -430,7 +430,7 @@ def gen_change_order(fake, agreement_id, skus, change_type):
             lines.append(
                 {
                     "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
-                    "item": get_reference(item, ["id", "name", "extenalIds"]),
+                    "item": get_reference(item, ["id", "name", "externalIds"]),
                     "quantity": quantity,
                     "oldQuantity": old_quantity,
                 }
@@ -767,11 +767,16 @@ def product_items(locale):
         console.print("[bold green]Product items have been generated ")
 
 @cli.command()
-def cleanup():
+@click.option(
+    "--with-items",
+    is_flag=True,
+    default=False,
+)
+def cleanup(with_items):
     """
     Remove all the content of the data folder.
     """
-    cleanup_data_folder()
+    cleanup_data_folder(with_items)
 
 
 @cli.command()

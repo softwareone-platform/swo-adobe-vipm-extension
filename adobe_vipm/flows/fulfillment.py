@@ -72,9 +72,14 @@ def _handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
     return
 
 
-def _complete_order(mpt_client, order):
+def _reset_retries(mpt_client, order):
     order = reset_retry_count(order)
     update_order(mpt_client, order["id"], parameters=order["parameters"])
+    return order
+
+
+def _complete_order(mpt_client, order):
+    order = _reset_retries(mpt_client, order)
     complete_order(
         mpt_client, order["id"], settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"]
     )
@@ -179,16 +184,19 @@ def _place_return_orders(mpt_client, seller_country, customer_id, order, lines):
                 )
             if return_order["status"] == STATUS_PENDING:
                 pending_order_ids.append(return_order["orderId"])
+                break
             else:
                 completed_order_ids.append(return_order["orderId"])
+                order = _reset_retries(mpt_client, order)
+
 
     if pending_order_ids:
         _handle_retries(
             mpt_client, order, ", ".join(pending_order_ids), adobe_order_type="RETURN"
         )
-        return None
+        return None, order
 
-    return completed_order_ids
+    return completed_order_ids, order
 
 
 def _place_new_order(mpt_client, seller_country, customer_id, order):
@@ -242,7 +250,7 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
                 grouped_items.downsizing_out_win,
             )
         if grouped_items.downsizing_in_win:
-            completed_return_orders = _place_return_orders(
+            completed_return_orders, order = _place_return_orders(
                 mpt_client,
                 seller_country,
                 customer_id,
@@ -374,13 +382,15 @@ def _fulfill_termination_order(mpt_client, seller_country, order):
         _complete_order(mpt_client, order)
         return
 
-    if _place_return_orders(
+    completed_return_orders, order = _place_return_orders(
         mpt_client,
         seller_country,
         customer_id,
         order,
         grouped_items.upsizing + grouped_items.downsizing_in_win,
-    ):
+    )
+
+    if completed_return_orders:
         _complete_order(mpt_client, order)
 
 

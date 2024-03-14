@@ -75,8 +75,8 @@ def base_id_from(mpt_obj_id):
     return mpt_obj_id.split("-", 1)[1]
 
 
-def cleanup_data_folder():
-    for folder in [
+def cleanup_data_folder(with_items):
+    folders = [
         ACCOUNTS_FOLDER,
         AGREEMENTS_FOLDER,
         BUYERS_FOLDER,
@@ -84,8 +84,11 @@ def cleanup_data_folder():
         ORDERS_FOLDER,
         SELLERS_FOLDER,
         SUBSCRIPTIONS_FOLDER,
-        ITEMS_FOLDER,
-    ]:
+    ]
+    if with_items:
+        folders.append(ITEMS_FOLDER)
+
+    for folder in folders:
         for f in glob.glob(os.path.join(folder, "*.json")):
             os.remove(f)
 
