@@ -1,3 +1,4 @@
+import copy
 import logging
 
 from django.conf import settings
@@ -122,6 +123,46 @@ def _create_subscription(mpt_client, seller_country, customer_id, order, item):
         f'created for order {order["id"]}'
     )
 
+def _check_adobe_subscriptions(seller_country, customer_id, order, lines):
+    lines_to_order = []
+    adobe_client = get_adobe_client()
+    for line in lines:
+        subcription = get_subscription_by_line_and_item_id(
+            order["subscriptions"],
+            line["item"]["id"],
+            line["id"],
+        )
+        adobe_sub_id = get_adobe_subscription_id(subcription)
+        adobe_subscription = adobe_client.get_subscription(
+            seller_country,
+            customer_id,
+            adobe_sub_id,
+        )
+        desired_quantity = line["quantity"]
+        current_quantity = adobe_subscription["currentQuantity"]
+        current_renewal_quantity = adobe_subscription["autoRenewal"]["renewalQuantity"]
+        renewal_quantity = desired_quantity
+        if desired_quantity > current_quantity:
+            # If we have to upsize over the current quantity
+            # we have to place an new order for the delta
+            # and set the renewal quantity equals to the
+            # current quantity (current quantity will be
+            # update due to the new order for the delta.
+            renewal_quantity = current_quantity
+            line_to_order = copy.deepcopy(line)
+            line_to_order["oldQuantity"] = current_quantity
+            lines_to_order.append(line_to_order)
+
+        if current_renewal_quantity < renewal_quantity:
+            adobe_client.update_subscription(
+                seller_country,
+                customer_id,
+                adobe_sub_id,
+                quantity=renewal_quantity,
+            )
+
+    return lines_to_order
+
 
 def _update_adobe_subscriptions(seller_country, customer_id, order, lines):
     adobe_client = get_adobe_client()
@@ -231,17 +272,20 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
     adobe_order = None
     grouped_items = group_items_by_type(order)
     logger.debug(
-        f"item groups: up={grouped_items.upsizing}, "
+        f"item groups: upwin={grouped_items.upsizing_in_win}, "
         f"downin={grouped_items.downsizing_in_win}, "
         f"downout={grouped_items.downsizing_out_win}",
     )
     try:
-        preview_order = adobe_client.create_preview_order(
-            seller_country,
-            customer_id,
-            order["id"],
-            grouped_items.upsizing + grouped_items.downsizing_in_win,
-        )
+        to_add_to_preview = []
+        if grouped_items.upsizing_out_win:
+            to_add_to_preview = _check_adobe_subscriptions(
+                seller_country,
+                customer_id,
+                order,
+                grouped_items.upsizing_out_win,
+            )
+
         if grouped_items.downsizing_out_win:
             _update_adobe_subscriptions(
                 seller_country,
@@ -249,35 +293,48 @@ def _place_change_order(mpt_client, seller_country, customer_id, order):
                 order,
                 grouped_items.downsizing_out_win,
             )
-        if grouped_items.downsizing_in_win:
-            completed_return_orders, order = _place_return_orders(
-                mpt_client,
+
+        items_to_preview = (
+            grouped_items.upsizing_in_win + grouped_items.downsizing_in_win + to_add_to_preview
+        )
+
+        if items_to_preview:
+            preview_order = adobe_client.create_preview_order(
                 seller_country,
                 customer_id,
-                order,
-                grouped_items.downsizing_in_win,
+                order["id"],
+                items_to_preview,
             )
 
-            if not completed_return_orders:
-                return None
+            if grouped_items.downsizing_in_win:
+                completed_return_orders, order = _place_return_orders(
+                    mpt_client,
+                    seller_country,
+                    customer_id,
+                    order,
+                    grouped_items.downsizing_in_win,
+                )
 
-        adobe_order = adobe_client.create_new_order(
-            seller_country,
-            customer_id,
-            preview_order,
-        )
-        logger.info(f'New order created for {order["id"]}: {adobe_order["orderId"]}')
+                if not completed_return_orders:
+                    return None
+
+            adobe_order = adobe_client.create_new_order(
+                seller_country,
+                customer_id,
+                preview_order,
+            )
+            logger.info(f'New order created for {order["id"]}: {adobe_order["orderId"]}')
     except AdobeError as e:
         fail_order(mpt_client, order["id"], str(e))
         logger.warning(f"Order {order['id']} has been failed: {str(e)}.")
         return None
-
-    adobe_order_id = adobe_order["orderId"]
-    order = set_adobe_order_id(order, adobe_order_id)
-    logger.debug(
-        f'Updating the order {order["id"]} to save order id into vendor external id'
-    )
-    update_order(mpt_client, order["id"], externalIds=order["externalIds"])
+    if adobe_order:
+        adobe_order_id = adobe_order["orderId"]
+        order = set_adobe_order_id(order, adobe_order_id)
+        logger.debug(
+            f'Updating the order {order["id"]} to save order id into vendor external id'
+        )
+        update_order(mpt_client, order["id"], externalIds=order["externalIds"])
     return order
 
 
@@ -342,7 +399,11 @@ def _fulfill_change_order(mpt_client, seller_country, order):
         if not order:
             return
 
-    adobe_order_id = order["externalIds"]["vendor"]
+    adobe_order_id = get_adobe_order_id(order)
+    if not adobe_order_id:
+        _complete_order(mpt_client, order)
+        return
+
     adobe_order = _check_adobe_order_fulfilled(
         mpt_client, seller_country, order, customer_id, adobe_order_id
     )
@@ -376,7 +437,7 @@ def _fulfill_termination_order(mpt_client, seller_country, order):
         )
 
     has_orders_to_return = bool(
-        grouped_items.upsizing + grouped_items.downsizing_in_win
+        grouped_items.upsizing_in_win + grouped_items.downsizing_in_win
     )
     if not has_orders_to_return:
         _complete_order(mpt_client, order)
@@ -387,7 +448,7 @@ def _fulfill_termination_order(mpt_client, seller_country, order):
         seller_country,
         customer_id,
         order,
-        grouped_items.upsizing + grouped_items.downsizing_in_win,
+        grouped_items.upsizing_in_win + grouped_items.downsizing_in_win,
     )
 
     if completed_return_orders:

@@ -976,3 +976,220 @@ def test_mixed(
         processing_change_order["id"],
         "TPL-1111",
     )
+
+
+
+def test_upsize_of_previously_downsized_out_of_win_without_new_order(
+    mocker,
+    settings,
+    seller,
+    agreement,
+    order_factory,
+    lines_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_subscription_factory,
+):
+    """
+    Tests a change order in case of an upsizing after a previous downsizing change
+    order fulfilled outside the cancellation window.
+    Only the renewal quantity of the subscription should be updated.
+    """
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+
+
+    adobe_sub_to_update = adobe_subscription_factory(
+        subscription_id="sub-4",
+        current_quantity=18,
+        renewal_quantity=10,
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+
+    mocked_adobe_client.get_subscription.return_value = adobe_sub_to_update
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    upsizing_items_out_of_window = lines_factory(
+        line_id=4,
+        old_quantity=10,
+        quantity=18,
+    )
+
+    order_subscriptions = subscriptions_factory(
+        subscription_id="SUB-004",
+        adobe_subscription_id="sub-4",
+        lines=lines_factory(
+            line_id=4,
+            quantity=10,
+        ),
+        start_date=datetime.now(UTC) - timedelta(days=CANCELLATION_WINDOW_DAYS + 1),
+    )
+
+    processing_change_order = order_factory(
+        order_type="change",
+        lines=upsizing_items_out_of_window,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+        ),
+        order_parameters=[],
+        subscriptions=order_subscriptions,
+    )
+
+
+    mocked_mpt_client = mocker.MagicMock()
+
+
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.complete_order",
+    )
+
+    fulfill_order(mocked_mpt_client, processing_change_order)
+
+    seller_country = seller["address"]["country"]
+
+    mocked_adobe_client.update_subscription.assert_called_once_with(
+        seller_country,
+        "a-client-id",
+        "sub-4",
+        quantity=18,
+    )
+
+    mocked_complete_order.assert_called_once_with(
+        mocked_mpt_client,
+        processing_change_order["id"],
+        "TPL-1111",
+    )
+
+
+def test_upsize_of_previously_downsized_out_of_win_with_new_order(
+    mocker,
+    settings,
+    seller,
+    agreement,
+    order_factory,
+    lines_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_subscription_factory,
+):
+    """
+    Tests a change order in case of an upsizing after a previous downsizing change
+    order fulfilled outside the cancellation window and with a quantity that exceed
+    the current.
+    The renewal quantity of the subscription should not be updated because of the
+    current quantity is equal to the auto renewal.
+    """
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
+    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+
+
+    adobe_preview_order = adobe_order_factory(
+        ORDER_TYPE_PREVIEW,
+        items=adobe_items_factory(
+            line_number=4,
+            quantity=3,
+        ),
+    )
+    adobe_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        status=STATUS_PROCESSED,
+        items=adobe_items_factory(
+            line_number=4,
+            quantity=3,
+            subscription_id="sub-4",
+        ),
+    )
+
+    adobe_sub_to_update = adobe_subscription_factory(
+        subscription_id="sub-4",
+        current_quantity=18,
+        renewal_quantity=18,
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
+    mocked_adobe_client.create_new_order.return_value = adobe_order
+    mocked_adobe_client.get_order.return_value = adobe_order
+    mocked_adobe_client.get_subscription.return_value = adobe_sub_to_update
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    upsizing_items_out_of_window = lines_factory(
+        line_id=4,
+        old_quantity=10,
+        quantity=21,
+    )
+
+    order_subscriptions = subscriptions_factory(
+        subscription_id="SUB-004",
+        adobe_subscription_id="sub-4",
+        lines=lines_factory(
+            line_id=4,
+            quantity=10,
+        ),
+        start_date=datetime.now(UTC) - timedelta(days=CANCELLATION_WINDOW_DAYS + 1),
+    )
+
+    processing_change_order = order_factory(
+        order_type="change",
+        lines=upsizing_items_out_of_window,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+        ),
+        order_parameters=[],
+        subscriptions=order_subscriptions,
+    )
+
+    updated_change_order = order_factory(
+        order_type="change",
+        lines=upsizing_items_out_of_window,
+        subscriptions=order_subscriptions,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+        ),
+        order_parameters=[],
+        external_ids={"vendor": adobe_order["orderId"]},
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.update_order",
+        return_value=updated_change_order,
+    )
+
+
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.complete_order",
+    )
+
+    fulfill_order(mocked_mpt_client, processing_change_order)
+
+    seller_country = seller["address"]["country"]
+
+    mocked_adobe_client.create_preview_order.assert_called_once_with(
+        seller_country,
+        "a-client-id",
+        processing_change_order["id"],
+        lines_factory(
+            line_id=4,
+            old_quantity=18,
+            quantity=21,
+        ),
+    )
+
+    mocked_adobe_client.update_subscription.assert_not_called()
+
+    mocked_complete_order.assert_called_once_with(
+        mocked_mpt_client,
+        processing_change_order["id"],
+        "TPL-1111",
+    )
