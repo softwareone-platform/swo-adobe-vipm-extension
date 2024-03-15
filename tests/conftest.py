@@ -260,10 +260,7 @@ def order_parameters_factory():
                 "externalId": PARAM_COMPANY_NAME,
                 "type": "SingleLineText",
                 "value": company_name,
-                "constraints": {
-                    "hidden": True,
-                    "optional": True,
-                },
+                "constraints": None,
             },
             {
                 "id": "PAR-0000-0002",
@@ -271,10 +268,6 @@ def order_parameters_factory():
                 "externalId": PARAM_PREFERRED_LANGUAGE,
                 "type": "Choice",
                 "value": preferred_language,
-                "constraints": {
-                    "hidden": False,
-                    "optional": False,
-                },
             },
             {
                 "id": "PAR-0000-0002",
@@ -282,10 +275,6 @@ def order_parameters_factory():
                 "externalId": PARAM_ADDRESS,
                 "type": "Address",
                 "value": address,
-                "constraints": {
-                    "hidden": True,
-                    "optional": True,
-                },
             },
             {
                 "id": "PAR-0000-0003",
@@ -293,10 +282,6 @@ def order_parameters_factory():
                 "externalId": PARAM_CONTACT,
                 "type": "Contact",
                 "value": contact,
-                "constraints": {
-                    "hidden": False,
-                    "optional": False,
-                },
             },
         ]
 

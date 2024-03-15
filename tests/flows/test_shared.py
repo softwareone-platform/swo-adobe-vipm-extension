@@ -181,8 +181,10 @@ def test_create_customer_account_address_error(
         title=address_param["name"],
         details=str(adobe_error),
     )
-    address_param["constraints"]["hidden"] = False
-    address_param["constraints"]["optional"] = False
+    address_param["constraints"] = {
+        "hidden": False,
+        "optional": False,
+    }
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -257,8 +259,10 @@ def test_create_customer_account_fields_error(
         title=param["name"],
         details=str(adobe_error),
     )
-    param["constraints"]["hidden"] = False
-    param["constraints"]["optional"] = False
+    param["constraints"] = {
+        "hidden": False,
+        "optional": False,
+    }
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
