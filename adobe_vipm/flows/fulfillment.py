@@ -464,7 +464,7 @@ def _handle_transfer_preview_error(client, order, e):
         order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["title"], details=str(e)),
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
         )
         query_order(
             client,

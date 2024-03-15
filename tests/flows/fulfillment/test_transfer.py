@@ -340,7 +340,7 @@ def test_transfer_invalid_membership(
         order,
         PARAM_MEMBERSHIP_ID,
         ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-            title=param["title"],
+            title=param["name"],
             details=str(adobe_error),
         ),
     )

@@ -178,7 +178,7 @@ def test_create_customer_account_address_error(
     ordering_parameters = order_parameters_factory()
     address_param = next(filter(lambda x: x["name"] == "Address", ordering_parameters))
     address_param["error"] = ERR_ADOBE_ADDRESS.to_dict(
-        title=address_param["title"],
+        title=address_param["name"],
         details=str(adobe_error),
     )
     address_param["constraints"]["hidden"] = False
@@ -254,7 +254,7 @@ def test_create_customer_account_fields_error(
         filter(lambda x: x["externalId"] == param_external_id, ordering_parameters)
     )
     param["error"] = error_constant.to_dict(
-        title=param["title"],
+        title=param["name"],
         details=str(adobe_error),
     )
     param["constraints"]["hidden"] = False
