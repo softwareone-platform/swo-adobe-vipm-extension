@@ -65,10 +65,7 @@ class OrderEventProducer(EventProducer):
         offset = 0
         while self.has_more_pages(page):
             try:
-                response = self.client.get(
-                    f"{url}&limit={limit}&offset={offset}",
-                    headers={"Authorization": f"Bearer {settings.MPT_API_TOKEN}"},
-                )
+                response = self.client.get(f"{url}&limit={limit}&offset={offset}")
             except requests.RequestException:
                 logger.exception("Cannot retrieve orders")
                 return []
