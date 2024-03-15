@@ -372,13 +372,17 @@ def in_cancellation_window(order, line):
 
     Returns:
         bool: True is the subscription items is within the
-        cancellation window, False otherwise.
+        cancellation window or the subscription does not exist
+        (purchase cases), False otherwise.
     """
     subscription = get_subscription_by_line_and_item_id(
         order["subscriptions"],
         line["item"]["id"],
         line["id"],
     )
+    if not subscription:
+        return True
+
     creation_date = datetime.fromisoformat(subscription["startDate"])
     delta = datetime.now(UTC) - creation_date
     return delta.days < CANCELLATION_WINDOW_DAYS
@@ -388,7 +392,10 @@ def group_items_by_type(order):
     """
     Grups the items of a change order in the following groups:
 
-    - upsizing_items: item which quantity have been increased
+    - upsizing_items_in_window: item bought within the
+      cancellation window which quantity have been increased
+    - upsizing_items_out_window: item bought outside the
+      cancellation window which have been quantity increased
     - downsizing_items_in_window: item bought within the
       cancellation window which quantity have been descreased
     - downsizing_items_out_window: item bought outside the
@@ -399,8 +406,14 @@ def group_items_by_type(order):
     Returns:
         ItemGroups: a data class with the three item groups.
     """
-    upsizing_items = filter(
-        lambda line: line["quantity"] > line["oldQuantity"],
+    upsizing_items_in_window = filter(
+        lambda line: line["quantity"] > line["oldQuantity"]
+        and in_cancellation_window(order, line),
+        order["lines"],
+    )
+    upsizing_items_out_window = filter(
+        lambda line: line["quantity"] > line["oldQuantity"]
+        and not in_cancellation_window(order, line),
         order["lines"],
     )
     downsizing_items_in_window = filter(
@@ -415,7 +428,8 @@ def group_items_by_type(order):
     )
 
     return ItemGroups(
-        list(upsizing_items),
+        list(upsizing_items_in_window),
+        list(upsizing_items_out_window),
         list(downsizing_items_in_window),
         list(downsizing_items_out_window),
     )
