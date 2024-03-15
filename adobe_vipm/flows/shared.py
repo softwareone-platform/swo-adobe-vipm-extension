@@ -102,7 +102,7 @@ def _handle_customer_error(client, order, e):
         order = set_ordering_parameter_error(
             order,
             PARAM_ADDRESS,
-            ERR_ADOBE_ADDRESS.to_dict(title=param["title"], details=str(e)),
+            ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(e)),
         )
     else:
         if "companyProfile.companyName" in e.details:
@@ -110,7 +110,7 @@ def _handle_customer_error(client, order, e):
             order = set_ordering_parameter_error(
                 order,
                 PARAM_COMPANY_NAME,
-                ERR_ADOBE_COMPANY_NAME.to_dict(title=param["title"], details=str(e)),
+                ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(e)),
             )
         if "companyProfile.preferredLanguage" in e.details:
             param = get_ordering_parameter(order, PARAM_PREFERRED_LANGUAGE)
@@ -118,7 +118,7 @@ def _handle_customer_error(client, order, e):
                 order,
                 PARAM_PREFERRED_LANGUAGE,
                 ERR_ADOBE_PREFERRED_LANGUAGE.to_dict(
-                    title=param["title"], details=str(e)
+                    title=param["name"], details=str(e)
                 ),
             )
         if len(
@@ -130,7 +130,7 @@ def _handle_customer_error(client, order, e):
             order = set_ordering_parameter_error(
                 order,
                 PARAM_CONTACT,
-                ERR_ADOBE_CONTACT.to_dict(title=param["title"], details=str(e)),
+                ERR_ADOBE_CONTACT.to_dict(title=param["name"], details=str(e)),
             )
 
     order = reset_retry_count(order)

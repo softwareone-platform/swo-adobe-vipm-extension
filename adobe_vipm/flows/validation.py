@@ -60,14 +60,14 @@ def validate_company_name(order, customer_data):
         order = set_ordering_parameter_error(
             order,
             PARAM_COMPANY_NAME,
-            ERR_COMPANY_NAME_LENGTH.to_dict(title=param["title"]),
+            ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"]),
         )
         return True, order
     if not REGEX_COMPANY_NAME.match(name):
         order = set_ordering_parameter_error(
             order,
             PARAM_COMPANY_NAME,
-            ERR_COMPANY_NAME_CHARS.to_dict(title=param["title"]),
+            ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"]),
         )
         return True, order
     return False, order
@@ -81,7 +81,7 @@ def validate_preferred_language(order, customer_data):
             order,
             PARAM_PREFERRED_LANGUAGE,
             ERR_PREFERRED_LANGUAGE.to_dict(
-                title=param["title"],
+                title=param["name"],
                 languages=", ".join(config.language_codes),
             ),
         )
@@ -101,7 +101,7 @@ def validate_address(order, customer_data):
             order,
             PARAM_ADDRESS,
             ERR_ADDRESS.to_dict(
-                title=param["title"],
+                title=param["name"],
                 errors="".join(errors),
             ),
         )
@@ -130,7 +130,7 @@ def validate_address(order, customer_data):
             order,
             PARAM_ADDRESS,
             ERR_ADDRESS.to_dict(
-                title=param["title"],
+                title=param["name"],
                 errors="; ".join(errors),
             ),
         )
@@ -163,7 +163,7 @@ def validate_contact(order, customer_data):
             order,
             PARAM_CONTACT,
             ERR_CONTACT.to_dict(
-                title=param["title"],
+                title=param["name"],
                 errors="; ".join(errors),
             ),
         )
@@ -204,7 +204,7 @@ def validate_transfer(mpt_client, order):
         order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["title"], details=str(e)),
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
         )
         return True, order
 
@@ -225,7 +225,7 @@ def validate_transfer(mpt_client, order):
                 order,
                 PARAM_MEMBERSHIP_ID,
                 ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
-                    title=param["title"],
+                    title=param["name"],
                     item_sku=adobe_line["offerId"][:10],
                 ),
             )

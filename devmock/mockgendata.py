@@ -126,7 +126,7 @@ def gen_param(
     par_id = generate_random_id("PRM", 16, 4)
     param = {
         "id": par_id,
-        "title": name,
+        "name": name,
         "externalId": external_id,
         "constraints": {
             "readonly": readonly,

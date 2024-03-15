@@ -256,7 +256,6 @@ def order_parameters_factory():
         return [
             {
                 "id": "PAR-0000-0001",
-                "title": "Company Name",
                 "name": "Company Name",
                 "externalId": PARAM_COMPANY_NAME,
                 "type": "SingleLineText",
@@ -268,7 +267,6 @@ def order_parameters_factory():
             },
             {
                 "id": "PAR-0000-0002",
-                "title": "Preferred Language",
                 "name": "Preferred Language",
                 "externalId": PARAM_PREFERRED_LANGUAGE,
                 "type": "Choice",
@@ -280,7 +278,6 @@ def order_parameters_factory():
             },
             {
                 "id": "PAR-0000-0002",
-                "title": "Customer Address",
                 "name": "Address",
                 "externalId": PARAM_ADDRESS,
                 "type": "Address",
@@ -292,7 +289,6 @@ def order_parameters_factory():
             },
             {
                 "id": "PAR-0000-0003",
-                "title": "Customer Contact",
                 "name": "Contact",
                 "externalId": PARAM_CONTACT,
                 "type": "Contact",
@@ -313,7 +309,6 @@ def transfer_order_parameters_factory():
         return [
             {
                 "id": "PAR-0000-0004",
-                "title": "Membership Id",
                 "name": "Membership Id",
                 "externalId": PARAM_MEMBERSHIP_ID,
                 "type": "SingleLineText",
@@ -426,7 +421,6 @@ def subscriptions_factory(lines_factory):
                     "fulfillment": [
                         {
                             "name": "Adobe SKU",
-                            "title": "Adobe SKU",
                             "externalId": PARAM_ADOBE_SKU,
                             "type": "SingleLineText",
                             "value": adobe_sku,

@@ -98,7 +98,7 @@ def test_validate_company_name_invalid_length(
     assert has_error is True
 
     param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
-    assert param["error"] == ERR_COMPANY_NAME_LENGTH.to_dict(title=param["title"])
+    assert param["error"] == ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["optional"] is False
 
@@ -127,7 +127,7 @@ def test_validate_company_name_invalid_chars(
     assert has_error is True
 
     param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
-    assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["title"])
+    assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["optional"] is False
 
@@ -173,7 +173,7 @@ def test_validate_preferred_language_invalid(
         PARAM_PREFERRED_LANGUAGE,
     )
     assert param["error"] == ERR_PREFERRED_LANGUAGE.to_dict(
-        title=param["title"],
+        title=param["name"],
         languages="en-US",
     )
     assert param["constraints"]["hidden"] is False
@@ -225,7 +225,7 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_COUNTRY_CODE,
     )
     assert param["constraints"]["hidden"] is False
@@ -259,7 +259,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_STATE_OR_PROVINCE,
     )
     assert param["constraints"]["hidden"] is False
@@ -294,7 +294,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_POSTAL_CODE_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
@@ -331,7 +331,7 @@ def test_validate_address_invalid_postal_code_length(
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_POSTAL_CODE_LENGTH,
     )
     assert param["constraints"]["hidden"] is False
@@ -367,7 +367,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
     )
 
     assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors="; ".join(
             (
                 ERR_ADDRESS_LINE_1_LENGTH,
@@ -422,7 +422,7 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_FIRST_NAME_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
@@ -453,7 +453,7 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_LAST_NAME_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
@@ -484,7 +484,7 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_EMAIL_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
@@ -519,7 +519,7 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["title"],
+        title=param["name"],
         errors=ERR_PHONE_NUMBER_LENGTH,
     )
     assert param["constraints"]["hidden"] is False
@@ -713,7 +713,7 @@ def test_validate_transfer_membership_error(
 
     param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-        title=param["title"],
+        title=param["name"],
         details=str(api_error),
     )
     assert param["constraints"]["hidden"] is False
@@ -746,7 +746,7 @@ def test_validate_transfer_unknown_item(
     assert has_errors is True
     param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
-        title=param["title"],
+        title=param["name"],
         item_sku=adobe_preview_transfer["items"][0]["offerId"][:10],
     )
     assert param["constraints"]["hidden"] is False
