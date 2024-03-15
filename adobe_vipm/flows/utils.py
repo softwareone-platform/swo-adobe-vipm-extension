@@ -222,8 +222,10 @@ def set_ordering_parameter_error(order, param_external_id, error):
         param_external_id,
     )
     param["error"] = error
-    param["constraints"]["hidden"] = False
-    param["constraints"]["optional"] = False
+    param["constraints"] = {
+        "hidden": False,
+        "optional": False,
+    }
     return updated_order
 
 

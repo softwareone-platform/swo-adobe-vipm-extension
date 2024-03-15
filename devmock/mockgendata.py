@@ -118,22 +118,14 @@ def gen_param(
     name,
     external_id,
     value=None,
-    readonly=False,
-    hidden=False,
-    required=False,
-    unique=False,
+    constraints=None,
 ):
     par_id = generate_random_id("PRM", 16, 4)
     param = {
         "id": par_id,
         "name": name,
         "externalId": external_id,
-        "constraints": {
-            "readonly": readonly,
-            "hidden": hidden,
-            "required": required,
-            "unique": unique,
-        },
+        "constraints": constraints,
     }
     if value:
         param["value"] = value
@@ -357,7 +349,7 @@ def gen_purchase_order(
                     "RetryCount",
                     "retryCount",
                     "0",
-                    hidden=True,
+                    constraints={"hidden": True},
                 ),
                 gen_param("CustomerId", "customerId", value=customer_id),
             ],
@@ -548,7 +540,7 @@ def gen_transfer_order(
                     "RetryCount",
                     "retryCount",
                     "0",
-                    hidden=True,
+                    constraints={"hidden": True},
                 ),
                 gen_param("CustomerId", "customerId"),
             ],
