@@ -5,7 +5,9 @@ from datetime import UTC, datetime
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
+    ORDER_TYPE_CHANGE,
     ORDER_TYPE_PURCHASE,
+    ORDER_TYPE_TERMINATION,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -89,6 +91,14 @@ def is_transfer_order(order):
         bool: True if it is a subscriptions transfer order, False otherwise.
     """
     return order["type"] == ORDER_TYPE_PURCHASE and get_adobe_membership_id(order)
+
+
+def is_change_order(order):
+    return order["type"] == ORDER_TYPE_CHANGE
+
+
+def is_termination_order(order):
+    return order["type"] == ORDER_TYPE_TERMINATION
 
 
 def get_adobe_customer_id(source):

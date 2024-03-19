@@ -713,6 +713,7 @@ def mock_authorization(requests_mocker, settings):
         json={"token_type": "Bearer", "access_token": "1234-12345"},
     )
 
+
 @pytest.fixture()
 def mpt_client(settings, mock_authorization):
     """

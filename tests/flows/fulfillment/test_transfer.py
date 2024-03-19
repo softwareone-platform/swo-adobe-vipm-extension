@@ -35,7 +35,7 @@ def test_transfer(
 
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
 
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer = adobe_transfer_factory(
         status=STATUS_PROCESSED,
@@ -53,16 +53,20 @@ def test_transfer(
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.update_order")
-    mocked_create_subscription = mocker.patch(
-        "adobe_vipm.flows.fulfillment.create_subscription"
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order"
     )
-    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.complete_order")
+    mocked_create_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_subscription"
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order"
+    )
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 
@@ -150,7 +154,7 @@ def test_transfer_not_ready(
     on Adobe side. The RetryCount fullfilment paramter must be incremented.
     The transfer order will not be completed and the processing will be stopped.
     """
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING)
 
@@ -158,13 +162,17 @@ def test_transfer_not_ready(
     mocked_adobe_client.create_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.update_order")
-    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.complete_order")
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order"
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order"
+    )
 
     order = order_factory(
         order_parameters=transfer_order_parameters_factory(),
@@ -209,7 +217,7 @@ def test_transfer_unexpected_status(
     The transfer order will be failed with a message that explain that Adobe returned an
     unexpected error.
     """
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer = adobe_transfer_factory(status="9999")
 
@@ -217,12 +225,12 @@ def test_transfer_unexpected_status(
     mocked_adobe_client.create_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.fail_order")
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(
         order_parameters=transfer_order_parameters_factory(),
@@ -251,7 +259,7 @@ def test_transfer_items_mismatch(
     Tests a transfer order when the items contained in the order don't match
     the subscriptions owned by a given membership id.
     """
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer_preview = adobe_preview_transfer_factory(
         items=adobe_items_factory(offer_id="99999999CA01A12"),
@@ -260,12 +268,12 @@ def test_transfer_items_mismatch(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.fail_order")
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 
@@ -307,7 +315,7 @@ def test_transfer_invalid_membership(
     Tests a transfer order when the membership id is not valid.
     """
     settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"] = "TPL-964-112"
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
@@ -318,12 +326,12 @@ def test_transfer_invalid_membership(
     )
     mocked_adobe_client.preview_transfer.side_effect = adobe_error
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_query_order = mocker.patch("adobe_vipm.flows.fulfillment.query_order")
+    mocked_query_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.query_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 
@@ -365,7 +373,7 @@ def test_transfer_unrecoverable_status(
     """
     Tests a transfer order when it cannot be processed.
     """
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
@@ -376,12 +384,12 @@ def test_transfer_unrecoverable_status(
     )
     mocked_adobe_client.preview_transfer.side_effect = adobe_error
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.fail_order")
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 
@@ -410,7 +418,7 @@ def test_create_transfer_fail(
     """
     Tests generic failure on transfer order creation.
     """
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer_preview = adobe_preview_transfer_factory()
 
@@ -419,12 +427,12 @@ def test_create_transfer_fail(
     mocked_adobe_client.create_transfer.side_effect = AdobeError("Unexpected error")
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.fail_order")
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 

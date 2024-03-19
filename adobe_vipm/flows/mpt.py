@@ -91,7 +91,9 @@ def create_subscription(mpt_client, order_id, subscription):
 @wrap_http_error
 def get_product_items_by_skus(mpt_client, product_id, skus):
     items = []
-    rql_query = f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    rql_query = (
+        f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    )
     url = f"/product-items?{rql_query}"
     page = None
     limit = 10

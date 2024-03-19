@@ -301,7 +301,9 @@ def test_get_product_items_by_skus(mpt_client, requests_mocker):
     """
     product_id = "PRD-1234-5678"
     skus = ["sku1", "sku2"]
-    rql_query = f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    rql_query = (
+        f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    )
     url = f"product-items?{rql_query}"
     page1_url = f"{url}&limit=10&offset=0"
     page2_url = f"{url}&limit=10&offset=10"
@@ -316,7 +318,7 @@ def test_get_product_items_by_skus(mpt_client, requests_mocker):
                     "total": 12,
                 },
             },
-            "data": data[:10]
+            "data": data[:10],
         },
     )
     requests_mocker.get(
@@ -336,14 +338,18 @@ def test_get_product_items_by_skus(mpt_client, requests_mocker):
     assert get_product_items_by_skus(mpt_client, product_id, skus) == data
 
 
-def test_get_product_items_by_skus_error(mpt_client, requests_mocker, mpt_error_factory):
+def test_get_product_items_by_skus_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
     """
     Tests the call to retrieve all the item of a given product
     that matches a list of vendor SKUs.
     """
     product_id = "PRD-1234-5678"
     skus = ["sku1", "sku2"]
-    rql_query = f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    rql_query = (
+        f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    )
     url = f"product-items?{rql_query}&limit=10&offset=0"
 
     requests_mocker.get(
