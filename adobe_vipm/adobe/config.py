@@ -84,12 +84,12 @@ class Config:
             )
 
     @classmethod
-    def _load_credentials(self):
+    def _load_credentials(cls):
         with open(settings.EXTENSION_CONFIG["ADOBE_CREDENTIALS_FILE"]) as f:
             return json.load(f)
 
     @classmethod
-    def _load_config(self):
+    def _load_config(cls):
         with files("adobe_vipm").joinpath("adobe_config.json").open(
             "r", encoding="utf-8"
         ) as f:

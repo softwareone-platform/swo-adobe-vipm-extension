@@ -12,6 +12,7 @@ from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
+    ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RETURN,
     STATUS_ORDER_INACTIVE_CUSTOMER,
     STATUS_PENDING,
@@ -433,6 +434,93 @@ def test_create_new_order_bad_request(
             reseller_country,
             customer_id,
             adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
+        )
+
+    assert repr(cv.value) == str(error)
+
+
+
+def test_create_preview_renewal(
+    mocker,
+    requests_mocker,
+    adobe_config_file,
+    adobe_client_factory,
+    adobe_order_factory,
+):
+    """
+    Test the call to Adobe API to create a preview renewal.
+    """
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        side_effect=["uuid-1", "uuid-2"],
+    )
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    customer_id = "a-customer"
+
+    client, credentials, api_token = adobe_client_factory()
+
+    adobe_order = adobe_order_factory(ORDER_TYPE_PREVIEW_RENEWAL)
+
+    requests_mocker.post(
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
+        status=200,
+        json=adobe_order,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": credentials.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": "uuid-2",
+                },
+            ),
+            matchers.json_params_matcher(
+                {
+                    "orderType": ORDER_TYPE_PREVIEW_RENEWAL,
+                },
+            ),
+        ],
+    )
+
+    preview_renewal = client.create_preview_renewal(
+        reseller_country,
+        customer_id,
+    )
+    assert preview_renewal == adobe_order
+
+
+def test_create_preview_renewal_bad_request(
+    requests_mocker,
+    adobe_config_file,
+    adobe_api_error_factory,
+    adobe_client_factory,
+):
+    """
+    Test the call to Adobe API to create a preview renewal when the response is 400 bad request.
+    """
+    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    customer_id = "a-customer"
+
+    client, _, _ = adobe_client_factory()
+
+    error = adobe_api_error_factory("1234", "An error")
+
+    requests_mocker.post(
+        urljoin(
+            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+        ),
+        status=400,
+        json=error,
+    )
+
+    with pytest.raises(AdobeError) as cv:
+        client.create_preview_renewal(
+            reseller_country,
+            customer_id,
         )
 
     assert repr(cv.value) == str(error)

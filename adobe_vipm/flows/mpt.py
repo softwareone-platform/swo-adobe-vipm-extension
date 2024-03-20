@@ -1,4 +1,3 @@
-import copy
 import logging
 
 from adobe_vipm.flows.errors import wrap_http_error
@@ -38,11 +37,9 @@ def get_buyer(mpt_client, buyer_id):
 
 @wrap_http_error
 def update_order(mpt_client, order_id, **kwargs):
-    json_body = copy.deepcopy(kwargs)
-
     response = mpt_client.put(
         f"/commerce/orders/{order_id}",
-        json=json_body,
+        json=kwargs,
     )
     response.raise_for_status()
     return response.json()
@@ -89,9 +86,21 @@ def create_subscription(mpt_client, order_id, subscription):
 
 
 @wrap_http_error
+def update_subscription(mpt_client, order_id, subscription_id, **kwargs):
+    response = mpt_client.put(
+        f"/commerce/orders/{order_id}/subscriptions/{subscription_id}",
+        json=kwargs,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
 def get_product_items_by_skus(mpt_client, product_id, skus):
     items = []
-    rql_query = f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    rql_query = (
+        f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
+    )
     url = f"/product-items?{rql_query}"
     page = None
     limit = 10

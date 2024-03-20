@@ -5,7 +5,9 @@ from datetime import UTC, datetime
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
+    ORDER_TYPE_CHANGE,
     ORDER_TYPE_PURCHASE,
+    ORDER_TYPE_TERMINATION,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -89,6 +91,14 @@ def is_transfer_order(order):
         bool: True if it is a subscriptions transfer order, False otherwise.
     """
     return order["type"] == ORDER_TYPE_PURCHASE and get_adobe_membership_id(order)
+
+
+def is_change_order(order):
+    return order["type"] == ORDER_TYPE_CHANGE
+
+
+def is_termination_order(order):
+    return order["type"] == ORDER_TYPE_TERMINATION
 
 
 def get_adobe_customer_id(source):
@@ -434,4 +444,22 @@ def group_items_by_type(order):
         list(upsizing_items_out_window),
         list(downsizing_items_in_window),
         list(downsizing_items_out_window),
+    )
+
+
+def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
+    """
+    Get the line item from an Adobe order which subscription id match the
+    one given as an argument.
+
+    Args:
+        line_items (list): List of order line items.
+        subscription_id (str): Identifier of the subscription to search.
+
+    Returns:
+        dict: the line item corresponding to the given subscription id.
+    """
+    return find_first(
+        lambda item: item["subscriptionId"] == subscription_id,
+        line_items,
     )

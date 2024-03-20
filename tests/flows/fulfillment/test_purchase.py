@@ -1,15 +1,28 @@
+import copy
+
 import pytest
 
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
+    STATUS_ACCOUNT_ALREADY_EXISTS,
+    STATUS_INVALID_ADDRESS,
+    STATUS_INVALID_FIELDS,
     STATUS_PENDING,
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
 )
-from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
+from adobe_vipm.flows.constants import (
+    ERR_ADOBE_ADDRESS,
+    ERR_ADOBE_COMPANY_NAME,
+    ERR_ADOBE_CONTACT,
+    ERR_ADOBE_PREFERRED_LANGUAGE,
+)
 from adobe_vipm.flows.fulfillment import fulfill_order
+from adobe_vipm.flows.fulfillment.purchase import create_customer_account
+from adobe_vipm.flows.utils import set_adobe_customer_id
 
 
 def test_no_customer(
@@ -35,10 +48,10 @@ def test_no_customer(
 
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
 
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
-    mocker.patch("adobe_vipm.flows.fulfillment.get_buyer", return_value=buyer)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.fulfillment.purchase.get_buyer", return_value=buyer)
     mocked_create_customer_account = mocker.patch(
-        "adobe_vipm.flows.fulfillment.create_customer_account",
+        "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
         return_value=order_factory(
             fulfillment_parameters=fulfillment_parameters_factory(
                 customer_id="a-client-id"
@@ -61,13 +74,13 @@ def test_no_customer(
     mocked_adobe_client.get_order.return_value = adobe_order
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
     mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.update_order",
+        "adobe_vipm.flows.fulfillment.shared.update_order",
         side_effect=[
             order_factory(
                 fulfillment_parameters=fulfillment_parameters_factory(
@@ -86,10 +99,10 @@ def test_no_customer(
         ],
     )
     mocked_create_subscription = mocker.patch(
-        "adobe_vipm.flows.fulfillment.create_subscription",
+        "adobe_vipm.flows.fulfillment.shared.create_subscription",
     )
     mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.complete_order",
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
 
     order = order_factory()
@@ -186,9 +199,9 @@ def test_customer_already_created(
     Tests the processing of a purchase order with the customer already created.
     Adobe returns that the order is still processing.
     """
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
     mocked_create_customer_account = mocker.patch(
-        "adobe_vipm.flows.fulfillment.create_customer_account",
+        "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
     )
 
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
@@ -199,13 +212,13 @@ def test_customer_already_created(
     mocked_adobe_client.create_new_order.return_value = adobe_order
     mocked_adobe_client.get_order.return_value = adobe_order
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_mpt_client = mocker.MagicMock()
     mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.update_order",
+        "adobe_vipm.flows.fulfillment.shared.update_order",
         return_value=order_factory(
             fulfillment_parameters=fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -263,12 +276,12 @@ def test_create_customer_fails(
     order will be placed.
     """
     mocked_create_customer_account = mocker.patch(
-        "adobe_vipm.flows.fulfillment.create_customer_account",
+        "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
         return_value=None,
     )
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     mocked_mpt_client = mocker.MagicMock()
@@ -293,7 +306,7 @@ def test_create_adobe_preview_order_error(
     order creation. The purchase order will be failed.
     """
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.create_customer_account",
+        "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
         return_value=None,
     )
 
@@ -304,11 +317,11 @@ def test_create_adobe_preview_order_error(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.side_effect = adobe_error
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
-    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.fail_order")
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     mocked_mpt_client = mocker.MagicMock()
 
@@ -338,15 +351,15 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
     The purchase order will not be completed and the processing will be stopped.
     """
     mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.update_order",
+        "adobe_vipm.flows.fulfillment.shared.update_order",
     )
     mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.complete_order",
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_order.return_value = {"status": "1002"}
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     mocked_mpt_client = mocker.MagicMock()
@@ -387,12 +400,12 @@ def test_customer_already_created_order_already_created_max_retries_reached(
     The order will be failed with a message saying that this maximum has been reached.
     """
     mocked_fail_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.fail_order",
+        "adobe_vipm.flows.fulfillment.shared.fail_order",
     )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_order.return_value = {"status": "1002"}
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     mocked_mpt_client = mocker.MagicMock()
@@ -430,12 +443,12 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
     The purchase order will be failed and with a message that describe the error returned by Adobe.
     """
     mocked_fail_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.fail_order",
+        "adobe_vipm.flows.fulfillment.shared.fail_order",
     )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_order.return_value = {"status": order_status}
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     mocked_mpt_client = mocker.MagicMock()
@@ -471,12 +484,12 @@ def test_customer_already_created_order_already_created_unexpected_status(
     unexpected error.
     """
     mocked_fail_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.fail_order",
+        "adobe_vipm.flows.fulfillment.shared.fail_order",
     )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_order.return_value = {"status": "9999"}
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     mocked_mpt_client = mocker.MagicMock()
@@ -497,3 +510,303 @@ def test_customer_already_created_order_already_created_unexpected_status(
         order["id"],
         "Unexpected status (9999) received from Adobe.",
     )
+
+
+def test_create_customer_account(
+    mocker,
+    buyer,
+    order,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+):
+    """
+    Test create a customer account in Adobe.
+    Customer data is available as ordering parameters.
+    """
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_customer_account.return_value = "adobe-customer-id"
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=copy.deepcopy(order),
+    )
+    order = set_adobe_customer_id(order, "adobe-customer-id")
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        "US",
+        buyer,
+        order,
+    )
+
+    mocked_adobe_client.create_customer_account.assert_called_once_with(
+        "US",
+        order["agreement"]["id"],
+        {param["externalId"]: param["value"] for param in order_parameters_factory()},
+    )
+
+    mocked_update_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": order_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="adobe-customer-id"
+            ),
+        },
+    )
+    assert updated_order == order
+
+
+def test_create_customer_account_empty_order_parameters(
+    mocker,
+    buyer,
+    order,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+):
+    """
+    Test create a customer account in Adobe.
+    Customer data must be taken getting the buyer associated with the order.
+    """
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_customer_account.return_value = "adobe-customer-id"
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_update_order_customer_id = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    mocked_update_order_customer_params = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    order["parameters"]["ordering"] = order_parameters_factory(
+        company_name="",
+        preferred_language="",
+        address={},
+        contact={},
+    )
+
+    create_customer_account(
+        mocked_mpt_client,
+        "US",
+        buyer,
+        order,
+    )
+
+    mocked_adobe_client.create_customer_account.assert_called_once_with(
+        "US",
+        order["agreement"]["id"],
+        {param["externalId"]: param["value"] for param in order_parameters_factory()},
+    )
+
+    mocked_update_order_customer_params.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": order_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(),
+        },
+    )
+
+    mocked_update_order_customer_id.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": order_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="adobe-customer-id"
+            ),
+        },
+    )
+
+
+def test_create_customer_account_address_error(
+    mocker,
+    buyer,
+    order,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_api_error_factory,
+    settings,
+):
+    """
+    Test address validation error handling when create a customer account in Adobe.
+    """
+    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"] = "TPL-0000"
+    mocked_adobe_client = mocker.MagicMock()
+    adobe_error = AdobeAPIError(
+        adobe_api_error_factory(
+            code=STATUS_INVALID_ADDRESS,
+            message="Invalid address",
+            details=["detail1", "detail2"],
+        ),
+    )
+    mocked_adobe_client.create_customer_account.side_effect = adobe_error
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_query_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.query_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        "US",
+        buyer,
+        order,
+    )
+
+    ordering_parameters = order_parameters_factory()
+    address_param = next(filter(lambda x: x["name"] == "Address", ordering_parameters))
+    address_param["error"] = ERR_ADOBE_ADDRESS.to_dict(
+        title=address_param["name"],
+        details=str(adobe_error),
+    )
+    address_param["constraints"] = {
+        "hidden": False,
+        "optional": False,
+    }
+    mocked_query_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": ordering_parameters,
+            "fulfillment": fulfillment_parameters_factory(),
+        },
+        templateId="TPL-0000",
+    )
+    assert updated_order is None
+
+
+@pytest.mark.parametrize(
+    ("param_external_id", "error_constant", "error_details"),
+    [
+        ("contact", ERR_ADOBE_CONTACT, "companyProfile.contacts[0].firstName"),
+        ("companyName", ERR_ADOBE_COMPANY_NAME, "companyProfile.companyName"),
+        (
+            "preferredLanguage",
+            ERR_ADOBE_PREFERRED_LANGUAGE,
+            "companyProfile.preferredLanguage",
+        ),
+    ],
+)
+def test_create_customer_account_fields_error(
+    mocker,
+    buyer,
+    order,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_api_error_factory,
+    settings,
+    param_external_id,
+    error_constant,
+    error_details,
+):
+    """
+    Test fields validation error handling when create a customer account in Adobe.
+    """
+    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"] = "TPL-0000"
+    mocked_adobe_client = mocker.MagicMock()
+    adobe_error = AdobeAPIError(
+        adobe_api_error_factory(
+            code=STATUS_INVALID_FIELDS,
+            message="Invalid fields",
+            details=[error_details],
+        ),
+    )
+    mocked_adobe_client.create_customer_account.side_effect = adobe_error
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_query_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.query_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        "US",
+        buyer,
+        order,
+    )
+
+    ordering_parameters = order_parameters_factory()
+    param = next(
+        filter(lambda x: x["externalId"] == param_external_id, ordering_parameters)
+    )
+    param["error"] = error_constant.to_dict(
+        title=param["name"],
+        details=str(adobe_error),
+    )
+    param["constraints"] = {
+        "hidden": False,
+        "optional": False,
+    }
+    mocked_query_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": ordering_parameters,
+            "fulfillment": fulfillment_parameters_factory(),
+        },
+        templateId="TPL-0000",
+    )
+    assert updated_order is None
+
+
+def test_create_customer_account_other_error(
+    mocker,
+    buyer,
+    order,
+    adobe_api_error_factory,
+):
+    """
+    Test unrecoverable error handling when create a customer account in Adobe.
+    """
+    mocked_adobe_client = mocker.MagicMock()
+    adobe_error = AdobeAPIError(
+        adobe_api_error_factory(
+            code=STATUS_ACCOUNT_ALREADY_EXISTS,
+            message="Account already exists.",
+        ),
+    )
+    mocked_adobe_client.create_customer_account.side_effect = adobe_error
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_fail_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.fail_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        "US",
+        buyer,
+        order,
+    )
+
+    mocked_fail_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        str(adobe_error),
+    )
+    assert updated_order is None

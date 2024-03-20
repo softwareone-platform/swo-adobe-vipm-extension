@@ -40,8 +40,8 @@ from adobe_vipm.flows.constants import (
     REGEX_EMAIL,
     REGEX_FIRST_LAST_NAME,
 )
+from adobe_vipm.flows.helpers import populate_order_info, prepare_customer_data
 from adobe_vipm.flows.mpt import get_buyer, get_product_items_by_skus
-from adobe_vipm.flows.shared import populate_order_info, prepare_customer_data
 from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_ordering_parameter,

@@ -12,6 +12,7 @@ from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
+    ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RETURN,
     STATUS_ORDER_CANCELLED,
     STATUS_PENDING,
@@ -438,6 +439,34 @@ class AdobeClient:
             reseller.distributor.credentials,
             correlation_id=adobe_preview_order["externalReferenceId"],
         )
+        response = requests.post(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def create_preview_renewal(
+        self,
+        reseller_country: str,
+        customer_id: str,
+    ) -> dict:
+        """
+        Creates a preview of the renewal for a given customer.
+
+        Args:
+            reseller_country (str): The country of the reseller to which the customer account
+            belongs to.
+            customer_id (str): Identifier of the customer account.
+
+        Returns:
+            dict: a preview of the renewal.
+        """
+        reseller: Reseller = self._config.get_reseller(reseller_country)
+        payload = {"orderType": ORDER_TYPE_PREVIEW_RENEWAL}
+        headers = self._get_headers(reseller.distributor.credentials)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,

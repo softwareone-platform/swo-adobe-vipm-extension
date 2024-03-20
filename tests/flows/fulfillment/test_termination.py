@@ -28,7 +28,7 @@ def test_termination(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -46,7 +46,7 @@ def test_termination(
     ]
     mocked_adobe_client.create_return_order.return_value = adobe_return_order
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
@@ -66,12 +66,12 @@ def test_termination(
     mocked_mpt_client = mocker.MagicMock()
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.update_order",
+        "adobe_vipm.flows.fulfillment.shared.update_order",
         return_value=processing_order,
     )
 
     mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.complete_order",
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
 
     fulfill_order(mocked_mpt_client, processing_order)
@@ -116,7 +116,7 @@ def test_termination_return_order_pending(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -134,7 +134,7 @@ def test_termination_return_order_pending(
     ]
     mocked_adobe_client.create_return_order.return_value = adobe_return_order
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
@@ -154,12 +154,12 @@ def test_termination_return_order_pending(
     mocked_mpt_client = mocker.MagicMock()
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.update_order",
+        "adobe_vipm.flows.fulfillment.shared.update_order",
         return_value=processing_order,
     )
 
     mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.complete_order",
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
 
     fulfill_order(mocked_mpt_client, processing_order)
@@ -193,14 +193,14 @@ def test_termination_out_window(
         * order completion
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
-    mocker.patch("adobe_vipm.flows.shared.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_subscription = adobe_subscription_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
@@ -223,12 +223,12 @@ def test_termination_out_window(
     mocked_mpt_client = mocker.MagicMock()
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.update_order",
+        "adobe_vipm.flows.fulfillment.shared.update_order",
         return_value=processing_order,
     )
 
     mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.complete_order",
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
 
     fulfill_order(mocked_mpt_client, processing_order)
