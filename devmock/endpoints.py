@@ -174,6 +174,20 @@ def create_subscription(
     return subscription
 
 
+@router.put("/commerce/orders/{order_id}/subscriptions/{id}")
+def update_subscription(
+    order_id: str,
+    id: str,
+    subscription: Subscription,
+):
+    load_order(order_id)
+    current_subscription = load_subscription(id)
+    if subscription.parameters:
+        current_subscription["parameters"] = subscription.parameters
+    save_subscription(current_subscription)
+    return current_subscription
+
+
 @router.get("/accounts/buyers/{id}")
 def get_buyer(id: str):
     return load_buyer(id)

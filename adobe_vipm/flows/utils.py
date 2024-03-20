@@ -445,3 +445,21 @@ def group_items_by_type(order):
         list(downsizing_items_in_window),
         list(downsizing_items_out_window),
     )
+
+
+def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
+    """
+    Get the line item from an Adobe order which subscription id match the
+    one given as an argument.
+
+    Args:
+        line_items (list): List of order line items.
+        subscription_id (str): Identifier of the subscription to search.
+
+    Returns:
+        dict: the line item corresponding to the given subscription id.
+    """
+    return find_first(
+        lambda item: item["subscriptionId"] == subscription_id,
+        line_items,
+    )

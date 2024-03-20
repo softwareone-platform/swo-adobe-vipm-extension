@@ -716,6 +716,7 @@ def test_mixed(
         * Adobe subscription update for downsizing out of window
         * order creation for the three items
         * subscription creation for new item
+        * subscription actual sku update for existing upsized items
     """
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -786,6 +787,16 @@ def test_mixed(
         items=adobe_order_items,
     )
 
+    adobe_sub_downsized_to_update = adobe_subscription_factory(
+        subscription_id="sub-1",
+        offer_id="sku-downsized",
+    )
+
+    adobe_sub_upsized_to_update = adobe_subscription_factory(
+        subscription_id="sub-2",
+        offer_id="sku-upsized",
+    )
+
     adobe_new_sub = adobe_subscription_factory(
         subscription_id="sub-3",
         offer_id="sku-new",
@@ -804,8 +815,18 @@ def test_mixed(
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocked_adobe_client.create_new_order.return_value = adobe_order
     mocked_adobe_client.get_order.return_value = adobe_order
+    mocked_adobe_client.create_preview_renewal.return_value = {
+        "lineItems": [
+            {
+                "subscriptionId": "sub-4",
+                "offerId": "sku-downsize-out-full-sku",
+            },
+        ],
+    }
     mocked_adobe_client.get_subscription.side_effect = [
         adobe_sub_to_update,
+        adobe_sub_downsized_to_update,
+        adobe_sub_upsized_to_update,
         adobe_new_sub,
     ]
     mocker.patch(
@@ -908,6 +929,10 @@ def test_mixed(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
     )
 
+    mocked_update_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_subscription",
+    )
+
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
@@ -970,6 +995,55 @@ def test_mixed(
             "startDate": adobe_new_sub["creationDate"],
         },
     )
+
+    assert mocked_update_subscription.mock_calls[0].args == (
+        mocked_mpt_client,
+        processing_change_order["id"],
+        order_subscriptions[2]["id"],
+    )
+    assert mocked_update_subscription.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": [
+                {
+                    "externalId": "adobeSKU",
+                    "value": "sku-downsize-out-full-sku",
+                },
+            ],
+        },
+    }
+
+    assert mocked_update_subscription.mock_calls[1].args == (
+        mocked_mpt_client,
+        processing_change_order["id"],
+        order_subscriptions[0]["id"],
+    )
+    assert mocked_update_subscription.mock_calls[1].kwargs == {
+        "parameters": {
+            "fulfillment": [
+                {
+                    "externalId": "adobeSKU",
+                    "value": adobe_sub_downsized_to_update["offerId"],
+                },
+            ],
+        },
+    }
+
+    assert mocked_update_subscription.mock_calls[2].args == (
+        mocked_mpt_client,
+        processing_change_order["id"],
+        order_subscriptions[1]["id"],
+    )
+    assert mocked_update_subscription.mock_calls[2].kwargs == {
+        "parameters": {
+            "fulfillment": [
+                {
+                    "externalId": "adobeSKU",
+                    "value": adobe_sub_upsized_to_update["offerId"],
+                },
+            ],
+        },
+    }
+
 
     mocked_complete_order.assert_called_once_with(
         mocked_mpt_client,

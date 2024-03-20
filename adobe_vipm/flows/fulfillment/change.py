@@ -12,13 +12,15 @@ from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
-    complete_order,
     handle_return_orders,
     save_adobe_order_id,
+    set_subscription_actual_sku,
+    switch_order_to_completed,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
+    get_adobe_line_item_by_subscription_id,
     get_adobe_order_id,
     get_adobe_subscription_id,
     get_order_line,
@@ -85,12 +87,13 @@ def _upsize_out_of_win_subscriptions(seller_country, customer_id, order, lines):
     return lines_to_order
 
 
-def _downsize_out_of_win_subscriptions(seller_country, customer_id, order, lines):
+def _downsize_out_of_win_subscriptions(mpt_client, seller_country, customer_id, order, lines):
     """
     Reduces the renewal quantity for subscriptions that need to be downsized but were created
     X days before the change order (outside the cancellation window).
 
     Args:
+        mpt_client: An instance of the MPT client used for communication with the MPT system.
         seller_country (str): Country code of the seller attached to this MPT order.
         customer_id (str): The ID used in Adobe to identify the customer attached
             to this MPT order.
@@ -102,12 +105,12 @@ def _downsize_out_of_win_subscriptions(seller_country, customer_id, order, lines
     """
     adobe_client = get_adobe_client()
     for line in lines:
-        subcription = get_subscription_by_line_and_item_id(
+        subscription = get_subscription_by_line_and_item_id(
             order["subscriptions"],
             line["item"]["id"],
             line["id"],
         )
-        adobe_sub_id = get_adobe_subscription_id(subcription)
+        adobe_sub_id = get_adobe_subscription_id(subscription)
         adobe_subscription = adobe_client.get_subscription(
             seller_country,
             customer_id,
@@ -121,6 +124,27 @@ def _downsize_out_of_win_subscriptions(seller_country, customer_id, order, lines
                 quantity=line["quantity"],
             )
 
+    renewal_preview = adobe_client.create_preview_renewal(seller_country, customer_id)
+
+    for line in lines:
+        subscription = get_subscription_by_line_and_item_id(
+            order["subscriptions"],
+            line["item"]["id"],
+            line["id"],
+        )
+        adobe_line_item = get_adobe_line_item_by_subscription_id(
+            renewal_preview["lineItems"],
+            subscription["externalIds"]["vendor"],
+        )
+        set_subscription_actual_sku(
+            mpt_client,
+            adobe_client,
+            seller_country,
+            customer_id,
+            order,
+            subscription,
+            sku=adobe_line_item["offerId"],
+        )
 
 def _submit_change_order(mpt_client, seller_country, customer_id, order):
     adobe_client = get_adobe_client()
@@ -143,6 +167,7 @@ def _submit_change_order(mpt_client, seller_country, customer_id, order):
 
         if grouped_items.downsizing_out_win:
             _downsize_out_of_win_subscriptions(
+                mpt_client,
                 seller_country,
                 customer_id,
                 order,
@@ -217,7 +242,7 @@ def fulfill_change_order(mpt_client, seller_country, order):
 
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
-        complete_order(mpt_client, order)
+        switch_order_to_completed(mpt_client, order)
         return
 
     adobe_order = check_adobe_order_fulfilled(
@@ -241,5 +266,9 @@ def fulfill_change_order(mpt_client, seller_country, order):
             add_subscription(
                 mpt_client, adobe_client, seller_country, customer_id, order, item
             )
+        else:
+            set_subscription_actual_sku(
+                mpt_client, adobe_client, seller_country, customer_id, order, order_subscription,
+            )
 
-    complete_order(mpt_client, order)
+    switch_order_to_completed(mpt_client, order)

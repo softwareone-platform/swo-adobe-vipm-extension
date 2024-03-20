@@ -22,9 +22,9 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
-    complete_order,
     save_adobe_customer_id,
     save_adobe_order_id,
+    switch_order_to_completed,
     switch_order_to_failed,
     switch_order_to_query,
 )
@@ -188,4 +188,4 @@ def fulfill_purchase_order(mpt_client, seller_country, order):
             mpt_client, adobe_client, seller_country, customer_id, order, item
         )
 
-    complete_order(mpt_client, order)
+    switch_order_to_completed(mpt_client, order)

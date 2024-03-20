@@ -14,10 +14,12 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.flows.constants import PARAM_ADOBE_SKU
 from adobe_vipm.flows.mpt import (
+    complete_order,
     create_subscription,
     fail_order,
     query_order,
     update_order,
+    update_subscription,
 )
 from adobe_vipm.flows.utils import (
     get_order_line_by_sku,
@@ -137,7 +139,6 @@ def handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
     reason = f"Max processing attemps reached ({max_attemps})."
     fail_order(mpt_client, order["id"], reason)
     logger.warning(f"Order {order['id']} has been failed: {reason}.")
-    return
 
 
 def reset_retries(mpt_client, order):
@@ -256,7 +257,7 @@ def handle_return_orders(
     return completed_order_ids, order
 
 
-def complete_order(mpt_client, order):
+def switch_order_to_completed(mpt_client, order):
     """
     Reset the retry count to zero and switch the MPT order
     to completed using the completed template.
@@ -322,4 +323,30 @@ def add_subscription(
     logger.info(
         f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
         f'created for order {order["id"]}'
+    )
+
+
+def set_subscription_actual_sku(
+    mpt_client, adobe_client, seller_country, customer_id, order, subscription, sku=None,
+):
+    if not sku:
+        adobe_subscription = adobe_client.get_subscription(
+            seller_country,
+            customer_id,
+            subscription["externalIds"]["vendor"],
+        )
+        sku = adobe_subscription["offerId"]
+
+    return update_subscription(
+        mpt_client,
+        order["id"],
+        subscription["id"],
+        parameters={
+            "fulfillment": [
+                {
+                    "externalId": PARAM_ADOBE_SKU,
+                    "value": sku,
+                },
+            ],
+        },
     )

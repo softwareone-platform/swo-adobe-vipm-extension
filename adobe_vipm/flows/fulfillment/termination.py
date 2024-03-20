@@ -6,8 +6,8 @@ processing.
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows.fulfillment.shared import (
-    complete_order,
     handle_return_orders,
+    switch_order_to_completed,
 )
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
@@ -77,7 +77,7 @@ def fulfill_termination_order(mpt_client, seller_country, order):
         grouped_items.upsizing_in_win + grouped_items.downsizing_in_win
     )
     if not has_orders_to_return:
-        complete_order(mpt_client, order)
+        switch_order_to_completed(mpt_client, order)
         return
 
     completed_return_orders, order = handle_return_orders(
@@ -90,4 +90,4 @@ def fulfill_termination_order(mpt_client, seller_country, order):
     )
 
     if completed_return_orders:
-        complete_order(mpt_client, order)
+        switch_order_to_completed(mpt_client, order)

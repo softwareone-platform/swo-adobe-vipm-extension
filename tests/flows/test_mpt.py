@@ -13,6 +13,7 @@ from adobe_vipm.flows.mpt import (
     get_seller,
     query_order,
     update_order,
+    update_subscription,
 )
 
 
@@ -290,6 +291,68 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
 
     with pytest.raises(MPTError) as cv:
         create_subscription(mpt_client, "ORD-0000", {})
+
+    assert cv.value.payload["status"] == 404
+
+
+
+def test_update_subscription(mpt_client, requests_mocker, subscriptions_factory):
+    """Test the call to update a subscription."""
+    subscription = subscriptions_factory()
+    requests_mocker.put(
+        urljoin(
+            mpt_client.base_url,
+            "commerce/orders/ORD-0000/subscriptions/SUB-1234",
+        ),
+        json=subscription,
+        match=[
+            matchers.json_params_matcher(
+                {
+                    "parameters": {
+                        "fulfillment": [
+                            {
+                                "externalId": "a-param",
+                                "name": "a-param",
+                                "value": "a-value",
+                                "type": "SingleLineText",
+                            }
+                        ],
+                    },
+                },
+            ),
+        ],
+    )
+
+    updated_subscription = update_subscription(
+        mpt_client,
+        "ORD-0000",
+        "SUB-1234",
+        parameters={
+            "fulfillment": [
+                {
+                    "externalId": "a-param",
+                    "name": "a-param",
+                    "value": "a-value",
+                    "type": "SingleLineText",
+                }
+            ]
+        },
+    )
+    assert updated_subscription == subscription
+
+
+def test_update_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
+    """
+    Test the call to update a subscription when it fails.
+    """
+    requests_mocker.put(
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-0000/subscriptions/SUB-1234"),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Order not found"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        update_subscription(mpt_client, "ORD-0000", "SUB-1234", parameters={})
 
     assert cv.value.payload["status"] == 404
 
