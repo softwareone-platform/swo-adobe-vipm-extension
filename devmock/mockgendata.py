@@ -25,10 +25,14 @@ from devmock.utils import (
     load_subscription,
     save_account,
     save_agreement,
+    save_authorization,
     save_buyer,
     save_item,
     save_licensee,
+    save_listing,
     save_order,
+    save_pricelist,
+    save_pricelist_item,
     save_seller,
     save_subscription,
 )
@@ -262,13 +266,136 @@ def gen_buyer(fake, client):
     return buyer
 
 
+def gen_authorization(fake, product, vendor, seller, currency="USD"):
+    auth_id = generate_random_id("AUT", 8, 4)
+    authorization = {
+        "id": auth_id,
+        "href": f"/v1/authorizations/{auth_id}",
+        "currency": currency,
+        "name": "Adobe VIP MP Authorization",
+        "product": product,
+        "vendor": get_reference(vendor),
+        "owner": get_reference(seller),
+    }
+    save_authorization(authorization)
+    console.print(f"[green]✓[/green] Authorization {auth_id} - {authorization['name']} generated")
+    return authorization
+
+def gen_pricelist(fake, product, vendor, currency="USD"):
+    pl_id = generate_random_id("PRC", 12, 4)
+    pricelist = {
+        "id": pl_id,
+        "href": f"/v1/price-lists/{pl_id}",
+        "currency": currency,
+        "precision": 3,
+        "defaultMarkup": float(fake.pydecimal(left_digits=0, right_digits=3, positive=True, min_value=0.001, max_value=0.45)),
+        "product": product,
+        "vendor": get_reference(vendor),
+    }
+    save_pricelist(pricelist)
+    console.print(f"[green]✓[/green] Price List {pl_id} generated")
+    return pricelist
+
+
+def gen_listing(fake, product, authorization, seller, price_list):
+    lst_id = generate_random_id("LST", 8, 4)
+    listing = {
+        "id": lst_id,
+        "href": f"/listing/{lst_id}",
+        "product": product,
+        "authorization": get_reference(authorization),
+        "seller": get_reference(seller),
+        "priceList": get_reference(price_list),
+        "primary": True,
+        "audit": gen_audit(fake),
+    }
+    save_listing(listing)
+    console.print(f"[green]✓[/green] Listing {lst_id} generated")
+    return listing
+
+def gen_pricelist_items(fake, pricelist):
+    pl_id = pricelist["id"]
+    pl_base_id = base_id_from(pricelist["id"])
+    idx = 1
+    for adobe_item in ADOBE_CONFIG["skus_mapping"]:
+        item = load_item(adobe_item["vendor_external_id"])
+        pl_item_id = f"PRI-{pl_base_id}-{idx:04d}"
+        unit_pp = float(fake.pydecimal(left_digits=4, right_digits=3, positive=True))
+        unit_sp = unit_pp * (1 + pricelist["defaultMarkup"])
+
+        pricelist_item = {
+            "id": pl_item_id,
+            "href": f"/price-lists/{pl_id}/price-list-items/{pl_item_id}",
+            "forSale": True,
+            "unitPP": unit_pp,
+            "unitSP": unit_sp,
+            "unitLP": unit_sp,
+            "PPxM": unit_pp,
+            "PPxY": 12 * unit_pp,
+            "SPxM": unit_sp,
+            "SPxY": 12 * unit_sp,
+            "markup": pricelist["defaultMarkup"],
+            "margin": pricelist["defaultMarkup"] / (1 + pricelist["defaultMarkup"]),
+            "priceList": get_reference(pricelist),
+            "item": get_reference(item),
+        }
+        save_pricelist_item(pricelist_item)
+        console.print(
+            f"[green]✓[/green] Pricelist item {pl_item_id} - {adobe_item['name']} ({adobe_item['vendor_external_id']}) generated",
+        )
+        idx += 1
+        for discount_level, discount_rate in (
+            ("02", 0.1),
+            ("03", 0.12),
+            ("04", 0.15),
+            ("12", 0.2),
+            ("13", 0.22),
+            ("14", 0.25),
+        ):
+            full_sku = f"{adobe_item['vendor_external_id']}{discount_level}A12"
+            pl_item_id = f"PRI-{pl_base_id}-{idx:04d}"
+            item = load_item(full_sku)
+            pricelist_item = {
+                "id": pl_item_id,
+                "href": f"/price-lists/{pl_id}/price-list-items/{pl_item_id}",
+                "forSale": True,
+                "unitPP": unit_pp * (1 - discount_rate),
+                "unitSP": unit_sp * (1 - discount_rate),
+                "unitLP": unit_sp * (1 - discount_rate),
+                "PPxM": unit_pp * (1 - discount_rate),
+                "PPxY": 12 * unit_pp * (1 - discount_rate),
+                "SPxM": unit_sp * (1 - discount_rate),
+                "SPxY": 12 * unit_sp * (1 - discount_rate),
+                "markup": pricelist["defaultMarkup"],
+                "margin": pricelist["defaultMarkup"] / (1 + pricelist["defaultMarkup"]),
+                "priceList": get_reference(pricelist),
+                "item": get_reference(item),
+            }
+            save_pricelist_item(pricelist_item)
+            console.print(
+                f"[green]✓[/green] Pricelist item {pl_item_id} - {adobe_item['name']} ({full_sku}) generated",
+            )
+            idx += 1
+
 def gen_agreement(fake, product_id):
     agr_id = generate_random_id("AGR", 12, 4)
+    product = {
+        "id": product_id,
+        "href": f"/catalog/products/{product_id}",
+        "name": "Adobe VIP Marketplace for Commercial",
+        "icon": f"/static/{product_id}/logo.png",
+    }
     client = gen_account(fake)
     buyer = gen_buyer(fake, client)
     seller = gen_seller(fake)
     vendor = gen_account(fake, "Vendor")
     licensee = gen_licensee(fake, buyer, seller)
+    authorization = gen_authorization(fake, product, vendor, seller)
+    pricelist = gen_pricelist(fake, product, vendor)
+    listing = gen_listing(fake, product, authorization, seller, pricelist)
+    gen_pricelist_items(fake, pricelist)
+
+
     agreement = {
         "id": agr_id,
         "href": f"/v1/commerce/agreements/{agr_id}",
@@ -279,12 +406,7 @@ def gen_agreement(fake, product_id):
         "licensee": get_reference(licensee),
         "buyer": get_reference(buyer, DEFAULT_FIELDS),
         "seller": seller,
-        "product": {
-            "id": product_id,
-            "href": f"/catalog/products/{product_id}",
-            "name": "Adobe VIP Marketplace for Commercial",
-            "icon": f"/static/{product_id}/logo.png",
-        },
+        "product": product,
         "price": {
             "PPxY": 150,
             "PPxM": 12.50,
@@ -294,6 +416,7 @@ def gen_agreement(fake, product_id):
             "margin": 0.11,
             "currency": "USD",
         },
+        "listing": get_reference(listing),
         "audit": gen_audit(fake),
     }
     save_agreement(agreement)
@@ -553,7 +676,8 @@ def gen_transfer_order(
 def gen_items(fake):
     product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111")
     item_base_id = base_id_from(product_id)
-    for idx, item in enumerate(ADOBE_CONFIG["skus_mapping"], start=1):
+    idx = 1
+    for item in ADOBE_CONFIG["skus_mapping"]:
         item_id = f"ITM-{item_base_id}-{idx:04d}"
         prod_item = {
             "id": item_id,
@@ -572,8 +696,32 @@ def gen_items(fake):
         }
         save_item(prod_item, item["vendor_external_id"])
         console.print(
-            f"[green]✓[/green] Item {item_id} - {item['name']} generated",
+            f"[green]✓[/green] Item {item_id} - {item['name']} ({item['vendor_external_id']}) generated",
         )
+        idx += 1
+        for discount_level in ("02", "03", "04", "12", "13", "14"):
+            full_sku = f"{item['vendor_external_id']}{discount_level}A12"
+            item_id = f"ITM-{item_base_id}-{idx:04d}"
+            prod_item = {
+                "id": item_id,
+                "href": f"/product-items/{item_id}",
+                "name": item["name"],
+                "description": item["name"],
+                "externalIds": {
+                    "vendor": full_sku,
+                },
+                "status": "draft",
+                "product": {
+                    "id": product_id,
+                    "name": "Adobe VIP Marketplace for Commercial",
+                },
+                "audit": gen_audit(fake)
+            }
+            save_item(prod_item, full_sku)
+            console.print(
+                f"[green]✓[/green] Item {item_id} - {item['name']} ({full_sku}) generated",
+            )
+            idx += 1
 
 
 @click.group()
