@@ -13,6 +13,12 @@ AGREEMENTS_FOLDER = os.path.join(
     "agreements",
 )
 
+AUTHORIZATIONS_FOLDER = os.path.join(
+    os.path.dirname(__file__),
+    "data",
+    "authorizations",
+)
+
 
 LICENSEES_FOLDER = os.path.join(
     os.path.dirname(__file__),
@@ -52,6 +58,25 @@ ITEMS_FOLDER = os.path.join(
     os.path.dirname(__file__),
     "data",
     "items",
+)
+
+PRICELISTS_FOLDER = os.path.join(
+    os.path.dirname(__file__),
+    "data",
+    "pricelists",
+)
+
+PRICELIST_ITEMS_FOLDER = os.path.join(
+    os.path.dirname(__file__),
+    "data",
+    "pricelist_items",
+)
+
+
+LISTINGS_FOLDER = os.path.join(
+    os.path.dirname(__file__),
+    "data",
+    "listings",
 )
 
 

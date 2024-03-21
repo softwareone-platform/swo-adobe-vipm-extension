@@ -8,9 +8,9 @@ import requests
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from devmock.filters import ItemsFilter, OrdersFilter
+from devmock.filters import ItemsFilter, OrdersFilter, PriceListItemFilter
 from devmock.models import Order, Subscription
-from devmock.settings import ITEMS_FOLDER, ORDERS_FOLDER, WEBHOOK_ENDPOINT
+from devmock.settings import ITEMS_FOLDER, ORDERS_FOLDER, PRICELIST_ITEMS_FOLDER, WEBHOOK_ENDPOINT
 from devmock.utils import (
     base_id_from,
     gen_jwt_token,
@@ -18,8 +18,11 @@ from devmock.utils import (
     get_line_for_subscription,
     get_reference,
     load_agreement,
+    load_authorization,
     load_buyer,
+    load_listing,
     load_order,
+    load_pricelist,
     load_seller,
     load_subscription,
     save_agreement,
@@ -60,6 +63,14 @@ def list_orders(request: Request):
 @router.get("/commerce/orders/{id}")
 def get_order(id: str):
     return load_order(id)
+
+
+@router.post("/commerce/orders/{id}/process")
+def process_order(id: str):
+    order = load_order(id)
+    order["status"] = "processing"
+    save_order(order)
+    return order
 
 
 @router.put("/commerce/orders/{id}")
@@ -200,7 +211,20 @@ def get_seller(id: str):
 
 @router.get("/commerce/agreements/{id}")
 def get_agreement(id: str):
-    return load_agreement(id)
+    agreement = load_agreement(id)
+    listing = load_listing(agreement["listing"]["id"])
+    agreement["listing"] = listing
+    return agreement
+
+
+@router.get("/price-lists/{id}")
+def get_pricelist(id: str):
+    return load_pricelist(id)
+
+
+@router.get("/autorizations/{id}")
+def get_authorization(id: str):
+    return load_authorization(id)
 
 
 @router.get("/commerce/orders/{order_id}/subscriptions")
@@ -265,6 +289,28 @@ def list_product_items(request: Request):
 
     query = unquote(request.scope.get("query_string", b"").decode())
     filter_instance = ItemsFilter()
+    filtered_items, count, limit, offset = filter_instance.apply(query, items)
+    response["data"] = filtered_items
+    response["$meta"] = {"pagination": {"offset": offset, "limit": limit, "total": count}}
+    return response
+
+
+@router.get("/price-lists/{pid}/price-items")
+def list_priceslist_items(request: Request, pid: str):
+    items = []
+    response = {
+        "data": [],
+    }
+    pricelist = load_pricelist(pid)
+    items_files = glob.glob(os.path.join(PRICELIST_ITEMS_FOLDER, f"PRI-{base_id_from(pid)}-*.json"))
+
+    for item_file in items_files:
+        with open(os.path.join(PRICELIST_ITEMS_FOLDER, item_file), "r") as f:
+            item = json.load(f)
+            items.append(item)
+
+    query = unquote(request.scope.get("query_string", b"").decode())
+    filter_instance = PriceListItemFilter()
     filtered_items, count, limit, offset = filter_instance.apply(query, items)
     response["data"] = filtered_items
     response["$meta"] = {"pagination": {"offset": offset, "limit": limit, "total": count}}

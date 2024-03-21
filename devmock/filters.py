@@ -71,3 +71,14 @@ class ItemsFilter(FilterClass):
             "filter": "externalIds.vendor",
         },
     ]
+
+
+class PriceListItemFilter(FilterClass):
+    FILTERS = [
+        {
+            "filter": "priceList.id",
+        },
+        {
+            "filter": "item.id",
+        },    
+    ]
