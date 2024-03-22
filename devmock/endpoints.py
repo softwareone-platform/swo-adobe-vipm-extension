@@ -23,6 +23,7 @@ from devmock.utils import (
     load_listing,
     load_order,
     load_pricelist,
+    load_pricelist_item,
     load_seller,
     load_subscription,
     save_agreement,
@@ -162,16 +163,29 @@ def create_subscription(
 ):
     order = load_order(id)
     agreement = load_agreement(order["agreement"]["id"])
+
+
     if "subscriptions" not in agreement:
         agreement["subscriptions"] = []
     order_lines = {line["id"]: line for line in order["lines"]}
+    subscription_lines = [
+        get_line_for_subscription(order_lines[line["id"]]) for line in subscription.lines
+    ]
+    item_id = subscription_lines[0]["item"]["id"]
+
+    pricelist_id = agreement["listing"]["priceList"]["id"]
+    pricelist_item_id = f"PRI-{base_id_from(pricelist_id)}-{item_id[-4:]}"
+
+    pricelist_item = load_pricelist_item(pricelist_item_id)
+
     subscription = {
         "id": generate_random_id("SUB", 16, 4),
         "name": subscription.name,
         "parameters": subscription.parameters,
-        "lines": [
-            get_line_for_subscription(order_lines[line["id"]]) for line in subscription.lines
-        ],
+        "lines": subscription_lines,
+        "price": {
+            "unitPP": pricelist_item["unitPP"],
+        },
         "startDate": subscription.start_date,
         "externalIds": subscription.external_ids,
         "status": "active",
@@ -195,6 +209,8 @@ def update_subscription(
     current_subscription = load_subscription(id)
     if subscription.parameters:
         current_subscription["parameters"] = subscription.parameters
+    if subscription.price:
+        current_subscription["price"] = subscription.price
     save_subscription(current_subscription)
     return current_subscription
 

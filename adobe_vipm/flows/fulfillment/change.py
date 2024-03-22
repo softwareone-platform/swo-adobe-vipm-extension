@@ -14,7 +14,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     check_adobe_order_fulfilled,
     handle_return_orders,
     save_adobe_order_id,
-    set_subscription_actual_sku,
+    set_subscription_actual_sku_and_purchase_price,
     switch_order_to_completed,
     switch_order_to_failed,
 )
@@ -138,7 +138,7 @@ def _downsize_out_of_win_subscriptions(
             renewal_preview["lineItems"],
             subscription["externalIds"]["vendor"],
         )
-        set_subscription_actual_sku(
+        set_subscription_actual_sku_and_purchase_price(
             mpt_client,
             adobe_client,
             seller_country,
@@ -247,14 +247,12 @@ def fulfill_change_order(mpt_client, seller_country, order):
     if not adobe_order_id:
         switch_order_to_completed(mpt_client, order)
         return
-
     adobe_order = check_adobe_order_fulfilled(
         mpt_client, adobe_client, seller_country, order, customer_id, adobe_order_id
     )
 
     if not adobe_order:
         return
-
     for item in adobe_order["lineItems"]:
         order_line = get_order_line(
             order,
@@ -270,13 +268,8 @@ def fulfill_change_order(mpt_client, seller_country, order):
                 mpt_client, adobe_client, seller_country, customer_id, order, item
             )
         else:
-            set_subscription_actual_sku(
-                mpt_client,
-                adobe_client,
-                seller_country,
-                customer_id,
-                order,
-                order_subscription,
+            set_subscription_actual_sku_and_purchase_price(
+                mpt_client, adobe_client, seller_country, customer_id, order, order_subscription,
             )
 
     switch_order_to_completed(mpt_client, order)
