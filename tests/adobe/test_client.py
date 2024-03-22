@@ -439,7 +439,6 @@ def test_create_new_order_bad_request(
     assert repr(cv.value) == str(error)
 
 
-
 def test_create_preview_renewal(
     mocker,
     requests_mocker,

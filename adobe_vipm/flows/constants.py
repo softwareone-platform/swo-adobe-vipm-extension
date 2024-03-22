@@ -104,3 +104,8 @@ ERR_PHONE_NUMBER_LENGTH = (
     "The provided `Phone number` is too long, "
     f"the maximum length is {MAXLEN_PHONE_NUMBER} characters"
 )
+
+ERR_VIPM_UNHANDLED_EXCEPTION = ValidationError(
+    "VIPM001",
+    "Order can't be processed. Failure reason: {error}",
+)

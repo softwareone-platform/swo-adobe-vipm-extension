@@ -26,7 +26,10 @@ def test_fail_order(mpt_client, requests_mocker, order_factory):
         match=[
             matchers.json_params_matcher(
                 {
-                    "statusNotes": "a-reason",
+                    "statusNotes": {
+                        "id": "VIPM001",
+                        "message": "Order can't be processed. Failure reason: a-reason"
+                    },
                 },
             ),
         ],
@@ -293,7 +296,6 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
         create_subscription(mpt_client, "ORD-0000", {})
 
     assert cv.value.payload["status"] == 404
-
 
 
 def test_update_subscription(mpt_client, requests_mocker, subscriptions_factory):

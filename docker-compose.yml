@@ -59,7 +59,7 @@ services:
       context: .
       dockerfile: dev.Dockerfile
     working_dir: /extension
-    command: ruff format .
+    command: bash -c "ruff check . --select I --fix && ruff format ."
     volumes:
       - .:/extension
     env_file:

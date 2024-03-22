@@ -1044,7 +1044,6 @@ def test_mixed(
         },
     }
 
-
     mocked_complete_order.assert_called_once_with(
         mocked_mpt_client,
         processing_change_order["id"],
