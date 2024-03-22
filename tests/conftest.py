@@ -437,6 +437,14 @@ def agreement():
             },
             "updated": None,
         },
+        "listing": {
+            "id": "LST-9401-9279",
+            "href": "/listing/LST-9401-9279",
+            "priceList": {
+                "id": "PRC-9457-4272-3691",
+                "href": "/v1/price-lists/PRC-9457-4272-3691"
+            },
+        },
         "licensee": None,
         "buyer": {
             "id": "BUY-3731-7971",

@@ -25,6 +25,8 @@ def test_transfer(
     adobe_transfer_factory,
     adobe_items_factory,
     adobe_subscription_factory,
+    items_factory,
+    subscriptions_factory,
 ):
     """
     Tests the processing of a transfer order including:
@@ -61,9 +63,25 @@ def test_transfer(
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
+    subscription = subscriptions_factory()[0]
     mocked_create_subscription = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.create_subscription"
+        "adobe_vipm.flows.fulfillment.shared.create_subscription",
+        return_value=subscription,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
+        return_value=items_factory(),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_pricelist_item_by_product_item",
+        return_value={
+            "unitPP": 200.12,
+        },
+    )
+    mocked_update_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_subscription",
+    )
+
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
@@ -122,6 +140,22 @@ def test_transfer(
                 },
             ],
             "startDate": adobe_subscription["creationDate"],
+        },
+    )
+    mocked_update_subscription.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        subscription["id"],
+        parameters={
+            "fulfillment": [
+                {
+                    "externalId": "adobeSKU",
+                    "value": adobe_subscription["offerId"],
+                },
+            ],
+        },
+        price={
+            "unitPP": 200.12,
         },
     )
     mocked_complete_order.assert_called_once_with(

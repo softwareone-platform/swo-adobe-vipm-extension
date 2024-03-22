@@ -17,6 +17,8 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
+    get_pricelist_item_by_product_item,
+    get_product_items_by_skus,
     query_order,
     update_order,
     update_subscription,
@@ -320,21 +322,43 @@ def add_subscription(
         "startDate": adobe_subscription["creationDate"],
     }
     subscription = create_subscription(mpt_client, order["id"], subscription)
+    subscription = set_subscription_actual_sku_and_purchase_price(
+        mpt_client,
+        adobe_client,
+        seller_country,
+        customer_id,
+        order,
+        subscription,
+        sku=item["offerId"],
+    )
     logger.info(
         f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
         f'created for order {order["id"]}'
     )
 
 
-def set_subscription_actual_sku(
-    mpt_client,
-    adobe_client,
-    seller_country,
-    customer_id,
-    order,
-    subscription,
-    sku=None,
+def set_subscription_actual_sku_and_purchase_price(
+    mpt_client, adobe_client, seller_country, customer_id, order, subscription, sku=None,
 ):
+    """
+    Set the subscription fullfilment parameter to store the actual SKU
+    (Adobe SKU with discount level) and updates the unit purchase price of the
+    subscription according to such SKU.
+
+    Args:
+        mpt_client (MPTClient): An instance of the Marketplace platform client.
+        adobe_client (AdobeClient): An instance of the Adobe client for communication with the
+            Adobe API.
+        seller_country (str): Country code of the seller attached to this MPT order.
+        customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
+        order (dict): The MPT order to which the subscription will be added.
+        subscription (dict): The MPT subscription that need to be updated.
+        sku (str, optional): The Adobe full SKU. If None a lookup to the corresponding
+        Adobe subscription will be done to retreive such SKU.
+
+    Returns:
+        dict: The updated MPT subscription.
+    """
     if not sku:
         adobe_subscription = adobe_client.get_subscription(
             seller_country,
@@ -342,6 +366,15 @@ def set_subscription_actual_sku(
             subscription["externalIds"]["vendor"],
         )
         sku = adobe_subscription["offerId"]
+
+
+    pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
+    product_id = order["agreement"]["product"]["id"]
+    product_items = get_product_items_by_skus(mpt_client, product_id, [sku])
+
+    pricelist_item = get_pricelist_item_by_product_item(
+        mpt_client, pricelist_id, product_items[0]["id"],
+    )
 
     return update_subscription(
         mpt_client,
@@ -354,5 +387,8 @@ def set_subscription_actual_sku(
                     "value": sku,
                 },
             ],
+        },
+        price={
+            "unitPP": pricelist_item["unitPP"],
         },
     )

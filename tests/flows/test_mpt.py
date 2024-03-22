@@ -9,6 +9,7 @@ from adobe_vipm.flows.mpt import (
     create_subscription,
     fail_order,
     get_buyer,
+    get_pricelist_item_by_product_item,
     get_product_items_by_skus,
     get_seller,
     query_order,
@@ -425,5 +426,52 @@ def test_get_product_items_by_skus_error(
 
     with pytest.raises(MPTError) as cv:
         get_product_items_by_skus(mpt_client, product_id, skus)
+
+    assert cv.value.payload["status"] == 500
+
+
+
+def test_get_pricelist_item_by_product_item(mpt_client, requests_mocker):
+    """
+    Tests the call to retrieve a pricelist item given the pricelist id and
+    the product item id.
+    """
+
+    url = "price-lists/PRC-1234/price-items?eq(item.id,ITM-5678)"
+    url = f"{url}&limit=10&offset=0"
+    pl_item = {"unitPP": 100}
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 0,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": [pl_item]
+        },
+    )
+    assert get_pricelist_item_by_product_item(mpt_client, "PRC-1234", "ITM-5678") == pl_item
+
+
+def test_get_pricelist_item_by_product_item_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
+    """
+    Tests the call to retrieve a pricelist item given the pricelist id and
+    the product item id when it fails.
+    """
+    url = "price-lists/PRC-1234/price-items?eq(item.id,ITM-5678)"
+    url = f"{url}&limit=10&offset=0"
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, url),
+        status=500,
+        json=mpt_error_factory(500, "Internal server error", "Whatever"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        get_pricelist_item_by_product_item(mpt_client, "PRC-1234", "ITM-5678")
 
     assert cv.value.payload["status"] == 500

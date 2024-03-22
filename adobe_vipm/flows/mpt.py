@@ -16,7 +16,7 @@ def _has_more_pages(page):
 @wrap_http_error
 def get_agreement(mpt_client, agreement_id):
     response = mpt_client.get(
-        f"/commerce/agreements/{agreement_id}?select=seller,buyer"
+        f"/commerce/agreements/{agreement_id}?select=seller,buyer,listing"
     )
     response.raise_for_status()
     return response.json()
@@ -114,3 +114,14 @@ def get_product_items_by_skus(mpt_client, product_id, skus):
         offset += limit
 
     return items
+
+
+@wrap_http_error
+def get_pricelist_item_by_product_item(mpt_client, pricelist_id, product_item_id):
+    url = f"/price-lists/{pricelist_id}/price-items?eq(item.id,{product_item_id})"
+    limit = 10
+    offset = 0
+    response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
+    response.raise_for_status()
+    page = response.json()
+    return page["data"][0]
