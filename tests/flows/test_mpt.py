@@ -298,7 +298,6 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
     assert cv.value.payload["status"] == 404
 
 
-
 def test_update_subscription(mpt_client, requests_mocker, subscriptions_factory):
     """Test the call to update a subscription."""
     subscription = subscriptions_factory()

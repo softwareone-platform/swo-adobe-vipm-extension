@@ -327,7 +327,13 @@ def add_subscription(
 
 
 def set_subscription_actual_sku(
-    mpt_client, adobe_client, seller_country, customer_id, order, subscription, sku=None,
+    mpt_client,
+    adobe_client,
+    seller_country,
+    customer_id,
+    order,
+    subscription,
+    sku=None,
 ):
     if not sku:
         adobe_subscription = adobe_client.get_subscription(

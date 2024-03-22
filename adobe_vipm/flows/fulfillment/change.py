@@ -87,7 +87,9 @@ def _upsize_out_of_win_subscriptions(seller_country, customer_id, order, lines):
     return lines_to_order
 
 
-def _downsize_out_of_win_subscriptions(mpt_client, seller_country, customer_id, order, lines):
+def _downsize_out_of_win_subscriptions(
+    mpt_client, seller_country, customer_id, order, lines
+):
     """
     Reduces the renewal quantity for subscriptions that need to be downsized but were created
     X days before the change order (outside the cancellation window).
@@ -145,6 +147,7 @@ def _downsize_out_of_win_subscriptions(mpt_client, seller_country, customer_id, 
             subscription,
             sku=adobe_line_item["offerId"],
         )
+
 
 def _submit_change_order(mpt_client, seller_country, customer_id, order):
     adobe_client = get_adobe_client()
@@ -268,7 +271,12 @@ def fulfill_change_order(mpt_client, seller_country, order):
             )
         else:
             set_subscription_actual_sku(
-                mpt_client, adobe_client, seller_country, customer_id, order, order_subscription,
+                mpt_client,
+                adobe_client,
+                seller_country,
+                customer_id,
+                order,
+                order_subscription,
             )
 
     switch_order_to_completed(mpt_client, order)
