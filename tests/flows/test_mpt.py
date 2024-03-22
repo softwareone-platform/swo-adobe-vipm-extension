@@ -26,7 +26,10 @@ def test_fail_order(mpt_client, requests_mocker, order_factory):
         match=[
             matchers.json_params_matcher(
                 {
-                    "statusNotes": "a-reason",
+                    "statusNotes": {
+                        "id": "VIPM001",
+                        "message": "Order can't be processed. Failure reason: a-reason"
+                    },
                 },
             ),
         ],

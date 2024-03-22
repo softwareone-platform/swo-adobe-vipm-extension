@@ -1,5 +1,6 @@
 import logging
 
+from adobe_vipm.flows.constants import ERR_VIPM_UNHANDLED_EXCEPTION
 from adobe_vipm.flows.errors import wrap_http_error
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def query_order(mpt_client, order_id, **kwargs):
 def fail_order(mpt_client, order_id, reason):
     response = mpt_client.post(
         f"/commerce/orders/{order_id}/fail",
-        json={"statusNotes": reason},
+        json={"statusNotes": ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason)},
     )
     response.raise_for_status()
     return response.json()
