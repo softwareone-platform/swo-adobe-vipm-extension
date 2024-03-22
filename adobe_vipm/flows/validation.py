@@ -40,7 +40,11 @@ from adobe_vipm.flows.constants import (
     REGEX_EMAIL,
     REGEX_FIRST_LAST_NAME,
 )
-from adobe_vipm.flows.helpers import populate_order_info, prepare_customer_data
+from adobe_vipm.flows.helpers import (
+    populate_order_info,
+    prepare_customer_data,
+    update_purchase_prices,
+)
 from adobe_vipm.flows.mpt import get_buyer, get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
@@ -251,7 +255,10 @@ def validate_order(mpt_client, order):
         has_errors, order = validate_customer_data(order, customer_data)
     elif is_transfer_order(order):  # pragma: no branch
         has_errors, order = validate_transfer(mpt_client, order)
-
+    if not has_errors:
+        adobe_client = get_adobe_client()
+        seller_country = order["agreement"]["seller"]["address"]["country"]
+        order = update_purchase_prices(mpt_client, adobe_client, seller_country, order)
     logger.info(
         f"Validation of order {order['id']} succeeded with{'out' if not has_errors else ''} errors"
     )

@@ -17,7 +17,7 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
-    get_pricelist_item_by_product_item,
+    get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     query_order,
     update_order,
@@ -372,9 +372,10 @@ def set_subscription_actual_sku_and_purchase_price(
     product_id = order["agreement"]["product"]["id"]
     product_items = get_product_items_by_skus(mpt_client, product_id, [sku])
 
-    pricelist_item = get_pricelist_item_by_product_item(
+    pricelist_items = get_pricelist_items_by_product_items(
         mpt_client, pricelist_id, product_items[0]["id"],
     )
+
 
     return update_subscription(
         mpt_client,
@@ -389,6 +390,6 @@ def set_subscription_actual_sku_and_purchase_price(
             ],
         },
         price={
-            "unitPP": pricelist_item["unitPP"],
+            "unitPP": pricelist_items[0]["unitPP"],
         },
     )

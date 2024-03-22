@@ -73,10 +73,8 @@ def test_transfer(
         return_value=items_factory(),
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_item_by_product_item",
-        return_value={
-            "unitPP": 200.12,
-        },
+        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
+        return_value=[{"unitPP": 200.12}],
     )
     mocked_update_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_subscription",

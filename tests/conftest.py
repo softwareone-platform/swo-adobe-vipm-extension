@@ -347,7 +347,30 @@ def items_factory():
                 "name": name,
                 "externalIds": {
                     "vendor": external_vendor_id,
+                }
+            },
+        ]
+
+    return _items
+
+
+@pytest.fixture()
+def pricelist_items_factory():
+    def _items(
+        item_id=1,
+        external_vendor_id="65304578CA",
+        unit_purchase_price=1234.55,
+    ):
+        return [
+            {
+                "id": f"PRI-1234-1234-1234-{item_id:04d}",
+                "item": {
+                    "id": f"ITM-1234-1234-1234-{item_id:04d}",
+                    "externalIds": {
+                        "vendor": external_vendor_id,
+                    },
                 },
+                "unitPP": unit_purchase_price,
             },
         ]
 
@@ -376,6 +399,9 @@ def lines_factory(agreement):
             },
             "oldQuantity": old_quantity,
             "quantity": quantity,
+            "price": {
+                "unitPP": 1234.55,
+            },
         }
         if line_id:
             line["id"] = f"ALI-{agreement_id}-{line_id:04d}"
