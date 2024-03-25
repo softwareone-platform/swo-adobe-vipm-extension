@@ -9,7 +9,7 @@ from adobe_vipm.flows.mpt import (
     create_subscription,
     fail_order,
     get_buyer,
-    get_pricelist_item_by_product_item,
+    get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_seller,
     query_order,
@@ -431,17 +431,18 @@ def test_get_product_items_by_skus_error(
 
 
 
-def test_get_pricelist_item_by_product_item(mpt_client, requests_mocker):
+def test_get_pricelist_items_by_product_items(mpt_client, requests_mocker):
     """
-    Tests the call to retrieve a pricelist item given the pricelist id and
-    the product item id.
+    Tests the call to retrieve the pricelist items given the pricelist id and
+    the product item ids.
     """
 
-    url = "price-lists/PRC-1234/price-items?eq(item.id,ITM-5678)"
-    url = f"{url}&limit=10&offset=0"
-    pl_item = {"unitPP": 100}
+    url = "price-lists/PRC-1234/price-items?in(item.id,(ITM-5678,ITM-9012))"
+    page1_url = f"{url}&limit=10&offset=0"
+    page2_url = f"{url}&limit=10&offset=10"
+    data = [{"id": f"PRI-{idx}"} for idx in range(13)]
     requests_mocker.get(
-        urljoin(mpt_client.base_url, url),
+        urljoin(mpt_client.base_url, page1_url),
         json={
             "$meta": {
                 "pagination": {
@@ -450,10 +451,28 @@ def test_get_pricelist_item_by_product_item(mpt_client, requests_mocker):
                     "total": 12,
                 },
             },
-            "data": [pl_item]
+            "data": data[:10],
         },
     )
-    assert get_pricelist_item_by_product_item(mpt_client, "PRC-1234", "ITM-5678") == pl_item
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, page2_url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 10,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": data[10:],
+        },
+    )
+
+    assert get_pricelist_items_by_product_items(
+        mpt_client,
+        "PRC-1234",
+        ["ITM-5678", "ITM-9012"],
+    ) == data
 
 
 def test_get_pricelist_item_by_product_item_error(
@@ -463,7 +482,7 @@ def test_get_pricelist_item_by_product_item_error(
     Tests the call to retrieve a pricelist item given the pricelist id and
     the product item id when it fails.
     """
-    url = "price-lists/PRC-1234/price-items?eq(item.id,ITM-5678)"
+    url = "price-lists/PRC-1234/price-items?in(item.id,(ITM-5678))"
     url = f"{url}&limit=10&offset=0"
     requests_mocker.get(
         urljoin(mpt_client.base_url, url),
@@ -472,6 +491,6 @@ def test_get_pricelist_item_by_product_item_error(
     )
 
     with pytest.raises(MPTError) as cv:
-        get_pricelist_item_by_product_item(mpt_client, "PRC-1234", "ITM-5678")
+        get_pricelist_items_by_product_items(mpt_client, "PRC-1234", ["ITM-5678"])
 
     assert cv.value.payload["status"] == 500

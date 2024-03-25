@@ -22,6 +22,7 @@ from devmock.utils import (
     get_reference,
     load_agreement,
     load_item,
+    load_pricelist_item,
     load_subscription,
     save_account,
     save_agreement,
@@ -345,6 +346,7 @@ def gen_pricelist_items(fake, pricelist):
         )
         idx += 1
         for discount_level, discount_rate in (
+            ("01", 0),
             ("02", 0.1),
             ("03", 0.12),
             ("04", 0.15),
@@ -416,7 +418,7 @@ def gen_agreement(fake, product_id):
             "margin": 0.11,
             "currency": "USD",
         },
-        "listing": get_reference(listing),
+        "listing": listing,
         "audit": gen_audit(fake),
     }
     save_agreement(agreement)
@@ -429,6 +431,7 @@ def gen_purchase_order(
     skus,
     customer_id,
     adobe_order_id,
+    draft,
 ):
     order_id = generate_random_id("ORD", 16, 4)
     product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
@@ -439,12 +442,19 @@ def gen_purchase_order(
         old_quantity = 0
         quantity = random.randint(2, 5)
         item = load_item(sku)
+        item_id = item["id"]
+        pricelist_id = agreement["listing"]["priceList"]["id"]
+        pricelist_item_id = f"PRI-{base_id_from(pricelist_id)}-{item_id[-4:]}"
+        pricelist_item = load_pricelist_item(pricelist_item_id)
         lines.append(
             {
                 "id": f"ALI-{base_id_from(agreement['id'])}-{idx:04d}",
                 "item": get_reference(item, ["id", "name", "externalIds"]),
                 "quantity": quantity,
                 "oldQuantity": old_quantity,
+                "price": {
+                    "unitPP": pricelist_item["unitPP"],
+                },
             }
         )
         console.print(
@@ -454,7 +464,7 @@ def gen_purchase_order(
     order = {
         "id": order_id,
         "type": "purchase",
-        "status": "processing",
+        "status": "draft" if draft else "processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
         "subscriptions": [get_reference(sub) for sub in subscriptions],
         "lines": lines,
@@ -699,7 +709,7 @@ def gen_items(fake):
             f"[green]✓[/green] Item {item_id} - {item['name']} ({item['vendor_external_id']}) generated",
         )
         idx += 1
-        for discount_level in ("02", "03", "04", "12", "13", "14"):
+        for discount_level in ("01", "02", "03", "04", "12", "13", "14"):
             full_sku = f"{item['vendor_external_id']}{discount_level}A12"
             item_id = f"ITM-{item_base_id}-{idx:04d}"
             prod_item = {
@@ -747,8 +757,16 @@ def cli():
         "to simulate that the order has already been created."
     ),
 )
+@click.option(
+    "--draft",
+    default=False,
+    is_flag=True,
+    help=(
+        "Set the status of the order to draft."
+    ),
+)
 @click.option("--locale", default="en_US")
-def purchase(customer_id, order_id, locale, skus):
+def purchase(customer_id, order_id, locale, skus, draft):
     """
     Generate a purchase order for the provided Adobe (partial) SKUs.
     """
@@ -763,6 +781,7 @@ def purchase(customer_id, order_id, locale, skus):
             skus,
             customer_id,
             order_id,
+            draft,
         )
     console.print(
         "[bold green]New 'Purchase' order has been "

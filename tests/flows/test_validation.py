@@ -607,6 +607,12 @@ def test_validate_purchase_order(mocker, caplog, order_factory, buyer, customer_
         "adobe_vipm.flows.validation.validate_customer_data",
         return_value=(False, order),
     )
+    m_update_purchase_prices = mocker.patch(
+        "adobe_vipm.flows.validation.update_purchase_prices",
+        return_value=order,
+    )
+    m_adobe_cli = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.validation.get_adobe_client", return_value=m_adobe_cli)
 
     with caplog.at_level(logging.INFO):
         assert validate_order(m_client, order) == order
@@ -618,6 +624,12 @@ def test_validate_purchase_order(mocker, caplog, order_factory, buyer, customer_
     m_get_buyer.assert_called_once_with(m_client, order["agreement"]["buyer"]["id"])
     m_prepare_customer_data.assert_called_once_with(m_client, order, buyer)
     m_validate_customer_data.assert_called_once_with(order, customer_data)
+    m_update_purchase_prices.assert_called_once_with(
+        m_client,
+        m_adobe_cli,
+        order["agreement"]["seller"]["address"]["country"],
+        order,
+    )
 
 
 def test_validate_purchase_order_no_validate(mocker, caplog, order_factory):
@@ -669,9 +681,10 @@ def test_validate_transfer(
     )
 
     has_errors, validated_order = validate_transfer(m_client, order)
-
+    lines = lines_factory(line_id=None)
+    del lines[0]["price"]
     assert has_errors is False
-    assert validated_order["lines"] == lines_factory(line_id=None)
+    assert validated_order["lines"] == lines
 
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
@@ -767,6 +780,12 @@ def test_validate_transfer_order(
         "adobe_vipm.flows.validation.validate_transfer",
         return_value=(False, order),
     )
+    m_update_purchase_prices = mocker.patch(
+        "adobe_vipm.flows.validation.update_purchase_prices",
+        return_value=order,
+    )
+    m_adobe_cli = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.validation.get_adobe_client", return_value=m_adobe_cli)
 
     with caplog.at_level(logging.INFO):
         assert validate_order(m_client, order) == order
@@ -779,10 +798,16 @@ def test_validate_transfer_order(
         m_client,
         order,
     )
+    m_update_purchase_prices.assert_called_once_with(
+        m_client,
+        m_adobe_cli,
+        order["agreement"]["seller"]["address"]["country"],
+        order,
+    )
 
 
 def test_validate_transfer_order_no_validate(
-    mocker, caplog, order_factory, transfer_order_parameters_factory
+    mocker, caplog, order_factory, transfer_order_parameters_factory,
 ):
     """Tests the validate order entrypoint function for transfers when doesn't validate."""
     order = order_factory(order_parameters=transfer_order_parameters_factory())
@@ -794,6 +819,7 @@ def test_validate_transfer_order_no_validate(
         "adobe_vipm.flows.validation.prepare_customer_data",
         return_value=(order, mocker.MagicMock()),
     )
+
     mocker.patch(
         "adobe_vipm.flows.validation.validate_transfer",
         return_value=(True, order),

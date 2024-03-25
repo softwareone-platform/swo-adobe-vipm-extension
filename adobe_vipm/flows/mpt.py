@@ -117,11 +117,18 @@ def get_product_items_by_skus(mpt_client, product_id, skus):
 
 
 @wrap_http_error
-def get_pricelist_item_by_product_item(mpt_client, pricelist_id, product_item_id):
-    url = f"/price-lists/{pricelist_id}/price-items?eq(item.id,{product_item_id})"
+def get_pricelist_items_by_product_items(mpt_client, pricelist_id, product_item_ids):
+    items = []
+    rql_query = f"in(item.id,({",".join(product_item_ids)}))"
+    url = f"/price-lists/{pricelist_id}/price-items?{rql_query}"
+    page = None
     limit = 10
     offset = 0
-    response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
-    response.raise_for_status()
-    page = response.json()
-    return page["data"][0]
+    while _has_more_pages(page):
+        response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
+        response.raise_for_status()
+        page = response.json()
+        items.extend(page["data"])
+        offset += limit
+
+    return items
