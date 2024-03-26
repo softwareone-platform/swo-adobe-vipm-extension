@@ -19,10 +19,7 @@ logger = logging.getLogger(__name__)
 def setup_client():
     return MPTClient(
         f"{settings.MPT_API_BASE_URL}/v1/",
-        settings.MPT_LOGIN_URL,
-        settings.MPT_AUTH0_CLIENT_ID,
-        settings.MPT_USERNAME,
-        settings.MPT_API_TOKEN,  # w/a replace with MPT_PASSWORD later
+        settings.MPT_API_TOKEN,
     )
 
 

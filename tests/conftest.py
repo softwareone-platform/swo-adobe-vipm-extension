@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urljoin
 
 import jwt
 import pytest
@@ -741,15 +740,7 @@ def adobe_client_factory(adobe_credentials_file, adobe_config_file, mock_adobe_c
 
 
 @pytest.fixture()
-def mock_authorization(requests_mocker, settings):
-    requests_mocker.post(
-        urljoin(settings.MPT_LOGIN_URL, "/oauth/token"),
-        json={"token_type": "Bearer", "access_token": "1234-12345"},
-    )
-
-
-@pytest.fixture()
-def mpt_client(settings, mock_authorization):
+def mpt_client(settings):
     """
     Create an instance of the MPT client used by the extension.
     """
