@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 import pytest
 import responses
+from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
@@ -346,7 +347,7 @@ def items_factory():
                 "name": name,
                 "externalIds": {
                     "vendor": external_vendor_id,
-                }
+                },
             },
         ]
 
@@ -467,7 +468,7 @@ def agreement():
             "href": "/listing/LST-9401-9279",
             "priceList": {
                 "id": "PRC-9457-4272-3691",
-                "href": "/v1/price-lists/PRC-9457-4272-3691"
+                "href": "/v1/price-lists/PRC-9457-4272-3691",
             },
         },
         "licensee": None,
@@ -605,6 +606,16 @@ def seller():
                 "number": "4082954078",
             },
         },
+    }
+
+
+@pytest.fixture()
+def webhook(settings):
+    return {
+        "id": "WH-123-123",
+        "criteria": {
+            "product.id": settings.MPT_PRODUCTS_IDS[0],
+        }
     }
 
 
@@ -789,7 +800,8 @@ def jwt_token(settings):
             "iat": iat,
             "nbf": nbf,
             "exp": exp,
+            "webhook_id": "WH-123-123",
         },
-        settings.EXTENSION_CONFIG["WEBHOOK_SECRET"],
+        get_for_product(settings, "WEBHOOK_SECRET", "PRD-1111-1111-1111"),
         algorithm="HS256",
     )

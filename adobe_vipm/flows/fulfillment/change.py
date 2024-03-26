@@ -269,7 +269,12 @@ def fulfill_change_order(mpt_client, seller_country, order):
             )
         else:
             set_subscription_actual_sku_and_purchase_price(
-                mpt_client, adobe_client, seller_country, customer_id, order, order_subscription,
+                mpt_client,
+                adobe_client,
+                seller_country,
+                customer_id,
+                order,
+                order_subscription,
             )
 
     switch_order_to_completed(mpt_client, order)

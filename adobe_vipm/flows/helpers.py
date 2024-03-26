@@ -1,6 +1,7 @@
 """
 This module contains orders helper functions.
 """
+
 import logging
 
 from adobe_vipm.flows.constants import (
@@ -129,7 +130,9 @@ def update_purchase_prices(mpt_client, adobe_client, seller_country, order):
     updated_lines = []
     for preview_item in preview_order["lineItems"]:
         order_line = get_order_line_by_sku(order, preview_item["offerId"][:10])
-        order_line["price"]["unitPP"] = sku_pricelist_item_map[preview_item["offerId"]]["unitPP"]
+        order_line["price"]["unitPP"] = sku_pricelist_item_map[preview_item["offerId"]][
+            "unitPP"
+        ]
         updated_lines.append(order_line)
     order["lines"] = updated_lines
 

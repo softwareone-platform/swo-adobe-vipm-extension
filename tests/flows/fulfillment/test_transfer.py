@@ -35,7 +35,7 @@ def test_transfer(
         * order completion
     """
 
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -346,7 +346,7 @@ def test_transfer_invalid_membership(
     """
     Tests a transfer order when the membership id is not valid.
     """
-    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"] = "TPL-964-112"
+    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-964-112"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_adobe_client = mocker.MagicMock()

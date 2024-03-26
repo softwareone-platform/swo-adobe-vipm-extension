@@ -5,6 +5,7 @@ This module contains shared functions used by the different fulfillment flows.
 import logging
 
 from django.conf import settings
+from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
@@ -103,7 +104,9 @@ def switch_order_to_query(client, order):
         client,
         order["id"],
         parameters=order["parameters"],
-        templateId=settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID"],
+        templateId=get_for_product(
+            settings, "QUERYING_TEMPLATE_ID", order["agreement"]["product"]["id"]
+        ),
     )
 
 
@@ -270,7 +273,11 @@ def switch_order_to_completed(mpt_client, order):
     """
     order = reset_retries(mpt_client, order)
     complete_order(
-        mpt_client, order["id"], settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"]
+        mpt_client,
+        order["id"],
+        get_for_product(
+            settings, "COMPLETED_TEMPLATE_ID", order["agreement"]["product"]["id"]
+        ),
     )
     logger.info(f'Order {order["id"]} has been completed successfully')
 
@@ -338,7 +345,13 @@ def add_subscription(
 
 
 def set_subscription_actual_sku_and_purchase_price(
-    mpt_client, adobe_client, seller_country, customer_id, order, subscription, sku=None,
+    mpt_client,
+    adobe_client,
+    seller_country,
+    customer_id,
+    order,
+    subscription,
+    sku=None,
 ):
     """
     Set the subscription fullfilment parameter to store the actual SKU
@@ -367,15 +380,15 @@ def set_subscription_actual_sku_and_purchase_price(
         )
         sku = adobe_subscription["offerId"]
 
-
     pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
     product_id = order["agreement"]["product"]["id"]
     product_items = get_product_items_by_skus(mpt_client, product_id, [sku])
 
     pricelist_items = get_pricelist_items_by_product_items(
-        mpt_client, pricelist_id, product_items[0]["id"],
+        mpt_client,
+        pricelist_id,
+        product_items[0]["id"],
     )
-
 
     return update_subscription(
         mpt_client,
