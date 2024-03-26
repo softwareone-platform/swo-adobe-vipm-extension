@@ -5,12 +5,14 @@ from rich.theme import Theme
 from swo.mpt.extensions.runtime.events.utils import instrument_logging
 from swo.mpt.extensions.runtime.utils import get_extension_app_config_name
 
+from django.core.exceptions import ImproperlyConfigured
+
 
 def get_extension_variables():
-    vars = {}
+    variables = {}
     for var in filter(lambda x: x[0].startswith("EXT_"), os.environ.items()):
-        vars[var[0][4:]] = var[1]
-    return vars
+        variables[var[0][4:]] = var[1]
+    return variables
 
 
 def initialize(options):
@@ -36,8 +38,16 @@ def initialize(options):
         "propagate": False,
     }
     settings.EXTENSION_CONFIG.update(get_extension_variables())
+    settings.MPT_PRODUCTS_IDS = settings.MPT_PRODUCTS_IDS.split(",")
 
     if settings.USE_APPLICATIONINSIGHTS:
         instrument_logging()
 
+    _check_ext_configuration()
+
     django.setup()
+
+
+def _check_ext_configuration():
+    if settings.MPT_PRODUCTS_IDS:
+        ImproperlyConfigured(f"Extension is not properly configured. MPT_PRODUCTS_IDS is missing or empty.")
