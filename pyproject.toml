@@ -13,7 +13,6 @@ readme = "README.md"
 python = ">=3.12,<4"
 django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
 requests = "2.31.*"
-auth0-python = "4.7.*"
 
 [tool.poetry.group.devmock.dependencies] # Remove when devmock is not needed anymore
 faker = "22.2.*"
