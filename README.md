@@ -59,6 +59,7 @@ EXT_ADOBE_API_BASE_URL=<adobe-vipm-api>
 EXT_ADOBE_AUTH_ENDPOINT_URL=<adobe-vipm-authentication-url>
 MPT_PRODUCT_ID=<softwareone-marketplace-product-id>
 MPT_API_BASE_URL=http://devmock:8000
+MPT_API_TOKEN=<mpt-api-token>
 ```
 
 Example of `.env` file
@@ -70,6 +71,7 @@ EXT_ADOBE_API_BASE_URL=<adobe-vipm-api>
 EXT_ADOBE_AUTH_ENDPOINT_URL=<adobe-vipm-authentication-url>
 MPT_PRODUCT_ID=PRD-1111-1111-1111
 MPT_API_BASE_URL=http://devmock:8000
+MPT_API_TOKEN=c0fdafd7-6d5a-4fa4-9839-4c2c163794ff
 ```
 
 
