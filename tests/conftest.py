@@ -615,7 +615,7 @@ def webhook(settings):
         "id": "WH-123-123",
         "criteria": {
             "product.id": settings.MPT_PRODUCTS_IDS[0],
-        }
+        },
     }
 
 

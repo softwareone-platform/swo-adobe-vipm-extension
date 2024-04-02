@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.theme import Theme
 
 from devmock.exceptions import NotFoundException
+from devmock.settings import PRODUCT_ID
 from devmock.utils import (
     base_id_from,
     cleanup_data_folder,
@@ -434,7 +435,7 @@ def gen_purchase_order(
     draft,
 ):
     order_id = generate_random_id("ORD", 16, 4)
-    product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
+    product_id = settings.PRODUCT_ID
     agreement = gen_agreement(fake, product_id)
     lines = []
     subscriptions = []
@@ -630,7 +631,7 @@ def gen_transfer_order(
     membership_id,
 ):
     order_id = generate_random_id("ORD", 16, 4)
-    product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111-1111")
+    product_id = settings.PRODUCT_ID
     agreement = gen_agreement(fake, product_id)
     lines = []
     for idx, line in enumerate(skus, start=1):
@@ -684,7 +685,7 @@ def gen_transfer_order(
 
 
 def gen_items(fake):
-    product_id = os.getenv("MPT_PRODUCT_ID", "PRD-1111-1111")
+    product_id = settings.PRODUCT_ID
     item_base_id = base_id_from(product_id)
     idx = 1
     for item in ADOBE_CONFIG["skus_mapping"]:
