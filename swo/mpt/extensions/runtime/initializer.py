@@ -2,15 +2,16 @@ import os
 
 import rich
 from rich.theme import Theme
+from swo.mpt.extensions.runtime.djapp.conf import extract_product_ids
 from swo.mpt.extensions.runtime.events.utils import instrument_logging
 from swo.mpt.extensions.runtime.utils import get_extension_app_config_name
 
 
 def get_extension_variables():
-    vars = {}
+    variables = {}
     for var in filter(lambda x: x[0].startswith("EXT_"), os.environ.items()):
-        vars[var[0][4:]] = var[1]
-    return vars
+        variables[var[0][4:]] = var[1]
+    return variables
 
 
 def initialize(options):
@@ -36,6 +37,7 @@ def initialize(options):
         "propagate": False,
     }
     settings.EXTENSION_CONFIG.update(get_extension_variables())
+    settings.MPT_PRODUCTS_IDS = extract_product_ids(settings.MPT_PRODUCTS_IDS)
 
     if settings.USE_APPLICATIONINSIGHTS:
         instrument_logging()

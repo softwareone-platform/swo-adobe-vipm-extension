@@ -5,6 +5,8 @@ import jwt
 from django.http import HttpRequest
 from ninja.security import HttpBearer
 
+from swo.mpt.client import MPTClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,7 +15,7 @@ class JWTAuth(HttpBearer):
 
     def __init__(
         self,
-        secret_callback: Callable[[Mapping[str, Any]], str],
+        secret_callback: Callable[[MPTClient, Mapping[str, Any]], str],
     ) -> None:
         self.secret_callback = secret_callback
         super().__init__()
@@ -27,7 +29,7 @@ class JWTAuth(HttpBearer):
                 options={"verify_signature": False},
                 algorithms=self.JWT_ALGOS,
             )
-            secret = self.secret_callback(claims)
+            secret = self.secret_callback(request.client, claims)
             if not secret:
                 return
             jwt.decode(token, secret, audience=audience, algorithms=self.JWT_ALGOS)

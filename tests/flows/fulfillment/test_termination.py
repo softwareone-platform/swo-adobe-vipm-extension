@@ -27,7 +27,7 @@ def test_termination(
         * adobe return order creation
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -115,7 +115,7 @@ def test_termination_return_order_pending(
         * adobe return order creation
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -192,7 +192,7 @@ def test_termination_out_window(
         * update subscription auto renewal
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_subscription = adobe_subscription_factory()

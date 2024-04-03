@@ -12,6 +12,7 @@ from adobe_vipm.flows.mpt import (
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_seller,
+    get_webhook,
     query_order,
     update_order,
     update_subscription,
@@ -29,7 +30,7 @@ def test_fail_order(mpt_client, requests_mocker, order_factory):
                 {
                     "statusNotes": {
                         "id": "VIPM001",
-                        "message": "Order can't be processed. Failure reason: a-reason"
+                        "message": "Order can't be processed. Failure reason: a-reason",
                     },
                 },
             ),
@@ -430,7 +431,6 @@ def test_get_product_items_by_skus_error(
     assert cv.value.payload["status"] == 500
 
 
-
 def test_get_pricelist_items_by_product_items(mpt_client, requests_mocker):
     """
     Tests the call to retrieve the pricelist items given the pricelist id and
@@ -468,11 +468,14 @@ def test_get_pricelist_items_by_product_items(mpt_client, requests_mocker):
         },
     )
 
-    assert get_pricelist_items_by_product_items(
-        mpt_client,
-        "PRC-1234",
-        ["ITM-5678", "ITM-9012"],
-    ) == data
+    assert (
+        get_pricelist_items_by_product_items(
+            mpt_client,
+            "PRC-1234",
+            ["ITM-5678", "ITM-9012"],
+        )
+        == data
+    )
 
 
 def test_get_pricelist_item_by_product_item_error(
@@ -494,3 +497,13 @@ def test_get_pricelist_item_by_product_item_error(
         get_pricelist_items_by_product_items(mpt_client, "PRC-1234", ["ITM-5678"])
 
     assert cv.value.payload["status"] == 500
+
+
+def test_get_webhoook(mpt_client, requests_mocker, webhook):
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, f"notifications/webhooks/{webhook["id"]}"),
+        json=webhook,
+    )
+
+    api_webhook = get_webhook(mpt_client, webhook["id"])
+    assert api_webhook == webhook

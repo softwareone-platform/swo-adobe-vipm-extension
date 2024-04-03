@@ -1,4 +1,5 @@
 import logging
+from functools import cache
 
 from adobe_vipm.flows.constants import ERR_VIPM_UNHANDLED_EXCEPTION
 from adobe_vipm.flows.errors import wrap_http_error
@@ -16,7 +17,7 @@ def _has_more_pages(page):
 @wrap_http_error
 def get_agreement(mpt_client, agreement_id):
     response = mpt_client.get(
-        f"/commerce/agreements/{agreement_id}?select=seller,buyer,listing"
+        f"/commerce/agreements/{agreement_id}?select=seller,buyer,listing,product"
     )
     response.raise_for_status()
     return response.json()
@@ -132,3 +133,12 @@ def get_pricelist_items_by_product_items(mpt_client, pricelist_id, product_item_
         offset += limit
 
     return items
+
+
+@cache
+@wrap_http_error
+def get_webhook(mpt_client, webhook_id):
+    response = mpt_client.get(f"/notifications/webhooks/{webhook_id}")
+    response.raise_for_status()
+
+    return response.json()

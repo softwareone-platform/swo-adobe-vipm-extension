@@ -53,25 +53,36 @@ $ cp .env.sample .env
 1. Setup parameters for `.env` file
 ```
 EXT_ADOBE_CREDENTIALS_FILE=/extension/adobe_secrets.json
-EXT_QUERYING_TEMPLATE_ID=<querying-template-id>
-EXT_COMPLETED_TEMPLATE_ID=<completed_template-id>
 EXT_ADOBE_API_BASE_URL=<adobe-vipm-api>
 EXT_ADOBE_AUTH_ENDPOINT_URL=<adobe-vipm-authentication-url>
-MPT_PRODUCT_ID=<softwareone-marketplace-product-id>
+MPT_PRODUCTS_IDS=<list-of-softwareone-marketplace-product-id>
 MPT_API_BASE_URL=http://devmock:8000
 MPT_API_TOKEN=<mpt-api-token>
+```
+
+`MPT_PRODUCTS_IDS` should be a comma-separated list of the SWO Marketplace Product identifiers
+For each of the defined product id in the `MPT_PRODUCTS_IDS` list define `EXT_QUERYING_TEMPLATE_<product-id>`, `EXT_COMPLETED_TEMPLATE_<product_id>` and `WEBHOOK_SECRET_<produt-id>`. Replace `-` (dash) symbols with `_` (underscores) for the product identifier.
+
+```
+EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111_1111=<querying-template-id-for-product>
+EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111=<completed_template-id-for-product>
+EXT_WEBHOOK_SECRET_PRD_1111_1111_1111=<webhook-secret-for-product>
 ```
 
 Example of `.env` file
 ```
 EXT_ADOBE_CREDENTIALS_FILE=/extension/adobe_secrets.json
-EXT_QUERYING_TEMPLATE_ID=TPL-1234-5678
-EXT_COMPLETED_TEMPLATE_ID=TPL-3333-4444
 EXT_ADOBE_API_BASE_URL=<adobe-vipm-api>
 EXT_ADOBE_AUTH_ENDPOINT_URL=<adobe-vipm-authentication-url>
-MPT_PRODUCT_ID=PRD-1111-1111-1111
+MPT_PRODUCT_ID=PRD-1111-1111-1111,PRD-2222-2222-2222
 MPT_API_BASE_URL=http://devmock:8000
 MPT_API_TOKEN=c0fdafd7-6d5a-4fa4-9839-4c2c163794ff
+EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111_1111=TPL-1234-1234
+EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111=TPL-4321-4321
+EXT_WEBHOOK_SECRET_PRD_1111_1111_1111=<webhook-secret-for-product>
+EXT_QUERYING_TEMPLATE_ID_PRD_2222_2222_2222=TPL-5678-5678
+EXT_COMPLETED_TEMPLATE_ID_PRD_2222_2222_2222=TPL-8765-8765
+EXT_WEBHOOK_SECRET_PRD_2222_2222_2222=<webhook-secret-for-product>
 ```
 
 
@@ -111,9 +122,10 @@ Find generated data in the `devmock/data` folder. Extension automatically retrie
 | `EXT_ADOBE_CREDENTIALS_FILE` | - | /extension/adobe_secrets.json | Path to Adobe credentials file |
 | `EXT_ADOBE_API_BASE_URL` | - | https://partner-example.adobe.io | Path to Adobe VIPM API |
 | `EXT_ADOBE_AUTH_ENDPOINT_URL` | - | https://auth.partner-example.adobe.io | Path to Adobe VIPM authentication API |
-| `EXT_QUERYING_TEMPLATE_ID` | - | TPL-1111-1111 | SoftwareONE Marketplace Template ID for Order Quering status |
-| `EXT_COMPLETED_TEMPLATE_ID` | - | TPL-2222-2222 | SoftwareONE Marketplace Template ID for Order Completed status |
-| `MPT_PRODUCT_ID` | PRD-1111-1111-1111 | PRD-1234-1234-1234 | SoftwareONE Marketplace Product ID |
+| `EXT_QUERYING_TEMPLATE_ID_<product_id>` | - | TPL-1111-1111 | SoftwareONE Marketplace Template ID for Order Quering status |
+| `EXT_COMPLETED_TEMPLATE_ID_<product_id>` | - | TPL-2222-2222 | SoftwareONE Marketplace Template ID for Order Completed status |
+| `EXT_WEBHOOK_SECRET_<product_id>` | - | 123qweasd3432234 | Webhook secret of the Draft validation Webhook in SoftwareONE Marketplace for the product |
+| `MPT_PRODUCTS_IDS` | PRD-1111-1111-1111 | PRD-1234-1234-1234,PRD-4321-4321-4321 | Comma-separated list of SoftwareONE Marketplace Product ID |
 | `MPT_API_BASE_URL` | http://localhost:8000 | https://portal.softwareone.com/mpt | SoftwareONE Marketplace API URL |
 | `MPT_API_TOKEN` | - | eyJhbGciOiJSUzI1N... | SoftwareONE Marketplace API Token |
 

@@ -23,8 +23,8 @@ def test_update_purchase_price(
     order = order_factory()
 
     m_get_prod_items = mocker.patch(
-         "adobe_vipm.flows.helpers.get_product_items_by_skus",
-         return_value=not_for_sale_items,
+        "adobe_vipm.flows.helpers.get_product_items_by_skus",
+        return_value=not_for_sale_items,
     )
     m_get_pl_items = mocker.patch(
         "adobe_vipm.flows.helpers.get_pricelist_items_by_product_items",

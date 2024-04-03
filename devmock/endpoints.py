@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from devmock.filters import ItemsFilter, OrdersFilter, PriceListItemFilter
 from devmock.models import Order, Subscription
-from devmock.settings import ITEMS_FOLDER, ORDERS_FOLDER, PRICELIST_ITEMS_FOLDER, WEBHOOK_ENDPOINT
+from devmock.settings import ITEMS_FOLDER, ORDERS_FOLDER, PRICELIST_ITEMS_FOLDER, WEBHOOK_ENDPOINT, WEBHOOK_ID, PRODUCT_ID
 from devmock.utils import (
     base_id_from,
     gen_jwt_token,
@@ -331,3 +331,13 @@ def list_priceslist_items(request: Request, pid: str):
     response["data"] = filtered_items
     response["$meta"] = {"pagination": {"offset": offset, "limit": limit, "total": count}}
     return response
+
+
+@router.get(f"/notifications/webhooks/{WEBHOOK_ID}")
+def get_webhook(request: Request):
+    return {
+        "id": WEBHOOK_ID,
+        "params": {
+            "product.id": PRODUCT_ID,
+        }
+    }
