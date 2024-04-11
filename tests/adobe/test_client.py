@@ -9,6 +9,7 @@ from freezegun import freeze_time
 from responses import matchers
 
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
+from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
@@ -18,15 +19,16 @@ from adobe_vipm.adobe.constants import (
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
-from adobe_vipm.adobe.dataclasses import APIToken, Credentials
+from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
 
 
 def test_create_reseller_account(
     mocker,
+    settings,
     requests_mocker,
-    adobe_config_file,
+    adobe_authorizations_file,
     reseller_data,
     adobe_client_factory,
 ):
@@ -37,13 +39,15 @@ def test_create_reseller_account(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
-    country = adobe_config_file["accounts"][0]["country"]
+    distributor_id = adobe_authorizations_file["authorizations"][0]["distributor_id"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], "/v3/resellers"),
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/resellers"),
         status=201,
         json={
             "resellerId": "a-reseller-id",
@@ -51,7 +55,7 @@ def test_create_reseller_account(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -93,13 +97,16 @@ def test_create_reseller_account(
         ],
     )
 
-    reseller_id = client.create_reseller_account(country, "external_id", reseller_data)
+    reseller_id = client.create_reseller_account(
+        authorization_uk, "external_id", reseller_data
+    )
     assert reseller_id == "a-reseller-id"
 
 
 def test_create_reseller_account_bad_request(
     requests_mocker,
-    adobe_config_file,
+    settings,
+    adobe_authorizations_file,
     reseller_data,
     adobe_api_error_factory,
     adobe_client_factory,
@@ -107,28 +114,31 @@ def test_create_reseller_account_bad_request(
     """
     Test the call to Adobe API to create a reseller when the response is 400 bad request.
     """
-    country = adobe_config_file["accounts"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
 
     client, _, _ = adobe_client_factory()
 
     error = adobe_api_error_factory("1234", "An error")
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], "/v3/resellers"),
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/resellers"),
         status=400,
         json=error,
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.create_reseller_account(country, "external_id", reseller_data)
+        client.create_reseller_account(authorization_uk, "external_id", reseller_data)
 
     assert repr(cv.value) == str(error)
 
 
 def test_create_customer_account(
     mocker,
+    settings,
     requests_mocker,
-    adobe_config_file,
+    adobe_authorizations_file,
     customer_data,
     adobe_client_factory,
 ):
@@ -139,10 +149,15 @@ def test_create_customer_account(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    reseller_id = adobe_config_file["accounts"][0]["resellers"][0]["id"]
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
+        "seller_id"
+    ]
+    reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     company_name = f"{customer_data['companyName']} (external_id)"
 
@@ -173,7 +188,7 @@ def test_create_customer_account(
     }
     correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], "/v3/customers"),
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers"),
         status=201,
         json={
             "customerId": "A-customer-id",
@@ -181,7 +196,7 @@ def test_create_customer_account(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -194,14 +209,15 @@ def test_create_customer_account(
     )
 
     customer_id = client.create_customer_account(
-        reseller_country, "external_id", customer_data
+        authorization_uk, seller_id, "external_id", customer_data
     )
     assert customer_id == "A-customer-id"
 
 
 def test_create_customer_account_bad_request(
     requests_mocker,
-    adobe_config_file,
+    settings,
+    adobe_authorizations_file,
     customer_data,
     adobe_api_error_factory,
     adobe_client_factory,
@@ -209,20 +225,27 @@ def test_create_customer_account_bad_request(
     """
     Test the call to Adobe API to create a customer when the response is 400 bad request.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
+        "seller_id"
+    ]
 
     client, _, _ = adobe_client_factory()
 
     error = adobe_api_error_factory("1234", "An error")
 
     requests_mocker.post(
-        urljoin(adobe_config_file["api_base_url"], "/v3/customers"),
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers"),
         status=400,
         json=error,
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.create_customer_account(reseller_country, "external_id", customer_data)
+        client.create_customer_account(
+            authorization_uk, seller_id, "external_id", customer_data
+        )
 
     assert repr(cv.value) == str(error)
 
@@ -237,8 +260,10 @@ def test_create_customer_account_bad_request(
 )
 def test_create_preview_order(
     mocker,
+    settings,
     requests_mocker,
     adobe_config_file,
+    adobe_authorizations_file,
     order_factory,
     lines_factory,
     adobe_client_factory,
@@ -253,11 +278,13 @@ def test_create_preview_order(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
     )
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
     customer_id = "a-customer"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     order = order_factory(
         lines=lines_factory(old_quantity=old_quantity, quantity=quantity)
@@ -266,7 +293,8 @@ def test_create_preview_order(
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
         json={
@@ -275,7 +303,7 @@ def test_create_preview_order(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -303,7 +331,7 @@ def test_create_preview_order(
     )
 
     preview_order = client.create_preview_order(
-        reseller_country,
+        authorization_uk,
         customer_id,
         order["id"],
         order["lines"],
@@ -315,7 +343,8 @@ def test_create_preview_order(
 
 def test_create_preview_order_bad_request(
     requests_mocker,
-    adobe_config_file,
+    settings,
+    adobe_authorizations_file,
     adobe_api_error_factory,
     adobe_client_factory,
     order,
@@ -324,7 +353,9 @@ def test_create_preview_order_bad_request(
     Test the call to Adobe API to create a preview order when the response is 400 bad request.
     """
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -333,7 +364,8 @@ def test_create_preview_order_bad_request(
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=400,
         json=error,
@@ -341,7 +373,7 @@ def test_create_preview_order_bad_request(
 
     with pytest.raises(AdobeError) as cv:
         client.create_preview_order(
-            reseller_country,
+            authorization_uk,
             customer_id,
             order["id"],
             order["lines"],
@@ -352,9 +384,10 @@ def test_create_preview_order_bad_request(
 
 def test_create_new_order(
     mocker,
+    settings,
     requests_mocker,
     adobe_client_factory,
-    adobe_config_file,
+    adobe_authorizations_file,
     adobe_order_factory,
 ):
     """
@@ -364,16 +397,19 @@ def test_create_new_order(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     adobe_order = adobe_order_factory(ORDER_TYPE_NEW, external_id="mpt-order-id")
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=202,
         json={
@@ -382,7 +418,7 @@ def test_create_new_order(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -395,7 +431,7 @@ def test_create_new_order(
     )
 
     new_order = client.create_new_order(
-        reseller_country,
+        authorization_uk,
         customer_id,
         adobe_order,
     )
@@ -406,15 +442,18 @@ def test_create_new_order(
 
 def test_create_new_order_bad_request(
     requests_mocker,
+    settings,
     adobe_client_factory,
-    adobe_config_file,
+    adobe_authorizations_file,
     adobe_order_factory,
     adobe_api_error_factory,
 ):
     """
     Test the call to Adobe API to create a new order when the response is 400 bad request.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -423,7 +462,8 @@ def test_create_new_order_bad_request(
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=400,
         json=error,
@@ -431,7 +471,7 @@ def test_create_new_order_bad_request(
 
     with pytest.raises(AdobeError) as cv:
         client.create_new_order(
-            reseller_country,
+            authorization_uk,
             customer_id,
             adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
         )
@@ -441,8 +481,9 @@ def test_create_new_order_bad_request(
 
 def test_create_preview_renewal(
     mocker,
+    settings,
     requests_mocker,
-    adobe_config_file,
+    adobe_authorizations_file,
     adobe_client_factory,
     adobe_order_factory,
 ):
@@ -453,23 +494,26 @@ def test_create_preview_renewal(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
     )
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     adobe_order = adobe_order_factory(ORDER_TYPE_PREVIEW_RENEWAL)
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
         json=adobe_order,
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -486,7 +530,7 @@ def test_create_preview_renewal(
     )
 
     preview_renewal = client.create_preview_renewal(
-        reseller_country,
+        authorization_uk,
         customer_id,
     )
     assert preview_renewal == adobe_order
@@ -494,14 +538,17 @@ def test_create_preview_renewal(
 
 def test_create_preview_renewal_bad_request(
     requests_mocker,
-    adobe_config_file,
+    settings,
+    adobe_authorizations_file,
     adobe_api_error_factory,
     adobe_client_factory,
 ):
     """
     Test the call to Adobe API to create a preview renewal when the response is 400 bad request.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -510,7 +557,8 @@ def test_create_preview_renewal_bad_request(
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=400,
         json=error,
@@ -518,26 +566,30 @@ def test_create_preview_renewal_bad_request(
 
     with pytest.raises(AdobeError) as cv:
         client.create_preview_renewal(
-            reseller_country,
+            authorization_uk,
             customer_id,
         )
 
     assert repr(cv.value) == str(error)
 
 
-def test_get_order(requests_mocker, adobe_client_factory, adobe_config_file):
+def test_get_order(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
     """
     Tests the retrieval of an order.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     order_id = "an-order-id"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/orders/{order_id}",
         ),
         status=200,
@@ -545,7 +597,7 @@ def test_get_order(requests_mocker, adobe_client_factory, adobe_config_file):
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -554,16 +606,22 @@ def test_get_order(requests_mocker, adobe_client_factory, adobe_config_file):
         ],
     )
 
-    assert client.get_order(reseller_country, customer_id, order_id) == {"an": "order"}
+    assert client.get_order(authorization_uk, customer_id, order_id) == {"an": "order"}
 
 
 def test_get_order_not_found(
-    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
 ):
     """
     Tests the retrieval of an order when it doesn't exist.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     order_id = "an-order-id"
 
@@ -571,7 +629,7 @@ def test_get_order_not_found(
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/orders/{order_id}",
         ),
         status=404,
@@ -579,24 +637,28 @@ def test_get_order_not_found(
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.get_order(reseller_country, customer_id, order_id)
+        client.get_order(authorization_uk, customer_id, order_id)
 
     assert cv.value.code == "404"
 
 
-def test_get_subscription(requests_mocker, adobe_client_factory, adobe_config_file):
+def test_get_subscription(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
     """
     Tests the retrieval of a subscription.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
         ),
         status=200,
@@ -604,7 +666,7 @@ def test_get_subscription(requests_mocker, adobe_client_factory, adobe_config_fi
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -613,18 +675,24 @@ def test_get_subscription(requests_mocker, adobe_client_factory, adobe_config_fi
         ],
     )
 
-    assert client.get_subscription(reseller_country, customer_id, sub_id) == {
+    assert client.get_subscription(authorization_uk, customer_id, sub_id) == {
         "a": "subscription"
     }
 
 
 def test_get_subscription_not_found(
-    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
 ):
     """
     Tests the retrieval of a subscription when it doesn't exist.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
@@ -632,7 +700,7 @@ def test_get_subscription_not_found(
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
         ),
         status=404,
@@ -640,15 +708,17 @@ def test_get_subscription_not_found(
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.get_subscription(reseller_country, customer_id, sub_id)
+        client.get_subscription(authorization_uk, customer_id, sub_id)
 
     assert cv.value.code == "404"
 
 
 def test_search_new_and_returned_orders_by_sku_line_number(
     requests_mocker,
+    settings,
     adobe_client_factory,
     adobe_config_file,
+    adobe_authorizations_file,
     adobe_order_factory,
     adobe_items_factory,
 ):
@@ -656,11 +726,13 @@ def test_search_new_and_returned_orders_by_sku_line_number(
     Tests the call to search the last processed order by SKU for a given
     customer.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     vendor_external_id = adobe_config_file["skus_mapping"][0]["vendor_external_id"]
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     new_order_0 = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -714,7 +786,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
@@ -726,7 +798,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -744,7 +816,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
@@ -755,7 +827,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -776,7 +848,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
@@ -787,7 +859,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -808,7 +880,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
@@ -819,7 +891,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -839,7 +911,7 @@ def test_search_new_and_returned_orders_by_sku_line_number(
     )
 
     result = client.search_new_and_returned_orders_by_sku_line_number(
-        reseller_country,
+        authorization_uk,
         customer_id,
         vendor_external_id,
         "ALI-2119-4550-8674-5962-0001",
@@ -853,21 +925,27 @@ def test_search_new_and_returned_orders_by_sku_line_number(
 
 
 def test_search_new_and_returned_orders_by_sku_line_number_not_found(
-    requests_mocker, adobe_client_factory, adobe_config_file
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_config_file,
+    adobe_authorizations_file,
 ):
     """
     Tests the call to search the last processed order by SKU for a given
     customer when no order is found.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     vendor_external_id = adobe_config_file["skus_mapping"][0]["vendor_external_id"]
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/orders",
         ),
         status=200,
@@ -875,7 +953,7 @@ def test_search_new_and_returned_orders_by_sku_line_number_not_found(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -892,7 +970,7 @@ def test_search_new_and_returned_orders_by_sku_line_number_not_found(
     )
 
     results = client.search_new_and_returned_orders_by_sku_line_number(
-        reseller_country,
+        authorization_uk,
         customer_id,
         vendor_external_id,
         "ALI-2119-4550-8674-5962-0001",
@@ -903,9 +981,10 @@ def test_search_new_and_returned_orders_by_sku_line_number_not_found(
 
 def test_create_return_order(
     mocker,
+    settings,
     requests_mocker,
     adobe_client_factory,
-    adobe_config_file,
+    adobe_authorizations_file,
     adobe_order_factory,
     adobe_items_factory,
 ):
@@ -916,10 +995,12 @@ def test_create_return_order(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     returning_order = adobe_order_factory(
         ORDER_TYPE_NEW,
@@ -943,7 +1024,8 @@ def test_create_return_order(
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=202,
         json={
@@ -952,7 +1034,7 @@ def test_create_return_order(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -965,7 +1047,7 @@ def test_create_return_order(
     )
 
     return_order = client.create_return_order(
-        reseller_country,
+        authorization_uk,
         customer_id,
         returning_order,
         returning_item,
@@ -977,15 +1059,18 @@ def test_create_return_order(
 
 def test_create_return_order_bad_request(
     requests_mocker,
+    settings,
     adobe_client_factory,
-    adobe_config_file,
+    adobe_authorizations_file,
     adobe_order_factory,
     adobe_api_error_factory,
 ):
     """
     Test the call to Adobe API to create a return order when the response is 400 bad request.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -994,7 +1079,8 @@ def test_create_return_order_bad_request(
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"], f"/v3/customers/{customer_id}/orders"
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
         ),
         status=400,
         json=error,
@@ -1003,7 +1089,7 @@ def test_create_return_order_bad_request(
 
     with pytest.raises(AdobeError) as cv:
         client.create_return_order(
-            reseller_country,
+            authorization_uk,
             customer_id,
             returning_order,
             returning_order["lineItems"][0],
@@ -1024,16 +1110,22 @@ def test_create_return_order_bad_request(
     ],
 )
 def test_update_subscription(
-    requests_mocker, adobe_client_factory, adobe_config_file, update_params
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    update_params,
 ):
     """
     Tests the update of a subscription.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     body_to_match = {
         "autoRenewal": {
@@ -1045,7 +1137,7 @@ def test_update_subscription(
 
     requests_mocker.patch(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
         ),
         status=200,
@@ -1053,7 +1145,7 @@ def test_update_subscription(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -1064,7 +1156,7 @@ def test_update_subscription(
     )
 
     assert client.update_subscription(
-        reseller_country,
+        authorization_uk,
         customer_id,
         sub_id,
         **update_params,
@@ -1072,12 +1164,18 @@ def test_update_subscription(
 
 
 def test_update_subscription_not_found(
-    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
 ):
     """
     Tests the update of a subscription when it doesn't exist.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
@@ -1085,7 +1183,7 @@ def test_update_subscription_not_found(
 
     requests_mocker.patch(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
         ),
         status=404,
@@ -1093,23 +1191,27 @@ def test_update_subscription_not_found(
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.update_subscription(reseller_country, customer_id, sub_id, quantity=10)
+        client.update_subscription(authorization_uk, customer_id, sub_id, quantity=10)
 
     assert cv.value.code == "404"
 
 
-def test_preview_transfer(requests_mocker, adobe_client_factory, adobe_config_file):
+def test_preview_transfer(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
     """
     Tests the retrieval subscriptions for a transfer given a membership id.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     membership_id = "a-membership-id"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/memberships/{membership_id}/offers",
         ),
         status=200,
@@ -1117,7 +1219,7 @@ def test_preview_transfer(requests_mocker, adobe_client_factory, adobe_config_fi
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -1126,25 +1228,31 @@ def test_preview_transfer(requests_mocker, adobe_client_factory, adobe_config_fi
         ],
     )
 
-    assert client.preview_transfer(reseller_country, membership_id) == {
+    assert client.preview_transfer(authorization_uk, membership_id) == {
         "a": "transfer-preview"
     }
 
 
 def test_preview_transfer_not_found(
-    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
 ):
     """
     Tests the retrieval subscriptions for a transfer given a membership id when they don't exist.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     membership_id = "a-membership-id"
 
     client, _, _ = adobe_client_factory()
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/memberships/{membership_id}/offers",
         ),
         status=404,
@@ -1152,16 +1260,17 @@ def test_preview_transfer_not_found(
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.preview_transfer(reseller_country, membership_id)
+        client.preview_transfer(authorization_uk, membership_id)
 
     assert cv.value.code == "404"
 
 
 def test_create_transfer(
     mocker,
+    settings,
     requests_mocker,
     adobe_client_factory,
-    adobe_config_file,
+    adobe_authorizations_file,
 ):
     """
     Test the call to Adobe API to create a transfer order.
@@ -1170,16 +1279,21 @@ def test_create_transfer(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
-    reseller_id = adobe_config_file["accounts"][0]["resellers"][0]["id"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
+        "seller_id"
+    ]
     membership_id = "a-membership-id"
     order_id = "an-order-id"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/memberships/{membership_id}/transfers",
         ),
         status=202,
@@ -1189,7 +1303,7 @@ def test_create_transfer(
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -1202,7 +1316,8 @@ def test_create_transfer(
     )
 
     new_transfer = client.create_transfer(
-        reseller_country,
+        authorization_uk,
+        seller_id,
         order_id,
         membership_id,
     )
@@ -1213,15 +1328,20 @@ def test_create_transfer(
 
 def test_create_transfer_bad_request(
     requests_mocker,
+    settings,
     adobe_client_factory,
-    adobe_config_file,
-    adobe_order_factory,
+    adobe_authorizations_file,
     adobe_api_error_factory,
 ):
     """
     Test the call to Adobe API to create a transfer order when the response is 400 bad request.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
+        "seller_id"
+    ]
     membership_id = "a-membership-id"
 
     client, _, _ = adobe_client_factory()
@@ -1230,7 +1350,7 @@ def test_create_transfer_bad_request(
 
     requests_mocker.post(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/memberships/{membership_id}/transfers",
         ),
         status=400,
@@ -1239,7 +1359,8 @@ def test_create_transfer_bad_request(
 
     with pytest.raises(AdobeError) as cv:
         client.create_transfer(
-            reseller_country,
+            authorization_uk,
+            seller_id,
             "an-order-id",
             membership_id,
         )
@@ -1247,19 +1368,23 @@ def test_create_transfer_bad_request(
     assert repr(cv.value) == str(error)
 
 
-def test_get_transfer(requests_mocker, adobe_client_factory, adobe_config_file):
+def test_get_transfer(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
     """
     Tests the retrieval of a transfer order.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     membership_id = "a-membership-id"
     transfer_id = "a-transfer-id"
 
-    client, credentials, api_token = adobe_client_factory()
+    client, authorization, api_token = adobe_client_factory()
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/memberships/{membership_id}/transfers/{transfer_id}",
         ),
         status=200,
@@ -1267,7 +1392,7 @@ def test_get_transfer(requests_mocker, adobe_client_factory, adobe_config_file):
         match=[
             matchers.header_matcher(
                 {
-                    "X-Api-Key": credentials.client_id,
+                    "X-Api-Key": authorization.client_id,
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
@@ -1276,18 +1401,24 @@ def test_get_transfer(requests_mocker, adobe_client_factory, adobe_config_file):
         ],
     )
 
-    assert client.get_transfer(reseller_country, membership_id, transfer_id) == {
+    assert client.get_transfer(authorization_uk, membership_id, transfer_id) == {
         "a": "transfer"
     }
 
 
 def test_get_transfer_not_found(
-    requests_mocker, adobe_client_factory, adobe_config_file, adobe_api_error_factory
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
 ):
     """
     Tests the retrieval of a transfer when it doesn't exist.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
     membership_id = "a-membership-id"
     transfer_id = "a-transfer-id"
 
@@ -1295,7 +1426,7 @@ def test_get_transfer_not_found(
 
     requests_mocker.get(
         urljoin(
-            adobe_config_file["api_base_url"],
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             f"/v3/memberships/{membership_id}/transfers/{transfer_id}",
         ),
         status=404,
@@ -1303,24 +1434,29 @@ def test_get_transfer_not_found(
     )
 
     with pytest.raises(AdobeError) as cv:
-        client.get_transfer(reseller_country, membership_id, transfer_id)
+        client.get_transfer(authorization_uk, membership_id, transfer_id)
 
     assert cv.value.code == "404"
 
 
-def test_get_auth_token(requests_mocker, mock_adobe_config, adobe_config_file):
+def test_get_auth_token(
+    requests_mocker, settings, mock_adobe_config, adobe_config_file
+):
     """
     Test issuing of authentication token.
     """
-    credentials = Credentials(
-        "client_id",
-        "client_secret",
-        "NA",
-        "distributor_id",
+    authorization = Authorization(
+        authorization_uk="auth_uk",
+        authorization_id="auth_id",
+        name="test",
+        client_id="client_id",
+        client_secret="client_secret",
+        currency="USD",
+        distributor_id="distributor_id",
     )
 
     requests_mocker.post(
-        adobe_config_file["authentication_endpoint_url"],
+        settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"],
         json={
             "access_token": "an-access-token",
             "expires_in": 83000,
@@ -1329,9 +1465,9 @@ def test_get_auth_token(requests_mocker, mock_adobe_config, adobe_config_file):
             matchers.urlencoded_params_matcher(
                 {
                     "grant_type": "client_credentials",
-                    "client_id": credentials.client_id,
-                    "client_secret": credentials.client_secret,
-                    "scope": ",".join(adobe_config_file["scopes"]),
+                    "client_id": authorization.client_id,
+                    "client_secret": authorization.client_secret,
+                    "scope": ",".join(Config.REQUIRED_API_SCOPES),
                 },
             ),
         ],
@@ -1339,32 +1475,37 @@ def test_get_auth_token(requests_mocker, mock_adobe_config, adobe_config_file):
 
     client = AdobeClient()
     with freeze_time("2024-01-01 12:00:00"):
-        token = client._get_auth_token(credentials)
+        token = client._get_auth_token(authorization)
         assert isinstance(token, APIToken)
         assert token.token == "an-access-token"
         assert token.expires == datetime.now() + timedelta(seconds=83000 - 180)
-        assert client._token_cache[credentials] == token
+        assert client._token_cache[authorization] == token
 
 
-def test_get_auth_token_error(requests_mocker, mock_adobe_config, adobe_config_file):
+def test_get_auth_token_error(
+    requests_mocker, settings, mock_adobe_config, adobe_config_file
+):
     """
     Test error issuing of authentication token.
     """
-    credentials = Credentials(
-        "client_id",
-        "client_secret",
-        "NA",
-        "distributor_id",
+    authorization = Authorization(
+        authorization_uk="auth_uk",
+        authorization_id="auth_id",
+        name="test",
+        client_id="client_id",
+        client_secret="client_secret",
+        currency="USD",
+        distributor_id="distributor_id",
     )
 
     requests_mocker.post(
-        adobe_config_file["authentication_endpoint_url"],
+        settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"],
         status=403,
     )
 
     client = AdobeClient()
     with pytest.raises(requests.HTTPError):
-        client._get_auth_token(credentials)
+        client._get_auth_token(authorization)
 
 
 def test_get_adobe_client(mocker):

@@ -1,30 +1,25 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 
 @dataclass(frozen=True)
-class Credentials:
+class Authorization:
+    authorization_uk: str
+    authorization_id: Optional[str]
+    name: str
     client_id: str
     client_secret: str
-    country: str
-    distributor_id: str
-
-
-@dataclass(frozen=True)
-class Distributor:
-    id: str
-    country: str
-    pricelist_region: str
     currency: str
-    credentials: Credentials
+    distributor_id: str
 
 
 @dataclass(frozen=True)
 class Reseller:
     id: str
-    country: str
-    distributor: Distributor
+    seller_uk: str
+    authorization: Authorization
+    seller_id: Optional[str]
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,6 @@ from adobe_vipm.flows.helpers import update_purchase_prices
 
 def test_update_purchase_price(
     mocker,
-    seller,
     order_factory,
     adobe_order_factory,
     items_factory,
@@ -34,7 +33,6 @@ def test_update_purchase_price(
     updated_order = update_purchase_prices(
         m_mpt_client,
         mocked_adobe_client,
-        seller["address"]["country"],
         order,
     )
 

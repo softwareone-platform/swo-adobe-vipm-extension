@@ -54,13 +54,12 @@ def _handle_transfer_preview_error(client, order, error):
     switch_order_to_failed(client, order, str(error))
 
 
-def _check_transfer(mpt_client, seller_country, order, membership_id):
+def _check_transfer(mpt_client, order, membership_id):
     """
     Checks the validity of a transfer order based on the provided parameters.
 
     Args:
         mpt_client (MPTClient): An instance of the Marketplace platform client.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dict): The MPT order being processed.
         membership_id (str): The Adobe membership ID associated with the transfer.
 
@@ -69,9 +68,10 @@ def _check_transfer(mpt_client, seller_country, order, membership_id):
     """
 
     adobe_client = get_adobe_client()
+    authorization_id = order["authorization"]["id"]
     transfer_preview = None
     try:
-        transfer_preview = adobe_client.preview_transfer(seller_country, membership_id)
+        transfer_preview = adobe_client.preview_transfer(authorization_id, membership_id)
     except AdobeError as e:
         _handle_transfer_preview_error(mpt_client, order, e)
         logger.warning(f"Transfer order {order['id']} has been failed: {str(e)}.")
@@ -103,14 +103,13 @@ def _check_transfer(mpt_client, seller_country, order, membership_id):
     return True
 
 
-def _submit_transfer_order(mpt_client, seller_country, order, membership_id):
+def _submit_transfer_order(mpt_client, order, membership_id):
     """
     Submits a transfer order to the Adobe API based on the provided parameters.
     In case the Adobe API returns errors, the order will be switched to failed.
 
     Args:
         mpt_client (MPTClient): An instance of the Marketplace platform client.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dict): The MPT order to be submitted.
         membership_id (str): The Adobe membership ID associated with the transfer.
 
@@ -118,10 +117,11 @@ def _submit_transfer_order(mpt_client, seller_country, order, membership_id):
         dict or None: The Adobe transfer order if successful, None otherwise.
     """
     adobe_client = get_adobe_client()
+    authorization_id = order["authorization"]["id"]
     adobe_transfer_order = None
     try:
         adobe_transfer_order = adobe_client.create_transfer(
-            seller_country, order["id"], membership_id
+            authorization_id, order["id"], membership_id
         )
     except AdobeError as e:
         switch_order_to_failed(mpt_client, order, str(e))
@@ -133,14 +133,13 @@ def _submit_transfer_order(mpt_client, seller_country, order, membership_id):
 
 
 def _check_adobe_transfer_order_fulfilled(
-    mpt_client, seller_country, order, membership_id, adobe_transfer_id
+    mpt_client, order, membership_id, adobe_transfer_id
 ):
     """
     Checks the fulfillment status of an Adobe transfer order.
 
     Args:
         mpt_client (MPTClient): An instance of the Marketplace platform client.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dict): The MPT order being processed.
         membership_id (str): The Adobe membership ID associated with the transfer.
         adobe_transfer_id (str): The Adobe transfer order ID.
@@ -149,8 +148,9 @@ def _check_adobe_transfer_order_fulfilled(
         dict or None: The Adobe transfer order if fulfilled, None otherwise.
     """
     adobe_client = get_adobe_client()
+    authorization_id = order["authorization"]["id"]
     adobe_order = adobe_client.get_transfer(
-        seller_country,
+        authorization_id,
         membership_id,
         adobe_transfer_id,
     )
@@ -165,13 +165,12 @@ def _check_adobe_transfer_order_fulfilled(
     return adobe_order
 
 
-def fulfill_transfer_order(mpt_client, seller_country, order):
+def fulfill_transfer_order(mpt_client, order):
     """
     Fulfills a transfer order by processing the necessary actions based on the provided parameters.
 
     Args:
         mpt_client (MPTClient): An instance of the Marketplace platform client.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dict): The MPT transfer order to be fulfilled.
 
     Returns:
@@ -181,17 +180,17 @@ def fulfill_transfer_order(mpt_client, seller_country, order):
     membership_id = get_adobe_membership_id(order)
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
-        if not _check_transfer(mpt_client, seller_country, order, membership_id):
+        if not _check_transfer(mpt_client, order, membership_id):
             return
 
-        order = _submit_transfer_order(mpt_client, seller_country, order, membership_id)
+        order = _submit_transfer_order(mpt_client, order, membership_id)
         if not order:
             return
 
         adobe_order_id = order["externalIds"]["vendor"]
 
     adobe_transfer_order = _check_adobe_transfer_order_fulfilled(
-        mpt_client, seller_country, order, membership_id, adobe_order_id
+        mpt_client, order, membership_id, adobe_order_id
     )
     if not adobe_transfer_order:
         return
@@ -200,6 +199,6 @@ def fulfill_transfer_order(mpt_client, seller_country, order):
     order = save_adobe_customer_id(mpt_client, order, customer_id)
     for item in adobe_transfer_order["lineItems"]:
         add_subscription(
-            mpt_client, adobe_client, seller_country, customer_id, order, item
+            mpt_client, adobe_client, customer_id, order, item
         )
     switch_order_to_completed(mpt_client, order)

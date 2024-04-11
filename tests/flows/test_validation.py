@@ -591,14 +591,11 @@ def test_validate_customer_data_invalid(mocker, no_validating_fn):
     assert has_errors is True
 
 
-def test_validate_purchase_order(mocker, caplog, order_factory, buyer, customer_data):
+def test_validate_purchase_order(mocker, caplog, order_factory, customer_data):
     """Tests the validate order entrypoint function when it validates."""
     order = order_factory()
     m_client = mocker.MagicMock()
 
-    m_get_buyer = mocker.patch(
-        "adobe_vipm.flows.validation.get_buyer", return_value=buyer
-    )
     m_prepare_customer_data = mocker.patch(
         "adobe_vipm.flows.validation.prepare_customer_data",
         return_value=(order, customer_data),
@@ -623,13 +620,11 @@ def test_validate_purchase_order(mocker, caplog, order_factory, buyer, customer_
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    m_get_buyer.assert_called_once_with(m_client, order["agreement"]["buyer"]["id"])
-    m_prepare_customer_data.assert_called_once_with(m_client, order, buyer)
+    m_prepare_customer_data.assert_called_once_with(m_client, order)
     m_validate_customer_data.assert_called_once_with(order, customer_data)
     m_update_purchase_prices.assert_called_once_with(
         m_client,
         m_adobe_cli,
-        order["agreement"]["seller"]["address"]["country"],
         order,
     )
 
@@ -640,7 +635,6 @@ def test_validate_purchase_order_no_validate(mocker, caplog, order_factory):
     m_client = mocker.MagicMock()
 
     mocker.patch("adobe_vipm.flows.validation.populate_order_info", return_value=order)
-    mocker.patch("adobe_vipm.flows.validation.get_buyer")
     mocker.patch(
         "adobe_vipm.flows.validation.prepare_customer_data",
         return_value=(order, mocker.MagicMock()),
@@ -805,7 +799,6 @@ def test_validate_transfer_order(
     m_update_purchase_prices.assert_called_once_with(
         m_client,
         m_adobe_cli,
-        order["agreement"]["seller"]["address"]["country"],
         order,
     )
 
@@ -821,7 +814,6 @@ def test_validate_transfer_order_no_validate(
     m_client = mocker.MagicMock()
 
     mocker.patch("adobe_vipm.flows.validation.populate_order_info", return_value=order)
-    mocker.patch("adobe_vipm.flows.validation.get_buyer")
     mocker.patch(
         "adobe_vipm.flows.validation.prepare_customer_data",
         return_value=(order, mocker.MagicMock()),

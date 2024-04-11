@@ -1,4 +1,4 @@
-import secrets
+import uvicorn
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -20,3 +20,7 @@ async def custom_exception_handler(request: Request, exc: DevmockException):
         exc.to_dict(),
         status_code=exc.status_code,
     )
+
+
+def main():
+    uvicorn.run(app)

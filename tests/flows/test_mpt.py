@@ -8,10 +8,8 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
-    get_buyer,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
-    get_seller,
     get_webhook,
     query_order,
     update_order,
@@ -53,60 +51,6 @@ def test_fail_order_error(mpt_client, requests_mocker, mpt_error_factory):
 
     with pytest.raises(MPTError) as cv:
         fail_order(mpt_client, "ORD-0000", "a-reason")
-
-    assert cv.value.payload["status"] == 404
-
-
-def test_get_buyer(mpt_client, requests_mocker):
-    """Test the call to retrieve a buyer."""
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, "accounts/buyers/BUY-0000"),
-        json={"a": "buyer"},
-    )
-
-    buyer = get_buyer(mpt_client, "BUY-0000")
-    assert buyer == {"a": "buyer"}
-
-
-def test_get_buyer_error(mpt_client, requests_mocker, mpt_error_factory):
-    """
-    Test the call to to retrieve a buyer when it fails.
-    """
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, "accounts/buyers/BUY-0000"),
-        status=404,
-        json=mpt_error_factory(404, "Not Found", "Buyer not found"),
-    )
-
-    with pytest.raises(MPTError) as cv:
-        get_buyer(mpt_client, "BUY-0000")
-
-    assert cv.value.payload["status"] == 404
-
-
-def test_get_seller(mpt_client, requests_mocker):
-    """Test the call to retrieve a seller."""
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, "accounts/sellers/SEL-0000"),
-        json={"a": "seller"},
-    )
-
-    seller = get_seller(mpt_client, "SEL-0000")
-    assert seller == {"a": "seller"}
-
-
-def test_get_seller_error(mpt_client, requests_mocker, mpt_error_factory):
-    """
-    Test the call to to retrieve a seller when it fails.
-    """
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, "accounts/sellers/SEL-0000"),
-        status=404,
-        json=mpt_error_factory(404, "Not Found", "Buyer not found"),
-    )
-
-    with pytest.raises(MPTError) as cv:
-        get_seller(mpt_client, "SEL-0000")
 
     assert cv.value.payload["status"] == 404
 

@@ -20,11 +20,13 @@ $ docker-compose run --service-ports app_test
 $ touch adobe_secrets.json
 ```
 
-1. Fufill Adobe secrets file
+1. Fill Adobe secrets file
 ```
 [
     {
-        "country": "<two-letters-country>",
+        "authorization_uk": "<authorization-uk>",
+        "authorization_id": "<authorization-id>",
+        "name": "<name>",
         "client_id": "<client-id>",
         "client_secret": "<client-secret>"
     },
@@ -36,14 +38,64 @@ Example of the secrets file
 ```
 [
     {
-        "country": "US",
+        "authorization_uk": "auth-adobe-us-01",
+        "authorization_id": "AUT-1111-1111",
+        "name": "Credentials for US",
         "client_id": "cc7fce0d-f2e8-45c2-a61e-452b31d096c7",
         "client_secret": "cltn3c1eo0001m5pxkdcmd8cl"
     }
 ]
 ```
 
-The list of supported countries can be found in [adobe_vipm/adobe_config.json](adobe_vipm/adobe_config.json:795) "code" field.
+
+1. Create Adobe authorizations file
+```
+$ touch adobe_authorizations.json
+```
+
+1. Fill Adobe authorizations file
+```
+{
+    "authorizations": [
+        {
+            "authorization_uk": "<authorization-uk>",
+            "authorization_id": "<authorization-id>",
+            "distributor_id": "<distributor-id>",
+            "currency": "USD",
+            "resellers": [
+                {
+                    "id": "<adobe-reseller-id>",
+                    "seller_id": "<seller-id>",
+                    "seller_uk": "<seller-uk>"
+                }
+            ]
+        }
+    ]
+}
+```
+
+Example of the authorizations file
+```
+{
+    "authorizations": [
+        {
+            "authorization_uk": "auth-adobe-us-01",
+            "authorization_id": "AUT-1111-1111",
+            "distributor_id": "db5a6d9c-9eb5-492e-a000-ab4b8c29fc63",
+            "currency": "USD",
+            "resellers": [
+                {
+                    "id": "P1000041107",
+                    "seller_id": "SEL-1111-1111",
+                    "seller_uk": "SWO_US"
+                }
+            ]
+        }
+    ]
+}
+
+```
+
 
 1. Create environment file
 ```
@@ -64,9 +116,9 @@ MPT_API_TOKEN=<mpt-api-token>
 For each of the defined product id in the `MPT_PRODUCTS_IDS` list define `EXT_QUERYING_TEMPLATE_<product-id>`, `EXT_COMPLETED_TEMPLATE_<product_id>` and `WEBHOOK_SECRET_<produt-id>`. Replace `-` (dash) symbols with `_` (underscores) for the product identifier.
 
 ```
-EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111_1111=<querying-template-id-for-product>
-EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111=<completed_template-id-for-product>
-EXT_WEBHOOK_SECRET_PRD_1111_1111_1111=<webhook-secret-for-product>
+EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111=<querying-template-id-for-product>
+EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111=<completed_template-id-for-product>
+EXT_WEBHOOK_SECRET_PRD_1111_1111=<webhook-secret-for-product>
 ```
 
 Example of `.env` file
@@ -74,12 +126,12 @@ Example of `.env` file
 EXT_ADOBE_CREDENTIALS_FILE=/extension/adobe_secrets.json
 EXT_ADOBE_API_BASE_URL=<adobe-vipm-api>
 EXT_ADOBE_AUTH_ENDPOINT_URL=<adobe-vipm-authentication-url>
-MPT_PRODUCT_ID=PRD-1111-1111-1111,PRD-2222-2222-2222
+MPT_PRODUCT_ID=PRD-1111-1111,PRD-2222-2222
 MPT_API_BASE_URL=http://devmock:8000
 MPT_API_TOKEN=c0fdafd7-6d5a-4fa4-9839-4c2c163794ff
-EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111_1111=TPL-1234-1234
-EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111=TPL-4321-4321
-EXT_WEBHOOK_SECRET_PRD_1111_1111_1111=<webhook-secret-for-product>
+EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111=TPL-1234-1234
+EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111=TPL-4321-4321
+EXT_WEBHOOK_SECRET_PRD_1111_1111=<webhook-secret-for-product>
 EXT_QUERYING_TEMPLATE_ID_PRD_2222_2222_2222=TPL-5678-5678
 EXT_COMPLETED_TEMPLATE_ID_PRD_2222_2222_2222=TPL-8765-8765
 EXT_WEBHOOK_SECRET_PRD_2222_2222_2222=<webhook-secret-for-product>
@@ -101,7 +153,12 @@ $ docker-compose build bash
 $ docker-compose run --service-ports bash
 ```
 
-1. Inside the `bash` container use `mockgendata` command
+1. Inside the container, setup the data generator
+```
+$ mockgendata setup
+```
+
+1. Use data generator
 ```
 $ mockgendata sku <name>
 $ mockgendata purchase <sku>
@@ -120,12 +177,13 @@ Find generated data in the `devmock/data` folder. Extension automatically retrie
 | Environment Variable | Default | Example | Description |
 | --- | --- | --- | --- |
 | `EXT_ADOBE_CREDENTIALS_FILE` | - | /extension/adobe_secrets.json | Path to Adobe credentials file |
+| `EXT_ADOBE_AUTHORIZATIONS_FILE` | - | /extension/adobe_authorizations.json | Path to Adobe authorizations file |
 | `EXT_ADOBE_API_BASE_URL` | - | https://partner-example.adobe.io | Path to Adobe VIPM API |
 | `EXT_ADOBE_AUTH_ENDPOINT_URL` | - | https://auth.partner-example.adobe.io | Path to Adobe VIPM authentication API |
 | `EXT_QUERYING_TEMPLATE_ID_<product_id>` | - | TPL-1111-1111 | SoftwareONE Marketplace Template ID for Order Quering status |
 | `EXT_COMPLETED_TEMPLATE_ID_<product_id>` | - | TPL-2222-2222 | SoftwareONE Marketplace Template ID for Order Completed status |
 | `EXT_WEBHOOK_SECRET_<product_id>` | - | 123qweasd3432234 | Webhook secret of the Draft validation Webhook in SoftwareONE Marketplace for the product |
-| `MPT_PRODUCTS_IDS` | PRD-1111-1111-1111 | PRD-1234-1234-1234,PRD-4321-4321-4321 | Comma-separated list of SoftwareONE Marketplace Product ID |
+| `MPT_PRODUCTS_IDS` | PRD-1111-1111 | PRD-1234-1234,PRD-4321-4321 | Comma-separated list of SoftwareONE Marketplace Product ID |
 | `MPT_API_BASE_URL` | http://localhost:8000 | https://portal.softwareone.com/mpt | SoftwareONE Marketplace API URL |
 | `MPT_API_TOKEN` | - | eyJhbGciOiJSUzI1N... | SoftwareONE Marketplace API Token |
 

@@ -44,20 +44,6 @@
         "zh-HANT",
         "zh-TW"
     ],
-    "accounts": [
-        {
-            "pricelist_region": "NA",
-            "country": "US",
-            "distributor_id": "db5a6d9c-9eb5-492e-a000-ab4b8c29fc63",
-            "currency": "USD",
-            "resellers": [
-                {
-                    "id": "P1000041107",
-                    "country": "US"
-                }
-            ]
-        }
-    ],
     "skus_mapping": [
         {
             "vendor_external_id": "65324845CA",

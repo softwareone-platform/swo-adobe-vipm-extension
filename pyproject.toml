@@ -62,6 +62,7 @@ watchfiles = "0.21.*"
 [tool.poetry.scripts]
 swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
 mockgendata = 'devmock.mockgendata:main' # Remove when devmock is not needed anymore
+devmock = 'devmock.app:main' # Remove when devmock is not needed anymore
 
 
 [tool.poetry.plugins."swo.mpt.ext"]

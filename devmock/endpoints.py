@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from devmock.filters import ItemsFilter, OrdersFilter, PriceListItemFilter
 from devmock.models import Order, Subscription
-from devmock.settings import ITEMS_FOLDER, ORDERS_FOLDER, PRICELIST_ITEMS_FOLDER, WEBHOOK_ENDPOINT, WEBHOOK_ID, PRODUCT_ID
+from devmock.settings import ITEMS_FOLDER, ORDERS_FOLDER, PRICELIST_ITEMS_FOLDER, WEBHOOK_ENDPOINT, WEBHOOK_ID
 from devmock.utils import (
     base_id_from,
     gen_jwt_token,
@@ -215,16 +215,6 @@ def update_subscription(
     return current_subscription
 
 
-@router.get("/accounts/buyers/{id}")
-def get_buyer(id: str):
-    return load_buyer(id)
-
-
-@router.get("/accounts/sellers/{id}")
-def get_seller(id: str):
-    return load_seller(id)
-
-
 @router.get("/commerce/agreements/{id}")
 def get_agreement(id: str):
     agreement = load_agreement(id)
@@ -335,9 +325,10 @@ def list_priceslist_items(request: Request, pid: str):
 
 @router.get(f"/notifications/webhooks/{WEBHOOK_ID}")
 def get_webhook(request: Request):
+    products = os.environ("MPT_PRODUCTS_IDS").split(",")
     return {
         "id": WEBHOOK_ID,
         "params": {
-            "product.id": PRODUCT_ID,
+            "product.id": products[0],
         }
     }

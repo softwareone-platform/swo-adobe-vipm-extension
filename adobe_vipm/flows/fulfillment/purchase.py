@@ -29,7 +29,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_query,
 )
 from adobe_vipm.flows.helpers import prepare_customer_data
-from adobe_vipm.flows.mpt import get_buyer
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
@@ -99,16 +98,13 @@ def _handle_customer_error(client, order, error):
     switch_order_to_query(client, order)
 
 
-def create_customer_account(client, seller_country, buyer, order):
+def create_customer_account(client, order):
     """
     Creates a customer account in Adobe for the new agreement that belongs to the order
     currently being processed.
 
     Args:
         client (MPTClient): An instance of the Marketplace platform client.
-        seller_country (str): Country code of the seller attached to this MPT order.
-            Used to select the right credentials to access the Adobe API.
-        buyer (dict): The buyer attached to the current order.
         order (dict): The order that is being processed.
 
     Returns:
@@ -117,10 +113,12 @@ def create_customer_account(client, seller_country, buyer, order):
     """
     adobe_client = get_adobe_client()
     try:
-        order, customer_data = prepare_customer_data(client, order, buyer)
+        order, customer_data = prepare_customer_data(client, order)
         external_id = order["agreement"]["id"]
+        seller_id = order["agreement"]["seller"]["id"]
+        authorization_id = order["authorization"]["id"]
         customer_id = adobe_client.create_customer_account(
-            seller_country, external_id, customer_data
+            authorization_id, seller_id, external_id, customer_data
         )
         return save_adobe_customer_id(client, order, customer_id)
     except AdobeError as e:
@@ -128,15 +126,16 @@ def create_customer_account(client, seller_country, buyer, order):
         _handle_customer_error(client, order, e)
 
 
-def _submit_new_order(mpt_client, seller_country, customer_id, order):
+def _submit_new_order(mpt_client, customer_id, order):
     adobe_client = get_adobe_client()
     adobe_order = None
     try:
+        authorization_id = order["authorization"]["id"]
         preview_order = adobe_client.create_preview_order(
-            seller_country, customer_id, order["id"], order["lines"]
+            authorization_id, customer_id, order["id"], order["lines"]
         )
         adobe_order = adobe_client.create_new_order(
-            seller_country,
+            authorization_id,
             customer_id,
             preview_order,
         )
@@ -149,43 +148,40 @@ def _submit_new_order(mpt_client, seller_country, customer_id, order):
     return save_adobe_order_id(mpt_client, order, adobe_order["orderId"])
 
 
-def fulfill_purchase_order(mpt_client, seller_country, order):
+def fulfill_purchase_order(mpt_client, order):
     """
     Fulfills a purchase order by processing the necessary actions based on the provided parameters.
 
     Args:
         mpt_client: An instance of the MPT client used for communication with the MPT system.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dict): The MPT order representing the purchase order to be fulfilled.
 
     Returns:
         None
     """
     adobe_client = get_adobe_client()
-    buyer_id = order["agreement"]["buyer"]["id"]
-    buyer = get_buyer(mpt_client, buyer_id)
     customer_id = get_adobe_customer_id(order)
     if not customer_id:
-        order = create_customer_account(mpt_client, seller_country, buyer, order)
+        order = create_customer_account(mpt_client, order)
         if not order:
             return
 
     customer_id = get_adobe_customer_id(order)
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
-        order = _submit_new_order(mpt_client, seller_country, customer_id, order)
+        order = _submit_new_order(mpt_client, customer_id, order)
         if not order:
             return
     adobe_order_id = order["externalIds"]["vendor"]
     adobe_order = check_adobe_order_fulfilled(
-        mpt_client, adobe_client, seller_country, order, customer_id, adobe_order_id
+        mpt_client, adobe_client, order, customer_id, adobe_order_id
     )
     if not adobe_order:
         return
 
     for item in adobe_order["lineItems"]:
         add_subscription(
-            mpt_client, adobe_client, seller_country, customer_id, order, item
+            mpt_client, adobe_client, customer_id, order, item
         )
 
     switch_order_to_completed(mpt_client, order)

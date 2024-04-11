@@ -28,8 +28,6 @@ from adobe_vipm.flows.utils import set_adobe_customer_id
 def test_no_customer(
     mocker,
     settings,
-    buyer,
-    seller,
     agreement,
     order_factory,
     order_parameters_factory,
@@ -48,10 +46,9 @@ def test_no_customer(
         * order completion
     """
 
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
-    mocker.patch("adobe_vipm.flows.fulfillment.purchase.get_buyer", return_value=buyer)
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
         return_value=order_factory(
@@ -127,16 +124,14 @@ def test_no_customer(
 
     fulfill_order(mocked_mpt_client, order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = order["authorization"]["id"]
 
     mocked_create_customer_account.assert_called_once_with(
         mocked_mpt_client,
-        seller_country,
-        buyer,
         order,
     )
     mocked_adobe_client.create_preview_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         order_with_customer_param["id"],
         order_with_customer_param["lines"],
@@ -208,10 +203,10 @@ def test_no_customer(
         "TPL-1111",
     )
     mocked_adobe_client.get_order.assert_called_once_with(
-        seller_country, "a-client-id", adobe_order["orderId"]
+        authorization_id, "a-client-id", adobe_order["orderId"]
     )
     mocked_adobe_client.get_subscription.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         adobe_subscription["subscriptionId"],
     )
@@ -219,7 +214,6 @@ def test_no_customer(
 
 def test_customer_already_created(
     mocker,
-    seller,
     agreement,
     order_factory,
     order_parameters_factory,
@@ -263,11 +257,11 @@ def test_customer_already_created(
 
     fulfill_order(mocked_mpt_client, order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = order["authorization"]["id"]
 
     mocked_create_customer_account.assert_not_called()
     mocked_adobe_client.create_preview_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         order["id"],
         order["lines"],
@@ -299,7 +293,6 @@ def test_customer_already_created(
 
 def test_create_customer_fails(
     mocker,
-    seller,
     order_factory,
 ):
     """
@@ -421,7 +414,6 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
 
 def test_customer_already_created_order_already_created_max_retries_reached(
     mocker,
-    seller,
     order_factory,
     fulfillment_parameters_factory,
 ):
@@ -504,7 +496,6 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
 
 def test_customer_already_created_order_already_created_unexpected_status(
     mocker,
-    seller,
     order_factory,
     fulfillment_parameters_factory,
 ):
@@ -545,7 +536,6 @@ def test_customer_already_created_order_already_created_unexpected_status(
 
 def test_create_customer_account(
     mocker,
-    buyer,
     order,
     order_parameters_factory,
     fulfillment_parameters_factory,
@@ -569,13 +559,12 @@ def test_create_customer_account(
 
     updated_order = create_customer_account(
         mocked_mpt_client,
-        "US",
-        buyer,
         order,
     )
 
     mocked_adobe_client.create_customer_account.assert_called_once_with(
-        "US",
+        order["authorization"]["id"],
+        order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
         {param["externalId"]: param["value"] for param in order_parameters_factory()},
     )
@@ -595,7 +584,6 @@ def test_create_customer_account(
 
 def test_create_customer_account_empty_order_parameters(
     mocker,
-    buyer,
     order,
     order_parameters_factory,
     fulfillment_parameters_factory,
@@ -628,15 +616,11 @@ def test_create_customer_account_empty_order_parameters(
         contact={},
     )
 
-    create_customer_account(
-        mocked_mpt_client,
-        "US",
-        buyer,
-        order,
-    )
+    create_customer_account(mocked_mpt_client, order)
 
     mocked_adobe_client.create_customer_account.assert_called_once_with(
-        "US",
+        order["authorization"]["id"],
+        order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
         {param["externalId"]: param["value"] for param in order_parameters_factory()},
     )
@@ -664,7 +648,6 @@ def test_create_customer_account_empty_order_parameters(
 
 def test_create_customer_account_address_error(
     mocker,
-    buyer,
     order,
     order_parameters_factory,
     fulfillment_parameters_factory,
@@ -674,7 +657,7 @@ def test_create_customer_account_address_error(
     """
     Test address validation error handling when create a customer account in Adobe.
     """
-    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-0000"
+    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111"] = "TPL-0000"
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
         adobe_api_error_factory(
@@ -696,8 +679,6 @@ def test_create_customer_account_address_error(
 
     updated_order = create_customer_account(
         mocked_mpt_client,
-        "US",
-        buyer,
         order,
     )
 
@@ -737,7 +718,6 @@ def test_create_customer_account_address_error(
 )
 def test_create_customer_account_fields_error(
     mocker,
-    buyer,
     order,
     order_parameters_factory,
     fulfillment_parameters_factory,
@@ -750,7 +730,7 @@ def test_create_customer_account_fields_error(
     """
     Test fields validation error handling when create a customer account in Adobe.
     """
-    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-0000"
+    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111"] = "TPL-0000"
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
         adobe_api_error_factory(
@@ -772,8 +752,6 @@ def test_create_customer_account_fields_error(
 
     updated_order = create_customer_account(
         mocked_mpt_client,
-        "US",
-        buyer,
         order,
     )
 
@@ -803,7 +781,6 @@ def test_create_customer_account_fields_error(
 
 def test_create_customer_account_other_error(
     mocker,
-    buyer,
     order,
     adobe_api_error_factory,
 ):
@@ -830,8 +807,6 @@ def test_create_customer_account_other_error(
 
     updated_order = create_customer_account(
         mocked_mpt_client,
-        "US",
-        buyer,
         order,
     )
 

@@ -16,7 +16,6 @@ from adobe_vipm.flows.utils import get_ordering_parameter, set_ordering_paramete
 def test_transfer(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     transfer_order_parameters_factory,
@@ -35,7 +34,7 @@ def test_transfer(
         * order completion
     """
 
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -88,10 +87,10 @@ def test_transfer(
 
     fulfill_order(mocked_mpt_client, order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = order["authorization"]["id"]
 
     mocked_adobe_client.preview_transfer.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-membership-id",
     )
 
@@ -162,10 +161,10 @@ def test_transfer(
         "TPL-1111",
     )
     mocked_adobe_client.get_transfer.assert_called_once_with(
-        seller_country, "a-membership-id", adobe_transfer["transferId"]
+        authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
     mocked_adobe_client.get_subscription.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         adobe_subscription["subscriptionId"],
     )
@@ -173,7 +172,6 @@ def test_transfer(
 
 def test_transfer_not_ready(
     mocker,
-    seller,
     agreement,
     order_factory,
     transfer_order_parameters_factory,
@@ -213,7 +211,7 @@ def test_transfer_not_ready(
 
     fulfill_order(mocked_mpt_client, order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = order["authorization"]["id"]
 
     assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
@@ -230,13 +228,12 @@ def test_transfer_not_ready(
 
     mocked_complete_order.assert_not_called()
     mocked_adobe_client.get_transfer.assert_called_once_with(
-        seller_country, "a-membership-id", adobe_transfer["transferId"]
+        authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
 
 
 def test_transfer_unexpected_status(
     mocker,
-    seller,
     agreement,
     order_factory,
     transfer_order_parameters_factory,
@@ -280,7 +277,6 @@ def test_transfer_unexpected_status(
 
 def test_transfer_items_mismatch(
     mocker,
-    seller,
     agreement,
     order_factory,
     transfer_order_parameters_factory,
@@ -311,10 +307,10 @@ def test_transfer_items_mismatch(
 
     fulfill_order(mocked_mpt_client, order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = order["authorization"]["id"]
 
     mocked_adobe_client.preview_transfer.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-membership-id",
     )
 
@@ -336,7 +332,6 @@ def test_transfer_items_mismatch(
 def test_transfer_invalid_membership(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     transfer_order_parameters_factory,
@@ -346,7 +341,7 @@ def test_transfer_invalid_membership(
     """
     Tests a transfer order when the membership id is not valid.
     """
-    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-964-112"
+    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111"] = "TPL-964-112"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_adobe_client = mocker.MagicMock()
@@ -369,10 +364,10 @@ def test_transfer_invalid_membership(
 
     fulfill_order(mocked_mpt_client, order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = order["authorization"]["id"]
 
     mocked_adobe_client.preview_transfer.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-membership-id",
     )
     param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
@@ -395,7 +390,6 @@ def test_transfer_invalid_membership(
 @pytest.mark.parametrize("transfer_status", UNRECOVERABLE_TRANSFER_STATUSES)
 def test_transfer_unrecoverable_status(
     mocker,
-    seller,
     agreement,
     order_factory,
     transfer_order_parameters_factory,
@@ -427,10 +421,10 @@ def test_transfer_unrecoverable_status(
 
     fulfill_order(mocked_mpt_client, order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = order["authorization"]["id"]
 
     mocked_adobe_client.preview_transfer.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-membership-id",
     )
     mocked_fail_order.assert_called_once_with(

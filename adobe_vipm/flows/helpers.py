@@ -44,7 +44,7 @@ def populate_order_info(client, order):
     return order
 
 
-def prepare_customer_data(client, order, buyer):
+def prepare_customer_data(client, order):
     """
     Try to get customer data from ordering parameters. If they are empty,
     they will be filled with data from the buyer object related to the
@@ -53,8 +53,6 @@ def prepare_customer_data(client, order, buyer):
     Args:
         client (MPTClient): an instance of the Marketplace platform client.
         order (dict): the order that is being processed.
-        buyer (dict): the buyer that can be used to take the customer data
-        from.
 
     Returns:
         tuple: a tuple which first item is the updated order and the second
@@ -62,6 +60,7 @@ def prepare_customer_data(client, order, buyer):
     """
     customer_data = get_customer_data(order)
     if not all(customer_data.values()):
+        buyer = order["agreement"]["buyer"]
         order = set_customer_data(
             order,
             {
@@ -92,7 +91,7 @@ def prepare_customer_data(client, order, buyer):
     return order, customer_data
 
 
-def update_purchase_prices(mpt_client, adobe_client, seller_country, order):
+def update_purchase_prices(mpt_client, adobe_client, order):
     """
     Creates a preview order in adobe to get the full SKU list to update items prices
     during draft validation.
@@ -101,15 +100,15 @@ def update_purchase_prices(mpt_client, adobe_client, seller_country, order):
         mpt_client (MPTClient): An instance of the Marketplace platform client.
         adobe_client (AdobeClient): An instance of the Adobe client for communication with the
             Adobe API.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dict): The MPT order to which the subscription will be added.
 
     Returns:
         dict: The updated order
     """
     customer_id = get_adobe_customer_id(order) or FAKE_CUSTOMER_ID
+    authorization_id = order["authorization"]["id"]
     preview_order = adobe_client.create_preview_order(
-        seller_country, customer_id, order["id"], order["lines"]
+        authorization_id, customer_id, order["id"], order["lines"]
     )
 
     adobe_skus = [item["offerId"] for item in preview_order["lineItems"]]

@@ -8,7 +8,7 @@ from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
-from adobe_vipm.adobe.dataclasses import APIToken, Credentials
+from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_ADOBE_SKU,
@@ -54,19 +54,7 @@ def adobe_config_file():
     Return an Adobe VIP Marketplace configuration file
     """
     return {
-        "authentication_endpoint_url": "https://authenticate.adobe",
-        "api_base_url": "https://api.adobe",
-        "scopes": ["openid", "AdobeID", "read_organizations"],
         "language_codes": ["en-US"],
-        "accounts": [
-            {
-                "pricelist_region": "NA",
-                "country": "US",
-                "distributor_id": "distributor_id",
-                "currency": "USD",
-                "resellers": [{"id": "P1000040545", "country": "US"}],
-            }
-        ],
         "skus_mapping": [
             {
                 "vendor_external_id": "65304578CA",
@@ -168,6 +156,9 @@ def adobe_credentials_file():
     """
     return [
         {
+            "authorization_uk": "uk-auth-adobe-us-01",
+            "authorization_id": "AUT-1234-4567",
+            "name": "Adobe VIP Marketplace for Sandbox",
             "country": "US",
             "client_id": "client_id",
             "client_secret": "client_secret",
@@ -176,13 +167,40 @@ def adobe_credentials_file():
 
 
 @pytest.fixture()
-def mock_adobe_config(mocker, adobe_credentials_file, adobe_config_file):
+def adobe_authorizations_file():
+    """
+    Return an Adobe VIP Marketplace authorizations file
+    """
+    return {
+        "authorizations": [
+            {
+                "pricelist_region": "NA",
+                "distributor_id": "db5a6d9c-9eb5-492e-a000-ab4b8c29fc63",
+                "currency": "USD",
+                "authorization_uk": "uk-auth-adobe-us-01",
+                "authorization_id": "AUT-1234-4567",
+                "resellers": [
+                    {
+                        "id": "P1000041107",
+                        "seller_uk": "SWO_US",
+                        "seller_id": "SEL-1234-4567",
+                    },
+                ],
+            },
+        ]
+    }
+
+@pytest.fixture()
+def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file):
     """
     Mock the Adobe Config object to load test data from the adobe_credentials and
     adobe_config_file fixtures.
     """
     mocker.patch.object(
         Config, "_load_credentials", return_value=adobe_credentials_file
+    )
+    mocker.patch.object(
+        Config, "_load_authorizations", return_value=adobe_authorizations_file
     )
     mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
 
@@ -450,7 +468,7 @@ def subscriptions_factory(lines_factory):
 
 
 @pytest.fixture()
-def agreement():
+def agreement(buyer):
     return {
         "id": "AGR-2119-4550-8674-5962",
         "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
@@ -472,12 +490,7 @@ def agreement():
             },
         },
         "licensee": None,
-        "buyer": {
-            "id": "BUY-3731-7971",
-            "href": "/accounts/buyers/BUY-3731-7971",
-            "name": "Adam Ruszczak",
-            "icon": "/static/BUY-3731-7971/icon.png",
-        },
+        "buyer": buyer,
         "seller": {
             "id": "SEL-9121-8944",
             "href": "/accounts/sellers/SEL-9121-8944",
@@ -488,7 +501,7 @@ def agreement():
             },
         },
         "product": {
-            "id": "PRD-1111-1111-1111",
+            "id": "PRD-1111-1111",
         },
     }
 
@@ -525,6 +538,9 @@ def order_factory(
             "id": "ORD-0792-5000-2253-4210",
             "href": "/commerce/orders/ORD-0792-5000-2253-4210",
             "agreement": agreement,
+            "authorization": {
+                "id": "AUT-1234-4567",
+            },
             "type": order_type,
             "status": "Processing",
             "clientReferenceNumber": None,
@@ -725,27 +741,34 @@ def adobe_transfer_factory(adobe_items_factory):
 
 
 @pytest.fixture()
-def adobe_client_factory(adobe_credentials_file, adobe_config_file, mock_adobe_config):
+def adobe_client_factory(
+    adobe_credentials_file,
+    mock_adobe_config,
+    adobe_authorizations_file,
+):
     """
     Returns a factory that allow the creation of an instance
     of the AdobeClient with a fake token ready for tests.
     """
 
     def _factory():
-        credentials = Credentials(
-            adobe_credentials_file[0]["client_id"],
-            adobe_credentials_file[0]["client_secret"],
-            adobe_config_file["accounts"][0]["country"],
-            adobe_config_file["accounts"][0]["distributor_id"],
+        authorization = Authorization(
+            authorization_uk=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+            authorization_id=adobe_authorizations_file["authorizations"][0]["authorization_id"],
+            name=adobe_credentials_file[0]["name"],
+            client_id=adobe_credentials_file[0]["client_id"],
+            client_secret=adobe_credentials_file[0]["client_secret"],
+            currency=adobe_authorizations_file["authorizations"][0]["currency"],
+            distributor_id=adobe_authorizations_file["authorizations"][0]["distributor_id"],
         )
         api_token = APIToken(
             "a-token",
             expires=datetime.now() + timedelta(seconds=86000),
         )
         client = AdobeClient()
-        client._token_cache[credentials] = api_token
+        client._token_cache[authorization] = api_token
 
-        return client, credentials, api_token
+        return client, authorization, api_token
 
     return _factory
 
@@ -802,6 +825,6 @@ def jwt_token(settings):
             "exp": exp,
             "webhook_id": "WH-123-123",
         },
-        get_for_product(settings, "WEBHOOK_SECRET", "PRD-1111-1111-1111"),
+        get_for_product(settings, "WEBHOOK_SECRET", "PRD-1111-1111"),
         algorithm="HS256",
     )

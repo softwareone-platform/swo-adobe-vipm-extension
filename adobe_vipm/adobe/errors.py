@@ -15,7 +15,7 @@ class AdobeProductNotFoundError(AdobeError):
     pass
 
 
-class DistributorNotFoundError(AdobeError):
+class AuthorizationNotFoundError(AdobeError):
     pass
 
 

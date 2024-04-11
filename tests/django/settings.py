@@ -176,14 +176,14 @@ MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
 # TODO: Should be synced with the initializer.py::initialize function
 MPT_PRODUCTS_IDS = extract_product_ids(
-    os.getenv("MPT_PRODUCTS_IDS", "PRD-1111-1111-1111")
+    os.getenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
 )
 MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30
 
 EXTENSION_CONFIG = {
     "ADOBE_API_BASE_URL": "https://api.adobe",
     "ADOBE_AUTH_ENDPOINT_URL": "https://authenticate.adobe",
-    "QUERYING_TEMPLATE_ID_PRD_1111_1111_1111": "TPL-1234-1234",
-    "COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111": "TPL-4321-4321",
-    "WEBHOOK_SECRET_PRD_1111_1111_1111": "that's my awesome test secret",
+    "QUERYING_TEMPLATE_ID_PRD_1111_1111": "TPL-1234-1234",
+    "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-4321-4321",
+    "WEBHOOK_SECRET_PRD_1111_1111": "that's my awesome test secret",
 }

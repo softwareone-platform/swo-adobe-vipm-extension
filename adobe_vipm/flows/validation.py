@@ -45,7 +45,7 @@ from adobe_vipm.flows.helpers import (
     prepare_customer_data,
     update_purchase_prices,
 )
-from adobe_vipm.flows.mpt import get_buyer, get_product_items_by_skus
+from adobe_vipm.flows.mpt import get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_ordering_parameter,
@@ -194,13 +194,13 @@ def validate_customer_data(order, customer_data):
 
 
 def validate_transfer(mpt_client, order):
-    seller_country = order["agreement"]["seller"]["address"]["country"]
+    authorization_id = order["authorization"]["id"]
     membership_id = get_adobe_membership_id(order)
     adobe_client = get_adobe_client()
     transfer_preview = None
     try:
         transfer_preview = adobe_client.preview_transfer(
-            seller_country,
+            authorization_id,
             membership_id,
         )
     except AdobeAPIError as e:
@@ -249,16 +249,13 @@ def validate_order(mpt_client, order):
     order = populate_order_info(mpt_client, order)
     has_errors = False
     if is_purchase_order(order):
-        buyer_id = order["agreement"]["buyer"]["id"]
-        buyer = get_buyer(mpt_client, buyer_id)
-        order, customer_data = prepare_customer_data(mpt_client, order, buyer)
+        order, customer_data = prepare_customer_data(mpt_client, order)
         has_errors, order = validate_customer_data(order, customer_data)
     elif is_transfer_order(order):  # pragma: no branch
         has_errors, order = validate_transfer(mpt_client, order)
     if not has_errors:
         adobe_client = get_adobe_client()
-        seller_country = order["agreement"]["seller"]["address"]["country"]
-        order = update_purchase_prices(mpt_client, adobe_client, seller_country, order)
+        order = update_purchase_prices(mpt_client, adobe_client, order)
     logger.info(
         f"Validation of order {order['id']} succeeded with{'out' if not has_errors else ''} errors"
     )

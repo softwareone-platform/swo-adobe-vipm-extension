@@ -161,6 +161,7 @@ cython_debug/
 #.idea/
 
 adobe_credentials.json
+adobe_authorizations.json
 .devcontainer/
 .vscode
 

@@ -29,12 +29,11 @@ def fulfill_order(client, order):
     """
     logger.info(f'Start processing {order["type"]} order {order["id"]}')
     order = populate_order_info(client, order)
-    seller_country = order["agreement"]["seller"]["address"]["country"]
     if is_purchase_order(order):
-        fulfill_purchase_order(client, seller_country, order)
+        fulfill_purchase_order(client, order)
     elif is_transfer_order(order):
-        fulfill_transfer_order(client, seller_country, order)
+        fulfill_transfer_order(client, order)
     elif is_change_order(order):
-        fulfill_change_order(client, seller_country, order)
+        fulfill_change_order(client, order)
     elif is_termination_order(order):  # pragma: no branch
-        fulfill_termination_order(client, seller_country, order)
+        fulfill_termination_order(client, order)

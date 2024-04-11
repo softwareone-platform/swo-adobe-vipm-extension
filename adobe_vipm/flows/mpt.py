@@ -24,20 +24,6 @@ def get_agreement(mpt_client, agreement_id):
 
 
 @wrap_http_error
-def get_seller(mpt_client, seller_id):
-    response = mpt_client.get(f"/accounts/sellers/{seller_id}")
-    response.raise_for_status()
-    return response.json()
-
-
-@wrap_http_error
-def get_buyer(mpt_client, buyer_id):
-    response = mpt_client.get(f"/accounts/buyers/{buyer_id}")
-    response.raise_for_status()
-    return response.json()
-
-
-@wrap_http_error
 def update_order(mpt_client, order_id, **kwargs):
     response = mpt_client.put(
         f"/commerce/orders/{order_id}",

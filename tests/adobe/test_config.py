@@ -5,101 +5,99 @@ import pytest
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.dataclasses import (
     AdobeProduct,
+    Authorization,
     Country,
-    Credentials,
-    Distributor,
     Reseller,
 )
 from adobe_vipm.adobe.errors import (
     AdobeProductNotFoundError,
+    AuthorizationNotFoundError,
     CountryNotFoundError,
-    DistributorNotFoundError,
     ResellerNotFoundError,
 )
 
 
-def test_properties(mock_adobe_config, adobe_config_file):
+def test_properties(mock_adobe_config, adobe_config_file, settings):
     """
     Check the Config properties map to the right value.
     """
     c = Config()
-    assert c.api_base_url == adobe_config_file["api_base_url"]
-    assert c.auth_endpoint_url == adobe_config_file["authentication_endpoint_url"]
-    assert c.api_scopes == ",".join(adobe_config_file["scopes"])
+    assert c.api_base_url == settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"]
+    assert c.auth_endpoint_url == settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"]
+    assert c.api_scopes == ",".join(Config.REQUIRED_API_SCOPES)
     assert c.language_codes == ["en-US"]
 
 
-def test_get_reseller(mock_adobe_config, adobe_credentials_file, adobe_config_file):
+def test_get_reseller(mock_adobe_config, adobe_credentials_file, adobe_authorizations_file):
     """
-    Test the lookup the Reseller object by country.
+    Test the lookup the Reseller object by Authorization and id.
     """
-    reseller_country = adobe_config_file["accounts"][0]["resellers"][0]["country"]
-    reseller_id = adobe_config_file["accounts"][0]["resellers"][0]["id"]
-    client_id = adobe_credentials_file[0]["client_id"]
-    client_secret = adobe_credentials_file[0]["client_secret"]
-    distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
-    currency = adobe_config_file["accounts"][0]["currency"]
-    pricelist_region = adobe_config_file["accounts"][0]["pricelist_region"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_uk = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_uk"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
+    reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+
 
     c = Config()
-    reseller = c.get_reseller(reseller_country)
+    authorization = c.get_authorization(authorization_uk)
+    reseller = c.get_reseller(authorization, seller_uk)
     assert isinstance(reseller, Reseller)
     assert reseller.id == reseller_id
-    assert isinstance(reseller.distributor, Distributor)
-    assert reseller.distributor.id == distributor_id
-    assert reseller.distributor.currency == currency
-    assert reseller.distributor.pricelist_region == pricelist_region
-    assert isinstance(reseller.distributor.credentials, Credentials)
-    assert reseller.distributor.credentials.client_id == client_id
-    assert reseller.distributor.credentials.client_secret == client_secret
+    assert reseller.seller_id == seller_id
+    assert reseller.authorization == authorization
+    assert c.get_reseller(authorization, seller_id) == reseller
 
 
-def test_get_reseller_not_found(mock_adobe_config):
+def test_get_reseller_not_found(mock_adobe_config, adobe_authorizations_file):
     """
     Check that the lookup of the reseller raises `ResellerNotFoundError`
-    if there is no reseller for a given country.
+    if there is no reseller for a given an authorization and reseller uk/id.
     """
     c = Config()
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    auth = c.get_authorization(authorization_uk)
     with pytest.raises(ResellerNotFoundError) as cv:
-        assert c.get_reseller("IT")
+        assert c.get_reseller(auth, "SEL-unknown")
 
-    assert str(cv.value) == "Reseller not found for country IT."
+    assert str(cv.value) == (
+        "Reseller not found for authorization uk-auth-adobe-us-01 and uk/id SEL-unknown."
+    )
 
 
-def test_get_distributor(mock_adobe_config, adobe_credentials_file, adobe_config_file):
+def test_get_authorization(mock_adobe_config, adobe_credentials_file, adobe_authorizations_file):
     """
-    Test the lookup the Distributor object by country.
+    Test the lookup the Authorization object by uk/id.
     """
-    country = adobe_config_file["accounts"][0]["country"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    authorization_id = adobe_authorizations_file["authorizations"][0]["authorization_id"]
     client_id = adobe_credentials_file[0]["client_id"]
     client_secret = adobe_credentials_file[0]["client_secret"]
-    distributor_id = adobe_config_file["accounts"][0]["distributor_id"]
-    currency = adobe_config_file["accounts"][0]["currency"]
-    pricelist_region = adobe_config_file["accounts"][0]["pricelist_region"]
+    distributor_id = adobe_authorizations_file["authorizations"][0]["distributor_id"]
+    currency = adobe_authorizations_file["authorizations"][0]["currency"]
 
     c = Config()
-    distributor = c.get_distributor(country)
+    authorization = c.get_authorization(authorization_uk)
 
-    assert isinstance(distributor, Distributor)
-    assert distributor.id == distributor_id
-    assert distributor.country == country
-    assert distributor.pricelist_region == pricelist_region
-    assert distributor.currency == currency
-    assert isinstance(distributor.credentials, Credentials)
-    assert distributor.credentials.client_id == client_id
-    assert distributor.credentials.client_secret == client_secret
+    assert isinstance(authorization, Authorization)
+    assert authorization.authorization_uk == authorization_uk
+    assert authorization.authorization_id == authorization_id
+    assert authorization.distributor_id == distributor_id
+    assert authorization.currency == currency
+    assert authorization.client_id == client_id
+    assert authorization.client_secret == client_secret
+    assert c.get_authorization(authorization_id) == authorization
 
 
-def test_get_distributor_not_found(mock_adobe_config):
+def test_get_authorization_not_found(mock_adobe_config):
     """
-    Check that the lookup of the Distributor raises `DistributorNotFound`
-    if there is no Distributor for a given country.
+    Check that the lookup of the Authorization raises `AuthorizationNotFoundError`
+    if there is no Authorization for a given uk/id.
     """
     c = Config()
-    with pytest.raises(DistributorNotFoundError) as cv:
-        assert c.get_distributor("ES")
+    with pytest.raises(AuthorizationNotFoundError) as cv:
+        assert c.get_authorization("does-not-exist")
 
-    assert str(cv.value) == "Distributor not found for country ES."
+    assert str(cv.value) == "Authorization with uk/id does-not-exist not found."
 
 
 def test_get_adobe_product(mock_adobe_config, adobe_config_file):
@@ -159,17 +157,30 @@ def test_get_country_not_found(mock_adobe_config):
     assert str(cv.value) == "Country with code not-found not found."
 
 
-def test_load_data(mocker, adobe_credentials_file, adobe_config_file, settings):
-    settings.EXTENSION_CONFIG["ADOBE_CREDENTIALS_FILE"] = "a-file.json"
+def test_load_data(
+    mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file, settings,
+):
+    def multi_mock_open(*file_contents):
+        mock_files = [mocker.mock_open(read_data=content).return_value for content in file_contents]
+        mock_opener = mocker.mock_open()
+        mock_opener.side_effect = mock_files
+        return mock_opener
+
+    settings.EXTENSION_CONFIG["ADOBE_CREDENTIALS_FILE"] = "a-credentials-file.json"
+    settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"] = "an-authorization-file.json"
     m_join = mocker.MagicMock()
     m_join.open = mocker.mock_open(read_data=json.dumps(adobe_config_file))
     m_files = mocker.MagicMock()
     m_files.joinpath.return_value = m_join
     mocked_files = mocker.patch("adobe_vipm.adobe.config.files", return_value=m_files)
     mocker.patch(
-        "builtins.open", mocker.mock_open(read_data=json.dumps(adobe_credentials_file))
+        "builtins.open", multi_mock_open(
+            json.dumps(adobe_credentials_file),
+            json.dumps(adobe_authorizations_file),
+        ),
     )
     c = Config()
-    assert c.credentials == adobe_credentials_file
     mocked_files.assert_called_once_with("adobe_vipm")
     m_files.joinpath.assert_called_once_with("adobe_config.json")
+    assert c.authorizations != {}
+    assert c.resellers != {}

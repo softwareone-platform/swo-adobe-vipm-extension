@@ -21,8 +21,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.dataclasses import (
     AdobeProduct,
     APIToken,
-    Credentials,
-    Distributor,
+    Authorization,
     Reseller,
 )
 from adobe_vipm.adobe.errors import wrap_http_error
@@ -39,31 +38,31 @@ logger = logging.getLogger(__name__)
 class AdobeClient:
     def __init__(self) -> None:
         self._config: Config = get_config()
-        self._token_cache: MutableMapping[Credentials, APIToken] = {}
+        self._token_cache: MutableMapping[Authorization, APIToken] = {}
 
     @wrap_http_error
     def create_reseller_account(
         self,
-        country: str,
+        authorization_id: str,
         reseller_id: str,
         reseller_data: dict,
     ) -> str:
         """
-        Creates a reseller account under the distributor account identified by `country`.
+        Creates a reseller account under the distributor identified by `authorization`.
 
         Args:
-            region (str): Region to which the distributor account is bounded to and into which
-            the reseller must be created.
+            authorization_id (str): Identifier of the Authorization to which the distributor account
+            is bounded to and into which the reseller must be created.
             reseller_id (str): Identifier of the reseller in the Marketplace platform.
             reseller_data (dict): Data of the reseller to create.
 
         Returns:
             str: The identifier of the reseller in the Adobe VIP Markerplace.
         """
-        distributor: Distributor = self._config.get_distributor(country)
+        authorization = self._config.get_authorization(authorization_id)
         payload = {
             "externalReferenceId": reseller_id,
-            "distributorId": distributor.id,
+            "distributorId": authorization.distributor_id,
             "companyProfile": {
                 "companyName": reseller_data["companyName"],
                 "preferredLanguage": reseller_data["preferredLanguage"],
@@ -88,7 +87,7 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(distributor.credentials, correlation_id=reseller_id)
+        headers = self._get_headers(authorization, correlation_id=reseller_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/resellers"),
             headers=headers,
@@ -101,33 +100,33 @@ class AdobeClient:
         adobe_reseller_id = created_reseller["resellerId"]
         logger.info(
             f"Reseller {reseller_id} - {reseller_data['companyName']} "
-            "created successfully in distributor account "
-            f"{distributor.id} ({country}): {adobe_reseller_id}",
+            "created successfully under authorization "
+            f"{authorization.name} ({authorization.authorization_uk}): {adobe_reseller_id}",
         )
         return adobe_reseller_id
 
     @wrap_http_error
     def create_customer_account(
         self,
-        reseller_country: str,
+        authorization_id: str,
+        seller_id: str,
         agreement_id: str,
         customer_data: dict,
     ) -> str:
         """
-        Creates a customer account under the reseller of the country `reseller_country`.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
+        Creates a customer account under the reseller identified by `seller_id`.
 
         Args:
-            reseller_country (str): The country of the reseller under which the account
-            should be created.
+            authorization_id (str): Id of the authorization to use.
+            seller_id (str): Id of the seller to use.
             agreement_id (str): id of the Marketplace platform agreement for this customer.
             customer_data (dict): Data of the customer to create.
 
         Returns:
             str: The identifier of the customer in the Adobe VIP Markerplace.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
+        authorization = self._config.get_authorization(authorization_id)
+        reseller: Reseller = self._config.get_reseller(authorization, seller_id)
         company_name: str = f"{customer_data['companyName']} ({agreement_id})"
         payload = {
             "resellerId": reseller.id,
@@ -158,7 +157,7 @@ class AdobeClient:
         }
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
         headers = self._get_headers(
-            reseller.distributor.credentials, correlation_id=correlation_id
+            authorization, correlation_id=correlation_id
         )
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
@@ -179,7 +178,7 @@ class AdobeClient:
     @wrap_http_error
     def search_new_and_returned_orders_by_sku_line_number(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
         sku: str,
         mpt_line_id: str,
@@ -188,12 +187,10 @@ class AdobeClient:
         Search all the NEW orders placed by the customer identified by `customer_id`
         for a a given `sku` and `line_number` and the corresponding RETURN order
         if it exists.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
+            seller_id (str): Id of the seller to use.
             customer_id (str): Identifier of the customer that placed the order.
             sku (str): The SKU to search for.
             line_number (int): the line number to search for.
@@ -202,8 +199,8 @@ class AdobeClient:
             list: Return a list of three values tuple with the NEW order the item identified
             by the pair sku, line_number and the RETURN order if it exists or None.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.distributor.credentials)
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
 
         line_number = to_adobe_line_id(mpt_line_id)
 
@@ -285,7 +282,7 @@ class AdobeClient:
     @wrap_http_error
     def create_return_order(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
         returning_order: dict,
         returning_item: dict,
@@ -293,12 +290,9 @@ class AdobeClient:
         """
         Creates an order of type RETURN for a given `item` that was purchased in the
         order identified by `returning_order_id`.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
             customer_id (str): Identifier of the customer that place the RETURN order.
             returning_order (dict): The order that contains the item to return.
             returning_item (dict): The item that must be returned.
@@ -306,7 +300,7 @@ class AdobeClient:
         Returns:
             dict: The RETURN order.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
+        authorization = self._config.get_authorization(authorization_id)
         line_number = returning_item["extLineItemNumber"]
         quantity = returning_item["quantity"]
         sku = returning_item["offerId"]
@@ -314,7 +308,7 @@ class AdobeClient:
         payload = {
             "externalReferenceId": external_id,
             "referenceOrderId": returning_order["orderId"],
-            "currencyCode": reseller.distributor.currency,
+            "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_RETURN,
             "lineItems": [],
         }
@@ -328,7 +322,7 @@ class AdobeClient:
         )
 
         headers = self._get_headers(
-            reseller.distributor.credentials,
+            authorization,
             correlation_id=external_id,
         )
         response = requests.post(
@@ -342,7 +336,7 @@ class AdobeClient:
     @wrap_http_error
     def create_preview_order(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
         order_id: str,
         lines: list,
@@ -352,12 +346,9 @@ class AdobeClient:
         Creating a PREVIEW order allows to validate the order lines and eventually
         obtaining from Adobe replacement SKUs to get the best discount level
         the customer is elegible for.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
             customer_id (str): Identifier of the customer that place the PREVIEW order.
             order_id: The identifier of the Marketplace platform order for which the PREVIEW
             order must be created.
@@ -366,10 +357,10 @@ class AdobeClient:
         Returns:
             dict: The PREVIEW order.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
+        authorization = self._config.get_authorization(authorization_id)
         payload = {
             "externalReferenceId": order_id,
-            "currencyCode": reseller.distributor.currency,
+            "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_PREVIEW,
             "lineItems": [],
         }
@@ -397,7 +388,7 @@ class AdobeClient:
                 }
             )
 
-        headers = self._get_headers(reseller.distributor.credentials)
+        headers = self._get_headers(authorization)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -409,34 +400,31 @@ class AdobeClient:
     @wrap_http_error
     def create_new_order(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
         adobe_preview_order: dict,
     ) -> dict:
         """
         Creates an order of type NEW (the actual order) for a given Marketplace platform order.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
             customer_id (str): Identifier of the customer that place the NEW order.
             adobe_preview_order (dict): The Adobe PREVIEW order that must be created.
 
         Returns:
             dict: The NEW order.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
+        authorization = self._config.get_authorization(authorization_id)
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
-            "currencyCode": reseller.distributor.currency,
+            "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_NEW,
             "lineItems": adobe_preview_order["lineItems"],
         }
 
         headers = self._get_headers(
-            reseller.distributor.credentials,
+            authorization,
             correlation_id=adobe_preview_order["externalReferenceId"],
         )
         response = requests.post(
@@ -450,23 +438,22 @@ class AdobeClient:
     @wrap_http_error
     def create_preview_renewal(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
     ) -> dict:
         """
         Creates a preview of the renewal for a given customer.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
             customer_id (str): Identifier of the customer account.
 
         Returns:
             dict: a preview of the renewal.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
+        authorization = self._config.get_authorization(authorization_id)
         payload = {"orderType": ORDER_TYPE_PREVIEW_RENEWAL}
-        headers = self._get_headers(reseller.distributor.credentials)
+        headers = self._get_headers(authorization)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -478,26 +465,23 @@ class AdobeClient:
     @wrap_http_error
     def get_order(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
         order_id: str,
     ) -> dict:
         """
         Retrieves an order of a given customer by its identifier.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
             customer_id (str): Identifier of the customer that placed the order.
             order_id (str): Identifier of the order that must be retrieved.
 
         Returns:
             dict: The retrieved order.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.distributor.credentials)
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
@@ -511,26 +495,23 @@ class AdobeClient:
     @wrap_http_error
     def get_subscription(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
         subscription_id: str,
     ) -> dict:
         """
         Retrieve a subscription by its identifier.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
             customer_id (str): Identifier of the customer to which the subscription belongs to.
             subscription_id (str): Identifier of the subscription that must be retrieved.
 
         Returns:
             str: The retrieved subscription.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.distributor.credentials)
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
@@ -545,7 +526,7 @@ class AdobeClient:
     @wrap_http_error
     def update_subscription(
         self,
-        reseller_country: str,
+        authorization_id: str,
         customer_id: str,
         subscription_id: str,
         auto_renewal: bool = True,
@@ -554,12 +535,9 @@ class AdobeClient:
         """
         Update a subscription either to reduce the quantity on the anniversary date either
         to switch auto renewal off.
-        The `reseller_country` is used to select the reseller and the Adobe credentials
-        of the account to which the reseller belong to.
 
         Args:
-            reseller_country (str): The country of the reseller to which the customer account
-            belongs to.
+            authorization_id (str): Id of the authorization to use.
             customer_id (str): Identifier of the customer to which the subscription belongs to.
             subscription_id (str): Identifier of the subscription that must be retrieved.
             auto_renewal (boolean): Set if the subscription must be auto renewed on the anniversary
@@ -570,8 +548,8 @@ class AdobeClient:
         Returns:
             str: The retrieved subscription.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.distributor.credentials)
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
         payload = {
             "autoRenewal": {
                 "enabled": auto_renewal,
@@ -595,7 +573,7 @@ class AdobeClient:
     @wrap_http_error
     def preview_transfer(
         self,
-        reseller_country: str,
+        authorization_id: str,
         membership_id: str,
     ):
         """
@@ -603,15 +581,14 @@ class AdobeClient:
         Adobe VIP program that will be transferred to the Adobe VIP Marketplace program.
 
         Args:
-            reseller_country (str): The country of the reseller to select the credentials
-            to access the Adobe VIP Marketplace API.
+            authorization_id (str): Id of the authorization to use.
             membership_id (str): The membership identifier.
 
         Returns:
             dict: a transfer preview object.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.distributor.credentials)
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
@@ -626,7 +603,8 @@ class AdobeClient:
     @wrap_http_error
     def create_transfer(
         self,
-        reseller_country: str,
+        authorization_id: str,
+        seller_id: str,
         order_id: str,
         membership_id: str,
     ):
@@ -636,17 +614,18 @@ class AdobeClient:
         program.
 
         Args:
-            reseller_country (str): The country of the reseller under which such customer
-            and its subscriptions will be transferred.
+            authorization_id (str): Id of the authorization to use.
+            seller_id (str): Id of the seller under which transfer the membership.
             order_id (str): Identifier of the MPT transfer order
             membership_id (str): The membership identifier.
 
         Returns:
             dict: a transfer object.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
+        authorization = self._config.get_authorization(authorization_id)
+        reseller: Reseller = self._config.get_reseller(authorization, seller_id)
         headers = self._get_headers(
-            reseller.distributor.credentials, correlation_id=order_id
+            authorization, correlation_id=order_id
         )
         response = requests.post(
             urljoin(
@@ -665,7 +644,7 @@ class AdobeClient:
     @wrap_http_error
     def get_transfer(
         self,
-        reseller_country: str,
+        authorization_id: str,
         membership_id: str,
         transfer_id: str,
     ):
@@ -673,16 +652,15 @@ class AdobeClient:
         Retrieve a transfer object by the membership and transfer identifiers.
 
         Args:
-            reseller_country (str): The country of the reseller to select the credentials
-            to access the Adobe VIP Marketplace API.
+            authorization_id (str): Id of the authorization to use.
             membership_id (str): The membership identifier.
             transfer_id (str): The transfer identifier.
 
         Returns:
-            _type_: A transfer object.
+            dict: A transfer object.
         """
-        reseller: Reseller = self._config.get_reseller(reseller_country)
-        headers = self._get_headers(reseller.distributor.credentials)
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
@@ -694,17 +672,17 @@ class AdobeClient:
         response.raise_for_status()
         return response.json()
 
-    def _get_headers(self, credentials: Credentials, correlation_id=None):
+    def _get_headers(self, authorization: Authorization, correlation_id=None):
         return {
-            "X-Api-Key": credentials.client_id,
-            "Authorization": f"Bearer {self._get_auth_token(credentials).token}",
+            "X-Api-Key": authorization.client_id,
+            "Authorization": f"Bearer {self._get_auth_token(authorization).token}",
             "Accept": "application/json",
             "Content-Type": "application/json",
             "X-Request-Id": str(uuid4()),
             "x-correlation-id": correlation_id or str(uuid4()),
         }
 
-    def _refresh_auth_token(self, credentials: Credentials):
+    def _refresh_auth_token(self, authorization: Authorization):
         """
         Request an authentication token for the Adobe VIPM API
         using the credentials associated to a given the reseller.
@@ -712,8 +690,8 @@ class AdobeClient:
 
         data = {
             "grant_type": "client_credentials",
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
+            "client_id": authorization.client_id,
+            "client_secret": authorization.client_secret,
             "scope": self._config.api_scopes,
         }
         response = requests.post(
@@ -723,7 +701,7 @@ class AdobeClient:
         )
         if response.status_code == 200:
             token_info = response.json()
-            self._token_cache[credentials] = APIToken(
+            self._token_cache[authorization] = APIToken(
                 token=token_info["access_token"],
                 expires=(
                     datetime.now() + timedelta(seconds=token_info["expires_in"] - 180)
@@ -731,11 +709,11 @@ class AdobeClient:
             )
         response.raise_for_status()
 
-    def _get_auth_token(self, credentials: Credentials):
-        token: APIToken | None = self._token_cache.get(credentials)
+    def _get_auth_token(self, authorization: Authorization):
+        token: APIToken | None = self._token_cache.get(authorization)
         if not token or token.is_expired():
-            self._refresh_auth_token(credentials)
-        token = self._token_cache[credentials]
+            self._refresh_auth_token(authorization)
+        token = self._token_cache[authorization]
         return token
 
 

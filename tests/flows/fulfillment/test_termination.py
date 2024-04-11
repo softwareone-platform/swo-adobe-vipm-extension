@@ -13,7 +13,6 @@ from adobe_vipm.flows.fulfillment import fulfill_order
 def test_termination(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -27,7 +26,7 @@ def test_termination(
         * adobe return order creation
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -76,10 +75,10 @@ def test_termination(
 
     fulfill_order(mocked_mpt_client, processing_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_order["authorization"]["id"]
 
     mocked_adobe_client.create_return_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         order_to_return,
         order_to_return["lineItems"][0],
@@ -91,7 +90,7 @@ def test_termination(
         "TPL-1111",
     )
     mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         processing_order["lines"][0]["item"]["externalIds"]["vendor"],
         processing_order["lines"][0]["id"],
@@ -101,7 +100,6 @@ def test_termination(
 def test_termination_return_order_pending(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -115,7 +113,7 @@ def test_termination_return_order_pending(
         * adobe return order creation
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -164,10 +162,10 @@ def test_termination_return_order_pending(
 
     fulfill_order(mocked_mpt_client, processing_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_order["authorization"]["id"]
 
     mocked_adobe_client.create_return_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         order_to_return,
         order_to_return["lineItems"][0],
@@ -179,7 +177,6 @@ def test_termination_return_order_pending(
 def test_termination_out_window(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -192,7 +189,7 @@ def test_termination_out_window(
         * update subscription auto renewal
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_subscription = adobe_subscription_factory()
@@ -233,10 +230,10 @@ def test_termination_out_window(
 
     fulfill_order(mocked_mpt_client, processing_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_order["authorization"]["id"]
 
     mocked_adobe_client.update_subscription.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         adobe_subscription["subscriptionId"],
         auto_renewal=False,
