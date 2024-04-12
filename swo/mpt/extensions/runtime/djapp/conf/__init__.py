@@ -8,7 +8,7 @@ def extract_product_ids(product_ids):
 def to_postfix(product_id: str) -> str:
 	"""
 	Converts SWO MPT product id to the postfix to use in a settings variable
-	Example, PRD-1111-1111-1111 -> PRD_1111_1111_1111
+	Example, PRD-1111-1111 -> PRD_1111_1111
 	"""
 	return product_id.replace("-", "_")
 

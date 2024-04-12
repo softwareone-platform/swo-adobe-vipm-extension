@@ -54,6 +54,13 @@ SELLERS_FOLDER = os.path.join(
 )
 
 
+PRODUCTS_FOLDER = os.path.join(
+    os.path.dirname(__file__),
+    "data",
+    "products",
+)
+
+
 ITEMS_FOLDER = os.path.join(
     os.path.dirname(__file__),
     "data",
@@ -83,4 +90,3 @@ LISTINGS_FOLDER = os.path.join(
 WEBHOOK_ENDPOINT = "http://localhost:8080/api/v1/orders/validate"
 WEBHOOK_JWT_SECRET = os.environ.get("EXT_WEBHOOK_SECRET_1111_1111_1111", "change-me")
 WEBHOOK_ID = "WBH-1234-5678"
-PRODUCT_ID = os.getenv("MPT_PRODUCTS_IDS", "PRD-1111-1111-1111").split(",")[0]

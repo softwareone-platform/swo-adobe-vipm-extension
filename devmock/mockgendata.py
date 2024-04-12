@@ -15,15 +15,19 @@ from rich.table import Table
 from rich.theme import Theme
 
 from devmock.exceptions import NotFoundException
-from devmock.settings import PRODUCT_ID
 from devmock.utils import (
     base_id_from,
     cleanup_data_folder,
     generate_random_id,
     get_reference,
+    load_account,
+    load_authorization,
     load_agreement,
     load_item,
+    load_listing,
     load_pricelist_item,
+    load_product,
+    load_seller,
     load_subscription,
     save_account,
     save_agreement,
@@ -35,6 +39,7 @@ from devmock.utils import (
     save_order,
     save_pricelist,
     save_pricelist_item,
+    save_product,
     save_seller,
     save_subscription,
 )
@@ -186,8 +191,8 @@ def gen_address(fake):
     }
 
 
-def gen_seller(fake):
-    seller_id = generate_random_id("SEL", 8, 4)
+def gen_seller(fake, product):
+    seller_id = f"SEL-{base_id_from(product['id'])}"
     seller = {
         "id": seller_id,
         "name": f"{fake.company()} {fake.company_suffix()}",
@@ -269,12 +274,12 @@ def gen_buyer(fake, client):
 
 
 def gen_authorization(fake, product, vendor, seller, currency="USD"):
-    auth_id = generate_random_id("AUT", 8, 4)
+    auth_id = f"AUT-{base_id_from(product['id'])}"
     authorization = {
         "id": auth_id,
         "href": f"/v1/authorizations/{auth_id}",
         "currency": currency,
-        "name": "Adobe VIP MP Authorization",
+        "name": f"Authorization for {product['name']}",
         "product": product,
         "vendor": get_reference(vendor),
         "owner": get_reference(seller),
@@ -299,8 +304,13 @@ def gen_pricelist(fake, product, vendor, currency="USD"):
     return pricelist
 
 
-def gen_listing(fake, product, authorization, seller, price_list):
-    lst_id = generate_random_id("LST", 8, 4)
+def gen_listing(fake, product):
+    seller = gen_seller(fake, product)
+    vendor = gen_account(fake, "Vendor")
+    authorization = gen_authorization(fake, product, vendor, seller)
+    price_list = gen_pricelist(fake, product, vendor)
+    gen_pricelist_items(fake, product, price_list)
+    lst_id = f"LST-{base_id_from(product['id'])}"
     listing = {
         "id": lst_id,
         "href": f"/listing/{lst_id}",
@@ -315,12 +325,13 @@ def gen_listing(fake, product, authorization, seller, price_list):
     console.print(f"[green]✓[/green] Listing {lst_id} generated")
     return listing
 
-def gen_pricelist_items(fake, pricelist):
+def gen_pricelist_items(fake, product, pricelist):
+    product_id = product["id"]
     pl_id = pricelist["id"]
     pl_base_id = base_id_from(pricelist["id"])
     idx = 1
     for adobe_item in ADOBE_CONFIG["skus_mapping"]:
-        item = load_item(adobe_item["vendor_external_id"])
+        item = load_item(f"{product_id}_{adobe_item['vendor_external_id']}")
         pl_item_id = f"PRI-{pl_base_id}-{idx:04d}"
         unit_pp = float(fake.pydecimal(left_digits=4, right_digits=3, positive=True))
         unit_sp = unit_pp * (1 + pricelist["defaultMarkup"])
@@ -357,7 +368,7 @@ def gen_pricelist_items(fake, pricelist):
         ):
             full_sku = f"{adobe_item['vendor_external_id']}{discount_level}A12"
             pl_item_id = f"PRI-{pl_base_id}-{idx:04d}"
-            item = load_item(full_sku)
+            item = load_item(f"{product_id}_{full_sku}")
             pricelist_item = {
                 "id": pl_item_id,
                 "href": f"/price-lists/{pl_id}/price-list-items/{pl_item_id}",
@@ -380,23 +391,13 @@ def gen_pricelist_items(fake, pricelist):
             )
             idx += 1
 
-def gen_agreement(fake, product_id):
+def gen_agreement(fake, product, listing, authorization, seller_id=None):
+    seller = load_seller(seller_id or authorization["owner"]["id"])
     agr_id = generate_random_id("AGR", 12, 4)
-    product = {
-        "id": product_id,
-        "href": f"/catalog/products/{product_id}",
-        "name": "Adobe VIP Marketplace for Commercial",
-        "icon": f"/static/{product_id}/logo.png",
-    }
     client = gen_account(fake)
     buyer = gen_buyer(fake, client)
-    seller = gen_seller(fake)
-    vendor = gen_account(fake, "Vendor")
+    vendor = load_account(authorization["vendor"]["id"])
     licensee = gen_licensee(fake, buyer, seller)
-    authorization = gen_authorization(fake, product, vendor, seller)
-    pricelist = gen_pricelist(fake, product, vendor)
-    listing = gen_listing(fake, product, authorization, seller, pricelist)
-    gen_pricelist_items(fake, pricelist)
 
 
     agreement = {
@@ -407,7 +408,7 @@ def gen_agreement(fake, product_id):
         "vendor": get_reference(vendor),
         "client": get_reference(client),
         "licensee": get_reference(licensee),
-        "buyer": get_reference(buyer, DEFAULT_FIELDS),
+        "buyer": buyer,
         "seller": seller,
         "product": product,
         "price": {
@@ -419,6 +420,7 @@ def gen_agreement(fake, product_id):
             "margin": 0.11,
             "currency": "USD",
         },
+        "authorization": authorization,
         "listing": listing,
         "audit": gen_audit(fake),
     }
@@ -429,20 +431,24 @@ def gen_agreement(fake, product_id):
 
 def gen_purchase_order(
     fake,
+    listing_id,
     skus,
     customer_id,
     adobe_order_id,
     draft,
 ):
     order_id = generate_random_id("ORD", 16, 4)
-    product_id = settings.PRODUCT_ID
-    agreement = gen_agreement(fake, product_id)
+    listing = load_listing(listing_id)
+    product_id = listing["product"]["id"]
+    product = load_product(product_id)
+    authorization = load_authorization(listing["authorization"]["id"])
+    agreement = gen_agreement(fake, product, listing, authorization)
     lines = []
     subscriptions = []
     for idx, sku in enumerate(skus, start=1):
         old_quantity = 0
         quantity = random.randint(2, 5)
-        item = load_item(sku)
+        item = load_item(f"{product_id}_{sku}")
         item_id = item["id"]
         pricelist_id = agreement["listing"]["priceList"]["id"]
         pricelist_item_id = f"PRI-{base_id_from(pricelist_id)}-{item_id[-4:]}"
@@ -467,6 +473,8 @@ def gen_purchase_order(
         "type": "purchase",
         "status": "draft" if draft else "processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
+        "authorization": authorization,
+        "listing": agreement["listing"],
         "subscriptions": [get_reference(sub) for sub in subscriptions],
         "lines": lines,
         "audit": gen_audit(fake),
@@ -500,6 +508,8 @@ def gen_purchase_order(
 def gen_change_order(fake, agreement_id, skus, change_type):
     order_id = generate_random_id("ORD", 16, 4)
     agreement = load_agreement(agreement_id)
+    listing = load_listing(agreement["listing"]["id"])
+    authorization = load_authorization(listing["authorization"]["id"])
     product_id = agreement["product"]["id"]
     if agreement["status"] != "active":
         raise ClickException("Agreement must be 'active' in order to generate a Change order.")
@@ -549,7 +559,7 @@ def gen_change_order(fake, agreement_id, skus, change_type):
 
     if skus:
         for idx, sku in enumerate(skus, start=line_number + 1):
-            item = load_item(sku)
+            item = load_item(f"{product_id}_{sku}")
             old_quantity = 0
             quantity = random.randint(1, 5)
 
@@ -570,6 +580,8 @@ def gen_change_order(fake, agreement_id, skus, change_type):
         "type": "change",
         "status": "processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
+        "listing": listing,
+        "authorization": authorization,
         "lines": lines,
         "subscriptions": subscriptions,
         "audit": gen_audit(fake),
@@ -627,12 +639,16 @@ def gen_termination_order(fake, agreement_id, subscriptions_ids):
 
 def gen_transfer_order(
     fake,
-    skus,
+    listing_id,
     membership_id,
+    skus,
 ):
     order_id = generate_random_id("ORD", 16, 4)
-    product_id = settings.PRODUCT_ID
-    agreement = gen_agreement(fake, product_id)
+    listing = load_listing(listing_id)
+    product_id = listing["product"]["id"]
+    product = load_product(product_id)
+    authorization = load_authorization(listing["authorization"]["id"])
+    agreement = gen_agreement(fake, product, listing, authorization)
     lines = []
     for idx, line in enumerate(skus, start=1):
         sku, quantity = line
@@ -661,6 +677,8 @@ def gen_transfer_order(
         "type": "purchase",
         "status": "processing" if skus else "draft",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
+        "authorization": authorization,
+        "listing": listing,
         "subscriptions": [],
         "lines": lines,
         "audit": gen_audit(fake),
@@ -684,8 +702,8 @@ def gen_transfer_order(
     return order
 
 
-def gen_items(fake):
-    product_id = settings.PRODUCT_ID
+def gen_items(fake, product):
+    product_id = product["id"]
     item_base_id = base_id_from(product_id)
     idx = 1
     for item in ADOBE_CONFIG["skus_mapping"]:
@@ -699,13 +717,10 @@ def gen_items(fake):
                 "vendor": item["vendor_external_id"],
             },
             "status": "published",
-            "product": {
-                "id": product_id,
-                "name": "Adobe VIP Marketplace for Commercial",
-            },
+            "product": product,
             "audit": gen_audit(fake)
         }
-        save_item(prod_item, item["vendor_external_id"])
+        save_item(prod_item, f"{product_id}_{item['vendor_external_id']}")
         console.print(
             f"[green]✓[/green] Item {item_id} - {item['name']} ({item['vendor_external_id']}) generated",
         )
@@ -728,7 +743,7 @@ def gen_items(fake):
                 },
                 "audit": gen_audit(fake)
             }
-            save_item(prod_item, full_sku)
+            save_item(prod_item, f"{product_id}_{full_sku}")
             console.print(
                 f"[green]✓[/green] Item {item_id} - {item['name']} ({full_sku}) generated",
             )
@@ -741,6 +756,7 @@ def cli():
 
 
 @cli.command()
+@click.argument("listing_id", metavar="[LISTING ID]", nargs=1, required=True)
 @click.argument("skus", metavar="[SKU ...]", nargs=-1, required=True)
 @click.option(
     "--customer-id",
@@ -767,7 +783,7 @@ def cli():
     ),
 )
 @click.option("--locale", default="en_US")
-def purchase(customer_id, order_id, locale, skus, draft):
+def purchase(listing_id, customer_id, order_id, locale, skus, draft):
     """
     Generate a purchase order for the provided Adobe (partial) SKUs.
     """
@@ -779,6 +795,7 @@ def purchase(customer_id, order_id, locale, skus, draft):
     ):
         order = gen_purchase_order(
             fake,
+            listing_id,
             skus,
             customer_id,
             order_id,
@@ -792,6 +809,11 @@ def purchase(customer_id, order_id, locale, skus, draft):
 
 @cli.command()
 @click.argument(
+    "listing_id",
+    metavar="[LISTING ID]",
+    nargs=1,
+)
+@click.argument(
     "membership_id",
     metavar="[MEMBERSHIP ID]",
     nargs=1,
@@ -804,7 +826,7 @@ def purchase(customer_id, order_id, locale, skus, draft):
     multiple=True,
 )
 @click.option("--locale", default="en_US")
-def transfer(membership_id, locale, lines):
+def transfer(listing_id, membership_id, locale, lines):
     """
     Generate a transfer order optionally including the provided Adobe (partial) SKUs.
     """
@@ -817,8 +839,9 @@ def transfer(membership_id, locale, lines):
         skus = [line[0] for line in lines]
         order = gen_transfer_order(
             fake,
-            lines,
+            listing_id,
             membership_id,
+            lines,
         )
     msg = f"[bold green]New 'Transfer' order has been generated: {order['id']}"
     if skus:
@@ -829,7 +852,7 @@ def transfer(membership_id, locale, lines):
 @cli.command()
 @click.argument(
     "agreement_id",
-    metavar="[AGREEMENT_ID]",
+    metavar="[AGREEMENT ID]",
     nargs=1,
     required=True,
 )
@@ -914,29 +937,48 @@ def terminate(locale, agreement_id, subscriptions):
         )
 
 
-@cli.command("product-items")
+def gen_products(fake):
+    products = [
+        ("PRD-1111-1111", "Adobe VIP Marketplace for Commercial"),
+        ("PRD-2222-2222", "Adobe VIP Marketplace for Government"),
+        ("PRD-3333-3333", "Adobe VIP Marketplace for Education"),
+    ]
+    for product_id, product_name in products:
+        product = {
+            "id": product_id,
+            "href": f"/v1/products/{product_id}",
+            "name": product_name,
+            "status": "Published",
+        }
+        save_product(product)
+        gen_items(fake, product)
+        gen_listing(fake, product)
+
+
+
+@cli.command()
 @click.option("--locale", default="en_US")
-def product_items(locale):
+def setup(locale):
     with console.status(
-        "[magenta]Generating product items...",
+        "[magenta]Setup mocked data generator...",
         spinner="bouncingBall",
         spinner_style="yellow",
     ):
-        fake = Faker(locale)
-        gen_items(fake)
-        console.print("[bold green]Product items have been generated ")
+        fake = Faker()
+        gen_products(fake)
+
 
 @cli.command()
 @click.option(
-    "--with-items",
+    "--all",
     is_flag=True,
     default=False,
 )
-def cleanup(with_items):
+def cleanup(all):
     """
     Remove all the content of the data folder.
     """
-    cleanup_data_folder(with_items)
+    cleanup_data_folder(all)
 
 
 @cli.command()

@@ -163,7 +163,7 @@ def reset_retries(mpt_client, order):
 
 
 def check_adobe_order_fulfilled(
-    mpt_client, adobe_client, seller_country, order, customer_id, adobe_order_id
+    mpt_client, adobe_client, order, customer_id, adobe_order_id
 ):
     """
     Check if the order that has been placed in Adobe has been fulfilled or not.
@@ -175,7 +175,6 @@ def check_adobe_order_fulfilled(
 
     Args:
         mpt_client (MPTClient):  an instance of the Marketplace platform client.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dct): The MPT order from which the Adobe order has been derived.
         customer_id (str): The id used in Adobe to identify the customer attached
         to this MPT order.
@@ -184,8 +183,9 @@ def check_adobe_order_fulfilled(
     Returns:
         dict: The Adobe order if it has been fulfilled, None otherwise.
     """
+    authorization_id = order["authorization"]["id"]
     adobe_order = adobe_client.get_order(
-        seller_country,
+        authorization_id,
         customer_id,
         adobe_order_id,
     )
@@ -206,7 +206,7 @@ def check_adobe_order_fulfilled(
 
 
 def handle_return_orders(
-    mpt_client, adobe_client, seller_country, customer_id, order, lines
+    mpt_client, adobe_client, customer_id, order, lines
 ):
     """
     Handles return orders for a given MPT order by processing the necessary
@@ -216,7 +216,6 @@ def handle_return_orders(
         mpt_client (MPTClient): An instance of the Marketplace platform client.
         adobe_client (AdobeClient): An instance of the Adobe client for communication with the
             Adobe API.
-        seller_country (str): Country code of the seller attached to this MPT order.
         customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
         order (dict): The MPT order being processed.
         lines (list): The MPT order lines associated with the return.
@@ -227,9 +226,10 @@ def handle_return_orders(
     """
     completed_order_ids = []
     pending_order_ids = []
+    authorization_id = order["authorization"]["id"]
     for line in lines:
         orders_4_item = adobe_client.search_new_and_returned_orders_by_sku_line_number(
-            seller_country,
+            authorization_id,
             customer_id,
             line["item"]["externalIds"]["vendor"],
             line["id"],
@@ -238,7 +238,7 @@ def handle_return_orders(
             if not return_order:
                 logger.debug(f"Return order not found for {line['item']['id']}")
                 return_order = adobe_client.create_return_order(
-                    seller_country,
+                    authorization_id,
                     customer_id,
                     order_to_return,
                     item_to_return,
@@ -283,7 +283,7 @@ def switch_order_to_completed(mpt_client, order):
 
 
 def add_subscription(
-    mpt_client, adobe_client, seller_country, customer_id, order, item
+    mpt_client, adobe_client, customer_id, order, item
 ):
     """
     Adds a subscription to the correspoding MPT order based on the provided parameters.
@@ -292,7 +292,6 @@ def add_subscription(
         mpt_client (MPTClient): An instance of the Marketplace platform client.
         adobe_client (AdobeClient): An instance of the Adobe client for communication with the
             Adobe API.
-        seller_country (str): Country code of the seller attached to this MPT order.
         customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
         order (dict): The MPT order to which the subscription will be added.
         item (dict): The subscription item details, including offer ID and subscription ID.
@@ -300,8 +299,9 @@ def add_subscription(
     Returns:
         None
     """
+    authorization_id = order["authorization"]["id"]
     adobe_subscription = adobe_client.get_subscription(
-        seller_country,
+        authorization_id,
         customer_id,
         item["subscriptionId"],
     )
@@ -332,7 +332,6 @@ def add_subscription(
     subscription = set_subscription_actual_sku_and_purchase_price(
         mpt_client,
         adobe_client,
-        seller_country,
         customer_id,
         order,
         subscription,
@@ -347,7 +346,6 @@ def add_subscription(
 def set_subscription_actual_sku_and_purchase_price(
     mpt_client,
     adobe_client,
-    seller_country,
     customer_id,
     order,
     subscription,
@@ -362,7 +360,6 @@ def set_subscription_actual_sku_and_purchase_price(
         mpt_client (MPTClient): An instance of the Marketplace platform client.
         adobe_client (AdobeClient): An instance of the Adobe client for communication with the
             Adobe API.
-        seller_country (str): Country code of the seller attached to this MPT order.
         customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
         order (dict): The MPT order to which the subscription will be added.
         subscription (dict): The MPT subscription that need to be updated.
@@ -372,9 +369,10 @@ def set_subscription_actual_sku_and_purchase_price(
     Returns:
         dict: The updated MPT subscription.
     """
+    authorization_id = order["authorization"]["id"]
     if not sku:
         adobe_subscription = adobe_client.get_subscription(
-            seller_country,
+            authorization_id,
             customer_id,
             subscription["externalIds"]["vendor"],
         )
@@ -387,7 +385,7 @@ def set_subscription_actual_sku_and_purchase_price(
     pricelist_items = get_pricelist_items_by_product_items(
         mpt_client,
         pricelist_id,
-        product_items[0]["id"],
+        [product_items[0]["id"]],
     )
 
     return update_subscription(

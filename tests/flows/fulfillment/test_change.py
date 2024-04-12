@@ -16,7 +16,6 @@ def test_upsizing(
     mocker,
     settings,
     agreement,
-    seller,
     order_factory,
     lines_factory,
     fulfillment_parameters_factory,
@@ -29,7 +28,7 @@ def test_upsizing(
     """
     Tests a change order in case of upsizing.
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
@@ -100,10 +99,10 @@ def test_upsizing(
     )
     fulfill_order(mocked_mpt_client, processing_change_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_change_order["authorization"]["id"]
 
     mocked_adobe_client.create_preview_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         processing_change_order["id"],
         processing_change_order["lines"],
@@ -265,7 +264,6 @@ def test_upsizing_create_adobe_preview_order_error(
 def test_downsizing(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -284,7 +282,7 @@ def test_downsizing(
         * adobe new order creation
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -369,10 +367,10 @@ def test_downsizing(
     )
     fulfill_order(mocked_mpt_client, processing_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_order["authorization"]["id"]
 
     mocked_adobe_client.create_return_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         order_to_return,
         order_to_return["lineItems"][0],
@@ -419,7 +417,7 @@ def test_downsizing(
         "TPL-1111",
     )
     mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         processing_order["lines"][0]["item"]["externalIds"]["vendor"],
         processing_order["lines"][0]["id"],
@@ -444,7 +442,7 @@ def test_downsizing_return_order_exists(
     has already been created in Adobe.
     The return order will not be placed again.
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -648,7 +646,6 @@ def test_downsizing_return_order_pending(
 
 def test_downsizing_new_order_pending(
     mocker,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -731,7 +728,7 @@ def test_downsizing_create_new_order_error(
     returns an error.
 
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -789,7 +786,6 @@ def test_downsizing_create_new_order_error(
 def test_mixed(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -809,7 +805,7 @@ def test_mixed(
         * subscription creation for new item
         * subscription actual sku update for existing upsized items
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_preview_order_items = (
@@ -1039,16 +1035,16 @@ def test_mixed(
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_change_order["authorization"]["id"]
 
     mocked_adobe_client.create_preview_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         processing_change_order["id"],
         preview_order_items,
     )
     mocked_adobe_client.update_subscription.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         "sub-4",
         quantity=8,
@@ -1163,7 +1159,6 @@ def test_mixed(
 def test_upsize_of_previously_downsized_out_of_win_without_new_order(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -1176,7 +1171,7 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
     order fulfilled outside the cancellation window.
     Only the renewal quantity of the subscription should be updated.
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_sub_to_update = adobe_subscription_factory(
@@ -1227,10 +1222,10 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_change_order["authorization"]["id"]
 
     mocked_adobe_client.update_subscription.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         "sub-4",
         quantity=18,
@@ -1246,7 +1241,6 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
 def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     mocker,
     settings,
-    seller,
     agreement,
     order_factory,
     lines_factory,
@@ -1264,7 +1258,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     The renewal quantity of the subscription should not be updated because of the
     current quantity is equal to the auto renewal.
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_preview_order = adobe_order_factory(
@@ -1360,10 +1354,10 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 
-    seller_country = seller["address"]["country"]
+    authorization_id = processing_change_order["authorization"]["id"]
 
     mocked_adobe_client.create_preview_order.assert_called_once_with(
-        seller_country,
+        authorization_id,
         "a-client-id",
         processing_change_order["id"],
         lines_factory(

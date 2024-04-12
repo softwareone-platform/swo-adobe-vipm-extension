@@ -20,6 +20,7 @@ from devmock.settings import (
     ORDERS_FOLDER,
     PRICELISTS_FOLDER,
     PRICELIST_ITEMS_FOLDER,
+    PRODUCTS_FOLDER,
     SELLERS_FOLDER,
     SUBSCRIPTIONS_FOLDER,
     WEBHOOK_ID,
@@ -47,6 +48,7 @@ def save_object(folder, obj, obj_id=None):
     json.dump(obj, open(obj_file, "w"), indent=2)
 
 
+load_account = functools.partial(load_object, ACCOUNTS_FOLDER, "account")
 load_order = functools.partial(load_object, ORDERS_FOLDER, "order")
 load_buyer = functools.partial(load_object, BUYERS_FOLDER, "buyer")
 load_seller = functools.partial(load_object, SELLERS_FOLDER, "seller")
@@ -57,6 +59,7 @@ load_authorization = functools.partial(load_object, AUTHORIZATIONS_FOLDER, "auth
 load_pricelist = functools.partial(load_object, PRICELISTS_FOLDER, "pricelist")
 load_listing = functools.partial(load_object, LISTINGS_FOLDER, "listing")
 load_pricelist_item = functools.partial(load_object, PRICELIST_ITEMS_FOLDER, "pricelist item")
+load_product = functools.partial(load_object, PRODUCTS_FOLDER, "product")
 
 
 save_order = functools.partial(save_object, ORDERS_FOLDER)
@@ -71,6 +74,7 @@ save_authorization = functools.partial(save_object, AUTHORIZATIONS_FOLDER)
 save_pricelist = functools.partial(save_object, PRICELISTS_FOLDER)
 save_listing = functools.partial(save_object, LISTINGS_FOLDER)
 save_pricelist_item = functools.partial(save_object, PRICELIST_ITEMS_FOLDER)
+save_product = functools.partial(save_object, PRODUCTS_FOLDER)
 
 
 def generate_random_id(
@@ -92,22 +96,29 @@ def base_id_from(mpt_obj_id):
     return mpt_obj_id.split("-", 1)[1]
 
 
-def cleanup_data_folder(with_items):
+def cleanup_data_folder(all):
     folders = [
-        ACCOUNTS_FOLDER,
         AGREEMENTS_FOLDER,
-        AUTHORIZATIONS_FOLDER,
         BUYERS_FOLDER,
         LICENSEES_FOLDER,
-        LISTINGS_FOLDER,
-        PRICELISTS_FOLDER,
-        PRICELIST_ITEMS_FOLDER,
         ORDERS_FOLDER,
-        SELLERS_FOLDER,
         SUBSCRIPTIONS_FOLDER,
     ]
-    if with_items:
-        folders.append(ITEMS_FOLDER)
+    if all:
+        folders.extend(
+            [
+                PRODUCTS_FOLDER,
+                ITEMS_FOLDER,
+                PRICELISTS_FOLDER,
+                PRICELIST_ITEMS_FOLDER,
+                ACCOUNTS_FOLDER,
+                SELLERS_FOLDER,
+                AUTHORIZATIONS_FOLDER,
+                LISTINGS_FOLDER,
+                PRICELISTS_FOLDER,
+                PRICELIST_ITEMS_FOLDER,
+            ]
+        )
 
     for folder in folders:
         for f in glob.glob(os.path.join(folder, "*.json")):

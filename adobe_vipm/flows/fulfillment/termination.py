@@ -17,19 +17,19 @@ from adobe_vipm.flows.utils import (
 )
 
 
-def _terminate_out_of_win_subscriptions(seller_country, customer_id, order, lines):
+def _terminate_out_of_win_subscriptions(customer_id, order, lines):
     """
     Switch off auto renewal for subscriptions that have to be cancelled but that
     have been more that X days before the termination order (outside cancellation window).
 
     Args:
-        seller_country (str): Country code of the seller attached to this MPT order.
         customer_id (str): The id used in Adobe to identify the customer attached
         to this MPT order.
         order (dct): The MPT order from which the Adobe order has been derived.
         lines (list): The MPT order lines that have to process.
     """
     adobe_client = get_adobe_client()
+    authorization_id = order["authorization"]["id"]
     for line in lines:
         subcription = get_subscription_by_line_and_item_id(
             order["subscriptions"],
@@ -38,20 +38,20 @@ def _terminate_out_of_win_subscriptions(seller_country, customer_id, order, line
         )
         adobe_sub_id = get_adobe_subscription_id(subcription)
         adobe_subscription = adobe_client.get_subscription(
-            seller_country,
+            authorization_id,
             customer_id,
             adobe_sub_id,
         )
         if adobe_subscription["autoRenewal"]["enabled"]:
             adobe_client.update_subscription(
-                seller_country,
+                authorization_id,
                 customer_id,
                 adobe_sub_id,
                 auto_renewal=False,
             )
 
 
-def fulfill_termination_order(mpt_client, seller_country, order):
+def fulfill_termination_order(mpt_client, order):
     """
     Fulfills a termination order with Adobe.
     Adobe allow to terminate a subscription with a cancellation window
@@ -61,7 +61,6 @@ def fulfill_termination_order(mpt_client, seller_country, order):
 
     Args:
         mpt_client (MPTClient):  an instance of the Marketplace platform client.
-        seller_country (str): Country code of the seller attached to this MPT order.
         order (dct): The MPT termination order.
     """
     adobe_client = get_adobe_client()
@@ -70,7 +69,7 @@ def fulfill_termination_order(mpt_client, seller_country, order):
     grouped_items = group_items_by_type(order)
     if grouped_items.downsizing_out_win:
         _terminate_out_of_win_subscriptions(
-            seller_country, customer_id, order, grouped_items.downsizing_out_win
+            customer_id, order, grouped_items.downsizing_out_win
         )
 
     has_orders_to_return = bool(
@@ -83,7 +82,6 @@ def fulfill_termination_order(mpt_client, seller_country, order):
     completed_return_orders, order = handle_return_orders(
         mpt_client,
         adobe_client,
-        seller_country,
         customer_id,
         order,
         grouped_items.upsizing_in_win + grouped_items.downsizing_in_win,

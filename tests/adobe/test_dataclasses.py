@@ -3,25 +3,46 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from adobe_vipm.adobe.dataclasses import APIToken, Credentials, Reseller
+from adobe_vipm.adobe.dataclasses import APIToken, Authorization, Reseller
 
 
-def test_credentials():
+def test_authorization():
     """
-    Check the Credentials dataclass is unmutable and hasheable.
+    Check the Authorization dataclass is unmutable and hasheable.
     """
-    credentials = Credentials("client_id", "client_secret", "region", "distributor_id")
+    auth = Authorization(
+        authorization_uk="auth_uk",
+        authorization_id="auth_id",
+        name="test",
+        client_id="client_id",
+        client_secret="client_secret",
+        currency="EUR",
+        distributor_id="distributor_id",
+    )
     with pytest.raises(FrozenInstanceError):
-        credentials.client_id = "new id"
-    assert hash(credentials) is not None
+        auth.client_id = "new id"
+    assert hash(auth) is not None
 
 
 def test_reseller():
     """
     Check the Reseller dataclass is unmutable and hasheable.
     """
-    credentials = Credentials("client_id", "client_secret", "region", "distributor_id")
-    r = Reseller("id", "country", credentials)
+    auth = Authorization(
+        authorization_uk="auth_uk",
+        authorization_id="auth_id",
+        name="test",
+        client_id="client_id",
+        client_secret="client_secret",
+        currency="EUR",
+        distributor_id="distributor_id",
+    )
+    r = Reseller(
+        seller_uk="seller_uk",
+        seller_id="seller_id",
+        id="P123456",
+        authorization=auth,
+    )
     with pytest.raises(FrozenInstanceError):
         r.id = "new id"
     assert hash(r) is not None

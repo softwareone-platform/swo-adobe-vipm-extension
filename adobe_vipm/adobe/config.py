@@ -1,20 +1,19 @@
 import json
 from importlib.resources import files
-from typing import List, MutableMapping
+from typing import List, MutableMapping, Tuple
 
 from django.conf import settings
 
 from adobe_vipm.adobe.dataclasses import (
     AdobeProduct,
+    Authorization,
     Country,
-    Credentials,
-    Distributor,
     Reseller,
 )
 from adobe_vipm.adobe.errors import (
     AdobeProductNotFoundError,
+    AuthorizationNotFoundError,
     CountryNotFoundError,
-    DistributorNotFoundError,
     ResellerNotFoundError,
 )
 
@@ -23,13 +22,12 @@ class Config:
     REQUIRED_API_SCOPES = ["openid", "AdobeID", "read_organizations"]
 
     def __init__(self) -> None:
-        self.credentials = self._load_credentials()
-        self.config = self._load_config()
-        self.resellers: MutableMapping[str, Reseller] = {}
+        self.language_codes: List[str] = []
+        self.resellers: MutableMapping[Tuple[Authorization, str], Reseller] = {}
+        self.authorizations: MutableMapping[str, Authorization] = {}
         self.skus_mapping: MutableMapping[str, AdobeProduct] = {}
-        self.distributors: MutableMapping[str, Distributor] = {}
         self.countries: MutableMapping[str, Country] = {}
-        self._parse_config()
+        self._setup()
 
     @property
     def auth_endpoint_url(self) -> str:
@@ -44,27 +42,24 @@ class Config:
         return ",".join(self.REQUIRED_API_SCOPES)
 
     @property
-    def language_codes(self) -> List[str]:
-        return self.config["language_codes"]
-
-    @property
     def country_codes(self) -> List[str]:
         return list(self.countries.keys())
 
-    def get_reseller(self, country: str) -> Reseller:
+    def get_authorization(self, id: str) -> Authorization:
         try:
-            return self.resellers[country]
+            return self.authorizations[id]
         except KeyError:
-            raise ResellerNotFoundError(
-                f"Reseller not found for country {country}.",
+            raise AuthorizationNotFoundError(
+                f"Authorization with uk/id {id} not found.",
             )
 
-    def get_distributor(self, country: str) -> Distributor:
+    def get_reseller(self, authorization: Authorization, id: str) -> Reseller:
         try:
-            return self.distributors[country]
+            return self.resellers[(authorization, id)]
         except KeyError:
-            raise DistributorNotFoundError(
-                f"Distributor not found for country {country}.",
+            raise ResellerNotFoundError(
+                f"Reseller not found for authorization {authorization.authorization_uk} "
+                f"and uk/id {id}.",
             )
 
     def get_adobe_product(self, vendor_external_id: str) -> AdobeProduct:
@@ -89,44 +84,61 @@ class Config:
             return json.load(f)
 
     @classmethod
+    def _load_authorizations(cls):
+        with open(settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"]) as f:
+            return json.load(f)
+
+    @classmethod
     def _load_config(cls):
         with files("adobe_vipm").joinpath("adobe_config.json").open(
             "r", encoding="utf-8"
         ) as f:
             return json.load(f)
 
-    def _parse_config(self):
-        credentials_map = {cred["country"]: cred for cred in self.credentials}
-        for account in self.config["accounts"]:
-            country = account["country"]
-            credentials = Credentials(
-                client_id=credentials_map[country]["client_id"],
-                client_secret=credentials_map[country]["client_secret"],
-                country=country,
-                distributor_id=account["distributor_id"],
+    def _setup(self):
+        config_data = self._load_config()
+        credentials_data = self._load_credentials()
+        authorizations_data = self._load_authorizations()
+
+        credentials_map = {cred["authorization_uk"]: cred for cred in credentials_data}
+        for authorization_data in authorizations_data["authorizations"]:
+            auth_uk = authorization_data["authorization_uk"]
+            authorization = Authorization(
+                authorization_uk=auth_uk,
+                authorization_id=authorization_data.get("authorization_id"),
+                name=credentials_map[auth_uk]["name"],
+                client_id=credentials_map[auth_uk]["client_id"],
+                client_secret=credentials_map[auth_uk]["client_secret"],
+                currency=authorization_data["currency"],
+                distributor_id=authorization_data["distributor_id"],
             )
-            distributor = Distributor(
-                id=account["distributor_id"],
-                country=country,
-                pricelist_region=account["pricelist_region"],
-                currency=account["currency"],
-                credentials=credentials,
-            )
-            self.distributors[country] = distributor
-            for reseller in account["resellers"]:
-                country = reseller["country"]
-                self.resellers[country] = Reseller(
-                    id=reseller["id"],
-                    country=country,
-                    distributor=distributor,
+            self.authorizations[auth_uk] = authorization
+
+            if authorization.authorization_id:
+                self.authorizations[authorization.authorization_id] = authorization
+
+            for reseller_data in authorization_data["resellers"]:
+                seller_uk = reseller_data["seller_uk"]
+                seller_id = reseller_data.get("seller_id")
+                reseller = Reseller(
+                    id=reseller_data["id"],
+                    seller_uk=seller_uk,
+                    authorization=authorization,
+                    seller_id=seller_id,
                 )
-        for product in self.config["skus_mapping"]:
+                self.resellers[(authorization, seller_uk)] = reseller
+
+            if seller_id:
+                self.resellers[(authorization, seller_id)] = reseller
+
+        for product in config_data["skus_mapping"]:
             self.skus_mapping[product["vendor_external_id"]] = AdobeProduct(
                 sku=product["sku"],
                 name=product["name"],
                 type=product["type"],
             )
-        for country in self.config["countries"]:
+        self.language_codes = config_data["language_codes"]
+        for country in config_data["countries"]:
             self.countries[country["code"]] = Country(**country)
 
 

@@ -32,7 +32,7 @@ def test_jwt_secret_callback(mocker, settings, mpt_client, webhook):
     )
     assert jwt_secret_callback(
         mpt_client, {"webhook_id": "WH-123-123"}
-    ) == get_for_product(settings, "WEBHOOK_SECRET", "PRD-1111-1111-1111")
+    ) == get_for_product(settings, "WEBHOOK_SECRET", "PRD-1111-1111")
     mocked_webhook.assert_called_once_with(mpt_client, "WH-123-123")
 
 
