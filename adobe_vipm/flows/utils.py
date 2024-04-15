@@ -265,14 +265,23 @@ def get_order_line_by_sku(order, sku):
     Args:
         order (dict): The order from which the line
         must be retrieved.
-        line_id (str): The idetifier of the line.
+        sku (str): Full Adobe Item SKU, including discount level
 
     Returns:
         dict: The line object or None if not found.
     """
+    # important to have `in` here, since line items contain cutted Adobe Item SKU
+    # and sku is a full Adobe Item SKU including discount level
     return find_first(
         lambda line: line["item"]["externalIds"]["vendor"] in sku,
         order["lines"],
+    )
+
+
+def get_price_item_by_line_sku(price_items, line_sku):
+    return find_first(
+        lambda price_item: line_sku in price_item["item"]["externalIds"]["vendor"],
+        price_items,
     )
 
 

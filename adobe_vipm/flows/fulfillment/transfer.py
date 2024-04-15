@@ -71,7 +71,9 @@ def _check_transfer(mpt_client, order, membership_id):
     authorization_id = order["authorization"]["id"]
     transfer_preview = None
     try:
-        transfer_preview = adobe_client.preview_transfer(authorization_id, membership_id)
+        transfer_preview = adobe_client.preview_transfer(
+            authorization_id, membership_id
+        )
     except AdobeError as e:
         _handle_transfer_preview_error(mpt_client, order, e)
         logger.warning(f"Transfer order {order['id']} has been failed: {str(e)}.")
@@ -198,7 +200,5 @@ def fulfill_transfer_order(mpt_client, order):
     customer_id = adobe_transfer_order["customerId"]
     order = save_adobe_customer_id(mpt_client, order, customer_id)
     for item in adobe_transfer_order["lineItems"]:
-        add_subscription(
-            mpt_client, adobe_client, customer_id, order, item
-        )
+        add_subscription(mpt_client, adobe_client, customer_id, order, item)
     switch_order_to_completed(mpt_client, order)

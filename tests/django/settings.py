@@ -175,9 +175,7 @@ LOGGING_ATTEMPT_GETTER = os.getenv(
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
 # TODO: Should be synced with the initializer.py::initialize function
-MPT_PRODUCTS_IDS = extract_product_ids(
-    os.getenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
-)
+MPT_PRODUCTS_IDS = extract_product_ids(os.getenv("MPT_PRODUCTS_IDS", "PRD-1111-1111"))
 MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30
 
 EXTENSION_CONFIG = {

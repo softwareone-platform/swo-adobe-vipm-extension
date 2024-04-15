@@ -3,6 +3,7 @@ This module contains shared functions used by the different fulfillment flows.
 """
 
 import logging
+from operator import itemgetter
 
 from django.conf import settings
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
@@ -26,6 +27,7 @@ from adobe_vipm.flows.mpt import (
 )
 from adobe_vipm.flows.utils import (
     get_order_line_by_sku,
+    get_price_item_by_line_sku,
     get_retry_count,
     increment_retry_count,
     reset_retry_count,
@@ -189,6 +191,7 @@ def check_adobe_order_fulfilled(
         customer_id,
         adobe_order_id,
     )
+
     if adobe_order["status"] == STATUS_PENDING:
         handle_retries(mpt_client, order, adobe_order_id)
         return
@@ -205,9 +208,7 @@ def check_adobe_order_fulfilled(
     return adobe_order
 
 
-def handle_return_orders(
-    mpt_client, adobe_client, customer_id, order, lines
-):
+def handle_return_orders(mpt_client, adobe_client, customer_id, order, lines):
     """
     Handles return orders for a given MPT order by processing the necessary
     actions based on the provided parameters.
@@ -282,9 +283,7 @@ def switch_order_to_completed(mpt_client, order):
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
-def add_subscription(
-    mpt_client, adobe_client, customer_id, order, item
-):
+def add_subscription(mpt_client, adobe_client, customer_id, order, item):
     """
     Adds a subscription to the correspoding MPT order based on the provided parameters.
 
@@ -329,38 +328,24 @@ def add_subscription(
         "startDate": adobe_subscription["creationDate"],
     }
     subscription = create_subscription(mpt_client, order["id"], subscription)
-    subscription = set_subscription_actual_sku_and_purchase_price(
-        mpt_client,
-        adobe_client,
-        customer_id,
-        order,
-        subscription,
-        sku=item["offerId"],
-    )
     logger.info(
         f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
         f'created for order {order["id"]}'
     )
 
 
-def set_subscription_actual_sku_and_purchase_price(
+def set_subscription_actual_sku(
     mpt_client,
-    adobe_client,
-    customer_id,
     order,
     subscription,
-    sku=None,
+    sku,
 ):
     """
     Set the subscription fullfilment parameter to store the actual SKU
-    (Adobe SKU with discount level) and updates the unit purchase price of the
-    subscription according to such SKU.
+    (Adobe SKU with discount level)
 
     Args:
         mpt_client (MPTClient): An instance of the Marketplace platform client.
-        adobe_client (AdobeClient): An instance of the Adobe client for communication with the
-            Adobe API.
-        customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
         order (dict): The MPT order to which the subscription will be added.
         subscription (dict): The MPT subscription that need to be updated.
         sku (str, optional): The Adobe full SKU. If None a lookup to the corresponding
@@ -369,25 +354,6 @@ def set_subscription_actual_sku_and_purchase_price(
     Returns:
         dict: The updated MPT subscription.
     """
-    authorization_id = order["authorization"]["id"]
-    if not sku:
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id,
-            customer_id,
-            subscription["externalIds"]["vendor"],
-        )
-        sku = adobe_subscription["offerId"]
-
-    pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
-    product_id = order["agreement"]["product"]["id"]
-    product_items = get_product_items_by_skus(mpt_client, product_id, [sku])
-
-    pricelist_items = get_pricelist_items_by_product_items(
-        mpt_client,
-        pricelist_id,
-        [product_items[0]["id"]],
-    )
-
     return update_subscription(
         mpt_client,
         order["id"],
@@ -400,7 +366,56 @@ def set_subscription_actual_sku_and_purchase_price(
                 },
             ],
         },
-        price={
-            "unitPP": pricelist_items[0]["unitPP"],
-        },
     )
+
+
+def update_order_actual_price(
+    mpt_client,
+    order,
+    lines_to_update,
+    adobe_items,
+):
+    actual_skus = [item["offerId"] for item in adobe_items]
+    pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
+    product_id = order["agreement"]["product"]["id"]
+    product_actual_items = get_product_items_by_skus(
+        mpt_client, product_id, actual_skus
+    )
+    price_items = get_pricelist_items_by_product_items(
+        mpt_client,
+        pricelist_id,
+        [item["id"] for item in product_actual_items],
+    )
+
+    lines = []
+    for line in lines_to_update:
+        new_price_item = get_price_item_by_line_sku(
+            price_items, line["item"]["externalIds"]["vendor"]
+        )
+        lines.append(
+            {
+                "id": line["id"],
+                "price": {
+                    "unitPP": new_price_item["unitPP"],
+                },
+            }
+        )
+
+    # to have total list of lines, leave other not updated
+    updated_lines_ids = {line["id"] for line in lines}
+    for line in order["lines"]:
+        if line["id"] in updated_lines_ids:
+            continue
+
+        lines.append(
+            {
+                "id": line["id"],
+                "price": {
+                    "unitPP": line["price"]["unitPP"],
+                },
+            }
+        )
+
+    lines = sorted(lines, key=itemgetter("id"))
+
+    return update_order(mpt_client, order["id"], lines=lines)

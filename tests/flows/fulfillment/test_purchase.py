@@ -37,6 +37,7 @@ def test_no_customer(
     adobe_subscription_factory,
     items_factory,
     subscriptions_factory,
+    pricelist_items_factory,
 ):
     """
     Tests the processing of a purchase order including:
@@ -95,6 +96,13 @@ def test_no_customer(
                 ),
                 external_ids={"vendor": adobe_order["orderId"]},
             ),
+            order_factory(
+                fulfillment_parameters=fulfillment_parameters_factory(
+                    customer_id="a-client-id",
+                    retry_count="0",
+                ),
+                external_ids={"vendor": adobe_order["orderId"]},
+            ),
         ],
     )
     subscription = subscriptions_factory()[0]
@@ -108,10 +116,7 @@ def test_no_customer(
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
-    )
-    mocked_update_subscription = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_subscription",
+        return_value=pricelist_items_factory(),
     )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
@@ -151,6 +156,20 @@ def test_no_customer(
         order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
+        "lines": [
+            {
+                "id": order["lines"][0]["id"],
+                "price": {
+                    "unitPP": 1234.55,
+                },
+            }
+        ],
+    }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -179,22 +198,6 @@ def test_no_customer(
                 },
             ],
             "startDate": adobe_subscription["creationDate"],
-        },
-    )
-    mocked_update_subscription.assert_called_once_with(
-        mocked_mpt_client,
-        order["id"],
-        subscription["id"],
-        parameters={
-            "fulfillment": [
-                {
-                    "externalId": "adobeSKU",
-                    "value": adobe_subscription["offerId"],
-                },
-            ],
-        },
-        price={
-            "unitPP": 200.12,
         },
     )
     mocked_complete_order.assert_called_once_with(

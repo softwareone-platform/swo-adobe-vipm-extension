@@ -470,8 +470,8 @@ def gen_purchase_order(
 
     order = {
         "id": order_id,
-        "type": "purchase",
-        "status": "draft" if draft else "processing",
+        "type": "Purchase",
+        "status": "Draft" if draft else "Processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
         "authorization": authorization,
         "listing": agreement["listing"],
@@ -577,8 +577,8 @@ def gen_change_order(fake, agreement_id, skus, change_type):
 
     order = {
         "id": order_id,
-        "type": "change",
-        "status": "processing",
+        "type": "Change",
+        "status": "Processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
         "listing": listing,
         "authorization": authorization,
@@ -623,8 +623,8 @@ def gen_termination_order(fake, agreement_id, subscriptions_ids):
 
     order = {
         "id": order_id,
-        "type": "termination",
-        "status": "processing",
+        "type": "Termination",
+        "status": "Processing",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
         "lines": lines,
         "subscriptions": subscriptions,
@@ -674,8 +674,8 @@ def gen_transfer_order(
 
     order = {
         "id": order_id,
-        "type": "purchase",
-        "status": "processing" if skus else "draft",
+        "type": "Purchase",
+        "status": "Processing" if skus else "Draft",
         "agreement": get_reference(agreement, DEFAULT_FIELDS + ["product"]),
         "authorization": authorization,
         "listing": listing,
@@ -710,7 +710,7 @@ def gen_items(fake, product):
         item_id = f"ITM-{item_base_id}-{idx:04d}"
         prod_item = {
             "id": item_id,
-            "href": f"/product-items/{item_id}",
+            "href": f"/items/{item_id}",
             "name": item["name"],
             "description": item["name"],
             "externalIds": {
@@ -730,13 +730,13 @@ def gen_items(fake, product):
             item_id = f"ITM-{item_base_id}-{idx:04d}"
             prod_item = {
                 "id": item_id,
-                "href": f"/product-items/{item_id}",
+                "href": f"/items/{item_id}",
                 "name": item["name"],
                 "description": item["name"],
                 "externalIds": {
                     "vendor": full_sku,
                 },
-                "status": "draft",
+                "status": "Draft",
                 "product": {
                     "id": product_id,
                     "name": "Adobe VIP Marketplace for Commercial",
