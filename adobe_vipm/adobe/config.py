@@ -46,6 +46,18 @@ class Config:
         return list(self.countries.keys())
 
     def get_authorization(self, id: str) -> Authorization:
+        """
+        _summary_
+
+        Args:
+            id (str): _description_
+
+        Raises:
+            AuthorizationNotFoundError: _description_
+
+        Returns:
+            Authorization: _description_
+        """
         try:
             return self.authorizations[id]
         except KeyError:
@@ -54,6 +66,19 @@ class Config:
             )
 
     def get_reseller(self, authorization: Authorization, id: str) -> Reseller:
+        """
+        _summary_
+
+        Args:
+            authorization (Authorization): _description_
+            id (str): _description_
+
+        Raises:
+            ResellerNotFoundError: _description_
+
+        Returns:
+            Reseller: _description_
+        """
         try:
             return self.resellers[(authorization, id)]
         except KeyError:
@@ -62,7 +87,32 @@ class Config:
                 f"and uk/id {id}.",
             )
 
+    def reseller_exists(self, authorization: Authorization, id: str) -> bool:
+        """
+        _summary_
+
+        Args:
+            authorization (Authorization): _description_
+            id (str): _description_
+
+        Returns:
+            bool: _description_
+        """
+        return (authorization, id) in self.resellers
+
     def get_adobe_product(self, vendor_external_id: str) -> AdobeProduct:
+        """
+        _summary_
+
+        Args:
+            vendor_external_id (str): _description_
+
+        Raises:
+            AdobeProductNotFoundError: _description_
+
+        Returns:
+            AdobeProduct: _description_
+        """
         try:
             return self.skus_mapping[vendor_external_id]
         except KeyError:
@@ -71,6 +121,18 @@ class Config:
             )
 
     def get_country(self, code: str) -> Country:
+        """
+        _summary_
+
+        Args:
+            code (str): _description_
+
+        Raises:
+            CountryNotFoundError: _description_
+
+        Returns:
+            Country: _description_
+        """
         try:
             return self.countries[code]
         except KeyError:

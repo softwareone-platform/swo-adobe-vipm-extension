@@ -1,5 +1,12 @@
-import re
-
+from adobe_vipm.adobe.constants import (
+    MAXLEN_ADDRESS_LINE_1,
+    MAXLEN_ADDRESS_LINE_2,
+    MAXLEN_CITY,
+    MAXLEN_COMPANY_NAME,
+    MAXLEN_PHONE_NUMBER,
+    MAXLEN_POSTAL_CODE,
+    MINLEN_COMPANY_NAME,
+)
 from adobe_vipm.flows.errors import ValidationError
 
 ORDER_TYPE_PURCHASE = "Purchase"
@@ -20,20 +27,6 @@ PARAM_PHASE_FULFILLMENT = "fulfillment"
 
 CANCELLATION_WINDOW_DAYS = 14
 FAKE_CUSTOMER_ID = "1234567890"
-
-MINLEN_COMPANY_NAME = 4
-MINLEN_NAME = 1
-MAXLEN_POSTAL_CODE = 40
-MAXLEN_CITY = 40
-MAXLEN_ADDRESS_LINE_1 = 60
-MAXLEN_ADDRESS_LINE_2 = 60
-MAXLEN_PHONE_NUMBER = 40
-MAXLEN_COMPANY_NAME = 59
-MAXLEN_NAME = 35
-
-REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")
-REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")
-REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
 
@@ -61,7 +54,7 @@ ERR_COMPANY_NAME_CHARS = ValidationError(
 )
 ERR_PREFERRED_LANGUAGE = ValidationError(
     "VIPMV003",
-    "The `{title}` must be one of the following: {languages}.",
+    "The provided `{title}` is not valid.",
 )
 ERR_ADDRESS = ValidationError(
     "VIPMV004",
