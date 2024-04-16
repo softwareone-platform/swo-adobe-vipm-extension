@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from operator import itemgetter
 
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
@@ -24,6 +25,7 @@ def test_upsizing(
     adobe_items_factory,
     adobe_subscription_factory,
     items_factory,
+    pricelist_items_factory,
 ):
     """
     Tests a change order in case of upsizing.
@@ -50,7 +52,7 @@ def test_upsizing(
 
     subscriptions = subscriptions_factory(lines=lines_factory(quantity=10))
     processing_change_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=10,
             quantity=20,
@@ -63,7 +65,7 @@ def test_upsizing(
     )
 
     updated_change_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=10,
             quantity=20,
@@ -88,7 +90,7 @@ def test_upsizing(
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
+        return_value=pricelist_items_factory(),
     )
     mocked_update_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_subscription",
@@ -122,6 +124,20 @@ def test_upsizing(
         processing_change_order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
+        "lines": [
+            {
+                "id": updated_change_order["lines"][0]["id"],
+                "price": {
+                    "unitPP": 1234.55,
+                },
+            }
+        ],
+    }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        processing_change_order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -141,9 +157,6 @@ def test_upsizing(
                     "value": adobe_order["lineItems"][0]["offerId"],
                 },
             ],
-        },
-        price={
-            "unitPP": 200.12,
         },
     )
     mocked_complete_order.assert_called_once_with(
@@ -184,7 +197,7 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=10,
             quantity=20,
@@ -242,7 +255,7 @@ def test_upsizing_create_adobe_preview_order_error(
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=10,
             quantity=20,
@@ -273,6 +286,7 @@ def test_downsizing(
     adobe_items_factory,
     adobe_subscription_factory,
     items_factory,
+    pricelist_items_factory,
 ):
     """
     Tests the processing of a change order (downsizing) including:
@@ -332,7 +346,7 @@ def test_downsizing(
     )
 
     processing_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=20,
             quantity=10,
@@ -356,7 +370,7 @@ def test_downsizing(
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
+        return_value=pricelist_items_factory(),
     )
     mocked_update_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_subscription",
@@ -394,6 +408,21 @@ def test_downsizing(
         },
     }
 
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        processing_order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
+        "lines": [
+            {
+                "id": updated_order["lines"][0]["id"],
+                "price": {
+                    "unitPP": 1234.55,
+                },
+            }
+        ],
+    }
+
     mocked_update_subscription.assert_called_once_with(
         mocked_mpt_client,
         processing_order["id"],
@@ -405,9 +434,6 @@ def test_downsizing(
                     "value": adobe_order["lineItems"][0]["offerId"],
                 },
             ],
-        },
-        price={
-            "unitPP": 200.12,
         },
     )
 
@@ -436,6 +462,7 @@ def test_downsizing_return_order_exists(
     adobe_items_factory,
     adobe_subscription_factory,
     items_factory,
+    pricelist_items_factory,
 ):
     """
     Tests the processing of a change order (downsizing) when the return order
@@ -479,7 +506,7 @@ def test_downsizing_return_order_exists(
     subscriptions = subscriptions_factory(lines=lines_factory(quantity=20))
 
     processing_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=20,
             quantity=10,
@@ -492,7 +519,7 @@ def test_downsizing_return_order_exists(
     )
 
     updated_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=20,
             quantity=10,
@@ -516,7 +543,7 @@ def test_downsizing_return_order_exists(
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
+        return_value=pricelist_items_factory(),
     )
     mocked_update_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_subscription",
@@ -544,6 +571,20 @@ def test_downsizing_return_order_exists(
             "vendor": adobe_order["orderId"],
         },
     }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        processing_order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
+        "lines": [
+            {
+                "id": updated_order["lines"][0]["id"],
+                "price": {
+                    "unitPP": 1234.55,
+                },
+            }
+        ]
+    }
     mocked_update_subscription.assert_called_once_with(
         mocked_mpt_client,
         processing_order["id"],
@@ -555,9 +596,6 @@ def test_downsizing_return_order_exists(
                     "value": adobe_order["lineItems"][0]["offerId"],
                 },
             ],
-        },
-        price={
-            "unitPP": 200.12,
         },
     )
 
@@ -616,7 +654,7 @@ def test_downsizing_return_order_pending(
     )
 
     order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=20,
             quantity=10,
@@ -675,7 +713,7 @@ def test_downsizing_new_order_pending(
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=20,
             quantity=10,
@@ -758,7 +796,7 @@ def test_downsizing_create_new_order_error(
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=lines_factory(
             old_quantity=20,
             quantity=10,
@@ -795,6 +833,7 @@ def test_mixed(
     adobe_items_factory,
     adobe_subscription_factory,
     items_factory,
+    pricelist_items_factory,
 ):
     """
     Tests a change order in case of upsizing + downsizing + new item + downsizing out of window.
@@ -986,7 +1025,7 @@ def test_mixed(
     )
 
     processing_change_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=order_items,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
@@ -996,7 +1035,7 @@ def test_mixed(
     )
 
     updated_change_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=order_items,
         subscriptions=order_subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
@@ -1020,9 +1059,13 @@ def test_mixed(
         "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
         return_value=items_factory(),
     )
+    price_items = pricelist_items_factory(1, "sku-downsized", 1234.55)
+    price_items.extend(pricelist_items_factory(2, "sku-upsized", 4321.55))
+    price_items.extend(pricelist_items_factory(3, "sku-new", 9876.54))
+    price_items.extend(pricelist_items_factory(4, "sku-downsize-out", 6789.55))
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
+        return_value=price_items,
     )
 
     mocked_update_subscription = mocker.patch(
@@ -1054,16 +1097,38 @@ def test_mixed(
         mocked_mpt_client,
         processing_change_order["id"],
     )
-    assert mocked_update_order.mock_calls[0].kwargs == {
-        "parameters": processing_change_order["parameters"],
-    }
+    expected_lines = []
+    for line in sorted(order_items, key=itemgetter("id")):
+        if line["id"] == downsizing_items_out_of_window[0]["id"]:
+            unit_pp = 6789.55
+        else:
+            unit_pp = line["price"]["unitPP"]
+
+        expected_lines.append(
+            {
+                "id": line["id"],
+                "price": {
+                    "unitPP": unit_pp,
+                },
+            }
+        )
+
+    assert mocked_update_order.mock_calls[0].kwargs == {"lines": expected_lines}
 
     assert mocked_update_order.mock_calls[1].args == (
         mocked_mpt_client,
         processing_change_order["id"],
     )
-
     assert mocked_update_order.mock_calls[1].kwargs == {
+        "parameters": processing_change_order["parameters"],
+    }
+
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        processing_change_order["id"],
+    )
+
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "externalIds": {
             "vendor": adobe_order["orderId"],
         },
@@ -1106,9 +1171,6 @@ def test_mixed(
                 },
             ],
         },
-        "price": {
-            "unitPP": 200.12,
-        },
     }
 
     assert mocked_update_subscription.mock_calls[1].args == (
@@ -1125,9 +1187,6 @@ def test_mixed(
                 },
             ],
         },
-        "price": {
-            "unitPP": 200.12,
-        },
     }
 
     assert mocked_update_subscription.mock_calls[2].args == (
@@ -1143,9 +1202,6 @@ def test_mixed(
                     "value": adobe_sub_upsized_to_update["offerId"],
                 },
             ],
-        },
-        "price": {
-            "unitPP": 200.12,
         },
     }
 
@@ -1205,7 +1261,7 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
     )
 
     processing_change_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=upsizing_items_out_of_window,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
@@ -1250,6 +1306,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     adobe_items_factory,
     adobe_subscription_factory,
     items_factory,
+    pricelist_items_factory,
 ):
     """
     Tests a change order in case of an upsizing after a previous downsizing change
@@ -1311,7 +1368,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     )
 
     processing_change_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=upsizing_items_out_of_window,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
@@ -1321,7 +1378,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     )
 
     updated_change_order = order_factory(
-        order_type="change",
+        order_type="Change",
         lines=upsizing_items_out_of_window,
         subscriptions=order_subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
@@ -1343,7 +1400,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
+        return_value=pricelist_items_factory(),
     )
     mocked_update_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_subscription",
@@ -1380,9 +1437,6 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
                     "value": adobe_order["lineItems"][0]["offerId"],
                 },
             ],
-        },
-        price={
-            "unitPP": 200.12,
         },
     )
 

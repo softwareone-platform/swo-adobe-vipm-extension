@@ -190,8 +190,11 @@ def adobe_authorizations_file():
         ]
     }
 
+
 @pytest.fixture()
-def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file):
+def mock_adobe_config(
+    mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file
+):
     """
     Mock the Adobe Config object to load test data from the adobe_credentials and
     adobe_config_file fixtures.
@@ -515,7 +518,7 @@ def order_factory(
     """
 
     def _order(
-        order_type="purchase",
+        order_type="Purchase",
         order_parameters=None,
         fulfillment_parameters=None,
         lines=None,
@@ -629,9 +632,12 @@ def seller():
 def webhook(settings):
     return {
         "id": "WH-123-123",
-        "criteria": {
-            "product.id": settings.MPT_PRODUCTS_IDS[0],
-        },
+        "criteria": [
+            {
+                "key": "product.id",
+                "value": settings.MPT_PRODUCTS_IDS[0]
+            },
+        ]
     }
 
 
@@ -753,13 +759,19 @@ def adobe_client_factory(
 
     def _factory():
         authorization = Authorization(
-            authorization_uk=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
-            authorization_id=adobe_authorizations_file["authorizations"][0]["authorization_id"],
+            authorization_uk=adobe_authorizations_file["authorizations"][0][
+                "authorization_uk"
+            ],
+            authorization_id=adobe_authorizations_file["authorizations"][0][
+                "authorization_id"
+            ],
             name=adobe_credentials_file[0]["name"],
             client_id=adobe_credentials_file[0]["client_id"],
             client_secret=adobe_credentials_file[0]["client_secret"],
             currency=adobe_authorizations_file["authorizations"][0]["currency"],
-            distributor_id=adobe_authorizations_file["authorizations"][0]["distributor_id"],
+            distributor_id=adobe_authorizations_file["authorizations"][0][
+                "distributor_id"
+            ],
         )
         api_token = APIToken(
             "a-token",

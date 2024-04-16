@@ -27,6 +27,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_completed,
     switch_order_to_failed,
     switch_order_to_query,
+    update_order_actual_price,
 )
 from adobe_vipm.flows.helpers import prepare_customer_data
 from adobe_vipm.flows.utils import (
@@ -180,8 +181,9 @@ def fulfill_purchase_order(mpt_client, order):
         return
 
     for item in adobe_order["lineItems"]:
-        add_subscription(
-            mpt_client, adobe_client, customer_id, order, item
-        )
+        add_subscription(mpt_client, adobe_client, customer_id, order, item)
+    update_order_actual_price(
+        mpt_client, order, order["lines"], adobe_order["lineItems"]
+    )
 
     switch_order_to_completed(mpt_client, order)

@@ -315,7 +315,7 @@ def test_get_product_items_by_skus(mpt_client, requests_mocker):
     rql_query = (
         f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
     )
-    url = f"product-items?{rql_query}"
+    url = f"items?{rql_query}"
     page1_url = f"{url}&limit=10&offset=0"
     page2_url = f"{url}&limit=10&offset=10"
     data = [{"id": f"ITM-{idx}"} for idx in range(13)]
@@ -361,7 +361,7 @@ def test_get_product_items_by_skus_error(
     rql_query = (
         f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
     )
-    url = f"product-items?{rql_query}&limit=10&offset=0"
+    url = f"items?{rql_query}&limit=10&offset=0"
 
     requests_mocker.get(
         urljoin(mpt_client.base_url, url),
@@ -381,7 +381,7 @@ def test_get_pricelist_items_by_product_items(mpt_client, requests_mocker):
     the product item ids.
     """
 
-    url = "price-lists/PRC-1234/price-items?in(item.id,(ITM-5678,ITM-9012))"
+    url = "price-lists/PRC-1234/items?in(item.id,(ITM-5678,ITM-9012))"
     page1_url = f"{url}&limit=10&offset=0"
     page2_url = f"{url}&limit=10&offset=10"
     data = [{"id": f"PRI-{idx}"} for idx in range(13)]
@@ -429,7 +429,7 @@ def test_get_pricelist_item_by_product_item_error(
     Tests the call to retrieve a pricelist item given the pricelist id and
     the product item id when it fails.
     """
-    url = "price-lists/PRC-1234/price-items?in(item.id,(ITM-5678))"
+    url = "price-lists/PRC-1234/items?in(item.id,(ITM-5678))"
     url = f"{url}&limit=10&offset=0"
     requests_mocker.get(
         urljoin(mpt_client.base_url, url),

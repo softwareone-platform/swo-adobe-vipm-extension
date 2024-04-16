@@ -75,9 +75,6 @@ def test_transfer(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
         return_value=[{"unitPP": 200.12}],
     )
-    mocked_update_subscription = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_subscription",
-    )
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
@@ -137,22 +134,6 @@ def test_transfer(
                 },
             ],
             "startDate": adobe_subscription["creationDate"],
-        },
-    )
-    mocked_update_subscription.assert_called_once_with(
-        mocked_mpt_client,
-        order["id"],
-        subscription["id"],
-        parameters={
-            "fulfillment": [
-                {
-                    "externalId": "adobeSKU",
-                    "value": adobe_subscription["offerId"],
-                },
-            ],
-        },
-        price={
-            "unitPP": 200.12,
         },
     )
     mocked_complete_order.assert_called_once_with(

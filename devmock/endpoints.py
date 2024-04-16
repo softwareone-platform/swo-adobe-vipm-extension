@@ -280,7 +280,7 @@ def validate_draft_order(order_id: str, order: Order):
     )
 
 
-@router.get("/product-items")
+@router.get("/items")
 def list_product_items(request: Request):
     items = []
     response = {
@@ -301,7 +301,7 @@ def list_product_items(request: Request):
     return response
 
 
-@router.get("/price-lists/{pid}/price-items")
+@router.get("/price-lists/{pid}/items")
 def list_priceslist_items(request: Request, pid: str):
     items = []
     response = {

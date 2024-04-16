@@ -89,7 +89,7 @@ def get_product_items_by_skus(mpt_client, product_id, skus):
     rql_query = (
         f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
     )
-    url = f"/product-items?{rql_query}"
+    url = f"/items?{rql_query}"
     page = None
     limit = 10
     offset = 0
@@ -107,7 +107,7 @@ def get_product_items_by_skus(mpt_client, product_id, skus):
 def get_pricelist_items_by_product_items(mpt_client, pricelist_id, product_item_ids):
     items = []
     rql_query = f"in(item.id,({",".join(product_item_ids)}))"
-    url = f"/price-lists/{pricelist_id}/price-items?{rql_query}"
+    url = f"/price-lists/{pricelist_id}/items?{rql_query}"
     page = None
     limit = 10
     offset = 0
@@ -124,7 +124,7 @@ def get_pricelist_items_by_product_items(mpt_client, pricelist_id, product_item_
 @cache
 @wrap_http_error
 def get_webhook(mpt_client, webhook_id):
-    response = mpt_client.get(f"/notifications/webhooks/{webhook_id}")
+    response = mpt_client.get(f"/notifications/webhooks/{webhook_id}?select=criteria")
     response.raise_for_status()
 
     return response.json()

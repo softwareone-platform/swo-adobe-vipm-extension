@@ -161,8 +161,13 @@ $ mockgendata setup
 1. Use data generator
 ```
 $ mockgendata sku <name>
-$ mockgendata purchase <sku>
+$ mockgendata purchase <listing-id> <sku>
 ```
+
+Where listing ID is one of the following:
+LST-1111-1111 - Adobe for Commercial
+LST-2222-2222 - Adobe for Government
+LST-3333-3333 - Adobe for Education products
 
 For more information use `--help` option
 ```

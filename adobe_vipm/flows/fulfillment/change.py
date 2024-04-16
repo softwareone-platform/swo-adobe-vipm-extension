@@ -14,9 +14,10 @@ from adobe_vipm.flows.fulfillment.shared import (
     check_adobe_order_fulfilled,
     handle_return_orders,
     save_adobe_order_id,
-    set_subscription_actual_sku_and_purchase_price,
+    set_subscription_actual_sku,
     switch_order_to_completed,
     switch_order_to_failed,
+    update_order_actual_price,
 )
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
@@ -87,9 +88,7 @@ def _upsize_out_of_win_subscriptions(customer_id, order, lines):
     return lines_to_order
 
 
-def _downsize_out_of_win_subscriptions(
-    mpt_client, customer_id, order, lines
-):
+def _downsize_out_of_win_subscriptions(mpt_client, customer_id, order, lines):
     """
     Reduces the renewal quantity for subscriptions that need to be downsized but were created
     X days before the change order (outside the cancellation window).
@@ -128,6 +127,7 @@ def _downsize_out_of_win_subscriptions(
 
     renewal_preview = adobe_client.create_preview_renewal(authorization_id, customer_id)
 
+    mpt_subscription_to_adobe_line_item_map = []
     for line in lines:
         subscription = get_subscription_by_line_and_item_id(
             order["subscriptions"],
@@ -138,14 +138,20 @@ def _downsize_out_of_win_subscriptions(
             renewal_preview["lineItems"],
             subscription["externalIds"]["vendor"],
         )
-        set_subscription_actual_sku_and_purchase_price(
+        mpt_subscription_to_adobe_line_item_map.append((subscription, adobe_line_item))
+
+    for subscription, adobe_line_item in mpt_subscription_to_adobe_line_item_map:
+        set_subscription_actual_sku(
             mpt_client,
-            adobe_client,
-            customer_id,
             order,
             subscription,
-            sku=adobe_line_item["offerId"],
+            adobe_line_item["offerId"],
         )
+
+    adobe_line_items = [
+        line_item for _, line_item in mpt_subscription_to_adobe_line_item_map
+    ]
+    update_order_actual_price(mpt_client, order, lines, adobe_line_items)
 
 
 def _submit_change_order(mpt_client, customer_id, order):
@@ -249,27 +255,37 @@ def fulfill_change_order(mpt_client, order):
 
     if not adobe_order:
         return
+    updated_lines = []
     for item in adobe_order["lineItems"]:
         order_line = get_order_line(
             order,
             item["extLineItemNumber"],
         )
+        updated_lines.append(order_line)
         order_subscription = get_subscription_by_line_and_item_id(
             order["subscriptions"],
             order_line["item"]["id"],
             order_line["id"],
         )
         if not order_subscription:
-            add_subscription(
-                mpt_client, adobe_client, customer_id, order, item
-            )
+            add_subscription(mpt_client, adobe_client, customer_id, order, item)
         else:
-            set_subscription_actual_sku_and_purchase_price(
-                mpt_client,
-                adobe_client,
+            authorization_id = order["authorization"]["id"]
+            adobe_subscription = adobe_client.get_subscription(
+                authorization_id,
                 customer_id,
+                order_subscription["externalIds"]["vendor"],
+            )
+            adobe_sku = adobe_subscription["offerId"]
+
+            set_subscription_actual_sku(
+                mpt_client,
                 order,
                 order_subscription,
+                adobe_sku,
             )
 
+    update_order_actual_price(
+        mpt_client, order, updated_lines, adobe_order["lineItems"]
+    )
     switch_order_to_completed(mpt_client, order)

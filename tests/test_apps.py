@@ -51,9 +51,7 @@ def test_completed_template_not_defined(settings):
     with pytest.raises(ImproperlyConfigured) as e:
         app.ready()
 
-    assert "Please, specify EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111" in str(
-        e.value
-    )
+    assert "Please, specify EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111" in str(e.value)
 
 
 def test_webhook_secret_not_defined(settings):
