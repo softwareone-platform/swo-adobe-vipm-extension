@@ -21,18 +21,26 @@ class JWTAuth(HttpBearer):
         super().__init__()
 
     def authenticate(self, request: HttpRequest, token: str) -> Any | None:
-        audience = request.get_host()
         try:
             claims = jwt.decode(
                 token,
-                audience=audience,
-                options={"verify_signature": False},
+                options={
+                    "verify_signature": False,
+                    "verify_aud": False,
+                },
                 algorithms=self.JWT_ALGOS,
             )
             secret = self.secret_callback(request.client, claims)
             if not secret:
                 return
-            jwt.decode(token, secret, audience=audience, algorithms=self.JWT_ALGOS)
+            jwt.decode(
+                token,
+                secret,
+                options={
+                    "verify_aud": False,
+                },
+                algorithms=self.JWT_ALGOS,
+            )
             request.jwt_claims = claims
             return claims
 
