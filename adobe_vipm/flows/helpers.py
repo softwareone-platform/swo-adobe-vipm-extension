@@ -78,7 +78,7 @@ def prepare_customer_data(client, order):
                     "firstName": buyer["contact"]["firstName"],
                     "lastName": buyer["contact"]["lastName"],
                     "email": buyer["contact"]["email"],
-                    "phone": buyer["contact"]["phone"],
+                    "phone": buyer["contact"].get("phone"),
                 },
             },
         )

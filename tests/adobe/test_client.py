@@ -45,6 +45,36 @@ def test_create_reseller_account(
     ]
 
     client, authorization, api_token = adobe_client_factory()
+    payload = {
+        "externalReferenceId": "external_id",
+        "distributorId": distributor_id,
+        "companyProfile": {
+            "companyName": reseller_data["companyName"],
+            "preferredLanguage": reseller_data["preferredLanguage"],
+            "address": {
+                "country": reseller_data["address"]["country"],
+                "region": reseller_data["address"]["state"],
+                "city": reseller_data["address"]["city"],
+                "addressLine1": reseller_data["address"]["addressLine1"],
+                "addressLine2": reseller_data["address"]["addressLine2"],
+                "postalCode": reseller_data["address"]["postalCode"],
+                "phoneNumber": join_phone_number(
+                    reseller_data["contact"]["phone"]
+                ),
+            },
+            "contacts": [
+                {
+                    "firstName": reseller_data["contact"]["firstName"],
+                    "lastName": reseller_data["contact"]["lastName"],
+                    "email": reseller_data["contact"]["email"],
+                    "phoneNumber": join_phone_number(
+                        reseller_data["contact"]["phone"]
+                    ),
+                }
+            ],
+        },
+    }
+    correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
 
     requests_mocker.post(
         urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/resellers"),
@@ -60,40 +90,10 @@ def test_create_reseller_account(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": "external_id",
+                    "x-correlation-id": correlation_id,
                 },
             ),
-            matchers.json_params_matcher(
-                {
-                    "distributorId": distributor_id,
-                    "externalReferenceId": "external_id",
-                    "companyProfile": {
-                        "companyName": reseller_data["companyName"],
-                        "preferredLanguage": reseller_data["preferredLanguage"],
-                        "address": {
-                            "country": reseller_data["address"]["country"],
-                            "region": reseller_data["address"]["state"],
-                            "city": reseller_data["address"]["city"],
-                            "addressLine1": reseller_data["address"]["addressLine1"],
-                            "addressLine2": reseller_data["address"]["addressLine2"],
-                            "postalCode": reseller_data["address"]["postalCode"],
-                            "phoneNumber": join_phone_number(
-                                reseller_data["contact"]["phone"]
-                            ),
-                        },
-                        "contacts": [
-                            {
-                                "firstName": reseller_data["contact"]["firstName"],
-                                "lastName": reseller_data["contact"]["lastName"],
-                                "email": reseller_data["contact"]["email"],
-                                "phoneNumber": join_phone_number(
-                                    reseller_data["contact"]["phone"]
-                                ),
-                            }
-                        ],
-                    },
-                },
-            ),
+            matchers.json_params_matcher(payload),
         ],
     )
 

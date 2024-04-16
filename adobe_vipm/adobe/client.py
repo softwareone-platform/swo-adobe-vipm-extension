@@ -87,7 +87,8 @@ class AdobeClient:
                 ],
             },
         }
-        headers = self._get_headers(authorization, correlation_id=reseller_id)
+        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+        headers = self._get_headers(authorization, correlation_id=correlation_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/resellers"),
             headers=headers,
