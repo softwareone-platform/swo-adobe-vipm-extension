@@ -138,7 +138,7 @@ def get_pricelist_items_by_product_items(mpt_client, pricelist_id, product_item_
 @cache
 @wrap_http_error
 def get_webhook(mpt_client, webhook_id):
-    response = mpt_client.get(f"/notifications/webhooks/{webhook_id}")
+    response = mpt_client.get(f"/notifications/webhooks/{webhook_id}?select=criteria")
     response.raise_for_status()
 
     return response.json()
