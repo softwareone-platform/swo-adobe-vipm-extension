@@ -74,62 +74,9 @@ class Command(BaseCommand):
         return json.load(open(settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"]))
 
     def validate_reseller_data(self, reseller_data):
-        errors = []
-
-        if not is_valid_company_name_length(reseller_data["companyName"]):
-            errors.append("invalid company_name length.")
-
-        if not is_valid_company_name(reseller_data["companyName"]):
-            errors.append("invalid company_name")
-
-        if not is_valid_preferred_language(reseller_data["preferredLanguage"]):
-            errors.append("invalid preferred_language")
-
-        address = reseller_data["address"]
-        country_code = address["country"]
-
-        if not is_valid_country(country_code):
-            errors.append("invalid country")
-        else:
-            if not is_valid_state_or_province(country_code, address["state"]):
-                errors.append("invalid region")
-
-            if not is_valid_postal_code(country_code, address["postalCode"]):
-                errors.append("invalid postal_code")
-
-        for field, validator_func, err_msg in (
-            ("postalCode", is_valid_postal_code_length, "invalid postal:code length"),
-            (
-                "addressLine1",
-                is_valid_address_line_1_length,
-                "invalid address_line_1 length",
-            ),
-            (
-                "addressLine2",
-                is_valid_address_line_2_length,
-                "invalid address_line_2 length",
-            ),
-            ("city", is_valid_city_length, "invalid city length"),
-        ):
-            if not validator_func(address[field]):
-                errors.append(err_msg)
-
-        contact = reseller_data["contact"]
-
-        if not is_valid_first_last_name(contact["firstName"]):
-            errors.append("invalid contact_first_name")
-
-        if not is_valid_first_last_name(contact["lastName"]):
-            errors.append("invalid contact_last_name")
-
-        if not is_valid_email(contact["email"]):
-            errors.append("invalid contact_email")
-
-        if contact.get("phone") and not is_valid_phone_number_length(
-            join_phone_number(contact["phone"])
-        ):
-            errors.append("invalid phone_prefix/phone_number")
-
+        errors = self._validate_company_profile(reseller_data)
+        errors.extend(self._validate_reseller_address(reseller_data))
+        errors.extend(self._validate_reseller_contact(reseller_data))
         return errors
 
     def validate_input_file(self, workbook):
@@ -290,3 +237,72 @@ class Command(BaseCommand):
                 f"{row_data['company_name']} ({row_data['authorization_uk']}) "
                 f"created: id is {reseller_id}.",
             )
+
+
+    def _validate_company_profile(self, reseller_data):
+        errors = []
+        if not is_valid_company_name_length(reseller_data["companyName"]):
+            errors.append("invalid company_name length.")
+
+        if not is_valid_company_name(reseller_data["companyName"]):
+            errors.append("invalid company_name")
+
+        if not is_valid_preferred_language(reseller_data["preferredLanguage"]):
+            errors.append("invalid preferred_language")
+
+        return errors
+
+    def _validate_reseller_address(self, reseller_data):
+        errors = []
+
+        address = reseller_data["address"]
+        country_code = address["country"]
+
+        if not is_valid_country(country_code):
+            errors.append("invalid country")
+        else:
+            if not is_valid_state_or_province(country_code, address["state"]):
+                errors.append("invalid region")
+
+            if not is_valid_postal_code(country_code, address["postalCode"]):
+                errors.append("invalid postal_code")
+
+        for field, validator_func, err_msg in (
+            ("postalCode", is_valid_postal_code_length, "invalid postal:code length"),
+            (
+                "addressLine1",
+                is_valid_address_line_1_length,
+                "invalid address_line_1 length",
+            ),
+            (
+                "addressLine2",
+                is_valid_address_line_2_length,
+                "invalid address_line_2 length",
+            ),
+            ("city", is_valid_city_length, "invalid city length"),
+        ):
+            if not validator_func(address[field]):
+                errors.append(err_msg)
+
+        return errors
+
+    def _validate_reseller_contact(self, reseller_data):
+        errors = []
+
+        contact = reseller_data["contact"]
+
+        if not is_valid_first_last_name(contact["firstName"]):
+            errors.append("invalid contact_first_name")
+
+        if not is_valid_first_last_name(contact["lastName"]):
+            errors.append("invalid contact_last_name")
+
+        if not is_valid_email(contact["email"]):
+            errors.append("invalid contact_email")
+
+        if contact.get("phone") and not is_valid_phone_number_length(
+            join_phone_number(contact["phone"])
+        ):
+            errors.append("invalid phone_prefix/phone_number")
+
+        return errors
