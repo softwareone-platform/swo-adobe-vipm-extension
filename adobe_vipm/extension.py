@@ -1,3 +1,5 @@
+import logging
+from pprint import pformat
 from typing import Any, Mapping
 
 from django.conf import settings
@@ -10,6 +12,8 @@ from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.mpt import get_webhook
 from adobe_vipm.flows.validation import validate_order
 from adobe_vipm.models import Error
+
+logger = logging.getLogger(__name__)
 
 ext = Extension()
 
@@ -39,8 +43,11 @@ def process_order_fulfillment(client, event):
 )
 def process_order_validation(request, order: dict = Body(None)):
     try:
-        return 200, validate_order(request.client, order)
+        validated_order = validate_order(request.client, order)
+        logger.debug(f"Validated order: {pformat(validated_order)}")
+        return 200, validated_order
     except Exception as e:
+        logger.exception("Unexpected error during validation")
         return 400, Error(
             id="VIPMG001",
             message=f"Unexpected error during validation: {str(e)}.",

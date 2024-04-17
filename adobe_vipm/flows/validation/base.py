@@ -25,8 +25,13 @@ def validate_order(mpt_client, order):
         has_errors, order = validate_customer_data(order, customer_data)
     elif is_transfer_order(order):  # pragma: no branch
         has_errors, order = validate_transfer(mpt_client, adobe_client, order)
-    if not has_errors:
+
+    if not has_errors and order["lines"]:
         order = update_purchase_prices(mpt_client, adobe_client, order)
+
+    if not order["lines"]:  # pragma: no cover
+        del order["lines"]
+
     logger.info(
         f"Validation of order {order['id']} succeeded with{'out' if not has_errors else ''} errors"
     )
