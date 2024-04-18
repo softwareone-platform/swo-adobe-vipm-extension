@@ -238,7 +238,6 @@ class Command(BaseCommand):
                 f"created: id is {reseller_id}.",
             )
 
-
     def _validate_company_profile(self, reseller_data):
         errors = []
         if not is_valid_company_name_length(reseller_data["companyName"]):

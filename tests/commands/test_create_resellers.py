@@ -466,7 +466,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
                 "postalCode": "9412312",
-            }
+            },
         ),
         (
             "address",
@@ -477,7 +477,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "addressLine1": "Blah blah",
                 "addressLine2": "",
                 "postalCode": "9" * 41,
-            }
+            },
         ),
         (
             "address",
@@ -488,7 +488,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "addressLine1": "1" * 61,
                 "addressLine2": "2" * 61,
                 "postalCode": "",
-            }
+            },
         ),
         (
             "contact",
@@ -496,7 +496,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "firstName": "First N@m€",
                 "lastName": "Last Name",
                 "email": "test@example.com",
-            }
+            },
         ),
         (
             "contact",
@@ -504,7 +504,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "firstName": "First Name",
                 "lastName": "L@ast N@m€",
                 "email": "test@example.com",
-            }
+            },
         ),
         (
             "contact",

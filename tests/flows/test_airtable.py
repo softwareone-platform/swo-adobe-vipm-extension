@@ -5,6 +5,7 @@ from adobe_vipm.flows.airtable import (
     create_offers,
     get_offer_ids_by_membership_id,
     get_offer_model,
+    get_transfer_by_authorization_membership,
     get_transfer_model,
     get_transfers_to_check,
     get_transfers_to_process,
@@ -53,7 +54,9 @@ def test_get_offer_ids_by_membership_id(mocker, settings):
     offer_ids = get_offer_ids_by_membership_id("product_id", "member_id")
 
     assert offer_ids == ["offer-id"]
-    mocked_offer_model.all.assert_called_once_with(formula="{membership_id}='member_id'")
+    mocked_offer_model.all.assert_called_once_with(
+        formula="{membership_id}='member_id'"
+    )
 
 
 def test_create_offers(mocker, settings):
@@ -124,4 +127,29 @@ def test_get_transfers_to_check(mocker, settings):
     assert transfer_to_process == [mocked_transfer]
     mocked_transfer_model.all.assert_called_once_with(
         formula="{status}='running'",
+    )
+
+
+def test_get_transfer_by_authorization_membership(mocker, settings):
+    settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"] = "api_key"
+    settings.EXTENSION_CONFIG["AIRTABLE_BASE_product_id"] = "base_id"
+    mocked_transfer_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_transfer_model",
+        return_value=mocked_transfer_model,
+    )
+
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer_model.all.return_value = [mocked_transfer]
+
+    transfer = get_transfer_by_authorization_membership(
+        "product_id",
+        "authorization_uk",
+        "membership_id",
+    )
+
+    assert transfer == mocked_transfer
+
+    mocked_transfer_model.all.assert_called_once_with(
+        formula="AND({authorization_uk}='authorization_uk',{membership_id}='membership_id',{status}!='duplicated')",
     )

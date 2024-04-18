@@ -10,6 +10,7 @@ program.
 import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
     STATUS_PENDING,
     STATUS_PROCESSED,
@@ -17,11 +18,21 @@ from adobe_vipm.adobe.constants import (
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
 )
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.flows.constants import ERR_ADOBE_MEMBERSHIP_ID, PARAM_MEMBERSHIP_ID
+from adobe_vipm.flows.airtable import (
+    STATUS_RUNNING,
+    get_transfer_by_authorization_membership,
+)
+from adobe_vipm.flows.constants import (
+    ERR_ADOBE_MEMBERSHIP_ID,
+    ITEM_TYPE_ORDER_LINE,
+    ITEM_TYPE_SUBSCRIPTION,
+    PARAM_MEMBERSHIP_ID,
+)
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     handle_retries,
     save_adobe_customer_id,
+    save_adobe_order_and_customer_ids,
     save_adobe_order_id,
     switch_order_to_completed,
     switch_order_to_failed,
@@ -167,6 +178,43 @@ def _check_adobe_transfer_order_fulfilled(
     return adobe_order
 
 
+def _fulfill_transfer_migrated(mpt_client, order, transfer):
+    if transfer.status == STATUS_RUNNING:
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+                title=param["name"], details="Migration in progress, retry later."
+            ),
+        )
+        switch_order_to_query(mpt_client, order)
+        return
+
+    adobe_client = get_adobe_client()
+    authorization_id = order["authorization"]["id"]
+    order = save_adobe_order_and_customer_ids(
+        mpt_client,
+        order,
+        transfer.transfer_id,
+        transfer.customer_id,
+    )
+    subscriptions = adobe_client.get_subscriptions(
+        authorization_id,
+        transfer.customer_id,
+    )
+    for subscription in subscriptions["items"]:
+        add_subscription(
+            mpt_client,
+            adobe_client,
+            transfer.customer_id,
+            order,
+            ITEM_TYPE_SUBSCRIPTION,
+            subscription,
+        )
+    switch_order_to_completed(mpt_client, order)
+
+
 def fulfill_transfer_order(mpt_client, order):
     """
     Fulfills a transfer order by processing the necessary actions based on the provided parameters.
@@ -179,7 +227,21 @@ def fulfill_transfer_order(mpt_client, order):
         None
     """
     adobe_client = get_adobe_client()
+    config = get_config()
     membership_id = get_adobe_membership_id(order)
+    authorization_id = order["authorization"]["id"]
+    product_id = order["agreement"]["product"]["id"]
+    authorization = config.get_authorization(authorization_id)
+    transfer = get_transfer_by_authorization_membership(
+        product_id,
+        authorization.authorization_uk,
+        membership_id,
+    )
+
+    if transfer:
+        _fulfill_transfer_migrated(mpt_client, order, transfer)
+        return
+
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
         if not _check_transfer(mpt_client, order, membership_id):
@@ -200,5 +262,7 @@ def fulfill_transfer_order(mpt_client, order):
     customer_id = adobe_transfer_order["customerId"]
     order = save_adobe_customer_id(mpt_client, order, customer_id)
     for item in adobe_transfer_order["lineItems"]:
-        add_subscription(mpt_client, adobe_client, customer_id, order, item)
+        add_subscription(
+            mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+        )
     switch_order_to_completed(mpt_client, order)

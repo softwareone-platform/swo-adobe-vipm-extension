@@ -58,18 +58,14 @@ def test_create_reseller_account(
                 "addressLine1": reseller_data["address"]["addressLine1"],
                 "addressLine2": reseller_data["address"]["addressLine2"],
                 "postalCode": reseller_data["address"]["postalCode"],
-                "phoneNumber": join_phone_number(
-                    reseller_data["contact"]["phone"]
-                ),
+                "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
             },
             "contacts": [
                 {
                     "firstName": reseller_data["contact"]["firstName"],
                     "lastName": reseller_data["contact"]["lastName"],
                     "email": reseller_data["contact"]["email"],
-                    "phoneNumber": join_phone_number(
-                        reseller_data["contact"]["phone"]
-                    ),
+                    "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
                 }
             ],
         },
@@ -1523,3 +1519,40 @@ def test_get_adobe_client(mocker):
     from adobe_vipm.adobe import client
 
     assert client._ADOBE_CLIENT == mocked_client
+
+
+def test_get_subscriptions(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    """
+    Tests the retrieval of all the subscriptions of a given customer.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions",
+        ),
+        status=200,
+        json={"items": [{"a": "subscription"}]},
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+        ],
+    )
+
+    assert client.get_subscriptions(authorization_uk, customer_id) == {
+        "items": [{"a": "subscription"}]
+    }

@@ -1,4 +1,3 @@
-
 import pytest
 
 from adobe_vipm.flows.constants import (

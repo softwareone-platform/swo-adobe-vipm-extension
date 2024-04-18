@@ -523,6 +523,35 @@ class AdobeClient:
         return response.json()
 
     @wrap_http_error
+    def get_subscriptions(
+        self,
+        authorization_id: str,
+        customer_id: str,
+    ) -> dict:
+        """
+        Retrieve all the subscriptions of the given custome.
+
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str): Identifier of the customer to which the subscriptions belongs to.
+
+        Returns:
+            dict: The retrieved subscriptions.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/customers/{customer_id}/subscriptions",
+            ),
+            headers=headers,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
     def update_subscription(
         self,
         authorization_id: str,

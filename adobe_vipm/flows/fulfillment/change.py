@@ -9,6 +9,7 @@ import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.flows.constants import ITEM_TYPE_ORDER_LINE
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
@@ -268,7 +269,9 @@ def fulfill_change_order(mpt_client, order):
             order_line["id"],
         )
         if not order_subscription:
-            add_subscription(mpt_client, adobe_client, customer_id, order, item)
+            add_subscription(
+                mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+            )
         else:
             authorization_id = order["authorization"]["id"]
             adobe_subscription = adobe_client.get_subscription(

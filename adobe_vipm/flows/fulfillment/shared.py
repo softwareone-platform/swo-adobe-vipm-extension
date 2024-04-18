@@ -14,7 +14,10 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
 )
-from adobe_vipm.flows.constants import PARAM_ADOBE_SKU
+from adobe_vipm.flows.constants import (
+    ITEM_TYPE_ORDER_LINE,
+    PARAM_ADOBE_SKU,
+)
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
@@ -52,6 +55,18 @@ def save_adobe_customer_id(client, order, customer_id):
     """
     order = set_adobe_customer_id(order, customer_id)
     update_order(client, order["id"], parameters=order["parameters"])
+    return order
+
+
+def save_adobe_order_and_customer_ids(client, order, order_id, customer_id):
+    order = set_adobe_order_id(order, order_id)
+    order = set_adobe_customer_id(order, customer_id)
+    update_order(
+        client,
+        order["id"],
+        parameters=order["parameters"],
+        externalIds=order["externalIds"],
+    )
     return order
 
 
@@ -283,7 +298,7 @@ def switch_order_to_completed(mpt_client, order):
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
-def add_subscription(mpt_client, adobe_client, customer_id, order, item):
+def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, item):
     """
     Adds a subscription to the correspoding MPT order based on the provided parameters.
 
@@ -293,17 +308,21 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item):
             Adobe API.
         customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
         order (dict): The MPT order to which the subscription will be added.
+        item_type (str): Type of the item (subscription or order line.)
         item (dict): The subscription item details, including offer ID and subscription ID.
 
     Returns:
         None
     """
     authorization_id = order["authorization"]["id"]
-    adobe_subscription = adobe_client.get_subscription(
-        authorization_id,
-        customer_id,
-        item["subscriptionId"],
-    )
+    if item_type == ITEM_TYPE_ORDER_LINE:
+        adobe_subscription = adobe_client.get_subscription(
+            authorization_id,
+            customer_id,
+            item["subscriptionId"],
+        )
+    else:
+        adobe_subscription = item
 
     order_line = get_order_line_by_sku(order, item["offerId"])
 

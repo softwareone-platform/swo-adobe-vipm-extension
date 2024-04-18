@@ -47,7 +47,9 @@ def test_validate_purchase_order_no_validate(mocker, caplog, order_factory):
     order = order_factory()
     m_client = mocker.MagicMock()
 
-    mocker.patch("adobe_vipm.flows.validation.base.populate_order_info", return_value=order)
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+    )
     mocker.patch(
         "adobe_vipm.flows.validation.base.prepare_customer_data",
         return_value=(order, mocker.MagicMock()),
@@ -118,7 +120,9 @@ def test_validate_transfer_order_no_validate(
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     m_client = mocker.MagicMock()
 
-    mocker.patch("adobe_vipm.flows.validation.base.populate_order_info", return_value=order)
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+    )
     mocker.patch(
         "adobe_vipm.flows.validation.base.prepare_customer_data",
         return_value=(order, mocker.MagicMock()),
