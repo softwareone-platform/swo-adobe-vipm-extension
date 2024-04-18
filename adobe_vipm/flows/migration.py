@@ -33,9 +33,7 @@ def check_retries(transfer):
         transfer.save()
         return
 
-    transfer.migration_error_description = (
-        f"Max retries ({max_retries}) exceeded."
-    )
+    transfer.migration_error_description = f"Max retries ({max_retries}) exceeded."
     transfer.status = "failed"
     transfer.save()
 
@@ -134,7 +132,6 @@ def check_running_transfers_for_product(product_id):
             transfer.return_description = str(api_err)
             check_retries(transfer)
             continue
-
 
         if adobe_transfer["status"] == STATUS_PENDING:
             check_retries(transfer)

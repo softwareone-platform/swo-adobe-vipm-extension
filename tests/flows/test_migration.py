@@ -19,7 +19,10 @@ from adobe_vipm.flows.migration import (
 
 
 def test_start_transfers_for_product(
-    mocker, adobe_preview_transfer_factory, adobe_transfer_factory, adobe_items_factory,
+    mocker,
+    adobe_preview_transfer_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
 ):
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.authorization_uk = "auth-uk"

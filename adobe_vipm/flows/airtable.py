@@ -2,9 +2,14 @@ from dataclasses import dataclass
 from functools import cache
 
 from django.conf import settings
-from pyairtable.formulas import EQUAL, FIELD, OR, STR_VALUE
+from pyairtable.formulas import AND, EQUAL, FIELD, NOT_EQUAL, OR, STR_VALUE
 from pyairtable.orm import Model, fields
 from swo.mpt.extensions.runtime.djapp.conf import to_postfix
+
+STATUS_INIT = "init"
+STATUS_RUNNING = "running"
+STATUS_RESCHEDULED = "rescheduled"
+STATUS_DUPLICATED = "duplicated"
 
 
 @dataclass(frozen=True)
@@ -16,7 +21,9 @@ class AirTableBaseInfo:
     def for_product(product_id):
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
-            base_id=settings.EXTENSION_CONFIG[f"AIRTABLE_BASE_{to_postfix(product_id)}"],
+            base_id=settings.EXTENSION_CONFIG[
+                f"AIRTABLE_BASE_{to_postfix(product_id)}"
+            ],
         )
 
 
@@ -55,6 +62,7 @@ def get_transfer_model(base_info):
 @cache
 def get_offer_model(base_info):
     Transfer = get_transfer_model(base_info)
+
     class Offer(Model):
         transfer = fields.LinkField("membership_id", Transfer, lazy=True)
         offer_id = fields.TextField("offer_id")
@@ -91,13 +99,29 @@ def get_transfers_to_process(product_id):
     Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
     return Transfer.all(
         formula=OR(
-            EQUAL(FIELD("status"), STR_VALUE("init")),
-            EQUAL(FIELD("status"), STR_VALUE("rescheduled")),
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_INIT)),
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_RESCHEDULED)),
         ),
     )
+
 
 def get_transfers_to_check(product_id):
     Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
     return Transfer.all(
-        formula=EQUAL(FIELD("status"), STR_VALUE("running")),
+        formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
     )
+
+
+def get_transfer_by_authorization_membership(
+    product_id, authorization_uk, membership_id
+):
+    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    transfers = Transfer.all(
+        formula=AND(
+            EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
+            EQUAL(FIELD("membership_id"), STR_VALUE(membership_id)),
+            NOT_EQUAL(FIELD("status"), STR_VALUE(STATUS_DUPLICATED)),
+        ),
+    )
+
+    return transfers[0] if transfers else None

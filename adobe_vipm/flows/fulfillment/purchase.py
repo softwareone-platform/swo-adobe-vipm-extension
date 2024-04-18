@@ -14,6 +14,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_ADOBE_PREFERRED_LANGUAGE,
+    ITEM_TYPE_ORDER_LINE,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -181,7 +182,9 @@ def fulfill_purchase_order(mpt_client, order):
         return
 
     for item in adobe_order["lineItems"]:
-        add_subscription(mpt_client, adobe_client, customer_id, order, item)
+        add_subscription(
+            mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+        )
     update_order_actual_price(
         mpt_client, order, order["lines"], adobe_order["lineItems"]
     )

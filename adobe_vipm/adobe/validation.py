@@ -17,7 +17,7 @@ from adobe_vipm.adobe.constants import (
 
 
 def is_valid_company_name_length(name):
-    return (MINLEN_COMPANY_NAME <= len(name) <= MAXLEN_COMPANY_NAME)
+    return MINLEN_COMPANY_NAME <= len(name) <= MAXLEN_COMPANY_NAME
 
 
 def is_valid_company_name(name):
@@ -61,7 +61,13 @@ def is_valid_email(email):
 
 
 is_valid_postal_code_length = functools.partial(_is_valid_maxlength, MAXLEN_POSTAL_CODE)
-is_valid_address_line_1_length = functools.partial(_is_valid_maxlength, MAXLEN_ADDRESS_LINE_1)
-is_valid_address_line_2_length = functools.partial(_is_valid_maxlength, MAXLEN_ADDRESS_LINE_2)
+is_valid_address_line_1_length = functools.partial(
+    _is_valid_maxlength, MAXLEN_ADDRESS_LINE_1
+)
+is_valid_address_line_2_length = functools.partial(
+    _is_valid_maxlength, MAXLEN_ADDRESS_LINE_2
+)
 is_valid_city_length = functools.partial(_is_valid_maxlength, MAXLEN_CITY)
-is_valid_phone_number_length = functools.partial(_is_valid_maxlength, MAXLEN_PHONE_NUMBER)
+is_valid_phone_number_length = functools.partial(
+    _is_valid_maxlength, MAXLEN_PHONE_NUMBER
+)

@@ -8,9 +8,15 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_TRANSFER_STATUSES,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
-from adobe_vipm.flows.constants import ERR_ADOBE_MEMBERSHIP_ID, PARAM_MEMBERSHIP_ID
+from adobe_vipm.flows.constants import (
+    ERR_ADOBE_MEMBERSHIP_ID,
+    ITEM_TYPE_SUBSCRIPTION,
+    PARAM_MEMBERSHIP_ID,
+)
 from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.utils import get_ordering_parameter, set_ordering_parameter_error
+
+pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
 def test_transfer(
@@ -33,9 +39,11 @@ def test_transfer(
         * subscription creation
         * order completion
     """
-
     settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
-
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=None,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer = adobe_transfer_factory(
@@ -165,6 +173,10 @@ def test_transfer_not_ready(
     on Adobe side. The RetryCount fullfilment paramter must be incremented.
     The transfer order will not be completed and the processing will be stopped.
     """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=None,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING)
@@ -218,7 +230,6 @@ def test_transfer_unexpected_status(
     agreement,
     order_factory,
     transfer_order_parameters_factory,
-    fulfillment_parameters_factory,
     adobe_transfer_factory,
 ):
     """
@@ -227,6 +238,10 @@ def test_transfer_unexpected_status(
     The transfer order will be failed with a message that explain that Adobe returned an
     unexpected error.
     """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=None,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer = adobe_transfer_factory(status="9999")
@@ -268,6 +283,10 @@ def test_transfer_items_mismatch(
     Tests a transfer order when the items contained in the order don't match
     the subscriptions owned by a given membership id.
     """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=None,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer_preview = adobe_preview_transfer_factory(
@@ -323,6 +342,10 @@ def test_transfer_invalid_membership(
     Tests a transfer order when the membership id is not valid.
     """
     settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111"] = "TPL-964-112"
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=None,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_adobe_client = mocker.MagicMock()
@@ -380,6 +403,10 @@ def test_transfer_unrecoverable_status(
     """
     Tests a transfer order when it cannot be processed.
     """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=None,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_adobe_client = mocker.MagicMock()
@@ -425,6 +452,10 @@ def test_create_transfer_fail(
     """
     Tests generic failure on transfer order creation.
     """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=None,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_transfer_preview = adobe_preview_transfer_factory()
@@ -449,4 +480,177 @@ def test_create_transfer_fail(
         mocked_mpt_client,
         order["id"],
         "Unexpected error",
+    )
+
+
+def test_fulfill_transfer_order_already_migrated(
+    mocker,
+    settings,
+    order_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_subscription_factory,
+    adobe_authorizations_file,
+    agreement,
+):
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "transfer-id"
+
+    updated_order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="customer-id",
+        ),
+        order_parameters=order_params,
+        external_ids={"vendor": "transfer-id"},
+    )
+
+    m_client = mocker.MagicMock()
+
+    mocked_get_transfer = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=mocked_transfer,
+    )
+
+    mocked_add_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_subscription",
+    )
+
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=updated_order,
+    )
+
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order"
+    )
+
+    adobe_subscription = adobe_subscription_factory()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    fulfill_order(m_client, order)
+
+    mocked_get_transfer.assert_called_once_with(
+        order["agreement"]["product"]["id"],
+        adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+        order_params[0]["value"],
+    )
+    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
+        mocked_transfer.customer_id,
+    )
+
+    mocked_complete_order.assert_called_once_with(
+        m_client,
+        order["id"],
+        "TPL-1111",
+    )
+
+    assert mocked_update_order.mock_calls[0].args == (
+        m_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "externalIds": {
+            "vendor": mocked_transfer.transfer_id,
+        },
+        "parameters": updated_order["parameters"],
+    }
+    assert mocked_update_order.mock_calls[1].args == (
+        m_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[1].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="customer-id",
+                retry_count="0",
+            ),
+            "ordering": transfer_order_parameters_factory(),
+        },
+    }
+
+    mocked_add_subscription.assert_called_once_with(
+        m_client,
+        mocked_adobe_client,
+        mocked_transfer.customer_id,
+        updated_order,
+        ITEM_TYPE_SUBSCRIPTION,
+        adobe_subscription,
+    )
+
+
+def test_fulfill_transfer_order_migration_running(
+    mocker,
+    settings,
+    order_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_subscription_factory,
+    adobe_authorizations_file,
+    agreement,
+):
+    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.status = "running"
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "transfer-id"
+
+    m_client = mocker.MagicMock()
+
+    mocked_get_transfer = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        return_value=mocked_transfer,
+    )
+
+    mocked_query_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.query_order")
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+    )
+
+    fulfill_order(m_client, order)
+
+    mocked_get_transfer.assert_called_once_with(
+        order["agreement"]["product"]["id"],
+        adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+        order_params[0]["value"],
+    )
+
+    param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    order = set_ordering_parameter_error(
+        order,
+        PARAM_MEMBERSHIP_ID,
+        ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+            title=param["name"],
+            details="Migration in progress, retry later.",
+        ),
+    )
+    mocked_query_order.assert_called_once_with(
+        m_client,
+        order["id"],
+        parameters=order["parameters"],
+        templateId="TPL-964-112",
     )
