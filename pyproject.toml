@@ -13,6 +13,7 @@ readme = "README.md"
 python = ">=3.12,<4"
 django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
 openpyxl = "3.1.*"
+pyairtable = "^2.3.3"
 requests = "2.31.*"
 
 [tool.poetry.group.devmock.dependencies] # Remove when devmock is not needed anymore

@@ -648,12 +648,15 @@ def adobe_items_factory():
         offer_id="65304578CA01A12",
         quantity=170,
         subscription_id=None,
+        renewal_date=None,
     ):
         item = {
             "extLineItemNumber": line_number,
             "offerId": offer_id,
             "quantity": quantity,
         }
+        if renewal_date:
+            item["renewalDate"] = renewal_date
         if subscription_id:
             item["subscriptionId"] = subscription_id
         return [item]
