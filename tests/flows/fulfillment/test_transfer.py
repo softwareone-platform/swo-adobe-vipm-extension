@@ -601,12 +601,10 @@ def test_fulfill_transfer_order_migration_running(
     settings,
     order_factory,
     transfer_order_parameters_factory,
-    fulfillment_parameters_factory,
-    adobe_subscription_factory,
     adobe_authorizations_file,
     agreement,
 ):
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG["QUERY_TEMPLATE_ID_PRD_1111_1111"] = "TPL-964-112"
 
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
