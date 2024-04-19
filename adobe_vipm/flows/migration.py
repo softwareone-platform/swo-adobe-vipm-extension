@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime
 
 from django.conf import settings
@@ -22,6 +23,8 @@ RECOVERABLE_TRANSFER_ERRORS = (
     "IN_WINDOW_PARTIAL_RENEWAL",
     "EXTENDED_TERM_3YC",
 )
+
+logger = logging.getLogger(__name__)
 
 
 def check_retries(transfer):
@@ -58,7 +61,9 @@ def populate_offers_for_transfer(product_id, transfer, transfer_preview):
 def start_transfers_for_product(product_id):
     client = get_adobe_client()
 
-    for transfer in get_transfers_to_process(product_id):
+    transfers_to_process = get_transfers_to_process(product_id)
+    logger.info(f"Found {len(transfers_to_process)} transfers for product {product_id}")
+    for transfer in transfers_to_process:
         transfer_preview = None
         try:
             transfer_preview = client.preview_transfer(
@@ -118,7 +123,7 @@ def check_running_transfers_for_product(product_id):
     client = get_adobe_client()
 
     transfers_to_check = get_transfers_to_check(product_id)
-
+    logger.info(f"Found {len(transfers_to_check)} running transfers for product {product_id}")
     for transfer in transfers_to_check:
         adobe_transfer = None
         try:
