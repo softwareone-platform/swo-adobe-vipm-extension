@@ -1221,6 +1221,12 @@ def test_preview_transfer(
                     "Content-Type": "application/json",
                 },
             ),
+            matchers.query_param_matcher(
+                {
+                    "ignore-order-return": "true",
+                    "expire-open-pas": "true",
+                },
+            ),
         ],
     )
 
@@ -1308,6 +1314,12 @@ def test_create_transfer(
                 },
             ),
             matchers.json_params_matcher({"resellerId": reseller_id}),
+            matchers.query_param_matcher(
+                {
+                    "ignore-order-return": "true",
+                    "expire-open-pas": "true",
+                },
+            ),
         ],
     )
 
