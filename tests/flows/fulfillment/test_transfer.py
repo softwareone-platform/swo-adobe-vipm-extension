@@ -546,10 +546,12 @@ def test_fulfill_transfer_order_already_migrated(
 
     fulfill_order(m_client, order)
 
+    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_uk"],
-        order_params[0]["value"],
+        membership_id_param["value"],
     )
     mocked_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
@@ -631,10 +633,12 @@ def test_fulfill_transfer_order_migration_running(
 
     fulfill_order(m_client, order)
 
+    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_uk"],
-        order_params[0]["value"],
+        membership_param["value"],
     )
 
     param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
