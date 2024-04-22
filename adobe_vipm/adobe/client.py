@@ -623,6 +623,10 @@ class AdobeClient:
                 f"/v3/memberships/{membership_id}/offers",
             ),
             headers=headers,
+            params={
+                "ignore-order-return": "true",
+                "expire-open-pas": "true",
+            },
         )
 
         response.raise_for_status()
@@ -659,6 +663,10 @@ class AdobeClient:
                 f"/v3/memberships/{membership_id}/transfers",
             ),
             headers=headers,
+            params={
+                "ignore-order-return": "true",
+                "expire-open-pas": "true",
+            },
             json={
                 "resellerId": reseller.id,
             },
