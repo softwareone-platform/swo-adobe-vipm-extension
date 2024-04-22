@@ -16,6 +16,7 @@ from adobe_vipm.flows.airtable import (
     get_transfers_to_check,
     get_transfers_to_process,
 )
+from adobe_vipm.utils import find_first
 
 RECOVERABLE_TRANSFER_ERRORS = (
     "RETURNABLE_PURCHASE",
@@ -27,17 +28,77 @@ RECOVERABLE_TRANSFER_ERRORS = (
 logger = logging.getLogger(__name__)
 
 
+def fill_customer_data(transfer, customer):
+    transfer.customer_company_name = customer["companyProfile"]["companyName"]
+    transfer.customer_preferred_language = customer["companyProfile"]["preferredLanguage"]
+
+    address = customer["companyProfile"]["address"]
+    transfer.customer_address_address_line_1 = address["addressLine1"]
+    transfer.customer_address_address_line_2 = address["addressLine2"]
+    transfer.customer_address_city = address["city"]
+    transfer.customer_address_region = address["region"]
+    transfer.customer_address_postal_code = address["postalCode"]
+    transfer.customer_address_country = address["country"]
+    transfer.customer_address_phone_number = address["phoneNumber"]
+
+    contact = customer["companyProfile"]["contacts"][0]
+    transfer.customer_contact_first_name = contact["firstName"]
+    transfer.customer_contact_last_name = contact["lastName"]
+    transfer.customer_contact_email = contact["email"]
+    transfer.customer_contact_phone_number = contact["phoneNumber"]
+
+    benefit_3yc = find_first(
+        lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
+        customer.get("benefits", []),
+    )
+
+    if not benefit_3yc:
+        return transfer
+
+    commitment = benefit_3yc["commitment"]
+    transfer.customer_benefits_3yc_start_date = date.fromisoformat(commitment["startDate"])
+    transfer.customer_benefits_3yc_end_date = date.fromisoformat(commitment["endDate"])
+    transfer.customer_benefits_3yc_status = commitment["status"]
+
+    for mq in commitment["minimumQuantities"]:
+        setattr(
+            transfer,
+            f"customer_benefits_3yc_minimum_quantity_{mq['offerType'].lower()}",
+            mq["quantity"],
+        )
+
+    return transfer
+
+
 def check_retries(transfer):
     max_retries = int(
         settings.EXTENSION_CONFIG.get("MIGRATION_RUNNING_MAX_RETRIES", 15)
     )
     transfer.retry_count += 1
     if transfer.retry_count < max_retries:
+        transfer.updated_at = datetime.now()
         transfer.save()
         return
 
     transfer.migration_error_description = f"Max retries ({max_retries}) exceeded."
     transfer.status = "failed"
+    transfer.updated_at = datetime.now()
+    transfer.save()
+
+
+def check_reschedules(transfer):
+    max_reschedule = int(
+        settings.EXTENSION_CONFIG.get("MIGRATION_RESCHEDULE_MAX_RETRIES", 60)
+    )
+    transfer.reschedule_count += 1
+    if transfer.reschedule_count < max_reschedule:
+        transfer.updated_at = datetime.now()
+        transfer.save()
+        return
+
+    transfer.migration_error_description = f"Max reschedules ({max_reschedule}) exceeded."
+    transfer.status = "failed"
+    transfer.updated_at = datetime.now()
     transfer.save()
 
 
@@ -79,13 +140,14 @@ def start_transfers_for_product(product_id):
                     transfer.migration_error_description = (
                         "Adobe transient error received during transfer preview."
                     )
+                    check_reschedules(transfer)
                 else:
                     transfer.status = "failed"
                     transfer.migration_error_description = (
                         "Adobe error received during transfer preview."
                     )
-
-                transfer.save()
+                    transfer.updated_at = datetime.now()
+                    transfer.save()
                 continue
 
         if transfer_preview:
@@ -111,11 +173,13 @@ def start_transfers_for_product(product_id):
                 "Adobe error received during transfer creation."
             )
             transfer.status = "failed"
+            transfer.updated_at = datetime.now()
             transfer.save()
             continue
 
         transfer.transfer_id = adobe_transfer["transferId"]
         transfer.status = "running"
+        transfer.updated_at = datetime.now()
         transfer.save()
 
 
@@ -135,8 +199,8 @@ def check_running_transfers_for_product(product_id):
                 transfer.transfer_id,
             )
         except AdobeAPIError as api_err:
-            transfer.return_code = api_err.code
-            transfer.return_description = str(api_err)
+            transfer.adobe_error_code = api_err.code
+            transfer.adobe_error_description = str(api_err)
             check_retries(transfer)
             continue
 
@@ -150,11 +214,23 @@ def check_running_transfers_for_product(product_id):
                 "received from Adobe while retrieving transfer."
             )
             transfer.status = "failed"
+            transfer.updated_at = datetime.now()
             transfer.save()
             continue
 
         transfer.customer_id = adobe_transfer["customerId"]
+        customer = None
+        try:
+            customer = client.get_customer(transfer.authorization_uk, transfer.customer_id)
+        except AdobeAPIError as api_err:
+            transfer.adobe_error_code = api_err.code
+            transfer.adobe_error_description = str(api_err)
+            check_retries(transfer)
+            continue
+
+        transfer = fill_customer_data(transfer, customer)
         transfer.status = "completed"
+        transfer.updated_at = datetime.now()
         transfer.completed_at = datetime.now()
         transfer.save()
 

@@ -706,6 +706,35 @@ class AdobeClient:
         response.raise_for_status()
         return response.json()
 
+    @wrap_http_error
+    def get_customer(
+        self,
+        authorization_id: str,
+        customer_id: str,
+    ):
+        """
+        Retrieve a customer object by the customer identifier.
+
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str): The customer identifier.
+
+        Returns:
+            dict: A customer object.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/customers/{customer_id}",
+            ),
+            headers=headers,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
     def _get_headers(self, authorization: Authorization, correlation_id=None):
         return {
             "X-Api-Key": authorization.client_id,
