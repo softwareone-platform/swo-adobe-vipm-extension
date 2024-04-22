@@ -9,6 +9,7 @@ from adobe_vipm.flows.constants import (
     ORDER_TYPE_PURCHASE,
     ORDER_TYPE_TERMINATION,
     PARAM_ADDRESS,
+    PARAM_AGREEMENT_TYPE,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
@@ -472,3 +473,36 @@ def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
         lambda item: item["subscriptionId"] == subscription_id,
         line_items,
     )
+
+
+def is_new_customer(source):
+    return get_ordering_parameter(
+        source,
+        PARAM_AGREEMENT_TYPE,
+    ).get("value") == "New"
+
+
+def set_parameter_visible(order, param_external_id):
+    updated_order = copy.deepcopy(order)
+    param = get_ordering_parameter(
+        updated_order,
+        param_external_id,
+    )
+    param["constraints"] = {
+        "hidden": False,
+        "optional": False,
+    }
+    return updated_order
+
+
+def set_parameter_hidden(order, param_external_id):
+    updated_order = copy.deepcopy(order)
+    param = get_ordering_parameter(
+        updated_order,
+        param_external_id,
+    )
+    param["constraints"] = {
+        "hidden": True,
+        "optional": True,
+    }
+    return updated_order

@@ -19,6 +19,8 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_ADOBE_PREFERRED_LANGUAGE,
+    PARAM_AGREEMENT_TYPE,
+    PARAM_MEMBERSHIP_ID,
 )
 from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.fulfillment.purchase import create_customer_account
@@ -569,7 +571,11 @@ def test_create_customer_account(
         order["authorization"]["id"],
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
-        {param["externalId"]: param["value"] for param in order_parameters_factory()},
+        {
+            param["externalId"]: param["value"]
+            for param in order_parameters_factory()
+            if param["externalId"] not in (PARAM_MEMBERSHIP_ID, PARAM_AGREEMENT_TYPE)
+        },
     )
 
     mocked_update_order.assert_called_once_with(
@@ -625,7 +631,11 @@ def test_create_customer_account_empty_order_parameters(
         order["authorization"]["id"],
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
-        {param["externalId"]: param["value"] for param in order_parameters_factory()},
+        {
+            param["externalId"]: param["value"]
+            for param in order_parameters_factory()
+            if param["externalId"] not in (PARAM_MEMBERSHIP_ID, PARAM_AGREEMENT_TYPE)
+        },
     )
 
     mocked_update_order_customer_params.assert_called_once_with(

@@ -12,6 +12,7 @@ from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_ADOBE_SKU,
+    PARAM_AGREEMENT_TYPE,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
@@ -281,7 +282,10 @@ def order_parameters_factory():
                 "externalId": PARAM_COMPANY_NAME,
                 "type": "SingleLineText",
                 "value": company_name,
-                "constraints": None,
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
             },
             {
                 "id": "PAR-0000-0002",
@@ -289,6 +293,10 @@ def order_parameters_factory():
                 "externalId": PARAM_PREFERRED_LANGUAGE,
                 "type": "Choice",
                 "value": preferred_language,
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
             },
             {
                 "id": "PAR-0000-0002",
@@ -296,6 +304,10 @@ def order_parameters_factory():
                 "externalId": PARAM_ADDRESS,
                 "type": "Address",
                 "value": address,
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
             },
             {
                 "id": "PAR-0000-0003",
@@ -303,6 +315,32 @@ def order_parameters_factory():
                 "externalId": PARAM_CONTACT,
                 "type": "Contact",
                 "value": contact,
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
+            },
+            {
+                "id": "PAR-0000-0004",
+                "name": "Account type",
+                "externalId": PARAM_AGREEMENT_TYPE,
+                "type": "SingleLineText",
+                "value": "New",
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
+            },
+            {
+                "id": "PAR-0000-0005",
+                "name": "Membership Id",
+                "externalId": PARAM_MEMBERSHIP_ID,
+                "type": "SingleLineText",
+                "value": "",
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
             },
         ]
 
@@ -314,7 +352,62 @@ def transfer_order_parameters_factory():
     def _order_parameters(membership_id="a-membership-id"):
         return [
             {
+                "id": "PAR-0000-0001",
+                "name": "Company Name",
+                "externalId": PARAM_COMPANY_NAME,
+                "type": "SingleLineText",
+                "value": "",
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
+            },
+            {
+                "id": "PAR-0000-0002",
+                "name": "Preferred Language",
+                "externalId": PARAM_PREFERRED_LANGUAGE,
+                "type": "Choice",
+                "value": "",
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
+            },
+            {
+                "id": "PAR-0000-0002",
+                "name": "Address",
+                "externalId": PARAM_ADDRESS,
+                "type": "Address",
+                "value": {},
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
+            },
+            {
+                "id": "PAR-0000-0003",
+                "name": "Contact",
+                "externalId": PARAM_CONTACT,
+                "type": "Contact",
+                "value": {},
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
+            },
+            {
                 "id": "PAR-0000-0004",
+                "name": "Account type",
+                "externalId": PARAM_AGREEMENT_TYPE,
+                "type": "SingleLineText",
+                "value": "Migrate",
+                "constraints": {
+                    "hidden": False,
+                    "optional": False,
+                },
+            },
+            {
+                "id": "PAR-0000-0005",
                 "name": "Membership Id",
                 "externalId": PARAM_MEMBERSHIP_ID,
                 "type": "SingleLineText",

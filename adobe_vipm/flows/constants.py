@@ -24,6 +24,7 @@ PARAM_CUSTOMER_ID = "customerId"
 PARAM_MEMBERSHIP_ID = "membershipId"
 PARAM_PREFERRED_LANGUAGE = "preferredLanguage"
 PARAM_RETRY_COUNT = "retryCount"
+PARAM_AGREEMENT_TYPE = "agreementType"
 
 PARAM_PHASE_ORDERING = "ordering"
 PARAM_PHASE_FULFILLMENT = "fulfillment"
