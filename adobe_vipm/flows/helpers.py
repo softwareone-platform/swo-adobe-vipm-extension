@@ -91,6 +91,35 @@ def prepare_customer_data(client, order):
     return order, customer_data
 
 
+def _update_purchase_prices(mpt_client, order, line_items):
+    adobe_skus = [item["offerId"] for item in line_items]
+    pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
+    product_id = order["agreement"]["product"]["id"]
+    product_items = get_product_items_by_skus(mpt_client, product_id, adobe_skus)
+    pricelist_items = get_pricelist_items_by_product_items(
+        mpt_client,
+        pricelist_id,
+        [product_item["id"] for product_item in product_items],
+    )
+
+    product_items_map = {item["id"]: item for item in product_items}
+    sku_pricelist_item_map = {
+        product_items_map[item["item"]["id"]]["externalIds"]["vendor"]: item
+        for item in pricelist_items
+    }
+    updated_lines = []
+    for preview_item in line_items:
+        order_line = get_order_line_by_sku(order, preview_item["offerId"][:10])
+        order_line.setdefault("price", {})
+        order_line["price"]["unitPP"] = sku_pricelist_item_map[preview_item["offerId"]][
+            "unitPP"
+        ]
+        updated_lines.append(order_line)
+    order["lines"] = updated_lines
+
+    return order
+
+
 def update_purchase_prices(mpt_client, adobe_client, order):
     """
     Creates a preview order in adobe to get the full SKU list to update items prices
@@ -110,29 +139,14 @@ def update_purchase_prices(mpt_client, adobe_client, order):
     preview_order = adobe_client.create_preview_order(
         authorization_id, customer_id, order["id"], order["lines"]
     )
-
-    adobe_skus = [item["offerId"] for item in preview_order["lineItems"]]
-    pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
-    product_id = order["agreement"]["product"]["id"]
-    product_items = get_product_items_by_skus(mpt_client, product_id, adobe_skus)
-    pricelist_items = get_pricelist_items_by_product_items(
+    return _update_purchase_prices(
         mpt_client,
-        pricelist_id,
-        [product_item["id"] for product_item in product_items],
+        order,
+        preview_order["lineItems"],
     )
 
-    product_items_map = {item["id"]: item for item in product_items}
-    sku_pricelist_item_map = {
-        product_items_map[item["item"]["id"]]["externalIds"]["vendor"]: item
-        for item in pricelist_items
-    }
-    updated_lines = []
-    for preview_item in preview_order["lineItems"]:
-        order_line = get_order_line_by_sku(order, preview_item["offerId"][:10])
-        order_line["price"]["unitPP"] = sku_pricelist_item_map[preview_item["offerId"]][
-            "unitPP"
-        ]
-        updated_lines.append(order_line)
-    order["lines"] = updated_lines
 
-    return order
+def update_purchase_prices_for_transfer(mpt_client, order, adobe_object):
+    return _update_purchase_prices(
+        mpt_client, order, adobe_object["items"],
+    )

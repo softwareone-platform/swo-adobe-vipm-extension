@@ -41,13 +41,14 @@ def test_validate_transfer(
         return_value=product_items,
     )
 
-    has_errors, validated_order = validate_transfer(
+    has_errors, validated_order, adobe_obj = validate_transfer(
         m_client, mocked_adobe_client, order
     )
     lines = lines_factory(line_id=None)
     del lines[0]["price"]
     assert has_errors is False
     assert validated_order["lines"] == lines
+    assert adobe_obj == adobe_preview_transfer
 
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
@@ -119,7 +120,7 @@ def test_validate_transfer_unknown_item(
         return_value=[],
     )
 
-    has_errors, validated_order = validate_transfer(
+    has_errors, validated_order, _ = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 
@@ -213,7 +214,7 @@ def test_validate_transfer_migration_running(
         return_value=mocked_transfer,
     )
 
-    has_errors, validated_order = validate_transfer(
+    has_errors, validated_order, _ = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 

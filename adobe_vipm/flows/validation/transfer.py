@@ -43,7 +43,7 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
                     item_sku=adobe_line["offerId"][:10],
                 ),
             )
-            return True, order
+            return True, order, adobe_object
         lines.append(
             {
                 "item": item,
@@ -52,7 +52,7 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
             },
         )
     order["lines"] = lines
-    return False, order
+    return False, order, adobe_object
 
 
 def validate_transfer_not_migrated(mpt_client, adobe_client, order):
@@ -102,7 +102,7 @@ def validate_transfer(mpt_client, adobe_client, order):
                 title=param["name"], details="Migration in progress, retry later."
             ),
         )
-        return True, order
+        return True, order, None
 
     subscriptions = adobe_client.get_subscriptions(
         authorization_id,

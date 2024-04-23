@@ -12,6 +12,7 @@ from adobe_vipm.flows.helpers import (
     populate_order_info,
     prepare_customer_data,
     update_purchase_prices,
+    update_purchase_prices_for_transfer,
 )
 from adobe_vipm.flows.utils import (
     is_new_customer,
@@ -52,11 +53,12 @@ def validate_order(mpt_client, order):
     if is_purchase_order(order):
         order, customer_data = prepare_customer_data(mpt_client, order)
         has_errors, order = validate_customer_data(order, customer_data)
+        if not has_errors and order["lines"]:
+            order = update_purchase_prices(mpt_client, adobe_client, order)
     elif is_transfer_order(order):  # pragma: no branch
-        has_errors, order = validate_transfer(mpt_client, adobe_client, order)
-
-    if not has_errors and order["lines"]:
-        order = update_purchase_prices(mpt_client, adobe_client, order)
+        has_errors, order, adobe_object = validate_transfer(mpt_client, adobe_client, order)
+        if not has_errors:
+            order = update_purchase_prices_for_transfer(mpt_client, order, adobe_object)
 
     order = update_parameters_visibility(order)
 
