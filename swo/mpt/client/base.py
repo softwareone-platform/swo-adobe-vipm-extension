@@ -1,4 +1,4 @@
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 from requests import Session
 from requests.adapters import HTTPAdapter, Retry

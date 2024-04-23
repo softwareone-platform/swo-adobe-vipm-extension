@@ -84,6 +84,16 @@ def update_subscription(mpt_client, order_id, subscription_id, **kwargs):
 
 
 @wrap_http_error
+def does_subscription_exist(mpt_client, order_id, subscription_external_id):
+    response = mpt_client.get(
+        f"/commerce/orders/{order_id}/subscriptions?eq(externalIds.vendor,{subscription_external_id})&limit=0",
+    )
+    response.raise_for_status()
+    subscriptions = response.json()
+    return subscriptions["$meta"]["pagination"]["total"] == 1
+
+
+@wrap_http_error
 def get_product_items_by_skus(mpt_client, product_id, skus):
     items = []
     rql_query = (
