@@ -21,6 +21,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
+    does_subscription_exist,
     fail_order,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
@@ -326,31 +327,32 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
 
     order_line = get_order_line_by_sku(order, item["offerId"])
 
-    subscription = {
-        "name": f"Subscription for {order_line['item']['name']}",
-        "parameters": {
-            "fulfillment": [
-                {
-                    "externalId": PARAM_ADOBE_SKU,
-                    "value": item["offerId"],
-                }
-            ]
-        },
-        "externalIds": {
-            "vendor": item["subscriptionId"],
-        },
-        "lines": [
-            {
-                "id": order_line["id"],
+    if not does_subscription_exist(mpt_client, order["id"], item["subscriptionId"]):
+        subscription = {
+            "name": f"Subscription for {order_line['item']['name']}",
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": PARAM_ADOBE_SKU,
+                        "value": item["offerId"],
+                    }
+                ]
             },
-        ],
-        "startDate": adobe_subscription["creationDate"],
-    }
-    subscription = create_subscription(mpt_client, order["id"], subscription)
-    logger.info(
-        f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
-        f'created for order {order["id"]}'
-    )
+            "externalIds": {
+                "vendor": item["subscriptionId"],
+            },
+            "lines": [
+                {
+                    "id": order_line["id"],
+                },
+            ],
+            "startDate": adobe_subscription["creationDate"],
+        }
+        subscription = create_subscription(mpt_client, order["id"], subscription)
+        logger.info(
+            f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
+            f'created for order {order["id"]}'
+        )
 
 
 def set_subscription_actual_sku(

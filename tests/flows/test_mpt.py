@@ -7,6 +7,7 @@ from adobe_vipm.flows.errors import MPTError
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
+    does_subscription_exist,
     fail_order,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
@@ -451,3 +452,30 @@ def test_get_webhoook(mpt_client, requests_mocker, webhook):
 
     api_webhook = get_webhook(mpt_client, webhook["id"])
     assert api_webhook == webhook
+
+
+@pytest.mark.parametrize(
+    ("total", "expected"),
+    [
+        (0, False),
+        (1, True),
+    ],
+)
+def test_does_subscription_exist(mpt_client, requests_mocker, total, expected):
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            "/v1/commerce/orders/ORD-1234/subscriptions?eq(externalIds.vendor,a-sub-id)&limit=0",
+        ),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 0,
+                    "limit": 0,
+                    "total": total,
+                },
+            },
+        },
+    )
+
+    assert does_subscription_exist(mpt_client, "ORD-1234", 'a-sub-id') is expected
