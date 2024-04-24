@@ -188,9 +188,9 @@ def test_authorization_not_found(mocker, adobe_authorizations_file, tmp_path):
 
 
 def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
-    settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"] = (
-        "/path/to/authorizations.json"
-    )
+    settings.EXTENSION_CONFIG = {
+        "ADOBE_AUTHORIZATIONS_FILE": "/path/to/authorizations.json"
+    }
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
     mocker.patch(
         "adobe_vipm.management.commands.create_resellers.open",
@@ -236,9 +236,9 @@ def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
 def test_reseller_create_ok(
     mocker, settings, adobe_authorizations_file, tmp_path, reseller_data
 ):
-    settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"] = (
-        "/path/to/authorizations.json"
-    )
+    settings.EXTENSION_CONFIG = {
+        "ADOBE_AUTHORIZATIONS_FILE": "/path/to/authorizations.json"
+    }
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
 

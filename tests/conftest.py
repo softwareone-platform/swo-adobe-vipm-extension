@@ -1,3 +1,4 @@
+import copy
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -933,3 +934,10 @@ def jwt_token(settings):
         get_for_product(settings, "WEBHOOK_SECRET", "PRD-1111-1111"),
         algorithm="HS256",
     )
+
+
+@pytest.fixture()
+def extension_settings(settings):
+    current_extension_config = copy.copy(settings.EXTENSION_CONFIG)
+    yield settings
+    settings.EXTENSION_CONFIG = current_extension_config

@@ -39,7 +39,9 @@ def test_transfer(
         * subscription creation
         * order completion
     """
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG = {
+        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+    }
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
         return_value=None,
@@ -341,7 +343,9 @@ def test_transfer_invalid_membership(
     """
     Tests a transfer order when the membership id is not valid.
     """
-    settings.EXTENSION_CONFIG["QUERYING_TEMPLATE_ID_PRD_1111_1111"] = "TPL-964-112"
+    settings.EXTENSION_CONFIG = {
+        "QUERYING_TEMPLATE_ID_PRD_1111_1111":  "TPL-964-112",
+    }
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
         return_value=None,
@@ -493,7 +497,9 @@ def test_fulfill_transfer_order_already_migrated(
     adobe_authorizations_file,
     agreement,
 ):
-    settings.EXTENSION_CONFIG["COMPLETED_TEMPLATE_ID_PRD_1111_1111"] = "TPL-1111"
+    settings.EXTENSION_CONFIG = {
+        "COMPLETED_TEMPLATE_ID_PRD_1111_1111":  "TPL-1111",
+    }
 
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
@@ -606,7 +612,9 @@ def test_fulfill_transfer_order_migration_running(
     adobe_authorizations_file,
     agreement,
 ):
-    settings.EXTENSION_CONFIG["QUERY_TEMPLATE_ID_PRD_1111_1111"] = "TPL-964-112"
+    settings.EXTENSION_CONFIG = {
+        "QUERYING_TEMPLATE_ID_PRD_1111_1111":  "TPL-964-112",
+    }
 
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
