@@ -15,8 +15,10 @@ from adobe_vipm.flows.airtable import (
 def test_airtable_base_info_for_product(settings):
     api_key = "airtable-token"
     base_id = "base-id"
-    settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"] = api_key
-    settings.EXTENSION_CONFIG["AIRTABLE_BASE_PRD_1111"] = base_id
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASE_PRD_1111": base_id,
+    }
 
     base_info = AirTableBaseInfo.for_product("PRD-1111")
 
@@ -39,8 +41,10 @@ def test_get_offer_model():
 
 
 def test_get_offer_ids_by_membership_id(mocker, settings):
-    settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"] = "api_key"
-    settings.EXTENSION_CONFIG["AIRTABLE_BASE_product_id"] = "base_id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASE_product_id": "base_id",
+    }
     mocked_offer_model = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.airtable.get_offer_model",
@@ -60,8 +64,10 @@ def test_get_offer_ids_by_membership_id(mocker, settings):
 
 
 def test_create_offers(mocker, settings):
-    settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"] = "api_key"
-    settings.EXTENSION_CONFIG["AIRTABLE_BASE_product_id"] = "base_id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASE_product_id": "base_id",
+    }
     mocked_offer = mocker.MagicMock()
     mocked_transfer = mocker.MagicMock()
     mocked_offer_model = mocker.MagicMock(return_value=mocked_offer)
@@ -91,8 +97,10 @@ def test_create_offers(mocker, settings):
 
 
 def test_get_transfers_to_process(mocker, settings):
-    settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"] = "api_key"
-    settings.EXTENSION_CONFIG["AIRTABLE_BASE_product_id"] = "base_id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASE_product_id": "base_id",
+    }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.airtable.get_transfer_model",
@@ -111,8 +119,10 @@ def test_get_transfers_to_process(mocker, settings):
 
 
 def test_get_transfers_to_check(mocker, settings):
-    settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"] = "api_key"
-    settings.EXTENSION_CONFIG["AIRTABLE_BASE_product_id"] = "base_id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASE_product_id": "base_id",
+    }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.airtable.get_transfer_model",
@@ -131,8 +141,10 @@ def test_get_transfers_to_check(mocker, settings):
 
 
 def test_get_transfer_by_authorization_membership(mocker, settings):
-    settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"] = "api_key"
-    settings.EXTENSION_CONFIG["AIRTABLE_BASE_product_id"] = "base_id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASE_product_id": "base_id",
+    }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.airtable.get_transfer_model",

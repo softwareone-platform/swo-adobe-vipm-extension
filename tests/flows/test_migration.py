@@ -401,7 +401,7 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
     settings,
     adobe_api_error_factory,
 ):
-    settings.EXTENSION_CONFIG["MIGRATION_RUNNING_MAX_RETRIES"] = 15
+    settings.EXTENSION_CONFIG = {"MIGRATION_RUNNING_MAX_RETRIES": 15}
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.authorization_uk = "auth-uk"
     mocked_transfer.seller_uk = "seller-uk"
