@@ -931,7 +931,7 @@ def jwt_token(settings):
             "exp": exp,
             "webhook_id": "WH-123-123",
         },
-        get_for_product(settings, "WEBHOOK_SECRET", "PRD-1111-1111"),
+        get_for_product(settings, "WEBHOOKS_SECRETS", "PRD-1111-1111"),
         algorithm="HS256",
     )
 

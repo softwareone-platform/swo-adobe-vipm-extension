@@ -31,7 +31,7 @@ def test_upsizing(
     Tests a change order in case of upsizing.
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -299,7 +299,7 @@ def test_downsizing(
         * order completion
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -474,7 +474,7 @@ def test_downsizing_return_order_exists(
     The return order will not be placed again.
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -773,7 +773,7 @@ def test_downsizing_create_new_order_error(
 
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -853,7 +853,7 @@ def test_mixed(
         * subscription actual sku update for existing upsized items
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -1238,7 +1238,7 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
     Only the renewal quantity of the subscription should be updated.
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -1328,7 +1328,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     current quantity is equal to the auto renewal.
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 

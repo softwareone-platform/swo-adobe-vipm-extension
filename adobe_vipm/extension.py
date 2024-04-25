@@ -22,7 +22,7 @@ def jwt_secret_callback(client: MPTClient, claims: Mapping[str, Any]) -> str:
     webhook = get_webhook(client, claims["webhook_id"])
     criterias = {criteria["key"]: criteria["value"] for criteria in webhook["criteria"]}
     product_id = criterias["product.id"]
-    return get_for_product(settings, "WEBHOOK_SECRET", product_id)
+    return get_for_product(settings, "WEBHOOKS_SECRETS", product_id)
 
 
 @ext.events.listener("orders")

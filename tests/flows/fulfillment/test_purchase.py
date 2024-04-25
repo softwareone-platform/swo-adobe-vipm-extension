@@ -50,7 +50,7 @@ def test_no_customer(
     """
 
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -673,7 +673,7 @@ def test_create_customer_account_address_error(
     Test address validation error handling when create a customer account in Adobe.
     """
     settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATE_ID_PRD_1111_1111": "TPL-0000",
+        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
     }
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
@@ -748,7 +748,7 @@ def test_create_customer_account_fields_error(
     Test fields validation error handling when create a customer account in Adobe.
     """
     settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATE_ID_PRD_1111_1111": "TPL-0000",
+        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
     }
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(

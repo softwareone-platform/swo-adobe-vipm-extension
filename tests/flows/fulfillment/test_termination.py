@@ -27,7 +27,7 @@ def test_termination(
         * order completion
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -116,7 +116,7 @@ def test_termination_return_order_pending(
         * order completion
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
@@ -194,7 +194,7 @@ def test_termination_out_window(
         * order completion
     """
     settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-1111",
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
     }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 

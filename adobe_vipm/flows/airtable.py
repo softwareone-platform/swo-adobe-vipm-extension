@@ -4,7 +4,7 @@ from functools import cache
 from django.conf import settings
 from pyairtable.formulas import AND, EQUAL, FIELD, NOT_EQUAL, OR, STR_VALUE
 from pyairtable.orm import Model, fields
-from swo.mpt.extensions.runtime.djapp.conf import to_postfix
+from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 STATUS_INIT = "init"
 STATUS_RUNNING = "running"
@@ -21,9 +21,7 @@ class AirTableBaseInfo:
     def for_product(product_id):
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
-            base_id=settings.EXTENSION_CONFIG[
-                f"AIRTABLE_BASE_{to_postfix(product_id)}"
-            ],
+            base_id=get_for_product(settings, "AIRTABLE_BASES", product_id),
         )
 
 
