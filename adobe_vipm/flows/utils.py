@@ -240,6 +240,24 @@ def set_ordering_parameter_error(order, param_external_id, error):
     return updated_order
 
 
+def reset_ordering_parameters_error(order):
+    """
+    Reset errors for all ordering parameters
+
+    Args:
+        order (dict): The order that contains the parameter.
+
+    Returns:
+        dict: The order updated.
+    """
+    updated_order = copy.deepcopy(order)
+
+    for param in updated_order["parameters"][PARAM_PHASE_ORDERING]:
+        param["error"] = None
+
+    return updated_order
+
+
 def get_order_line(order, line_id):
     """
     Returns an order line object by the line identifier
@@ -476,10 +494,13 @@ def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
 
 
 def is_new_customer(source):
-    return get_ordering_parameter(
-        source,
-        PARAM_AGREEMENT_TYPE,
-    ).get("value") == "New"
+    return (
+        get_ordering_parameter(
+            source,
+            PARAM_AGREEMENT_TYPE,
+        ).get("value")
+        == "New"
+    )
 
 
 def set_parameter_visible(order, param_external_id):

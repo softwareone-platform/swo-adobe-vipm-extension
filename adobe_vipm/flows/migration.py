@@ -123,7 +123,9 @@ def check_running_transfers_for_product(product_id):
     client = get_adobe_client()
 
     transfers_to_check = get_transfers_to_check(product_id)
-    logger.info(f"Found {len(transfers_to_check)} running transfers for product {product_id}")
+    logger.info(
+        f"Found {len(transfers_to_check)} running transfers for product {product_id}"
+    )
     for transfer in transfers_to_check:
         adobe_transfer = None
         try:

@@ -148,5 +148,7 @@ def update_purchase_prices(mpt_client, adobe_client, order):
 
 def update_purchase_prices_for_transfer(mpt_client, order, adobe_object):
     return _update_purchase_prices(
-        mpt_client, order, adobe_object["items"],
+        mpt_client,
+        order,
+        adobe_object["items"],
     )

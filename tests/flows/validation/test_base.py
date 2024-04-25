@@ -1,5 +1,6 @@
 import logging
 
+from adobe_vipm.flows.utils import reset_ordering_parameters_error
 from adobe_vipm.flows.validation.base import validate_order
 
 
@@ -8,6 +9,9 @@ def test_validate_purchase_order(mocker, caplog, order_factory, customer_data):
     order = order_factory()
     m_client = mocker.MagicMock()
 
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+    )
     m_prepare_customer_data = mocker.patch(
         "adobe_vipm.flows.validation.base.prepare_customer_data",
         return_value=(order, customer_data),
@@ -32,7 +36,9 @@ def test_validate_purchase_order(mocker, caplog, order_factory, customer_data):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    m_prepare_customer_data.assert_called_once_with(m_client, order)
+    m_prepare_customer_data.assert_called_once_with(
+        m_client, reset_ordering_parameters_error(order)
+    )
     m_validate_customer_data.assert_called_once_with(order, customer_data)
     m_update_purchase_prices.assert_called_once_with(
         m_client,
@@ -80,6 +86,9 @@ def test_validate_transfer_order(
 
     adobe_preview_transfer = adobe_preview_transfer_factory()
 
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+    )
     m_validate_transfer = mocker.patch(
         "adobe_vipm.flows.validation.base.validate_transfer",
         return_value=(False, order, adobe_preview_transfer),
@@ -104,7 +113,7 @@ def test_validate_transfer_order(
     m_validate_transfer.assert_called_once_with(
         m_client,
         m_adobe_cli,
-        order,
+        reset_ordering_parameters_error(order),
     )
     m_update_purchase_prices.assert_called_once_with(
         m_client,
@@ -125,7 +134,8 @@ def test_validate_transfer_order_no_validate(
     m_client = mocker.MagicMock()
 
     mocker.patch(
-        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+        "adobe_vipm.flows.validation.base.populate_order_info",
+        return_value=reset_ordering_parameters_error(order),
     )
     mocker.patch(
         "adobe_vipm.flows.validation.base.prepare_customer_data",
