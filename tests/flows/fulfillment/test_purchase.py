@@ -716,7 +716,7 @@ def test_create_customer_account_address_error(
             "ordering": ordering_parameters,
             "fulfillment": fulfillment_parameters_factory(),
         },
-        templateId="TPL-0000",
+        template={"id": "TPL-0000"},
     )
     assert updated_order is None
 
@@ -793,7 +793,7 @@ def test_create_customer_account_fields_error(
             "ordering": ordering_parameters,
             "fulfillment": fulfillment_parameters_factory(),
         },
-        templateId="TPL-0000",
+        template={"id": "TPL-0000"},
     )
     assert updated_order is None
 

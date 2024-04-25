@@ -142,12 +142,12 @@ def fail_order(id: str, order: Order):
 @router.post("/commerce/orders/{id}/query")
 def inquire_order(
     id: str,
-    templateId: Annotated[str, Body()],
+    template: Annotated[dict, Body()],
     parameters: Annotated[dict, Body()],
 ):
     order = load_order(id)
     order["parameters"] = parameters
-    order["templateId"] = templateId
+    order["template"] = template
     order["status"] = "querying"
     save_order(order)
     return order
