@@ -61,7 +61,6 @@ def test_update_purchase_price_for_transfer(
     pricelist_items_factory,
     adobe_preview_transfer_factory,
 ):
-
     m_mpt_client = mocker.MagicMock()
     not_for_sale_items = items_factory(external_vendor_id="65304578CA01A12")
     pricelist_items = pricelist_items_factory(unit_purchase_price=7892.11)

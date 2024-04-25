@@ -478,4 +478,4 @@ def test_does_subscription_exist(mpt_client, requests_mocker, total, expected):
         },
     )
 
-    assert does_subscription_exist(mpt_client, "ORD-1234", 'a-sub-id') is expected
+    assert does_subscription_exist(mpt_client, "ORD-1234", "a-sub-id") is expected

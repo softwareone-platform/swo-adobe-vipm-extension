@@ -187,6 +187,7 @@ def test_load_data(
         mock_opener = mocker.mock_open()
         mock_opener.side_effect = mock_files
         return mock_opener
+
     settings.EXTENSION_CONFIG = {
         "ADOBE_CREDENTIALS_FILE": "a-credentials-file.json",
         "ADOBE_AUTHORIZATIONS_FILE": "an-authorization-file.json",
