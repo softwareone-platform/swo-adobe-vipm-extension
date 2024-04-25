@@ -17,7 +17,7 @@ def test_airtable_base_info_for_product(settings):
     base_id = "base-id"
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": api_key,
-        "AIRTABLE_BASE_PRD_1111": base_id,
+        "AIRTABLE_BASES": {"PRD-1111": "base-id"},
     }
 
     base_info = AirTableBaseInfo.for_product("PRD-1111")
@@ -43,7 +43,7 @@ def test_get_offer_model():
 def test_get_offer_ids_by_membership_id(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASE_product_id": "base_id",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
     }
     mocked_offer_model = mocker.MagicMock()
     mocker.patch(
@@ -66,7 +66,7 @@ def test_get_offer_ids_by_membership_id(mocker, settings):
 def test_create_offers(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASE_product_id": "base_id",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
     }
     mocked_offer = mocker.MagicMock()
     mocked_transfer = mocker.MagicMock()
@@ -99,7 +99,7 @@ def test_create_offers(mocker, settings):
 def test_get_transfers_to_process(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASE_product_id": "base_id",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
     }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
@@ -121,7 +121,7 @@ def test_get_transfers_to_process(mocker, settings):
 def test_get_transfers_to_check(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASE_product_id": "base_id",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
     }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
@@ -143,7 +143,7 @@ def test_get_transfers_to_check(mocker, settings):
 def test_get_transfer_by_authorization_membership(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASE_product_id": "base_id",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
     }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(

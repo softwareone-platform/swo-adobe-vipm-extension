@@ -38,27 +38,16 @@ def test_querying_template_not_defined(settings):
     with pytest.raises(ImproperlyConfigured) as e:
         app.ready()
 
-    assert "Please, specify EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111" in str(e.value)
+    assert (
+        "Please, specify it in EXT_QUERYING_TEMPLATES_IDS environment variable."
+        in str(e.value)
+    )
 
 
 def test_completed_template_not_defined(settings):
     settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
     settings.EXTENSION_CONFIG = {
-        "EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111": "TPL-123-123-123"
-    }
-
-    app = apps.get_app_config("adobe_vipm")
-    with pytest.raises(ImproperlyConfigured) as e:
-        app.ready()
-
-    assert "Please, specify EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111" in str(e.value)
-
-
-def test_webhook_secret_not_defined(settings):
-    settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
-    settings.EXTENSION_CONFIG = {
-        "EXT_QUERYING_TEMPLATE_ID_PRD_1111_1111": "TPL-123-123-123",
-        "EXT_COMPLETED_TEMPLATE_ID_PRD_1111_1111": "TPL-321-321-321",
+        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-123-123-123"},
     }
 
     app = apps.get_app_config("adobe_vipm")
@@ -66,6 +55,22 @@ def test_webhook_secret_not_defined(settings):
         app.ready()
 
     assert (
-        "Please, specify EXT_WEBHOOK_SECRET_PRD_1111_1111 environment variable."
+        "Please, specify it in EXT_COMPLETED_TEMPLATES_IDS environment variable."
         in str(e.value)
+    )
+
+
+def test_webhook_secret_not_defined(settings):
+    settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
+    settings.EXTENSION_CONFIG = {
+        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-123-123-123"},
+        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-321-321-321"},
+    }
+
+    app = apps.get_app_config("adobe_vipm")
+    with pytest.raises(ImproperlyConfigured) as e:
+        app.ready()
+
+    assert "Please, specify it in EXT_WEBHOOKS_SECRETS environment variable." in str(
+        e.value
     )

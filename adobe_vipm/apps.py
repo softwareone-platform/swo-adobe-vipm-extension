@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from swo.mpt.extensions.runtime.djapp.apps import DjAppConfig
-from swo.mpt.extensions.runtime.djapp.conf import to_postfix
 
 from .extension import ext
 
@@ -15,26 +14,34 @@ class ExtensionConfig(DjAppConfig):
         error_msgs = []
 
         for product_id in settings.MPT_PRODUCTS_IDS:
-            postfix = to_postfix(product_id)
-
-            if f"QUERYING_TEMPLATE_ID_{postfix}" not in settings.EXTENSION_CONFIG:
+            if (
+                "QUERYING_TEMPLATES_IDS" not in settings.EXTENSION_CONFIG
+                or product_id not in settings.EXTENSION_CONFIG["QUERYING_TEMPLATES_IDS"]
+            ):
                 msg = (
                     f"The querying template id for product {product_id} is not found. "
-                    f"Please, specify EXT_QUERYING_TEMPLATE_ID_{postfix} environment variable."
+                    f"Please, specify it in EXT_QUERYING_TEMPLATES_IDS environment variable."
                 )
                 error_msgs.append(msg)
 
-            if f"COMPLETED_TEMPLATE_ID_{postfix}" not in settings.EXTENSION_CONFIG:
+            if (
+                "COMPLETED_TEMPLATES_IDS" not in settings.EXTENSION_CONFIG
+                or product_id
+                not in settings.EXTENSION_CONFIG["COMPLETED_TEMPLATES_IDS"]
+            ):
                 msg = (
                     f"The completed template id for product {product_id} is not found. "
-                    f"Please, specify EXT_COMPLETED_TEMPLATE_ID_{postfix} environment variable."
+                    f"Please, specify it in EXT_COMPLETED_TEMPLATES_IDS environment variable."
                 )
                 error_msgs.append(msg)
 
-            if f"WEBHOOK_SECRET_{postfix}" not in settings.EXTENSION_CONFIG:
+            if (
+                "WEBHOOKS_SECRETS" not in settings.EXTENSION_CONFIG
+                or product_id not in settings.EXTENSION_CONFIG["WEBHOOKS_SECRETS"]
+            ):
                 msg = (
                     f"The webhook secret for {product_id} is not found. "
-                    f"Please, specify EXT_WEBHOOK_SECRET_{postfix} environment variable."
+                    f"Please, specify it in EXT_WEBHOOKS_SECRETS environment variable."
                 )
                 error_msgs.append(msg)
 

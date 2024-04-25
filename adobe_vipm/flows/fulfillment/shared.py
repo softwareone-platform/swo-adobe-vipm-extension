@@ -124,7 +124,7 @@ def switch_order_to_query(client, order):
         parameters=order["parameters"],
         template={
             "id": get_for_product(
-                settings, "QUERYING_TEMPLATE_ID", order["agreement"]["product"]["id"]
+                settings, "QUERYING_TEMPLATES_IDS", order["agreement"]["product"]["id"]
             )
         },
     )
@@ -295,7 +295,7 @@ def switch_order_to_completed(mpt_client, order):
         mpt_client,
         order["id"],
         get_for_product(
-            settings, "COMPLETED_TEMPLATE_ID", order["agreement"]["product"]["id"]
+            settings, "COMPLETED_TEMPLATES_IDS", order["agreement"]["product"]["id"]
         ),
     )
     logger.info(f'Order {order["id"]} has been completed successfully')
