@@ -122,9 +122,11 @@ def switch_order_to_query(client, order):
         client,
         order["id"],
         parameters=order["parameters"],
-        templateId=get_for_product(
-            settings, "QUERYING_TEMPLATE_ID", order["agreement"]["product"]["id"]
-        ),
+        template={
+            "id": get_for_product(
+                settings, "QUERYING_TEMPLATE_ID", order["agreement"]["product"]["id"]
+            )
+        },
     )
 
 

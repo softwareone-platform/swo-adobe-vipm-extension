@@ -391,7 +391,7 @@ def test_transfer_invalid_membership(
         mocked_mpt_client,
         order["id"],
         parameters=order["parameters"],
-        templateId="TPL-964-112",
+        template={"id": "TPL-964-112"},
     )
 
 
@@ -662,5 +662,5 @@ def test_fulfill_transfer_order_migration_running(
         m_client,
         order["id"],
         parameters=order["parameters"],
-        templateId="TPL-964-112",
+        template={"id": "TPL-964-112"},
     )
