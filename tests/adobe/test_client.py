@@ -1568,3 +1568,73 @@ def test_get_subscriptions(
     assert client.get_subscriptions(authorization_uk, customer_id) == {
         "items": [{"a": "subscription"}]
     }
+
+
+
+def test_get_customer(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    """
+    Tests the retrieval of a customer.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer-id"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}",
+        ),
+        status=200,
+        json={"a": "customer"},
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+        ],
+    )
+
+    assert client.get_customer(authorization_uk, customer_id) == {
+        "a": "customer"
+    }
+
+
+def test_get_customer_not_found(
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
+):
+    """
+    Tests the retrieval of a transfer when it doesn't exist.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer-id"
+
+    client, _, _ = adobe_client_factory()
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}",
+        ),
+        status=404,
+        json=adobe_api_error_factory("404", "Not Found"),
+    )
+
+    with pytest.raises(AdobeError) as cv:
+        client.get_customer(authorization_uk, customer_id)
+
+    assert cv.value.code == "404"

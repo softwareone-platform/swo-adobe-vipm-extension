@@ -150,6 +150,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
     mocked_transfer.seller_uk = "seller-uk"
     mocked_transfer.membership_id = "membership-id"
     mocked_transfer.record_id = "record-id"
+    mocked_transfer.reschedule_count = 0
 
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_process",
@@ -333,8 +334,33 @@ def test_checking_running_transfers_for_product(
         customer_id="customer-id",
     )
 
+    customer = {
+        "companyProfile": {
+            "companyName": "Migrated Company",
+            "preferredLanguage": "en-US",
+            "address": {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": "country",
+                "phoneNumber": "phoneNumber",
+            },
+            "contacts": [
+                {
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "email": "email",
+                    "phoneNumber": "phoneNumber",
+                },
+            ],
+        }
+    }
+
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = customer
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -350,8 +376,126 @@ def test_checking_running_transfers_for_product(
             mocked_transfer.transfer_id,
         )
         mocked_transfer.save.assert_called_once()
+
+        assert (
+            mocked_transfer.customer_company_name
+            == customer["companyProfile"]["companyName"]
+        )
+        assert (
+            mocked_transfer.customer_preferred_language
+            == customer["companyProfile"]["preferredLanguage"]
+        )
+
+        address = customer["companyProfile"]["address"]
+        assert (
+            mocked_transfer.customer_address_address_line_1 == address["addressLine1"]
+        )
+        assert (
+            mocked_transfer.customer_address_address_line_2 == address["addressLine2"]
+        )
+        assert mocked_transfer.customer_address_city == address["city"]
+        assert mocked_transfer.customer_address_region == address["region"]
+        assert mocked_transfer.customer_address_postal_code == address["postalCode"]
+        assert mocked_transfer.customer_address_country == address["country"]
+        assert mocked_transfer.customer_address_phone_number == address["phoneNumber"]
+
+        contact = customer["companyProfile"]["contacts"][0]
+        assert mocked_transfer.customer_contact_first_name == contact["firstName"]
+        assert mocked_transfer.customer_contact_last_name == contact["lastName"]
+        assert mocked_transfer.customer_contact_email == contact["email"]
+        assert mocked_transfer.customer_contact_phone_number == contact["phoneNumber"]
+
         assert mocked_transfer.status == "completed"
         assert mocked_transfer.completed_at == datetime.now()
+
+
+def test_checking_running_transfers_for_product_3yc(
+    mocker,
+    adobe_transfer_factory,
+):
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.status = "running"
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_check",
+        return_value=[mocked_transfer],
+    )
+
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_PROCESSED,
+        customer_id="customer-id",
+    )
+
+    commitment = {
+        "startDate": "2024-01-01",
+        "endDate": "2025-01-01",
+        "status": "COMMITTED",
+        "minimumQuantities": [
+            {
+                "offerType": "LICENSE",
+                "quantity": 10,
+            },
+            {
+                "offerType": "CONSUMABLES",
+                "quantity": 30,
+            },
+        ],
+    }
+
+    customer = {
+        "companyProfile": {
+            "companyName": "Migrated Company",
+            "preferredLanguage": "en-US",
+            "address": {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": "country",
+                "phoneNumber": "phoneNumber",
+            },
+            "contacts": [
+                {
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "email": "email",
+                    "phoneNumber": "phoneNumber",
+                },
+            ],
+        },
+        "benefits": [
+            {
+                "type": "THREE_YEAR_COMMIT",
+                "commitment": commitment,
+            },
+        ],
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = customer
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    check_running_transfers_for_product("product-id")
+
+    assert mocked_transfer.customer_benefits_3yc_start_date == date.fromisoformat(
+        commitment["startDate"]
+    )
+    assert mocked_transfer.customer_benefits_3yc_end_date == date.fromisoformat(
+        commitment["endDate"]
+    )
+    assert mocked_transfer.customer_benefits_3yc_status == commitment["status"]
+    assert mocked_transfer.customer_benefits_3yc_minimum_quantity_license == 10
+    assert mocked_transfer.customer_benefits_3yc_minimum_quantity_consumables == 30
 
 
 def test_checking_running_transfers_for_product_error_retry(
@@ -366,6 +510,7 @@ def test_checking_running_transfers_for_product_error_retry(
     mocked_transfer.transfer_id = "transfer-id"
     mocked_transfer.status = "running"
     mocked_transfer.retry_count = 0
+    mocked_transfer.reschedule_count = 0
 
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
@@ -391,8 +536,58 @@ def test_checking_running_transfers_for_product_error_retry(
 
     mocked_transfer.save.assert_called_once()
     assert mocked_transfer.status == "running"
-    assert mocked_transfer.return_code == error.code
-    assert mocked_transfer.return_description == str(error)
+    assert mocked_transfer.adobe_error_code == error.code
+    assert mocked_transfer.adobe_error_description == str(error)
+    assert mocked_transfer.retry_count == 1
+
+
+def test_checking_running_transfers_for_product_get_customer_error_retry(
+    mocker,
+    adobe_api_error_factory,
+    adobe_transfer_factory,
+):
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.status = "running"
+    mocked_transfer.retry_count = 0
+    mocked_transfer.reschedule_count = 0
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_check",
+        return_value=[mocked_transfer],
+    )
+
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_PROCESSED,
+        customer_id="customer-id",
+    )
+
+    error = AdobeAPIError(
+        adobe_api_error_factory(
+            code="9999",
+            message="Unexpected error",
+        ),
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.side_effect = error
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    check_running_transfers_for_product("product-id")
+
+    mocked_transfer.save.assert_called_once()
+    assert mocked_transfer.status == "running"
+    assert mocked_transfer.adobe_error_code == error.code
+    assert mocked_transfer.adobe_error_description == str(error)
     assert mocked_transfer.retry_count == 1
 
 
@@ -410,6 +605,7 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
     mocked_transfer.transfer_id = "transfer-id"
     mocked_transfer.status = "running"
     mocked_transfer.retry_count = 14
+    mocked_transfer.reschedule_count = 0
 
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
@@ -435,8 +631,8 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
 
     mocked_transfer.save.assert_called_once()
     assert mocked_transfer.status == "failed"
-    assert mocked_transfer.return_code == error.code
-    assert mocked_transfer.return_description == str(error)
+    assert mocked_transfer.adobe_error_code == error.code
+    assert mocked_transfer.adobe_error_description == str(error)
     assert mocked_transfer.retry_count == 15
 
 
@@ -452,6 +648,7 @@ def test_checking_running_transfers_for_product_pending_retry(
     mocked_transfer.transfer_id = "transfer-id"
     mocked_transfer.status = "running"
     mocked_transfer.retry_count = 0
+    mocked_transfer.reschedule_count = 0
 
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
@@ -487,6 +684,7 @@ def test_checking_running_transfers_for_product_unexpected_status(
     mocked_transfer.transfer_id = "transfer-id"
     mocked_transfer.status = "running"
     mocked_transfer.retry_count = 0
+    mocked_transfer.reschedule_count = 0
 
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
@@ -538,4 +736,54 @@ def test_check_running_transfers(mocker, settings):
     )
     assert mocked_check_running_transfers_for_product.mock_calls[1].args == (
         "PRD-2222",
+    )
+
+
+def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_exceeded(
+    mocker,
+    settings,
+    adobe_api_error_factory,
+):
+    settings.EXTENSION_CONFIG = {"MIGRATION_RESCHEDULE_MAX_RETRIES": 15}
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+    mocked_transfer.reschedule_count = 14
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_process",
+        return_value=[mocked_transfer],
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    error = AdobeAPIError(
+        adobe_api_error_factory(
+            code=STATUS_TRANSFER_INELIGIBLE,
+            message="Cannot be transferred",
+            details=["Reason: RETURNABLE_PURCHASE"],
+        ),
+    )
+    mocked_adobe_client.preview_transfer.side_effect = error
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    start_transfers_for_product("product-id")
+
+    mocked_adobe_client.preview_transfer.assert_called_once_with(
+        mocked_transfer.authorization_uk,
+        mocked_transfer.membership_id,
+    )
+
+    mocked_transfer.save.assert_called_once()
+    assert mocked_transfer.adobe_error_code == STATUS_TRANSFER_INELIGIBLE
+    assert mocked_transfer.adobe_error_description == str(error)
+    assert mocked_transfer.status == "failed"
+    assert mocked_transfer.reschedule_count == 15
+    assert mocked_transfer.migration_error_description == (
+        "Max reschedules (15) exceeded."
     )
