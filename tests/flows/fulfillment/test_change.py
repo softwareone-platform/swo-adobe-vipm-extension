@@ -1164,6 +1164,7 @@ def test_mixed(
                 },
             ],
             "startDate": adobe_new_sub["creationDate"],
+            "commitmentDate": adobe_new_sub["renewalDate"],
         },
     )
 
