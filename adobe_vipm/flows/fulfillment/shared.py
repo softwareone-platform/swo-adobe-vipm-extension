@@ -349,6 +349,7 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
                 },
             ],
             "startDate": adobe_subscription["creationDate"],
+            "commitmentDate": adobe_subscription["renewalDate"],
         }
         subscription = create_subscription(mpt_client, order["id"], subscription)
         logger.info(

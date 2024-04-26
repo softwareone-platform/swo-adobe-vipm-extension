@@ -202,6 +202,7 @@ def test_no_customer(
                 },
             ],
             "startDate": adobe_subscription["creationDate"],
+            "commitmentDate": adobe_subscription["renewalDate"],
         },
     )
     mocked_complete_order.assert_called_once_with(

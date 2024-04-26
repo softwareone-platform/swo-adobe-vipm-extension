@@ -802,6 +802,7 @@ def adobe_subscription_factory():
                 "renewalQuantity": renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
+            "renewalDate": "2020-05-20",
             "status": "1000",
         }
 
