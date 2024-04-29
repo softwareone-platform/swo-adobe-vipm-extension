@@ -1,6 +1,7 @@
 import pytest
 
 from adobe_vipm.flows.constants import (
+    ERR_3YC_QUANTITIES,
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
@@ -17,6 +18,8 @@ from adobe_vipm.flows.constants import (
     ERR_POSTAL_CODE_LENGTH,
     ERR_PREFERRED_LANGUAGE,
     ERR_STATE_OR_PROVINCE,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -24,6 +27,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
 from adobe_vipm.flows.validation.purchase import (
+    validate_3yc,
     validate_address,
     validate_company_name,
     validate_contact,
@@ -529,6 +533,7 @@ def test_validate_customer_data(mocker):
         "validate_preferred_language",
         "validate_address",
         "validate_contact",
+        "validate_3yc",
     ):
         order_mock = mocker.MagicMock()
         order_mocks.append(order_mock)
@@ -555,6 +560,7 @@ def test_validate_customer_data(mocker):
         "validate_preferred_language",
         "validate_address",
         "validate_contact",
+        "validate_3yc",
     ],
 )
 def test_validate_customer_data_invalid(mocker, no_validating_fn):
@@ -567,6 +573,7 @@ def test_validate_customer_data_invalid(mocker, no_validating_fn):
         "validate_preferred_language",
         "validate_address",
         "validate_contact",
+        "validate_3yc",
     ):
         mocker.patch(
             f"adobe_vipm.flows.validation.purchase.{fnname}",
@@ -576,3 +583,72 @@ def test_validate_customer_data_invalid(mocker, no_validating_fn):
     has_errors, _ = validate_customer_data(mocker.MagicMock(), mocker.MagicMock())
 
     assert has_errors is True
+
+
+@pytest.mark.parametrize(
+    "quantities",
+    [
+        {"p3yc_licenses": "3"},
+        {"p3yc_consumables": "25"},
+        {"p3yc_licenses": "13", "p3yc_consumables": "23"},
+    ],
+)
+def test_validate_3yc(order_factory, order_parameters_factory, quantities):
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            p3yc=["Yes"],
+            **quantities,
+        ),
+    )
+    customer_data = get_customer_data(order)
+
+    has_error, order = validate_3yc(order, customer_data)
+
+    assert has_error is False
+
+    for param_name in (PARAM_3YC_LICENSES, PARAM_3YC_CONSUMABLES):
+        param = get_ordering_parameter(order, param_name)
+        assert "error" not in param
+
+
+@pytest.mark.parametrize(
+    ("param_name", "factory_field"),
+    [
+        (PARAM_3YC_LICENSES, "p3yc_licenses"),
+        (PARAM_3YC_CONSUMABLES, "p3yc_consumables"),
+    ],
+)
+@pytest.mark.parametrize("quantity", ["a", "-3"])
+def test_validate_3yc_invalid(
+    order_factory, order_parameters_factory, param_name, factory_field, quantity
+):
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            p3yc=["Yes"],
+            **{factory_field: quantity},
+        ),
+    )
+    customer_data = get_customer_data(order)
+
+    has_error, order = validate_3yc(order, customer_data)
+
+    assert has_error is True
+
+    param = get_ordering_parameter(
+        order,
+        param_name,
+    )
+    assert param["error"] == ERR_3YC_QUANTITIES.to_dict(
+        title=param["name"],
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["optional"] is False
+
+
+def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
+    order = order_factory(order_parameters=order_parameters_factory())
+    customer_data = get_customer_data(order)
+
+    has_error, order = validate_3yc(order, customer_data)
+
+    assert has_error is False

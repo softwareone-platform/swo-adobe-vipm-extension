@@ -17,6 +17,7 @@ from adobe_vipm.adobe.validation import (
     is_valid_state_or_province,
 )
 from adobe_vipm.flows.constants import (
+    ERR_3YC_QUANTITIES,
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
@@ -33,6 +34,9 @@ from adobe_vipm.flows.constants import (
     ERR_POSTAL_CODE_LENGTH,
     ERR_PREFERRED_LANGUAGE,
     ERR_STATE_OR_PROVINCE,
+    PARAM_3YC,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -44,6 +48,36 @@ from adobe_vipm.flows.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def validate_3yc(order, customer_data):
+    p3yc = customer_data[PARAM_3YC]
+
+    if p3yc != ["Yes"]:
+        return False, order
+
+    errors = False
+
+    for param_name in (PARAM_3YC_LICENSES, PARAM_3YC_CONSUMABLES):
+        param = get_ordering_parameter(order, param_name)
+        p3yc_qty = customer_data[param_name]
+
+        if customer_data[param_name]:
+            p3yc_qty = -1
+            try:
+                p3yc_qty = int(customer_data[param_name])
+            except ValueError:
+                pass
+
+            if p3yc_qty < 1:
+                errors = True
+                order = set_ordering_parameter_error(
+                    order,
+                    param_name,
+                    ERR_3YC_QUANTITIES.to_dict(title=param["name"]),
+                )
+
+    return errors, order
 
 
 def validate_company_name(order, customer_data):
@@ -170,6 +204,9 @@ def validate_customer_data(order, customer_data):
     has_errors = has_errors or has_error
 
     has_error, order = validate_contact(order, customer_data)
+    has_errors = has_errors or has_error
+
+    has_error, order = validate_3yc(order, customer_data)
     has_errors = has_errors or has_error
 
     return has_errors, order

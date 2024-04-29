@@ -25,6 +25,12 @@ PARAM_MEMBERSHIP_ID = "membershipId"
 PARAM_PREFERRED_LANGUAGE = "preferredLanguage"
 PARAM_RETRY_COUNT = "retryCount"
 PARAM_AGREEMENT_TYPE = "agreementType"
+PARAM_3YC = "3YC"
+PARAM_3YC_LICENSES = "3YCLicenses"
+PARAM_3YC_CONSUMABLES = "3YCConsumables"
+PARAM_3YC_ENROLL_STATUS = "3YCEnrollStatus"
+
+OPTIONAL_CUSTOMER_ORDER_PARAMS = (PARAM_3YC, PARAM_3YC_CONSUMABLES, PARAM_3YC_LICENSES)
 
 PARAM_PHASE_ORDERING = "ordering"
 PARAM_PHASE_FULFILLMENT = "fulfillment"
@@ -106,4 +112,9 @@ ERR_PHONE_NUMBER_LENGTH = (
 ERR_VIPM_UNHANDLED_EXCEPTION = ValidationError(
     "VIPM001",
     "Order can't be processed. Failure reason: {error}",
+)
+
+ERR_3YC_QUANTITIES = ValidationError(
+    "VIPMV006",
+    "The `{title}` must be an integer number greater then zero.",
 )

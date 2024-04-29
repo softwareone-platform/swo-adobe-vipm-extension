@@ -1,3 +1,4 @@
+import copy
 import json
 from datetime import datetime, timedelta
 from hashlib import sha256
@@ -207,7 +208,7 @@ def test_create_customer_account(
     customer_id = client.create_customer_account(
         authorization_uk, seller_id, "external_id", customer_data
     )
-    assert customer_id == "A-customer-id"
+    assert customer_id == {'customerId': 'A-customer-id'}
 
 
 def test_create_customer_account_bad_request(
@@ -1638,3 +1639,137 @@ def test_get_customer_not_found(
         client.get_customer(authorization_uk, customer_id)
 
     assert cv.value.code == "404"
+
+
+@pytest.mark.parametrize(
+    ("quantities", "expected"),
+    [
+        (
+            {"3YCLicenses": "12"},
+            [
+                {
+                    "offerType": "LICENSE",
+                    "quantity": 12,
+                },
+            ]
+        ),
+        (
+            {"3YCConsumables": "500"},
+            [
+                {
+                    "offerType": "CONSUMABLES",
+                    "quantity": 500,
+                },
+            ]
+        ),
+        (
+            {
+                "3YCLicenses": "9",
+                "3YCConsumables": "1220",
+            },
+            [
+                {
+                    "offerType": "LICENSE",
+                    "quantity": 9,
+                },
+                {
+                    "offerType": "CONSUMABLES",
+                    "quantity": 1220,
+                },
+            ],
+        ),
+    ]
+)
+def test_create_customer_account_3yc(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_authorizations_file,
+    customer_data,
+    adobe_client_factory,
+    quantities,
+    expected,
+):
+    """
+    Test the call to Adobe API to create a customer.
+    """
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
+        "seller_id"
+    ]
+    reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+
+    client, authorization, api_token = adobe_client_factory()
+
+    modified_customer = copy.copy(customer_data)
+
+    company_name = f"{modified_customer['companyName']} (external_id)"
+    modified_customer["3YC"] = ["Yes"]
+    modified_customer.update(quantities)
+
+    payload = {
+        "resellerId": reseller_id,
+        "externalReferenceId": "external_id",
+        "companyProfile": {
+            "companyName": company_name,
+            "preferredLanguage": modified_customer["preferredLanguage"],
+            "address": {
+                "country": modified_customer["address"]["country"],
+                "region": modified_customer["address"]["state"],
+                "city": modified_customer["address"]["city"],
+                "addressLine1": modified_customer["address"]["addressLine1"],
+                "addressLine2": modified_customer["address"]["addressLine2"],
+                "postalCode": modified_customer["address"]["postalCode"],
+                "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
+            },
+            "contacts": [
+                {
+                    "firstName": modified_customer["contact"]["firstName"],
+                    "lastName": modified_customer["contact"]["lastName"],
+                    "email": modified_customer["contact"]["email"],
+                    "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
+                }
+            ],
+        },
+        "benefits": [
+            {
+                "type": "THREE_YEAR_COMMIT",
+                "commitmentRequest": {
+                    "minimumQuantities": expected,
+                },
+            },
+        ]
+    }
+
+    correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+    requests_mocker.post(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers"),
+        status=201,
+        json={
+            "customerId": "A-customer-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": correlation_id,
+                },
+            ),
+            matchers.json_params_matcher(payload),
+        ],
+    )
+
+    customer_id = client.create_customer_account(
+        authorization_uk, seller_id, "external_id", modified_customer
+    )
+    assert customer_id == {'customerId': 'A-customer-id'}

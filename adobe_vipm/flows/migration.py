@@ -10,13 +10,13 @@ from adobe_vipm.adobe.constants import (
     STATUS_TRANSFER_ALREADY_TRANSFERRED,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
     create_offers,
     get_offer_ids_by_membership_id,
     get_transfers_to_check,
     get_transfers_to_process,
 )
-from adobe_vipm.utils import find_first
 
 RECOVERABLE_TRANSFER_ERRORS = (
     "RETURNABLE_PURCHASE",
@@ -47,15 +47,10 @@ def fill_customer_data(transfer, customer):
     transfer.customer_contact_email = contact["email"]
     transfer.customer_contact_phone_number = contact["phoneNumber"]
 
-    benefit_3yc = find_first(
-        lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
-        customer.get("benefits", []),
-    )
-
-    if not benefit_3yc:
+    commitment = get_3yc_commitment(customer)
+    if not commitment:
         return transfer
 
-    commitment = benefit_3yc["commitment"]
     transfer.customer_benefits_3yc_start_date = date.fromisoformat(commitment["startDate"])
     transfer.customer_benefits_3yc_end_date = date.fromisoformat(commitment["endDate"])
     transfer.customer_benefits_3yc_status = commitment["status"]

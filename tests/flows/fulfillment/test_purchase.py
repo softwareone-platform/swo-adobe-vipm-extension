@@ -553,7 +553,9 @@ def test_create_customer_account(
     Customer data is available as ordering parameters.
     """
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_customer_account.return_value = "adobe-customer-id"
+    mocked_adobe_client.create_customer_account.return_value = {
+        "customerId": "adobe-customer-id",
+    }
     mocked_mpt_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
@@ -605,7 +607,9 @@ def test_create_customer_account_empty_order_parameters(
     Customer data must be taken getting the buyer associated with the order.
     """
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_customer_account.return_value = "adobe-customer-id"
+    mocked_adobe_client.create_customer_account.return_value = {
+        "customerId": "adobe-customer-id",
+    }
     mocked_mpt_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
@@ -836,3 +840,83 @@ def test_create_customer_account_other_error(
         str(adobe_error),
     )
     assert updated_order is None
+
+
+def test_create_customer_account_3yc(
+    mocker,
+    order_factory,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+):
+    """
+    Test create a customer account in Adobe with 3YC.
+    Customer data is available as ordering parameters.
+    """
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_customer_account.return_value = {
+        "customerId": "adobe-customer-id",
+        "benefits": [
+            {
+                "type": "THREE_YEAR_COMMIT",
+                "commitment": {
+                    "status": "REQUESTED",
+                },
+            },
+        ],
+    }
+
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            p3yc=["Yes"],
+            p3yc_licenses=10,
+        ),
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        order,
+    )
+
+    mocked_adobe_client.create_customer_account.assert_called_once_with(
+        order["authorization"]["id"],
+        order["agreement"]["seller"]["id"],
+        order["agreement"]["id"],
+        {
+            param["externalId"]: param["value"]
+            for param in order_parameters_factory(p3yc=["Yes"], p3yc_licenses=10)
+            if param["externalId"] not in (PARAM_MEMBERSHIP_ID, PARAM_AGREEMENT_TYPE)
+        },
+    )
+
+    mocked_update_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": order_parameters_factory(p3yc=["Yes"], p3yc_licenses=10),
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="adobe-customer-id",
+                p3yc_enroll_status="REQUESTED",
+            ),
+        },
+    )
+
+    assert updated_order == order_factory(
+        order_parameters=order_parameters_factory(
+            p3yc=["Yes"],
+            p3yc_licenses=10,
+        ),
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="adobe-customer-id",
+            p3yc_enroll_status="REQUESTED",
+        )
+    )

@@ -2,6 +2,9 @@ import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows.constants import (
+    PARAM_3YC,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -30,6 +33,9 @@ NEW_CUSTOMER_PARAMETERS = (
     PARAM_PREFERRED_LANGUAGE,
     PARAM_ADDRESS,
     PARAM_CONTACT,
+    PARAM_3YC,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
 )
 
 logger = logging.getLogger(__name__)
