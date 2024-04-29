@@ -10,6 +10,8 @@ from adobe_vipm.adobe.validation import (
     is_valid_country,
     is_valid_email,
     is_valid_first_last_name,
+    is_valid_minimum_consumables,
+    is_valid_minimum_licenses,
     is_valid_phone_number_length,
     is_valid_postal_code,
     is_valid_postal_code_length,
@@ -17,7 +19,9 @@ from adobe_vipm.adobe.validation import (
     is_valid_state_or_province,
 )
 from adobe_vipm.flows.constants import (
-    ERR_3YC_QUANTITIES,
+    ERR_3YC_NO_MINIMUMS,
+    ERR_3YC_QUANTITY_CONSUMABLES,
+    ERR_3YC_QUANTITY_LICENSES,
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
@@ -44,6 +48,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
+    set_order_error,
     set_ordering_parameter_error,
 )
 
@@ -58,24 +63,38 @@ def validate_3yc(order, customer_data):
 
     errors = False
 
-    for param_name in (PARAM_3YC_LICENSES, PARAM_3YC_CONSUMABLES):
+    for param_name, validator, error in (
+        (
+            PARAM_3YC_CONSUMABLES,
+            is_valid_minimum_consumables,
+            ERR_3YC_QUANTITY_CONSUMABLES,
+        ),
+        (PARAM_3YC_LICENSES, is_valid_minimum_licenses, ERR_3YC_QUANTITY_LICENSES),
+    ):
         param = get_ordering_parameter(order, param_name)
-        p3yc_qty = customer_data[param_name]
 
-        if customer_data[param_name]:
-            p3yc_qty = -1
-            try:
-                p3yc_qty = int(customer_data[param_name])
-            except ValueError:
-                pass
+        if not validator(customer_data[param_name]):
+            errors = True
+            order = set_ordering_parameter_error(
+                order,
+                param_name,
+                error.to_dict(title=param["name"]),
+                optional=True,
+            )
 
-            if p3yc_qty < 1:
-                errors = True
-                order = set_ordering_parameter_error(
-                    order,
-                    param_name,
-                    ERR_3YC_QUANTITIES.to_dict(title=param["name"]),
-                )
+    if not errors and not (
+        customer_data[PARAM_3YC_LICENSES] or customer_data[PARAM_3YC_CONSUMABLES]
+    ):
+        errors = True
+        param_licenses = get_ordering_parameter(order, PARAM_3YC_LICENSES)
+        param_consumables = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
+        order = set_order_error(
+            order,
+            ERR_3YC_NO_MINIMUMS.to_dict(
+                title_min_licenses=param_licenses["name"],
+                title_min_consumables=param_consumables["name"],
+            ),
+        )
 
     return errors, order
 

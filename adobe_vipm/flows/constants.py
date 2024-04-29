@@ -6,6 +6,8 @@ from adobe_vipm.adobe.constants import (
     MAXLEN_PHONE_NUMBER,
     MAXLEN_POSTAL_CODE,
     MINLEN_COMPANY_NAME,
+    MINQTY_CONSUMABLES,
+    MINQTY_LICENSES,
 )
 from adobe_vipm.flows.errors import ValidationError
 
@@ -114,7 +116,20 @@ ERR_VIPM_UNHANDLED_EXCEPTION = ValidationError(
     "Order can't be processed. Failure reason: {error}",
 )
 
-ERR_3YC_QUANTITIES = ValidationError(
+ERR_3YC_QUANTITY_LICENSES = ValidationError(
     "VIPMV006",
-    "The `{title}` must be an integer number greater then zero.",
+    "The `{title}` must be an integer "
+    f"number equal to {MINQTY_LICENSES} or greater.",
+)
+
+ERR_3YC_QUANTITY_CONSUMABLES = ValidationError(
+    "VIPMV007",
+    "The `{title}` must be an integer "
+    f"number equal to {MINQTY_CONSUMABLES} or greater.",
+)
+
+ERR_3YC_NO_MINIMUMS = ValidationError(
+    "VIPMV008",
+    "To request 3-year commitment benefits you must fill at least one parameter between "
+    "`{title_min_licenses}` and `{title_min_consumables}`."
 )

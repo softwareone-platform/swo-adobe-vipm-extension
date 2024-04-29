@@ -21,6 +21,7 @@ from adobe_vipm.flows.utils import (
     is_new_customer,
     is_purchase_order,
     is_transfer_order,
+    reset_order_error,
     reset_ordering_parameters_error,
     set_parameter_hidden,
     set_parameter_visible,
@@ -58,6 +59,8 @@ def validate_order(mpt_client, order):
     order = populate_order_info(mpt_client, order)
     has_errors = False
     order = reset_ordering_parameters_error(order)
+    order = reset_order_error(order)
+
     if is_purchase_order(order):
         order, customer_data = prepare_customer_data(mpt_client, order)
         has_errors, order = validate_customer_data(order, customer_data)

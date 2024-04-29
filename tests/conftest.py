@@ -737,6 +737,7 @@ def order_factory(
                 "fulfillment": fulfillment_parameters,
                 "ordering": order_parameters,
             },
+            "error": {},
             "audit": {
                 "created": {
                     "at": "2023-12-14T18:02:16.9359",

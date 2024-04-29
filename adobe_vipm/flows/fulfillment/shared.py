@@ -121,15 +121,21 @@ def switch_order_to_query(client, order):
         None
     """
     order = reset_retry_count(order)
-    query_order(
-        client,
-        order["id"],
-        parameters=order["parameters"],
-        template={
+    kwargs = {
+        "parameters": order["parameters"],
+        "template": {
             "id": get_for_product(
                 settings, "QUERYING_TEMPLATES_IDS", order["agreement"]["product"]["id"]
             )
         },
+    }
+    if order.get("error"):
+        kwargs["error"] = order["error"]
+
+    query_order(
+        client,
+        order["id"],
+        **kwargs,
     )
 
 

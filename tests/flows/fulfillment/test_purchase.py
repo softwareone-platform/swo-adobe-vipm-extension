@@ -9,22 +9,28 @@ from adobe_vipm.adobe.constants import (
     STATUS_ACCOUNT_ALREADY_EXISTS,
     STATUS_INVALID_ADDRESS,
     STATUS_INVALID_FIELDS,
+    STATUS_INVALID_MINIMUM_QUANTITY,
     STATUS_PENDING,
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.flows.constants import (
+    ERR_3YC_NO_MINIMUMS,
+    ERR_3YC_QUANTITY_CONSUMABLES,
+    ERR_3YC_QUANTITY_LICENSES,
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_ADOBE_PREFERRED_LANGUAGE,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
     PARAM_AGREEMENT_TYPE,
     PARAM_MEMBERSHIP_ID,
 )
 from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.fulfillment.purchase import create_customer_account
-from adobe_vipm.flows.utils import set_adobe_customer_id
+from adobe_vipm.flows.utils import get_ordering_parameter, set_adobe_customer_id
 
 
 def test_no_customer(
@@ -918,5 +924,124 @@ def test_create_customer_account_3yc(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="adobe-customer-id",
             p3yc_enroll_status="REQUESTED",
-        )
+        ),
     )
+
+
+def test_create_customer_account_3yc_minimum_error(
+    mocker,
+    order,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_api_error_factory,
+    settings,
+):
+    settings.EXTENSION_CONFIG = {
+        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
+    }
+    mocked_adobe_client = mocker.MagicMock()
+    adobe_error = AdobeAPIError(
+        adobe_api_error_factory(
+            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            message="Minimum quantity out of range",
+            details=["LICENSE", "CONSUMABLES"],
+        ),
+    )
+    mocked_adobe_client.create_customer_account.side_effect = adobe_error
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_query_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.query_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        order,
+    )
+
+    ordering_parameters = order_parameters_factory()
+    consumables_param = next(
+        filter(lambda x: x["externalId"] == PARAM_3YC_CONSUMABLES, ordering_parameters)
+    )
+    consumables_param["error"] = ERR_3YC_QUANTITY_CONSUMABLES.to_dict(
+        title=consumables_param["name"],
+    )
+    consumables_param["constraints"] = {
+        "hidden": False,
+        "optional": True,
+    }
+    licenses_param = next(
+        filter(lambda x: x["externalId"] == PARAM_3YC_LICENSES, ordering_parameters)
+    )
+    licenses_param["error"] = ERR_3YC_QUANTITY_LICENSES.to_dict(
+        title=licenses_param["name"],
+    )
+    licenses_param["constraints"] = {
+        "hidden": False,
+        "optional": True,
+    }
+
+    mocked_query_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": ordering_parameters,
+            "fulfillment": fulfillment_parameters_factory(),
+        },
+        template={"id": "TPL-0000"},
+    )
+    assert updated_order is None
+
+
+def test_create_customer_account_3yc_empty_minimums(
+    mocker,
+    order,
+    adobe_api_error_factory,
+    settings,
+):
+    settings.EXTENSION_CONFIG = {
+        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
+    }
+    mocked_adobe_client = mocker.MagicMock()
+    adobe_error = AdobeAPIError(
+        adobe_api_error_factory(
+            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            message="Minimum quantity out of range",
+            details=[],
+        ),
+    )
+    mocked_adobe_client.create_customer_account.side_effect = adobe_error
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_query_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.query_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        order,
+    )
+
+
+    param_licenses = get_ordering_parameter(order, PARAM_3YC_LICENSES)
+    param_consumables = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
+
+    mocked_query_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        error=ERR_3YC_NO_MINIMUMS.to_dict(
+            title_min_licenses=param_licenses["name"],
+            title_min_consumables=param_consumables["name"],
+        ),
+        parameters=order["parameters"],
+        template={"id": "TPL-0000"},
+    )
+    assert updated_order is None
