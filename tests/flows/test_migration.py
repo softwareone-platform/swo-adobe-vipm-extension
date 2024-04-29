@@ -319,14 +319,20 @@ def test_checking_running_transfers_for_product(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.authorization_uk = "auth-uk"
     mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.nav_cco = "nav-cco"
     mocked_transfer.membership_id = "membership-id"
     mocked_transfer.record_id = "record-id"
     mocked_transfer.transfer_id = "transfer-id"
     mocked_transfer.status = "running"
+    mocked_transfer.nav_error = None
 
     mocked_get_transfer_to_check = mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
         return_value=[mocked_transfer],
+    )
+    mocked_terminate_contract = mocker.patch(
+        "adobe_vipm.flows.migration.terminate_contract",
+        return_value=(True, b""),
     )
 
     adobe_transfer = adobe_transfer_factory(
@@ -405,6 +411,10 @@ def test_checking_running_transfers_for_product(
         assert mocked_transfer.customer_contact_email == contact["email"]
         assert mocked_transfer.customer_contact_phone_number == contact["phoneNumber"]
 
+        mocked_terminate_contract.assert_called_once_with("nav-cco")
+        assert mocked_transfer.nav_terminated is True
+        assert mocked_transfer.nav_error is None
+
         assert mocked_transfer.status == "completed"
         assert mocked_transfer.completed_at == datetime.now()
 
@@ -420,7 +430,10 @@ def test_checking_running_transfers_for_product_3yc(
     mocked_transfer.record_id = "record-id"
     mocked_transfer.transfer_id = "transfer-id"
     mocked_transfer.status = "running"
-
+    mocker.patch(
+        "adobe_vipm.flows.migration.terminate_contract",
+        return_value=(True, ""),
+    )
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
         return_value=[mocked_transfer],
@@ -787,3 +800,74 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
     assert mocked_transfer.migration_error_description == (
         "Max reschedules (15) exceeded."
     )
+
+
+def test_checking_running_transfers_for_product_terminate_contract_error(
+    mocker,
+    adobe_transfer_factory,
+):
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.nav_cco = "nav-cco"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.status = "running"
+    mocked_transfer.nav_error = None
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_check",
+        return_value=[mocked_transfer],
+    )
+    mocked_terminate_contract = mocker.patch(
+        "adobe_vipm.flows.migration.terminate_contract",
+        return_value=(False, "internal server error"),
+    )
+
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_PROCESSED,
+        customer_id="customer-id",
+    )
+
+    customer = {
+        "companyProfile": {
+            "companyName": "Migrated Company",
+            "preferredLanguage": "en-US",
+            "address": {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": "country",
+                "phoneNumber": "phoneNumber",
+            },
+            "contacts": [
+                {
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "email": "email",
+                    "phoneNumber": "phoneNumber",
+                },
+            ],
+        }
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = customer
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    with freeze_time("2024-01-01 12:00:00"):
+        check_running_transfers_for_product("product-id")
+
+        mocked_terminate_contract.assert_called_once_with("nav-cco")
+        assert mocked_transfer.nav_terminated is False
+        assert mocked_transfer.nav_error == "internal server error"
+
+        assert mocked_transfer.status == "completed"
+        assert mocked_transfer.completed_at == datetime.now()
