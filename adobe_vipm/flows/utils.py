@@ -223,7 +223,7 @@ def set_customer_data(order, customer_data):
     return updated_order
 
 
-def set_ordering_parameter_error(order, param_external_id, error):
+def set_ordering_parameter_error(order, param_external_id, error, optional=False):
     """
     Set a validation error on an ordering parameter.
 
@@ -243,7 +243,7 @@ def set_ordering_parameter_error(order, param_external_id, error):
     param["error"] = error
     param["constraints"] = {
         "hidden": False,
-        "optional": False,
+        "optional": optional,
     }
     return updated_order
 
@@ -544,4 +544,16 @@ def set_adobe_3yc_enroll_status(order, enroll_status):
         PARAM_3YC_ENROLL_STATUS,
     )
     customer_ff_param["value"] = enroll_status
+    return updated_order
+
+
+def set_order_error(order, error):
+    updated_order = copy.deepcopy(order)
+    updated_order["error"] = error
+    return updated_order
+
+
+def reset_order_error(order):
+    updated_order = copy.deepcopy(order)
+    updated_order["error"] = {}
     return updated_order

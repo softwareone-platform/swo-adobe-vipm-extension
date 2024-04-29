@@ -15,7 +15,10 @@ def get_extension_variables():
     variables = {}
     for var in filter(lambda x: x[0].startswith("EXT_"), os.environ.items()):
         if var[0] in JSON_EXT_VARIABLES:
-            value = json.loads(var[1])
+            try:
+                value = json.loads(var[1])
+            except json.JSONDecodeError:
+                raise Exception(f"Variable {var[0]} not well formatted")
         else:
             value = var[1]
 

@@ -7,15 +7,24 @@ processing.
 import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import STATUS_INVALID_ADDRESS, STATUS_INVALID_FIELDS
+from adobe_vipm.adobe.constants import (
+    STATUS_INVALID_ADDRESS,
+    STATUS_INVALID_FIELDS,
+    STATUS_INVALID_MINIMUM_QUANTITY,
+)
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.constants import (
+    ERR_3YC_NO_MINIMUMS,
+    ERR_3YC_QUANTITY_CONSUMABLES,
+    ERR_3YC_QUANTITY_LICENSES,
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_ADOBE_PREFERRED_LANGUAGE,
     ITEM_TYPE_ORDER_LINE,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -36,6 +45,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
     get_ordering_parameter,
+    set_order_error,
     set_ordering_parameter_error,
 )
 
@@ -57,7 +67,11 @@ def _handle_customer_error(client, order, error):
     Returns:
         None
     """
-    if error.code not in (STATUS_INVALID_ADDRESS, STATUS_INVALID_FIELDS):
+    if error.code not in (
+        STATUS_INVALID_ADDRESS,
+        STATUS_INVALID_FIELDS,
+        STATUS_INVALID_MINIMUM_QUANTITY,
+    ):
         switch_order_to_failed(client, order, str(error))
         return
     if error.code == STATUS_INVALID_ADDRESS:
@@ -67,6 +81,33 @@ def _handle_customer_error(client, order, error):
             PARAM_ADDRESS,
             ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
         )
+    elif error.code == STATUS_INVALID_MINIMUM_QUANTITY:
+        if "LICENSE" in str(error):
+            param = get_ordering_parameter(order, PARAM_3YC_LICENSES)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_3YC_LICENSES,
+                ERR_3YC_QUANTITY_LICENSES.to_dict(title=param["name"]),
+                optional=True,
+            )
+        if "CONSUMABLES" in str(error):
+            param = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_3YC_CONSUMABLES,
+                ERR_3YC_QUANTITY_CONSUMABLES.to_dict(title=param["name"]),
+                optional=True,
+            )
+        if not error.details:
+            param_licenses = get_ordering_parameter(order, PARAM_3YC_LICENSES)
+            param_consumables = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
+            order = set_order_error(
+                order,
+                ERR_3YC_NO_MINIMUMS.to_dict(
+                    title_min_licenses=param_licenses["name"],
+                    title_min_consumables=param_consumables["name"],
+                ),
+            )
     else:
         if "companyProfile.companyName" in error.details:
             param = get_ordering_parameter(order, PARAM_COMPANY_NAME)

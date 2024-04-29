@@ -1,7 +1,8 @@
 import pytest
 
 from adobe_vipm.flows.constants import (
-    ERR_3YC_QUANTITIES,
+    ERR_3YC_QUANTITY_CONSUMABLES,
+    ERR_3YC_QUANTITY_LICENSES,
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
@@ -588,9 +589,9 @@ def test_validate_customer_data_invalid(mocker, no_validating_fn):
 @pytest.mark.parametrize(
     "quantities",
     [
-        {"p3yc_licenses": "3"},
-        {"p3yc_consumables": "25"},
-        {"p3yc_licenses": "13", "p3yc_consumables": "23"},
+        {"p3yc_licenses": "11"},
+        {"p3yc_consumables": "1213"},
+        {"p3yc_licenses": "13", "p3yc_consumables": "2300"},
     ],
 )
 def test_validate_3yc(order_factory, order_parameters_factory, quantities):
@@ -612,15 +613,15 @@ def test_validate_3yc(order_factory, order_parameters_factory, quantities):
 
 
 @pytest.mark.parametrize(
-    ("param_name", "factory_field"),
+    ("param_name", "factory_field", "error"),
     [
-        (PARAM_3YC_LICENSES, "p3yc_licenses"),
-        (PARAM_3YC_CONSUMABLES, "p3yc_consumables"),
+        (PARAM_3YC_LICENSES, "p3yc_licenses", ERR_3YC_QUANTITY_LICENSES),
+        (PARAM_3YC_CONSUMABLES, "p3yc_consumables", ERR_3YC_QUANTITY_CONSUMABLES),
     ],
 )
 @pytest.mark.parametrize("quantity", ["a", "-3"])
 def test_validate_3yc_invalid(
-    order_factory, order_parameters_factory, param_name, factory_field, quantity
+    order_factory, order_parameters_factory, param_name, factory_field, quantity, error
 ):
     order = order_factory(
         order_parameters=order_parameters_factory(
@@ -638,11 +639,11 @@ def test_validate_3yc_invalid(
         order,
         param_name,
     )
-    assert param["error"] == ERR_3YC_QUANTITIES.to_dict(
+    assert param["error"] == error.to_dict(
         title=param["name"],
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["optional"] is True
 
 
 def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
@@ -652,3 +653,13 @@ def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
     has_error, order = validate_3yc(order, customer_data)
 
     assert has_error is False
+
+
+def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
+    order = order_factory(order_parameters=order_parameters_factory(p3yc=["Yes"]))
+    customer_data = get_customer_data(order)
+
+    has_error, order = validate_3yc(order, customer_data)
+
+    assert has_error is True
+    assert order["error"]["id"] == "VIPMV008"
