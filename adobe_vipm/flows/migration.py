@@ -17,6 +17,7 @@ from adobe_vipm.flows.airtable import (
     get_transfers_to_check,
     get_transfers_to_process,
 )
+from adobe_vipm.flows.nav import terminate_contract
 
 RECOVERABLE_TRANSFER_ERRORS = (
     "RETURNABLE_PURCHASE",
@@ -224,6 +225,13 @@ def check_running_transfers_for_product(product_id):
             continue
 
         transfer = fill_customer_data(transfer, customer)
+
+        terminated, response = terminate_contract(transfer.nav_cco)
+
+        transfer.nav_terminated = terminated
+        if not terminated:
+            transfer.nav_error = response
+
         transfer.status = "completed"
         transfer.updated_at = datetime.now()
         transfer.completed_at = datetime.now()

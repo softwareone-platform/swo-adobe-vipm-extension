@@ -31,6 +31,7 @@ def get_transfer_model(base_info):
         membership_id = fields.TextField("membership_id")
         authorization_uk = fields.TextField("authorization_uk")
         seller_uk = fields.TextField("seller_uk")
+        nav_cco = fields.TextField("nav_cco")
         record_id = fields.TextField("record_id", readonly=True)
         transfer_id = fields.TextField("transfer_id")
         customer_id = fields.TextField("customer_id")
@@ -56,11 +57,13 @@ def get_transfer_model(base_info):
         customer_benefits_3yc_minimum_quantity_consumables = fields.NumberField(
             "customer_benefits_3yc_minimum_quantity_consumables",
         )
-        mpt_order_id = fields.TextField("mpt_order_id")
         adobe_error_code = fields.TextField("adobe_error_code")
         adobe_error_description = fields.TextField("adobe_error_description")
         retry_count = fields.NumberField("retry_count")
         reschedule_count = fields.NumberField("reschedule_count")
+        mpt_order_id = fields.TextField("mpt_order_id")
+        nav_terminated = fields.CheckboxField("nav_terminated")
+        nav_error = fields.TextField("nav_error")
         status = fields.SelectField("status")
         migration_error_description = fields.TextField("migration_error_description")
         created_at = fields.DatetimeField("created_at", readonly=True)
