@@ -31,7 +31,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     handle_retries,
-    save_adobe_customer_id,
+    save_adobe_customer_data,
     save_adobe_order_and_customer_ids,
     save_adobe_order_id,
     switch_order_to_completed,
@@ -260,7 +260,7 @@ def fulfill_transfer_order(mpt_client, order):
         return
 
     customer_id = adobe_transfer_order["customerId"]
-    order = save_adobe_customer_id(mpt_client, order, customer_id)
+    order = save_adobe_customer_data(mpt_client, order, customer_id)
     for item in adobe_transfer_order["lineItems"]:
         add_subscription(
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item

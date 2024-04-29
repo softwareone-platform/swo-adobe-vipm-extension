@@ -35,6 +35,7 @@ from adobe_vipm.flows.utils import (
     get_retry_count,
     increment_retry_count,
     reset_retry_count,
+    set_adobe_3yc_enroll_status,
     set_adobe_customer_id,
     set_adobe_order_id,
 )
@@ -42,7 +43,7 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def save_adobe_customer_id(client, order, customer_id):
+def save_adobe_customer_data(client, order, customer_id, enroll_status=None):
     """
     Sets the Adobe customer ID on the provided order and updates it using the MPT client.
 
@@ -55,6 +56,8 @@ def save_adobe_customer_id(client, order, customer_id):
         dict: The updated order with the customer ID set in the corresponding fulfillment parameter.
     """
     order = set_adobe_customer_id(order, customer_id)
+    if enroll_status:
+        order = set_adobe_3yc_enroll_status(order, enroll_status)
     update_order(client, order["id"], parameters=order["parameters"])
     return order
 

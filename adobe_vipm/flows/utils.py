@@ -5,9 +5,14 @@ from datetime import UTC, datetime
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
+    OPTIONAL_CUSTOMER_ORDER_PARAMS,
     ORDER_TYPE_CHANGE,
     ORDER_TYPE_PURCHASE,
     ORDER_TYPE_TERMINATION,
+    PARAM_3YC,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_ENROLL_STATUS,
+    PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_AGREEMENT_TYPE,
     PARAM_COMPANY_NAME,
@@ -186,6 +191,9 @@ def get_customer_data(order):
         PARAM_PREFERRED_LANGUAGE,
         PARAM_ADDRESS,
         PARAM_CONTACT,
+        PARAM_3YC,
+        PARAM_3YC_CONSUMABLES,
+        PARAM_3YC_LICENSES,
     ):
         customer_data[param_external_id] = get_ordering_parameter(
             order,
@@ -511,7 +519,7 @@ def set_parameter_visible(order, param_external_id):
     )
     param["constraints"] = {
         "hidden": False,
-        "optional": False,
+        "optional": param_external_id in OPTIONAL_CUSTOMER_ORDER_PARAMS,
     }
     return updated_order
 
@@ -526,4 +534,14 @@ def set_parameter_hidden(order, param_external_id):
         "hidden": True,
         "optional": True,
     }
+    return updated_order
+
+
+def set_adobe_3yc_enroll_status(order, enroll_status):
+    updated_order = copy.deepcopy(order)
+    customer_ff_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_3YC_ENROLL_STATUS,
+    )
+    customer_ff_param["value"] = enroll_status
     return updated_order

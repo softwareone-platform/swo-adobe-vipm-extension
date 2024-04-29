@@ -9,6 +9,7 @@ import logging
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import STATUS_INVALID_ADDRESS, STATUS_INVALID_FIELDS
 from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
@@ -23,7 +24,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
-    save_adobe_customer_id,
+    save_adobe_customer_data,
     save_adobe_order_id,
     switch_order_to_completed,
     switch_order_to_failed,
@@ -119,10 +120,16 @@ def create_customer_account(client, order):
         external_id = order["agreement"]["id"]
         seller_id = order["agreement"]["seller"]["id"]
         authorization_id = order["authorization"]["id"]
-        customer_id = adobe_client.create_customer_account(
+        customer = adobe_client.create_customer_account(
             authorization_id, seller_id, external_id, customer_data
         )
-        return save_adobe_customer_id(client, order, customer_id)
+        customer_id = customer["customerId"]
+        return save_adobe_customer_data(
+            client,
+            order,
+            customer_id,
+            enroll_status=get_3yc_commitment(customer).get("status"),
+        )
     except AdobeError as e:
         logger.error(repr(e))
         _handle_customer_error(client, order, e)

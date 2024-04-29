@@ -124,7 +124,7 @@ class AdobeClient:
             customer_data (dict): Data of the customer to create.
 
         Returns:
-            str: The identifier of the customer in the Adobe VIP Markerplace.
+            str: The customer object created in the Adobe VIP Markerplace.
         """
         authorization = self._config.get_authorization(authorization_id)
         reseller: Reseller = self._config.get_reseller(authorization, seller_id)
@@ -156,6 +156,31 @@ class AdobeClient:
                 ],
             },
         }
+        if customer_data["3YC"] == ["Yes"]:
+            quantities = []
+            if customer_data["3YCLicenses"]:
+                quantities.append(
+                    {
+                        "offerType": "LICENSE",
+                        "quantity": int(customer_data["3YCLicenses"]),
+                    },
+                )
+            if customer_data["3YCConsumables"]:
+                quantities.append(
+                    {
+                        "offerType": "CONSUMABLES",
+                        "quantity": int(customer_data["3YCConsumables"]),
+                    },
+                )
+            payload["benefits"] = [
+                {
+                    "type": "THREE_YEAR_COMMIT",
+                    "commitmentRequest": {
+                        "minimumQuantities": quantities,
+                    },
+                },
+            ]
+
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
         headers = self._get_headers(authorization, correlation_id=correlation_id)
         response = requests.post(
@@ -172,7 +197,7 @@ class AdobeClient:
             f"Customer {company_name} "
             f"created successfully for reseller {reseller.id}: {adobe_customer_id}",
         )
-        return adobe_customer_id
+        return created_customer
 
     @wrap_http_error
     def search_new_and_returned_orders_by_sku_line_number(

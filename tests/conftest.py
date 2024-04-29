@@ -11,6 +11,10 @@ from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.flows.constants import (
+    PARAM_3YC,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_ENROLL_STATUS,
+    PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_ADOBE_SKU,
     PARAM_AGREEMENT_TYPE,
@@ -241,7 +245,11 @@ def account_data():
 
 @pytest.fixture()
 def customer_data(account_data):
-    return account_data
+    data = copy.copy(account_data)
+    data["3YC"] = []
+    data["3YCConsumables"] = ""
+    data["3YCLicenses"] = ""
+    return data
 
 
 @pytest.fixture()
@@ -256,7 +264,13 @@ def order_parameters_factory():
         preferred_language="en-US",
         address=None,
         contact=None,
+        p3yc=None,
+        p3yc_licenses="",
+        p3yc_consumables="",
     ):
+        if p3yc is None:
+            p3yc = []
+
         if address is None:
             address = {
                 "country": "US",
@@ -343,6 +357,39 @@ def order_parameters_factory():
                     "optional": True,
                 },
             },
+            {
+                "id": "PAR-0000-0006",
+                "name": "3YC",
+                "externalId": PARAM_3YC,
+                "type": "Checkbox",
+                "value": p3yc,
+                "constraints": {
+                    "hidden": False,
+                    "optional": True,
+                },
+            },
+            {
+                "id": "PAR-0000-0007",
+                "name": "3YCLicenses",
+                "externalId": PARAM_3YC_LICENSES,
+                "type": "SingleLineText",
+                "value": p3yc_licenses,
+                "constraints": {
+                    "hidden": False,
+                    "optional": True,
+                },
+            },
+            {
+                "id": "PAR-0000-0008",
+                "name": "3YCConsumables",
+                "externalId": PARAM_3YC_CONSUMABLES,
+                "type": "SingleLineText",
+                "value": p3yc_consumables,
+                "constraints": {
+                    "hidden": False,
+                    "optional": True,
+                },
+            },
         ]
 
     return _order_parameters
@@ -418,6 +465,39 @@ def transfer_order_parameters_factory():
                     "optional": False,
                 },
             },
+            {
+                "id": "PAR-0000-0006",
+                "name": "3YC",
+                "externalId": PARAM_3YC,
+                "type": "Checkbox",
+                "value": [],
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
+            },
+            {
+                "id": "PAR-0000-0007",
+                "name": "3YCLicenses",
+                "externalId": PARAM_3YC_LICENSES,
+                "type": "SingleLineText",
+                "value": "",
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
+            },
+            {
+                "id": "PAR-0000-0008",
+                "name": "3YCConsumables",
+                "externalId": PARAM_3YC_CONSUMABLES,
+                "type": "SingleLineText",
+                "value": "",
+                "constraints": {
+                    "hidden": True,
+                    "optional": True,
+                },
+            },
         ]
 
     return _order_parameters
@@ -428,6 +508,7 @@ def fulfillment_parameters_factory():
     def _fulfillment_parameters(
         customer_id="",
         retry_count="0",
+        p3yc_enroll_status="",
     ):
         return [
             {
@@ -444,6 +525,14 @@ def fulfillment_parameters_factory():
                 "type": "SingleLineText",
                 "value": retry_count,
             },
+            {
+                "id": "PAR-9876-5432",
+                "name": "3YC Enroll Status",
+                "externalId": PARAM_3YC_ENROLL_STATUS,
+                "type": "SingleLineText",
+                "value": p3yc_enroll_status,
+            },
+
         ]
 
     return _fulfillment_parameters
