@@ -362,7 +362,9 @@ def order_parameters_factory():
                 "name": "3YC",
                 "externalId": PARAM_3YC,
                 "type": "Checkbox",
-                "value": p3yc,
+                "value": {
+                    "values": p3yc,
+                },
                 "constraints": {
                     "hidden": False,
                     "optional": True,
@@ -737,7 +739,7 @@ def order_factory(
                 "fulfillment": fulfillment_parameters,
                 "ordering": order_parameters,
             },
-            "error": {},
+
             "audit": {
                 "created": {
                     "at": "2023-12-14T18:02:16.9359",

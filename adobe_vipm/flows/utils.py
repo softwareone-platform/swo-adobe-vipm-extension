@@ -65,10 +65,11 @@ def get_adobe_membership_id(source):
     Returns:
         str: The Adobe membership identifier or None if it isn't set.
     """
-    return get_ordering_parameter(
+    param = get_ordering_parameter(
         source,
         PARAM_MEMBERSHIP_ID,
-    ).get("value")
+    )
+    return get_param_value(param)
 
 
 def is_purchase_order(order):
@@ -119,10 +120,11 @@ def get_adobe_customer_id(source):
     Returns:
         str: The Adobe customer identifier or None if it isn't set.
     """
-    return get_fulfillment_parameter(
+    param = get_fulfillment_parameter(
         source,
         PARAM_CUSTOMER_ID,
-    ).get("value")
+    )
+    return get_param_value(param)
 
 
 def set_adobe_customer_id(order, customer_id):
@@ -195,10 +197,11 @@ def get_customer_data(order):
         PARAM_3YC_CONSUMABLES,
         PARAM_3YC_LICENSES,
     ):
-        customer_data[param_external_id] = get_ordering_parameter(
+        param = get_ordering_parameter(
             order,
             param_external_id,
-        ).get("value")
+        )
+        customer_data[param_external_id] = get_param_value(param)
 
     return customer_data
 
@@ -365,13 +368,11 @@ def get_retry_count(order):
     Returns:
         int: The value of the retry count parameter.
     """
-    return int(
-        get_fulfillment_parameter(
-            order,
-            PARAM_RETRY_COUNT,
-        ).get("value", "0")
-        or "0",
+    param = get_fulfillment_parameter(
+        order,
+        PARAM_RETRY_COUNT,
     )
+    return int(get_param_value(param) or "")
 
 
 def get_subscription_by_line_and_item_id(subscriptions, item_id, line_id):
@@ -502,13 +503,11 @@ def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
 
 
 def is_new_customer(source):
-    return (
-        get_ordering_parameter(
-            source,
-            PARAM_AGREEMENT_TYPE,
-        ).get("value")
-        == "New"
+    param = get_ordering_parameter(
+        source,
+        PARAM_AGREEMENT_TYPE,
     )
+    return get_param_value(param) == "New"
 
 
 def set_parameter_visible(order, param_external_id):
@@ -554,6 +553,21 @@ def set_order_error(order, error):
 
 
 def reset_order_error(order):
+    if "error" not in order:
+        return order
     updated_order = copy.deepcopy(order)
-    updated_order["error"] = {}
+    del updated_order["error"]
     return updated_order
+
+
+def get_param_value(param):
+    if param["type"] in (
+        "SingleLineText",
+        "Choice",
+        "Address",
+        "Contact",
+    ):
+        return param.get("value")
+
+    if param["type"] == "Checkbox":
+        return param.get("value", {}).get("values")
