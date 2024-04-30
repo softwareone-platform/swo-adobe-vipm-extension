@@ -362,9 +362,7 @@ def order_parameters_factory():
                 "name": "3YC",
                 "externalId": PARAM_3YC,
                 "type": "Checkbox",
-                "value": {
-                    "values": p3yc,
-                },
+                "value": p3yc,
                 "constraints": {
                     "hidden": False,
                     "optional": True,

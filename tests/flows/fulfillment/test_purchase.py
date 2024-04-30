@@ -32,7 +32,6 @@ from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.fulfillment.purchase import create_customer_account
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
-    get_param_value,
     set_adobe_customer_id,
 )
 
@@ -587,7 +586,7 @@ def test_create_customer_account(
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
         {
-            param["externalId"]: get_param_value(param)
+            param["externalId"]: param.get("value")
             for param in order_parameters_factory()
             if param["externalId"] not in (PARAM_MEMBERSHIP_ID, PARAM_AGREEMENT_TYPE)
         },
@@ -649,7 +648,7 @@ def test_create_customer_account_empty_order_parameters(
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
         {
-            param["externalId"]: get_param_value(param)
+            param["externalId"]: param.get("value")
             for param in order_parameters_factory()
             if param["externalId"] not in (PARAM_MEMBERSHIP_ID, PARAM_AGREEMENT_TYPE)
         },
@@ -902,7 +901,7 @@ def test_create_customer_account_3yc(
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
         {
-            param["externalId"]: get_param_value(param)
+            param["externalId"]: param.get("value")
             for param in order_parameters_factory(p3yc=["Yes"], p3yc_licenses=10)
             if param["externalId"] not in (PARAM_MEMBERSHIP_ID, PARAM_AGREEMENT_TYPE)
         },
