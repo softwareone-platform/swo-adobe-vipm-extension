@@ -69,7 +69,7 @@ def get_adobe_membership_id(source):
         source,
         PARAM_MEMBERSHIP_ID,
     )
-    return get_param_value(param)
+    return param.get("value")
 
 
 def is_purchase_order(order):
@@ -124,7 +124,7 @@ def get_adobe_customer_id(source):
         source,
         PARAM_CUSTOMER_ID,
     )
-    return get_param_value(param)
+    return param.get("value")
 
 
 def set_adobe_customer_id(order, customer_id):
@@ -201,7 +201,7 @@ def get_customer_data(order):
             order,
             param_external_id,
         )
-        customer_data[param_external_id] = get_param_value(param)
+        customer_data[param_external_id] = param.get("value")
 
     return customer_data
 
@@ -372,7 +372,7 @@ def get_retry_count(order):
         order,
         PARAM_RETRY_COUNT,
     )
-    return int(get_param_value(param) or "")
+    return int(param.get("value") or "")
 
 
 def get_subscription_by_line_and_item_id(subscriptions, item_id, line_id):
@@ -507,7 +507,7 @@ def is_new_customer(source):
         source,
         PARAM_AGREEMENT_TYPE,
     )
-    return get_param_value(param) == "New"
+    return param.get("value") == "New"
 
 
 def set_parameter_visible(order, param_external_id):
@@ -558,16 +558,3 @@ def reset_order_error(order):
     updated_order = copy.deepcopy(order)
     del updated_order["error"]
     return updated_order
-
-
-def get_param_value(param):
-    if param["type"] in (
-        "SingleLineText",
-        "Choice",
-        "Address",
-        "Contact",
-    ):
-        return param.get("value")
-
-    if param["type"] == "Checkbox":
-        return param.get("value", {}).get("values")
