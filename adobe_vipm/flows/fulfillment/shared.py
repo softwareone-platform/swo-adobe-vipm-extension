@@ -14,9 +14,17 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
 )
+from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.constants import (
     ITEM_TYPE_ORDER_LINE,
+    PARAM_3YC,
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
+    PARAM_ADDRESS,
     PARAM_ADOBE_SKU,
+    PARAM_COMPANY_NAME,
+    PARAM_CONTACT,
+    PARAM_PREFERRED_LANGUAGE,
 )
 from adobe_vipm.flows.mpt import (
     complete_order,
@@ -35,9 +43,13 @@ from adobe_vipm.flows.utils import (
     get_retry_count,
     increment_retry_count,
     reset_retry_count,
+    set_adobe_3yc_end_date,
     set_adobe_3yc_enroll_status,
+    set_adobe_3yc_start_date,
     set_adobe_customer_id,
     set_adobe_order_id,
+    set_customer_data,
+    split_phone_number,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,9 +74,47 @@ def save_adobe_customer_data(client, order, customer_id, enroll_status=None):
     return order
 
 
-def save_adobe_order_and_customer_ids(client, order, order_id, customer_id):
+def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     order = set_adobe_order_id(order, order_id)
-    order = set_adobe_customer_id(order, customer_id)
+    order = set_adobe_customer_id(order, customer["customerId"])
+
+    address = customer["companyProfile"]["address"]
+    contact = customer["companyProfile"]["contacts"][0]
+    commitment = get_3yc_commitment(customer)
+
+    customer_data = {
+        PARAM_COMPANY_NAME: customer["companyProfile"]["companyName"],
+        PARAM_PREFERRED_LANGUAGE: customer["companyProfile"]["preferredLanguage"],
+        PARAM_ADDRESS: {
+            "country": address["country"],
+            "state": address["region"],
+            "city": address["city"],
+            "addressLine1": address["addressLine1"],
+            "addressLine2": address["addressLine2"],
+            "postalCode": address["postalCode"],
+        },
+        PARAM_CONTACT: {
+            "firstName": contact["firstName"],
+            "lastName": contact["lastName"],
+            "email": contact["email"],
+            "phone": split_phone_number(contact.get("phoneNumber"), address["country"]),
+        },
+    }
+    if commitment:
+        customer_data[PARAM_3YC] = ["Yes"]
+        for mq in commitment["minimumQuantities"]:
+            if mq["offerType"] == "LICENSE":
+                customer_data[PARAM_3YC_LICENSES] = str(mq["quantity"])
+            if mq["offerType"] == "CONSUMABLES":
+                customer_data[PARAM_3YC_CONSUMABLES] = str(mq["quantity"])
+
+        order = set_adobe_3yc_enroll_status(order, commitment["status"])
+        if "startDate" in commitment and "endDate" in commitment:
+            order = set_adobe_3yc_start_date(order, commitment["startDate"])
+            order = set_adobe_3yc_end_date(order, commitment["endDate"])
+
+    order = set_customer_data(order, customer_data)
+
     update_order(
         client,
         order["id"],
