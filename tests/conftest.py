@@ -13,8 +13,10 @@ from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
     PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_END_DATE,
     PARAM_3YC_ENROLL_STATUS,
     PARAM_3YC_LICENSES,
+    PARAM_3YC_START_DATE,
     PARAM_ADDRESS,
     PARAM_ADOBE_SKU,
     PARAM_AGREEMENT_TYPE,
@@ -397,14 +399,23 @@ def order_parameters_factory():
 
 @pytest.fixture()
 def transfer_order_parameters_factory():
-    def _order_parameters(membership_id="a-membership-id"):
+    def _order_parameters(
+        membership_id="a-membership-id",
+        company_name=None,
+        preferred_language=None,
+        address=None,
+        contact=None,
+        p3yc=None,
+        p3yc_licenses=None,
+        p3yc_consumables=None,
+    ):
         return [
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
                 "externalId": PARAM_COMPANY_NAME,
                 "type": "SingleLineText",
-                "value": "",
+                "value": company_name or "",
                 "constraints": {
                     "hidden": True,
                     "optional": True,
@@ -415,7 +426,7 @@ def transfer_order_parameters_factory():
                 "name": "Preferred Language",
                 "externalId": PARAM_PREFERRED_LANGUAGE,
                 "type": "Choice",
-                "value": "",
+                "value": preferred_language or "",
                 "constraints": {
                     "hidden": True,
                     "optional": True,
@@ -426,7 +437,7 @@ def transfer_order_parameters_factory():
                 "name": "Address",
                 "externalId": PARAM_ADDRESS,
                 "type": "Address",
-                "value": {},
+                "value": address or {},
                 "constraints": {
                     "hidden": True,
                     "optional": True,
@@ -437,7 +448,7 @@ def transfer_order_parameters_factory():
                 "name": "Contact",
                 "externalId": PARAM_CONTACT,
                 "type": "Contact",
-                "value": {},
+                "value": contact or {},
                 "constraints": {
                     "hidden": True,
                     "optional": True,
@@ -470,7 +481,7 @@ def transfer_order_parameters_factory():
                 "name": "3YC",
                 "externalId": PARAM_3YC,
                 "type": "Checkbox",
-                "value": [],
+                "value": p3yc or [],
                 "constraints": {
                     "hidden": True,
                     "optional": True,
@@ -481,7 +492,7 @@ def transfer_order_parameters_factory():
                 "name": "3YCLicenses",
                 "externalId": PARAM_3YC_LICENSES,
                 "type": "SingleLineText",
-                "value": "",
+                "value": p3yc_licenses or "",
                 "constraints": {
                     "hidden": True,
                     "optional": True,
@@ -492,7 +503,7 @@ def transfer_order_parameters_factory():
                 "name": "3YCConsumables",
                 "externalId": PARAM_3YC_CONSUMABLES,
                 "type": "SingleLineText",
-                "value": "",
+                "value": p3yc_consumables or "",
                 "constraints": {
                     "hidden": True,
                     "optional": True,
@@ -509,6 +520,9 @@ def fulfillment_parameters_factory():
         customer_id="",
         retry_count="0",
         p3yc_enroll_status="",
+        p3yc_start_date="",
+        p3yc_end_date="",
+
     ):
         return [
             {
@@ -532,7 +546,20 @@ def fulfillment_parameters_factory():
                 "type": "SingleLineText",
                 "value": p3yc_enroll_status,
             },
-
+            {
+                "id": "PAR-2266-4848",
+                "name": "3YC Start Date",
+                "externalId": PARAM_3YC_START_DATE,
+                "type": "Date",
+                "value": p3yc_start_date,
+            },
+            {
+                "id": "PAR-3528-2927",
+                "name": "3YC End Date",
+                "externalId": PARAM_3YC_END_DATE,
+                "type": "Date",
+                "value": p3yc_end_date,
+            },
         ]
 
     return _fulfillment_parameters
@@ -737,7 +764,6 @@ def order_factory(
                 "fulfillment": fulfillment_parameters,
                 "ordering": order_parameters,
             },
-
             "audit": {
                 "created": {
                     "at": "2023-12-14T18:02:16.9359",
@@ -1032,3 +1058,77 @@ def extension_settings(settings):
     current_extension_config = copy.copy(settings.EXTENSION_CONFIG)
     yield settings
     settings.EXTENSION_CONFIG = current_extension_config
+
+
+@pytest.fixture()
+def adobe_commitment_factory():
+    def _commitment(licenses=None, consumables=None):
+        commitment = {
+            "startDate": "2024-01-01",
+            "endDate": "2025-01-01",
+            "status": "COMMITTED",
+            "minimumQuantities": [],
+        }
+        if licenses:
+            commitment["minimumQuantities"].append(
+                {
+                    "offerType": "LICENSE",
+                    "quantity": licenses,
+                },
+            )
+
+        if consumables:
+            commitment["minimumQuantities"].append(
+                {
+                    "offerType": "CONSUMABLES",
+                    "quantity": consumables,
+                },
+            )
+
+        return commitment
+
+    return _commitment
+
+
+@pytest.fixture()
+def adobe_customer_factory():
+    def _customer(
+        customer_id="a-client-id",
+        phone_number="+18004449890",
+        country="US",
+        commitment=None,
+    ):
+        customer = {
+            "customerId": customer_id,
+            "companyProfile": {
+                "companyName": "Migrated Company",
+                "preferredLanguage": "en-US",
+                "address": {
+                    "addressLine1": "addressLine1",
+                    "addressLine2": "addressLine2",
+                    "city": "city",
+                    "region": "region",
+                    "postalCode": "postalCode",
+                    "country": country,
+                    "phoneNumber": phone_number,
+                },
+                "contacts": [
+                    {
+                        "firstName": "firstName",
+                        "lastName": "lastName",
+                        "email": "email",
+                        "phoneNumber": phone_number,
+                    },
+                ],
+            },
+        }
+        if commitment:
+            customer["benefits"] = [
+                {
+                    "type": "THREE_YEAR_COMMIT",
+                    "commitment": commitment,
+                },
+            ]
+        return customer
+
+    return _customer

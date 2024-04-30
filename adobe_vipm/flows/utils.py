@@ -2,6 +2,8 @@ import copy
 import functools
 from datetime import UTC, datetime
 
+import phonenumbers
+
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
@@ -11,8 +13,10 @@ from adobe_vipm.flows.constants import (
     ORDER_TYPE_TERMINATION,
     PARAM_3YC,
     PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_END_DATE,
     PARAM_3YC_ENROLL_STATUS,
     PARAM_3YC_LICENSES,
+    PARAM_3YC_START_DATE,
     PARAM_ADDRESS,
     PARAM_AGREEMENT_TYPE,
     PARAM_COMPANY_NAME,
@@ -538,11 +542,29 @@ def set_parameter_hidden(order, param_external_id):
 
 def set_adobe_3yc_enroll_status(order, enroll_status):
     updated_order = copy.deepcopy(order)
-    customer_ff_param = get_fulfillment_parameter(
+    ff_param = get_fulfillment_parameter(
         updated_order,
         PARAM_3YC_ENROLL_STATUS,
     )
-    customer_ff_param["value"] = enroll_status
+    ff_param["value"] = enroll_status
+    return updated_order
+
+def set_adobe_3yc_start_date(order, start_date):
+    updated_order = copy.deepcopy(order)
+    ff_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_3YC_START_DATE,
+    )
+    ff_param["value"] = start_date
+    return updated_order
+
+def set_adobe_3yc_end_date(order, end_date):
+    updated_order = copy.deepcopy(order)
+    ff_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_3YC_END_DATE,
+    )
+    ff_param["value"] = end_date
     return updated_order
 
 
@@ -558,3 +580,23 @@ def reset_order_error(order):
     updated_order = copy.deepcopy(order)
     del updated_order["error"]
     return updated_order
+
+def split_phone_number(phone_number, country):
+    if not phone_number:
+        return
+
+    pn = None
+    try:
+        pn = phonenumbers.parse(phone_number, keep_raw_input=True)
+    except phonenumbers.NumberParseException:
+        try:
+            pn = phonenumbers.parse(phone_number, country, keep_raw_input=True)
+        except phonenumbers.NumberParseException:
+            return
+
+    country_code = f"+{pn.country_code}"
+    number = f"{pn.national_number}{pn.extension or ''}".strip()
+    return {
+        "prefix": country_code,
+        "number": number,
+    }

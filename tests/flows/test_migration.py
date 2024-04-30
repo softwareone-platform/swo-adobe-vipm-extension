@@ -422,6 +422,8 @@ def test_checking_running_transfers_for_product(
 def test_checking_running_transfers_for_product_3yc(
     mocker,
     adobe_transfer_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
 ):
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.authorization_uk = "auth-uk"
@@ -444,51 +446,8 @@ def test_checking_running_transfers_for_product_3yc(
         customer_id="customer-id",
     )
 
-    commitment = {
-        "startDate": "2024-01-01",
-        "endDate": "2025-01-01",
-        "status": "COMMITTED",
-        "minimumQuantities": [
-            {
-                "offerType": "LICENSE",
-                "quantity": 10,
-            },
-            {
-                "offerType": "CONSUMABLES",
-                "quantity": 30,
-            },
-        ],
-    }
-
-    customer = {
-        "companyProfile": {
-            "companyName": "Migrated Company",
-            "preferredLanguage": "en-US",
-            "address": {
-                "addressLine1": "addressLine1",
-                "addressLine2": "addressLine2",
-                "city": "city",
-                "region": "region",
-                "postalCode": "postalCode",
-                "country": "country",
-                "phoneNumber": "phoneNumber",
-            },
-            "contacts": [
-                {
-                    "firstName": "firstName",
-                    "lastName": "lastName",
-                    "email": "email",
-                    "phoneNumber": "phoneNumber",
-                },
-            ],
-        },
-        "benefits": [
-            {
-                "type": "THREE_YEAR_COMMIT",
-                "commitment": commitment,
-            },
-        ],
-    }
+    commitment = adobe_commitment_factory(licenses=10, consumables=30)
+    customer = adobe_customer_factory(commitment=commitment)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -805,6 +764,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
 def test_checking_running_transfers_for_product_terminate_contract_error(
     mocker,
     adobe_transfer_factory,
+    adobe_customer_factory,
 ):
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.authorization_uk = "auth-uk"
@@ -830,29 +790,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
         customer_id="customer-id",
     )
 
-    customer = {
-        "companyProfile": {
-            "companyName": "Migrated Company",
-            "preferredLanguage": "en-US",
-            "address": {
-                "addressLine1": "addressLine1",
-                "addressLine2": "addressLine2",
-                "city": "city",
-                "region": "region",
-                "postalCode": "postalCode",
-                "country": "country",
-                "phoneNumber": "phoneNumber",
-            },
-            "contacts": [
-                {
-                    "firstName": "firstName",
-                    "lastName": "lastName",
-                    "email": "email",
-                    "phoneNumber": "phoneNumber",
-                },
-            ],
-        }
-    }
+    customer = adobe_customer_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
