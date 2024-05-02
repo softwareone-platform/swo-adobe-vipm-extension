@@ -13,7 +13,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_INVALID_MINIMUM_QUANTITY,
 )
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.adobe.utils import get_3yc_commitment
+from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
     ERR_3YC_QUANTITY_CONSUMABLES,
@@ -169,7 +169,7 @@ def create_customer_account(client, order):
             client,
             order,
             customer_id,
-            enroll_status=get_3yc_commitment(customer).get("status"),
+            enroll_status=get_3yc_commitment_request(customer).get("status"),
         )
     except AdobeError as e:
         logger.error(repr(e))

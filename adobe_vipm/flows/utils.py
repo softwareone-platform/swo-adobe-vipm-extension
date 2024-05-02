@@ -376,7 +376,7 @@ def get_retry_count(order):
         order,
         PARAM_RETRY_COUNT,
     )
-    return int(param.get("value") or "")
+    return int(param.get("value") or "0")
 
 
 def get_subscription_by_line_and_item_id(subscriptions, item_id, line_id):

@@ -44,4 +44,14 @@ def get_3yc_commitment(customer):
         {},
     )
 
-    return benefit_3yc.get("commitment", {})
+    return benefit_3yc.get("commitment", {}) or {}
+
+
+def get_3yc_commitment_request(customer):
+    benefit_3yc = find_first(
+        lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
+        customer.get("benefits", []),
+        {},
+    )
+
+    return benefit_3yc.get("commitmentRequest", {}) or {}

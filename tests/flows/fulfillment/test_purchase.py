@@ -867,7 +867,7 @@ def test_create_customer_account_3yc(
         "benefits": [
             {
                 "type": "THREE_YEAR_COMMIT",
-                "commitment": {
+                "commitmentRequest": {
                     "status": "REQUESTED",
                 },
             },
