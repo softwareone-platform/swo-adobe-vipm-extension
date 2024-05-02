@@ -46,7 +46,7 @@ def fill_customer_data(transfer, customer):
     transfer.customer_contact_first_name = contact["firstName"]
     transfer.customer_contact_last_name = contact["lastName"]
     transfer.customer_contact_email = contact["email"]
-    transfer.customer_contact_phone_number = contact["phoneNumber"]
+    transfer.customer_contact_phone_number = contact.get("phoneNumber")
 
     commitment = get_3yc_commitment(customer)
     if not commitment:
