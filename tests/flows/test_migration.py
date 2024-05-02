@@ -332,7 +332,7 @@ def test_checking_running_transfers_for_product(
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
-        return_value=(True, b""),
+        return_value=(True, '200 - {"id": "whatever"}'),
     )
 
     adobe_transfer = adobe_transfer_factory(

@@ -1,4 +1,7 @@
+from datetime import datetime
+
 import pytest
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     STATUS_PENDING,
@@ -521,6 +524,7 @@ def test_create_transfer_fail(
     )
 
 
+@freeze_time("2012-01-14 12:00:01")
 def test_fulfill_transfer_order_already_migrated(
     mocker,
     settings,
@@ -659,6 +663,11 @@ def test_fulfill_transfer_order_already_migrated(
         ITEM_TYPE_SUBSCRIPTION,
         adobe_subscription,
     )
+
+    assert mocked_transfer.status == "synchronized"
+    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.mpt_order_id == order["id"]
+    mocked_transfer.save.assert_called_once()
 
 
 def test_fulfill_transfer_order_migration_running(

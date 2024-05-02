@@ -46,4 +46,7 @@ def terminate_contract(cco):
         },
     )
 
-    return resp.status_code == 200, f"{resp.status_code} - {resp.content.decode()}"
+    return (
+        resp.status_code == 200 and bool(resp.content.decode()),
+        f"{resp.status_code} - {resp.content.decode()}"
+    )

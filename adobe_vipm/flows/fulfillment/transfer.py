@@ -8,6 +8,7 @@ program.
 """
 
 import logging
+from datetime import datetime
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
@@ -214,6 +215,10 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
             subscription,
         )
     switch_order_to_completed(mpt_client, order)
+    transfer.status = "synchronized"
+    transfer.mpt_order_id = order["id"]
+    transfer.synchronized_at = datetime.now()
+    transfer.save()
 
 
 def fulfill_transfer_order(mpt_client, order):

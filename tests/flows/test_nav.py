@@ -54,6 +54,7 @@ def test_terminate_contract(mocker, requests_mocker, settings):
     requests_mocker.patch(
         "https://api.nav/v1/contracts/terminate/my-cco",
         status=200,
+        json={"id": "whatever"},
         match=[
             matchers.json_params_matcher(
                 {
