@@ -36,8 +36,8 @@ from adobe_vipm.flows.mpt import (
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_template_or_default,
-    process_order,
     query_order,
+    set_processing_template,
     update_order,
     update_subscription,
 )
@@ -519,4 +519,4 @@ def check_processing_template(mpt_client, order, template_name):
         template_name,
     )
     if template != order.get("template"):
-        process_order(mpt_client, order["id"], template)
+        set_processing_template(mpt_client, order["id"], template)

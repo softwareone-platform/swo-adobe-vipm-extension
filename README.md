@@ -113,11 +113,9 @@ MPT_API_TOKEN=<mpt-api-token>
 ```
 
 `MPT_PRODUCTS_IDS` should be a comma-separated list of the SWO Marketplace Product identifiers
-For each of the defined product id in the `MPT_PRODUCTS_IDS` list define `EXT_QUERYING_TEMPLATES_IDS`, `EXT_COMPLETED_TEMPLATES_IDS` and `WEBHOOKS_SECRETS` json variables using product ID as key.
+For each of the defined product id in the `MPT_PRODUCTS_IDS` list define `WEBHOOKS_SECRETS` json variables using product ID as key.
 
 ```
-EXT_QUERYING_TEMPLATES_IDS={"PRD-1111-1111": "<querying-template-id-for-product>"}
-EXT_COMPLETED_TEMPLATES_IDS={"PRD-1111-1111": "<completed_template-id-for-product>"}
 EXT_WEBHOOKS_SECRETS={"PRD-1111-1111": "<webhook-secret-for-product>"}
 ```
 
@@ -129,8 +127,6 @@ EXT_ADOBE_AUTH_ENDPOINT_URL=<adobe-vipm-authentication-url>
 MPT_PRODUCT_ID=PRD-1111-1111,PRD-2222-2222
 MPT_API_BASE_URL=http://devmock:8000
 MPT_API_TOKEN=c0fdafd7-6d5a-4fa4-9839-4c2c163794ff
-EXT_QUERYING_TEMPLATES_IDS={"PRD-1111-1111": "TPL-1234-1234", "PRD-2222-2222": "TPL-5678-5678"}
-EXT_COMPLETED_TEMPLATES_IDS={"PRD-1111-1111": "TPL-4321-4321", "PRD-2222-2222": "TPL-8765-8765"}
 EXT_WEBHOOKS_SECRETS={"PRD-1111-1111": "<webhook-secret-for-product>", "PRD-2222-2222": "<webhook-secret-for-product>"}
 ```
 
@@ -182,8 +178,6 @@ Find generated data in the `devmock/data` folder. Extension automatically retrie
 | `EXT_ADOBE_AUTHORIZATIONS_FILE` | - | /extension/adobe_authorizations.json | Path to Adobe authorizations file |
 | `EXT_ADOBE_API_BASE_URL` | - | https://partner-example.adobe.io | Path to Adobe VIPM API |
 | `EXT_ADOBE_AUTH_ENDPOINT_URL` | - | https://auth.partner-example.adobe.io | Path to Adobe VIPM authentication API |
-| `EXT_QUERYING_TEMPLATES_IDS` | - | {"PRD-1111-1111": "TPL-1111-1111"} | SoftwareONE Marketplace Template ID for Order Quering status |
-| `EXT_COMPLETED_TEMPLATES_IDS` | - | {"PRD-1111-1111": "TPL-2222-2222"} | SoftwareONE Marketplace Template ID for Order Completed status |
 | `EXT_WEBHOOKS_SECRETS` | - |  {"PRD-1111-1111": "123qweasd3432234"} | Webhook secret of the Draft validation Webhook in SoftwareONE Marketplace for the product |
 | `MPT_PRODUCTS_IDS` | PRD-1111-1111 | PRD-1234-1234,PRD-4321-4321 | Comma-separated list of SoftwareONE Marketplace Product ID |
 | `MPT_API_BASE_URL` | http://localhost:8000 | https://portal.softwareone.com/mpt | SoftwareONE Marketplace API URL |

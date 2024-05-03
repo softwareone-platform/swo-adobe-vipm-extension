@@ -77,7 +77,7 @@ def test_termination(
         return_value=processing_order,
     )
     mocked_process_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.process_order",
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",

@@ -100,7 +100,7 @@ def test_transfer(
     )
 
     mocked_process_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.process_order",
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
     mocked_complete_order = mocker.patch(
@@ -627,7 +627,7 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
     mocked_process_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.process_order",
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
     mocked_update_order = mocker.patch(
