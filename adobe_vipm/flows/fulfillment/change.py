@@ -9,10 +9,11 @@ import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.flows.constants import ITEM_TYPE_ORDER_LINE
+from adobe_vipm.flows.constants import ITEM_TYPE_ORDER_LINE, TEMPLATE_NAME_CHANGE
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
+    check_processing_template,
     handle_return_orders,
     save_adobe_order_id,
     set_subscription_actual_sku,
@@ -238,6 +239,7 @@ def fulfill_change_order(mpt_client, order):
     Returns:
         None
     """
+    check_processing_template(mpt_client, order, TEMPLATE_NAME_CHANGE)
     adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)
     adobe_order_id = get_adobe_order_id(order)
@@ -248,7 +250,7 @@ def fulfill_change_order(mpt_client, order):
 
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
-        switch_order_to_completed(mpt_client, order)
+        switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_CHANGE)
         return
     adobe_order = check_adobe_order_fulfilled(
         mpt_client, adobe_client, order, customer_id, adobe_order_id
@@ -291,4 +293,4 @@ def fulfill_change_order(mpt_client, order):
     update_order_actual_price(
         mpt_client, order, updated_lines, adobe_order["lineItems"]
     )
-    switch_order_to_completed(mpt_client, order)
+    switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_CHANGE)

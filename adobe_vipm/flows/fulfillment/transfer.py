@@ -28,9 +28,12 @@ from adobe_vipm.flows.constants import (
     ITEM_TYPE_ORDER_LINE,
     ITEM_TYPE_SUBSCRIPTION,
     PARAM_MEMBERSHIP_ID,
+    TEMPLATE_NAME_BULK_MIGRATE,
+    TEMPLATE_NAME_TRANSFER,
 )
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
+    check_processing_template,
     handle_retries,
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
@@ -214,7 +217,7 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
             ITEM_TYPE_SUBSCRIPTION,
             subscription,
         )
-    switch_order_to_completed(mpt_client, order)
+    switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
     transfer.mpt_order_id = order["id"]
     transfer.synchronized_at = datetime.now()
@@ -245,8 +248,11 @@ def fulfill_transfer_order(mpt_client, order):
     )
 
     if transfer:
+        check_processing_template(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
         _fulfill_transfer_migrated(mpt_client, order, transfer)
         return
+
+    check_processing_template(mpt_client, order, TEMPLATE_NAME_TRANSFER)
 
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:
@@ -278,4 +284,4 @@ def fulfill_transfer_order(mpt_client, order):
         add_subscription(
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
         )
-    switch_order_to_completed(mpt_client, order)
+    switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)

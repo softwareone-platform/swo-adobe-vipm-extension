@@ -6,7 +6,6 @@ import logging
 from operator import itemgetter
 
 from django.conf import settings
-from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
@@ -17,6 +16,9 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.constants import (
     ITEM_TYPE_ORDER_LINE,
+    MPT_ORDER_STATUS_COMPLETED,
+    MPT_ORDER_STATUS_PROCESSING,
+    MPT_ORDER_STATUS_QUERYING,
     PARAM_3YC,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
@@ -33,6 +35,8 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
+    get_product_template_or_default,
+    process_order,
     query_order,
     update_order,
     update_subscription,
@@ -170,14 +174,13 @@ def switch_order_to_query(client, order):
     Returns:
         None
     """
+    template = get_product_template_or_default(
+        client, order["agreement"]["product"]["id"], MPT_ORDER_STATUS_QUERYING
+    )
     order = reset_retry_count(order)
     kwargs = {
         "parameters": order["parameters"],
-        "template": {
-            "id": get_for_product(
-                settings, "QUERYING_TEMPLATES_IDS", order["agreement"]["product"]["id"]
-            )
-        },
+        "template": template,
     }
     if order.get("error"):
         kwargs["error"] = order["error"]
@@ -340,7 +343,7 @@ def handle_return_orders(mpt_client, adobe_client, customer_id, order, lines):
     return completed_order_ids, order
 
 
-def switch_order_to_completed(mpt_client, order):
+def switch_order_to_completed(mpt_client, order, template_name):
     """
     Reset the retry count to zero and switch the MPT order
     to completed using the completed template.
@@ -350,12 +353,16 @@ def switch_order_to_completed(mpt_client, order):
         order (dict): The MPT order that have to be switched to completed.
     """
     order = reset_retries(mpt_client, order)
+    template = get_product_template_or_default(
+        mpt_client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_COMPLETED,
+        template_name,
+    )
     complete_order(
         mpt_client,
         order["id"],
-        get_for_product(
-            settings, "COMPLETED_TEMPLATES_IDS", order["agreement"]["product"]["id"]
-        ),
+        template,
     )
     logger.info(f'Order {order["id"]} has been completed successfully')
 
@@ -502,3 +509,14 @@ def update_order_actual_price(
     lines = sorted(lines, key=itemgetter("id"))
 
     return update_order(mpt_client, order["id"], lines=lines)
+
+
+def check_processing_template(mpt_client, order, template_name):
+    template = get_product_template_or_default(
+        mpt_client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_PROCESSING,
+        template_name,
+    )
+    if template != order.get("template"):
+        process_order(mpt_client, order["id"], template)

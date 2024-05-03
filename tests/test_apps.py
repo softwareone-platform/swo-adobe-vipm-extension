@@ -30,42 +30,9 @@ def test_products_not_defined(settings):
     assert "MPT_PRODUCTS_IDS is missing or empty" in str(e.value)
 
 
-def test_querying_template_not_defined(settings):
-    settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
-    settings.EXTENSION_CONFIG = {}
-
-    app = apps.get_app_config("adobe_vipm")
-    with pytest.raises(ImproperlyConfigured) as e:
-        app.ready()
-
-    assert (
-        "Please, specify it in EXT_QUERYING_TEMPLATES_IDS environment variable."
-        in str(e.value)
-    )
-
-
-def test_completed_template_not_defined(settings):
-    settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
-    settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-123-123-123"},
-    }
-
-    app = apps.get_app_config("adobe_vipm")
-    with pytest.raises(ImproperlyConfigured) as e:
-        app.ready()
-
-    assert (
-        "Please, specify it in EXT_COMPLETED_TEMPLATES_IDS environment variable."
-        in str(e.value)
-    )
-
-
 def test_webhook_secret_not_defined(settings):
     settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
-    settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-123-123-123"},
-        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-321-321-321"},
-    }
+    settings.EXTENSION_CONFIG = {}
 
     app = apps.get_app_config("adobe_vipm")
     with pytest.raises(ImproperlyConfigured) as e:
