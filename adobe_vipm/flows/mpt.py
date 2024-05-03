@@ -64,9 +64,9 @@ def complete_order(mpt_client, order_id, template):
 
 
 @wrap_http_error
-def process_order(mpt_client, order_id, template):
-    response = mpt_client.post(
-        f"/commerce/orders/{order_id}/process",
+def set_processing_template(mpt_client, order_id, template):
+    response = mpt_client.put(
+        f"/commerce/orders/{order_id}",
         json={"template": template},
     )
     response.raise_for_status()
