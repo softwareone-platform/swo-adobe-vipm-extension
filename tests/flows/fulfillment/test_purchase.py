@@ -23,10 +23,14 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_ADOBE_PREFERRED_LANGUAGE,
+    MPT_ORDER_STATUS_COMPLETED,
+    MPT_ORDER_STATUS_PROCESSING,
+    MPT_ORDER_STATUS_QUERYING,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_AGREEMENT_TYPE,
     PARAM_MEMBERSHIP_ID,
+    TEMPLATE_NAME_PURCHASE,
 )
 from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.fulfillment.purchase import create_customer_account
@@ -38,7 +42,6 @@ from adobe_vipm.flows.utils import (
 
 def test_no_customer(
     mocker,
-    settings,
     agreement,
     order_factory,
     order_parameters_factory,
@@ -56,11 +59,13 @@ def test_no_customer(
         * order creation
         * subscription creation
         * order completion
+        * usage of right templates
     """
 
-    settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
-    }
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
     mocked_create_customer_account = mocker.patch(
@@ -118,6 +123,7 @@ def test_no_customer(
             ),
         ],
     )
+
     subscription = subscriptions_factory()[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
@@ -130,6 +136,9 @@ def test_no_customer(
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
         return_value=pricelist_items_factory(),
+    )
+    mocked_process_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.process_order",
     )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
@@ -214,10 +223,15 @@ def test_no_customer(
             "commitmentDate": adobe_subscription["renewalDate"],
         },
     )
+    mocked_process_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        {"id": "TPL-0000"},
+    )
     mocked_complete_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        "TPL-1111",
+        {"id": "TPL-1111"},
     )
     mocked_adobe_client.get_order.assert_called_once_with(
         authorization_id, "a-client-id", adobe_order["orderId"]
@@ -226,6 +240,19 @@ def test_no_customer(
         authorization_id,
         "a-client-id",
         adobe_subscription["subscriptionId"],
+    )
+    assert mocked_get_template.mock_calls[0].args == (
+        mocked_mpt_client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_PROCESSING,
+        TEMPLATE_NAME_PURCHASE,
+    )
+
+    assert mocked_get_template.mock_calls[1].args == (
+        mocked_mpt_client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_COMPLETED,
+        TEMPLATE_NAME_PURCHASE,
     )
 
 
@@ -681,14 +708,14 @@ def test_create_customer_account_address_error(
     order_parameters_factory,
     fulfillment_parameters_factory,
     adobe_api_error_factory,
-    settings,
 ):
     """
     Test address validation error handling when create a customer account in Adobe.
     """
-    settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
-    }
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-0000"},
+    )
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
         adobe_api_error_factory(
@@ -753,7 +780,6 @@ def test_create_customer_account_fields_error(
     order_parameters_factory,
     fulfillment_parameters_factory,
     adobe_api_error_factory,
-    settings,
     param_external_id,
     error_constant,
     error_details,
@@ -761,9 +787,11 @@ def test_create_customer_account_fields_error(
     """
     Test fields validation error handling when create a customer account in Adobe.
     """
-    settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
-    }
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-0000"},
+    )
+
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
         adobe_api_error_factory(
@@ -809,6 +837,13 @@ def test_create_customer_account_fields_error(
         },
         template={"id": "TPL-0000"},
     )
+
+    mocked_get_template.assert_called_once_with(
+        mocked_mpt_client,
+        mocker.ANY,
+        MPT_ORDER_STATUS_QUERYING,
+    )
+
     assert updated_order is None
 
 
@@ -937,11 +972,12 @@ def test_create_customer_account_3yc_minimum_error(
     order_parameters_factory,
     fulfillment_parameters_factory,
     adobe_api_error_factory,
-    settings,
 ):
-    settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
-    }
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-0000"},
+    )
+
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
         adobe_api_error_factory(
@@ -1004,11 +1040,11 @@ def test_create_customer_account_3yc_empty_minimums(
     mocker,
     order,
     adobe_api_error_factory,
-    settings,
 ):
-    settings.EXTENSION_CONFIG = {
-        "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-0000"},
-    }
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-0000"},
+    )
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
         adobe_api_error_factory(

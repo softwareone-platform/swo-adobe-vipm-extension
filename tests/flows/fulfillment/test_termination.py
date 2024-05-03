@@ -6,13 +6,18 @@ from adobe_vipm.adobe.constants import (
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
-from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS, ORDER_TYPE_TERMINATION
+from adobe_vipm.flows.constants import (
+    CANCELLATION_WINDOW_DAYS,
+    MPT_ORDER_STATUS_COMPLETED,
+    MPT_ORDER_STATUS_PROCESSING,
+    ORDER_TYPE_TERMINATION,
+    TEMPLATE_NAME_TERMINATION,
+)
 from adobe_vipm.flows.fulfillment import fulfill_order
 
 
 def test_termination(
     mocker,
-    settings,
     agreement,
     order_factory,
     lines_factory,
@@ -26,9 +31,10 @@ def test_termination(
         * adobe return order creation
         * order completion
     """
-    settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
-    }
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -70,7 +76,9 @@ def test_termination(
         "adobe_vipm.flows.fulfillment.shared.update_order",
         return_value=processing_order,
     )
-
+    mocked_process_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.process_order",
+    )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
@@ -85,11 +93,15 @@ def test_termination(
         order_to_return,
         order_to_return["lineItems"][0],
     )
-
+    mocked_process_order.assert_called_once_with(
+        mocked_mpt_client,
+        processing_order["id"],
+        {"id": "TPL-0000"},
+    )
     mocked_complete_order.assert_called_once_with(
         mocked_mpt_client,
         processing_order["id"],
-        "TPL-1111",
+        {"id": "TPL-1111"},
     )
     mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.assert_called_once_with(
         authorization_id,
@@ -97,11 +109,23 @@ def test_termination(
         processing_order["lines"][0]["item"]["externalIds"]["vendor"],
         processing_order["lines"][0]["id"],
     )
+    assert mocked_get_template.mock_calls[0].args == (
+        mocked_mpt_client,
+        processing_order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_PROCESSING,
+        TEMPLATE_NAME_TERMINATION,
+    )
+
+    assert mocked_get_template.mock_calls[1].args == (
+        mocked_mpt_client,
+        processing_order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_COMPLETED,
+        TEMPLATE_NAME_TERMINATION,
+    )
 
 
 def test_termination_return_order_pending(
     mocker,
-    settings,
     agreement,
     order_factory,
     lines_factory,
@@ -115,9 +139,6 @@ def test_termination_return_order_pending(
         * adobe return order creation
         * order completion
     """
-    settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
-    }
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     order_to_return = adobe_order_factory(
@@ -180,7 +201,6 @@ def test_termination_return_order_pending(
 
 def test_termination_out_window(
     mocker,
-    settings,
     agreement,
     order_factory,
     lines_factory,
@@ -193,9 +213,11 @@ def test_termination_out_window(
         * update subscription auto renewal
         * order completion
     """
-    settings.EXTENSION_CONFIG = {
-        "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-1111"},
-    }
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-1111"},
+    )
+
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     adobe_subscription = adobe_subscription_factory()
@@ -248,5 +270,5 @@ def test_termination_out_window(
     mocked_complete_order.assert_called_once_with(
         mocked_mpt_client,
         processing_order["id"],
-        "TPL-1111",
+        {"id": "TPL-1111"},
     )

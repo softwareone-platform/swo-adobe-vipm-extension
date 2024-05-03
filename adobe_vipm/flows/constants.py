@@ -135,3 +135,13 @@ ERR_3YC_NO_MINIMUMS = ValidationError(
     "To request 3-year commitment benefits you must fill at least one parameter between "
     "`{title_min_licenses}` and `{title_min_consumables}`."
 )
+
+MPT_ORDER_STATUS_PROCESSING = "Processing"
+MPT_ORDER_STATUS_QUERYING = "Querying"
+MPT_ORDER_STATUS_COMPLETED = "Completed"
+
+TEMPLATE_NAME_TRANSFER="Transfer"
+TEMPLATE_NAME_BULK_MIGRATE = "BulkMigrate"
+TEMPLATE_NAME_PURCHASE = "Purchase"
+TEMPLATE_NAME_CHANGE = "Change"
+TEMPLATE_NAME_TERMINATION = "Termination"

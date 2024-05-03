@@ -11,6 +11,7 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
+    get_product_template_or_default,
     get_webhook,
     query_order,
     update_order,
@@ -188,7 +189,7 @@ def test_complete_order(mpt_client, requests_mocker, order_factory):
     completed_order = complete_order(
         mpt_client,
         "ORD-0000",
-        "templateId",
+        {"id": "templateId"},
     )
     assert completed_order == order
 
@@ -204,7 +205,7 @@ def test_complete_order_error(mpt_client, requests_mocker, mpt_error_factory):
     )
 
     with pytest.raises(MPTError) as cv:
-        complete_order(mpt_client, "ORD-0000", "templateId")
+        complete_order(mpt_client, "ORD-0000", {"id": "templateId"})
 
     assert cv.value.payload["status"] == 404
 
@@ -479,3 +480,30 @@ def test_does_subscription_exist(mpt_client, requests_mocker, total, expected):
     )
 
     assert does_subscription_exist(mpt_client, "ORD-1234", "a-sub-id") is expected
+
+
+@pytest.mark.parametrize("name", ["template_name", None])
+def test_get_product_template_or_default(mpt_client, requests_mocker, name):
+    name_or_default_filter = "eq(default,true)"
+    if name:
+        name_or_default_filter = f"or({name_or_default_filter},eq(name,{name}))"
+    rql_filter = f"and(eq(type,OrderProcessing),{name_or_default_filter})"
+    url = f"/v1/products/PRD-1111/templates?{rql_filter}&limit=1"
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            url,
+        ),
+        json={
+            "data": [
+                {"id": "TPL-0000"},
+            ]
+        },
+    )
+
+    assert get_product_template_or_default(
+        mpt_client,
+        "PRD-1111",
+        "Processing",
+        name,
+    ) == {"id": "TPL-0000"}

@@ -29,10 +29,12 @@ from adobe_vipm.flows.constants import (
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_PREFERRED_LANGUAGE,
+    TEMPLATE_NAME_PURCHASE,
 )
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
+    check_processing_template,
     save_adobe_customer_data,
     save_adobe_order_id,
     switch_order_to_completed,
@@ -209,6 +211,7 @@ def fulfill_purchase_order(mpt_client, order):
     Returns:
         None
     """
+    check_processing_template(mpt_client, order, TEMPLATE_NAME_PURCHASE)
     adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)
     if not customer_id:
@@ -237,4 +240,4 @@ def fulfill_purchase_order(mpt_client, order):
         mpt_client, order, order["lines"], adobe_order["lineItems"]
     )
 
-    switch_order_to_completed(mpt_client, order)
+    switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_PURCHASE)

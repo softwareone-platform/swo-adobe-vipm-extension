@@ -15,27 +15,6 @@ class ExtensionConfig(DjAppConfig):
 
         for product_id in settings.MPT_PRODUCTS_IDS:
             if (
-                "QUERYING_TEMPLATES_IDS" not in settings.EXTENSION_CONFIG
-                or product_id not in settings.EXTENSION_CONFIG["QUERYING_TEMPLATES_IDS"]
-            ):
-                msg = (
-                    f"The querying template id for product {product_id} is not found. "
-                    f"Please, specify it in EXT_QUERYING_TEMPLATES_IDS environment variable."
-                )
-                error_msgs.append(msg)
-
-            if (
-                "COMPLETED_TEMPLATES_IDS" not in settings.EXTENSION_CONFIG
-                or product_id
-                not in settings.EXTENSION_CONFIG["COMPLETED_TEMPLATES_IDS"]
-            ):
-                msg = (
-                    f"The completed template id for product {product_id} is not found. "
-                    f"Please, specify it in EXT_COMPLETED_TEMPLATES_IDS environment variable."
-                )
-                error_msgs.append(msg)
-
-            if (
                 "WEBHOOKS_SECRETS" not in settings.EXTENSION_CONFIG
                 or product_id not in settings.EXTENSION_CONFIG["WEBHOOKS_SECRETS"]
             ):

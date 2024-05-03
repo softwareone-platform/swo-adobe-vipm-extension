@@ -5,7 +5,9 @@ processing.
 """
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.flows.constants import TEMPLATE_NAME_TERMINATION
 from adobe_vipm.flows.fulfillment.shared import (
+    check_processing_template,
     handle_return_orders,
     switch_order_to_completed,
 )
@@ -63,6 +65,7 @@ def fulfill_termination_order(mpt_client, order):
         mpt_client (MPTClient):  an instance of the Marketplace platform client.
         order (dct): The MPT termination order.
     """
+    check_processing_template(mpt_client, order, TEMPLATE_NAME_TERMINATION)
     adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)
 
@@ -76,7 +79,7 @@ def fulfill_termination_order(mpt_client, order):
         grouped_items.upsizing_in_win + grouped_items.downsizing_in_win
     )
     if not has_orders_to_return:
-        switch_order_to_completed(mpt_client, order)
+        switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TERMINATION)
         return
 
     completed_return_orders, order = handle_return_orders(
@@ -88,4 +91,4 @@ def fulfill_termination_order(mpt_client, order):
     )
 
     if completed_return_orders:
-        switch_order_to_completed(mpt_client, order)
+        switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TERMINATION)

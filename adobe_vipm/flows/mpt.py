@@ -54,10 +54,20 @@ def fail_order(mpt_client, order_id, reason):
 
 
 @wrap_http_error
-def complete_order(mpt_client, order_id, template_id):
+def complete_order(mpt_client, order_id, template):
     response = mpt_client.post(
         f"/commerce/orders/{order_id}/complete",
-        json={"template": {"id": template_id}},
+        json={"template": template},
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def process_order(mpt_client, order_id, template):
+    response = mpt_client.post(
+        f"/commerce/orders/{order_id}/process",
+        json={"template": template},
     )
     response.raise_for_status()
     return response.json()
@@ -138,3 +148,16 @@ def get_webhook(mpt_client, webhook_id):
     response.raise_for_status()
 
     return response.json()
+
+
+@wrap_http_error
+def get_product_template_or_default(mpt_client, product_id, status, name=None):
+    name_or_default_filter = "eq(default,true)"
+    if name:
+        name_or_default_filter = f"or({name_or_default_filter},eq(name,{name}))"
+    rql_filter = f"and(eq(type,Order{status}),{name_or_default_filter})"
+    url = f"/products/{product_id}/templates?{rql_filter}&limit=1"
+    response = mpt_client.get(url)
+    response.raise_for_status()
+    templates = response.json()
+    return templates["data"][0]

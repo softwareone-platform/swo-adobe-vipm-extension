@@ -181,8 +181,6 @@ MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30
 EXTENSION_CONFIG = {
     "ADOBE_API_BASE_URL": "https://api.adobe",
     "ADOBE_AUTH_ENDPOINT_URL": "https://authenticate.adobe",
-    "QUERYING_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-964-112"},
-    "COMPLETED_TEMPLATES_IDS": {"PRD-1111-1111": "TPL-4321-4321"},
     "WEBHOOKS_SECRETS": {"PRD-1111-1111": "that's my awesome test secret"},
     "AIRTABLE_BASES": {"PRD-1111-1111": "some-bases"},
 }
