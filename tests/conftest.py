@@ -24,7 +24,6 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
     PARAM_MEMBERSHIP_ID,
-    PARAM_PREFERRED_LANGUAGE,
     PARAM_RETRY_COUNT,
 )
 
@@ -224,7 +223,6 @@ def account_data():
     """
     return {
         "companyName": "ACME Inc",
-        "preferredLanguage": "en-US",
         "address": {
             "country": "US",
             "state": "CA",
@@ -263,7 +261,6 @@ def reseller_data(account_data):
 def order_parameters_factory():
     def _order_parameters(
         company_name="FF Buyer good enough",
-        preferred_language="en-US",
         address=None,
         contact=None,
         p3yc=None,
@@ -299,17 +296,6 @@ def order_parameters_factory():
                 "externalId": PARAM_COMPANY_NAME,
                 "type": "SingleLineText",
                 "value": company_name,
-                "constraints": {
-                    "hidden": False,
-                    "optional": False,
-                },
-            },
-            {
-                "id": "PAR-0000-0002",
-                "name": "Preferred Language",
-                "externalId": PARAM_PREFERRED_LANGUAGE,
-                "type": "Choice",
-                "value": preferred_language,
                 "constraints": {
                     "hidden": False,
                     "optional": False,
@@ -402,7 +388,6 @@ def transfer_order_parameters_factory():
     def _order_parameters(
         membership_id="a-membership-id",
         company_name=None,
-        preferred_language=None,
         address=None,
         contact=None,
         p3yc=None,
@@ -416,17 +401,6 @@ def transfer_order_parameters_factory():
                 "externalId": PARAM_COMPANY_NAME,
                 "type": "SingleLineText",
                 "value": company_name or "",
-                "constraints": {
-                    "hidden": True,
-                    "optional": True,
-                },
-            },
-            {
-                "id": "PAR-0000-0002",
-                "name": "Preferred Language",
-                "externalId": PARAM_PREFERRED_LANGUAGE,
-                "type": "Choice",
-                "value": preferred_language or "",
                 "constraints": {
                     "hidden": True,
                     "optional": True,

@@ -17,14 +17,12 @@ from adobe_vipm.flows.constants import (
     ERR_PHONE_NUMBER_LENGTH,
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
-    ERR_PREFERRED_LANGUAGE,
     ERR_STATE_OR_PROVINCE,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
-    PARAM_PREFERRED_LANGUAGE,
 )
 from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
 from adobe_vipm.flows.validation.purchase import (
@@ -33,7 +31,6 @@ from adobe_vipm.flows.validation.purchase import (
     validate_company_name,
     validate_contact,
     validate_customer_data,
-    validate_preferred_language,
 )
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
@@ -120,54 +117,6 @@ def test_validate_company_name_invalid_chars(
 
     param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"])
-    assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
-
-
-def test_validate_preferred_language(order_factory, order_parameters_factory):
-    """
-    Tests the validation of the preferred language when it is valid.
-    """
-    order = order_factory(
-        order_parameters=order_parameters_factory(preferred_language="en-US")
-    )
-    customer_data = get_customer_data(order)
-
-    has_error, order = validate_preferred_language(order, customer_data)
-
-    assert has_error is False
-
-    param = get_ordering_parameter(
-        order,
-        PARAM_PREFERRED_LANGUAGE,
-    )
-    assert "error" not in param
-
-
-def test_validate_preferred_language_invalid(
-    order_factory,
-    order_parameters_factory,
-):
-    """
-    Tests the validation of the preferred language when it is invalid.
-    """
-    order = order_factory(
-        order_parameters=order_parameters_factory(preferred_language="invalid")
-    )
-    customer_data = get_customer_data(order)
-
-    has_error, order = validate_preferred_language(order, customer_data)
-
-    assert has_error is True
-
-    param = get_ordering_parameter(
-        order,
-        PARAM_PREFERRED_LANGUAGE,
-    )
-    assert param["error"] == ERR_PREFERRED_LANGUAGE.to_dict(
-        title=param["name"],
-        languages="en-US",
-    )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["optional"] is False
 
@@ -531,7 +480,6 @@ def test_validate_customer_data(mocker):
     fn_mocks = []
     for fnname in (
         "validate_company_name",
-        "validate_preferred_language",
         "validate_address",
         "validate_contact",
         "validate_3yc",
@@ -558,7 +506,6 @@ def test_validate_customer_data(mocker):
     "no_validating_fn",
     [
         "validate_company_name",
-        "validate_preferred_language",
         "validate_address",
         "validate_contact",
         "validate_3yc",
@@ -571,7 +518,6 @@ def test_validate_customer_data_invalid(mocker, no_validating_fn):
     """
     for fnname in (
         "validate_company_name",
-        "validate_preferred_language",
         "validate_address",
         "validate_contact",
         "validate_3yc",

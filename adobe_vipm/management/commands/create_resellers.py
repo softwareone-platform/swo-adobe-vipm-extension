@@ -21,7 +21,6 @@ from adobe_vipm.adobe.validation import (
     is_valid_phone_number_length,
     is_valid_postal_code,
     is_valid_postal_code_length,
-    is_valid_preferred_language,
     is_valid_state_or_province,
 )
 from adobe_vipm.utils import find_first
@@ -30,20 +29,19 @@ COLUMNS = {
     "A": "authorization_uk",
     "B": "seller_uk",
     "C": "company_name",
-    "D": "preferred_language",
-    "E": "address_line_1",
-    "F": "address_line_2",
-    "G": "postal_code",
-    "H": "city",
-    "I": "region",
-    "J": "country",
-    "K": "phone_prefix",
-    "L": "phone_number",
-    "M": "contact_first_name",
-    "N": "contact_last_name",
-    "O": "contact_email",
-    "P": "status",
-    "Q": "error_message",
+    "D": "address_line_1",
+    "E": "address_line_2",
+    "F": "postal_code",
+    "G": "city",
+    "H": "region",
+    "I": "country",
+    "J": "phone_prefix",
+    "K": "phone_number",
+    "L": "contact_first_name",
+    "M": "contact_last_name",
+    "N": "contact_email",
+    "O": "status",
+    "P": "error_message",
 }
 
 
@@ -107,7 +105,6 @@ class Command(BaseCommand):
     def prepare_reseller_data(self, row_data):
         return {
             "companyName": row_data["company_name"],
-            "preferredLanguage": row_data["preferred_language"],
             "address": {
                 "addressLine1": row_data["address_line_1"],
                 "addressLine2": row_data["address_line_2"],
@@ -174,8 +171,8 @@ class Command(BaseCommand):
             try:
                 authorization = adobe_config.get_authorization(authorization_uk)
             except AuthorizationNotFoundError:
-                sheet[f"P{idx}"].value = "KO"
-                sheet[f"Q{idx}"].value = "Authorization not found"
+                sheet[f"O{idx}"].value = "KO"
+                sheet[f"P{idx}"].value = "Authorization not found"
                 workbook.save(excel_file)
                 self.error(
                     f"Authorization not found for {row_data['seller_uk']} - "
@@ -184,8 +181,8 @@ class Command(BaseCommand):
                 continue
 
             if adobe_config.reseller_exists(authorization, row_data["seller_uk"]):
-                sheet[f"P{idx}"].value = "OK"
-                sheet[f"Q{idx}"].value = ""
+                sheet[f"O{idx}"].value = "OK"
+                sheet[f"P{idx}"].value = ""
                 workbook.save(excel_file)
                 self.warning(
                     f"Reseller {row_data['seller_uk']} - "
@@ -198,8 +195,8 @@ class Command(BaseCommand):
             errors = self.validate_reseller_data(reseller_data)
             if errors:
                 err_message = ", ".join(errors)
-                sheet[f"P{idx}"].value = "KO"
-                sheet[f"Q{idx}"].value = err_message
+                sheet[f"O{idx}"].value = "KO"
+                sheet[f"P{idx}"].value = err_message
                 workbook.save(excel_file)
                 self.error(
                     f"Error validating data of {row_data['seller_uk']} - "
@@ -215,8 +212,8 @@ class Command(BaseCommand):
                     reseller_data,
                 )
             except AdobeAPIError as e:
-                sheet[f"P{idx}"].value = "KO"
-                sheet[f"Q{idx}"].value = str(e)
+                sheet[f"O{idx}"].value = "KO"
+                sheet[f"P{idx}"].value = str(e)
                 workbook.save(excel_file)
                 self.error(
                     f"Error creating {row_data['seller_uk']} - "
@@ -230,7 +227,7 @@ class Command(BaseCommand):
                 seller_uk,
                 reseller_id,
             )
-            sheet[f"P{idx}"].value = "OK"
+            sheet[f"O{idx}"].value = "OK"
             workbook.save(excel_file)
             self.success(
                 f"Reseller {row_data['seller_uk']} - "
@@ -245,9 +242,6 @@ class Command(BaseCommand):
 
         if not is_valid_company_name(reseller_data["companyName"]):
             errors.append("invalid company_name")
-
-        if not is_valid_preferred_language(reseller_data["preferredLanguage"]):
-            errors.append("invalid preferred_language")
 
         return errors
 

@@ -22,7 +22,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
-    ERR_ADOBE_PREFERRED_LANGUAGE,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     MPT_ORDER_STATUS_QUERYING,
@@ -663,7 +662,6 @@ def test_create_customer_account_empty_order_parameters(
 
     order["parameters"]["ordering"] = order_parameters_factory(
         company_name="",
-        preferred_language="",
         address={},
         contact={},
     )
@@ -767,11 +765,6 @@ def test_create_customer_account_address_error(
     [
         ("contact", ERR_ADOBE_CONTACT, "companyProfile.contacts[0].firstName"),
         ("companyName", ERR_ADOBE_COMPANY_NAME, "companyProfile.companyName"),
-        (
-            "preferredLanguage",
-            ERR_ADOBE_PREFERRED_LANGUAGE,
-            "companyProfile.preferredLanguage",
-        ),
     ],
 )
 def test_create_customer_account_fields_error(

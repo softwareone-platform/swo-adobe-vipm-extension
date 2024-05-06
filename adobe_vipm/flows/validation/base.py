@@ -9,7 +9,6 @@ from adobe_vipm.flows.constants import (
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_MEMBERSHIP_ID,
-    PARAM_PREFERRED_LANGUAGE,
 )
 from adobe_vipm.flows.helpers import (
     populate_order_info,
@@ -31,7 +30,6 @@ from adobe_vipm.flows.validation.transfer import validate_transfer
 
 NEW_CUSTOMER_PARAMETERS = (
     PARAM_COMPANY_NAME,
-    PARAM_PREFERRED_LANGUAGE,
     PARAM_ADDRESS,
     PARAM_CONTACT,
     PARAM_3YC,

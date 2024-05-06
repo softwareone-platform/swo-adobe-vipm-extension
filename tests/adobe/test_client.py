@@ -51,7 +51,7 @@ def test_create_reseller_account(
         "distributorId": distributor_id,
         "companyProfile": {
             "companyName": reseller_data["companyName"],
-            "preferredLanguage": reseller_data["preferredLanguage"],
+            "preferredLanguage": "en-US",
             "address": {
                 "country": reseller_data["address"]["country"],
                 "region": reseller_data["address"]["state"],
@@ -163,7 +163,7 @@ def test_create_customer_account(
         "externalReferenceId": "external_id",
         "companyProfile": {
             "companyName": company_name,
-            "preferredLanguage": customer_data["preferredLanguage"],
+            "preferredLanguage": "en-US",
             "address": {
                 "country": customer_data["address"]["country"],
                 "region": customer_data["address"]["state"],
@@ -1718,7 +1718,7 @@ def test_create_customer_account_3yc(
         "externalReferenceId": "external_id",
         "companyProfile": {
             "companyName": company_name,
-            "preferredLanguage": modified_customer["preferredLanguage"],
+            "preferredLanguage": "en-US",
             "address": {
                 "country": modified_customer["address"]["country"],
                 "region": modified_customer["address"]["state"],

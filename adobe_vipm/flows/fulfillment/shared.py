@@ -26,7 +26,6 @@ from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
-    PARAM_PREFERRED_LANGUAGE,
 )
 from adobe_vipm.flows.mpt import (
     complete_order,
@@ -88,7 +87,6 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
 
     customer_data = {
         PARAM_COMPANY_NAME: customer["companyProfile"]["companyName"],
-        PARAM_PREFERRED_LANGUAGE: customer["companyProfile"]["preferredLanguage"],
         PARAM_ADDRESS: {
             "country": address["country"],
             "state": address["region"],
