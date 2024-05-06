@@ -25,7 +25,6 @@ from adobe_vipm.flows.constants import (
     PARAM_MEMBERSHIP_ID,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
-    PARAM_PREFERRED_LANGUAGE,
     PARAM_RETRY_COUNT,
 )
 from adobe_vipm.flows.dataclasses import ItemGroups
@@ -194,7 +193,6 @@ def get_customer_data(order):
     customer_data = {}
     for param_external_id in (
         PARAM_COMPANY_NAME,
-        PARAM_PREFERRED_LANGUAGE,
         PARAM_ADDRESS,
         PARAM_CONTACT,
         PARAM_3YC,

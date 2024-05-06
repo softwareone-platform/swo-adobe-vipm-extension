@@ -24,7 +24,6 @@ PARAM_COMPANY_NAME = "companyName"
 PARAM_CONTACT = "contact"
 PARAM_CUSTOMER_ID = "customerId"
 PARAM_MEMBERSHIP_ID = "membershipId"
-PARAM_PREFERRED_LANGUAGE = "preferredLanguage"
 PARAM_RETRY_COUNT = "retryCount"
 PARAM_AGREEMENT_TYPE = "agreementType"
 PARAM_3YC = "3YC"
@@ -45,7 +44,6 @@ FAKE_CUSTOMER_ID = "1234567890"
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
 
 ERR_ADOBE_COMPANY_NAME = ValidationError("VIPMA001", ADOBE_ERR_MSG)
-ERR_ADOBE_PREFERRED_LANGUAGE = ValidationError("VIPMA002", ADOBE_ERR_MSG)
 ERR_ADOBE_ADDRESS = ValidationError("VIPMA003", ADOBE_ERR_MSG)
 ERR_ADOBE_CONTACT = ValidationError("VIPMA004", ADOBE_ERR_MSG)
 ERR_ADOBE_MEMBERSHIP_ID = ValidationError("VIPMA005", ADOBE_ERR_MSG)
@@ -65,10 +63,6 @@ ERR_COMPANY_NAME_CHARS = ValidationError(
     "The provided `{title}` must only contain letters, digits, spaces, "
     "commas, periods, ampersands, hyphens, apostrophes, parentheses, "
     "forward slashes, backslashes, double quotes, and underscores.",
-)
-ERR_PREFERRED_LANGUAGE = ValidationError(
-    "VIPMV003",
-    "The provided `{title}` is not valid.",
 )
 ERR_ADDRESS = ValidationError(
     "VIPMV004",

@@ -144,9 +144,6 @@ def test_transfer(
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
-                preferred_language=adobe_customer["companyProfile"][
-                    "preferredLanguage"
-                ],
                 address={
                     "country": adobe_customer_address["country"],
                     "state": adobe_customer_address["region"],
@@ -588,9 +585,6 @@ def test_fulfill_transfer_order_already_migrated(
         ),
         order_parameters=transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
-                preferred_language=adobe_customer["companyProfile"][
-                    "preferredLanguage"
-                ],
                 address={
                     "country": adobe_customer_address["country"],
                     "state": adobe_customer_address["region"],
@@ -898,9 +892,6 @@ def test_transfer_3yc_customer(
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
-                preferred_language=adobe_customer["companyProfile"][
-                    "preferredLanguage"
-                ],
                 address={
                     "country": adobe_customer_address["country"],
                     "state": adobe_customer_address["region"],

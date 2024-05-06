@@ -9,7 +9,6 @@ from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
-    PARAM_PREFERRED_LANGUAGE,
 )
 from adobe_vipm.flows.mpt import (
     get_agreement,
@@ -65,7 +64,6 @@ def prepare_customer_data(client, order):
             order,
             {
                 PARAM_COMPANY_NAME: buyer["name"],
-                PARAM_PREFERRED_LANGUAGE: "en-US",
                 PARAM_ADDRESS: {
                     "country": buyer["address"]["country"],
                     "state": buyer["address"]["state"],

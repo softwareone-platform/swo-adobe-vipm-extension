@@ -26,11 +26,6 @@ def is_valid_company_name(name):
     return REGEX_COMPANY_NAME.match(name)
 
 
-def is_valid_preferred_language(language_code):
-    config = get_config()
-    return language_code in config.language_codes
-
-
 def is_valid_country(country_code):
     config = get_config()
     return country_code in config.country_codes

@@ -124,10 +124,10 @@ def test_skip_processed(mocker, adobe_authorizations_file, tmp_path):
 
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
-        if letter not in ("P", "Q"):
+        if letter not in ("O", "P"):
             ws[f"{letter}2"].value = f"row_1_{column}"
 
-    ws["P2"].value = "OK"
+    ws["O2"].value = "OK"
     wb.save(tmp_path / "test.xlsx")
 
     mocker.patch.object(
@@ -159,7 +159,7 @@ def test_authorization_not_found(mocker, adobe_authorizations_file, tmp_path):
 
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
-        if letter not in ("P", "Q"):
+        if letter not in ("O", "P"):
             ws[f"{letter}2"].value = f"row_1_{column}"
 
     wb.save(tmp_path / "test.xlsx")
@@ -183,8 +183,8 @@ def test_authorization_not_found(mocker, adobe_authorizations_file, tmp_path):
     ws = wb.active
 
     assert "Authorization not found for " in err.getvalue()
-    assert ws["P2"].value == "KO"
-    assert ws["Q2"].value == "Authorization not found"
+    assert ws["O2"].value == "KO"
+    assert ws["P2"].value == "Authorization not found"
 
 
 def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
@@ -211,7 +211,7 @@ def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
         if column == "seller_uk":
             ws[f"{letter}2"].value = seller_uk
             continue
-        if letter not in ("P", "Q"):
+        if letter not in ("O", "P"):
             ws[f"{letter}2"].value = f"row_1_{column}"
 
     wb.save(tmp_path / "test.xlsx")
@@ -229,8 +229,8 @@ def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
     ws = wb.active
 
     assert "already exist." in out.getvalue()
-    assert ws["P2"].value == "OK"
-    assert ws["Q2"].value is None
+    assert ws["O2"].value == "OK"
+    assert ws["P2"].value is None
 
 
 def test_reseller_create_ok(
@@ -253,7 +253,7 @@ def test_reseller_create_ok(
         if column == "seller_uk":
             ws[f"{letter}2"].value = "another_seller_uk"
             continue
-        if letter not in ("P", "Q"):
+        if letter not in ("O", "P"):
             ws[f"{letter}2"].value = f"row_1_{column}"
 
     wb.save(tmp_path / "test.xlsx")
@@ -306,8 +306,8 @@ def test_reseller_create_ok(
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
 
-    assert ws["P2"].value == "OK"
-    assert ws["Q2"].value is None
+    assert ws["O2"].value == "OK"
+    assert ws["P2"].value is None
 
     mocked_dump.assert_called_once_with(
         new_auth,
@@ -334,7 +334,7 @@ def test_api_error(
         if column == "seller_uk":
             ws[f"{letter}2"].value = "another_seller_uk"
             continue
-        if letter not in ("P", "Q"):
+        if letter not in ("O", "P"):
             ws[f"{letter}2"].value = f"row_1_{column}"
 
     wb.save(tmp_path / "test.xlsx")
@@ -374,8 +374,8 @@ def test_api_error(
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
 
-    assert ws["P2"].value == "KO"
-    assert ws["Q2"].value == str(api_error)
+    assert ws["O2"].value == "KO"
+    assert ws["P2"].value == str(api_error)
 
 
 def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
@@ -394,7 +394,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
         if column == "seller_uk":
             ws[f"{letter}2"].value = "another_seller_uk"
             continue
-        if letter not in ("P", "Q"):
+        if letter not in ("O", "P"):
             ws[f"{letter}2"].value = f"row_1_{column}"
 
     wb.save(tmp_path / "test.xlsx")
@@ -425,8 +425,8 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
 
-    assert ws["P2"].value == "KO"
-    assert ws["Q2"].value == "error1, error2"
+    assert ws["O2"].value == "KO"
+    assert ws["P2"].value == "error1, error2"
 
 
 @pytest.mark.parametrize(
@@ -434,7 +434,6 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
     [
         ("companyName", ""),
         ("companyName", "Euro € Company"),
-        ("preferredLanguage", "zz-KK"),
         (
             "address",
             {
@@ -549,7 +548,7 @@ def test_validation_errors(
         if column == "seller_uk":
             ws[f"{letter}2"].value = "another_seller_uk"
             continue
-        if letter not in ("P", "Q"):
+        if letter not in ("O", "P"):
             ws[f"{letter}2"].value = f"row_1_{column}"
 
     wb.save(tmp_path / "test.xlsx")
@@ -577,5 +576,5 @@ def test_validation_errors(
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
 
-    assert ws["P2"].value == "KO"
-    assert ws["Q2"].value.startswith("invalid")
+    assert ws["O2"].value == "KO"
+    assert ws["P2"].value.startswith("invalid")

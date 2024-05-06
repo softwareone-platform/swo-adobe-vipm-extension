@@ -65,7 +65,9 @@ class AdobeClient:
             "distributorId": authorization.distributor_id,
             "companyProfile": {
                 "companyName": reseller_data["companyName"],
-                "preferredLanguage": reseller_data["preferredLanguage"],
+                "preferredLanguage": self._config.get_preferred_language(
+                    reseller_data["address"]["country"]
+                ),
                 "address": {
                     "country": reseller_data["address"]["country"],
                     "region": reseller_data["address"]["state"],
@@ -134,7 +136,9 @@ class AdobeClient:
             "externalReferenceId": agreement_id,
             "companyProfile": {
                 "companyName": company_name,
-                "preferredLanguage": customer_data["preferredLanguage"],
+                "preferredLanguage": self._config.get_preferred_language(
+                    customer_data["address"]["country"],
+                ),
                 "address": {
                     "country": customer_data["address"]["country"],
                     "region": customer_data["address"]["state"],

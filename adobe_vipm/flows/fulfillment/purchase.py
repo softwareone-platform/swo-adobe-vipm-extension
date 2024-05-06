@@ -21,14 +21,12 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
-    ERR_ADOBE_PREFERRED_LANGUAGE,
     ITEM_TYPE_ORDER_LINE,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
-    PARAM_PREFERRED_LANGUAGE,
     TEMPLATE_NAME_PURCHASE,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -117,15 +115,6 @@ def _handle_customer_error(client, order, error):
                 order,
                 PARAM_COMPANY_NAME,
                 ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(error)),
-            )
-        if "companyProfile.preferredLanguage" in error.details:
-            param = get_ordering_parameter(order, PARAM_PREFERRED_LANGUAGE)
-            order = set_ordering_parameter_error(
-                order,
-                PARAM_PREFERRED_LANGUAGE,
-                ERR_ADOBE_PREFERRED_LANGUAGE.to_dict(
-                    title=param["name"], details=str(error)
-                ),
             )
         if len(
             list(

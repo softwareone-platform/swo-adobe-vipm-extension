@@ -15,7 +15,6 @@ from adobe_vipm.adobe.validation import (
     is_valid_phone_number_length,
     is_valid_postal_code,
     is_valid_postal_code_length,
-    is_valid_preferred_language,
     is_valid_state_or_province,
 )
 from adobe_vipm.flows.constants import (
@@ -36,7 +35,6 @@ from adobe_vipm.flows.constants import (
     ERR_PHONE_NUMBER_LENGTH,
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
-    ERR_PREFERRED_LANGUAGE,
     ERR_STATE_OR_PROVINCE,
     PARAM_3YC,
     PARAM_3YC_CONSUMABLES,
@@ -44,7 +42,6 @@ from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
-    PARAM_PREFERRED_LANGUAGE,
 )
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
@@ -114,18 +111,6 @@ def validate_company_name(order, customer_data):
             order,
             PARAM_COMPANY_NAME,
             ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"]),
-        )
-        return True, order
-    return False, order
-
-
-def validate_preferred_language(order, customer_data):
-    param = get_ordering_parameter(order, PARAM_PREFERRED_LANGUAGE)
-    if not is_valid_preferred_language(customer_data[PARAM_PREFERRED_LANGUAGE]):
-        order = set_ordering_parameter_error(
-            order,
-            PARAM_PREFERRED_LANGUAGE,
-            ERR_PREFERRED_LANGUAGE.to_dict(title=param["name"]),
         )
         return True, order
     return False, order
@@ -214,9 +199,6 @@ def validate_customer_data(order, customer_data):
     has_errors = False
 
     has_error, order = validate_company_name(order, customer_data)
-    has_errors = has_errors or has_error
-
-    has_error, order = validate_preferred_language(order, customer_data)
     has_errors = has_errors or has_error
 
     has_error, order = validate_address(order, customer_data)

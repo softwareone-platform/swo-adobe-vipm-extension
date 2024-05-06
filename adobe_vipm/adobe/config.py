@@ -16,6 +16,7 @@ from adobe_vipm.adobe.errors import (
     CountryNotFoundError,
     ResellerNotFoundError,
 )
+from adobe_vipm.utils import find_first
 
 
 class Config:
@@ -47,16 +48,18 @@ class Config:
 
     def get_authorization(self, id: str) -> Authorization:
         """
-        _summary_
+        Returns an Authorization based on its identifier.
 
         Args:
-            id (str): _description_
+            id (str): the identifier of the Authorization.
 
         Raises:
-            AuthorizationNotFoundError: _description_
+            AuthorizationNotFoundError: if there is no Authorization
+                with such id.
 
         Returns:
-            Authorization: _description_
+            Authorization: the Authorization object identified by
+                the provided id.
         """
         try:
             return self.authorizations[id]
@@ -67,17 +70,20 @@ class Config:
 
     def get_reseller(self, authorization: Authorization, id: str) -> Reseller:
         """
-        _summary_
+        Returns a Reseller based on the Authorization and the Reseller
+        identifier.
 
         Args:
-            authorization (Authorization): _description_
-            id (str): _description_
+            authorization (Authorization): The Authorization for looking up the
+                reseller.
+            id (str): Identifier of the Reseller to retrieve.
 
         Raises:
-            ResellerNotFoundError: _description_
+            ResellerNotFoundError: if there is no Reseller with such
+            lookup keys.
 
         Returns:
-            Reseller: _description_
+            Reseller: The Reseller object.
         """
         try:
             return self.resellers[(authorization, id)]
@@ -89,29 +95,34 @@ class Config:
 
     def reseller_exists(self, authorization: Authorization, id: str) -> bool:
         """
-        _summary_
+        Returns True if a Reseller with a given Authorization and
+        identifier exists, else otherwise.
 
         Args:
-            authorization (Authorization): _description_
-            id (str): _description_
+            authorization (Authorization): The Authorization object used
+                to search for the Reseller.
+            id (str): The id of the Reseller to search for.
 
         Returns:
-            bool: _description_
+            bool: True if it exists False otherwise.
         """
         return (authorization, id) in self.resellers
 
     def get_adobe_product(self, vendor_external_id: str) -> AdobeProduct:
         """
-        _summary_
+        Returns the AdobeProduct object identified by the vendor
+        external id.
 
         Args:
-            vendor_external_id (str): _description_
+            vendor_external_id (str): The vendor external id to search
+                for the AdobeProduct.
 
         Raises:
-            AdobeProductNotFoundError: _description_
+            AdobeProductNotFoundError: If no AdobeProduct exists for the
+                given vendor external id.
 
         Returns:
-            AdobeProduct: _description_
+            AdobeProduct: The AdobeProduct object.
         """
         try:
             return self.skus_mapping[vendor_external_id]
@@ -122,16 +133,18 @@ class Config:
 
     def get_country(self, code: str) -> Country:
         """
-        _summary_
+        Returns a Country object identified by the Country code.
 
         Args:
-            code (str): _description_
+            code (str): The Country code to retrieve the Country
+                object.
 
         Raises:
-            CountryNotFoundError: _description_
+            CountryNotFoundError: If there is no Country object
+                identified by the given Country code.
 
         Returns:
-            Country: _description_
+            Country: The Country object.
         """
         try:
             return self.countries[code]
@@ -139,6 +152,13 @@ class Config:
             raise CountryNotFoundError(
                 f"Country with code {code} not found.",
             )
+
+    def get_preferred_language(self, country: str) -> str:
+        return find_first(
+            lambda code: code.endswith(f"-{country}"),
+            self.language_codes,
+            "en-US",
+        )
 
     @classmethod
     def _load_credentials(cls):
