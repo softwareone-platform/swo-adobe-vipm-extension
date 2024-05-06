@@ -24,6 +24,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
     PARAM_MEMBERSHIP_ID,
+    PARAM_NEXT_SYNC_DATE,
     PARAM_RETRY_COUNT,
 )
 
@@ -496,6 +497,7 @@ def fulfillment_parameters_factory():
         p3yc_enroll_status="",
         p3yc_start_date="",
         p3yc_end_date="",
+        next_sync_date="",
 
     ):
         return [
@@ -533,6 +535,13 @@ def fulfillment_parameters_factory():
                 "externalId": PARAM_3YC_END_DATE,
                 "type": "Date",
                 "value": p3yc_end_date,
+            },
+            {
+                "id": "PAR-4141-1414",
+                "name": "Next Sync",
+                "externalId": PARAM_NEXT_SYNC_DATE,
+                "type": "Date",
+                "value": next_sync_date,
             },
         ]
 
@@ -623,6 +632,7 @@ def subscriptions_factory(lines_factory):
         adobe_subscription_id="a-sub-id",
         adobe_sku="65304578CA01A12",
         start_date=None,
+        commitment_date=None,
         lines=None,
     ):
         start_date = (
@@ -648,6 +658,7 @@ def subscriptions_factory(lines_factory):
                 },
                 "lines": lines,
                 "startDate": start_date,
+                "commitmentDate": commitment_date,
             }
         ]
 

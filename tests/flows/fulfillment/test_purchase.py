@@ -120,10 +120,18 @@ def test_no_customer(
                 ),
                 external_ids={"vendor": adobe_order["orderId"]},
             ),
+            order_factory(
+                fulfillment_parameters=fulfillment_parameters_factory(
+                    customer_id="a-client-id",
+                    retry_count="0",
+                    next_sync_date="2024-01-01",
+                ),
+                external_ids={"vendor": adobe_order["orderId"]},
+            ),
         ],
     )
 
-    subscription = subscriptions_factory()[0]
+    subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscription,
@@ -177,6 +185,20 @@ def test_no_customer(
         order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-01-02",
+            ),
+            "ordering": order_parameters_factory(),
+        },
+    }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "lines": [
             {
                 "id": order["lines"][0]["id"],
@@ -186,19 +208,21 @@ def test_no_customer(
             }
         ],
     }
-    assert mocked_update_order.mock_calls[2].args == (
+    assert mocked_update_order.mock_calls[3].args == (
         mocked_mpt_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[2].kwargs == {
+    assert mocked_update_order.mock_calls[3].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 retry_count="0",
+                next_sync_date="2024-01-02",
             ),
             "ordering": order_parameters_factory(),
         },
     }
+
     mocked_create_subscription.assert_called_once_with(
         mocked_mpt_client,
         order["id"],

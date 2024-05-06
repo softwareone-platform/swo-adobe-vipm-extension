@@ -23,6 +23,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
     PARAM_MEMBERSHIP_ID,
+    PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
     PARAM_RETRY_COUNT,
@@ -143,6 +144,15 @@ def set_adobe_customer_id(order, customer_id):
         PARAM_CUSTOMER_ID,
     )
     customer_ff_param["value"] = customer_id
+    return updated_order
+
+def set_next_sync(order, next_sync):
+    updated_order = copy.deepcopy(order)
+    customer_ff_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_NEXT_SYNC_DATE,
+    )
+    customer_ff_param["value"] = next_sync
     return updated_order
 
 

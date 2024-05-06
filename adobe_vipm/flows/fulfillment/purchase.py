@@ -5,6 +5,7 @@ processing.
 """
 
 import logging
+from datetime import date, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -35,6 +36,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     check_processing_template,
     save_adobe_customer_data,
     save_adobe_order_id,
+    save_next_sync_date,
     switch_order_to_completed,
     switch_order_to_failed,
     switch_order_to_query,
@@ -222,9 +224,16 @@ def fulfill_purchase_order(mpt_client, order):
         return
 
     for item in adobe_order["lineItems"]:
-        add_subscription(
+        subscription = add_subscription(
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
         )
+
+    # subscription are cotermed so it's ok to take the last created
+    commitment_date = subscription["commitmentDate"]
+    next_sync = (date.fromisoformat(commitment_date) + timedelta(days=1)).isoformat()
+
+    order = save_next_sync_date(mpt_client, order, next_sync)
+
     update_order_actual_price(
         mpt_client, order, order["lines"], adobe_order["lineItems"]
     )
