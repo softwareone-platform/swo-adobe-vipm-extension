@@ -52,6 +52,7 @@ from adobe_vipm.flows.utils import (
     set_adobe_customer_id,
     set_adobe_order_id,
     set_customer_data,
+    set_next_sync,
     split_phone_number,
 )
 
@@ -420,6 +421,7 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
             f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
             f'created for order {order["id"]}'
         )
+        return subscription
 
 
 def set_subscription_actual_sku(
@@ -518,3 +520,9 @@ def check_processing_template(mpt_client, order, template_name):
     )
     if template != order.get("template"):
         set_processing_template(mpt_client, order["id"], template)
+
+
+def save_next_sync_date(client, order, next_sync):
+    order = set_next_sync(order, next_sync)
+    update_order(client, order["id"], parameters=order["parameters"])
+    return order

@@ -85,7 +85,7 @@ def test_transfer(
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
-    subscription = subscriptions_factory()[0]
+    subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscription,
@@ -164,6 +164,42 @@ def test_transfer(
             ),
         },
     }
+
+
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-01-02",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postalCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+            ),
+        },
+    }
+
 
     mocked_create_subscription.assert_called_once_with(
         mocked_mpt_client,
@@ -834,7 +870,7 @@ def test_transfer_3yc_customer(
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
-    subscription = subscriptions_factory()[0]
+    subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscription,
@@ -889,6 +925,46 @@ def test_transfer_3yc_customer(
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postalCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+                p3yc=["Yes"],
+                p3yc_licenses="15",
+                p3yc_consumables="37",
+            ),
+        },
+    }
+
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                p3yc_enroll_status=adobe_3yc_commitment["status"],
+                p3yc_start_date=adobe_3yc_commitment["startDate"],
+                p3yc_end_date=adobe_3yc_commitment["endDate"],
+                next_sync_date="2024-01-02",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],

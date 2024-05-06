@@ -8,7 +8,7 @@ program.
 """
 
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
@@ -37,6 +37,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     handle_retries,
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
+    save_next_sync_date,
     switch_order_to_completed,
     switch_order_to_failed,
     switch_order_to_query,
@@ -280,8 +281,16 @@ def fulfill_transfer_order(mpt_client, order):
         adobe_order_id,
         customer,
     )
+
     for item in adobe_transfer_order["lineItems"]:
-        add_subscription(
+        subscription = add_subscription(
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
         )
+
+    # subscription are cotermed so it's ok to take the last created
+    commitment_date = subscription["commitmentDate"]
+    next_sync = (date.fromisoformat(commitment_date) + timedelta(days=1)).isoformat()
+
+    order = save_next_sync_date(mpt_client, order, next_sync)
+
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)
