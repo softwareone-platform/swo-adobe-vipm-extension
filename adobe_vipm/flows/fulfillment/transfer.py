@@ -21,7 +21,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
-    get_transfer_by_authorization_membership,
+    get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
@@ -241,7 +241,7 @@ def fulfill_transfer_order(mpt_client, order):
     authorization_id = order["authorization"]["id"]
     product_id = order["agreement"]["product"]["id"]
     authorization = config.get_authorization(authorization_id)
-    transfer = get_transfer_by_authorization_membership(
+    transfer = get_transfer_by_authorization_membership_or_customer(
         product_id,
         authorization.authorization_uk,
         membership_id,

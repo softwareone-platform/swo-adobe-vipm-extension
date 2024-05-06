@@ -132,14 +132,17 @@ def get_transfers_to_check(product_id):
     )
 
 
-def get_transfer_by_authorization_membership(
-    product_id, authorization_uk, membership_id
+def get_transfer_by_authorization_membership_or_customer(
+    product_id, authorization_uk, membership_or_customer_id
 ):
     Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
     transfers = Transfer.all(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
-            EQUAL(FIELD("membership_id"), STR_VALUE(membership_id)),
+            OR(
+                EQUAL(FIELD("membership_id"), STR_VALUE(membership_or_customer_id)),
+                EQUAL(FIELD("customer_id"), STR_VALUE(membership_or_customer_id)),
+            ),
             NOT_EQUAL(FIELD("status"), STR_VALUE(STATUS_DUPLICATED)),
         ),
     )

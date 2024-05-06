@@ -26,7 +26,7 @@ def test_validate_transfer(
     lines_factory,
 ):
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     m_client = mocker.MagicMock()
@@ -73,7 +73,7 @@ def test_validate_transfer_membership_error(
     status_code,
 ):
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     m_client = mocker.MagicMock()
@@ -106,7 +106,7 @@ def test_validate_transfer_unknown_item(
     adobe_preview_transfer_factory,
 ):
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     m_client = mocker.MagicMock()
@@ -149,7 +149,7 @@ def test_validate_transfer_already_migrated(
     m_client = mocker.MagicMock()
 
     mocked_get_transfer = mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
 
@@ -210,7 +210,7 @@ def test_validate_transfer_migration_running(
     m_client = mocker.MagicMock()
 
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
 

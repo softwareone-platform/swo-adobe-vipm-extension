@@ -55,7 +55,7 @@ def test_transfer(
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -239,7 +239,7 @@ def test_transfer_not_ready(
     The transfer order will not be completed and the processing will be stopped.
     """
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -304,7 +304,7 @@ def test_transfer_unexpected_status(
     unexpected error.
     """
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -349,7 +349,7 @@ def test_transfer_items_mismatch(
     the subscriptions owned by a given membership id.
     """
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -411,7 +411,7 @@ def test_transfer_invalid_membership(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -472,7 +472,7 @@ def test_transfer_unrecoverable_status(
     Tests a transfer order when it cannot be processed.
     """
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -521,7 +521,7 @@ def test_create_transfer_fail(
     Tests generic failure on transfer order creation.
     """
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -618,7 +618,7 @@ def test_fulfill_transfer_order_already_migrated(
     m_client = mocker.MagicMock()
 
     mocked_get_transfer = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
 
@@ -747,7 +747,7 @@ def test_fulfill_transfer_order_migration_running(
     m_client = mocker.MagicMock()
 
     mocked_get_transfer = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
 
@@ -810,7 +810,7 @@ def test_transfer_3yc_customer(
         return_value={"id": "TPL-1111"},
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership",
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
