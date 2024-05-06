@@ -4,7 +4,15 @@ from responses import matchers
 from adobe_vipm.flows.nav import get_token, terminate_contract
 
 
-def test_get_token(requests_mocker, settings):
+@freeze_time("2024-04-04 12:30:00")
+def test_get_token(mocker, requests_mocker, settings):
+    mocker.patch(
+        "adobe_vipm.flows.nav.os.path.exists",
+        return_value=False,
+    )
+
+    mocked_open = mocker.patch("adobe_vipm.flows.nav.open", mocker.mock_open())
+
     settings.EXTENSION_CONFIG = {
         "NAV_AUTH_ENDPOINT_URL": "https://authenticate.nav",
         "NAV_AUTH_CLIENT_ID": "client-id",
@@ -17,6 +25,7 @@ def test_get_token(requests_mocker, settings):
         status=200,
         json={
             "access_token": "a-token",
+            "expires_in": 86400,
         },
         match=[
             matchers.urlencoded_params_matcher(
@@ -31,9 +40,82 @@ def test_get_token(requests_mocker, settings):
     )
 
     assert get_token() == (True, "a-token")
+    mocked_open().write.assert_called_once_with(
+        '{"access_token": "a-token", "expires_in": 86400, '
+        '"expires_at": "2024-04-05T12:25:00+00:00"}',
+    )
 
 
-def test_get_token_error(requests_mocker, settings):
+@freeze_time("2024-04-04 12:30:00")
+def test_get_token_from_cache(mocker):
+    mocker.patch("adobe_vipm.flows.nav.os.path.exists", return_value=True)
+    mocker.patch(
+        "adobe_vipm.flows.nav.open",
+        mocker.mock_open(
+            read_data=(
+                '{"access_token": "a-token", "expires_in": 86400, '
+                '"expires_at": "2024-04-05T12:25:00+00:00"}'
+            )
+        ),
+    )
+
+    assert get_token() == (True, "a-token")
+
+
+@freeze_time("2024-04-04 12:30:00")
+def test_get_token_from_cache_expired(mocker, requests_mocker, settings):
+    mocker.patch("adobe_vipm.flows.nav.os.path.exists", return_value=True)
+    mocker.patch(
+        "adobe_vipm.flows.nav.open",
+        mocker.mock_open(
+            read_data=(
+                '{"access_token": "a-token", "expires_in": 86400, '
+                '"expires_at": "2024-03-05T12:25:00+00:00"}'
+            )
+        ),
+    )
+    mocked_save_token = mocker.patch("adobe_vipm.flows.nav.save_token_to_disk")
+
+    settings.EXTENSION_CONFIG = {
+        "NAV_AUTH_ENDPOINT_URL": "https://authenticate.nav",
+        "NAV_AUTH_CLIENT_ID": "client-id",
+        "NAV_AUTH_CLIENT_SECRET": "client-secret",
+        "NAV_AUTH_AUDIENCE": "audience",
+    }
+
+    requests_mocker.post(
+        "https://authenticate.nav",
+        status=200,
+        json={
+            "access_token": "a-token",
+            "expires_in": 86400,
+        },
+        match=[
+            matchers.urlencoded_params_matcher(
+                {
+                    "client_id": "client-id",
+                    "client_secret": "client-secret",
+                    "audience": "audience",
+                    "grant_type": "client_credentials",
+                },
+            ),
+        ],
+    )
+
+    assert get_token() == (True, "a-token")
+    mocked_save_token.assert_called_once_with(
+        {
+            "access_token": "a-token",
+            "expires_in": 86400,
+        }
+    )
+
+
+def test_get_token_error(mocker, requests_mocker, settings):
+    mocker.patch(
+        "adobe_vipm.flows.nav.get_token_from_disk",
+        return_value=None,
+    )
     settings.EXTENSION_CONFIG = {
         "NAV_AUTH_ENDPOINT_URL": "https://authenticate.nav",
         "NAV_AUTH_CLIENT_ID": "client-id",
