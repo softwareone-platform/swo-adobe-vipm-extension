@@ -4,7 +4,7 @@ from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
-    get_transfer_by_authorization_membership,
+    get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
@@ -84,7 +84,7 @@ def validate_transfer(mpt_client, adobe_client, order):
     membership_id = get_adobe_membership_id(order)
     product_id = order["agreement"]["product"]["id"]
 
-    transfer = get_transfer_by_authorization_membership(
+    transfer = get_transfer_by_authorization_membership_or_customer(
         product_id,
         authorization.authorization_uk,
         membership_id,
