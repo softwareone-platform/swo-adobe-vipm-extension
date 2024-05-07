@@ -12,7 +12,10 @@ class MPTClient(Session):
             backoff_factor=0.1,
             status_forcelist=[500, 502, 503, 504],
         )
-        self.mount("http://", HTTPAdapter(max_retries=retries))
+        self.mount("http://", HTTPAdapter(
+            max_retries=retries,
+            pool_maxsize=32,
+        ))
         self.headers.update(
             {
                 "User-Agent": "swo-extensions/1.0",
