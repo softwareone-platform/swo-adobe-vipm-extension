@@ -100,7 +100,7 @@ class Command(BaseCommand):
         return ws
 
     def load_row(self, row):
-        return {COLUMNS[cel.column_letter]: cel.value for cel in row}
+        return {COLUMNS[cel.column_letter]: str(cel.value) for cel in row}
 
     def prepare_reseller_data(self, row_data):
         return {
