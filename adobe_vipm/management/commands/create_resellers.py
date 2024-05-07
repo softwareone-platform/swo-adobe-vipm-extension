@@ -277,7 +277,7 @@ class Command(BaseCommand):
             ),
             ("city", is_valid_city_length, "invalid city length"),
         ):
-            if not validator_func(address[field]):
+            if address[field] and not validator_func(address[field]):
                 errors.append(err_msg)
 
         return errors
