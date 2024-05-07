@@ -8,7 +8,7 @@ program.
 """
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
@@ -289,7 +289,7 @@ def fulfill_transfer_order(mpt_client, order):
 
     # subscription are cotermed so it's ok to take the last created
     commitment_date = subscription["commitmentDate"]
-    next_sync = (date.fromisoformat(commitment_date) + timedelta(days=1)).isoformat()
+    next_sync = (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
 
     order = save_next_sync_date(mpt_client, order, next_sync)
 

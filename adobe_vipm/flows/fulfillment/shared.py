@@ -30,11 +30,11 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
-    does_subscription_exist,
     fail_order,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_template_or_default,
+    get_subscription_by_external_id,
     query_order,
     set_processing_template,
     update_order,
@@ -394,7 +394,8 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
 
     order_line = get_order_line_by_sku(order, item["offerId"])
 
-    if not does_subscription_exist(mpt_client, order["id"], item["subscriptionId"]):
+    subscription = get_subscription_by_external_id(mpt_client, order["id"], item["subscriptionId"])
+    if not subscription:
         subscription = {
             "name": f"Subscription for {order_line['item']['name']}",
             "parameters": {
@@ -421,7 +422,7 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
             f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
             f'created for order {order["id"]}'
         )
-        return subscription
+    return subscription
 
 
 def set_subscription_actual_sku(

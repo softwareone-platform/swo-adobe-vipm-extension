@@ -94,13 +94,14 @@ def update_subscription(mpt_client, order_id, subscription_id, **kwargs):
 
 
 @wrap_http_error
-def does_subscription_exist(mpt_client, order_id, subscription_external_id):
+def get_subscription_by_external_id(mpt_client, order_id, subscription_external_id):
     response = mpt_client.get(
-        f"/commerce/orders/{order_id}/subscriptions?eq(externalIds.vendor,{subscription_external_id})&limit=0",
+        f"/commerce/orders/{order_id}/subscriptions?eq(externalIds.vendor,{subscription_external_id})&limit=1",
     )
     response.raise_for_status()
     subscriptions = response.json()
-    return subscriptions["$meta"]["pagination"]["total"] == 1
+    if subscriptions["$meta"]["pagination"]["total"] == 1:
+        return subscriptions["data"][0]
 
 
 @wrap_http_error

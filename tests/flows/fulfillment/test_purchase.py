@@ -279,6 +279,215 @@ def test_no_customer(
     )
 
 
+def test_no_customer_subscription_already_created(
+    mocker,
+    agreement,
+    order_factory,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_subscription_factory,
+    items_factory,
+    subscriptions_factory,
+    pricelist_items_factory,
+):
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+    mocked_create_customer_account = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
+        return_value=order_factory(
+            fulfillment_parameters=fulfillment_parameters_factory(
+                customer_id="a-client-id"
+            ),
+        ),
+    )
+
+    adobe_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        status=STATUS_PROCESSED,
+        items=adobe_items_factory(subscription_id="a-sub-id"),
+    )
+    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
+
+    adobe_subscription = adobe_subscription_factory()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
+    mocked_adobe_client.create_new_order.return_value = adobe_order
+    mocked_adobe_client.get_order.return_value = adobe_order
+    mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        side_effect=[
+            order_factory(
+                fulfillment_parameters=fulfillment_parameters_factory(
+                    customer_id="a-client-id",
+                    retry_count="1",
+                ),
+                external_ids={"vendor": adobe_order["orderId"]},
+            ),
+            order_factory(
+                fulfillment_parameters=fulfillment_parameters_factory(
+                    customer_id="a-client-id",
+                    retry_count="0",
+                ),
+                external_ids={"vendor": adobe_order["orderId"]},
+            ),
+            order_factory(
+                fulfillment_parameters=fulfillment_parameters_factory(
+                    customer_id="a-client-id",
+                    retry_count="0",
+                ),
+                external_ids={"vendor": adobe_order["orderId"]},
+            ),
+            order_factory(
+                fulfillment_parameters=fulfillment_parameters_factory(
+                    customer_id="a-client-id",
+                    retry_count="0",
+                    next_sync_date="2024-01-01",
+                ),
+                external_ids={"vendor": adobe_order["orderId"]},
+            ),
+        ],
+    )
+
+    subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_subscription_by_external_id",
+        return_value=subscription,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
+        return_value=items_factory(),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
+        return_value=pricelist_items_factory(),
+    )
+    mocked_process_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
+    )
+
+    order = order_factory()
+    order_with_customer_param = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
+    )
+
+    fulfill_order(mocked_mpt_client, order)
+
+    authorization_id = order["authorization"]["id"]
+
+    mocked_create_customer_account.assert_called_once_with(
+        mocked_mpt_client,
+        order,
+    )
+    mocked_adobe_client.create_preview_order.assert_called_once_with(
+        authorization_id,
+        "a-client-id",
+        order_with_customer_param["id"],
+        order_with_customer_param["lines"],
+    )
+
+    assert mocked_update_order.mock_calls[0].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "externalIds": {
+            "vendor": adobe_order["orderId"],
+        },
+    }
+    assert mocked_update_order.mock_calls[1].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[1].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-01-02",
+            ),
+            "ordering": order_parameters_factory(),
+        },
+    }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
+        "lines": [
+            {
+                "id": order["lines"][0]["id"],
+                "price": {
+                    "unitPP": 1234.55,
+                },
+            }
+        ],
+    }
+    assert mocked_update_order.mock_calls[3].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[3].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-01-02",
+            ),
+            "ordering": order_parameters_factory(),
+        },
+    }
+
+    mocked_process_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        {"id": "TPL-0000"},
+    )
+    mocked_complete_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        {"id": "TPL-1111"},
+    )
+    mocked_adobe_client.get_order.assert_called_once_with(
+        authorization_id, "a-client-id", adobe_order["orderId"]
+    )
+    mocked_adobe_client.get_subscription.assert_called_once_with(
+        authorization_id,
+        "a-client-id",
+        adobe_subscription["subscriptionId"],
+    )
+    assert mocked_get_template.mock_calls[0].args == (
+        mocked_mpt_client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_PROCESSING,
+        TEMPLATE_NAME_PURCHASE,
+    )
+
+    assert mocked_get_template.mock_calls[1].args == (
+        mocked_mpt_client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_COMPLETED,
+        TEMPLATE_NAME_PURCHASE,
+    )
+
+
 def test_customer_already_created(
     mocker,
     agreement,
