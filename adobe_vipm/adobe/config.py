@@ -210,8 +210,8 @@ class Config:
                 )
                 self.resellers[(authorization, seller_uk)] = reseller
 
-            if seller_id:
-                self.resellers[(authorization, seller_id)] = reseller
+                if seller_id:
+                    self.resellers[(authorization, seller_id)] = reseller
 
         for product in config_data["skus_mapping"]:
             self.skus_mapping[product["vendor_external_id"]] = AdobeProduct(
