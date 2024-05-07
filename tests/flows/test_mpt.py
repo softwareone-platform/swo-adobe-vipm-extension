@@ -7,11 +7,11 @@ from adobe_vipm.flows.errors import MPTError
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
-    does_subscription_exist,
     fail_order,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_template_or_default,
+    get_subscription_by_external_id,
     get_webhook,
     query_order,
     update_order,
@@ -456,17 +456,17 @@ def test_get_webhoook(mpt_client, requests_mocker, webhook):
 
 
 @pytest.mark.parametrize(
-    ("total", "expected"),
+    ("total", "data", "expected"),
     [
-        (0, False),
-        (1, True),
+        (0, [], None),
+        (1, [{"id": "SUB-1234"}], {"id": "SUB-1234"}),
     ],
 )
-def test_does_subscription_exist(mpt_client, requests_mocker, total, expected):
+def test_get_subscription_by_external_id(mpt_client, requests_mocker, total, data, expected):
     requests_mocker.get(
         urljoin(
             mpt_client.base_url,
-            "/v1/commerce/orders/ORD-1234/subscriptions?eq(externalIds.vendor,a-sub-id)&limit=0",
+            "/v1/commerce/orders/ORD-1234/subscriptions?eq(externalIds.vendor,a-sub-id)&limit=1",
         ),
         json={
             "$meta": {
@@ -476,10 +476,11 @@ def test_does_subscription_exist(mpt_client, requests_mocker, total, expected):
                     "total": total,
                 },
             },
+            "data": data,
         },
     )
 
-    assert does_subscription_exist(mpt_client, "ORD-1234", "a-sub-id") is expected
+    assert get_subscription_by_external_id(mpt_client, "ORD-1234", "a-sub-id") == expected
 
 
 @pytest.mark.parametrize("name", ["template_name", None])

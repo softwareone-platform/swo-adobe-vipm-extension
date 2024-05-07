@@ -84,7 +84,7 @@ def test_validate_transfer_membership_error(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.side_effect = api_error
 
-    has_errors, validated_order = validate_transfer(
+    has_errors, validated_order, _ = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 

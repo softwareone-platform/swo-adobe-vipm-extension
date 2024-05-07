@@ -72,7 +72,7 @@ def validate_transfer_not_migrated(mpt_client, adobe_client, order):
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
         )
-        return True, order
+        return True, order, None
 
     return add_lines_to_order(mpt_client, order, transfer_preview, "quantity")
 
