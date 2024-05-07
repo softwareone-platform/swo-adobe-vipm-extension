@@ -94,7 +94,7 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
             "city": address["city"],
             "addressLine1": address["addressLine1"],
             "addressLine2": address["addressLine2"],
-            "postalCode": address["postalCode"],
+            "postCode": address["postalCode"],
         },
         PARAM_CONTACT: {
             "firstName": contact["firstName"],

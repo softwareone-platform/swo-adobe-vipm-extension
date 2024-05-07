@@ -151,7 +151,7 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
                 "city": "Barcelona",
                 "addressLine1": "Plaza Catalunya 1",
                 "addressLine2": "1o 1a",
-                "postalCode": "08001",
+                "postCode": "08001",
             },
         )
     )
@@ -185,7 +185,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postalCode": "94123",
+                "postCode": "94123",
             },
         )
     )
@@ -220,7 +220,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postalCode": "9412312",
+                "postCode": "9412312",
             },
         )
     )
@@ -257,7 +257,7 @@ def test_validate_address_invalid_postal_code_length(
                 "city": "Lalala",
                 "addressLine1": "Blah blah",
                 "addressLine2": "",
-                "postalCode": "9" * 41,
+                "postCode": "9" * 41,
             },
         )
     )
@@ -292,7 +292,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
                 "city": "C" * 41,
                 "addressLine1": "1" * 61,
                 "addressLine2": "2" * 61,
-                "postalCode": "",
+                "postCode": "",
             },
         )
     )
@@ -337,6 +337,30 @@ def test_validate_contact(order_factory):
         PARAM_CONTACT,
     )
     assert "error" not in param
+
+
+def test_validate_contact_mandatory(order_factory, order_parameters_factory):
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            contact={},
+        ),
+    )
+    customer_data = get_customer_data(order)
+
+    has_error, order = validate_contact(order, customer_data)
+
+    assert has_error is True
+
+    param = get_ordering_parameter(
+        order,
+        PARAM_CONTACT,
+    )
+    assert param["error"] == ERR_CONTACT.to_dict(
+        title=param["name"],
+        errors="it is mandatory.",
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["optional"] is False
 
 
 def test_validate_contact_invalid_first_name(order_factory, order_parameters_factory):

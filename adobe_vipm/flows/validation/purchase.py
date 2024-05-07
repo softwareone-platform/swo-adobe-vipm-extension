@@ -138,11 +138,11 @@ def validate_address(order, customer_data):
     if not is_valid_state_or_province(country_code, address["state"]):
         errors.append(ERR_STATE_OR_PROVINCE)
 
-    if not is_valid_postal_code(country_code, address["postalCode"]):
+    if not is_valid_postal_code(country_code, address["postCode"]):
         errors.append(ERR_POSTAL_CODE_FORMAT)
 
     for field, validator_func, err_msg in (
-        ("postalCode", is_valid_postal_code_length, ERR_POSTAL_CODE_LENGTH),
+        ("postCode", is_valid_postal_code_length, ERR_POSTAL_CODE_LENGTH),
         ("addressLine1", is_valid_address_line_1_length, ERR_ADDRESS_LINE_1_LENGTH),
         ("addressLine2", is_valid_address_line_2_length, ERR_ADDRESS_LINE_2_LENGTH),
         ("city", is_valid_city_length, ERR_CITY_LENGTH),
@@ -167,6 +167,17 @@ def validate_contact(order, customer_data):
     contact = customer_data[PARAM_CONTACT]
     param = get_ordering_parameter(order, PARAM_CONTACT)
     errors = []
+
+    if not contact:
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_CONTACT,
+            ERR_CONTACT.to_dict(
+                title=param["name"],
+                errors="it is mandatory.",
+            ),
+        )
+        return True, order
 
     if not is_valid_first_last_name(contact["firstName"]):
         errors.append(ERR_FIRST_NAME_FORMAT)

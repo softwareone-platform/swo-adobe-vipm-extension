@@ -442,7 +442,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "city": "Barcelona",
                 "addressLine1": "Plaza Catalunya 1",
                 "addressLine2": "1o 1a",
-                "postalCode": "08001",
+                "postCode": "08001",
             },
         ),
         (
@@ -453,7 +453,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postalCode": "94123",
+                "postCode": "94123",
             },
         ),
         (
@@ -464,7 +464,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postalCode": "9412312",
+                "postCode": "9412312",
             },
         ),
         (
@@ -475,7 +475,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "city": "Lalala",
                 "addressLine1": "Blah blah",
                 "addressLine2": "",
-                "postalCode": "9" * 41,
+                "postCode": "9" * 41,
             },
         ),
         (
@@ -486,7 +486,7 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
                 "city": "C" * 41,
                 "addressLine1": "1" * 61,
                 "addressLine2": "2" * 61,
-                "postalCode": "",
+                "postCode": "",
             },
         ),
         (

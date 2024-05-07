@@ -28,6 +28,7 @@ from adobe_vipm.flows.constants import (
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_AGREEMENT_TYPE,
+    PARAM_CONTACT,
     PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_PURCHASE,
 )
@@ -292,7 +293,6 @@ def test_no_customer_subscription_already_created(
     subscriptions_factory,
     pricelist_items_factory,
 ):
-
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -1295,7 +1295,6 @@ def test_create_customer_account_3yc_empty_minimums(
         order,
     )
 
-
     param_licenses = get_ordering_parameter(order, PARAM_3YC_LICENSES)
     param_consumables = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
 
@@ -1307,6 +1306,160 @@ def test_create_customer_account_3yc_empty_minimums(
             title_min_consumables=param_consumables["name"],
         ),
         parameters=order["parameters"],
+        template={"id": "TPL-0000"},
+    )
+    assert updated_order is None
+
+
+def test_create_customer_account_from_licensee(
+    mocker,
+    agreement_factory,
+    order,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+):
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_customer_account.return_value = {
+        "customerId": "adobe-customer-id",
+    }
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_update_order_customer_id = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    mocked_update_order_customer_params = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    address = {
+        "country": "US",
+        "state": "CA",
+        "city": "New York",
+        "addressLine1": "3601 Fifth Av",
+        "addressLine2": "",
+        "postCode": "94123",
+    }
+
+    contact = {
+        "firstName": "Ringo",
+        "lastName": "Mania",
+        "email": "ringo.mania@scarafaggi.com",
+        "phone": {
+            "prefix": "+1",
+            "number": "4082954078",
+        },
+    }
+
+    order["agreement"] = agreement_factory(
+        licensee_address=address,
+        licensee_contact=contact,
+    )
+
+    order["parameters"]["ordering"] = order_parameters_factory(
+        company_name="",
+        address={},
+        contact={},
+    )
+
+    create_customer_account(mocked_mpt_client, order)
+
+    mocked_adobe_client.create_customer_account.assert_called_once_with(
+        order["authorization"]["id"],
+        order["agreement"]["seller"]["id"],
+        order["agreement"]["id"],
+        {
+            param["externalId"]: param.get("value")
+            for param in order_parameters_factory(
+                company_name=order["agreement"]["licensee"]["name"],
+                address=address,
+                contact=contact,
+            )
+            if param["externalId"] not in (PARAM_MEMBERSHIP_ID, PARAM_AGREEMENT_TYPE)
+        },
+    )
+
+    mocked_update_order_customer_params.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": order_parameters_factory(
+                company_name=order["agreement"]["licensee"]["name"],
+                address=address,
+                contact=contact,
+            ),
+            "fulfillment": fulfillment_parameters_factory(),
+        },
+    )
+
+    mocked_update_order_customer_id.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": order_parameters_factory(
+                company_name=order["agreement"]["licensee"]["name"],
+                address=address,
+                contact=contact,
+            ),
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="adobe-customer-id"
+            ),
+        },
+    )
+
+
+def test_create_customer_account_no_contact(
+    mocker,
+    order,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-0000"},
+    )
+    mocked_adobe_client = mocker.MagicMock()
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_query_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.query_order",
+        return_value=copy.deepcopy(order),
+    )
+
+    order["agreement"]["licensee"]["contact"] = None
+    get_ordering_parameter(order, PARAM_CONTACT)["value"] = {}
+
+    updated_order = create_customer_account(
+        mocked_mpt_client,
+        order,
+    )
+
+    ordering_params = order_parameters_factory()
+    contact_param = get_ordering_parameter(
+        {"parameters": {"ordering": ordering_params}}, PARAM_CONTACT
+    )
+    contact_param["value"] = {}
+    contact_param["error"] =  ERR_ADOBE_CONTACT.to_dict(
+        title=contact_param["name"],
+        details="it is mandatory.",
+    )
+
+    mocked_query_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": ordering_params,
+            "fulfillment": fulfillment_parameters_factory(),
+        },
         template={"id": "TPL-0000"},
     )
     assert updated_order is None

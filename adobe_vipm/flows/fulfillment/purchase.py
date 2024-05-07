@@ -151,6 +151,17 @@ def create_customer_account(client, order):
     adobe_client = get_adobe_client()
     try:
         order, customer_data = prepare_customer_data(client, order)
+        if not customer_data.get("contact"):
+            param = get_ordering_parameter(order, PARAM_CONTACT)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_CONTACT,
+                ERR_ADOBE_CONTACT.to_dict(title=param["name"], details="it is mandatory."),
+            )
+
+            switch_order_to_query(client, order)
+            return
+
         external_id = order["agreement"]["id"]
         seller_id = order["agreement"]["seller"]["id"]
         authorization_id = order["authorization"]["id"]

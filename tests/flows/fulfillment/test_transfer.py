@@ -150,7 +150,7 @@ def test_transfer(
                     "city": adobe_customer_address["city"],
                     "addressLine1": adobe_customer_address["addressLine1"],
                     "addressLine2": adobe_customer_address["addressLine2"],
-                    "postalCode": adobe_customer_address["postalCode"],
+                    "postCode": adobe_customer_address["postalCode"],
                 },
                 contact={
                     "firstName": adobe_customer_contact["firstName"],
@@ -185,7 +185,7 @@ def test_transfer(
                     "city": adobe_customer_address["city"],
                     "addressLine1": adobe_customer_address["addressLine1"],
                     "addressLine2": adobe_customer_address["addressLine2"],
-                    "postalCode": adobe_customer_address["postalCode"],
+                    "postCode": adobe_customer_address["postalCode"],
                 },
                 contact={
                     "firstName": adobe_customer_contact["firstName"],
@@ -627,7 +627,7 @@ def test_fulfill_transfer_order_already_migrated(
                     "city": adobe_customer_address["city"],
                     "addressLine1": adobe_customer_address["addressLine1"],
                     "addressLine2": adobe_customer_address["addressLine2"],
-                    "postalCode": adobe_customer_address["postalCode"],
+                    "postCode": adobe_customer_address["postalCode"],
                 },
                 contact={
                     "firstName": adobe_customer_contact["firstName"],
@@ -934,7 +934,7 @@ def test_transfer_3yc_customer(
                     "city": adobe_customer_address["city"],
                     "addressLine1": adobe_customer_address["addressLine1"],
                     "addressLine2": adobe_customer_address["addressLine2"],
-                    "postalCode": adobe_customer_address["postalCode"],
+                    "postCode": adobe_customer_address["postalCode"],
                 },
                 contact={
                     "firstName": adobe_customer_contact["firstName"],
@@ -974,7 +974,7 @@ def test_transfer_3yc_customer(
                     "city": adobe_customer_address["city"],
                     "addressLine1": adobe_customer_address["addressLine1"],
                     "addressLine2": adobe_customer_address["addressLine2"],
-                    "postalCode": adobe_customer_address["postalCode"],
+                    "postCode": adobe_customer_address["postalCode"],
                 },
                 contact={
                     "firstName": adobe_customer_contact["firstName"],

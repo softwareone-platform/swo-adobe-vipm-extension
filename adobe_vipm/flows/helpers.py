@@ -12,6 +12,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import (
     get_agreement,
+    get_licensee,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     update_order,
@@ -39,6 +40,7 @@ def populate_order_info(client, order):
         dict: The enriched order.
     """
     order["agreement"] = get_agreement(client, order["agreement"]["id"])
+    order["agreement"]["licensee"] = get_licensee(client, order["agreement"]["licensee"]["id"])
 
     return order
 
@@ -57,36 +59,42 @@ def prepare_customer_data(client, order):
         tuple: a tuple which first item is the updated order and the second
         a dictionary with the data of the customer that must be created in Adobe.
     """
+    licensee = order["agreement"]["licensee"]
+    address = licensee["address"]
+    contact = licensee["contact"]
+
     customer_data = get_customer_data(order)
-    if not all(customer_data.values()):
-        buyer = order["agreement"]["buyer"]
-        order = set_customer_data(
-            order,
-            {
-                PARAM_COMPANY_NAME: buyer["name"],
-                PARAM_ADDRESS: {
-                    "country": buyer["address"]["country"],
-                    "state": buyer["address"]["state"],
-                    "city": buyer["address"]["city"],
-                    "addressLine1": buyer["address"]["addressLine1"],
-                    "addressLine2": buyer["address"]["addressLine2"],
-                    "postalCode": buyer["address"]["postCode"],
-                },
-                PARAM_CONTACT: {
-                    "firstName": buyer["contact"]["firstName"],
-                    "lastName": buyer["contact"]["lastName"],
-                    "email": buyer["contact"]["email"],
-                    "phone": buyer["contact"].get("phone"),
-                },
-            },
-        )
-        update_order(
-            client,
-            order["id"],
-            parameters=order["parameters"],
-        )
-        customer_data = get_customer_data(order)
-    return order, customer_data
+
+    if not customer_data.get(PARAM_COMPANY_NAME):
+        customer_data[PARAM_COMPANY_NAME] = licensee["name"]
+
+    if not customer_data.get(PARAM_ADDRESS):
+        customer_data[PARAM_ADDRESS] = {
+            "country": address["country"],
+            "state": address["state"],
+            "city": address["city"],
+            "addressLine1": address["addressLine1"],
+            "addressLine2": address["addressLine2"],
+            "postCode": address["postCode"],
+        }
+
+    if not customer_data.get(PARAM_CONTACT) and contact:
+        customer_data[PARAM_CONTACT] = {
+            "firstName": contact["firstName"],
+            "lastName": contact["lastName"],
+            "email": contact["email"],
+            "phone": contact.get("phone"),
+        }
+
+    order = set_customer_data(order, customer_data)
+
+    update_order(
+        client,
+        order["id"],
+        parameters=order["parameters"],
+    )
+
+    return order, get_customer_data(order)
 
 
 def _update_purchase_prices(mpt_client, order, line_items):
