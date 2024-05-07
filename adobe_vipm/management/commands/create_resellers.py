@@ -100,7 +100,10 @@ class Command(BaseCommand):
         return ws
 
     def load_row(self, row):
-        return {COLUMNS[cel.column_letter]: str(cel.value) for cel in row}
+        return {
+            COLUMNS[cel.column_letter]: str(cel.value) if cel.value else cel.value
+            for cel in row
+        }
 
     def prepare_reseller_data(self, row_data):
         return {
@@ -281,7 +284,6 @@ class Command(BaseCommand):
 
     def _validate_reseller_contact(self, reseller_data):
         errors = []
-
         contact = reseller_data["contact"]
 
         if not is_valid_first_last_name(contact["firstName"]):
