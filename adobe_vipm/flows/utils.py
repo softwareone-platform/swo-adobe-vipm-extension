@@ -79,29 +79,25 @@ def get_adobe_membership_id(source):
 def is_purchase_order(order):
     """
     Check if the order is a real purchase order or a subscriptions transfer order.
-    Subscriptions transfer orders have an ordering parameter filled with the
-    Adobe membership identifier that must be migrated.
     Args:
         source (str): The order to check.
 
     Returns:
         bool: True if it is a real purchase order, False otherwise.
     """
-    return order["type"] == ORDER_TYPE_PURCHASE and not get_adobe_membership_id(order)
+    return order["type"] == ORDER_TYPE_PURCHASE and is_new_customer(order)
 
 
 def is_transfer_order(order):
     """
     Check if the order is a subscriptions transfer order.
-    Subscriptions transfer orders are purchase orders that have an ordering parameter filled with
-    the Adobe membership identifier that must be migrated.
     Args:
         source (str): The order to check.
 
     Returns:
         bool: True if it is a subscriptions transfer order, False otherwise.
     """
-    return order["type"] == ORDER_TYPE_PURCHASE and get_adobe_membership_id(order)
+    return order["type"] == ORDER_TYPE_PURCHASE and not is_new_customer(order)
 
 
 def is_change_order(order):
