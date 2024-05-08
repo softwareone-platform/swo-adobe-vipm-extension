@@ -7,7 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from swo.mpt.extensions.core.events.dataclasses import Event
 from swo.mpt.extensions.core.events.registry import EventsRegistry
-from swo.mpt.extensions.runtime.events.utils import setup_client, wrap_for_trace
+from swo.mpt.extensions.core.utils import setup_client
+from swo.mpt.extensions.runtime.events.utils import wrap_for_trace
 from swo.mpt.extensions.runtime.utils import get_events_registry
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,7 @@
 from urllib.parse import urljoin
 
 import pytest
+from freezegun import freeze_time
 from responses import matchers
 
 from adobe_vipm.flows.errors import MPTError
@@ -8,6 +9,8 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
+    get_agreement_subscription,
+    get_agreements_by_next_sync,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_template_or_default,
@@ -15,6 +18,7 @@ from adobe_vipm.flows.mpt import (
     get_webhook,
     query_order,
     update_agreement,
+    update_agreement_subscription,
     update_order,
     update_subscription,
 )
@@ -548,5 +552,157 @@ def test_update_agreement_error(mpt_client, requests_mocker, mpt_error_factory):
 
     with pytest.raises(MPTError) as cv:
         update_agreement(mpt_client, "AGR-1111", externalIds={"vendor": "1234"})
+
+    assert cv.value.payload["status"] == 404
+
+
+@freeze_time("2024-01-04 03:00:00")
+def test_get_agreements_by_next_sync(mpt_client, requests_mocker):
+    param_condition = (
+        "any(parameters.fulfillment,and(eq(externalId,nextSync),lt(displayValue,2024-01-04)))"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
+    )
+    url = f"commerce/agreements?{rql_query}"
+
+    page1_url = f"{url}&limit=10&offset=0"
+    page2_url = f"{url}&limit=10&offset=10"
+    data = [{"id": f"AGR-{idx}"} for idx in range(13)]
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, page1_url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 0,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": data[:10],
+        },
+    )
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, page2_url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 10,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": data[10:],
+        },
+    )
+
+    assert get_agreements_by_next_sync(mpt_client) == data
+
+
+@freeze_time("2024-01-04 03:00:00")
+def test_get_agreements_by_next_sync_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
+    param_condition = (
+        "any(parameters.fulfillment,and(eq(externalId,nextSync),lt(displayValue,2024-01-04)))"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
+    )
+    url = f"commerce/agreements?{rql_query}"
+
+    url = f"{url}&limit=10&offset=0"
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, url),
+        status=500,
+        json=mpt_error_factory(500, "Internal server error", "Whatever"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        get_agreements_by_next_sync(mpt_client)
+
+    assert cv.value.payload["status"] == 500
+
+
+
+def test_update_agreement_subscription(mpt_client, requests_mocker, subscriptions_factory):
+    subscription = subscriptions_factory()
+    requests_mocker.put(
+        urljoin(
+            mpt_client.base_url,
+            "commerce/subscriptions/SUB-1234",
+        ),
+        json=subscription,
+        match=[
+            matchers.json_params_matcher(
+                {
+                    "parameters": {
+                        "fulfillment": [
+                            {
+                                "externalId": "a-param",
+                                "name": "a-param",
+                                "value": "a-value",
+                                "type": "SingleLineText",
+                            }
+                        ],
+                    },
+                },
+            ),
+        ],
+    )
+
+    updated_subscription = update_agreement_subscription(
+        mpt_client,
+        "SUB-1234",
+        parameters={
+            "fulfillment": [
+                {
+                    "externalId": "a-param",
+                    "name": "a-param",
+                    "value": "a-value",
+                    "type": "SingleLineText",
+                }
+            ]
+        },
+    )
+    assert updated_subscription == subscription
+
+
+def test_update_agreement_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
+    requests_mocker.put(
+        urljoin(mpt_client.base_url, "commerce/subscriptions/SUB-1234"),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Order not found"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        update_agreement_subscription(mpt_client, "SUB-1234", parameters={})
+
+    assert cv.value.payload["status"] == 404
+
+
+def test_get_agreement_subscription(mpt_client, requests_mocker, subscriptions_factory):
+    sub = subscriptions_factory()[0]
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, f"commerce/subscriptions/{sub["id"]}"),
+        json=sub,
+    )
+
+    assert get_agreement_subscription(mpt_client, sub["id"]) == sub
+
+
+def test_get_agreement_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, "commerce/subscriptions/SUB-1234"),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Order not found"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        get_agreement_subscription(mpt_client, "SUB-1234")
 
     assert cv.value.payload["status"] == 404

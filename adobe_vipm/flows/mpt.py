@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 from functools import cache
 
 from adobe_vipm.flows.constants import ERR_VIPM_UNHANDLED_EXCEPTION
@@ -175,6 +176,51 @@ def update_agreement(mpt_client, agreement_id, **kwargs):
     response = mpt_client.put(
         f"/commerce/agreements/{agreement_id}",
         json=kwargs,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def get_agreements_by_next_sync(mpt_client):
+    agreements = []
+    today = date.today().isoformat()
+    param_condition = (
+        f"any(parameters.fulfillment,and(eq(externalId,nextSync),lt(displayValue,{today})))"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
+    )
+    url = f"/commerce/agreements?{rql_query}"
+    page = None
+    limit = 10
+    offset = 0
+    while _has_more_pages(page):
+        response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
+        response.raise_for_status()
+        page = response.json()
+        agreements.extend(page["data"])
+        offset += limit
+
+    return agreements
+
+
+@wrap_http_error
+def update_agreement_subscription(mpt_client, subscription_id, **kwargs):
+    response = mpt_client.put(
+        f"/commerce/subscriptions/{subscription_id}",
+        json=kwargs,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def get_agreement_subscription(mpt_client, subscription_id):
+    response = mpt_client.get(
+        f"/commerce/subscriptions/{subscription_id}",
     )
     response.raise_for_status()
     return response.json()
