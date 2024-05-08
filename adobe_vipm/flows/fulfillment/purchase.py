@@ -169,6 +169,7 @@ def create_customer_account(client, order):
             authorization_id, seller_id, external_id, customer_data
         )
         customer_id = customer["customerId"]
+
         return save_adobe_customer_data(
             client,
             order,
@@ -216,6 +217,7 @@ def fulfill_purchase_order(mpt_client, order):
     check_processing_template(mpt_client, order, TEMPLATE_NAME_PURCHASE)
     adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)
+
     if not customer_id:
         order = create_customer_account(mpt_client, order)
         if not order:

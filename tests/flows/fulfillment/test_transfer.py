@@ -83,7 +83,10 @@ def test_transfer(
 
     mocked_mpt_client = mocker.MagicMock()
     mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    mocked_update_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement",
     )
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
@@ -165,7 +168,6 @@ def test_transfer(
         },
     }
 
-
     assert mocked_update_order.mock_calls[2].args == (
         mocked_mpt_client,
         order["id"],
@@ -200,6 +202,11 @@ def test_transfer(
         },
     }
 
+    mocked_update_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        order["agreement"]["id"],
+        externalIds={"vendor": "a-client-id"},
+    )
 
     mocked_create_subscription.assert_called_once_with(
         mocked_mpt_client,

@@ -14,6 +14,7 @@ from adobe_vipm.flows.mpt import (
     get_subscription_by_external_id,
     get_webhook,
     query_order,
+    update_agreement,
     update_order,
     update_subscription,
 )
@@ -508,3 +509,44 @@ def test_get_product_template_or_default(mpt_client, requests_mocker, name):
         "Processing",
         name,
     ) == {"id": "TPL-0000"}
+
+
+
+def test_update_agreement(mpt_client, requests_mocker):
+    """Test the call to update an agreement."""
+    requests_mocker.put(
+        urljoin(mpt_client.base_url, "commerce/agreements/AGR-1111"),
+        json={"id": "AGR-1111"},
+        match=[
+            matchers.json_params_matcher(
+                {
+                    "externalIds": {
+                        "vendor": "1234",
+                    },
+                },
+            ),
+        ],
+    )
+
+    updated_agreement = update_agreement(
+        mpt_client,
+        "AGR-1111",
+        externalIds={"vendor": "1234"},
+    )
+    assert updated_agreement == {"id": "AGR-1111"}
+
+
+def test_update_agreement_error(mpt_client, requests_mocker, mpt_error_factory):
+    """
+    Test the call to update an order when it fails.
+    """
+    requests_mocker.put(
+        urljoin(mpt_client.base_url, "commerce/agreements/AGR-1111"),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Order not found"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        update_agreement(mpt_client, "AGR-1111", externalIds={"vendor": "1234"})
+
+    assert cv.value.payload["status"] == 404
