@@ -230,7 +230,7 @@ def account_data():
             "city": "Irvine",
             "addressLine1": "Test street",
             "addressLine2": "Line 2",
-            "postalCode": "08010",
+            "postCode": "08010",
         },
         "contact": {
             "firstName": "First Name",
@@ -278,7 +278,7 @@ def order_parameters_factory():
                 "city": "San Jose",
                 "addressLine1": "3601 Lyon St",
                 "addressLine2": "",
-                "postalCode": "94123",
+                "postCode": "94123",
             }
         if contact is None:
             contact = {
@@ -498,7 +498,6 @@ def fulfillment_parameters_factory():
         p3yc_start_date="",
         p3yc_end_date="",
         next_sync_date="",
-
     ):
         return [
             {
@@ -666,6 +665,59 @@ def subscriptions_factory(lines_factory):
 
 
 @pytest.fixture()
+def agreement_factory(buyer):
+    def _agreement(
+        licensee_name="My beautiful licensee",
+        licensee_address=None,
+        licensee_contact=None,
+        use_buyer_address=False,
+    ):
+
+        return {
+            "id": "AGR-2119-4550-8674-5962",
+            "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
+            "icon": None,
+            "name": "Product Name 1",
+            "audit": {
+                "created": {
+                    "at": "2023-12-14T18:02:16.9359",
+                    "by": {"id": "USR-0000-0001"},
+                },
+                "updated": None,
+            },
+            "listing": {
+                "id": "LST-9401-9279",
+                "href": "/listing/LST-9401-9279",
+                "priceList": {
+                    "id": "PRC-9457-4272-3691",
+                    "href": "/v1/price-lists/PRC-9457-4272-3691",
+                },
+            },
+            "licensee": {
+                "name": licensee_name,
+                "address": licensee_address,
+                "useBuyerAddress": use_buyer_address,
+                "contact": licensee_contact,
+            },
+            "buyer": buyer,
+            "seller": {
+                "id": "SEL-9121-8944",
+                "href": "/accounts/sellers/SEL-9121-8944",
+                "name": "Software LN",
+                "icon": "/static/SEL-9121-8944/icon.png",
+                "address": {
+                    "country": "US",
+                },
+            },
+            "product": {
+                "id": "PRD-1111-1111",
+            },
+        }
+
+    return _agreement
+
+
+@pytest.fixture()
 def agreement(buyer):
     return {
         "id": "AGR-2119-4550-8674-5962",
@@ -687,7 +739,13 @@ def agreement(buyer):
                 "href": "/v1/price-lists/PRC-9457-4272-3691",
             },
         },
-        "licensee": None,
+        "licensee": {
+            "id": "LCE-1111-2222-3333",
+            "name": "FF Buyer good enough",
+            "useBuyerAddress": True,
+            "address": buyer["address"],
+            "contact": buyer["contact"],
+        },
         "buyer": buyer,
         "seller": {
             "id": "SEL-9121-8944",

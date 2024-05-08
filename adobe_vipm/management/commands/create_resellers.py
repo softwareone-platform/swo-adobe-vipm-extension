@@ -111,7 +111,7 @@ class Command(BaseCommand):
             "address": {
                 "addressLine1": row_data["address_line_1"],
                 "addressLine2": row_data["address_line_2"],
-                "postalCode": row_data["postal_code"],
+                "postCode": row_data["postal_code"],
                 "city": row_data["city"],
                 "state": row_data["region"],
                 "country": row_data["country"],
@@ -260,11 +260,11 @@ class Command(BaseCommand):
             if not is_valid_state_or_province(country_code, address["state"]):
                 errors.append("invalid region")
 
-            if not is_valid_postal_code(country_code, address["postalCode"]):
+            if not is_valid_postal_code(country_code, address["postCode"]):
                 errors.append("invalid postal_code")
 
         for field, validator_func, err_msg in (
-            ("postalCode", is_valid_postal_code_length, "invalid postal:code length"),
+            ("postCode", is_valid_postal_code_length, "invalid postal: code length"),
             (
                 "addressLine1",
                 is_valid_address_line_1_length,

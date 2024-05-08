@@ -22,6 +22,12 @@ def get_agreement(mpt_client, agreement_id):
     response.raise_for_status()
     return response.json()
 
+@wrap_http_error
+def get_licensee(mpt_client, licensee_id):
+    response = mpt_client.get(f"/accounts/licensees/{licensee_id}")
+    response.raise_for_status()
+    return response.json()
+
 
 @wrap_http_error
 def update_order(mpt_client, order_id, **kwargs):
