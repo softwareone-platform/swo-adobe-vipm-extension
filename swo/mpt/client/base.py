@@ -14,7 +14,7 @@ class MPTClient(Session):
         )
         self.mount("http://", HTTPAdapter(
             max_retries=retries,
-            pool_maxsize=32,
+            pool_maxsize=36,
         ))
         self.headers.update(
             {

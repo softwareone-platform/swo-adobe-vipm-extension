@@ -168,3 +168,13 @@ def get_product_template_or_default(mpt_client, product_id, status, name=None):
     response.raise_for_status()
     templates = response.json()
     return templates["data"][0]
+
+
+@wrap_http_error
+def update_agreement(mpt_client, agreement_id, **kwargs):
+    response = mpt_client.put(
+        f"/commerce/agreements/{agreement_id}",
+        json=kwargs,
+    )
+    response.raise_for_status()
+    return response.json()

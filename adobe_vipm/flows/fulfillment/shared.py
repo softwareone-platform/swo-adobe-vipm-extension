@@ -37,6 +37,7 @@ from adobe_vipm.flows.mpt import (
     get_subscription_by_external_id,
     query_order,
     set_processing_template,
+    update_agreement,
     update_order,
     update_subscription,
 )
@@ -75,6 +76,9 @@ def save_adobe_customer_data(client, order, customer_id, enroll_status=None):
     if enroll_status:
         order = set_adobe_3yc_enroll_status(order, enroll_status)
     update_order(client, order["id"], parameters=order["parameters"])
+    update_agreement(
+        client, order["agreement"]["id"], externalIds={"vendor": customer_id}
+    )
     return order
 
 
@@ -123,6 +127,9 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
         order["id"],
         parameters=order["parameters"],
         externalIds=order["externalIds"],
+    )
+    update_agreement(
+        client, order["agreement"]["id"], externalIds={"vendor": customer["customerId"]}
     )
     return order
 
@@ -394,7 +401,9 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
 
     order_line = get_order_line_by_sku(order, item["offerId"])
 
-    subscription = get_subscription_by_external_id(mpt_client, order["id"], item["subscriptionId"])
+    subscription = get_subscription_by_external_id(
+        mpt_client, order["id"], item["subscriptionId"]
+    )
     if not subscription:
         subscription = {
             "name": f"Subscription for {order_line['item']['name']}",

@@ -224,6 +224,10 @@ def test_no_customer(
         },
     }
 
+    # mocked_update_agreement.assert_called_once_with(
+    #     externalIds={"vendor": "a-client-id"},
+    # )
+
     mocked_create_subscription.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -829,6 +833,9 @@ def test_create_customer_account(
         "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocked_update_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement",
+    )
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
         return_value=copy.deepcopy(order),
@@ -860,6 +867,11 @@ def test_create_customer_account(
                 customer_id="adobe-customer-id"
             ),
         },
+    )
+    mocked_update_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        order["agreement"]["id"],
+        externalIds={"vendor": "adobe-customer-id"},
     )
     assert updated_order == order
 
