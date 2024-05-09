@@ -665,13 +665,26 @@ def subscriptions_factory(lines_factory):
 
 
 @pytest.fixture()
-def agreement_factory(buyer):
+def agreement_factory(buyer, fulfillment_parameters_factory):
     def _agreement(
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
         use_buyer_address=False,
+        subscriptions=None,
     ):
+
+        if not subscriptions:
+            subscriptions = [
+                {
+                    "id": "SUB-1000-2000-3000",
+                    "status": "Active",
+                },
+                {
+                    "id": "SUB-1234-5678",
+                    "status": "Terminated",
+                },
+            ]
 
         return {
             "id": "AGR-2119-4550-8674-5962",
@@ -711,6 +724,11 @@ def agreement_factory(buyer):
             },
             "product": {
                 "id": "PRD-1111-1111",
+            },
+            "authorization": {"id": "AUT-1234-5678"},
+            "subscriptions": subscriptions,
+            "parameters": {
+                "fulfillment": fulfillment_parameters_factory(),
             },
         }
 
@@ -1045,7 +1063,7 @@ def mpt_client(settings):
     Create an instance of the MPT client used by the extension.
     """
     settings.MPT_API_BASE_URL = "https://localhost"
-    from swo.mpt.extensions.runtime.events.utils import setup_client
+    from swo.mpt.extensions.core.utils import setup_client
 
     return setup_client()
 

@@ -11,16 +11,8 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from swo.mpt.client import MPTClient
 
 logger = logging.getLogger(__name__)
-
-
-def setup_client():
-    return MPTClient(
-        f"{settings.MPT_API_BASE_URL}/v1/",
-        settings.MPT_API_TOKEN,
-    )
 
 
 def _response_hook(span, request, response):
