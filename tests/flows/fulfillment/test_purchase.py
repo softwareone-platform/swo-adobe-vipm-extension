@@ -991,7 +991,7 @@ def test_create_customer_account_address_error(
     )
     address_param["constraints"] = {
         "hidden": False,
-        "optional": False,
+        "required": True,
     }
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
@@ -1064,7 +1064,7 @@ def test_create_customer_account_fields_error(
     )
     param["constraints"] = {
         "hidden": False,
-        "optional": False,
+        "required": True,
     }
     mocked_query_order.assert_called_once_with(
         mocked_mpt_client,
@@ -1249,7 +1249,7 @@ def test_create_customer_account_3yc_minimum_error(
     )
     consumables_param["constraints"] = {
         "hidden": False,
-        "optional": True,
+        "required": False,
     }
     licenses_param = next(
         filter(lambda x: x["externalId"] == PARAM_3YC_LICENSES, ordering_parameters)
@@ -1259,7 +1259,7 @@ def test_create_customer_account_3yc_minimum_error(
     )
     licenses_param["constraints"] = {
         "hidden": False,
-        "optional": True,
+        "required": False,
     }
 
     mocked_query_order.assert_called_once_with(

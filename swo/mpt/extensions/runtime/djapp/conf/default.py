@@ -153,7 +153,7 @@ LOGGING = {
     },
     "root": {
         "handlers": ["rich"],
-        "level": "INFO",
+        "level": "WARNING",
     },
     "loggers": {
         "django": {

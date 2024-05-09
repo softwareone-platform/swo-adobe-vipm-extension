@@ -76,7 +76,7 @@ def validate_3yc(order, customer_data):
                 order,
                 param_name,
                 error.to_dict(title=param["name"]),
-                optional=True,
+                required=False,
             )
 
     if not errors and not (

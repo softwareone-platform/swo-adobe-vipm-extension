@@ -299,7 +299,7 @@ def order_parameters_factory():
                 "value": company_name,
                 "constraints": {
                     "hidden": False,
-                    "optional": False,
+                    "required": True,
                 },
             },
             {
@@ -310,7 +310,7 @@ def order_parameters_factory():
                 "value": address,
                 "constraints": {
                     "hidden": False,
-                    "optional": False,
+                    "required": True,
                 },
             },
             {
@@ -321,7 +321,7 @@ def order_parameters_factory():
                 "value": contact,
                 "constraints": {
                     "hidden": False,
-                    "optional": False,
+                    "required": True,
                 },
             },
             {
@@ -332,7 +332,7 @@ def order_parameters_factory():
                 "value": "New",
                 "constraints": {
                     "hidden": False,
-                    "optional": False,
+                    "required": True,
                 },
             },
             {
@@ -343,7 +343,7 @@ def order_parameters_factory():
                 "value": "",
                 "constraints": {
                     "hidden": True,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -354,7 +354,7 @@ def order_parameters_factory():
                 "value": p3yc,
                 "constraints": {
                     "hidden": False,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -365,7 +365,7 @@ def order_parameters_factory():
                 "value": p3yc_licenses,
                 "constraints": {
                     "hidden": False,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -376,7 +376,7 @@ def order_parameters_factory():
                 "value": p3yc_consumables,
                 "constraints": {
                     "hidden": False,
-                    "optional": True,
+                    "required": False,
                 },
             },
         ]
@@ -404,7 +404,7 @@ def transfer_order_parameters_factory():
                 "value": company_name or "",
                 "constraints": {
                     "hidden": True,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -415,7 +415,7 @@ def transfer_order_parameters_factory():
                 "value": address or {},
                 "constraints": {
                     "hidden": True,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -426,7 +426,7 @@ def transfer_order_parameters_factory():
                 "value": contact or {},
                 "constraints": {
                     "hidden": True,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -437,7 +437,7 @@ def transfer_order_parameters_factory():
                 "value": "Migrate",
                 "constraints": {
                     "hidden": False,
-                    "optional": False,
+                    "required": True,
                 },
             },
             {
@@ -448,7 +448,7 @@ def transfer_order_parameters_factory():
                 "value": membership_id,
                 "constraints": {
                     "hidden": False,
-                    "optional": False,
+                    "required": True,
                 },
             },
             {
@@ -459,7 +459,7 @@ def transfer_order_parameters_factory():
                 "value": p3yc or [],
                 "constraints": {
                     "hidden": True,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -470,7 +470,7 @@ def transfer_order_parameters_factory():
                 "value": p3yc_licenses or "",
                 "constraints": {
                     "hidden": True,
-                    "optional": True,
+                    "required": False,
                 },
             },
             {
@@ -481,7 +481,7 @@ def transfer_order_parameters_factory():
                 "value": p3yc_consumables or "",
                 "constraints": {
                     "hidden": True,
-                    "optional": True,
+                    "required": False,
                 },
             },
         ]
