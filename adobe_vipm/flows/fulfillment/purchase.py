@@ -90,7 +90,7 @@ def _handle_customer_error(client, order, error):
                 order,
                 PARAM_3YC_LICENSES,
                 ERR_3YC_QUANTITY_LICENSES.to_dict(title=param["name"]),
-                optional=True,
+                required=False,
             )
         if "CONSUMABLES" in str(error):
             param = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
@@ -98,7 +98,7 @@ def _handle_customer_error(client, order, error):
                 order,
                 PARAM_3YC_CONSUMABLES,
                 ERR_3YC_QUANTITY_CONSUMABLES.to_dict(title=param["name"]),
-                optional=True,
+                required=False,
             )
         if not error.details:
             param_licenses = get_ordering_parameter(order, PARAM_3YC_LICENSES)

@@ -7,6 +7,7 @@ import phonenumbers
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
+    NEW_CUSTOMER_PARAMETERS,
     OPTIONAL_CUSTOMER_ORDER_PARAMS,
     ORDER_TYPE_CHANGE,
     ORDER_TYPE_PURCHASE,
@@ -27,6 +28,7 @@ from adobe_vipm.flows.constants import (
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
     PARAM_RETRY_COUNT,
+    REQUIRED_CUSTOMER_ORDER_PARAMS,
 )
 from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.utils import find_first
@@ -234,7 +236,7 @@ def set_customer_data(order, customer_data):
     return updated_order
 
 
-def set_ordering_parameter_error(order, param_external_id, error, optional=False):
+def set_ordering_parameter_error(order, param_external_id, error, required=True):
     """
     Set a validation error on an ordering parameter.
 
@@ -254,7 +256,7 @@ def set_ordering_parameter_error(order, param_external_id, error, optional=False
     param["error"] = error
     param["constraints"] = {
         "hidden": False,
-        "optional": optional,
+        "required": required,
     }
     return updated_order
 
@@ -526,7 +528,7 @@ def set_parameter_visible(order, param_external_id):
     )
     param["constraints"] = {
         "hidden": False,
-        "optional": param_external_id in OPTIONAL_CUSTOMER_ORDER_PARAMS,
+        "required": param_external_id not in OPTIONAL_CUSTOMER_ORDER_PARAMS,
     }
     return updated_order
 
@@ -539,7 +541,7 @@ def set_parameter_hidden(order, param_external_id):
     )
     param["constraints"] = {
         "hidden": True,
-        "optional": True,
+        "required": False,
     }
     return updated_order
 
@@ -604,3 +606,30 @@ def split_phone_number(phone_number, country):
         "prefix": country_code,
         "number": number,
     }
+
+def is_ordering_param_required(source, param_external_id):
+    param = get_ordering_parameter(source, param_external_id)
+    return (param.get("constraints", {}) or {}).get("required", False)
+
+
+def is_purchase_validation_enabled(order):
+    return all(
+        is_ordering_param_required(order, param_external_id)
+        for param_external_id in REQUIRED_CUSTOMER_ORDER_PARAMS
+    )
+
+
+def is_transfer_validation_enabled(order):
+    return is_ordering_param_required(order, PARAM_MEMBERSHIP_ID)
+
+
+def update_parameters_visibility(order):
+    if is_new_customer(order):
+        for param in NEW_CUSTOMER_PARAMETERS:
+            order = set_parameter_visible(order, param)
+        order = set_parameter_hidden(order, PARAM_MEMBERSHIP_ID)
+    else:
+        for param in NEW_CUSTOMER_PARAMETERS:
+            order = set_parameter_hidden(order, param)
+        order = set_parameter_visible(order, PARAM_MEMBERSHIP_ID)
+    return order

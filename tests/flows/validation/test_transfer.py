@@ -96,7 +96,7 @@ def test_validate_transfer_membership_error(
         details=str(api_error),
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_transfer_unknown_item(
@@ -131,7 +131,7 @@ def test_validate_transfer_unknown_item(
         item_sku=adobe_preview_transfer["items"][0]["offerId"][:10],
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_transfer_already_migrated(
@@ -226,4 +226,4 @@ def test_validate_transfer_migration_running(
         details="Migration in progress, retry later.",
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True

@@ -89,7 +89,7 @@ def test_validate_company_name_invalid_length(
     param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 @pytest.mark.parametrize(
@@ -118,7 +118,7 @@ def test_validate_company_name_invalid_chars(
     param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_address(order_factory):
@@ -170,7 +170,7 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
         errors=ERR_COUNTRY_CODE,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_address_invalid_state(order_factory, order_parameters_factory):
@@ -204,7 +204,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
         errors=ERR_STATE_OR_PROVINCE,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_address_invalid_postal_code(order_factory, order_parameters_factory):
@@ -239,7 +239,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
         errors=ERR_POSTAL_CODE_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_address_invalid_postal_code_length(
@@ -276,7 +276,7 @@ def test_validate_address_invalid_postal_code_length(
         errors=ERR_POSTAL_CODE_LENGTH,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_address_invalid_others(order_factory, order_parameters_factory):
@@ -318,7 +318,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
         ),
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_contact(order_factory):
@@ -360,7 +360,7 @@ def test_validate_contact_mandatory(order_factory, order_parameters_factory):
         errors="it is mandatory.",
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_contact_invalid_first_name(order_factory, order_parameters_factory):
@@ -391,7 +391,7 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
         errors=ERR_FIRST_NAME_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_contact_invalid_last_name(order_factory, order_parameters_factory):
@@ -422,7 +422,7 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
         errors=ERR_LAST_NAME_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_contact_invalid_email(order_factory, order_parameters_factory):
@@ -453,7 +453,7 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
         errors=ERR_EMAIL_FORMAT,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_contact_invalid_phone(order_factory, order_parameters_factory):
@@ -488,7 +488,7 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
         errors=ERR_PHONE_NUMBER_LENGTH,
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is False
+    assert param["constraints"]["required"] is True
 
 
 def test_validate_customer_data(mocker):
@@ -613,7 +613,7 @@ def test_validate_3yc_invalid(
         title=param["name"],
     )
     assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["optional"] is True
+    assert param["constraints"]["required"] is False
 
 
 def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
