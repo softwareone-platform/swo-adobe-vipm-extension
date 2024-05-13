@@ -153,3 +153,28 @@ def test_validate_transfer_order_no_validate(
     assert caplog.records[0].message == (
         f"Validation of order {order['id']} succeeded with errors"
     )
+
+
+def test_validate_purchase_order_populate_params_only(mocker, caplog, order_factory):
+    mocker.patch("adobe_vipm.flows.validation.base.get_adobe_client")
+    order = order_factory()
+    m_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.is_purchase_validation_enabled",
+        return_value=False,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.prepare_customer_data",
+        return_value=(order, mocker.MagicMock()),
+    )
+    mocked_validate = mocker.patch(
+        "adobe_vipm.flows.validation.base.validate_customer_data",
+    )
+
+    validate_order(m_client, order)
+
+    mocked_validate.assert_not_called()
