@@ -133,16 +133,11 @@ def test_terminate_contract(mocker, requests_mocker, settings):
     }
 
     mocker.patch("adobe_vipm.flows.nav.get_token", return_value=(True, "a-token"))
-    requests_mocker.patch(
-        "https://api.nav/v1/contracts/terminate/my-cco",
+    requests_mocker.post(
+        "https://api.nav/v1.0/contracts/terminateNow/my-cco",
         status=200,
-        json={"id": "whatever"},
+        json={"contractInsert":{"contractNumber": "whatever"}},
         match=[
-            matchers.json_params_matcher(
-                {
-                    "terminationDate": "2024-01-01T12:00:00+00:00",
-                },
-            ),
             matchers.header_matcher(
                 {
                     "Authorization": "Bearer a-token",
@@ -173,11 +168,43 @@ def test_terminate_contract_api_error(mocker, requests_mocker, settings):
     }
 
     mocker.patch("adobe_vipm.flows.nav.get_token", return_value=(True, "a-token"))
-    requests_mocker.patch(
-        "https://api.nav/v1/contracts/terminate/my-cco", status=400, body="Bad request"
+    requests_mocker.post(
+        "https://api.nav/v1.0/contracts/terminateNow/my-cco", status=400, body="Bad request"
     )
 
     with freeze_time("2024-01-01 12:00:00"):
         ok, response = terminate_contract("my-cco")
         assert ok is False
         assert response == "400 - Bad request"
+
+
+def test_terminate_contract_json_decode_error(mocker, requests_mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "NAV_API_BASE_URL": "https://api.nav",
+    }
+
+    mocker.patch("adobe_vipm.flows.nav.get_token", return_value=(True, "a-token"))
+    requests_mocker.post(
+        "https://api.nav/v1.0/contracts/terminateNow/my-cco", status=200, body="This is not JSON"
+    )
+
+    with freeze_time("2024-01-01 12:00:00"):
+        ok, response = terminate_contract("my-cco")
+        assert ok is False
+        assert response == "200 - This is not JSON"
+
+
+def test_terminate_contract_unexpected_json(mocker, requests_mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "NAV_API_BASE_URL": "https://api.nav",
+    }
+
+    mocker.patch("adobe_vipm.flows.nav.get_token", return_value=(True, "a-token"))
+    requests_mocker.post(
+        "https://api.nav/v1.0/contracts/terminateNow/my-cco", status=200, json={"other": "JSON"},
+    )
+
+    with freeze_time("2024-01-01 12:00:00"):
+        ok, response = terminate_contract("my-cco")
+        assert ok is False
+        assert response == '200 - {"other": "JSON"}'
