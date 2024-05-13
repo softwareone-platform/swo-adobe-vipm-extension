@@ -68,17 +68,18 @@ def terminate_contract(cco):
 
     base_url = settings.EXTENSION_CONFIG["NAV_API_BASE_URL"]
 
-    resp = requests.patch(
-        urljoin(base_url, f"/v1/contracts/terminate/{cco}"),
+    resp = requests.post(
+        urljoin(base_url, f"/v1.0/contracts/terminateNow/{cco}"),
         headers={
             "Authorization": f"Bearer {response}",
         },
-        json={
-            "terminationDate": datetime.now(UTC).isoformat(),
-        },
     )
+    if resp.status_code == 200:
+        try:
+            data = resp.json()
+            if (data.get("contractInsert", {}) or {}).get("contractNumber"):
+                return True, ''
+        except requests.JSONDecodeError:
+            pass
 
-    return (
-        resp.status_code == 200 and bool(resp.content.decode()),
-        f"{resp.status_code} - {resp.content.decode()}",
-    )
+    return False, f"{resp.status_code} - {resp.content.decode()}"
