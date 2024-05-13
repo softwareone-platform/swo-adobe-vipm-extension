@@ -4,13 +4,32 @@ import pytest
 from freezegun import freeze_time
 from responses import matchers
 
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACCEPTED,
+    STATUS_3YC_COMMITTED,
+    STATUS_3YC_DECLINED,
+    STATUS_3YC_REQUESTED,
+)
+from adobe_vipm.flows.constants import (
+    PARAM_3YC,
+    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+    PARAM_3YC_END_DATE,
+    PARAM_3YC_ENROLL_STATUS,
+    PARAM_3YC_RECOMMITMENT,
+    PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
+    PARAM_NEXT_SYNC_DATE,
+)
 from adobe_vipm.flows.errors import MPTError
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
     get_agreement_subscription,
+    get_agreements_by_3yc_commitment_request_status,
     get_agreements_by_next_sync,
+    get_agreements_by_query,
+    get_agreements_for_3yc_recommitment,
+    get_agreements_for_3yc_resubmit,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_template_or_default,
@@ -467,7 +486,9 @@ def test_get_webhoook(mpt_client, requests_mocker, webhook):
         (1, [{"id": "SUB-1234"}], {"id": "SUB-1234"}),
     ],
 )
-def test_get_subscription_by_external_id(mpt_client, requests_mocker, total, data, expected):
+def test_get_subscription_by_external_id(
+    mpt_client, requests_mocker, total, data, expected
+):
     requests_mocker.get(
         urljoin(
             mpt_client.base_url,
@@ -485,7 +506,9 @@ def test_get_subscription_by_external_id(mpt_client, requests_mocker, total, dat
         },
     )
 
-    assert get_subscription_by_external_id(mpt_client, "ORD-1234", "a-sub-id") == expected
+    assert (
+        get_subscription_by_external_id(mpt_client, "ORD-1234", "a-sub-id") == expected
+    )
 
 
 @pytest.mark.parametrize("name", ["template_name", None])
@@ -513,7 +536,6 @@ def test_get_product_template_or_default(mpt_client, requests_mocker, name):
         "Processing",
         name,
     ) == {"id": "TPL-0000"}
-
 
 
 def test_update_agreement(mpt_client, requests_mocker):
@@ -556,80 +578,9 @@ def test_update_agreement_error(mpt_client, requests_mocker, mpt_error_factory):
     assert cv.value.payload["status"] == 404
 
 
-@freeze_time("2024-01-04 03:00:00")
-def test_get_agreements_by_next_sync(mpt_client, requests_mocker):
-    param_condition = (
-        "any(parameters.fulfillment,and(eq(externalId,nextSync),lt(displayValue,2024-01-04)))"
-    )
-    status_condition = "eq(status,Active)"
-
-    rql_query = (
-        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
-    )
-    url = f"commerce/agreements?{rql_query}"
-
-    page1_url = f"{url}&limit=10&offset=0"
-    page2_url = f"{url}&limit=10&offset=10"
-    data = [{"id": f"AGR-{idx}"} for idx in range(13)]
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, page1_url),
-        json={
-            "$meta": {
-                "pagination": {
-                    "offset": 0,
-                    "limit": 10,
-                    "total": 12,
-                },
-            },
-            "data": data[:10],
-        },
-    )
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, page2_url),
-        json={
-            "$meta": {
-                "pagination": {
-                    "offset": 10,
-                    "limit": 10,
-                    "total": 12,
-                },
-            },
-            "data": data[10:],
-        },
-    )
-
-    assert get_agreements_by_next_sync(mpt_client) == data
-
-
-@freeze_time("2024-01-04 03:00:00")
-def test_get_agreements_by_next_sync_error(
-    mpt_client, requests_mocker, mpt_error_factory
+def test_update_agreement_subscription(
+    mpt_client, requests_mocker, subscriptions_factory
 ):
-    param_condition = (
-        "any(parameters.fulfillment,and(eq(externalId,nextSync),lt(displayValue,2024-01-04)))"
-    )
-    status_condition = "eq(status,Active)"
-
-    rql_query = (
-        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
-    )
-    url = f"commerce/agreements?{rql_query}"
-
-    url = f"{url}&limit=10&offset=0"
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, url),
-        status=500,
-        json=mpt_error_factory(500, "Internal server error", "Whatever"),
-    )
-
-    with pytest.raises(MPTError) as cv:
-        get_agreements_by_next_sync(mpt_client)
-
-    assert cv.value.payload["status"] == 500
-
-
-
-def test_update_agreement_subscription(mpt_client, requests_mocker, subscriptions_factory):
     subscription = subscriptions_factory()
     requests_mocker.put(
         urljoin(
@@ -672,7 +623,9 @@ def test_update_agreement_subscription(mpt_client, requests_mocker, subscription
     assert updated_subscription == subscription
 
 
-def test_update_agreement_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
+def test_update_agreement_subscription_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
     requests_mocker.put(
         urljoin(mpt_client.base_url, "commerce/subscriptions/SUB-1234"),
         status=404,
@@ -695,7 +648,9 @@ def test_get_agreement_subscription(mpt_client, requests_mocker, subscriptions_f
     assert get_agreement_subscription(mpt_client, sub["id"]) == sub
 
 
-def test_get_agreement_subscription_error(mpt_client, requests_mocker, mpt_error_factory):
+def test_get_agreement_subscription_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
     requests_mocker.get(
         urljoin(mpt_client.base_url, "commerce/subscriptions/SUB-1234"),
         status=404,
@@ -706,3 +661,225 @@ def test_get_agreement_subscription_error(mpt_client, requests_mocker, mpt_error
         get_agreement_subscription(mpt_client, "SUB-1234")
 
     assert cv.value.payload["status"] == 404
+
+
+def test_get_agreements_by_query(mpt_client, requests_mocker):
+    rql_query = "any-rql-query&select=any-obj"
+    url = f"commerce/agreements?{rql_query}"
+
+    page1_url = f"{url}&limit=10&offset=0"
+    page2_url = f"{url}&limit=10&offset=10"
+    data = [{"id": f"AGR-{idx}"} for idx in range(13)]
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, page1_url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 0,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": data[:10],
+        },
+    )
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, page2_url),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 10,
+                    "limit": 10,
+                    "total": 12,
+                },
+            },
+            "data": data[10:],
+        },
+    )
+
+    assert get_agreements_by_query(mpt_client, rql_query) == data
+
+
+def test_get_agreements_by_query_error(mpt_client, requests_mocker, mpt_error_factory):
+    rql_query = "any-rql-query&select=any-obj"
+    url = f"commerce/agreements?{rql_query}"
+
+    url = f"{url}&limit=10&offset=0"
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, url),
+        status=500,
+        json=mpt_error_factory(500, "Internal server error", "Whatever"),
+    )
+
+    with pytest.raises(MPTError) as cv:
+        get_agreements_by_query(mpt_client, rql_query)
+
+    assert cv.value.payload["status"] == 500
+
+
+@freeze_time("2024-01-04 03:00:00")
+def test_get_agreements_by_next_sync(mocker):
+    param_condition = (
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_NEXT_SYNC_DATE})"
+        f",lt(displayValue,2024-01-04)))"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
+    )
+
+
+    mocked_get_by_query = mocker.patch(
+        "adobe_vipm.flows.mpt.get_agreements_by_query",
+        return_value=[{"id": "AGR-0001"}],
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    assert get_agreements_by_next_sync(mocked_client) == [{"id": "AGR-0001"}]
+    mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
+
+
+@pytest.mark.parametrize("is_recommitment", [True, False])
+def test_get_agreements_by_3yc_commitment_request_status(mocker, is_recommitment):
+    param_external_id = (
+        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+        if not is_recommitment
+        else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+    )
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_phase = (
+        "ordering" if not is_recommitment else "fulfillment"
+    )
+
+    enroll_status_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{param_external_id}),"
+        f"in(displayValue,({STATUS_3YC_REQUESTED},{STATUS_3YC_ACCEPTED}))"
+        ")"
+        ")"
+    )
+    request_3yc_condition = (
+        f"any(parameters.{request_type_param_phase},and("
+        f"eq(externalId,{request_type_param_ext_id}),"
+        "like(displayValue,*Yes*)"
+        ")"
+        ")"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+    )
+
+    mocked_get_by_query = mocker.patch(
+        "adobe_vipm.flows.mpt.get_agreements_by_query",
+        return_value=[{"id": "AGR-0001"}],
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    assert get_agreements_by_3yc_commitment_request_status(
+        mocked_client, is_recommitment=is_recommitment
+    ) == [{"id": "AGR-0001"}]
+    mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
+
+
+@freeze_time("2024-01-01 03:00:00")
+def test_get_agreements_for_3yc_recommitment(mocker):
+    enroll_status_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{PARAM_3YC_ENROLL_STATUS}),"
+        f"eq(displayValue,{STATUS_3YC_COMMITTED})"
+        ")"
+        ")"
+    )
+    recommitment_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{PARAM_3YC_RECOMMITMENT}),"
+        "like(displayValue,*Yes*)"
+        ")"
+        ")"
+    )
+    enddate_gt_condition = (
+        "any(parameters.ordering,and("
+        f"eq(externalId,{PARAM_3YC_END_DATE}),"
+        f"gt(displayValue,2024-01-31)"
+        ")"
+        ")"
+    )
+    enddate_le_condition = (
+        "any(parameters.ordering,and("
+        f"eq(externalId,{PARAM_3YC_END_DATE}),"
+        f"le(displayValue,2024-01-01)"
+        ")"
+        ")"
+    )
+    status_condition = "eq(status,Active)"
+
+    all_conditions = (
+        enroll_status_condition,
+        recommitment_condition,
+        enddate_gt_condition,
+        enddate_le_condition,
+        status_condition,
+    )
+
+    rql_query = f"and({','.join(all_conditions)})&select=parameters"
+
+    mocked_get_by_query = mocker.patch(
+        "adobe_vipm.flows.mpt.get_agreements_by_query",
+        return_value=[{"id": "AGR-0001"}],
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    assert get_agreements_for_3yc_recommitment(mocked_client) == [{"id": "AGR-0001"}]
+    mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
+
+
+@pytest.mark.parametrize("is_recommitment", [True, False])
+def test_get_agreements_for_3yc_resubmit(mocker, is_recommitment):
+    param_external_id = (
+        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+        if not is_recommitment
+        else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+    )
+
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_phase = (
+        "ordering" if not is_recommitment else "fulfillment"
+    )
+
+    enroll_status_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{param_external_id}),"
+        f"eq(displayValue,{STATUS_3YC_DECLINED})"
+        ")"
+        ")"
+    )
+    request_3yc_condition = (
+        f"any(parameters.{request_type_param_phase},and("
+        f"eq(externalId,{request_type_param_ext_id}),"
+        "like(displayValue,*Yes*)"
+        ")"
+        ")"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+    )
+
+    mocked_get_by_query = mocker.patch(
+        "adobe_vipm.flows.mpt.get_agreements_by_query",
+        return_value=[{"id": "AGR-0001"}],
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    assert get_agreements_for_3yc_resubmit(
+        mocked_client, is_recommitment=is_recommitment,
+    ) == [{"id": "AGR-0001"}]
+    mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)

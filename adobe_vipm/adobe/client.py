@@ -764,6 +764,60 @@ class AdobeClient:
         response.raise_for_status()
         return response.json()
 
+    @wrap_http_error
+    def create_3yc_request(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        commitment_request: dict,
+        is_recommitment: bool = False,
+    ) -> str:
+        authorization = self._config.get_authorization(authorization_id)
+
+        customer = self.get_customer(authorization_id, customer_id)
+
+        request_type = "commitmentRequest" if not is_recommitment else "recommitmentRequest"
+
+        quantities = []
+        if commitment_request["3YCLicenses"]:
+            quantities.append(
+                {
+                    "offerType": "LICENSE",
+                    "quantity": int(commitment_request["3YCLicenses"]),
+                },
+            )
+        if commitment_request["3YCConsumables"]:
+            quantities.append(
+                {
+                    "offerType": "CONSUMABLES",
+                    "quantity": int(commitment_request["3YCConsumables"]),
+                },
+            )
+        payload = {
+            "companyProfile": customer["companyProfile"],
+            "benefits": [
+                {
+                    "type": "THREE_YEAR_COMMIT",
+                    request_type: {
+                        "minimumQuantities": quantities,
+                    },
+                },
+            ]
+        }
+
+        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        response = requests.patch(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}"),
+            headers=headers,
+            json=payload,
+        )
+
+        response.raise_for_status()
+
+        updated_customer = response.json()
+        return updated_customer
+
     def _get_headers(self, authorization: Authorization, correlation_id=None):
         return {
             "X-Api-Key": authorization.client_id,
