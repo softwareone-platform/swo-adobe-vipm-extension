@@ -12,10 +12,13 @@ from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
+    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_END_DATE,
     PARAM_3YC_ENROLL_STATUS,
     PARAM_3YC_LICENSES,
+    PARAM_3YC_RECOMMITMENT,
+    PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
     PARAM_3YC_START_DATE,
     PARAM_ADDRESS,
     PARAM_ADOBE_SKU,
@@ -494,7 +497,10 @@ def fulfillment_parameters_factory():
     def _fulfillment_parameters(
         customer_id="",
         retry_count="0",
+        p3yc_recommitment=None,
         p3yc_enroll_status="",
+        p3yc_commitment_request_status="",
+        p3yc_recommitment_request_status="",
         p3yc_start_date="",
         p3yc_end_date="",
         next_sync_date="",
@@ -541,6 +547,27 @@ def fulfillment_parameters_factory():
                 "externalId": PARAM_NEXT_SYNC_DATE,
                 "type": "Date",
                 "value": next_sync_date,
+            },
+            {
+                "id": "PAR-0022-2200",
+                "name": "3YC Commitment Request Status",
+                "externalId": PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+                "type": "SingleLineText",
+                "value": p3yc_commitment_request_status,
+            },
+            {
+                "id": "PAR-0077-7700",
+                "name": "3YC Recommitment Request Status",
+                "externalId": PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
+                "type": "SingleLineText",
+                "value": p3yc_recommitment_request_status,
+            },
+            {
+                "id": "PAR-0000-6666",
+                "name": "3YCRecommitment",
+                "externalId": PARAM_3YC_RECOMMITMENT,
+                "type": "Checkbox",
+                "value": p3yc_recommitment or [],
             },
         ]
 
@@ -665,13 +692,15 @@ def subscriptions_factory(lines_factory):
 
 
 @pytest.fixture()
-def agreement_factory(buyer, fulfillment_parameters_factory):
+def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_factory):
     def _agreement(
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
         use_buyer_address=False,
         subscriptions=None,
+        fulfillment_parameters=None,
+        ordering_parameters=None,
     ):
 
         if not subscriptions:
@@ -728,7 +757,8 @@ def agreement_factory(buyer, fulfillment_parameters_factory):
             "authorization": {"id": "AUT-1234-5678"},
             "subscriptions": subscriptions,
             "parameters": {
-                "fulfillment": fulfillment_parameters_factory(),
+                "ordering": ordering_parameters or order_parameters_factory(),
+                "fulfillment": fulfillment_parameters or fulfillment_parameters_factory(),
             },
         }
 
@@ -1123,11 +1153,11 @@ def extension_settings(settings):
 
 @pytest.fixture()
 def adobe_commitment_factory():
-    def _commitment(licenses=None, consumables=None):
+    def _commitment(licenses=None, consumables=None, status="COMMITTED"):
         commitment = {
             "startDate": "2024-01-01",
             "endDate": "2025-01-01",
-            "status": "COMMITTED",
+            "status": status,
             "minimumQuantities": [],
         }
         if licenses:
@@ -1158,6 +1188,8 @@ def adobe_customer_factory():
         phone_number="+18004449890",
         country="US",
         commitment=None,
+        commitment_request=None,
+        recommitment_request=None,
     ):
         customer = {
             "customerId": customer_id,
@@ -1183,11 +1215,13 @@ def adobe_customer_factory():
                 ],
             },
         }
-        if commitment:
+        if commitment or commitment_request or recommitment_request:
             customer["benefits"] = [
                 {
                     "type": "THREE_YEAR_COMMIT",
                     "commitment": commitment,
+                    "commitmentRequest": commitment_request,
+                    "recommitmentRequest": recommitment_request,
                 },
             ]
         return customer

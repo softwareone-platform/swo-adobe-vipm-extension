@@ -177,6 +177,7 @@ MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
 # TODO: Should be synced with the initializer.py::initialize function
 MPT_PRODUCTS_IDS = extract_product_ids(os.getenv("MPT_PRODUCTS_IDS", "PRD-1111-1111"))
 MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30
+MPT_PORTAL_BASE_URL = "https://portal.s1.local"
 
 EXTENSION_CONFIG = {
     "ADOBE_API_BASE_URL": "https://api.adobe",

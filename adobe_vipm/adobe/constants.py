@@ -61,3 +61,8 @@ MINQTY_CONSUMABLES = 1000
 REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")
 REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")
 REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+STATUS_3YC_ACCEPTED = "ACCEPTED"
+STATUS_3YC_DECLINED = "DECLINED"
+STATUS_3YC_COMMITTED = "COMMITTED"
+STATUS_3YC_REQUESTED = "REQUESTED"

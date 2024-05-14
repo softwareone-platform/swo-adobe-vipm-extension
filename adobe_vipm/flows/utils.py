@@ -633,3 +633,10 @@ def update_parameters_visibility(order):
             order = set_parameter_hidden(order, param)
         order = set_parameter_visible(order, PARAM_MEMBERSHIP_ID)
     return order
+
+
+def get_company_name(source):
+    return get_ordering_parameter(
+        source,
+        PARAM_COMPANY_NAME,
+    ).get("value")

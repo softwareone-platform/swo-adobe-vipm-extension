@@ -1,8 +1,25 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 from functools import cache
 
-from adobe_vipm.flows.constants import ERR_VIPM_UNHANDLED_EXCEPTION
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACCEPTED,
+    STATUS_3YC_COMMITTED,
+    STATUS_3YC_DECLINED,
+    STATUS_3YC_REQUESTED,
+)
+from adobe_vipm.flows.constants import (
+    ERR_VIPM_UNHANDLED_EXCEPTION,
+    PARAM_3YC,
+    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+    PARAM_3YC_END_DATE,
+    PARAM_3YC_ENROLL_STATUS,
+    PARAM_3YC_RECOMMITMENT,
+    PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
+    PARAM_NEXT_SYNC_DATE,
+    PARAM_PHASE_FULFILLMENT,
+    PARAM_PHASE_ORDERING,
+)
 from adobe_vipm.flows.errors import wrap_http_error
 
 logger = logging.getLogger(__name__)
@@ -22,6 +39,7 @@ def get_agreement(mpt_client, agreement_id):
     )
     response.raise_for_status()
     return response.json()
+
 
 @wrap_http_error
 def get_licensee(mpt_client, licensee_id):
@@ -182,18 +200,9 @@ def update_agreement(mpt_client, agreement_id, **kwargs):
 
 
 @wrap_http_error
-def get_agreements_by_next_sync(mpt_client):
+def get_agreements_by_query(mpt_client, query):
     agreements = []
-    today = date.today().isoformat()
-    param_condition = (
-        f"any(parameters.fulfillment,and(eq(externalId,nextSync),lt(displayValue,{today})))"
-    )
-    status_condition = "eq(status,Active)"
-
-    rql_query = (
-        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
-    )
-    url = f"/commerce/agreements?{rql_query}"
+    url = f"/commerce/agreements?{query}"
     page = None
     limit = 10
     offset = 0
@@ -205,6 +214,20 @@ def get_agreements_by_next_sync(mpt_client):
         offset += limit
 
     return agreements
+
+
+def get_agreements_by_next_sync(mpt_client):
+    today = date.today().isoformat()
+    param_condition = (
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_NEXT_SYNC_DATE})"
+        f",lt(displayValue,{today})))"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
+    )
+    return get_agreements_by_query(mpt_client, rql_query)
 
 
 @wrap_http_error
@@ -224,3 +247,116 @@ def get_agreement_subscription(mpt_client, subscription_id):
     )
     response.raise_for_status()
     return response.json()
+
+
+def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=False):
+    param_external_id = (
+        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+        if not is_recommitment
+        else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+    )
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_phase = (
+        PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
+    )
+
+    enroll_status_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{param_external_id}),"
+        f"in(displayValue,({STATUS_3YC_REQUESTED},{STATUS_3YC_ACCEPTED}))"
+        ")"
+        ")"
+    )
+    request_3yc_condition = (
+        f"any(parameters.{request_type_param_phase},and("
+        f"eq(externalId,{request_type_param_ext_id}),"
+        "like(displayValue,*Yes*)"
+        ")"
+        ")"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+    )
+    return get_agreements_by_query(mpt_client, rql_query)
+
+
+@wrap_http_error
+def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
+    param_external_id = (
+        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+        if not is_recommitment
+        else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+    )
+
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_phase = (
+        PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
+    )
+
+    enroll_status_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{param_external_id}),"
+        f"eq(displayValue,{STATUS_3YC_DECLINED})"
+        ")"
+        ")"
+    )
+    request_3yc_condition = (
+        f"any(parameters.{request_type_param_phase},and("
+        f"eq(externalId,{request_type_param_ext_id}),"
+        "like(displayValue,*Yes*)"
+        ")"
+        ")"
+    )
+    status_condition = "eq(status,Active)"
+
+    rql_query = (
+        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+    )
+    return get_agreements_by_query(mpt_client, rql_query)
+
+
+def get_agreements_for_3yc_recommitment(mpt_client):
+    today = date.today()
+    limit_date = today + timedelta(days=30)
+    enroll_status_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{PARAM_3YC_ENROLL_STATUS}),"
+        f"eq(displayValue,{STATUS_3YC_COMMITTED})"
+        ")"
+        ")"
+    )
+    recommitment_condition = (
+        "any(parameters.fulfillment,and("
+        f"eq(externalId,{PARAM_3YC_RECOMMITMENT}),"
+        "like(displayValue,*Yes*)"
+        ")"
+        ")"
+    )
+    enddate_gt_condition = (
+        "any(parameters.ordering,and("
+        f"eq(externalId,{PARAM_3YC_END_DATE}),"
+        f"gt(displayValue,{limit_date.isoformat()})"
+        ")"
+        ")"
+    )
+    enddate_le_condition = (
+        "any(parameters.ordering,and("
+        f"eq(externalId,{PARAM_3YC_END_DATE}),"
+        f"le(displayValue,{today.isoformat()})"
+        ")"
+        ")"
+    )
+    status_condition = "eq(status,Active)"
+
+    all_conditions = (
+        enroll_status_condition,
+        recommitment_condition,
+        enddate_gt_condition,
+        enddate_le_condition,
+        status_condition,
+    )
+
+    rql_query = f"and({','.join(all_conditions)})&select=parameters"
+    return get_agreements_by_query(mpt_client, rql_query)

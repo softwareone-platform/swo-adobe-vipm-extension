@@ -1773,3 +1773,147 @@ def test_create_customer_account_3yc(
         authorization_uk, seller_id, "external_id", modified_customer
     )
     assert customer_id == {'customerId': 'A-customer-id'}
+
+
+@pytest.mark.parametrize(
+    ("quantities", "expected"),
+    [
+        (
+            {
+                "3YCLicenses": "12",
+                "3YCConsumables": "",
+            },
+            [
+                {
+                    "offerType": "LICENSE",
+                    "quantity": 12,
+                },
+            ]
+        ),
+        (
+            {
+                "3YCLicenses": "",
+                "3YCConsumables": "500",
+            },
+            [
+                {
+                    "offerType": "CONSUMABLES",
+                    "quantity": 500,
+                },
+            ]
+        ),
+        (
+            {
+                "3YCLicenses": "9",
+                "3YCConsumables": "1220",
+            },
+            [
+                {
+                    "offerType": "LICENSE",
+                    "quantity": 9,
+                },
+                {
+                    "offerType": "CONSUMABLES",
+                    "quantity": 1220,
+                },
+            ],
+        ),
+    ]
+)
+@pytest.mark.parametrize("is_recommitment", [False, True])
+def test_create_3yc_request(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_authorizations_file,
+    customer_data,
+    adobe_client_factory,
+    is_recommitment,
+    quantities,
+    expected,
+):
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+
+    client, authorization, api_token = adobe_client_factory()
+
+
+    modified_customer = copy.copy(customer_data)
+
+    company_name = f"{modified_customer['companyName']} (external_id)"
+
+    companyProfile = {
+            "companyName": company_name,
+            "preferredLanguage": "en-US",
+            "address": {
+                "country": modified_customer["address"]["country"],
+                "region": modified_customer["address"]["state"],
+                "city": modified_customer["address"]["city"],
+                "addressLine1": modified_customer["address"]["addressLine1"],
+                "addressLine2": modified_customer["address"]["addressLine2"],
+                "postalCode": modified_customer["address"]["postCode"],
+                "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
+            },
+            "contacts": [
+                {
+                    "firstName": modified_customer["contact"]["firstName"],
+                    "lastName": modified_customer["contact"]["lastName"],
+                    "email": modified_customer["contact"]["email"],
+                    "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
+                }
+            ],
+        }
+
+    client.get_customer = mocker.MagicMock(
+        return_value={"companyProfile": companyProfile},
+    )
+
+    request_type = "commitmentRequest" if not is_recommitment else "recommitmentRequest"
+
+    payload = {
+        "companyProfile": companyProfile,
+        "benefits": [
+            {
+                "type": "THREE_YEAR_COMMIT",
+                request_type: {
+                    "minimumQuantities": expected,
+                },
+            },
+        ]
+    }
+
+    correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+    requests_mocker.patch(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers/a-customer-id"),
+        status=200,
+        json={
+            "customerId": "a-customer-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": correlation_id,
+                },
+            ),
+            matchers.json_params_matcher(payload),
+        ],
+    )
+
+    customer_id = client.create_3yc_request(
+        authorization_uk,
+        "a-customer-id",
+        quantities,
+        is_recommitment=is_recommitment,
+    )
+    assert customer_id == {'customerId': 'a-customer-id'}
