@@ -458,6 +458,7 @@ def test_transfer_invalid_membership(
 
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             transfer_status,
             "some error",
@@ -519,6 +520,7 @@ def test_transfer_unrecoverable_status(
 
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             transfer_status,
             "some error",

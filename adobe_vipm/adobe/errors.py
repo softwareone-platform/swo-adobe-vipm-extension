@@ -1,3 +1,4 @@
+import json
 from functools import wraps
 from typing import Callable, ParamSpec, TypeVar
 
@@ -27,8 +28,15 @@ class CountryNotFoundError(AdobeError):
     pass
 
 
-class AdobeAPIError(AdobeError):
-    def __init__(self, payload: dict) -> None:
+class AdobeHttpError(AdobeError):
+    def __init__(self, status_code: int, content: str):
+        self.status_code = status_code
+        self.content = content
+        super().__init__(f"{self.status_code} - {self.content}")
+
+class AdobeAPIError(AdobeHttpError):
+    def __init__(self, status_code: int, payload: dict) -> None:
+        super().__init__(status_code, json.dumps(payload))
         self.payload: dict = payload
         self.code: str = payload["code"]
         self.message: str = payload["message"]
@@ -51,8 +59,8 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
             return func(*args, **kwargs)
         except HTTPError as e:
             try:
-                raise AdobeAPIError(e.response.json())
+                raise AdobeAPIError(e.response.status_code, e.response.json())
             except JSONDecodeError:
-                raise AdobeError(f"{e.response.status_code} - {e.response.content.decode()}")
+                raise AdobeHttpError(e.response.status_code, e.response.content.decode())
 
     return _wrapper

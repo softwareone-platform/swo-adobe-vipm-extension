@@ -1,20 +1,36 @@
+import json
 from functools import wraps
 
-from requests import HTTPError
+from requests import HTTPError, JSONDecodeError
 
 
 class MPTError(Exception):
-    def __init__(self, payload):
+    pass
+
+
+class MPTHttpError(MPTError):
+    def __init__(self, status_code: int, content: str):
+        self.status_code = status_code
+        self.content = content
+        super().__init__(f"{self.status_code} - {self.content}")
+
+
+class MPTAPIError(MPTHttpError):
+    def __init__(self, status_code, payload):
+        super().__init__(status_code, json.dumps(payload))
         self.payload = payload
-        self.status = payload["status"]
-        self.title = payload["title"]
-        self.trace_id = payload["traceId"]
+        self.status = payload.get("status")
+        self.title = payload.get("title")
+        self.detail = payload.get("detail")
+        self.trace_id = payload.get("traceId")
         self.errors = payload.get("errors")
 
     def __str__(self):
-        return (
-            f"{self.status} {self.title} trace: {self.trace_id} errors: {self.errors}"
-        )
+        base = f"{self.status} {self.title} - {self.detail} ({self.trace_id})"
+
+        if self.errors:
+            return f"{base}\n{json.dumps(self.errors, indent=2)}"
+        return base
 
     def __repr__(self):
         return str(self.payload)
@@ -26,7 +42,10 @@ def wrap_http_error(func):
         try:
             return func(*args, **kwargs)
         except HTTPError as e:
-            raise MPTError(e.response.json())
+            try:
+                raise MPTAPIError(e.response.status_code, e.response.json())
+            except JSONDecodeError:
+                raise MPTHttpError(e.response.status_code, e.response.content.decode())
 
     return _wrapper
 
