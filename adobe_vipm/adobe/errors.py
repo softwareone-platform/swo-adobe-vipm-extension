@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Callable, ParamSpec, TypeVar
 
-from requests import HTTPError
+from requests import HTTPError, JSONDecodeError
 
 Param = ParamSpec("Param")
 RetType = TypeVar("RetType")
@@ -50,8 +50,9 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
         try:
             return func(*args, **kwargs)
         except HTTPError as e:
-            if e.response.headers.get("Content-Type") == "application/json":
+            try:
                 raise AdobeAPIError(e.response.json())
-            raise AdobeError(f"{e.response.status_code} - {e.response.content.decode()}")
+            except JSONDecodeError:
+                raise AdobeError(f"{e.response.status_code} - {e.response.content.decode()}")
 
     return _wrapper
