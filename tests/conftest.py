@@ -1104,13 +1104,22 @@ def mpt_error_factory():
     Generate an error message returned by the Marketplace platform.
     """
 
-    def _mpt_error(status, title, errors):
+    def _mpt_error(
+        status,
+        title,
+        detail,
+        trace_id="00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00",
+        errors=None,
+    ):
         error = {
             "status": status,
             "title": title,
-            "errors": errors,
-            "traceId": "1234567890",
+            "detail": detail,
+            "traceId": trace_id,
         }
+        if errors:
+            error["errors"] = errors
+
         return error
 
     return _mpt_error

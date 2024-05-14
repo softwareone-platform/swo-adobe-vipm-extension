@@ -10,7 +10,8 @@ def test_simple_error(adobe_api_error_factory):
     Adobe does not contain additional details.
     """
     error_data = adobe_api_error_factory("1234", "error message")
-    error = AdobeAPIError(error_data)
+    error = AdobeAPIError(400, error_data)
+    assert error.status_code == 400
     assert error.code == "1234"
     assert error.message == "error message"
     assert error.details == []
@@ -26,7 +27,7 @@ def test_detailed_error(adobe_api_error_factory):
     error_data = adobe_api_error_factory(
         "5678", "error message with details", details=["detail1", "detail2"]
     )
-    error = AdobeAPIError(error_data)
+    error = AdobeAPIError(400, error_data)
     assert error.details == ["detail1", "detail2"]
     assert str(error) == "5678 - error message with details: detail1, detail2"
 
@@ -34,6 +35,7 @@ def test_detailed_error(adobe_api_error_factory):
 def test_wrap_http_error(mocker, adobe_api_error_factory):
     def func():
         response = mocker.MagicMock()
+        response.status_code = 400
         response.json.return_value = adobe_api_error_factory(
         "5678", "error message with details", details=["detail1", "detail2"]
     )
@@ -44,11 +46,12 @@ def test_wrap_http_error(mocker, adobe_api_error_factory):
     with pytest.raises(AdobeAPIError) as cv:
         wrapped_func()
 
+    assert cv.value.status_code == 400
     assert cv.value.details == ["detail1", "detail2"]
     assert str(cv.value) == "5678 - error message with details: detail1, detail2"
 
 
-def test_wrap_http_error_json_decode_error(mocker, adobe_api_error_factory):
+def test_wrap_http_error_json_decode_error(mocker):
     def func():
         response = mocker.MagicMock()
         response.status_code = 500

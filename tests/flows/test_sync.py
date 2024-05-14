@@ -97,6 +97,7 @@ def test_sync_prices_exception(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.side_effect = AdobeAPIError(
+        400,
         adobe_api_error_factory(code="9999", message="Error from Adobe."),
     )
 

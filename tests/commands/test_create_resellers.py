@@ -352,6 +352,7 @@ def test_api_error(
     )
 
     api_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(code="7777", message="Test Api Error"),
     )
 

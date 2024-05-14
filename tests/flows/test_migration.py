@@ -107,6 +107,7 @@ def test_start_transfers_for_product_preview_already_transferred(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.side_effect = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_TRANSFER_ALREADY_TRANSFERRED,
             message="Already transferred",
@@ -159,6 +160,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
 
     mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_TRANSFER_INELIGIBLE,
             message="Cannot be transferred",
@@ -205,6 +207,7 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
 
     mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_TRANSFER_INELIGIBLE,
             message="Cannot be transferred",
@@ -263,6 +266,7 @@ def test_start_transfers_for_product_error(
         items=adobe_items_factory(renewal_date="2022-10-11"),
     )
     error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code="9999",
             message="Unexpected error",
@@ -490,6 +494,7 @@ def test_checking_running_transfers_for_product_error_retry(
     )
 
     error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code="9999",
             message="Unexpected error",
@@ -539,6 +544,7 @@ def test_checking_running_transfers_for_product_get_customer_error_retry(
     )
 
     error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code="9999",
             message="Unexpected error",
@@ -585,6 +591,7 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
     )
 
     error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code="9999",
             message="Unexpected error",
@@ -731,6 +738,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
 
     mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_TRANSFER_INELIGIBLE,
             message="Cannot be transferred",

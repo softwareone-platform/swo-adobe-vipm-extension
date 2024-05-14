@@ -19,7 +19,7 @@ from adobe_vipm.flows.constants import (
     PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
     PARAM_NEXT_SYNC_DATE,
 )
-from adobe_vipm.flows.errors import MPTError
+from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
@@ -75,7 +75,7 @@ def test_fail_order_error(mpt_client, requests_mocker, mpt_error_factory):
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         fail_order(mpt_client, "ORD-0000", "a-reason")
 
     assert cv.value.payload["status"] == 404
@@ -132,7 +132,7 @@ def test_query_order_error(mpt_client, requests_mocker, mpt_error_factory):
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         query_order(mpt_client, "ORD-0000", parameters={})
 
     assert cv.value.payload["status"] == 404
@@ -189,7 +189,7 @@ def test_update_order_error(mpt_client, requests_mocker, mpt_error_factory):
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         update_order(mpt_client, "ORD-0000", parameters={})
 
     assert cv.value.payload["status"] == 404
@@ -228,7 +228,7 @@ def test_complete_order_error(mpt_client, requests_mocker, mpt_error_factory):
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         complete_order(mpt_client, "ORD-0000", {"id": "templateId"})
 
     assert cv.value.payload["status"] == 404
@@ -264,7 +264,7 @@ def test_create_subscription_error(mpt_client, requests_mocker, mpt_error_factor
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         create_subscription(mpt_client, "ORD-0000", {})
 
     assert cv.value.payload["status"] == 404
@@ -325,7 +325,7 @@ def test_update_subscription_error(mpt_client, requests_mocker, mpt_error_factor
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         update_subscription(mpt_client, "ORD-0000", "SUB-1234", parameters={})
 
     assert cv.value.payload["status"] == 404
@@ -395,7 +395,7 @@ def test_get_product_items_by_skus_error(
         json=mpt_error_factory(500, "Internal server error", "Whatever"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         get_product_items_by_skus(mpt_client, product_id, skus)
 
     assert cv.value.payload["status"] == 500
@@ -463,7 +463,7 @@ def test_get_pricelist_item_by_product_item_error(
         json=mpt_error_factory(500, "Internal server error", "Whatever"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         get_pricelist_items_by_product_items(mpt_client, "PRC-1234", ["ITM-5678"])
 
     assert cv.value.payload["status"] == 500
@@ -572,7 +572,7 @@ def test_update_agreement_error(mpt_client, requests_mocker, mpt_error_factory):
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         update_agreement(mpt_client, "AGR-1111", externalIds={"vendor": "1234"})
 
     assert cv.value.payload["status"] == 404
@@ -632,7 +632,7 @@ def test_update_agreement_subscription_error(
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         update_agreement_subscription(mpt_client, "SUB-1234", parameters={})
 
     assert cv.value.payload["status"] == 404
@@ -657,7 +657,7 @@ def test_get_agreement_subscription_error(
         json=mpt_error_factory(404, "Not Found", "Order not found"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         get_agreement_subscription(mpt_client, "SUB-1234")
 
     assert cv.value.payload["status"] == 404
@@ -711,7 +711,7 @@ def test_get_agreements_by_query_error(mpt_client, requests_mocker, mpt_error_fa
         json=mpt_error_factory(500, "Internal server error", "Whatever"),
     )
 
-    with pytest.raises(MPTError) as cv:
+    with pytest.raises(MPTAPIError) as cv:
         get_agreements_by_query(mpt_client, rql_query)
 
     assert cv.value.payload["status"] == 500

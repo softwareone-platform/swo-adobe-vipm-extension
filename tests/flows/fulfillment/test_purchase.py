@@ -961,6 +961,7 @@ def test_create_customer_account_address_error(
     )
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_INVALID_ADDRESS,
             message="Invalid address",
@@ -1032,6 +1033,7 @@ def test_create_customer_account_fields_error(
 
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_INVALID_FIELDS,
             message="Invalid fields",
@@ -1095,6 +1097,7 @@ def test_create_customer_account_other_error(
     """
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_ACCOUNT_ALREADY_EXISTS,
             message="Account already exists.",
@@ -1218,6 +1221,7 @@ def test_create_customer_account_3yc_minimum_error(
 
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_INVALID_MINIMUM_QUANTITY,
             message="Minimum quantity out of range",
@@ -1285,6 +1289,7 @@ def test_create_customer_account_3yc_empty_minimums(
     )
     mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(
             code=STATUS_INVALID_MINIMUM_QUANTITY,
             message="Minimum quantity out of range",

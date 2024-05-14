@@ -79,6 +79,7 @@ def test_validate_transfer_membership_error(
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     api_error = AdobeAPIError(
+        400,
         adobe_api_error_factory(status_code, "An error"),
     )
     mocked_adobe_client = mocker.MagicMock()
