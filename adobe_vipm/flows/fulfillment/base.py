@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
@@ -10,6 +11,8 @@ from adobe_vipm.flows.utils import (
     is_purchase_order,
     is_termination_order,
     is_transfer_order,
+    notify_unhandled_exception_in_teams,
+    strip_trace_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,12 +31,20 @@ def fulfill_order(client, order):
         None
     """
     logger.info(f'Start processing {order["type"]} order {order["id"]}')
-    order = populate_order_info(client, order)
-    if is_purchase_order(order):
-        fulfill_purchase_order(client, order)
-    elif is_transfer_order(order):
-        fulfill_transfer_order(client, order)
-    elif is_change_order(order):
-        fulfill_change_order(client, order)
-    elif is_termination_order(order):  # pragma: no branch
-        fulfill_termination_order(client, order)
+    try:
+        order = populate_order_info(client, order)
+        if is_purchase_order(order):
+            fulfill_purchase_order(client, order)
+        elif is_transfer_order(order):
+            fulfill_transfer_order(client, order)
+        elif is_change_order(order):
+            fulfill_change_order(client, order)
+        elif is_termination_order(order):  # pragma: no branch
+            fulfill_termination_order(client, order)
+    except Exception:
+        notify_unhandled_exception_in_teams(
+            "fulfillment",
+            order["id"],
+            strip_trace_id(traceback.format_exc()),
+        )
+        raise

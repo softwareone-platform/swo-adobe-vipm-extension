@@ -14,10 +14,18 @@ from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
     create_offers,
     get_offer_ids_by_membership_id,
+    get_transfer_link,
     get_transfers_to_check,
     get_transfers_to_process,
 )
 from adobe_vipm.flows.nav import terminate_contract
+from adobe_vipm.notifications import (
+    Button,
+    FactsSection,
+    send_error,
+    send_exception,
+    send_warning,
+)
 
 RECOVERABLE_TRANSFER_ERRORS = (
     "RETURNABLE_PURCHASE",
@@ -27,6 +35,12 @@ RECOVERABLE_TRANSFER_ERRORS = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def get_transfer_link_button(transfer):
+    link = get_transfer_link(transfer)
+    if link:
+        return Button(transfer.membership_id, link)
 
 
 def fill_customer_data(transfer, customer):
@@ -81,6 +95,23 @@ def check_retries(transfer):
     transfer.updated_at = datetime.now()
     transfer.save()
 
+    facts = None
+
+    if transfer.adobe_error_code:
+        facts = FactsSection(
+            "Last error from Adobe",
+            {
+                transfer.adobe_error_code: transfer.adobe_error_description
+            }
+        )
+    send_error(
+        "Migration max retries exceeded.",
+        f"The maximum amount of retries ({max_retries}) "
+        f"has been exceeded for the Membership **{transfer.membership_id}**.",
+        button=get_transfer_link_button(transfer),
+        facts=facts,
+    )
+
 
 def check_reschedules(transfer):
     max_reschedule = int(
@@ -96,6 +127,18 @@ def check_reschedules(transfer):
     transfer.status = "failed"
     transfer.updated_at = datetime.now()
     transfer.save()
+    send_warning(
+        "Migration max reschedules exceeded.",
+        f"The maximum amount of reschedules ({max_reschedule}) "
+        f"has been exceeded for the Membership **{transfer.membership_id}**.",
+        facts=FactsSection(
+            "Last error from Adobe",
+            {
+                transfer.adobe_error_code: transfer.adobe_error_description
+            }
+        ),
+        button=get_transfer_link_button(transfer)
+    )
 
 
 def populate_offers_for_transfer(product_id, transfer, transfer_preview):
@@ -144,6 +187,18 @@ def start_transfers_for_product(product_id):
                     )
                     transfer.updated_at = datetime.now()
                     transfer.save()
+                    send_exception(
+                        "Adobe error received during transfer preview.",
+                        "An unexpected error has been received from Adobe asking for preview "
+                        f"of transfer for Membership **{transfer.membership_id}**.",
+                        facts=FactsSection(
+                            "Last error from Adobe",
+                            {
+                                transfer.adobe_error_code: transfer.adobe_error_description
+                            }
+                        ),
+                        button=get_transfer_link_button(transfer)
+                    )
                 continue
 
         if transfer_preview:
@@ -171,6 +226,18 @@ def start_transfers_for_product(product_id):
             transfer.status = "failed"
             transfer.updated_at = datetime.now()
             transfer.save()
+            send_exception(
+                "Adobe error received during transfer creation.",
+                "An unexpected error has been received from Adobe creating the "
+                f"transfer for Membership **{transfer.membership_id}**.",
+                facts=FactsSection(
+                    "Last error from Adobe",
+                    {
+                        transfer.adobe_error_code: transfer.adobe_error_description
+                    }
+                ),
+                button=get_transfer_link_button(transfer)
+            )
             continue
 
         transfer.transfer_id = adobe_transfer["transferId"]
@@ -212,6 +279,18 @@ def check_running_transfers_for_product(product_id):
             transfer.status = "failed"
             transfer.updated_at = datetime.now()
             transfer.save()
+            send_exception(
+                "Unexpected status retrieving a transfer.",
+                f"An unexpected status ({adobe_transfer['status']}) has been received from Adobe "
+                f"retrieving the transfer for Membership **{transfer.membership_id}**.",
+                facts=FactsSection(
+                    "Last error from Adobe",
+                    {
+                        transfer.adobe_error_code: transfer.adobe_error_description
+                    }
+                ),
+                button=get_transfer_link_button(transfer)
+            )
             continue
 
         transfer.customer_id = adobe_transfer["customerId"]

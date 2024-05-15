@@ -1,11 +1,14 @@
 from datetime import date
 
+from requests import HTTPError
+
 from adobe_vipm.flows.airtable import (
     AirTableBaseInfo,
     create_offers,
     get_offer_ids_by_membership_id,
     get_offer_model,
     get_transfer_by_authorization_membership_or_customer,
+    get_transfer_link,
     get_transfer_model,
     get_transfers_to_check,
     get_transfers_to_process,
@@ -169,3 +172,26 @@ def test_get_transfer_by_authorization_membership_or_customer(mocker, settings):
             "{status}!='duplicated')"
         ),
     )
+
+
+def test_get_transfer_link(mocker):
+    transfer = mocker.MagicMock()
+    transfer.id = "record-id"
+    transfer.Meta.base_id = "base-id"
+    view_mock = mocker.MagicMock()
+    view_mock.id = "view-id"
+    schema_mock = mocker.MagicMock()
+    schema_mock.view.return_value = view_mock
+    table_mock = mocker.MagicMock()
+    table_mock.id = "table-id"
+    table_mock.schema.return_value = schema_mock
+    transfer.get_table.return_value = table_mock
+
+    assert get_transfer_link(transfer) == "https://airtable.com/base-id/table-id/view-id/record-id"
+
+
+def test_get_transfer_link_exception(mocker):
+    transfer = mocker.MagicMock()
+    transfer.get_table.side_effect = HTTPError()
+
+    assert get_transfer_link(transfer) is None

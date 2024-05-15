@@ -13,9 +13,11 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.migration import (
     check_running_transfers,
     check_running_transfers_for_product,
+    get_transfer_link_button,
     process_transfers,
     start_transfers_for_product,
 )
+from adobe_vipm.notifications import Button, FactsSection
 
 
 def test_start_transfers_for_product(
@@ -205,6 +207,14 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
         return_value=[mocked_transfer],
     )
 
+    mocked_send_exception = mocker.patch(
+        "adobe_vipm.flows.migration.send_exception",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfer_link",
+        return_value="https://link.to.transfer",
+    )
+
     mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
         400,
@@ -235,6 +245,16 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     assert mocked_transfer.migration_error_description == (
         "Adobe error received during transfer preview."
     )
+    mocked_send_exception.assert_called_once_with(
+        "Adobe error received during transfer preview.",
+        "An unexpected error has been received from Adobe asking "
+        "for preview of transfer for Membership **membership-id**.",
+        facts=FactsSection(
+            title='Last error from Adobe',
+            data={'5117': '5117 - Cannot be transferred: Reason: BAD_MARKET_SEGMENT'},
+        ),
+        button=Button(label='membership-id', url='https://link.to.transfer'),
+    )
 
 
 def test_start_transfers_for_product_error(
@@ -252,6 +272,14 @@ def test_start_transfers_for_product_error(
     mocked_get_transfer_to_process = mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_process",
         return_value=[mocked_transfer],
+    )
+
+    mocked_send_exception = mocker.patch(
+        "adobe_vipm.flows.migration.send_exception",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfer_link",
+        return_value="https://link.to.transfer",
     )
 
     mocked_get_offer_ids_by_membership_id = mocker.patch(
@@ -313,6 +341,16 @@ def test_start_transfers_for_product_error(
     assert (
         mocked_transfer.migration_error_description
         == "Adobe error received during transfer creation."
+    )
+
+    mocked_send_exception.assert_called_once_with(
+        "Adobe error received during transfer creation.",
+        "An unexpected error has been received from Adobe creating "
+        "the transfer for Membership **membership-id**.",
+        facts=FactsSection(
+            title="Last error from Adobe", data={"9999": "9999 - Unexpected error"}
+        ),
+        button=Button(label="membership-id", url="https://link.to.transfer"),
     )
 
 
@@ -589,6 +627,13 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
         "adobe_vipm.flows.migration.get_transfers_to_check",
         return_value=[mocked_transfer],
     )
+    mocked_send_error = mocker.patch(
+        "adobe_vipm.flows.migration.send_error",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfer_link",
+        return_value="https://link.to.transfer",
+    )
 
     error = AdobeAPIError(
         400,
@@ -613,6 +658,16 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
     assert mocked_transfer.adobe_error_code == error.code
     assert mocked_transfer.adobe_error_description == str(error)
     assert mocked_transfer.retry_count == 15
+
+    mocked_send_error.assert_called_once_with(
+        "Migration max retries exceeded.",
+        "The maximum amount of retries (15) has been exceeded for "
+        "the Membership **membership-id**.",
+        button=Button(label="membership-id", url="https://link.to.transfer"),
+        facts=FactsSection(
+            title="Last error from Adobe", data={"9999": "9999 - Unexpected error"}
+        ),
+    )
 
 
 def test_checking_running_transfers_for_product_pending_retry(
@@ -664,10 +719,19 @@ def test_checking_running_transfers_for_product_unexpected_status(
     mocked_transfer.status = "running"
     mocked_transfer.retry_count = 0
     mocked_transfer.reschedule_count = 0
+    mocked_transfer.adobe_error_code = "code"
+    mocked_transfer.adobe_error_description = "message"
 
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
         return_value=[mocked_transfer],
+    )
+    mocked_send_exception = mocker.patch(
+        "adobe_vipm.flows.migration.send_exception",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfer_link",
+        return_value="https://link.to.transfer",
     )
 
     adobe_transfer = adobe_transfer_factory(
@@ -689,6 +753,13 @@ def test_checking_running_transfers_for_product_unexpected_status(
     assert mocked_transfer.migration_error_description == (
         f"Unexpected status ({adobe_transfer['status']}) "
         "received from Adobe while retrieving transfer."
+    )
+    mocked_send_exception.assert_called_once_with(
+        "Unexpected status retrieving a transfer.",
+        "An unexpected status (9999) has been received from Adobe "
+        "retrieving the transfer for Membership **membership-id**.",
+        button=Button("membership-id", "https://link.to.transfer"),
+        facts=FactsSection("Last error from Adobe", {"code": "message"}),
     )
 
 
@@ -736,6 +807,14 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
         return_value=[mocked_transfer],
     )
 
+    mocked_send_warning = mocker.patch(
+        "adobe_vipm.flows.migration.send_warning",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfer_link",
+        return_value="https://link.to.transfer",
+    )
+
     mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
         400,
@@ -766,6 +845,15 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
     assert mocked_transfer.reschedule_count == 15
     assert mocked_transfer.migration_error_description == (
         "Max reschedules (15) exceeded."
+    )
+    mocked_send_warning.assert_called_once_with(
+        "Migration max reschedules exceeded.",
+        "The maximum amount of reschedules (15) has been exceeded for the Membership "
+        "**membership-id**.",
+        button=Button(label='membership-id', url='https://link.to.transfer'),
+        facts=FactsSection(
+            title='Last error from Adobe',
+            data={'5117': '5117 - Cannot be transferred: Reason: RETURNABLE_PURCHASE'}),
     )
 
 
@@ -817,3 +905,17 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
 
         assert mocked_transfer.status == "completed"
         assert mocked_transfer.completed_at == datetime.now()
+
+
+@pytest.mark.parametrize(
+    ('return_value', "expected_value"),
+    [
+       (None, None),
+       ("https://link.to.transfer", Button("label", "https://link.to.transfer"))
+    ]
+)
+def test_get_transfer_link_button(mocker, return_value, expected_value):
+    mocker.patch("adobe_vipm.flows.migration.get_transfer_link", return_value=return_value)
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.membership_id = "label"
+    assert get_transfer_link_button(mocked_transfer) == expected_value
