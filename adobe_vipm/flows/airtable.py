@@ -4,6 +4,7 @@ from functools import cache
 from django.conf import settings
 from pyairtable.formulas import AND, EQUAL, FIELD, NOT_EQUAL, OR, STR_VALUE
 from pyairtable.orm import Model, fields
+from requests import HTTPError
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 STATUS_INIT = "init"
@@ -148,3 +149,14 @@ def get_transfer_by_authorization_membership_or_customer(
     )
 
     return transfers[0] if transfers else None
+
+
+def get_transfer_link(transfer):
+    try:
+        base_id = transfer.Meta.base_id
+        table_id = transfer.get_table().id
+        view_id = transfer.get_table().schema().view("Transfer View").id
+        record_id = transfer.id
+        return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
+    except HTTPError:
+        pass

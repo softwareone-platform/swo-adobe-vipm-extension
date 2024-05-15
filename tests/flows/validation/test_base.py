@@ -1,6 +1,9 @@
 import logging
 
-from adobe_vipm.flows.utils import reset_ordering_parameters_error
+import pytest
+
+from adobe_vipm.flows.errors import MPTAPIError
+from adobe_vipm.flows.utils import reset_ordering_parameters_error, strip_trace_id
 from adobe_vipm.flows.validation.base import validate_order
 
 
@@ -178,3 +181,24 @@ def test_validate_purchase_order_populate_params_only(mocker, caplog, order_fact
     validate_order(m_client, order)
 
     mocked_validate.assert_not_called()
+
+
+def test_validate_order_exception(mocker, mpt_error_factory, order_factory):
+    error_data = mpt_error_factory(500, "Internal Server Error", "Oops!")
+    error = MPTAPIError(500, error_data)
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.validation.base.notify_unhandled_exception_in_teams"
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info",
+        side_effect=error,
+    )
+    mocker.patch("adobe_vipm.flows.validation.base.get_adobe_client")
+    order = order_factory(order_id="ORD-VVVV")
+    with pytest.raises(MPTAPIError):
+        validate_order(mocker.MagicMock(), order)
+
+    process, order_id, tb = mocked_notify.mock_calls[0].args
+    assert process == "validation"
+    assert order_id == order["id"]
+    assert strip_trace_id(str(error)) in tb

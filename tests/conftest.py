@@ -819,6 +819,7 @@ def order_factory(
     """
 
     def _order(
+        order_id="ORD-0792-5000-2253-4210",
         order_type="Purchase",
         order_parameters=None,
         fulfillment_parameters=None,
@@ -839,7 +840,7 @@ def order_factory(
         subscriptions = [] if subscriptions is None else subscriptions
 
         order = {
-            "id": "ORD-0792-5000-2253-4210",
+            "id": order_id,
             "href": "/commerce/orders/ORD-0792-5000-2253-4210",
             "agreement": agreement,
             "authorization": {

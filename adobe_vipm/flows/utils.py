@@ -1,5 +1,6 @@
 import copy
 import functools
+import re
 from datetime import UTC, datetime
 
 import phonenumbers
@@ -32,7 +33,10 @@ from adobe_vipm.flows.constants import (
     REQUIRED_CUSTOMER_ORDER_PARAMS,
 )
 from adobe_vipm.flows.dataclasses import ItemGroups
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import find_first
+
+TRACE_ID_REGEX = re.compile(r"(\(00-[0-9a-f]{32}-[0-9a-f]{16}-00\))")
 
 
 def get_parameter(parameter_phase, source, param_external_id):
@@ -651,3 +655,17 @@ def get_company_name(source):
         source,
         PARAM_COMPANY_NAME,
     ).get("value")
+
+
+def strip_trace_id(traceback):
+    return TRACE_ID_REGEX.sub("(<omitted>)", traceback)
+
+
+@functools.cache
+def notify_unhandled_exception_in_teams(process, order_id, traceback):
+    send_exception(
+        f"Order {process} unhandled exception!",
+        f"An unhandled exception has been raised while performing {process} "
+        f"of the order **{order_id}**:\n\n"
+        f"```{traceback}```",
+    )
