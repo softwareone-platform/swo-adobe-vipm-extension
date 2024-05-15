@@ -6,6 +6,8 @@ from adobe_vipm.adobe.constants import (
     STATUS_3YC_ACCEPTED,
     STATUS_3YC_COMMITTED,
     STATUS_3YC_DECLINED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_NONCOMPLIANT,
     STATUS_3YC_REQUESTED,
 )
 from adobe_vipm.flows.constants import (
@@ -295,10 +297,12 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
         PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
     )
 
+    error_statuses = [STATUS_3YC_DECLINED, STATUS_3YC_NONCOMPLIANT, STATUS_3YC_EXPIRED]
+
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
-        f"eq(displayValue,{STATUS_3YC_DECLINED})"
+        f"in(displayValue,({','.join(error_statuses)}))"
         ")"
         ")"
     )

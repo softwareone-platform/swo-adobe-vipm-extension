@@ -174,7 +174,7 @@ def create_customer_account(client, order):
             client,
             order,
             customer_id,
-            enroll_status=get_3yc_commitment_request(customer).get("status"),
+            request_3yc_status=get_3yc_commitment_request(customer).get("status"),
         )
     except AdobeError as e:
         logger.error(repr(e))

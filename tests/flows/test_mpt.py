@@ -8,6 +8,8 @@ from adobe_vipm.adobe.constants import (
     STATUS_3YC_ACCEPTED,
     STATUS_3YC_COMMITTED,
     STATUS_3YC_DECLINED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_NONCOMPLIANT,
     STATUS_3YC_REQUESTED,
 )
 from adobe_vipm.flows.constants import (
@@ -852,13 +854,16 @@ def test_get_agreements_for_3yc_resubmit(mocker, is_recommitment):
         "ordering" if not is_recommitment else "fulfillment"
     )
 
+    error_statuses = [STATUS_3YC_DECLINED, STATUS_3YC_NONCOMPLIANT, STATUS_3YC_EXPIRED]
+
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
-        f"eq(displayValue,{STATUS_3YC_DECLINED})"
+        f"in(displayValue,({','.join(error_statuses)}))"
         ")"
         ")"
     )
+
     request_3yc_condition = (
         f"any(parameters.{request_type_param_phase},and("
         f"eq(externalId,{request_type_param_ext_id}),"

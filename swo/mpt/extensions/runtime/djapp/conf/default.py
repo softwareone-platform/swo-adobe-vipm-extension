@@ -166,6 +166,11 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+        "azure": {
+            "handlers": ["rich"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
 
