@@ -1190,7 +1190,7 @@ def test_create_customer_account_3yc(
             "ordering": order_parameters_factory(p3yc=["Yes"], p3yc_licenses=10),
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="adobe-customer-id",
-                p3yc_enroll_status="REQUESTED",
+                p3yc_commitment_request_status="REQUESTED",
             ),
         },
     )
@@ -1202,7 +1202,7 @@ def test_create_customer_account_3yc(
         ),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="adobe-customer-id",
-            p3yc_enroll_status="REQUESTED",
+            p3yc_commitment_request_status="REQUESTED",
         ),
     )
 

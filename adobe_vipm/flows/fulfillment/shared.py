@@ -47,6 +47,7 @@ from adobe_vipm.flows.utils import (
     get_retry_count,
     increment_retry_count,
     reset_retry_count,
+    set_adobe_3yc_commitment_request_status,
     set_adobe_3yc_end_date,
     set_adobe_3yc_enroll_status,
     set_adobe_3yc_start_date,
@@ -60,7 +61,7 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def save_adobe_customer_data(client, order, customer_id, enroll_status=None):
+def save_adobe_customer_data(client, order, customer_id, request_3yc_status=None):
     """
     Sets the Adobe customer ID on the provided order and updates it using the MPT client.
 
@@ -68,13 +69,14 @@ def save_adobe_customer_data(client, order, customer_id, enroll_status=None):
         client (MPTClient): An instance of the Marketplace platform client.
         order (dict): The MPT order that needs to be updated.
         customer_id (str): The customer ID to be associated with the order.
+        request_3yc_status (str): Status of the 3-year commitment request.
 
     Returns:
         dict: The updated order with the customer ID set in the corresponding fulfillment parameter.
     """
     order = set_adobe_customer_id(order, customer_id)
-    if enroll_status:
-        order = set_adobe_3yc_enroll_status(order, enroll_status)
+    if request_3yc_status:
+        order = set_adobe_3yc_commitment_request_status(order, request_3yc_status)
     update_order(client, order["id"], parameters=order["parameters"])
     update_agreement(
         client, order["agreement"]["id"], externalIds={"vendor": customer_id}

@@ -2,6 +2,11 @@ from urllib.parse import urljoin
 
 import pytest
 
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_DECLINED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_NONCOMPLIANT,
+)
 from adobe_vipm.flows.benefits import (
     check_3yc_commitment_request,
     resubmit_3yc_commitment_request,
@@ -142,6 +147,9 @@ def test_check_3yc_commitment_request_not_committed(
 
 
 @pytest.mark.parametrize("is_recommitment", [False, True])
+@pytest.mark.parametrize(
+    "request_status", [STATUS_3YC_DECLINED, STATUS_3YC_EXPIRED, STATUS_3YC_NONCOMPLIANT]
+)
 def test_check_3yc_commitment_request_declined(
     mocker,
     settings,
@@ -149,6 +157,7 @@ def test_check_3yc_commitment_request_declined(
     adobe_customer_factory,
     adobe_commitment_factory,
     is_recommitment,
+    request_status,
 ):
     status_param_ext_id = (
         "3YCCommitmentRequestStatus"
@@ -159,7 +168,7 @@ def test_check_3yc_commitment_request_declined(
         "commitment_request" if not is_recommitment else "recommitment_request"
     )
 
-    customer_kwargs = {request_type: adobe_commitment_factory(status="DECLINED")}
+    customer_kwargs = {request_type: adobe_commitment_factory(status=request_status)}
     agreement = agreement_factory()
     customer = adobe_customer_factory(**customer_kwargs)
 
@@ -189,7 +198,7 @@ def test_check_3yc_commitment_request_declined(
         agreement["id"],
         parameters={
             "fulfillment": [
-                {"externalId": status_param_ext_id, "value": "DECLINED"},
+                {"externalId": status_param_ext_id, "value": request_status},
             ],
         },
     )
@@ -200,10 +209,10 @@ def test_check_3yc_commitment_request_declined(
     request_type_title = "commitment" if not is_recommitment else "recommitment"
 
     mocked_send_warning.assert_called_once_with(
-        f"3YC {request_type_title.capitalize()} Request Declined",
+        f"3YC {request_type_title.capitalize()} Request {request_status.capitalize()}",
         f"The 3-year {request_type_title} request for agreement {agreement['id']} "
         f"**{agreement['name']}** of the customer **{get_company_name(agreement)}** "
-        "has been denied.\n\n"
+        f"has been denied: {request_status}.\n\n"
         "To request the 3YC again, as a Vendor user, "
         "modify the Agreement and mark the 3-year "
         f"{request_type_title} {request_type_param_phase} parameter checkbox again.",
@@ -286,7 +295,6 @@ def test_submit_3yc_recommitment_request(
     adobe_customer_factory,
     adobe_commitment_factory,
 ):
-
     agreement = agreement_factory(
         ordering_parameters=order_parameters_factory(
             p3yc_licenses="13",

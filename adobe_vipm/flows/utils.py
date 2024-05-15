@@ -13,6 +13,7 @@ from adobe_vipm.flows.constants import (
     ORDER_TYPE_PURCHASE,
     ORDER_TYPE_TERMINATION,
     PARAM_3YC,
+    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_END_DATE,
     PARAM_3YC_ENROLL_STATUS,
@@ -553,6 +554,16 @@ def set_adobe_3yc_enroll_status(order, enroll_status):
         PARAM_3YC_ENROLL_STATUS,
     )
     ff_param["value"] = enroll_status
+    return updated_order
+
+
+def set_adobe_3yc_commitment_request_status(order, status):
+    updated_order = copy.deepcopy(order)
+    ff_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+    )
+    ff_param["value"] = status
     return updated_order
 
 def set_adobe_3yc_start_date(order, start_date):
