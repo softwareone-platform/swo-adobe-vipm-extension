@@ -148,11 +148,18 @@ def test_no_customer(
     mocked_process_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order",
+    mocked_send_notification = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_email_notification",
     )
 
     order = order_factory()
+
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
+        return_value=order,
+    )
+
+
     order_with_customer_param = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
     )
@@ -224,10 +231,6 @@ def test_no_customer(
         },
     }
 
-    # mocked_update_agreement.assert_called_once_with(
-    #     externalIds={"vendor": "a-client-id"},
-    # )
-
     mocked_create_subscription.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -256,6 +259,17 @@ def test_no_customer(
         order["id"],
         {"id": "TPL-0000"},
     )
+
+    assert mocked_send_notification.mock_calls[0].args == (
+        mocked_mpt_client,
+        order,
+    )
+
+    assert mocked_send_notification.mock_calls[1].args == (
+        mocked_mpt_client,
+        order,
+    )
+
     mocked_complete_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -974,9 +988,12 @@ def test_create_customer_account_address_error(
         "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+
+    query_order = copy.deepcopy(order)
+
     mocked_query_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.query_order",
-        return_value=copy.deepcopy(order),
+        return_value=query_order,
     )
 
     updated_order = create_customer_account(
@@ -1003,6 +1020,7 @@ def test_create_customer_account_address_error(
         },
         template={"id": "TPL-0000"},
     )
+
     assert updated_order is None
 
 

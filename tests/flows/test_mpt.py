@@ -35,6 +35,7 @@ from adobe_vipm.flows.mpt import (
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_template_or_default,
+    get_rendered_template,
     get_subscription_by_external_id,
     get_webhook,
     query_order,
@@ -888,3 +889,27 @@ def test_get_agreements_for_3yc_resubmit(mocker, is_recommitment):
         mocked_client, is_recommitment=is_recommitment,
     ) == [{"id": "AGR-0001"}]
     mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
+
+
+def test_get_rendered_template(mpt_client, requests_mocker):
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-1234/template"),
+        json="rendered-template",
+    )
+
+    assert get_rendered_template(mpt_client, "ORD-1234") == "rendered-template"
+
+
+def test_get_rendered_template_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, "commerce/orders/ORD-1234/template"),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Order not found"),
+    )
+
+    with pytest.raises(MPTAPIError) as cv:
+        get_rendered_template(mpt_client, "ORD-1234")
+
+    assert cv.value.payload["status"] == 404

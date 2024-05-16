@@ -1,10 +1,17 @@
 import logging
 from dataclasses import dataclass
 
+import boto3
 import pymsteams
 from django.conf import settings
+from jinja2 import Environment, PackageLoader, select_autoescape
 
 logger = logging.getLogger(__name__)
+
+env = Environment(
+    loader=PackageLoader("adobe_vipm"),
+    autoescape=select_autoescape(),
+)
 
 
 @dataclass
@@ -88,3 +95,31 @@ def send_exception(
         button=button,
         facts=facts,
     )
+
+
+def send_email(recipient, subject, template_name, context):
+    template = env.get_template(f"{template_name}.html")
+    rendered_email = template.render(context)
+
+    client = boto3.client(
+        "ses",
+        aws_access_key_id=settings.EXTENSION_CONFIG["AWS_ACCESS_KEY"],
+        aws_secret_access_key=settings.EXTENSION_CONFIG["AWS_SECRET_KEY"],
+    )
+    try:
+        client.send_email(
+            Source=settings.EXTENSION_CONFIG["EMAIL_NOTIFICATIONS_SENDER"],
+            Destination={
+                "ToAddresses": [recipient],
+            },
+            Message={
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {
+                    "Html": {"Data": rendered_email, "Charset": "UTF-8"},
+                },
+            },
+        )
+    except Exception:
+        logger.exception(
+            f"Cannot send notification email with subject '{subject}' to: {recipient}",
+        )
