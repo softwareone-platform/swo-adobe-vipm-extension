@@ -4,6 +4,7 @@ import re
 from datetime import UTC, datetime
 
 import phonenumbers
+from markdown_it import MarkdownIt
 
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
@@ -148,6 +149,7 @@ def set_adobe_customer_id(order, customer_id):
     )
     customer_ff_param["value"] = customer_id
     return updated_order
+
 
 def set_next_sync(order, next_sync):
     updated_order = copy.deepcopy(order)
@@ -570,6 +572,7 @@ def set_adobe_3yc_commitment_request_status(order, status):
     ff_param["value"] = status
     return updated_order
 
+
 def set_adobe_3yc_start_date(order, start_date):
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
@@ -578,6 +581,7 @@ def set_adobe_3yc_start_date(order, start_date):
     )
     ff_param["value"] = start_date
     return updated_order
+
 
 def set_adobe_3yc_end_date(order, end_date):
     updated_order = copy.deepcopy(order)
@@ -602,6 +606,7 @@ def reset_order_error(order):
     del updated_order["error"]
     return updated_order
 
+
 def split_phone_number(phone_number, country):
     if not phone_number:
         return
@@ -621,6 +626,7 @@ def split_phone_number(phone_number, country):
         "prefix": country_code,
         "number": number,
     }
+
 
 def is_ordering_param_required(source, param_external_id):
     param = get_ordering_parameter(source, param_external_id)
@@ -672,7 +678,10 @@ def notify_unhandled_exception_in_teams(process, order_id, traceback):
 
 
 def get_notifications_recipient(order):
-    return (
-        (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get("email")
-        or (order["agreement"]["buyer"].get("contact", {}) or {}).get("email")
-    )
+    return (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get(
+        "email"
+    ) or (order["agreement"]["buyer"].get("contact", {}) or {}).get("email")
+
+
+def md2html(template):
+    return MarkdownIt("commonmark", {"breaks": True, "html": True}).render(template)

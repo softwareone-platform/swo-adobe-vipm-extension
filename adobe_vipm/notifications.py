@@ -1,17 +1,33 @@
 import logging
+import os
 from dataclasses import dataclass
+from datetime import datetime
 
 import boto3
 import pymsteams
 from django.conf import settings
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger(__name__)
 
+
+def dateformat(date_string):
+    return (
+        datetime.fromisoformat(date_string).strftime("%-d %B %Y")
+        if date_string else ""
+    )
+
 env = Environment(
-    loader=PackageLoader("adobe_vipm"),
+    loader=FileSystemLoader(
+        os.path.join(
+            os.path.abspath(os.path.dirname(__file__)),
+            "templates",
+        ),
+    ),
     autoescape=select_autoescape(),
 )
+
+env.filters["dateformat"] = dateformat
 
 
 @dataclass
@@ -101,10 +117,12 @@ def send_email(recipient, subject, template_name, context):
     template = env.get_template(f"{template_name}.html")
     rendered_email = template.render(context)
 
+    access_key, secret_key = settings.EXTENSION_CONFIG["AWS_SES_CREDENTIALS"].split(":")
+
     client = boto3.client(
         "ses",
-        aws_access_key_id=settings.EXTENSION_CONFIG["AWS_ACCESS_KEY"],
-        aws_secret_access_key=settings.EXTENSION_CONFIG["AWS_SECRET_KEY"],
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
     )
     try:
         client.send_email(

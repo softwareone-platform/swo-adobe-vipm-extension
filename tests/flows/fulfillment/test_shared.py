@@ -48,11 +48,12 @@ def test_send_email_notification(mocker, settings, order_factory, status, subjec
     mocked_send_email.assert_called_once_with(
         get_notifications_recipient(order),
         subject,
-        status.lower(),
+        "email",
         {
             "order": order,
-            "template": "rendered-template",
+            "activation_template": "<p>rendered-template</p>\n",
             "api_base_url": settings.MPT_API_BASE_URL,
+            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         },
     )
 

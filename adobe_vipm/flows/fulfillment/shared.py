@@ -48,6 +48,7 @@ from adobe_vipm.flows.utils import (
     get_price_item_by_line_sku,
     get_retry_count,
     increment_retry_count,
+    md2html,
     reset_retry_count,
     set_adobe_3yc_commitment_request_status,
     set_adobe_3yc_end_date,
@@ -561,8 +562,9 @@ def send_email_notification(mpt_client, order):
 
         context = {
             "order": order,
-            "template": get_rendered_template(mpt_client, order["id"]),
+            "activation_template": md2html(get_rendered_template(mpt_client, order["id"])),
             "api_base_url": settings.MPT_API_BASE_URL,
+            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         }
         subject = (
             f"Order status update {order["id"]} "
@@ -576,6 +578,6 @@ def send_email_notification(mpt_client, order):
         send_email(
             recipient,
             subject,
-            order["status"].lower(),
+            "email",
             context,
         )
