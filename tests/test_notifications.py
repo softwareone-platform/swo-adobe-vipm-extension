@@ -6,6 +6,7 @@ import pytest
 from adobe_vipm.notifications import (
     Button,
     FactsSection,
+    send_email,
     send_error,
     send_exception,
     send_notification,
@@ -130,3 +131,80 @@ def test_send_others(mocker, function, color, icon):
         button=mocked_button,
         facts=mocked_facts_section,
     )
+
+
+def test_send_email(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AWS_ACCESS_KEY": "access-key",
+        "AWS_SECRET_KEY": "secret-key",
+        "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
+    }
+    mocked_template = mocker.MagicMock()
+    mocked_template.render.return_value = "rendered-template"
+    mocked_jinja_env = mocker.MagicMock()
+    mocked_jinja_env.get_template.return_value = mocked_template
+    mocker.patch("adobe_vipm.notifications.env", mocked_jinja_env)
+
+    mocked_ses_client = mocker.MagicMock()
+    mocked_boto3 = mocker.patch(
+        "adobe_vipm.notifications.boto3.client",
+        return_value=mocked_ses_client,
+    )
+    send_email(
+        "customer@domain.com",
+        "email-subject",
+        "template_name",
+        {"test": "context"},
+    )
+
+    mocked_jinja_env.get_template.assert_called_once_with("template_name.html")
+    mocked_template.render.assert_called_once_with({"test": "context"})
+    mocked_boto3.assert_called_once_with(
+        "ses",
+        aws_access_key_id="access-key",
+        aws_secret_access_key="secret-key",
+    )
+    mocked_ses_client.send_email.assert_called_once_with(
+            Source="mpt@domain.com",
+            Destination={
+                "ToAddresses": ["customer@domain.com"],
+            },
+            Message={
+                "Subject": {"Data": "email-subject", "Charset": "UTF-8"},
+                "Body": {
+                    "Html": {"Data": "rendered-template", "Charset": "UTF-8"},
+                },
+            },
+    )
+
+
+def test_send_email_exception(mocker, settings, caplog):
+    settings.EXTENSION_CONFIG = {
+        "AWS_ACCESS_KEY": "access-key",
+        "AWS_SECRET_KEY": "secret-key",
+        "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
+    }
+    mocked_template = mocker.MagicMock()
+    mocked_template.render.return_value = "rendered-template"
+    mocked_jinja_env = mocker.MagicMock()
+    mocked_jinja_env.get_template.return_value = mocked_template
+    mocker.patch("adobe_vipm.notifications.env", mocked_jinja_env)
+
+    mocked_ses_client = mocker.MagicMock()
+    mocked_ses_client.send_email.side_effect = Exception("error")
+    mocker.patch(
+        "adobe_vipm.notifications.boto3.client",
+        return_value=mocked_ses_client,
+    )
+    with caplog.at_level(logging.ERROR):
+        send_email(
+            "customer@domain.com",
+            "email-subject",
+            "template_name",
+            {"test": "context"},
+        )
+
+    assert (
+        "Cannot send notification email with "
+        "subject 'email-subject' to: customer@domain.com"
+    ) in caplog.text

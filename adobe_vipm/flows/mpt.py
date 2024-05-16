@@ -364,3 +364,12 @@ def get_agreements_for_3yc_recommitment(mpt_client):
 
     rql_query = f"and({','.join(all_conditions)})&select=parameters"
     return get_agreements_by_query(mpt_client, rql_query)
+
+
+@wrap_http_error
+def get_rendered_template(mpt_client, order_id):
+    response = mpt_client.get(
+        f"/commerce/orders/{order_id}/template",
+    )
+    response.raise_for_status()
+    return response.json()

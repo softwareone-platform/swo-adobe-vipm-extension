@@ -669,3 +669,10 @@ def notify_unhandled_exception_in_teams(process, order_id, traceback):
         f"of the order **{order_id}**:\n\n"
         f"```{traceback}```",
     )
+
+
+def get_notifications_recipient(order):
+    return (
+        (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get("email")
+        or (order["agreement"]["buyer"].get("contact", {}) or {}).get("email")
+    )

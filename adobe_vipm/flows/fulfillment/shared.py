@@ -34,6 +34,7 @@ from adobe_vipm.flows.mpt import (
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_template_or_default,
+    get_rendered_template,
     get_subscription_by_external_id,
     query_order,
     set_processing_template,
@@ -42,6 +43,7 @@ from adobe_vipm.flows.mpt import (
     update_subscription,
 )
 from adobe_vipm.flows.utils import (
+    get_notifications_recipient,
     get_order_line_by_sku,
     get_price_item_by_line_sku,
     get_retry_count,
@@ -57,6 +59,7 @@ from adobe_vipm.flows.utils import (
     set_next_sync,
     split_phone_number,
 )
+from adobe_vipm.notifications import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -118,9 +121,8 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
                 customer_data[PARAM_3YC_CONSUMABLES] = str(mq["quantity"])
 
         order = set_adobe_3yc_enroll_status(order, commitment["status"])
-        if "startDate" in commitment and "endDate" in commitment:
-            order = set_adobe_3yc_start_date(order, commitment["startDate"])
-            order = set_adobe_3yc_end_date(order, commitment["endDate"])
+        order = set_adobe_3yc_start_date(order, commitment["startDate"])
+        order = set_adobe_3yc_end_date(order, commitment["endDate"])
 
     order = set_customer_data(order, customer_data)
 
@@ -166,7 +168,8 @@ def switch_order_to_failed(client, order, status_notes):
         dict: The updated order with the appropriate status and notes.
     """
     order = reset_retries(client, order)
-    fail_order(client, order["id"], status_notes)
+    order = fail_order(client, order["id"], status_notes)
+    send_email_notification(client, order)
     return order
 
 
@@ -193,11 +196,12 @@ def switch_order_to_query(client, order):
     if order.get("error"):
         kwargs["error"] = order["error"]
 
-    query_order(
+    order = query_order(
         client,
         order["id"],
         **kwargs,
     )
+    send_email_notification(client, order)
 
 
 def handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
@@ -367,11 +371,12 @@ def switch_order_to_completed(mpt_client, order, template_name):
         MPT_ORDER_STATUS_COMPLETED,
         template_name,
     )
-    complete_order(
+    order = complete_order(
         mpt_client,
         order["id"],
         template,
     )
+    send_email_notification(mpt_client, order)
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
@@ -532,9 +537,45 @@ def check_processing_template(mpt_client, order, template_name):
     )
     if template != order.get("template"):
         set_processing_template(mpt_client, order["id"], template)
+        send_email_notification(mpt_client, order)
 
 
 def save_next_sync_date(client, order, next_sync):
     order = set_next_sync(order, next_sync)
     update_order(client, order["id"], parameters=order["parameters"])
     return order
+
+
+def send_email_notification(mpt_client, order):
+    email_notification_enabled = bool(
+        settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
+    )
+
+    if email_notification_enabled:
+        recipient = get_notifications_recipient(order)
+        if not recipient:
+            logger.warning(
+                f"Cannot send email notifications for order {order['id']}: no recipient found"
+            )
+            return
+
+        context = {
+            "order": order,
+            "template": get_rendered_template(mpt_client, order["id"]),
+            "api_base_url": settings.MPT_API_BASE_URL,
+        }
+        subject = (
+            f"Order status update {order["id"]} "
+            f"for {order['agreement']['buyer']['name']}"
+        )
+        if order["status"] == "Querying":
+            subject = (
+                f"This order need your attention {order["id"]} "
+                f"for {order['agreement']['buyer']['name']}"
+            )
+        send_email(
+            recipient,
+            subject,
+            order["status"].lower(),
+            context,
+        )

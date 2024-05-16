@@ -751,6 +751,12 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                     "country": "US",
                 },
             },
+            "client": {
+                "id": "ACC-9121-8944",
+                "href": "/accounts/sellers/ACC-9121-8944",
+                "name": "Software LN",
+                "icon": "/static/ACC-9121-8944/icon.png",
+            },
             "product": {
                 "id": "PRD-1111-1111",
             },
@@ -826,6 +832,7 @@ def order_factory(
         lines=None,
         subscriptions=None,
         external_ids=None,
+        status="Processing",
     ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
@@ -847,7 +854,7 @@ def order_factory(
                 "id": "AUT-1234-4567",
             },
             "type": order_type,
-            "status": "Processing",
+            "status": status,
             "clientReferenceNumber": None,
             "notes": "First order to try",
             "lines": lines,
@@ -881,7 +888,7 @@ def buyer():
     return {
         "id": "BUY-3731-7971",
         "href": "/accounts/buyers/BUY-3731-7971",
-        "name": "FF Buyer good enough",
+        "name": "A buyer",
         "icon": "/static/BUY-3731-7971/icon.png",
         "address": {
             "country": "US",
