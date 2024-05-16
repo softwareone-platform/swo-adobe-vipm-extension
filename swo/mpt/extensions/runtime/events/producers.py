@@ -60,7 +60,7 @@ class OrderEventProducer(EventProducer):
         products = ','.join(settings.MPT_PRODUCTS_IDS)
         orders = []
         rql_query = f"and(in(agreement.product.id,({products})),eq(status,processing))"
-        url = f"/commerce/orders?{rql_query}&select=parameters,lines,subscriptions,subscriptions.lines&order=audit.created.at"
+        url = f"/commerce/orders?{rql_query}&select=audit,parameters,lines,subscriptions,subscriptions.lines&order=audit.created.at"
         page = None
         limit = 10
         offset = 0

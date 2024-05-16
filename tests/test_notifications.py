@@ -6,6 +6,7 @@ import pytest
 from adobe_vipm.notifications import (
     Button,
     FactsSection,
+    dateformat,
     send_email,
     send_error,
     send_exception,
@@ -135,8 +136,7 @@ def test_send_others(mocker, function, color, icon):
 
 def test_send_email(mocker, settings):
     settings.EXTENSION_CONFIG = {
-        "AWS_ACCESS_KEY": "access-key",
-        "AWS_SECRET_KEY": "secret-key",
+        "AWS_SES_CREDENTIALS": "access-key:secret-key",
         "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
     }
     mocked_template = mocker.MagicMock()
@@ -180,8 +180,7 @@ def test_send_email(mocker, settings):
 
 def test_send_email_exception(mocker, settings, caplog):
     settings.EXTENSION_CONFIG = {
-        "AWS_ACCESS_KEY": "access-key",
-        "AWS_SECRET_KEY": "secret-key",
+        "AWS_SES_CREDENTIALS": "access-key:secret-key",
         "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
     }
     mocked_template = mocker.MagicMock()
@@ -208,3 +207,9 @@ def test_send_email_exception(mocker, settings, caplog):
         "Cannot send notification email with "
         "subject 'email-subject' to: customer@domain.com"
     ) in caplog.text
+
+
+def test_dateformat():
+    assert dateformat("2024-05-16T10:54:42.831Z") == "16 May 2024"
+    assert dateformat("") == ""
+    assert dateformat(None) == ""
