@@ -1,0 +1,315 @@
+
+<!DOCTYPE html PUBLIC “-//W3C//DTD XHTML 1.0 Transitional//EN” “https://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd”>
+
+<html>
+	<head>
+    	<title>
+
+Order status update
+
+    	</title>
+    	<meta http–equiv=“Content-Type” content=“text/html; charset=UTF-8” />
+    	<meta http–equiv=“X-UA-Compatible” content=“IE=edge” />
+    	<meta name=“viewport” content=“width=device-width, initial-scale=1.0 “ />
+
+    	<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+    </head>
+	
+	<body style="background: #E0E5E8; font-family: 'Haas Grot Text', 'Open Sans', sans-serif; font-weight: 400;  font-size: 16px; line-height: 1.2em; color: #000000; margin: 0; padding: 24px;">
+		<table style="width: 100%"><tbody>
+			<tr><td align="center" style="padding-bottom: 24px;">
+<!-- >>>> Content -->
+				<table class="card" style="width: 800px; border-collapse: collapse;"><tbody>
+
+						<tr><td style="background: #FFFFFF; border-radius: 16px; padding: 24px;">
+							
+							<table style="width: 100%; border-collapse: collapse;"><tbody>
+<!-- >>>> Content.TopPanel -->
+								<tr><td style="width: 50%; vertical-align: middle; text-align: left;">
+
+										<table style="width: 100%; border-collapse: collapse;"><tbody>
+<!-- >>>> Content.TopPanel.Info -->
+											<tr><td style="padding: 0; width: 60px; height: 60px; overflow: hidden; background: #F4F6F8">
+												
+<!-- LOGO -->
+<img src="{% if order.agreement.client.icon is not none %}{{ api_base_url }}{{ order.agreement.client.icon }}{% else %}#{% endif %}" style="max-width: 60px; max-height: 60px;" />
+
+											</td><td style="padding-left: 16px;">
+												<h1 style="margin: 0; font-weight: 400; font-size: 24px;">
+
+<!-- NAME -->
+{{ order.agreement.client.name }}
+
+												</h1>
+												<p style="margin: 0"><span>
+
+<!-- IDs -->
+Client | {{ order.agreement.client.id }}
+
+												</span></p>
+											</td></tr>
+<!-- <<<< Content.TopPanel.Info -->
+										</tbody></table>
+										
+								</td><td style="width: 50%; vertical-align: middle; text-align: right;">
+<!-- >>>> Content.TopPanel.Button -->
+<!-- DETAILS LINK -->
+										<a 
+href="{{ portal_base_url }}/commerce/orders/{{ order.id }}/general"
+										   style="background: #472aff; color: #FFFFFF; text-decoration: none; padding: 8px 16px; border-radius: 8px;"
+										   target="_blank"
+									   	>
+											
+<!-- BUTTON TEXT -->
+View order
+										
+										</a>
+<!-- <<<< Content.TopPanel.Button -->
+								</td></tr>
+<!-- <<<< Content.TopPanel -->
+								<tr><td colspan="2" style="padding: 40px 0 16px 0;">
+									<h1 style="margin: 0; font-weight: 500; font-size: 24px;">
+										
+<!-- TITLE -->
+Order status update
+
+									</h1>
+								</td></tr>
+<!-- >>>> Content.LeftColumn -->
+								<tr><td style="width: 50%">
+									<table style="border-collapse: collapse; font-size: 14px;"><tbody>
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												ID
+											</td>
+
+											<td style="padding: 8px 0;">
+												
+<!-- ORDER.ID -->
+{{ order.id }}
+
+											</td>
+										</tr>
+
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												Status
+											</td>
+											
+											<td style="padding: 8px 0;">
+												
+<!-- ORDERD.STATUS -->
+{% if order.status == 'Completed' %}
+                                                    <span style="padding: 2px 8px; border-radius: 4px; background: #E6F9F2; color: #00784D">
+    {{ order.status }}
+                                                    </span>
+{% elif order.status == 'Failed' %}
+                                                    <span style="padding: 2px 8px; border-radius: 4px; background: #FCE8EA; color: #BB1425">
+    {{ order.status }}
+                                                    </span>
+{% else %}
+                                                <span style="padding: 2px 8px; border-radius: 4px; background: #EAECFF; color: #3520BF">
+{{ order.status }}
+                                                </span>
+{% endif %}
+											</td>
+										</tr>
+
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												Type
+											</td>
+											
+											<td style="padding: 8px 0;">
+												
+<!-- ORDERD.TYPE -->
+{{ order.type }}
+
+											</td>
+										</tr>
+
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												Licensee
+											</td>
+											
+											<td style="padding: 8px 0;">
+<!-- ENTITY.ACCOUNT.LINK -->
+<a href="{{ portal_base_url }}/accounts/settings/licensees/{{ order.agreement.licensee.id }}" style="color: #472AFF; text-decoration: none;">
+	{{ order.agreement.licensee.name }}
+</a>
+
+											</td>
+										</tr>
+
+									</tbody></table>
+<!-- <<<< Content.LeftColumn -->
+								</td><td style="width: 50%">
+<!-- >>>> Content.RightColumn -->
+									<table style="font-size: 14px"><tbody>
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												Vendor
+											</td>
+
+											<td style="padding: 8px 0;">
+												
+<!-- ORDER.PRODUCT.VENDOR -->
+{{ order.agreement.vendor.name }}
+
+											</td>
+										</tr>
+
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												Product
+											</td>
+											
+											<td style="padding: 8px 0;">
+												
+<!-- ORDER.PRODUCT.NAME -->
+{{ order.product.name }}
+
+											</td>
+										</tr>
+
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												Currency
+											</td>
+											
+											<td style="padding: 8px 0;">
+												
+<!-- ORDER.CURRENCY -->
+{{ order.agreement.authorization.currency }}
+
+											</td>
+										</tr>
+
+										<tr>
+											<td style="padding: 8px 0; font-weight: 500; padding-right: 16px;">
+												Assignee
+											</td>
+											
+											<td style="padding: 8px 0;">
+												
+<!-- ORDER.ASSIGNEE -->
+{{ order.assignee.name if order.assignee is not none else '-' }}
+
+											</td>
+										</tr>
+
+
+										
+
+									</tbody></table>
+<!-- <<<< Content.RightColumn -->
+								</td></tr>
+
+								<tr><td colspan="2" style="padding: 24px 0"><hr style="border: 0; background: #E0E5E8; height: 1px;"></td></tr>
+
+								<tr><td colspan="2" style="background: #F4F6F8; padding: 24px; font-weight: 300">
+
+{{ activation_template|safe }}
+
+								</td></tr>
+
+								<tr><td colspan="2" style="padding: 24px 0"><hr style="border: 0; background: #E0E5E8; height: 1px;"></td></tr>
+
+								<tr><td colspan="2">
+<!-- >>>> Content.LinesTable -->
+									<table style="width: 100%; border-collapse: collapse;">
+										<thead>
+											<tr style="border-bottom: 1px solid">
+												<th style="text-align: center; padding: 8px 16px;">#</th>
+												<th style="width: 100%; text-align: left; padding: 8px 16px; border-left: 1px solid #E0E5E8; border-right: 1px solid #E0E5E8;">Items</th>
+												<th style="text-align: left; padding: 8px 16px;">Qty.</th>
+											</tr>
+										</thead>
+										<tbody>
+<!-- >>>> Content.LinesTable.Row (*LINE) -->
+{% for line in order.lines %}
+											<tr style="border-bottom: 1px solid #E0E5E8">
+												<td style="text-align: center; padding: 8px 16px;">
+<!-- LINE.NUMBER -->
+{{ line.id[-4:] }}
+												</td>
+												<td style="padding: 8px 16px;">
+													<p style="margin: 0">
+<!-- LINE.ITEM.NAME -->
+{{ line.item.name }}
+													</p>
+													<p style="margin: 0; font-size: 12px; color: #6B7180">
+<!-- LINE.BILLING_PERIOD -->
+Yearly billing; 1 year commitment
+													</p>
+												</td>
+												<td style="padding: 8px 16px; text-align: right;">
+<!-- LINE.QUANTITY -->
+{{ line.quantity }}
+												</td>
+											</tr>
+{% endfor %}
+<!-- <<<< Content.LinesTable.Row (*LINE) -->
+
+										</tbody>
+									</table>
+<!-- <<<< Content.LinesTable -->
+								</td></tr>
+								
+								<tr><td colspan="2" style="padding: 24px 0"><hr style="border: 0; background: #E0E5E8; height: 1px;"></td></tr>
+
+								<tr><td colspan="2">				
+<!-- >>>> Events -->
+									<table><tbody>
+										<tr>
+											<td style="font-weight: 500; padding: 16px 20px 16px 0">
+												Created
+											</td>
+											<td>
+												{{ order.audit.created.at|dateformat }} by {{ order.audit.created.by.name }}
+											</td>
+										</tr>
+										<tr>
+											<td style="font-weight: 500; padding: 16px 20px 16px 0">
+												Updated
+											</td>
+											<td>
+												{{ order.audit.updated.at|dateformat }} by {{ order.audit.updated.by.name }}
+											</td>
+										</tr>
+									</tbody></table>
+<!-- <<<< Events -->
+								</td></tr>
+							
+							</tbody></table>
+						</td></tr>
+					</tbody></table>
+<!-- <<<< Content -->
+			</td></tr>
+
+			<tr><td align="center" style="padding-bottom: 24px;">
+<!-- >>>> Footer -->
+				<table style="width: 800px; border-collapse: collapse; color: #6B7180"><tbody>
+						<tr><td>
+							<p>© 2024 SoftwareOne</p>
+
+							<p><a href="#" style="color: #472AFF; text-decoration: none;">Visit our help center</a></p>
+
+							<p>
+								You are receiving this email because you are setup by an admin of the account you are a part of. To stop receiving these emails, go to <a href="#" style="color: #472AFF; text-decoration: none;">Email settings</a>, select notification type <b>Order Status Notification</b>, and disable this type of notification.
+							</p>
+
+							<p>
+<!-- CUSTOM FOOTER -->
+You can customize this section at the bottom of the email footer via the account settings. It allows administrators to (optionally) incorporate text that users can see for guidance and things like <a href="#" style="color: #472AFF; text-decoration: none;">support links</a> and <a href="#" style="color: #472AFF; text-decoration: none;">references</a> to company documentation. 
+							</p>
+						</td></tr>
+					</tbody></table>
+<!-- <<<< Footer -->
+			</td></tr>
+		</tbody></table>
+	</body>
+</html>
