@@ -123,6 +123,7 @@ def send_email(recipient, subject, template_name, context):
         "ses",
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
+        region_name=settings.EXTENSION_CONFIG["AWS_SES_REGION"],
     )
     try:
         client.send_email(

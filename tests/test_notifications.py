@@ -137,6 +137,7 @@ def test_send_others(mocker, function, color, icon):
 def test_send_email(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AWS_SES_CREDENTIALS": "access-key:secret-key",
+        "AWS_SES_REGION": "aws-region",
         "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
     }
     mocked_template = mocker.MagicMock()
@@ -163,6 +164,7 @@ def test_send_email(mocker, settings):
         "ses",
         aws_access_key_id="access-key",
         aws_secret_access_key="secret-key",
+        region_name="aws-region",
     )
     mocked_ses_client.send_email.assert_called_once_with(
             Source="mpt@domain.com",
@@ -181,6 +183,7 @@ def test_send_email(mocker, settings):
 def test_send_email_exception(mocker, settings, caplog):
     settings.EXTENSION_CONFIG = {
         "AWS_SES_CREDENTIALS": "access-key:secret-key",
+        "AWS_SES_REGION": "aws-region",
         "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
     }
     mocked_template = mocker.MagicMock()
