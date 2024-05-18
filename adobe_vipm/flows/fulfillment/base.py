@@ -3,6 +3,7 @@ import traceback
 
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
+from adobe_vipm.flows.fulfillment.shared import send_processing_notification
 from adobe_vipm.flows.fulfillment.termination import fulfill_termination_order
 from adobe_vipm.flows.fulfillment.transfer import fulfill_transfer_order
 from adobe_vipm.flows.helpers import populate_order_info
@@ -33,6 +34,9 @@ def fulfill_order(client, order):
     logger.info(f'Start processing {order["type"]} order {order["id"]}')
     try:
         order = populate_order_info(client, order)
+
+        send_processing_notification(client, order)
+
         if is_purchase_order(order):
             fulfill_purchase_order(client, order)
         elif is_transfer_order(order):

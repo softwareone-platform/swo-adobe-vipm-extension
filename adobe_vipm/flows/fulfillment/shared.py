@@ -538,6 +538,10 @@ def check_processing_template(mpt_client, order, template_name):
     )
     if template != order.get("template"):
         set_processing_template(mpt_client, order["id"], template)
+
+
+def send_processing_notification(mpt_client, order):
+    if get_retry_count(order) == 0:
         send_email_notification(mpt_client, order)
 
 
