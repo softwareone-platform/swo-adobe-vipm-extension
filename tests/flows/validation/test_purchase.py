@@ -121,13 +121,14 @@ def test_validate_company_name_invalid_chars(
     assert param["constraints"]["required"] is True
 
 
-def test_validate_address(order_factory):
+@pytest.mark.parametrize("address_line_2", ["", "a value"])
+def test_validate_address(order_factory, address_line_2):
     """
     Tests the validation of a valid address.
     """
     order = order_factory()
     customer_data = get_customer_data(order)
-
+    customer_data[PARAM_ADDRESS]["addressLine2"] = address_line_2
     has_error, order = validate_address(order, customer_data)
 
     assert has_error is False
@@ -312,8 +313,8 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
         errors="; ".join(
             (
                 ERR_ADDRESS_LINE_1_LENGTH,
-                ERR_ADDRESS_LINE_2_LENGTH,
                 ERR_CITY_LENGTH,
+                ERR_ADDRESS_LINE_2_LENGTH,
             ),
         ),
     )

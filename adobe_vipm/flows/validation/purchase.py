@@ -144,11 +144,13 @@ def validate_address(order, customer_data):
     for field, validator_func, err_msg in (
         ("postCode", is_valid_postal_code_length, ERR_POSTAL_CODE_LENGTH),
         ("addressLine1", is_valid_address_line_1_length, ERR_ADDRESS_LINE_1_LENGTH),
-        ("addressLine2", is_valid_address_line_2_length, ERR_ADDRESS_LINE_2_LENGTH),
         ("city", is_valid_city_length, ERR_CITY_LENGTH),
     ):
         if not validator_func(address[field]):
             errors.append(err_msg)
+
+    if address["addressLine2"] and not is_valid_address_line_2_length(address["addressLine2"]):
+        errors.append(ERR_ADDRESS_LINE_2_LENGTH)
 
     if errors:
         order = set_ordering_parameter_error(
