@@ -169,7 +169,9 @@ def switch_order_to_failed(client, order, status_notes):
         dict: The updated order with the appropriate status and notes.
     """
     order = reset_retries(client, order)
+    agreement = order["agreement"]
     order = fail_order(client, order["id"], status_notes)
+    order["agreement"] = agreement
     send_email_notification(client, order)
     return order
 
@@ -197,11 +199,13 @@ def switch_order_to_query(client, order):
     if order.get("error"):
         kwargs["error"] = order["error"]
 
+    agreement = order["agreement"]
     order = query_order(
         client,
         order["id"],
         **kwargs,
     )
+    order["agreement"] = agreement
     send_email_notification(client, order)
 
 
@@ -372,11 +376,13 @@ def switch_order_to_completed(mpt_client, order, template_name):
         MPT_ORDER_STATUS_COMPLETED,
         template_name,
     )
+    agreement = order["agreement"]
     order = complete_order(
         mpt_client,
         order["id"],
         template,
     )
+    order["agreement"] = agreement
     send_email_notification(mpt_client, order)
     logger.info(f'Order {order["id"]} has been completed successfully')
 
