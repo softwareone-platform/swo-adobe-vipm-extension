@@ -2,7 +2,10 @@ import logging
 
 import pytest
 
-from adobe_vipm.flows.fulfillment.shared import send_email_notification
+from adobe_vipm.flows.fulfillment.shared import (
+    send_email_notification,
+    send_processing_notification,
+)
 from adobe_vipm.flows.utils import get_notifications_recipient
 
 
@@ -25,7 +28,7 @@ from adobe_vipm.flows.utils import get_notifications_recipient
             "Failed",
             "Order status update ORD-1234 for A buyer",
         ),
-    ]
+    ],
 )
 def test_send_email_notification(mocker, settings, order_factory, status, subject):
     settings.EXTENSION_CONFIG = {
@@ -58,7 +61,6 @@ def test_send_email_notification(mocker, settings, order_factory, status, subjec
     )
 
 
-
 def test_send_email_notification_no_recipient(mocker, settings, order_factory, caplog):
     settings.EXTENSION_CONFIG = {
         "EMAIL_NOTIFICATIONS_ENABLED": "1",
@@ -87,3 +89,37 @@ def test_send_email_notification_no_recipient(mocker, settings, order_factory, c
 
     mocked_get_rendered_template.assert_not_called()
     mocked_send_email.assert_not_called()
+
+
+def test_send_processing_notification(mocker, order_factory):
+    mocked_send = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_email_notification"
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    order = order_factory()
+
+    send_processing_notification(mocked_client, order)
+
+    mocked_send.assert_called_once_with(mocked_client, order)
+
+
+def test_send_processing_notification_retries(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    mocked_send = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_email_notification"
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            retry_count="1",
+        )
+    )
+
+    send_processing_notification(mocked_client, order)
+
+    mocked_send.assert_not_called()
