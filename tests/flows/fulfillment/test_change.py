@@ -27,7 +27,6 @@ def test_upsizing(
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
-    adobe_subscription_factory,
     items_factory,
     pricelist_items_factory,
 ):
@@ -52,7 +51,6 @@ def test_upsizing(
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocked_adobe_client.create_new_order.return_value = adobe_order
     mocked_adobe_client.get_order.return_value = adobe_order
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription_factory()
     mocker.patch(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -315,7 +313,6 @@ def test_downsizing(
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
-    adobe_subscription_factory,
     items_factory,
     pricelist_items_factory,
 ):
@@ -357,7 +354,6 @@ def test_downsizing(
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocked_adobe_client.create_new_order.return_value = adobe_order
     mocked_adobe_client.get_order.return_value = adobe_order
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription_factory()
     mocker.patch(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -493,7 +489,6 @@ def test_downsizing_return_order_exists(
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
-    adobe_subscription_factory,
     items_factory,
     pricelist_items_factory,
 ):
@@ -523,7 +518,6 @@ def test_downsizing_return_order_exists(
         status=STATUS_PROCESSED,
         items=adobe_items_factory(subscription_id="a-sub-id"),
     )
-    adobe_subscription = adobe_subscription_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
@@ -532,7 +526,6 @@ def test_downsizing_return_order_exists(
     ]
     mocked_adobe_client.create_new_order.return_value = adobe_order
     mocked_adobe_client.get_order.return_value = adobe_order
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",

@@ -302,13 +302,7 @@ def fulfill_change_order(mpt_client, order):
                 mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
             )
         else:
-            authorization_id = order["authorization"]["id"]
-            adobe_subscription = adobe_client.get_subscription(
-                authorization_id,
-                customer_id,
-                order_subscription["externalIds"]["vendor"],
-            )
-            adobe_sku = adobe_subscription["offerId"]
+            adobe_sku = item["offerId"]
 
             set_subscription_actual_sku(
                 mpt_client,
