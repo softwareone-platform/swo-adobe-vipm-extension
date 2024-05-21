@@ -34,7 +34,12 @@ def is_valid_country(country_code):
 def is_valid_state_or_province(country_code, state_or_province):
     config = get_config()
     country = config.get_country(country_code)
-    return state_or_province in country.states_or_provinces
+    state_code = (
+        state_or_province
+        if not country.provinces_to_code
+        else country.provinces_to_code.get(state_or_province, state_or_province)
+    )
+    return state_code in country.states_or_provinces
 
 
 def is_valid_postal_code(country_code, postal_code):
@@ -82,5 +87,9 @@ is_valid_phone_number_length = functools.partial(
     _is_valid_maxlength, MAXLEN_PHONE_NUMBER
 )
 
-is_valid_minimum_licenses = functools.partial(_is_valid_minimum_quantity, MINQTY_LICENSES)
-is_valid_minimum_consumables = functools.partial(_is_valid_minimum_quantity, MINQTY_CONSUMABLES)
+is_valid_minimum_licenses = functools.partial(
+    _is_valid_minimum_quantity, MINQTY_LICENSES
+)
+is_valid_minimum_consumables = functools.partial(
+    _is_valid_minimum_quantity, MINQTY_CONSUMABLES
+)

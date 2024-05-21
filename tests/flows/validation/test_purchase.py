@@ -122,14 +122,16 @@ def test_validate_company_name_invalid_chars(
     assert param["constraints"]["required"] is True
 
 
+@pytest.mark.parametrize("state_or_province", ["CA", "California"])
 @pytest.mark.parametrize("address_line_2", ["", "a value"])
-def test_validate_address(order_factory, address_line_2):
+def test_validate_address(order_factory, address_line_2, state_or_province):
     """
     Tests the validation of a valid address.
     """
     order = order_factory()
     customer_data = get_customer_data(order)
     customer_data[PARAM_ADDRESS]["addressLine2"] = address_line_2
+    customer_data[PARAM_ADDRESS]["state"] = state_or_province
     has_error, order = validate_address(order, customer_data)
 
     assert has_error is False
