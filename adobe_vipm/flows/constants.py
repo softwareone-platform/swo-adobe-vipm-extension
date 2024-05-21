@@ -81,6 +81,7 @@ ERR_ADDRESS = ValidationError(
 
 ERR_COUNTRY_CODE = "The provided `Country` is not valid"
 ERR_STATE_OR_PROVINCE = "The provided `State/Region` is not valid"
+ERR_STATE_DID_YOU_MEAN = " (Did you mean {suggestion} ?)"
 ERR_POSTAL_CODE_FORMAT = "The provided `ZIP/Postal code` is not valid"
 ERR_POSTAL_CODE_LENGTH = (
     "The provided `ZIP/Postal code` is too long, "

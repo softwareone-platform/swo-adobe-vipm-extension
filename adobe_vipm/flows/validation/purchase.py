@@ -1,6 +1,8 @@
 import logging
 from collections import Counter
+from difflib import get_close_matches
 
+from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.utils import join_phone_number
 from adobe_vipm.adobe.validation import (
     is_valid_address_line_1_length,
@@ -37,6 +39,7 @@ from adobe_vipm.flows.constants import (
     ERR_PHONE_NUMBER_LENGTH,
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
+    ERR_STATE_DID_YOU_MEAN,
     ERR_STATE_OR_PROVINCE,
     PARAM_3YC,
     PARAM_3YC_CONSUMABLES,
@@ -138,7 +141,24 @@ def validate_address(order, customer_data):
         return True, order
 
     if not is_valid_state_or_province(country_code, address["state"]):
-        errors.append(ERR_STATE_OR_PROVINCE)
+        config = get_config()
+        country = config.get_country(country_code)
+        state_error = ERR_STATE_OR_PROVINCE
+        if country.provinces_to_code:
+            suggestions = get_close_matches(
+                address["state"],
+                list(country.provinces_to_code.keys()),
+            )
+            if suggestions:
+                if len(suggestions) > 1:
+                    did_u_mean = ERR_STATE_DID_YOU_MEAN.format(suggestion=",".join(suggestions))
+                    state_error = f"{state_error}{did_u_mean}"
+                else:
+                    address["state"] = suggestions[0]
+            else:
+                errors.append(state_error)
+        else:
+            errors.append(state_error)
 
     if not is_valid_postal_code(country_code, address["postCode"]):
         errors.append(ERR_POSTAL_CODE_FORMAT)
