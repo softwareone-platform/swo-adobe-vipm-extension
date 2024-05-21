@@ -5,6 +5,7 @@ processing.
 """
 
 import logging
+from collections import Counter
 from datetime import datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -214,7 +215,19 @@ def fulfill_purchase_order(mpt_client, order):
     Returns:
         None
     """
+
+    items = [line["item"]["id"] for line in order["lines"]]
+    duplicates = [item for item, count in Counter(items).items() if count > 1]
+    if duplicates:
+        switch_order_to_failed(
+            mpt_client,
+            order,
+            f"The order cannot contain multiple lines for the same item: {','.join(duplicates)}."
+        )
+        return
+
     check_processing_template(mpt_client, order, TEMPLATE_NAME_PURCHASE)
+
     adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)
 

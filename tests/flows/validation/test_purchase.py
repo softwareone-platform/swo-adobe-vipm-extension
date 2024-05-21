@@ -31,6 +31,7 @@ from adobe_vipm.flows.validation.purchase import (
     validate_company_name,
     validate_contact,
     validate_customer_data,
+    validate_duplicate_lines,
 )
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
@@ -633,3 +634,12 @@ def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
 
     assert has_error is True
     assert order["error"]["id"] == "VIPMV008"
+
+
+def test_validate_duplicate_lines(order_factory, lines_factory):
+    order = order_factory(lines=lines_factory() + lines_factory())
+
+    has_error, order = validate_duplicate_lines(order)
+
+    assert has_error is True
+    assert order["error"]["id"] == "VIPMV009"

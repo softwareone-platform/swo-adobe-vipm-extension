@@ -6,6 +6,7 @@ processing.
 
 import copy
 import logging
+from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeError
@@ -239,7 +240,33 @@ def fulfill_change_order(mpt_client, order):
     Returns:
         None
     """
+    items = [line["item"]["id"] for line in order["lines"]]
+    duplicates = [item for item, count in Counter(items).items() if count > 1]
+    if duplicates:
+        switch_order_to_failed(
+            mpt_client,
+            order,
+            f"The order cannot contain multiple lines for the same item: {','.join(duplicates)}."
+        )
+        return
+
+    items = []
+    for subscription in order["agreement"]["subscriptions"]:
+        for line in subscription["lines"]:
+            items.append(line["item"]["id"])
+
+    items.extend([line["item"]["id"] for line in order["lines"] if line["oldQuantity"] == 0])
+    duplicates = [item for item, count in Counter(items).items() if count > 1]
+    if duplicates:
+        switch_order_to_failed(
+            mpt_client,
+            order,
+            f"The order cannot contain new lines for an existing item: {','.join(duplicates)}."
+        )
+        return
+
     check_processing_template(mpt_client, order, TEMPLATE_NAME_CHANGE)
+
     adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)
     adobe_order_id = get_adobe_order_id(order)

@@ -1498,3 +1498,22 @@ def test_create_customer_account_no_contact(
         template={"id": "TPL-0000"},
     )
     assert updated_order is None
+
+
+def test_duplicate_items(mocker, order_factory, lines_factory):
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_failed",
+    )
+    mocked_client = mocker.MagicMock()
+
+    order = order_factory(
+        lines=lines_factory() + lines_factory(),
+    )
+
+    fulfill_order(mocked_client, order)
+
+    mocked_fail.assert_called_once_with(
+        mocked_client,
+        order,
+        "The order cannot contain multiple lines for the same item: ITM-1234-1234-1234-0001.",
+    )

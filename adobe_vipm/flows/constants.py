@@ -139,6 +139,15 @@ ERR_3YC_NO_MINIMUMS = ValidationError(
     "To request 3-year commitment benefits you must fill at least one parameter between "
     "`{title_min_licenses}` and `{title_min_consumables}`."
 )
+ERR_DUPLICATED_ITEMS = ValidationError(
+    "VIPMV009",
+    "The order cannot contain multiple lines for the same item: {duplicates}."
+)
+ERR_EXISTING_ITEMS = ValidationError(
+    "VIPMV010",
+    "The order cannot contain new lines for an existing item: {duplicates}."
+)
+
 
 MPT_ORDER_STATUS_PROCESSING = "Processing"
 MPT_ORDER_STATUS_QUERYING = "Querying"

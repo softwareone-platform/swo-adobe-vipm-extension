@@ -202,3 +202,31 @@ def test_validate_order_exception(mocker, mpt_error_factory, order_factory):
     assert process == "validation"
     assert order_id == order["id"]
     assert strip_trace_id(str(error)) in tb
+
+
+
+def test_validate_change_order(mocker, caplog, order_factory, customer_data):
+    """Tests the validate order entrypoint function when it validates."""
+    order = order_factory(order_type="Change")
+    m_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+    )
+    m_validate_duplicates = mocker.patch(
+        "adobe_vipm.flows.validation.base.validate_duplicate_or_existing_lines",
+        return_value=(False, order),
+    )
+    m_adobe_cli = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.get_adobe_client", return_value=m_adobe_cli
+    )
+
+    with caplog.at_level(logging.INFO):
+        assert validate_order(m_client, order) == order
+
+    assert caplog.records[0].message == (
+        f"Validation of order {order['id']} succeeded without errors"
+    )
+
+    m_validate_duplicates.assert_called_once_with(reset_ordering_parameters_error(order))
