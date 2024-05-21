@@ -151,8 +151,9 @@ def validate_address(order, customer_data):
             )
             if suggestions:
                 if len(suggestions) > 1:
-                    did_u_mean = ERR_STATE_DID_YOU_MEAN.format(suggestion=",".join(suggestions))
+                    did_u_mean = ERR_STATE_DID_YOU_MEAN.format(suggestion=", ".join(suggestions))
                     state_error = f"{state_error}{did_u_mean}"
+                    errors.append(state_error)
                 else:
                     address["state"] = suggestions[0]
             else:
