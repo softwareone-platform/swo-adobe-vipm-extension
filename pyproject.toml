@@ -19,7 +19,7 @@ openpyxl = "3.1.*"
 phonenumbers = "8.13.*"
 pyairtable = "2.3.*"
 pymsteams = "0.2.*"
-requests = "2.31.*"
+requests = "2.32.*"
 types-openpyxl = "3.1.*"
 
 [tool.poetry.group.devmock.dependencies] # Remove when devmock is not needed anymore

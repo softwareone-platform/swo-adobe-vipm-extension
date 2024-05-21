@@ -708,10 +708,16 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                 {
                     "id": "SUB-1000-2000-3000",
                     "status": "Active",
+                    "item": {
+                        "id": "ITM-0000-0001-0001",
+                    }
                 },
                 {
                     "id": "SUB-1234-5678",
                     "status": "Terminated",
+                    "item": {
+                        "id": "ITM-0000-0001-0002",
+                    }
                 },
             ]
 
@@ -785,6 +791,42 @@ def agreement(buyer):
             },
             "updated": None,
         },
+        "subscriptions": [
+            {
+                "id": "SUB-1000-2000-3000",
+                "status": "Active",
+                "lines": [
+                    {
+                        "id": "ALI-0010",
+                        "item": {
+                            "id": "ITM-1234-1234-1234-0010",
+                            "name": "Item 0010",
+                            "externalIds": {
+                                "vendor": "external-id1",
+                            },
+                        },
+                        "quantity": 10,
+                    }
+                ]
+            },
+            {
+                "id": "SUB-1234-5678",
+                "status": "Terminated",
+                "lines": [
+                    {
+                        "id": "ALI-0011",
+                        "item": {
+                            "id": "ITM-1234-1234-1234-0011",
+                            "name": "Item 0011",
+                            "externalIds": {
+                                "vendor": "external-id2",
+                            },
+                        },
+                        "quantity": 4,
+                    }
+                ]
+            },
+        ],
         "listing": {
             "id": "LST-9401-9279",
             "href": "/listing/LST-9401-9279",

@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 
 from adobe_vipm.adobe.utils import join_phone_number
 from adobe_vipm.adobe.validation import (
@@ -29,6 +30,7 @@ from adobe_vipm.flows.constants import (
     ERR_COMPANY_NAME_LENGTH,
     ERR_CONTACT,
     ERR_COUNTRY_CODE,
+    ERR_DUPLICATED_ITEMS,
     ERR_EMAIL_FORMAT,
     ERR_FIRST_NAME_FORMAT,
     ERR_LAST_NAME_FORMAT,
@@ -224,3 +226,16 @@ def validate_customer_data(order, customer_data):
     has_errors = has_errors or has_error
 
     return has_errors, order
+
+
+def validate_duplicate_lines(order):
+    items = [line["item"]["id"] for line in order["lines"]]
+    duplicates = [item for item, count in Counter(items).items() if count > 1]
+    if duplicates:
+        order = set_order_error(
+            order,
+            ERR_DUPLICATED_ITEMS.to_dict(duplicates=",".join(duplicates))
+        )
+        return True, order
+
+    return False, order

@@ -9,6 +9,7 @@ from adobe_vipm.flows.helpers import (
     update_purchase_prices_for_transfer,
 )
 from adobe_vipm.flows.utils import (
+    is_change_order,
     is_purchase_order,
     is_purchase_validation_enabled,
     is_transfer_order,
@@ -19,7 +20,11 @@ from adobe_vipm.flows.utils import (
     strip_trace_id,
     update_parameters_visibility,
 )
-from adobe_vipm.flows.validation.purchase import validate_customer_data
+from adobe_vipm.flows.validation.change import validate_duplicate_or_existing_lines
+from adobe_vipm.flows.validation.purchase import (
+    validate_customer_data,
+    validate_duplicate_lines,
+)
 from adobe_vipm.flows.validation.transfer import validate_transfer
 
 logger = logging.getLogger(__name__)
@@ -38,7 +43,11 @@ def validate_order(mpt_client, order):
             if is_purchase_validation_enabled(order):
                 has_errors, order = validate_customer_data(order, customer_data)
                 if not has_errors and order["lines"]:
+                    has_errors, order = validate_duplicate_lines(order)
+                if not has_errors and order["lines"]:
                     order = update_purchase_prices(mpt_client, adobe_client, order)
+        elif is_change_order(order) and order["lines"]:
+            has_errors, order = validate_duplicate_or_existing_lines(order)
         elif (
             is_transfer_order(order)
             and is_transfer_validation_enabled(order)

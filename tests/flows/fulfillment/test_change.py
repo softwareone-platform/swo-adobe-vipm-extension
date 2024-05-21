@@ -998,18 +998,21 @@ def test_mixed(
 
     downsizing_items = lines_factory(
         line_id=1,
+        item_id=1,
         old_quantity=10,
         quantity=8,
         external_vendor_id="sku-downsized",
     )
     upsizing_items = lines_factory(
         line_id=2,
+        item_id=2,
         old_quantity=10,
         quantity=12,
         external_vendor_id="sku-upsized",
     )
     new_items = lines_factory(
         line_id=3,
+        item_id=3,
         name="New cool product",
         old_quantity=0,
         quantity=5,
@@ -1018,6 +1021,7 @@ def test_mixed(
 
     downsizing_items_out_of_window = lines_factory(
         line_id=4,
+        item_id=4,
         old_quantity=10,
         quantity=8,
         external_vendor_id="sku-downsize-out",
@@ -1035,6 +1039,7 @@ def test_mixed(
             adobe_subscription_id="sub-1",
             lines=lines_factory(
                 line_id=1,
+                item_id=1,
                 quantity=10,
                 external_vendor_id="sku-downsized",
             ),
@@ -1044,6 +1049,7 @@ def test_mixed(
             adobe_subscription_id="sub-2",
             lines=lines_factory(
                 line_id=2,
+                item_id=2,
                 quantity=10,
                 external_vendor_id="sku-upsized",
             ),
@@ -1053,6 +1059,7 @@ def test_mixed(
             adobe_subscription_id="sub-4",
             lines=lines_factory(
                 line_id=4,
+                item_id=4,
                 quantity=10,
                 external_vendor_id="sku-downsize-out",
             ),
@@ -1485,4 +1492,46 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         mocked_mpt_client,
         processing_change_order["id"],
         {"id": "TPL-1111"},
+    )
+
+
+def test_duplicate_items(mocker, order_factory, lines_factory):
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
+    )
+    mocked_client = mocker.MagicMock()
+
+    order = order_factory(
+        order_type="Change",
+        lines=lines_factory() + lines_factory(),
+    )
+
+    fulfill_order(mocked_client, order)
+
+    mocked_fail.assert_called_once_with(
+        mocked_client,
+        order,
+        "The order cannot contain multiple lines for the same item: ITM-1234-1234-1234-0001.",
+    )
+
+
+def test_existing_items(mocker, order_factory, lines_factory):
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
+    )
+    mocked_client = mocker.MagicMock()
+
+    order = order_factory(
+        order_type="Change",
+        lines=lines_factory(line_id=2, item_id=10),
+    )
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=order["agreement"])
+
+    fulfill_order(mocked_client, order)
+
+    mocked_fail.assert_called_once_with(
+        mocked_client,
+        order,
+        "The order cannot contain new lines for an existing item: ITM-1234-1234-1234-0010.",
     )
