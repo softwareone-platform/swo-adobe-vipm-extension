@@ -46,3 +46,4 @@ class Country:
     currencies: List[str]
     pricelist_region: str
     postal_code_format_regex: str
+    provinces_to_code: Optional[dict] = None

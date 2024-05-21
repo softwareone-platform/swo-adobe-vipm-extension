@@ -131,6 +131,13 @@ class AdobeClient:
         authorization = self._config.get_authorization(authorization_id)
         reseller: Reseller = self._config.get_reseller(authorization, seller_id)
         company_name: str = f"{customer_data['companyName']} ({agreement_id})"
+        country = self._config.get_country(customer_data["address"]["country"])
+        state_or_province = customer_data["address"]["state"]
+        state_code = (
+            state_or_province
+            if not country.provinces_to_code
+            else country.provinces_to_code.get(state_or_province, state_or_province)
+        )
         payload = {
             "resellerId": reseller.id,
             "externalReferenceId": agreement_id,
@@ -141,7 +148,7 @@ class AdobeClient:
                 ),
                 "address": {
                     "country": customer_data["address"]["country"],
-                    "region": customer_data["address"]["state"],
+                    "region": state_code,
                     "city": customer_data["address"]["city"],
                     "addressLine1": customer_data["address"]["addressLine1"],
                     "addressLine2": customer_data["address"]["addressLine2"],
