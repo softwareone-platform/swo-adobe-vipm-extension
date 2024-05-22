@@ -86,7 +86,7 @@ def validate_transfer(mpt_client, adobe_client, order):
 
     transfer = get_transfer_by_authorization_membership_or_customer(
         product_id,
-        authorization.authorization_uk,
+        authorization.authorization_id,
         membership_id,
     )
 

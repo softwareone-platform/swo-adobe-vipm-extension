@@ -696,7 +696,7 @@ def test_fulfill_transfer_order_already_migrated(
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
-        adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_id_param["value"],
     )
     mocked_adobe_client.get_subscriptions.assert_called_once_with(
@@ -802,7 +802,7 @@ def test_fulfill_transfer_order_migration_running(
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
-        adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
 
