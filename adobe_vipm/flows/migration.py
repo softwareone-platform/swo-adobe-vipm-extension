@@ -15,6 +15,7 @@ from adobe_vipm.flows.airtable import (
     create_offers,
     get_offer_ids_by_membership_id,
     get_transfer_link,
+    get_transfers_completed,
     get_transfers_to_check,
     get_transfers_to_process,
 )
@@ -294,6 +295,25 @@ def check_running_transfers_for_product(product_id):
             continue
 
         transfer.customer_id = adobe_transfer["customerId"]
+
+        subscriptions = client.get_subscriptions(
+            transfer.authorization_uk,
+            transfer.customer_id,
+        )
+        try:
+            for subscription in subscriptions["items"]:
+                client.update_subscription(
+                    transfer.authorization_uk,
+                    transfer.customer_id,
+                    subscription["subscriptionId"],
+                    auto_renewal=False,
+                )
+        except AdobeAPIError as api_err:
+            transfer.adobe_error_code = api_err.code
+            transfer.adobe_error_description = str(api_err)
+            check_retries(transfer)
+            continue
+
         customer = None
         try:
             customer = client.get_customer(transfer.authorization_uk, transfer.customer_id)
@@ -317,6 +337,27 @@ def check_running_transfers_for_product(product_id):
         transfer.save()
 
 
+def fix_migrated_autorenewal(product_id):
+    client = get_adobe_client()
+    for transfer in get_transfers_completed(product_id):
+        try:
+            subscriptions = client.get_subscriptions(
+                transfer.authorization_uk,
+                transfer.customer_id,
+            )
+            for subscription in subscriptions["items"]:
+                client.update_subscription(
+                    transfer.authorization_uk,
+                    transfer.customer_id,
+                    subscription["subscriptionId"],
+                    auto_renewal=False,
+                )
+            transfer.fixed = True
+            transfer.updated_at = datetime.now()
+            transfer.save()
+        except Exception:
+            logger.exception("This failed")
+
 def process_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:
         start_transfers_for_product(product_id)
@@ -325,3 +366,8 @@ def process_transfers():
 def check_running_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:
         check_running_transfers_for_product(product_id)
+
+
+def fix_migrated_autorenewal_off():
+    for product_id in settings.MPT_PRODUCTS_IDS:
+        fix_migrated_autorenewal(product_id)

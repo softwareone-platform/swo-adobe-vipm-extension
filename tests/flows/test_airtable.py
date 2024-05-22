@@ -10,6 +10,7 @@ from adobe_vipm.flows.airtable import (
     get_transfer_by_authorization_membership_or_customer,
     get_transfer_link,
     get_transfer_model,
+    get_transfers_completed,
     get_transfers_to_check,
     get_transfers_to_process,
 )
@@ -195,3 +196,25 @@ def test_get_transfer_link_exception(mocker):
     transfer.get_table.side_effect = HTTPError()
 
     assert get_transfer_link(transfer) is None
+
+
+def test_get_transfers_completed(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
+    }
+    mocked_transfer_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_transfer_model",
+        return_value=mocked_transfer_model,
+    )
+
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer_model.all.return_value = [mocked_transfer]
+
+    transfer_to_process = get_transfers_completed("product_id")
+
+    assert transfer_to_process == [mocked_transfer]
+    mocked_transfer_model.all.assert_called_once_with(
+        formula="AND({status}='completed',{fixed}=1)",
+    )

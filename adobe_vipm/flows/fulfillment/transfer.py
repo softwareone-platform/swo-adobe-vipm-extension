@@ -218,6 +218,13 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
             ITEM_TYPE_SUBSCRIPTION,
             subscription,
         )
+        adobe_client.update_subscription(
+            authorization_id,
+            transfer.customer_id,
+            subscription["subscriptionId"],
+            auto_renewal=True,
+        )
+
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
     transfer.mpt_order_id = order["id"]
