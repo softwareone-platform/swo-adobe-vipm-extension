@@ -13,6 +13,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.migration import (
     check_running_transfers,
     check_running_transfers_for_product,
+    fix_migrated_autorenewal,
     get_transfer_link_button,
     process_transfers,
     start_transfers_for_product,
@@ -919,3 +920,33 @@ def test_get_transfer_link_button(mocker, return_value, expected_value):
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.membership_id = "label"
     assert get_transfer_link_button(mocked_transfer) == expected_value
+
+
+def test_fix_migrated_autorenewal(mocker, adobe_subscription_factory):
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.customer_id = "customer-id"
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_completed",
+        return_value=[mocked_transfer],
+    )
+
+    adobe_sub = adobe_subscription_factory()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_sub]}
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    fix_migrated_autorenewal("product_id")
+
+    mocked_adobe_client.update_subscription.assert_called_once_with(
+        mocked_transfer.authorization_uk,
+        mocked_transfer.customer_id,
+        adobe_sub["subscriptionId"],
+        auto_renewal=False,
+    )

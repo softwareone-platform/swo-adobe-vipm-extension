@@ -2,7 +2,15 @@ from dataclasses import dataclass
 from functools import cache
 
 from django.conf import settings
-from pyairtable.formulas import AND, EQUAL, FIELD, NOT_EQUAL, OR, STR_VALUE
+from pyairtable.formulas import (
+    AND,
+    EQUAL,
+    FIELD,
+    NOT_EQUAL,
+    OR,
+    STR_VALUE,
+    to_airtable_value,
+)
 from pyairtable.orm import Model, fields
 from requests import HTTPError
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
@@ -11,6 +19,7 @@ STATUS_INIT = "init"
 STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
+STATUS_COMPLETED = "completed"
 
 
 @dataclass(frozen=True)
@@ -38,19 +47,31 @@ def get_transfer_model(base_info):
         customer_id = fields.TextField("customer_id")
         customer_company_name = fields.TextField("customer_company_name")
         customer_preferred_language = fields.TextField("customer_preferred_language")
-        customer_address_address_line_1 = fields.TextField("customer_address_address_line_1")
-        customer_address_address_line_2 = fields.TextField("customer_address_address_line_2")
+        customer_address_address_line_1 = fields.TextField(
+            "customer_address_address_line_1"
+        )
+        customer_address_address_line_2 = fields.TextField(
+            "customer_address_address_line_2"
+        )
         customer_address_city = fields.TextField("customer_address_city")
         customer_address_region = fields.TextField("customer_address_region")
         customer_address_postal_code = fields.TextField("customer_address_postal_code")
         customer_address_country = fields.TextField("customer_address_country")
-        customer_address_phone_number = fields.TextField("customer_address_phone_number")
+        customer_address_phone_number = fields.TextField(
+            "customer_address_phone_number"
+        )
         customer_contact_first_name = fields.TextField("customer_contact_first_name")
         customer_contact_last_name = fields.TextField("customer_contact_last_name")
         customer_contact_email = fields.TextField("customer_contact_email")
-        customer_contact_phone_number = fields.TextField("customer_contact_phone_number")
-        customer_benefits_3yc_start_date = fields.DateField("customer_benefits_3yc_start_date")
-        customer_benefits_3yc_end_date = fields.DateField("customer_benefits_3yc_end_date")
+        customer_contact_phone_number = fields.TextField(
+            "customer_contact_phone_number"
+        )
+        customer_benefits_3yc_start_date = fields.DateField(
+            "customer_benefits_3yc_start_date"
+        )
+        customer_benefits_3yc_end_date = fields.DateField(
+            "customer_benefits_3yc_end_date"
+        )
         customer_benefits_3yc_status = fields.TextField("customer_benefits_3yc_status")
         customer_benefits_3yc_minimum_quantity_license = fields.NumberField(
             "customer_benefits_3yc_minimum_quantity_license",
@@ -71,6 +92,7 @@ def get_transfer_model(base_info):
         updated_at = fields.DatetimeField("updated_at")
         completed_at = fields.DatetimeField("completed_at")
         synchronized_at = fields.DatetimeField("synchronized_at")
+        fixed = fields.CheckboxField("fixed")
 
         class Meta:
             table_name = "Transfers"
@@ -130,6 +152,16 @@ def get_transfers_to_check(product_id):
     Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
     return Transfer.all(
         formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
+    )
+
+
+def get_transfers_completed(product_id):
+    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    return Transfer.all(
+        formula=AND(
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_COMPLETED)),
+            EQUAL(FIELD("fixed"), to_airtable_value(True)),
+        ),
     )
 
 
