@@ -216,5 +216,5 @@ def test_get_transfers_completed(mocker, settings):
 
     assert transfer_to_process == [mocked_transfer]
     mocked_transfer_model.all.assert_called_once_with(
-        formula="AND({status}='completed',{fixed}=1)",
+        formula="AND({status}='completed',{fixed}=0)",
     )

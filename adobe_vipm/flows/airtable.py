@@ -160,7 +160,7 @@ def get_transfers_completed(product_id):
     return Transfer.all(
         formula=AND(
             EQUAL(FIELD("status"), STR_VALUE(STATUS_COMPLETED)),
-            EQUAL(FIELD("fixed"), to_airtable_value(True)),
+            EQUAL(FIELD("fixed"), to_airtable_value(False)),
         ),
     )
 

@@ -176,7 +176,7 @@ def test_validate_transfer_already_migrated(
     assert validated_order == order
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
-        adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
     mocked_adobe_client.get_subscriptions.assert_called_once_with(

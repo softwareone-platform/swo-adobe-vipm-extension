@@ -355,8 +355,13 @@ def fix_migrated_autorenewal(product_id):
             transfer.fixed = True
             transfer.updated_at = datetime.now()
             transfer.save()
-        except Exception:
-            logger.exception("This failed")
+            logger.info(f"Transfer {transfer.membership_id} as been fixed")
+        except AdobeAPIError as api_err:
+            logger.error(f"Cannot fix transfer {transfer.membership_id}: {str(api_err)}")
+            transfer.adobe_error_code = api_err.code
+            transfer.adobe_error_description = str(api_err)
+            transfer.updated_at = datetime.now()
+            transfer.save()
 
 def process_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:
