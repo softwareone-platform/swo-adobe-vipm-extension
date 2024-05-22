@@ -520,7 +520,7 @@ def test_get_product_template_or_default(mpt_client, requests_mocker, name):
     if name:
         name_or_default_filter = f"or({name_or_default_filter},eq(name,{name}))"
     rql_filter = f"and(eq(type,OrderProcessing),{name_or_default_filter})"
-    url = f"/v1/products/PRD-1111/templates?{rql_filter}&limit=1"
+    url = f"/v1/products/PRD-1111/templates?{rql_filter}&order=default&limit=1"
     requests_mocker.get(
         urljoin(
             mpt_client.base_url,
