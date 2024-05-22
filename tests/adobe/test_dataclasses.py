@@ -24,6 +24,26 @@ def test_authorization():
     assert hash(auth) is not None
 
 
+def test_authorization_repr():
+    """
+    Check the Authorization repr offuscate the client_id, client_secret.
+    """
+    auth = Authorization(
+        authorization_uk="auth_uk",
+        authorization_id="auth_id",
+        name="test",
+        client_id="client_id",
+        client_secret="client_secret",
+        currency="EUR",
+        distributor_id="distributor_id",
+    )
+    assert repr(auth) == (
+        "Authorization(authorization_uk='auth_uk', authorization_id='auth_id', name='test', "
+        "client_id='clie******t_id', client_secret='clie******cret', currency='EUR', "
+        "distributor_id='distributor_id')"
+    )
+
+
 def test_reseller():
     """
     Check the Reseller dataclass is unmutable and hasheable.
