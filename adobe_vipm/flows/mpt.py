@@ -184,7 +184,7 @@ def get_product_template_or_default(mpt_client, product_id, status, name=None):
     if name:
         name_or_default_filter = f"or({name_or_default_filter},eq(name,{name}))"
     rql_filter = f"and(eq(type,Order{status}),{name_or_default_filter})"
-    url = f"/products/{product_id}/templates?{rql_filter}&limit=1"
+    url = f"/products/{product_id}/templates?{rql_filter}&order=default&limit=1"
     response = mpt_client.get(url)
     response.raise_for_status()
     templates = response.json()
