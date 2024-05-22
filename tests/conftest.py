@@ -1105,6 +1105,7 @@ def adobe_subscription_factory():
         current_quantity=10,
         renewal_quantity=10,
         autorenewal_enabled=True,
+        status="1000",
     ):
         return {
             "subscriptionId": subscription_id or "a-sub-id",
@@ -1116,7 +1117,7 @@ def adobe_subscription_factory():
             },
             "creationDate": "2019-05-20T22:49:55Z",
             "renewalDate": "2020-05-20",
-            "status": "1000",
+            "status": status,
         }
 
     return _subscription

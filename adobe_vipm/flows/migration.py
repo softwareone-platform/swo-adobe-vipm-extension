@@ -345,23 +345,42 @@ def fix_migrated_autorenewal(product_id):
                 transfer.authorization_uk,
                 transfer.customer_id,
             )
-            for subscription in subscriptions["items"]:
-                client.update_subscription(
-                    transfer.authorization_uk,
-                    transfer.customer_id,
-                    subscription["subscriptionId"],
-                    auto_renewal=False,
-                )
-            transfer.fixed = True
-            transfer.updated_at = datetime.now()
-            transfer.save()
-            logger.info(f"Transfer {transfer.membership_id} as been fixed")
         except AdobeAPIError as api_err:
             logger.error(f"Cannot fix transfer {transfer.membership_id}: {str(api_err)}")
             transfer.adobe_error_code = api_err.code
             transfer.adobe_error_description = str(api_err)
             transfer.updated_at = datetime.now()
             transfer.save()
+
+        failed_subscriptions = []
+        for subscription in subscriptions["items"]:
+            if subscription["status"] != STATUS_PROCESSED:
+                logger.warning(
+                    f"Migrated subscription {subscription['subscriptionId']} "
+                    f"for customer {transfer.customer_id} is in status "
+                    f"{subscription['status']}, skip it"
+                )
+                continue
+            try:
+                client.update_subscription(
+                    transfer.authorization_uk,
+                    transfer.customer_id,
+                    subscription["subscriptionId"],
+                    auto_renewal=False,
+                )
+            except AdobeAPIError:
+                logger.info(
+                    f"Subscription {subscription['subscriptionId']} of "
+                    f"{transfer.membership_id} failed",
+                )
+                failed_subscriptions.append(subscription["subscriptionId"])
+
+        transfer.migration_error_description = ",".join(failed_subscriptions)
+        transfer.fixed = not bool(failed_subscriptions)
+        transfer.updated_at = datetime.now()
+        transfer.save()
+        logger.info(f"Transfer {transfer.membership_id} as been fixed")
+
 
 def process_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:

@@ -1130,7 +1130,7 @@ def test_update_subscription(
         },
     }
     if "quantity" in update_params:
-        body_to_match["autoRenewal"]["quantity"] = update_params["quantity"]
+        body_to_match["autoRenewal"]["renewalQuantity"] = update_params["quantity"]
 
     requests_mocker.patch(
         urljoin(

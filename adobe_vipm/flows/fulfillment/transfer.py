@@ -210,6 +210,14 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
         transfer.customer_id,
     )
     for subscription in subscriptions["items"]:
+        if subscription["status"] != STATUS_PROCESSED:
+            logger.warning(
+                f"Migrated subscription {subscription['subscriptionId']} "
+                f"for customer {transfer.customer_id} is in status "
+                f"{subscription['status']}, skip it"
+            )
+            continue
+
         add_subscription(
             mpt_client,
             adobe_client,
