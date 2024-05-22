@@ -620,7 +620,7 @@ class AdobeClient:
             },
         }
         if quantity:
-            payload["autoRenewal"]["quantity"] = quantity
+            payload["autoRenewal"]["renewalQuantity"] = quantity
 
         response = requests.patch(
             urljoin(

@@ -932,10 +932,14 @@ def test_fix_migrated_autorenewal(mocker, adobe_subscription_factory):
         return_value=[mocked_transfer],
     )
 
-    adobe_sub = adobe_subscription_factory()
+    adobe_sub_active = adobe_subscription_factory()
+    adobe_sub_inactive = adobe_subscription_factory(status="1004")
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_sub]}
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [
+        adobe_sub_active,
+        adobe_sub_inactive,
+    ]}
 
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
@@ -947,6 +951,6 @@ def test_fix_migrated_autorenewal(mocker, adobe_subscription_factory):
     mocked_adobe_client.update_subscription.assert_called_once_with(
         mocked_transfer.authorization_uk,
         mocked_transfer.customer_id,
-        adobe_sub["subscriptionId"],
+        adobe_sub_active["subscriptionId"],
         auto_renewal=False,
     )
