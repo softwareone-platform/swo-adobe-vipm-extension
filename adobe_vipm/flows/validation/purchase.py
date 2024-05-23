@@ -52,6 +52,7 @@ from adobe_vipm.flows.utils import (
     get_ordering_parameter,
     set_order_error,
     set_ordering_parameter_error,
+    update_ordering_parameter_value,
 )
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,11 @@ def validate_address(order, customer_data):
             ),
         )
         return True, order
+    order = update_ordering_parameter_value(
+        order,
+        PARAM_ADDRESS,
+        address,
+    )
     return False, order
 
 

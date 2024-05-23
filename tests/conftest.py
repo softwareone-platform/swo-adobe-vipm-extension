@@ -1105,7 +1105,7 @@ def adobe_subscription_factory():
         current_quantity=10,
         renewal_quantity=10,
         autorenewal_enabled=True,
-        status="1000",
+        status=STATUS_PROCESSED,
     ):
         return {
             "subscriptionId": subscription_id or "a-sub-id",

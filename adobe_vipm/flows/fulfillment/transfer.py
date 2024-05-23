@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
@@ -205,6 +206,7 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
         transfer.transfer_id,
         customer,
     )
+
     subscriptions = adobe_client.get_subscriptions(
         authorization_id,
         transfer.customer_id,
@@ -226,12 +228,13 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
             ITEM_TYPE_SUBSCRIPTION,
             subscription,
         )
-        adobe_client.update_subscription(
-            authorization_id,
-            transfer.customer_id,
-            subscription["subscriptionId"],
-            auto_renewal=True,
-        )
+        if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
+            adobe_client.update_subscription(
+                authorization_id,
+                transfer.customer_id,
+                subscription["subscriptionId"],
+                auto_renewal=True,
+            )
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"

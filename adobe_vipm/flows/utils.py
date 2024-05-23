@@ -685,3 +685,14 @@ def get_notifications_recipient(order):
 
 def md2html(template):
     return MarkdownIt("commonmark", {"breaks": True, "html": True}).render(template)
+
+
+def update_ordering_parameter_value(order, param_external_id, value):
+    updated_order = copy.deepcopy(order)
+    param = get_ordering_parameter(
+        updated_order,
+        param_external_id,
+    )
+    param["value"] = value
+
+    return updated_order

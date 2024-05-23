@@ -17,3 +17,11 @@ def test_validate_existing_lines(order_factory, lines_factory):
 
     assert has_error is True
     assert order["error"]["id"] == "VIPMV010"
+
+
+def test_validate_no_duplicates_or_existing(order_factory, lines_factory):
+    order = order_factory()
+
+    has_error, order = validate_duplicate_or_existing_lines(order)
+
+    assert has_error is False
