@@ -5,6 +5,7 @@ from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_ALREADY_TRANSFERRED,
@@ -15,7 +16,6 @@ from adobe_vipm.flows.airtable import (
     create_offers,
     get_offer_ids_by_membership_id,
     get_transfer_link,
-    get_transfers_completed,
     get_transfers_to_check,
     get_transfers_to_process,
 )
@@ -296,24 +296,6 @@ def check_running_transfers_for_product(product_id):
 
         transfer.customer_id = adobe_transfer["customerId"]
 
-        subscriptions = client.get_subscriptions(
-            transfer.authorization_uk,
-            transfer.customer_id,
-        )
-        try:
-            for subscription in subscriptions["items"]:
-                client.update_subscription(
-                    transfer.authorization_uk,
-                    transfer.customer_id,
-                    subscription["subscriptionId"],
-                    auto_renewal=False,
-                )
-        except AdobeAPIError as api_err:
-            transfer.adobe_error_code = api_err.code
-            transfer.adobe_error_description = str(api_err)
-            check_retries(transfer)
-            continue
-
         customer = None
         try:
             customer = client.get_customer(transfer.authorization_uk, transfer.customer_id)
@@ -324,6 +306,27 @@ def check_running_transfers_for_product(product_id):
             continue
 
         transfer = fill_customer_data(transfer, customer)
+
+        if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
+            subscriptions = client.get_subscriptions(
+                transfer.authorization_uk,
+                transfer.customer_id,
+            )
+            try:
+                for subscription in subscriptions["items"]:
+                    if subscription["status"] != STATUS_PROCESSED:
+                        continue
+                    client.update_subscription(
+                        transfer.authorization_uk,
+                        transfer.customer_id,
+                        subscription["subscriptionId"],
+                        auto_renewal=False,
+                    )
+            except AdobeAPIError as api_err:
+                transfer.adobe_error_code = api_err.code
+                transfer.adobe_error_description = str(api_err)
+                check_retries(transfer)
+                continue
 
         terminated, response = terminate_contract(transfer.nav_cco)
 
@@ -336,52 +339,6 @@ def check_running_transfers_for_product(product_id):
         transfer.completed_at = datetime.now()
         transfer.save()
 
-
-def fix_migrated_autorenewal(product_id):
-    client = get_adobe_client()
-    for transfer in get_transfers_completed(product_id):
-        try:
-            subscriptions = client.get_subscriptions(
-                transfer.authorization_uk,
-                transfer.customer_id,
-            )
-        except AdobeAPIError as api_err:
-            logger.error(f"Cannot fix transfer {transfer.membership_id}: {str(api_err)}")
-            transfer.adobe_error_code = api_err.code
-            transfer.adobe_error_description = str(api_err)
-            transfer.updated_at = datetime.now()
-            transfer.save()
-
-        failed_subscriptions = []
-        for subscription in subscriptions["items"]:
-            if subscription["status"] != STATUS_PROCESSED:
-                logger.warning(
-                    f"Migrated subscription {subscription['subscriptionId']} "
-                    f"for customer {transfer.customer_id} is in status "
-                    f"{subscription['status']}, skip it"
-                )
-                continue
-            try:
-                client.update_subscription(
-                    transfer.authorization_uk,
-                    transfer.customer_id,
-                    subscription["subscriptionId"],
-                    auto_renewal=False,
-                )
-            except AdobeAPIError:
-                logger.info(
-                    f"Subscription {subscription['subscriptionId']} of "
-                    f"{transfer.membership_id} failed",
-                )
-                failed_subscriptions.append(subscription["subscriptionId"])
-
-        transfer.migration_error_description = ",".join(failed_subscriptions)
-        transfer.fixed = not bool(failed_subscriptions)
-        transfer.updated_at = datetime.now()
-        transfer.save()
-        logger.info(f"Transfer {transfer.membership_id} as been fixed")
-
-
 def process_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:
         start_transfers_for_product(product_id)
@@ -390,8 +347,3 @@ def process_transfers():
 def check_running_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:
         check_running_transfers_for_product(product_id)
-
-
-def fix_migrated_autorenewal_off():
-    for product_id in settings.MPT_PRODUCTS_IDS:
-        fix_migrated_autorenewal(product_id)

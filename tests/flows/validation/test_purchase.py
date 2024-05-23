@@ -122,7 +122,7 @@ def test_validate_company_name_invalid_chars(
     assert param["constraints"]["required"] is True
 
 
-@pytest.mark.parametrize("state_or_province", ["CA", "California"])
+@pytest.mark.parametrize("state_or_province", ["CA", "California", "Californio"])
 @pytest.mark.parametrize("address_line_2", ["", "a value"])
 def test_validate_address(order_factory, address_line_2, state_or_province):
     """
@@ -206,6 +206,38 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
     assert param["error"] == ERR_ADDRESS.to_dict(
         title=param["name"],
         errors=ERR_STATE_OR_PROVINCE,
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["required"] is True
+
+
+def test_validate_address_invalid_state_did_u_mean(order_factory, order_parameters_factory):
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            address={
+                "country": "US",
+                "state": "Coliflornia",
+                "city": "San Jose",
+                "addressLine1": "3601 Lyon St",
+                "addressLine2": "",
+                "postCode": "94123",
+            },
+        )
+    )
+    customer_data = get_customer_data(order)
+
+    has_error, order = validate_address(order, customer_data)
+
+    assert has_error is True
+
+    param = get_ordering_parameter(
+        order,
+        PARAM_ADDRESS,
+    )
+    error = f"{ERR_STATE_OR_PROVINCE} (Did you mean California, Colorado ?)"
+    assert param["error"] == ERR_ADDRESS.to_dict(
+        title=param["name"],
+        errors=error,
     )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
