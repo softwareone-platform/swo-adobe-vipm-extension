@@ -1,3 +1,5 @@
+import json
+
 from freezegun import freeze_time
 from responses import matchers
 
@@ -136,7 +138,7 @@ def test_terminate_contract(mocker, requests_mocker, settings):
     requests_mocker.post(
         "https://api.nav/v1.0/contracts/terminateNow/my-cco",
         status=200,
-        json={"contractInsert":{"contractNumber": "whatever"}},
+        json={"contractInsert":{"contractNumber": "whatever", "isPreferred": False}},
         match=[
             matchers.header_matcher(
                 {
@@ -208,3 +210,28 @@ def test_terminate_contract_unexpected_json(mocker, requests_mocker, settings):
         ok, response = terminate_contract("my-cco")
         assert ok is False
         assert response == '200 - {"other": "JSON"}'
+
+
+def test_terminate_contract_non_terminated(mocker, requests_mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "NAV_API_BASE_URL": "https://api.nav",
+    }
+    resp_json = """{"contractInsert": {"contractNumber": "whatever", "isPreferred": true}}"""
+    mocker.patch("adobe_vipm.flows.nav.get_token", return_value=(True, "a-token"))
+    requests_mocker.post(
+        "https://api.nav/v1.0/contracts/terminateNow/my-cco",
+        status=200,
+        json=json.loads(resp_json),
+        match=[
+            matchers.header_matcher(
+                {
+                    "Authorization": "Bearer a-token",
+                },
+            ),
+        ],
+    )
+
+    with freeze_time("2024-01-01 12:00:00"):
+        ok, resp = terminate_contract("my-cco")
+        assert ok is False
+        assert resp == f"200 - {resp_json}"
