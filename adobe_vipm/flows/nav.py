@@ -77,8 +77,13 @@ def terminate_contract(cco):
     if resp.status_code == 200:
         try:
             data = resp.json()
-            if (data.get("contractInsert", {}) or {}).get("contractNumber"):
-                return True, ''
+            if not data.get("contractInsert"):
+                return False, f"{resp.status_code} - {resp.content.decode()}"
+            contract_insert = data["contractInsert"]
+            if contract_insert.get("contractNumber") and not contract_insert.get(
+                "isPreferred", True
+            ):
+                return True, ""
         except requests.JSONDecodeError:
             pass
 

@@ -9,7 +9,6 @@ from pyairtable.formulas import (
     NOT_EQUAL,
     OR,
     STR_VALUE,
-    to_airtable_value,
 )
 from pyairtable.orm import Model, fields
 from requests import HTTPError
@@ -19,7 +18,6 @@ STATUS_INIT = "init"
 STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
-STATUS_COMPLETED = "completed"
 
 
 @dataclass(frozen=True)
@@ -92,7 +90,6 @@ def get_transfer_model(base_info):
         updated_at = fields.DatetimeField("updated_at")
         completed_at = fields.DatetimeField("completed_at")
         synchronized_at = fields.DatetimeField("synchronized_at")
-        fixed = fields.CheckboxField("fixed")
 
         class Meta:
             table_name = "Transfers"
@@ -152,16 +149,6 @@ def get_transfers_to_check(product_id):
     Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
     return Transfer.all(
         formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
-    )
-
-
-def get_transfers_completed(product_id):
-    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
-    return Transfer.all(
-        formula=AND(
-            EQUAL(FIELD("status"), STR_VALUE(STATUS_COMPLETED)),
-            EQUAL(FIELD("fixed"), to_airtable_value(False)),
-        ),
     )
 
 
