@@ -454,6 +454,14 @@ def in_cancellation_window(order, line):
     return delta.days < CANCELLATION_WINDOW_DAYS
 
 
+def is_migrated_customer(source):
+    param = get_ordering_parameter(
+        source,
+        PARAM_AGREEMENT_TYPE,
+    )
+    return param.get("value") == "Migrate"
+
+
 def group_items_by_type(order):
     """
     Grups the items of a change order in the following groups:
@@ -472,33 +480,48 @@ def group_items_by_type(order):
     Returns:
         ItemGroups: a data class with the three item groups.
     """
-    upsizing_items_in_window = filter(
-        lambda line: line["quantity"] > line["oldQuantity"]
-        and in_cancellation_window(order, line),
-        order["lines"],
-    )
-    upsizing_items_out_window = filter(
-        lambda line: line["quantity"] > line["oldQuantity"]
-        and not in_cancellation_window(order, line),
-        order["lines"],
-    )
-    downsizing_items_in_window = filter(
-        lambda line: line["quantity"] < line["oldQuantity"]
-        and in_cancellation_window(order, line),
-        order["lines"],
-    )
-    downsizing_items_out_window = filter(
-        lambda line: line["quantity"] < line["oldQuantity"]
-        and not in_cancellation_window(order, line),
-        order["lines"],
-    )
-
-    return ItemGroups(
-        list(upsizing_items_in_window),
-        list(upsizing_items_out_window),
-        list(downsizing_items_in_window),
-        list(downsizing_items_out_window),
-    )
+    if not is_migrated_customer(order):
+        upsizing_items_in_window = filter(
+            lambda line: line["quantity"] > line["oldQuantity"]
+            and in_cancellation_window(order, line),
+            order["lines"],
+        )
+        upsizing_items_out_window = filter(
+            lambda line: line["quantity"] > line["oldQuantity"]
+            and not in_cancellation_window(order, line),
+            order["lines"],
+        )
+        downsizing_items_in_window = filter(
+            lambda line: line["quantity"] < line["oldQuantity"]
+            and in_cancellation_window(order, line),
+            order["lines"],
+        )
+        downsizing_items_out_window = filter(
+            lambda line: line["quantity"] < line["oldQuantity"]
+            and not in_cancellation_window(order, line),
+            order["lines"],
+        )
+        return ItemGroups(
+            upsizing_in_win=list(upsizing_items_in_window),
+            upsizing_out_win_or_migrated=list(upsizing_items_out_window),
+            downsizing_in_win=list(downsizing_items_in_window),
+            downsizing_out_win_or_migrated=list(downsizing_items_out_window),
+        )
+    else:
+        upsizing_migrated = filter(
+            lambda line: line["quantity"] > line["oldQuantity"],
+            order["lines"],
+        )
+        downsizing_migrated = filter(
+            lambda line: line["quantity"] < line["oldQuantity"],
+            order["lines"],
+        )
+        return ItemGroups(
+            upsizing_in_win=[],
+            upsizing_out_win_or_migrated=list(upsizing_migrated),
+            downsizing_in_win=[],
+            downsizing_out_win_or_migrated=list(downsizing_migrated),
+        )
 
 
 def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
@@ -621,7 +644,8 @@ def split_phone_number(phone_number, country):
             return
 
     country_code = f"+{pn.country_code}"
-    number = f"{pn.national_number}{pn.extension or ''}".strip()
+    leading_zero = "0" if pn.italian_leading_zero else ""
+    number = f"{leading_zero}{pn.national_number}{pn.extension or ''}".strip()
     return {
         "prefix": country_code,
         "number": number,
