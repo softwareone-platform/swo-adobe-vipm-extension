@@ -35,10 +35,11 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def _upsize_out_of_win_subscriptions(customer_id, order, lines):
+def _upsize_out_of_win_or_migrated_subscriptions(customer_id, order, lines):
     """
-    Manages subscription growth outside of the cancellation period. If necessary,
-    adjusts the renewal quantity to match the final quantity of subscriptions requested.
+    Manages subscription growth outside of the cancellation period or migrated from Adobe VIP.
+    If necessary, adjusts the renewal quantity to match the final quantity of subscriptions
+    requested.
     Generates order lines for subscriptions whose final quantity exceeds the current quantity.
 
     Args:
@@ -91,10 +92,10 @@ def _upsize_out_of_win_subscriptions(customer_id, order, lines):
     return lines_to_order
 
 
-def _downsize_out_of_win_subscriptions(mpt_client, customer_id, order, lines):
+def _downsize_out_of_win_or_migrated_subscriptions(mpt_client, customer_id, order, lines):
     """
     Reduces the renewal quantity for subscriptions that need to be downsized but were created
-    X days before the change order (outside the cancellation window).
+    X days before the change order (outside the cancellation window) or migrated from Adobe VIP.
 
     Args:
         mpt_client: An instance of the MPT client used for communication with the MPT system.
@@ -157,6 +158,7 @@ def _downsize_out_of_win_subscriptions(mpt_client, customer_id, order, lines):
     update_order_actual_price(mpt_client, order, lines, adobe_line_items)
 
 
+
 def _submit_change_order(mpt_client, customer_id, order):
     adobe_client = get_adobe_client()
     authorization_id = order["authorization"]["id"]
@@ -165,23 +167,24 @@ def _submit_change_order(mpt_client, customer_id, order):
     logger.debug(
         f"item groups: upwin={grouped_items.upsizing_in_win}, "
         f"downin={grouped_items.downsizing_in_win}, "
-        f"downout={grouped_items.downsizing_out_win}",
+        f"upout={grouped_items.upsizing_out_win_or_migrated}, ",
+        f"downout={grouped_items.downsizing_out_win_or_migrated}",
     )
     try:
         to_add_to_preview = []
-        if grouped_items.upsizing_out_win:
-            to_add_to_preview = _upsize_out_of_win_subscriptions(
+        if grouped_items.upsizing_out_win_or_migrated:
+            to_add_to_preview = _upsize_out_of_win_or_migrated_subscriptions(
                 customer_id,
                 order,
-                grouped_items.upsizing_out_win,
+                grouped_items.upsizing_out_win_or_migrated,
             )
 
-        if grouped_items.downsizing_out_win:
-            _downsize_out_of_win_subscriptions(
+        if grouped_items.downsizing_out_win_or_migrated:
+            _downsize_out_of_win_or_migrated_subscriptions(
                 mpt_client,
                 customer_id,
                 order,
-                grouped_items.downsizing_out_win,
+                grouped_items.downsizing_out_win_or_migrated,
             )
 
         items_to_preview = (

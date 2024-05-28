@@ -19,7 +19,7 @@ from adobe_vipm.flows.utils import (
 )
 
 
-def _terminate_out_of_win_subscriptions(customer_id, order, lines):
+def _terminate_out_of_win_or_migrated_subscriptions(customer_id, order, lines):
     """
     Switch off auto renewal for subscriptions that have to be cancelled but that
     have been more that X days before the termination order (outside cancellation window).
@@ -70,9 +70,9 @@ def fulfill_termination_order(mpt_client, order):
     customer_id = get_adobe_customer_id(order)
 
     grouped_items = group_items_by_type(order)
-    if grouped_items.downsizing_out_win:
-        _terminate_out_of_win_subscriptions(
-            customer_id, order, grouped_items.downsizing_out_win
+    if grouped_items.downsizing_out_win_or_migrated:
+        _terminate_out_of_win_or_migrated_subscriptions(
+            customer_id, order, grouped_items.downsizing_out_win_or_migrated
         )
 
     has_orders_to_return = bool(
