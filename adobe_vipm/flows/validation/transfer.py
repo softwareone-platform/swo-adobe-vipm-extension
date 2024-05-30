@@ -38,6 +38,7 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
         )
     }
     lines = []
+    valid_adobe_lines = []
     for adobe_line in adobe_object["items"]:
         if is_transferring_item_expired(adobe_line):
             continue
@@ -60,8 +61,9 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
                 "oldQuantity": 0,
             },
         )
+        valid_adobe_lines.append(adobe_line)
     order["lines"] = lines
-    return False, order, adobe_object
+    return False, order, {"items": valid_adobe_lines}
 
 
 def validate_transfer_not_migrated(mpt_client, adobe_client, order):

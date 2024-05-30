@@ -38,12 +38,14 @@ def test_validate_transfer(
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     product_items = items_factory()
-    items = adobe_items_factory(
+    valid_items = adobe_items_factory(
         renewal_date=date.today().isoformat()
-    ) + adobe_items_factory(
+    )
+    expired_items = adobe_items_factory(
         line_number=2,
         renewal_date=(date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)).isoformat()
     )
+    items = valid_items + expired_items
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
@@ -60,7 +62,7 @@ def test_validate_transfer(
     del lines[0]["price"]
     assert has_errors is False
     assert validated_order["lines"] == lines
-    assert adobe_obj == adobe_preview_transfer
+    assert adobe_obj == {"items": valid_items}
 
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
