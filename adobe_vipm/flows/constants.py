@@ -149,8 +149,8 @@ ERR_EXISTING_ITEMS = ValidationError(
     "VIPMV010",
     "The order cannot contain new lines for an existing item: {duplicates}."
 )
-ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found."
-ERR_ADOBE_UNEXPECTED_ERROR = "Adobe returned an unexpected error."
+ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
+ERR_ADOBE_UNEXPECTED_ERROR = "Adobe returned an unexpected error"
 
 
 MPT_ORDER_STATUS_PROCESSING = "Processing"
