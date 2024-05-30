@@ -5,10 +5,12 @@ from adobe_vipm.adobe.constants import (
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_TRANSFER_STATUSES,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
+    ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_UNEXPECTED_ERROR,
     PARAM_MEMBERSHIP_ID,
 )
 from adobe_vipm.flows.utils import get_ordering_parameter
@@ -95,6 +97,48 @@ def test_validate_transfer_membership_error(
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details=str(api_error),
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["required"] is True
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_message"),
+    [
+        (AdobeHttpError(404, "Not Found"), ERR_ADOBE_MEMBERSHIP_NOT_FOUND),
+        (
+            AdobeHttpError(500, "Internal Server Error"),
+            ERR_ADOBE_UNEXPECTED_ERROR,
+        ),
+    ],
+)
+def test_validate_transfer_http_error(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    error,
+    expected_message,
+):
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    m_client = mocker.MagicMock()
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.side_effect = error
+
+    has_errors, validated_order, _ = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+
+    assert has_errors is True
+
+    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+        title=param["name"],
+        details=expected_message,
     )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
