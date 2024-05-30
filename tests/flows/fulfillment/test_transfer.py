@@ -5,7 +5,7 @@ from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_COMMITTED,
-    STATUS_GENERIC_FAILURE,
+    STATUS_INACTIVE_OR_GENERIC_FAILURE,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
@@ -465,7 +465,7 @@ def test_transfer_invalid_membership(
         adobe_api_error_factory(
             transfer_status,
             "some error",
-        )
+        ),
     )
     mocked_adobe_client.preview_transfer.side_effect = adobe_error
     mocker.patch(
@@ -561,8 +561,6 @@ def test_transfer_membership_not_found(
     )
 
 
-
-
 @pytest.mark.parametrize("transfer_status", UNRECOVERABLE_TRANSFER_STATUSES)
 def test_transfer_unrecoverable_status(
     mocker,
@@ -587,7 +585,7 @@ def test_transfer_unrecoverable_status(
         adobe_api_error_factory(
             transfer_status,
             "some error",
-        )
+        ),
     )
     mocked_adobe_client.preview_transfer.side_effect = adobe_error
     mocker.patch(
@@ -693,25 +691,25 @@ def test_fulfill_transfer_order_already_migrated(
             retry_count="0",
         ),
         order_parameters=transfer_order_parameters_factory(
-                company_name=adobe_customer["companyProfile"]["companyName"],
-                address={
-                    "country": adobe_customer_address["country"],
-                    "state": adobe_customer_address["region"],
-                    "city": adobe_customer_address["city"],
-                    "addressLine1": adobe_customer_address["addressLine1"],
-                    "addressLine2": adobe_customer_address["addressLine2"],
-                    "postCode": adobe_customer_address["postalCode"],
-                },
-                contact={
-                    "firstName": adobe_customer_contact["firstName"],
-                    "lastName": adobe_customer_contact["lastName"],
-                    "email": adobe_customer_contact["email"],
-                    "phone": split_phone_number(
-                        adobe_customer_contact.get("phoneNumber"),
-                        adobe_customer_address["country"],
-                    ),
-                },
-            ),
+            company_name=adobe_customer["companyProfile"]["companyName"],
+            address={
+                "country": adobe_customer_address["country"],
+                "state": adobe_customer_address["region"],
+                "city": adobe_customer_address["city"],
+                "addressLine1": adobe_customer_address["addressLine1"],
+                "addressLine2": adobe_customer_address["addressLine2"],
+                "postCode": adobe_customer_address["postalCode"],
+            },
+            contact={
+                "firstName": adobe_customer_contact["firstName"],
+                "lastName": adobe_customer_contact["lastName"],
+                "email": adobe_customer_contact["email"],
+                "phone": split_phone_number(
+                    adobe_customer_contact.get("phoneNumber"),
+                    adobe_customer_address["country"],
+                ),
+            },
+        ),
         external_ids={"vendor": "transfer-id"},
     )
 
@@ -739,7 +737,9 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
     adobe_subscription = adobe_subscription_factory()
-    adobe_inactive_subscription = adobe_subscription_factory(status=STATUS_GENERIC_FAILURE)
+    adobe_inactive_subscription = adobe_subscription_factory(
+        status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
@@ -829,9 +829,6 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
 
-
-
-
 @freeze_time("2012-01-14 12:00:01")
 def test_fulfill_transfer_order_already_migrated_3yc(
     mocker,
@@ -869,25 +866,25 @@ def test_fulfill_transfer_order_already_migrated_3yc(
             retry_count="0",
         ),
         order_parameters=transfer_order_parameters_factory(
-                company_name=adobe_customer["companyProfile"]["companyName"],
-                address={
-                    "country": adobe_customer_address["country"],
-                    "state": adobe_customer_address["region"],
-                    "city": adobe_customer_address["city"],
-                    "addressLine1": adobe_customer_address["addressLine1"],
-                    "addressLine2": adobe_customer_address["addressLine2"],
-                    "postCode": adobe_customer_address["postalCode"],
-                },
-                contact={
-                    "firstName": adobe_customer_contact["firstName"],
-                    "lastName": adobe_customer_contact["lastName"],
-                    "email": adobe_customer_contact["email"],
-                    "phone": split_phone_number(
-                        adobe_customer_contact.get("phoneNumber"),
-                        adobe_customer_address["country"],
-                    ),
-                },
-            ),
+            company_name=adobe_customer["companyProfile"]["companyName"],
+            address={
+                "country": adobe_customer_address["country"],
+                "state": adobe_customer_address["region"],
+                "city": adobe_customer_address["city"],
+                "addressLine1": adobe_customer_address["addressLine1"],
+                "addressLine2": adobe_customer_address["addressLine2"],
+                "postCode": adobe_customer_address["postalCode"],
+            },
+            contact={
+                "firstName": adobe_customer_contact["firstName"],
+                "lastName": adobe_customer_contact["lastName"],
+                "email": adobe_customer_contact["email"],
+                "phone": split_phone_number(
+                    adobe_customer_contact.get("phoneNumber"),
+                    adobe_customer_address["country"],
+                ),
+            },
+        ),
         external_ids={"vendor": "transfer-id"},
     )
 
@@ -915,7 +912,9 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     )
 
     adobe_subscription = adobe_subscription_factory()
-    adobe_inactive_subscription = adobe_subscription_factory(status=STATUS_GENERIC_FAILURE)
+    adobe_inactive_subscription = adobe_subscription_factory(
+        status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
@@ -998,8 +997,6 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     )
 
     mocked_adobe_client.update_subscription.assert_not_called()
-
-
 
 
 def test_fulfill_transfer_order_migration_running(

@@ -1,11 +1,12 @@
 import copy
 import functools
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import phonenumbers
 from markdown_it import MarkdownIt
 
+from adobe_vipm.adobe.constants import STATUS_INACTIVE_OR_GENERIC_FAILURE
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
@@ -31,6 +32,7 @@ from adobe_vipm.flows.constants import (
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
     PARAM_RETRY_COUNT,
+    RENEWAL_WINDOW_DAYS,
     REQUIRED_CUSTOMER_ORDER_PARAMS,
 )
 from adobe_vipm.flows.dataclasses import ItemGroups
@@ -720,3 +722,15 @@ def update_ordering_parameter_value(order, param_external_id, value):
     param["value"] = value
 
     return updated_order
+
+
+def is_transferring_item_expired(item):
+    if "status" in item and item["status"] == STATUS_INACTIVE_OR_GENERIC_FAILURE:
+        return True
+
+    renewal_date = date.fromisoformat(item["renewalDate"])
+
+    if (date.today() - renewal_date).days > RENEWAL_WINDOW_DAYS:
+        return True
+
+    return False

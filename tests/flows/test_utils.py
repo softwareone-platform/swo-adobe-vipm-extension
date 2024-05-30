@@ -1,10 +1,15 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS
+from adobe_vipm.adobe.constants import (
+    STATUS_INACTIVE_OR_GENERIC_FAILURE,
+    STATUS_PROCESSED,
+)
+from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS, RENEWAL_WINDOW_DAYS
 from adobe_vipm.flows.utils import (
     group_items_by_type,
+    is_transferring_item_expired,
     notify_unhandled_exception_in_teams,
     reset_order_error,
     set_order_error,
@@ -319,7 +324,7 @@ def test_reset_order_error(order_factory):
                 "number": "8004449890",
             },
         ),
-    ]
+    ],
 )
 def test_split_phone_number(number, country, expected):
     assert split_phone_number(number, country) == expected
@@ -331,3 +336,48 @@ def test_split_phone_number_invalid_number():
 
 def test_split_phone_number_no_number():
     assert split_phone_number("", "US") is None
+
+
+def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_factory):
+    assert (
+        is_transferring_item_expired(
+            adobe_subscription_factory(
+                status=STATUS_PROCESSED, renewal_date=date.today().isoformat()
+            )
+        )
+        is False
+    )
+    assert (
+        is_transferring_item_expired(
+            adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+        )
+        is True
+    )
+
+    assert (
+        is_transferring_item_expired(
+            adobe_items_factory(renewal_date=date.today().isoformat())[0]
+        )
+        is False
+    )
+    assert (
+        is_transferring_item_expired(
+            adobe_items_factory(
+                renewal_date=(
+                    date.today() - timedelta(days=RENEWAL_WINDOW_DAYS)
+                ).isoformat()
+            )[0]
+        )
+        is False
+    )
+
+    assert (
+        is_transferring_item_expired(
+            adobe_items_factory(
+                renewal_date=(
+                    date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)
+                ).isoformat()
+            )[0]
+        )
+        is True
+    )
