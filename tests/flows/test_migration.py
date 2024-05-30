@@ -4,7 +4,7 @@ import pytest
 from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
-    STATUS_GENERIC_FAILURE,
+    STATUS_INACTIVE_OR_GENERIC_FAILURE,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_ALREADY_TRANSFERRED,
@@ -410,7 +410,7 @@ def test_checking_running_transfers_for_product(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer

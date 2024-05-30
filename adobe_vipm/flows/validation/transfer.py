@@ -17,6 +17,7 @@ from adobe_vipm.flows.mpt import get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_ordering_parameter,
+    is_transferring_item_expired,
     set_ordering_parameter_error,
 )
 
@@ -24,7 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
-    returned_skus = [item["offerId"][:10] for item in adobe_object["items"]]
+    returned_skus = [
+        item["offerId"][:10]
+        for item in adobe_object["items"]
+        if not is_transferring_item_expired(item)
+    ]
 
     items_map = {
         item["externalIds"]["vendor"]: item
@@ -34,6 +39,8 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
     }
     lines = []
     for adobe_line in adobe_object["items"]:
+        if is_transferring_item_expired(adobe_line):
+            continue
         item = items_map.get(adobe_line["offerId"][:10])
         if not item:
             param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)

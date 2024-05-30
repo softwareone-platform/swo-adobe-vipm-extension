@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 import pytest
 
 from adobe_vipm.adobe.constants import (
@@ -12,6 +14,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_UNEXPECTED_ERROR,
     PARAM_MEMBERSHIP_ID,
+    RENEWAL_WINDOW_DAYS,
 )
 from adobe_vipm.flows.utils import get_ordering_parameter
 from adobe_vipm.flows.validation.transfer import validate_transfer
@@ -25,6 +28,7 @@ def test_validate_transfer(
     items_factory,
     transfer_order_parameters_factory,
     adobe_preview_transfer_factory,
+    adobe_items_factory,
     lines_factory,
 ):
     mocker.patch(
@@ -34,7 +38,13 @@ def test_validate_transfer(
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     product_items = items_factory()
-    adobe_preview_transfer = adobe_preview_transfer_factory()
+    items = adobe_items_factory(
+        renewal_date=date.today().isoformat()
+    ) + adobe_items_factory(
+        line_number=2,
+        renewal_date=(date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)).isoformat()
+    )
+    adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
 

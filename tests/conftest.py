@@ -1,5 +1,5 @@
 import copy
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import jwt
 import pytest
@@ -1106,6 +1106,7 @@ def adobe_subscription_factory():
         renewal_quantity=10,
         autorenewal_enabled=True,
         status=STATUS_PROCESSED,
+        renewal_date=None,
     ):
         return {
             "subscriptionId": subscription_id or "a-sub-id",
@@ -1116,7 +1117,7 @@ def adobe_subscription_factory():
                 "renewalQuantity": renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
-            "renewalDate": "2020-05-20",
+            "renewalDate": renewal_date or (date.today() + timedelta(days=366)).isoformat(),
             "status": status,
         }
 
@@ -1126,7 +1127,7 @@ def adobe_subscription_factory():
 @pytest.fixture()
 def adobe_preview_transfer_factory(adobe_items_factory):
     def _preview(items=None):
-        items = items or adobe_items_factory()
+        items = items or adobe_items_factory(renewal_date=date.today().isoformat())
         return {
             "totalCount": len(items),
             "items": items,
