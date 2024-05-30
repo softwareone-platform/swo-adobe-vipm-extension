@@ -19,13 +19,14 @@ from adobe_vipm.adobe.constants import (
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
 )
-from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
+    ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ITEM_TYPE_ORDER_LINE,
     ITEM_TYPE_SUBSCRIPTION,
     PARAM_MEMBERSHIP_ID,
@@ -54,15 +55,26 @@ logger = logging.getLogger(__name__)
 
 
 def _handle_transfer_preview_error(client, order, error):
-    if error.code in (
-        STATUS_TRANSFER_INVALID_MEMBERSHIP,
-        STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+    if (
+        isinstance(error, AdobeAPIError)
+        and error.code
+        in (
+            STATUS_TRANSFER_INVALID_MEMBERSHIP,
+            STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+        )
+        or isinstance(error, AdobeHttpError)
+        and error.status_code == 404
     ):
+        error_msg = (
+            str(error)
+            if isinstance(error, AdobeAPIError)
+            else ERR_ADOBE_MEMBERSHIP_NOT_FOUND
+        )
         param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(error)),
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=error_msg),
         )
         switch_order_to_query(client, order)
         return
@@ -307,7 +319,9 @@ def fulfill_transfer_order(mpt_client, order):
 
     # subscription are cotermed so it's ok to take the last created
     commitment_date = subscription["commitmentDate"]
-    next_sync = (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
+    next_sync = (
+        (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
+    )
 
     order = save_next_sync_date(mpt_client, order, next_sync)
 

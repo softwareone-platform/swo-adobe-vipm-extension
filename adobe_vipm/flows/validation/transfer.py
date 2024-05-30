@@ -1,7 +1,7 @@
 import logging
 
 from adobe_vipm.adobe.config import get_config
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
     get_transfer_by_authorization_membership_or_customer,
@@ -9,6 +9,8 @@ from adobe_vipm.flows.airtable import (
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
+    ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_UNEXPECTED_ERROR,
     PARAM_MEMBERSHIP_ID,
 )
 from adobe_vipm.flows.mpt import get_product_items_by_skus
@@ -71,6 +73,19 @@ def validate_transfer_not_migrated(mpt_client, adobe_client, order):
             order,
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
+        )
+        return True, order, None
+    except AdobeHttpError as he:
+        err_msg = (
+            ERR_ADOBE_MEMBERSHIP_NOT_FOUND
+            if he.status_code == 404
+            else ERR_ADOBE_UNEXPECTED_ERROR
+        )
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=err_msg),
         )
         return True, order, None
 

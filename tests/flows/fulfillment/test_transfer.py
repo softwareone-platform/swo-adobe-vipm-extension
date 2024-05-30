@@ -12,9 +12,10 @@ from adobe_vipm.adobe.constants import (
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_TRANSFER_STATUSES,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
+    ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ITEM_TYPE_SUBSCRIPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -500,6 +501,66 @@ def test_transfer_invalid_membership(
         parameters=order["parameters"],
         template={"id": "TPL-964-112"},
     )
+
+
+def test_transfer_membership_not_found(
+    mocker,
+    agreement,
+    order_factory,
+    transfer_order_parameters_factory,
+):
+    """
+    Tests a transfer order when the membership id is not found.
+    """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-964-112"},
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    mocked_adobe_client = mocker.MagicMock()
+    adobe_error = AdobeHttpError(404, "Not found")
+    mocked_adobe_client.preview_transfer.side_effect = adobe_error
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_query_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.query_order")
+
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+
+    fulfill_order(mocked_mpt_client, order)
+
+    authorization_id = order["authorization"]["id"]
+
+    mocked_adobe_client.preview_transfer.assert_called_once_with(
+        authorization_id,
+        "a-membership-id",
+    )
+    param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    order = set_ordering_parameter_error(
+        order,
+        PARAM_MEMBERSHIP_ID,
+        ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+            title=param["name"],
+            details=ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+        ),
+    )
+    mocked_query_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters=order["parameters"],
+        template={"id": "TPL-964-112"},
+    )
+
+
 
 
 @pytest.mark.parametrize("transfer_status", UNRECOVERABLE_TRANSFER_STATUSES)
