@@ -410,6 +410,13 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
             customer_id,
             item["subscriptionId"],
         )
+        if adobe_subscription["status"] != STATUS_PROCESSED:
+            logger.warning(
+                f"Subscription {adobe_subscription['subscriptionId']} "
+                f"for customer {customer_id} is in status "
+                f"{adobe_subscription['status']}, skip it"
+            )
+            return
     else:
         adobe_subscription = item
 
