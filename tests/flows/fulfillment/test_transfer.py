@@ -16,7 +16,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
-    ITEM_TYPE_SUBSCRIPTION,
+    ITEM_TYPE_ORDER_LINE,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     PARAM_MEMBERSHIP_ID,
@@ -66,19 +66,27 @@ def test_transfer(
     adobe_transfer = adobe_transfer_factory(
         status=STATUS_PROCESSED,
         customer_id="a-client-id",
-        items=adobe_items_factory(subscription_id="a-sub-id"),
+        items=adobe_items_factory(subscription_id="a-sub-id")
+        + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id"),
     )
 
     adobe_transfer_preview = adobe_preview_transfer_factory()
     adobe_customer = adobe_customer_factory()
     adobe_subscription = adobe_subscription_factory()
+    adobe_inactive_subscription = adobe_subscription_factory(
+        subscription_id="inactive-sub-id",
+        status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mocked_adobe_client.create_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_subscription.side_effect = [
+        adobe_subscription,
+        adobe_inactive_subscription,
+    ]
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -247,10 +255,16 @@ def test_transfer(
     mocked_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+
+    assert mocked_adobe_client.get_subscription.mock_calls[0].args == (
         authorization_id,
         "a-client-id",
         adobe_subscription["subscriptionId"],
+    )
+    assert mocked_adobe_client.get_subscription.mock_calls[1].args == (
+        authorization_id,
+        "a-client-id",
+        adobe_inactive_subscription["subscriptionId"],
     )
     assert mocked_get_template.mock_calls[0].args == (
         mocked_mpt_client,
@@ -660,7 +674,8 @@ def test_fulfill_transfer_order_already_migrated(
     order_factory,
     transfer_order_parameters_factory,
     fulfillment_parameters_factory,
-    adobe_subscription_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
     adobe_authorizations_file,
     adobe_customer_factory,
     agreement,
@@ -676,6 +691,7 @@ def test_fulfill_transfer_order_already_migrated(
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_transfer = mocker.MagicMock()
+    mocked_transfer.membership_id = "membership-id"
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
     mocked_transfer.customer_benefits_3yc_status = None
@@ -736,15 +752,12 @@ def test_fulfill_transfer_order_already_migrated(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
 
-    adobe_subscription = adobe_subscription_factory()
-    adobe_inactive_subscription = adobe_subscription_factory(
-        status=STATUS_INACTIVE_OR_GENERIC_FAILURE
-    )
+    transfer_items = adobe_items_factory(subscription_id="sub-id")
+
+    adobe_transfer = adobe_transfer_factory(items=transfer_items)
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription, adobe_inactive_subscription],
-    }
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
 
     mocker.patch(
@@ -760,10 +773,6 @@ def test_fulfill_transfer_order_already_migrated(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_id_param["value"],
-    )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
-        adobe_authorizations_file["authorizations"][0]["authorization_id"],
-        mocked_transfer.customer_id,
     )
 
     mocked_process_order.assert_called_once_with(
@@ -798,8 +807,8 @@ def test_fulfill_transfer_order_already_migrated(
         mocked_adobe_client,
         mocked_transfer.customer_id,
         updated_order,
-        ITEM_TYPE_SUBSCRIPTION,
-        adobe_subscription,
+        ITEM_TYPE_ORDER_LINE,
+        transfer_items[0],
     )
 
     assert mocked_transfer.status == "synchronized"
@@ -824,7 +833,7 @@ def test_fulfill_transfer_order_already_migrated(
     mocked_adobe_client.update_subscription.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
-        adobe_subscription["subscriptionId"],
+        transfer_items[0]["subscriptionId"],
         auto_renewal=True,
     )
 
@@ -835,7 +844,8 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     order_factory,
     transfer_order_parameters_factory,
     fulfillment_parameters_factory,
-    adobe_subscription_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
     adobe_authorizations_file,
     adobe_customer_factory,
     agreement,
@@ -911,15 +921,12 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
 
-    adobe_subscription = adobe_subscription_factory()
-    adobe_inactive_subscription = adobe_subscription_factory(
-        status=STATUS_INACTIVE_OR_GENERIC_FAILURE
-    )
+    transfer_items = adobe_items_factory(subscription_id="sub-id")
+
+    adobe_transfer = adobe_transfer_factory(items=transfer_items)
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription, adobe_inactive_subscription],
-    }
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
 
     mocker.patch(
@@ -935,10 +942,6 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_id_param["value"],
-    )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
-        adobe_authorizations_file["authorizations"][0]["authorization_id"],
-        mocked_transfer.customer_id,
     )
 
     mocked_process_order.assert_called_once_with(
@@ -973,8 +976,8 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         mocked_adobe_client,
         mocked_transfer.customer_id,
         updated_order,
-        ITEM_TYPE_SUBSCRIPTION,
-        adobe_subscription,
+        ITEM_TYPE_ORDER_LINE,
+        transfer_items[0],
     )
 
     assert mocked_transfer.status == "synchronized"

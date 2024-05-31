@@ -28,7 +28,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ITEM_TYPE_ORDER_LINE,
-    ITEM_TYPE_SUBSCRIPTION,
     PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
@@ -219,32 +218,25 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
         customer,
     )
 
-    subscriptions = adobe_client.get_subscriptions(
+    adobe_transfer = adobe_client.get_transfer(
         authorization_id,
-        transfer.customer_id,
+        transfer.membership_id,
+        transfer.transfer_id,
     )
-    for subscription in subscriptions["items"]:
-        if subscription["status"] != STATUS_PROCESSED:
-            logger.warning(
-                f"Migrated subscription {subscription['subscriptionId']} "
-                f"for customer {transfer.customer_id} is in status "
-                f"{subscription['status']}, skip it"
-            )
-            continue
-
+    for line in adobe_transfer["lineItems"]:
         add_subscription(
             mpt_client,
             adobe_client,
             transfer.customer_id,
             order,
-            ITEM_TYPE_SUBSCRIPTION,
-            subscription,
+            ITEM_TYPE_ORDER_LINE,
+            line,
         )
         if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
             adobe_client.update_subscription(
                 authorization_id,
                 transfer.customer_id,
-                subscription["subscriptionId"],
+                line["subscriptionId"],
                 auto_renewal=True,
             )
 
@@ -311,14 +303,15 @@ def fulfill_transfer_order(mpt_client, order):
         adobe_order_id,
         customer,
     )
-
+    commitment_date = None
     for item in adobe_transfer_order["lineItems"]:
         subscription = add_subscription(
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
         )
+        if subscription and not commitment_date:
+            # subscription are cotermed so it's ok to take the first created
+            commitment_date = subscription["commitmentDate"]
 
-    # subscription are cotermed so it's ok to take the last created
-    commitment_date = subscription["commitmentDate"]
     next_sync = (
         (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
     )
