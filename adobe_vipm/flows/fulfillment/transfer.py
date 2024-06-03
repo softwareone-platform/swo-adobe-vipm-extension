@@ -22,6 +22,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
+    STATUS_SYNCHRONIZED,
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
@@ -202,10 +203,15 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
             order,
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                title=param["name"], details="Migration in progress, retry later."
+                title=param["name"], details="Migration in progress, retry later"
             ),
         )
+
         switch_order_to_query(mpt_client, order)
+        return
+
+    if transfer.status == STATUS_SYNCHRONIZED:
+        switch_order_to_failed(mpt_client, order, "Membership has already been migrated.")
         return
 
     adobe_client = get_adobe_client()
