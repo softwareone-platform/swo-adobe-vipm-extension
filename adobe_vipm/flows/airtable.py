@@ -18,6 +18,7 @@ STATUS_INIT = "init"
 STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
+STATUS_SYNCHRONIZED = "synchronized"
 
 
 @dataclass(frozen=True)

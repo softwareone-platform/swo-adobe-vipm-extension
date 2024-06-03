@@ -1053,7 +1053,7 @@ def test_fulfill_transfer_order_migration_running(
         PARAM_MEMBERSHIP_ID,
         ERR_ADOBE_MEMBERSHIP_ID.to_dict(
             title=param["name"],
-            details="Migration in progress, retry later.",
+            details="Migration in progress, retry later",
         ),
     )
     mocked_query_order.assert_called_once_with(
@@ -1061,6 +1061,58 @@ def test_fulfill_transfer_order_migration_running(
         order["id"],
         parameters=order["parameters"],
         template={"id": "TPL-964-112"},
+    )
+
+
+def test_fulfill_transfer_order_migration_synchronized(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    adobe_authorizations_file,
+    agreement,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-964-112"},
+    )
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.status = "synchronized"
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "transfer-id"
+
+    m_client = mocker.MagicMock()
+
+    mocked_get_transfer = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+    )
+
+    fulfill_order(m_client, order)
+
+    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+
+    mocked_get_transfer.assert_called_once_with(
+        order["agreement"]["product"]["id"],
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
+        membership_param["value"],
+    )
+
+    mocked_fail_order.assert_called_once_with(
+        m_client,
+        mocker.ANY,
+        "Membership has already been migrated.",
     )
 
 

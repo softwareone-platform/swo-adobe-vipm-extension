@@ -4,6 +4,7 @@ from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
+    STATUS_SYNCHRONIZED,
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
@@ -123,7 +124,18 @@ def validate_transfer(mpt_client, adobe_client, order):
             order,
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                title=param["name"], details="Migration in progress, retry later."
+                title=param["name"], details="Migration in progress, retry later"
+            ),
+        )
+        return True, order, None
+
+    if transfer.status == STATUS_SYNCHRONIZED:
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+                title=param["name"], details="Membership has already been migrated"
             ),
         )
         return True, order, None

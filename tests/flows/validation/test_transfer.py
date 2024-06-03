@@ -280,7 +280,43 @@ def test_validate_transfer_migration_running(
     param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
-        details="Migration in progress, retry later.",
+        details="Migration in progress, retry later",
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["required"] is True
+
+
+def test_validate_transfer_migration_synchronized(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+):
+    m_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock()
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.status = "synchronized"
+
+    m_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+
+    has_errors, validated_order, _ = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+
+    assert has_errors is True
+
+    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+        title=param["name"],
+        details="Membership has already been migrated",
     )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
