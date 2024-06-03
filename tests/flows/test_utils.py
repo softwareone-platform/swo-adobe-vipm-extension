@@ -121,7 +121,7 @@ def test_group_items_by_type(
     assert groups.downsizing_out_win_or_migrated == downsizing_items_out_of_window
 
 
-def test_group_items_by_type_migraterd(
+def test_group_items_by_type_migrated(
     order_factory,
     transfer_order_parameters_factory,
     lines_factory,
@@ -156,12 +156,20 @@ def test_group_items_by_type_migraterd(
         quantity=8,
         external_vendor_id="sku-downsize-out",
     )
+    new_items = lines_factory(
+        line_id=5,
+        item_id=5,
+        old_quantity=0,
+        quantity=8,
+        external_vendor_id="sku-new",
+    )
 
     order_items = (
         upsizing_items
         + downsizing_items
         + upsizing_out_of_window
         + downsizing_items_out_of_window
+        + new_items
     )
 
     order_subscriptions = (
@@ -218,7 +226,7 @@ def test_group_items_by_type_migraterd(
 
     groups = group_items_by_type(order)
 
-    assert groups.upsizing_in_win == []
+    assert groups.upsizing_in_win == new_items
     assert groups.downsizing_in_win == []
 
     assert (

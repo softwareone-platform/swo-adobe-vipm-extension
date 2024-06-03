@@ -511,15 +511,19 @@ def group_items_by_type(order):
         )
     else:
         upsizing_migrated = filter(
-            lambda line: line["quantity"] > line["oldQuantity"],
+            lambda line: line["quantity"] > line["oldQuantity"] and line["oldQuantity"] > 0,
             order["lines"],
         )
         downsizing_migrated = filter(
             lambda line: line["quantity"] < line["oldQuantity"],
             order["lines"],
         )
+        new_purchases = filter(
+            lambda line: line["quantity"] > line["oldQuantity"] and line["oldQuantity"] == 0,
+            order["lines"],
+        )
         return ItemGroups(
-            upsizing_in_win=[],
+            upsizing_in_win=list(new_purchases),
             upsizing_out_win_or_migrated=list(upsizing_migrated),
             downsizing_in_win=[],
             downsizing_out_win_or_migrated=list(downsizing_migrated),
