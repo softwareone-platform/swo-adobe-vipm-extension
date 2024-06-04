@@ -36,7 +36,10 @@ def test_validate_transfer(
         return_value=None,
     )
     m_client = mocker.MagicMock()
-    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
+        lines=[],
+    )
     product_items = items_factory()
     valid_items = adobe_items_factory(
         renewal_date=date.today().isoformat()
@@ -62,6 +65,55 @@ def test_validate_transfer(
     del lines[0]["price"]
     assert has_errors is False
     assert validated_order["lines"] == lines
+    assert adobe_obj == {"items": valid_items}
+
+    mocked_get_product_items_by_skus.assert_called_once_with(
+        m_client,
+        order["agreement"]["product"]["id"],
+        [adobe_preview_transfer["items"][0]["offerId"][:10]],
+    )
+
+
+def test_validate_transfer_lines_exist(
+    mocker,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+    lines_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    m_client = mocker.MagicMock()
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
+    )
+    product_items = items_factory()
+    valid_items = adobe_items_factory(
+        renewal_date=date.today().isoformat()
+    )
+    expired_items = adobe_items_factory(
+        line_number=2,
+        renewal_date=(date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)).isoformat()
+    )
+    items = valid_items + expired_items
+    adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+
+    mocked_get_product_items_by_skus = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
+
+    has_errors, validated_order, adobe_obj = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+    assert has_errors is False
+    assert validated_order["lines"] == lines_factory()
     assert adobe_obj == {"items": valid_items}
 
     mocked_get_product_items_by_skus.assert_called_once_with(

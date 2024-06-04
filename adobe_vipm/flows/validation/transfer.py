@@ -17,6 +17,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.mpt import get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
+    get_order_line_by_sku,
     get_ordering_parameter,
     is_transferring_item_expired,
     set_ordering_parameter_error,
@@ -38,7 +39,6 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
             mpt_client, order["agreement"]["product"]["id"], returned_skus
         )
     }
-    lines = []
     valid_adobe_lines = []
     for adobe_line in adobe_object["items"]:
         if is_transferring_item_expired(adobe_line):
@@ -55,15 +55,26 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
                 ),
             )
             return True, order, adobe_object
-        lines.append(
-            {
-                "item": item,
-                "quantity": adobe_line[quantity_field],
-                "oldQuantity": 0,
-            },
-        )
+        current_line = get_order_line_by_sku(order, adobe_line["offerId"][:10])
+        if current_line:
+            current_line["quantity"] = adobe_line[quantity_field]
+        else:
+            order["lines"].append(
+                {
+                    "item": item,
+                    "quantity": adobe_line[quantity_field],
+                    "oldQuantity": 0,
+                },
+            )
+
         valid_adobe_lines.append(adobe_line)
+
+    lines = [
+        line for line in order["lines"]
+        if line["item"]["externalIds"]["vendor"] in returned_skus
+    ]
     order["lines"] = lines
+
     return False, order, {"items": valid_adobe_lines}
 
 
