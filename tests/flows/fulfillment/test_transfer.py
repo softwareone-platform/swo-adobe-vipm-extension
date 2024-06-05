@@ -37,7 +37,6 @@ def test_transfer(
     mocker,
     agreement,
     order_factory,
-    lines_factory,
     transfer_order_parameters_factory,
     fulfillment_parameters_factory,
     adobe_preview_transfer_factory,
@@ -294,6 +293,7 @@ def test_transfer(
     )
     mocked_get_onetime.assert_called_once_with(
         mocked_mpt_client,
+        order["agreement"]["product"]["id"],
         [line["item"]["id"] for line in order["lines"]]
     )
 

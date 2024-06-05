@@ -604,6 +604,7 @@ def send_email_notification(mpt_client, order):
 def get_one_time_skus(mpt_client, order):
     one_time_items = get_product_onetime_items_by_ids(
         mpt_client,
+        order["agreement"]["product"]["id"],
         [line["item"]["id"] for line in order["lines"]]
     )
     return [item["externalIds"]["vendor"] for item in one_time_items]

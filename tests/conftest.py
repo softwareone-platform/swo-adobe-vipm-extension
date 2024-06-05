@@ -946,6 +946,7 @@ def order_factory(
 
         order = {
             "id": order_id,
+            "error": None,
             "href": "/commerce/orders/ORD-0792-5000-2253-4210",
             "agreement": agreement,
             "authorization": {

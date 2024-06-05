@@ -257,12 +257,12 @@ def test_notify_unhandled_exception_in_teams(mocker):
 def test_reset_order_error(order_factory):
     order = order_factory()
     order = reset_order_error(order)
-    assert "error" not in order
+    assert order["error"] is None
 
     order = set_order_error(order, {"id": "ERR-1234", "message": "error_message"})
 
     order = reset_order_error(order)
-    assert "error" not in order
+    assert order["error"] is None
 
 
 @pytest.mark.parametrize(

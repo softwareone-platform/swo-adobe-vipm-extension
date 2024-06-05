@@ -2,6 +2,8 @@ import logging
 
 import pytest
 
+from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.flows.constants import ERR_ADOBE_ERROR
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.utils import reset_ordering_parameters_error, strip_trace_id
 from adobe_vipm.flows.validation.base import validate_order
@@ -204,7 +206,6 @@ def test_validate_order_exception(mocker, mpt_error_factory, order_factory):
     assert strip_trace_id(str(error)) in tb
 
 
-
 def test_validate_change_order(mocker, caplog, order_factory, customer_data):
     """Tests the validate order entrypoint function when it validates."""
     order = order_factory(order_type="Change")
@@ -229,4 +230,38 @@ def test_validate_change_order(mocker, caplog, order_factory, customer_data):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    m_validate_duplicates.assert_called_once_with(reset_ordering_parameters_error(order))
+    m_validate_duplicates.assert_called_once_with(
+        reset_ordering_parameters_error(order)
+    )
+
+
+def test_validate_purchase_order_preview_fails(
+    mocker, caplog, order_factory, customer_data, adobe_api_error_factory
+):
+    """Tests the validate order entrypoint function when it validates."""
+    order = order_factory()
+    m_client = mocker.MagicMock()
+    error = AdobeAPIError(400, adobe_api_error_factory("1134", "Cannot mix stuffs"))
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.prepare_customer_data",
+        return_value=(order, customer_data),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.validate_customer_data",
+        return_value=(False, order),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.update_purchase_prices",
+        side_effect=error,
+    )
+    m_adobe_cli = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.validation.base.get_adobe_client", return_value=m_adobe_cli
+    )
+
+    validated = validate_order(m_client, order)
+
+    assert validated["error"] == ERR_ADOBE_ERROR.to_dict(details=str(error))

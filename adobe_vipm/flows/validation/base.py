@@ -2,6 +2,8 @@ import logging
 import traceback
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.flows.constants import ERR_ADOBE_ERROR
 from adobe_vipm.flows.helpers import (
     populate_order_info,
     prepare_customer_data,
@@ -17,6 +19,7 @@ from adobe_vipm.flows.utils import (
     notify_unhandled_exception_in_teams,
     reset_order_error,
     reset_ordering_parameters_error,
+    set_order_error,
     strip_trace_id,
     update_parameters_visibility,
 )
@@ -45,7 +48,12 @@ def validate_order(mpt_client, order):
                 if not has_errors and order["lines"]:
                     has_errors, order = validate_duplicate_lines(order)
                 if not has_errors and order["lines"]:
-                    order = update_purchase_prices(mpt_client, adobe_client, order)
+                    try:
+                        order = update_purchase_prices(mpt_client, adobe_client, order)
+                    except AdobeAPIError as e:
+                        order = set_order_error(order, ERR_ADOBE_ERROR.to_dict(details=str(e)))
+                        has_errors = True
+
         elif is_change_order(order) and order["lines"]:
             has_errors, order = validate_duplicate_or_existing_lines(order)
         elif (

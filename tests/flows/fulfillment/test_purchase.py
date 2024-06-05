@@ -1691,5 +1691,6 @@ def test_one_time_items(
 
     mocked_get_onetime.assert_called_once_with(
         mocked_mpt_client,
+        order["agreement"]["product"]["id"],
         [line["item"]["id"] for line in order_lines],
     )
