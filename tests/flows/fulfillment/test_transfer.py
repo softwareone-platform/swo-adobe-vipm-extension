@@ -37,6 +37,7 @@ def test_transfer(
     mocker,
     agreement,
     order_factory,
+    lines_factory,
     transfer_order_parameters_factory,
     fulfillment_parameters_factory,
     adobe_preview_transfer_factory,
@@ -67,15 +68,20 @@ def test_transfer(
         status=STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
-        + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id"),
+        + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
+        + adobe_items_factory(
+            line_number=3, offer_id="99999999CA01A12", subscription_id="one-time-sub-id"
+        ),
     )
 
     adobe_transfer_preview = adobe_preview_transfer_factory()
     adobe_customer = adobe_customer_factory()
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id",
-        status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+    )
+    adobe_one_time_subscription = adobe_subscription_factory(
+        subscription_id="one-time-sub-id",
     )
 
     mocked_adobe_client = mocker.MagicMock()
@@ -86,10 +92,15 @@ def test_transfer(
     mocked_adobe_client.get_subscription.side_effect = [
         adobe_subscription,
         adobe_inactive_subscription,
+        adobe_one_time_subscription,
     ]
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
+    )
+
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
     )
 
     mocked_mpt_client = mocker.MagicMock()
@@ -106,7 +117,11 @@ def test_transfer(
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory(),
+        return_value=items_factory() + items_factory(item_id=2, external_vendor_id="99999999CA"),
+    )
+    mocked_get_onetime = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA")
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
@@ -120,8 +135,6 @@ def test_transfer(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
-
-    order = order_factory(order_parameters=transfer_order_parameters_factory())
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -278,6 +291,10 @@ def test_transfer(
         order["agreement"]["product"]["id"],
         MPT_ORDER_STATUS_COMPLETED,
         TEMPLATE_NAME_TRANSFER,
+    )
+    mocked_get_onetime.assert_called_once_with(
+        mocked_mpt_client,
+        [line["item"]["id"] for line in order["lines"]]
     )
 
 
@@ -672,6 +689,7 @@ def test_create_transfer_fail(
 def test_fulfill_transfer_order_already_migrated(
     mocker,
     order_factory,
+    items_factory,
     transfer_order_parameters_factory,
     fulfillment_parameters_factory,
     adobe_transfer_factory,
@@ -736,6 +754,11 @@ def test_fulfill_transfer_order_already_migrated(
         return_value=mocked_transfer,
     )
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
+    )
+
     mocked_add_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
     )
@@ -752,7 +775,11 @@ def test_fulfill_transfer_order_already_migrated(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
 
-    transfer_items = adobe_items_factory(subscription_id="sub-id")
+    transfer_items = adobe_items_factory(subscription_id="sub-id") + adobe_items_factory(
+        line_number=2,
+        offer_id="99999999CA01A12",
+        subscription_id="onetime-sub-id",
+    )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
 
@@ -903,6 +930,11 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
+    )
+
+    mocked_add_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=[],
     )
 
     mocked_add_subscription = mocker.patch(
@@ -1180,6 +1212,10 @@ def test_transfer_3yc_customer(
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
         return_value=items_factory(),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=[],
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",

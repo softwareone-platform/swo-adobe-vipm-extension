@@ -36,6 +36,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_processing_template,
+    get_one_time_skus,
     handle_retries,
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
@@ -48,6 +49,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_adobe_order_id,
     get_ordering_parameter,
+    get_partial_sku,
     set_ordering_parameter_error,
 )
 
@@ -109,7 +111,7 @@ def _check_transfer(mpt_client, order, membership_id):
 
     adobe_lines = sorted(
         [
-            (item["offerId"][:10], item["quantity"])
+            (get_partial_sku(item["offerId"]), item["quantity"])
             for item in transfer_preview["items"]
         ],
         key=lambda i: i[0],
@@ -229,7 +231,13 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
         transfer.membership_id,
         transfer.transfer_id,
     )
+
+    one_time_skus = get_one_time_skus(mpt_client, order)
+
     for line in adobe_transfer["lineItems"]:
+        if get_partial_sku(line["offerId"]) in one_time_skus:
+            continue
+
         add_subscription(
             mpt_client,
             adobe_client,
@@ -310,7 +318,13 @@ def fulfill_transfer_order(mpt_client, order):
         customer,
     )
     commitment_date = None
+
+    one_time_skus = get_one_time_skus(mpt_client, order)
+
     for item in adobe_transfer_order["lineItems"]:
+        if get_partial_sku(item["offerId"]) in one_time_skus:
+            continue
+
         subscription = add_subscription(
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
         )

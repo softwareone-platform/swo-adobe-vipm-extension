@@ -95,6 +95,10 @@ def test_upsizing(
         return_value=items_factory(),
     )
     mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=[],
+    )
+    mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
         return_value=pricelist_items_factory(),
     )
@@ -399,6 +403,10 @@ def test_downsizing(
         return_value=items_factory(),
     )
     mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=[],
+    )
+    mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
         return_value=pricelist_items_factory(),
     )
@@ -569,6 +577,10 @@ def test_downsizing_return_order_exists(
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
         return_value=items_factory(),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=[],
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
@@ -1095,6 +1107,10 @@ def test_mixed(
         "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
         return_value=items_factory(),
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=[],
+    )
     price_items = pricelist_items_factory(1, "sku-downsized", 1234.55)
     price_items.extend(pricelist_items_factory(2, "sku-upsized", 4321.55))
     price_items.extend(pricelist_items_factory(3, "sku-new", 9876.54))
@@ -1440,6 +1456,10 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         return_value=items_factory(),
     )
     mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=[],
+    )
+    mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
         return_value=pricelist_items_factory(),
     )
@@ -1528,3 +1548,101 @@ def test_existing_items(mocker, order_factory, lines_factory):
         order,
         "The order cannot contain new lines for an existing item: ITM-1234-1234-1234-0010.",
     )
+
+
+
+def test_one_time_items(
+    mocker,
+    agreement,
+    order_factory,
+    lines_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    items_factory,
+    pricelist_items_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
+    adobe_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        status=STATUS_PROCESSED,
+        items=adobe_items_factory(subscription_id="a-sub-id"),
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
+    mocked_adobe_client.create_new_order.return_value = adobe_order
+    mocked_adobe_client.get_order.return_value = adobe_order
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    subscriptions = subscriptions_factory(lines=lines_factory(quantity=10))
+    processing_change_order = order_factory(
+        order_type="Change",
+        lines=lines_factory(
+            old_quantity=10,
+            quantity=20,
+        ),
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+        ),
+        subscriptions=subscriptions,
+        order_parameters=[],
+    )
+
+    updated_change_order = order_factory(
+        order_type="Change",
+        lines=lines_factory(
+            old_quantity=10,
+            quantity=20,
+        ),
+        subscriptions=subscriptions,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+        ),
+        order_parameters=[],
+        external_ids={"vendor": adobe_order["orderId"]},
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=updated_change_order,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
+        return_value=items_factory(),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        return_value=items_factory(),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
+        return_value=pricelist_items_factory(),
+    )
+    mocked_update_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_subscription",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
+    )
+    fulfill_order(mocked_mpt_client, processing_change_order)
+
+
+    mocked_update_subscription.assert_not_called()

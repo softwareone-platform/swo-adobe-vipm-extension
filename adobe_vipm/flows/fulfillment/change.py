@@ -15,6 +15,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
     check_processing_template,
+    get_one_time_skus,
     handle_return_orders,
     save_adobe_order_id,
     set_subscription_actual_sku,
@@ -28,6 +29,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_order_id,
     get_adobe_subscription_id,
     get_order_line,
+    get_partial_sku,
     get_subscription_by_line_and_item_id,
     group_items_by_type,
 )
@@ -288,31 +290,36 @@ def fulfill_change_order(mpt_client, order):
 
     if not adobe_order:
         return
+
+
+    one_time_skus = get_one_time_skus(mpt_client, order)
     updated_lines = []
+
     for item in adobe_order["lineItems"]:
         order_line = get_order_line(
             order,
             item["extLineItemNumber"],
         )
         updated_lines.append(order_line)
-        order_subscription = get_subscription_by_line_and_item_id(
-            order["subscriptions"],
-            order_line["item"]["id"],
-            order_line["id"],
-        )
-        if not order_subscription:
-            add_subscription(
-                mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+        if get_partial_sku(item["offerId"]) not in one_time_skus:
+            order_subscription = get_subscription_by_line_and_item_id(
+                order["subscriptions"],
+                order_line["item"]["id"],
+                order_line["id"],
             )
-        else:
-            adobe_sku = item["offerId"]
+            if not order_subscription:
+                add_subscription(
+                    mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+                )
+            else:
+                adobe_sku = item["offerId"]
 
-            set_subscription_actual_sku(
-                mpt_client,
-                order,
-                order_subscription,
-                adobe_sku,
-            )
+                set_subscription_actual_sku(
+                    mpt_client,
+                    order,
+                    order_subscription,
+                    adobe_sku,
+                )
 
     update_order_actual_price(
         mpt_client, order, updated_lines, adobe_order["lineItems"]

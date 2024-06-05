@@ -33,6 +33,7 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
+    get_product_onetime_items_by_ids,
     get_product_template_or_default,
     get_rendered_template,
     get_subscription_by_external_id,
@@ -598,3 +599,11 @@ def send_email_notification(mpt_client, order):
             "email",
             context,
         )
+
+
+def get_one_time_skus(mpt_client, order):
+    one_time_items = get_product_onetime_items_by_ids(
+        mpt_client,
+        [line["item"]["id"] for line in order["lines"]]
+    )
+    return [item["externalIds"]["vendor"] for item in one_time_items]
