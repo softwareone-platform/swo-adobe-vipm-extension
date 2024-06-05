@@ -332,10 +332,10 @@ def fulfill_transfer_order(mpt_client, order):
             # subscription are cotermed so it's ok to take the first created
             commitment_date = subscription["commitmentDate"]
 
-    next_sync = (
-        (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
-    )
-
-    order = save_next_sync_date(mpt_client, order, next_sync)
+    if commitment_date:  # pragma: no branch
+        next_sync = (
+            (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
+        )
+        order = save_next_sync_date(mpt_client, order, next_sync)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)

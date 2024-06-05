@@ -251,7 +251,7 @@ def fulfill_purchase_order(mpt_client, order):
     if not adobe_order:
         return
     one_time_skus = get_one_time_skus(mpt_client, order)
-
+    subscription = None
     for item in adobe_order["lineItems"]:
         if get_partial_sku(item["offerId"]) in one_time_skus:
             continue
@@ -260,11 +260,11 @@ def fulfill_purchase_order(mpt_client, order):
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
         )
 
+    if subscription:  # pragma: no branch
     # subscription are cotermed so it's ok to take the last created
-    commitment_date = subscription["commitmentDate"]
-    next_sync = (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
-
-    order = save_next_sync_date(mpt_client, order, next_sync)
+        commitment_date = subscription["commitmentDate"]
+        next_sync = (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
+        order = save_next_sync_date(mpt_client, order, next_sync)
 
     update_order_actual_price(
         mpt_client, order, order["lines"], adobe_order["lineItems"]

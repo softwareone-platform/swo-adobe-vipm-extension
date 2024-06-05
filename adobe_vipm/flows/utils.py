@@ -629,10 +629,8 @@ def set_order_error(order, error):
 
 
 def reset_order_error(order):
-    if "error" not in order:
-        return order
     updated_order = copy.deepcopy(order)
-    del updated_order["error"]
+    updated_order["error"] = None
     return updated_order
 
 
