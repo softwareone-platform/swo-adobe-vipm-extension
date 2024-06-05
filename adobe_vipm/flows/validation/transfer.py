@@ -19,6 +19,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_order_line_by_sku,
     get_ordering_parameter,
+    get_partial_sku,
     is_transferring_item_expired,
     set_ordering_parameter_error,
 )
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
     returned_skus = [
-        item["offerId"][:10]
+        get_partial_sku(item["offerId"])
         for item in adobe_object["items"]
         if not is_transferring_item_expired(item)
     ]
@@ -43,7 +44,7 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
     for adobe_line in adobe_object["items"]:
         if is_transferring_item_expired(adobe_line):
             continue
-        item = items_map.get(adobe_line["offerId"][:10])
+        item = items_map.get(get_partial_sku(adobe_line["offerId"]))
         if not item:
             param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
             order = set_ordering_parameter_error(
@@ -51,11 +52,11 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
                 PARAM_MEMBERSHIP_ID,
                 ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
                     title=param["name"],
-                    item_sku=adobe_line["offerId"][:10],
+                    item_sku=get_partial_sku(adobe_line["offerId"]),
                 ),
             )
             return True, order, adobe_object
-        current_line = get_order_line_by_sku(order, adobe_line["offerId"][:10])
+        current_line = get_order_line_by_sku(order, get_partial_sku(adobe_line["offerId"]))
         if current_line:
             current_line["quantity"] = adobe_line[quantity_field]
         else:

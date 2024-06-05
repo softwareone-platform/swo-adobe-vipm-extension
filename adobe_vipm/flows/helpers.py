@@ -21,6 +21,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_customer_data,
     get_order_line_by_sku,
+    get_partial_sku,
     set_customer_data,
 )
 
@@ -115,7 +116,7 @@ def _update_purchase_prices(mpt_client, order, line_items):
     }
     updated_lines = []
     for preview_item in line_items:
-        order_line = get_order_line_by_sku(order, preview_item["offerId"][:10])
+        order_line = get_order_line_by_sku(order, get_partial_sku(preview_item["offerId"]))
         order_line.setdefault("price", {})
         order_line["price"]["unitPP"] = sku_pricelist_item_map[preview_item["offerId"]][
             "unitPP"

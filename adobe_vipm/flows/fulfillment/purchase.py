@@ -35,6 +35,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
     check_processing_template,
+    get_one_time_skus,
     save_adobe_customer_data,
     save_adobe_order_id,
     save_next_sync_date,
@@ -48,6 +49,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
     get_ordering_parameter,
+    get_partial_sku,
     set_order_error,
     set_ordering_parameter_error,
 )
@@ -248,8 +250,12 @@ def fulfill_purchase_order(mpt_client, order):
     )
     if not adobe_order:
         return
+    one_time_skus = get_one_time_skus(mpt_client, order)
 
     for item in adobe_order["lineItems"]:
+        if get_partial_sku(item["offerId"]) in one_time_skus:
+            continue
+
         subscription = add_subscription(
             mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
         )

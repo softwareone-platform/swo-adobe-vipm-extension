@@ -738,3 +738,6 @@ def is_transferring_item_expired(item):
         return True
 
     return False
+
+def get_partial_sku(full_sku):
+    return full_sku[:10]

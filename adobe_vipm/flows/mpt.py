@@ -373,3 +373,23 @@ def get_rendered_template(mpt_client, order_id):
     )
     response.raise_for_status()
     return response.json()
+
+
+@wrap_http_error
+def get_product_onetime_items_by_ids(mpt_client, product_id, item_ids):
+    items = []
+    rql_query = (
+        f"and(eq(product.id,{product_id}),in(id,({','.join(item_ids)})),eq(terms.period,OneTime))"
+    )
+    url = f"/items?{rql_query}"
+    page = None
+    limit = 10
+    offset = 0
+    while _has_more_pages(page):
+        response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
+        response.raise_for_status()
+        page = response.json()
+        items.extend(page["data"])
+        offset += limit
+
+    return items
