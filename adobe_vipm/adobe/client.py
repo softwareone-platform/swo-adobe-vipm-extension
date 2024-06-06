@@ -10,6 +10,8 @@ import requests
 
 from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.constants import (
+    OFFER_TYPE_CONSUMABLES,
+    OFFER_TYPE_LICENSE,
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_PREVIEW_RENEWAL,
@@ -172,14 +174,14 @@ class AdobeClient:
             if customer_data["3YCLicenses"]:
                 quantities.append(
                     {
-                        "offerType": "LICENSE",
+                        "offerType": OFFER_TYPE_LICENSE,
                         "quantity": int(customer_data["3YCLicenses"]),
                     },
                 )
             if customer_data["3YCConsumables"]:
                 quantities.append(
                     {
-                        "offerType": "CONSUMABLES",
+                        "offerType": OFFER_TYPE_CONSUMABLES,
                         "quantity": int(customer_data["3YCConsumables"]),
                     },
                 )

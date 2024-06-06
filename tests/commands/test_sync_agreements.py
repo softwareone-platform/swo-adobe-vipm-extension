@@ -7,7 +7,9 @@ def test_process_sync_agreements(mocker):
         "adobe_vipm.management.commands.sync_agreements.setup_client",
         return_value=mocked_client,
     )
-    mocked = mocker.patch("adobe_vipm.management.commands.sync_agreements.sync_prices")
+    mocked = mocker.patch(
+        "adobe_vipm.management.commands.sync_agreements.sync_agreements_by_next_sync"
+    )
 
     call_command("sync_agreements")
 
