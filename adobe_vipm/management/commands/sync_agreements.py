@@ -1,11 +1,30 @@
 from django.core.management.base import BaseCommand
 from swo.mpt.extensions.core.utils import setup_client
 
-from adobe_vipm.flows.sync import sync_agreements_by_next_sync
+from adobe_vipm.flows.sync import (
+    sync_agreements_by_agreement_ids,
+    sync_agreements_by_next_sync,
+)
 
 
 class Command(BaseCommand):
     help = "Synchronize agreements on anniversary."
+
+    def add_arguments(self, parser):
+        group = parser.add_argument_group("Agreements")
+        group.add_argument(
+            "--agreements",
+            nargs="*",
+            metavar="AGREEMENT",
+            default=[],
+            help="list of specific agreements to synchronize separated by space",
+        )
+        group.add_argument(
+            "--allow-3yc",
+            action="store_true",
+            default="False",
+            help="Allow synchronization for customers that commited for 3y",
+        )
 
     def success(self, message):
         self.stdout.write(self.style.SUCCESS(message), ending="\n")
@@ -16,5 +35,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.info("Start processing agreements...")
         client = setup_client()
-        sync_agreements_by_next_sync(client)
+        if options["agreements"]:
+            sync_agreements_by_agreement_ids(client, options["agreements"], options["allow_3yc"])
+        else:
+            sync_agreements_by_next_sync(client)
         self.success("Processing agreements completed.")
