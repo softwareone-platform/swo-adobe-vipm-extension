@@ -6,6 +6,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.sync import (
     sync_agreements_by_agreement_ids,
     sync_agreements_by_next_sync,
+    sync_all_agreements,
 )
 from adobe_vipm.flows.utils import get_adobe_customer_id
 
@@ -264,6 +265,7 @@ def test_sync_agreements_by_next_sync_skip_3yc(
     mocked_update_agreement_subscription.assert_not_called()
     mocked_update_agreement.assert_not_called()
 
+
 @pytest.mark.parametrize("allow_3yc", [True, False])
 def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, allow_3yc):
     agreement = agreement_factory()
@@ -290,6 +292,47 @@ def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, allow_3yc):
     )
 
     sync_agreements_by_agreement_ids(mocked_mpt_client, [agreement["id"]], allow_3yc)
+    mocked_sync_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        mocked_adobe_client,
+        mocked_adobe_config,
+        agreement,
+        allow_3yc=allow_3yc,
+    )
+
+    mocked_update_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        agreement["id"],
+        lines=agreement["lines"],
+    )
+
+
+@pytest.mark.parametrize("allow_3yc", [True, False])
+def test_sync_all_agreements(mocker, agreement_factory, allow_3yc):
+    agreement = agreement_factory()
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_adobe_config = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_config",
+        return_value=mocked_adobe_config,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_all_agreements",
+        return_value=[agreement],
+    )
+    mocked_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.sync_agreement_prices",
+    )
+    mocked_update_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.update_agreement",
+    )
+
+    sync_all_agreements(mocked_mpt_client, allow_3yc)
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         mocked_adobe_client,

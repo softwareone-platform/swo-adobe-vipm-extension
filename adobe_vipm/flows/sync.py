@@ -10,6 +10,7 @@ from adobe_vipm.flows.mpt import (
     get_agreement_subscription,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
+    get_all_agreements,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     update_agreement,
@@ -125,13 +126,13 @@ def sync_agreement_prices(
         logger.exception(f"Cannot sync agreement {agreement_id}")
 
 
-def sync_agreements_by_next_sync(mpt_client):
+def sync_agreements_by_next_sync(mpt_client, allow_3yc=False):
     adobe_client = get_adobe_client()
     adobe_config = get_config()
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
         coterm_date = sync_agreement_prices(
-            mpt_client, adobe_client, adobe_config, agreement
+            mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
         )
         if coterm_date:
             next_sync = (
@@ -153,6 +154,22 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, allow_3yc):
     adobe_client = get_adobe_client()
     adobe_config = get_config()
     agreements = get_agreements_by_ids(mpt_client, ids)
+    for agreement in agreements:
+        sync_agreement_prices(
+            mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
+        )
+
+        update_agreement(
+            mpt_client,
+            agreement["id"],
+            lines=agreement["lines"],
+        )
+
+
+def sync_all_agreements(mpt_client, allow_3yc):
+    adobe_client = get_adobe_client()
+    adobe_config = get_config()
+    agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
             mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
