@@ -33,6 +33,7 @@ from adobe_vipm.flows.mpt import (
     get_agreements_by_query,
     get_agreements_for_3yc_recommitment,
     get_agreements_for_3yc_resubmit,
+    get_all_agreements,
     get_pricelist_items_by_product_items,
     get_product_items_by_skus,
     get_product_onetime_items_by_ids,
@@ -990,4 +991,18 @@ def test_get_agreements_by_ids(mocker):
     mocked_client = mocker.MagicMock()
 
     assert get_agreements_by_ids(mocked_client, ["AGR-0001"]) == [{"id": "AGR-0001"}]
+    mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
+
+
+def test_get_all_agreements(mocker):
+    rql_query = "eq(status,Active))"
+
+    mocked_get_by_query = mocker.patch(
+        "adobe_vipm.flows.mpt.get_agreements_by_query",
+        return_value=[{"id": "AGR-0001"}],
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    assert get_all_agreements(mocked_client) == [{"id": "AGR-0001"}]
     mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)

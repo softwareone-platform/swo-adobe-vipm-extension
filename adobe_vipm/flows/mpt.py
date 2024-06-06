@@ -397,3 +397,7 @@ def get_product_onetime_items_by_ids(mpt_client, product_id, item_ids):
 def get_agreements_by_ids(mpt_client, ids):
     rql_query = f"and(in(id,({','.join(ids)})),eq(status,Active))"
     return get_agreements_by_query(mpt_client, rql_query)
+
+
+def get_all_agreements(mpt_client,):
+    return get_agreements_by_query(mpt_client, "eq(status,Active))")
