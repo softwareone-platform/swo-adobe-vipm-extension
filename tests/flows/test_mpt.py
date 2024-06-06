@@ -28,6 +28,7 @@ from adobe_vipm.flows.mpt import (
     fail_order,
     get_agreement_subscription,
     get_agreements_by_3yc_commitment_request_status,
+    get_agreements_by_ids,
     get_agreements_by_next_sync,
     get_agreements_by_query,
     get_agreements_for_3yc_recommitment,
@@ -976,3 +977,17 @@ def test_get_product_onetime_items_by_ids_error(
         get_product_onetime_items_by_ids(mpt_client, product_id, ids)
 
     assert cv.value.payload["status"] == 500
+
+
+def test_get_agreements_by_ids(mocker):
+    rql_query = "and(in(id,(AGR-0001)),eq(status,Active))"
+
+    mocked_get_by_query = mocker.patch(
+        "adobe_vipm.flows.mpt.get_agreements_by_query",
+        return_value=[{"id": "AGR-0001"}],
+    )
+
+    mocked_client = mocker.MagicMock()
+
+    assert get_agreements_by_ids(mocked_client, ["AGR-0001"]) == [{"id": "AGR-0001"}]
+    mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
