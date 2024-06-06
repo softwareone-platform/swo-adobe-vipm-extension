@@ -8,6 +8,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS, RENEWAL_WINDOW_DAYS
 from adobe_vipm.flows.utils import (
+    get_transfer_item_sku_by_subscription,
     group_items_by_type,
     is_transferring_item_expired,
     notify_unhandled_exception_in_teams,
@@ -389,3 +390,12 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
         )
         is True
     )
+
+
+def test_get_transfer_item_sku_by_subscription(
+    adobe_transfer_factory,
+    adobe_items_factory,
+):
+    items = adobe_items_factory(subscription_id="my-awesome-sub")
+    transfer = adobe_transfer_factory(items=items)
+    assert get_transfer_item_sku_by_subscription(transfer, "my-awesome-sub") == items[0]["offerId"]

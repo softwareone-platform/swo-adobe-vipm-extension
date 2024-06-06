@@ -266,7 +266,10 @@ def test_validate_transfer_already_migrated(
         "adobe_vipm.flows.validation.transfer.add_lines_to_order",
         return_value=(False, order),
     )
-
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
+        return_value="65304578CA03A12",
+    )
     adobe_subscription = adobe_subscription_factory()
 
     mocked_adobe_client = mocker.MagicMock()
@@ -300,6 +303,7 @@ def test_validate_transfer_already_migrated(
         },
         "currentQuantity",
     )
+    assert adobe_subscription["offerId"] == "65304578CA03A12"
 
 
 def test_validate_transfer_migration_running(

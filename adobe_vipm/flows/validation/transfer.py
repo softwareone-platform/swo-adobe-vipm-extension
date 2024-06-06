@@ -20,6 +20,7 @@ from adobe_vipm.flows.utils import (
     get_order_line_by_sku,
     get_ordering_parameter,
     get_partial_sku,
+    get_transfer_item_sku_by_subscription,
     is_transferring_item_expired,
     set_ordering_parameter_error,
 )
@@ -56,7 +57,9 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
                 ),
             )
             return True, order, adobe_object
-        current_line = get_order_line_by_sku(order, get_partial_sku(adobe_line["offerId"]))
+        current_line = get_order_line_by_sku(
+            order, get_partial_sku(adobe_line["offerId"])
+        )
         if current_line:
             current_line["quantity"] = adobe_line[quantity_field]
         else:
@@ -71,7 +74,8 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
         valid_adobe_lines.append(adobe_line)
 
     lines = [
-        line for line in order["lines"]
+        line
+        for line in order["lines"]
         if line["item"]["externalIds"]["vendor"] in returned_skus
     ]
     order["lines"] = lines
@@ -156,5 +160,15 @@ def validate_transfer(mpt_client, adobe_client, order):
         authorization_id,
         transfer.customer_id,
     )
+    adobe_transfer = adobe_client.get_transfer(
+        authorization_id,
+        transfer.membership_id,
+        transfer.transfer_id,
+    )
+    for subscription in subscriptions["items"]:
+        correct_sku = get_transfer_item_sku_by_subscription(
+            adobe_transfer, subscription["subscriptionId"]
+        )
+        subscription["offerId"] = correct_sku or subscription["offerId"]
 
     return add_lines_to_order(mpt_client, order, subscriptions, "currentQuantity")
