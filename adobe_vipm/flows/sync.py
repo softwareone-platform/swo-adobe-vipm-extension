@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.constants import PARAM_ADOBE_SKU
@@ -20,8 +21,7 @@ from adobe_vipm.flows.utils import (
 
 logger = logging.getLogger(__name__)
 
-
-def sync_agreement_prices(mpt_client, adobe_client, agreement, include_3yc=False):
+def sync_agreement_prices(mpt_client, adobe_client, adobe_config, agreement, include_3yc=False):
     agreement_id = agreement["id"]
     authorization_id = agreement["authorization"]["id"]
     customer_id = get_adobe_customer_id(agreement)
@@ -99,6 +99,17 @@ def sync_agreement_prices(mpt_client, adobe_client, agreement, include_3yc=False
                 parameters=parameters,
             )
 
+        for line in agreement["lines"]:
+            actual_sku = adobe_config.get_adobe_product(line["item"]["externalIds"]["vendor"]).sku
+            actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
+            prod_item = get_product_items_by_skus(mpt_client, product_id, [actual_sku])[
+                0
+            ]
+            price_item = get_pricelist_items_by_product_items(
+                mpt_client, pricelist_id, [prod_item["id"]]
+            )[0]
+            line["price"]["unitPP"] = price_item["unitPP"]
+
         logger.info(f"agreement updated {agreement['id']}")
         return coterm_date
 
@@ -108,9 +119,10 @@ def sync_agreement_prices(mpt_client, adobe_client, agreement, include_3yc=False
 
 def sync_agreements_by_next_sync(mpt_client):
     adobe_client = get_adobe_client()
+    adobe_config = get_config()
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
-        coterm_date = sync_agreement_prices(mpt_client, adobe_client, agreement)
+        coterm_date = sync_agreement_prices(mpt_client, adobe_client, adobe_config, agreement)
         if coterm_date:
             next_sync = (
                 (datetime.fromisoformat(coterm_date) + timedelta(days=1))
