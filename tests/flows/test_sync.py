@@ -1,20 +1,29 @@
 import logging
 
+import pytest
+
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.sync import sync_agreements_by_next_sync
 from adobe_vipm.flows.utils import get_adobe_customer_id
 
+pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 def test_sync_agreements_by_next_sync(
     mocker,
     agreement_factory,
     subscriptions_factory,
+    lines_factory,
     adobe_subscription_factory,
     items_factory,
     pricelist_items_factory,
     adobe_customer_factory,
 ):
-    agreement = agreement_factory()
+    agreement = agreement_factory(
+        lines=lines_factory(
+            external_vendor_id="77777777CA",
+            unit_purchase_price=10.11,
+        )
+    )
     mpt_subscription = subscriptions_factory()[0]
     adobe_subscription = adobe_subscription_factory()
 
@@ -46,11 +55,18 @@ def test_sync_agreements_by_next_sync(
 
     mocker.patch(
         "adobe_vipm.flows.sync.get_product_items_by_skus",
-        return_value=items_factory(),
+        side_effect=[items_factory(), items_factory(item_id=2, external_vendor_id="77777777CA")],
     )
     mocker.patch(
         "adobe_vipm.flows.sync.get_pricelist_items_by_product_items",
-        return_value=pricelist_items_factory(),
+        side_effect=[
+            pricelist_items_factory(),
+            pricelist_items_factory(
+                item_id=2,
+                external_vendor_id="77777777CA",
+                unit_purchase_price=20.22,
+            ),
+        ]
     )
 
     mocked_update_agreement_subscription = mocker.patch(
@@ -87,6 +103,7 @@ def test_sync_agreements_by_next_sync(
         agreement["id"],
         parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
     )
+    assert agreement["lines"][0]["price"]["unitPP"] == 20.22
 
 
 def test_sync_agreements_by_next_sync_exception(

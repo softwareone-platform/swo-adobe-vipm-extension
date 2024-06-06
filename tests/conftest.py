@@ -77,6 +77,12 @@ def adobe_config_file():
                 "sku": "65304578CA01A12",
                 "type": "TEAM",
             },
+            {
+                "vendor_external_id": "77777777CA",
+                "name": "Test onetime item",
+                "sku": "77777777CA01A12",
+                "type": "TEAM",
+            },
         ],
         "countries": [
             {
@@ -688,6 +694,7 @@ def lines_factory(agreement):
         old_quantity=0,
         quantity=170,
         external_vendor_id="65304578CA",
+        unit_purchase_price=1234.55,
     ):
         line = {
             "item": {
@@ -700,7 +707,7 @@ def lines_factory(agreement):
             "oldQuantity": old_quantity,
             "quantity": quantity,
             "price": {
-                "unitPP": 1234.55,
+                "unitPP": unit_purchase_price,
             },
         }
         if line_id:
@@ -761,6 +768,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
         subscriptions=None,
         fulfillment_parameters=None,
         ordering_parameters=None,
+        lines=None,
     ):
         if not subscriptions:
             subscriptions = [
@@ -826,6 +834,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                 "id": "PRD-1111-1111",
             },
             "authorization": {"id": "AUT-1234-5678"},
+            "lines": lines or [],
             "subscriptions": subscriptions,
             "parameters": {
                 "ordering": ordering_parameters or order_parameters_factory(),
