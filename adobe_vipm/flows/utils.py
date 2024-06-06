@@ -6,7 +6,10 @@ from datetime import UTC, date, datetime
 import phonenumbers
 from markdown_it import MarkdownIt
 
-from adobe_vipm.adobe.constants import STATUS_INACTIVE_OR_GENERIC_FAILURE
+from adobe_vipm.adobe.constants import (
+    OFFER_TYPE_LICENSE,
+    STATUS_INACTIVE_OR_GENERIC_FAILURE,
+)
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
     CANCELLATION_WINDOW_DAYS,
@@ -511,7 +514,8 @@ def group_items_by_type(order):
         )
     else:
         upsizing_migrated = filter(
-            lambda line: line["quantity"] > line["oldQuantity"] and line["oldQuantity"] > 0,
+            lambda line: line["quantity"] > line["oldQuantity"]
+            and line["oldQuantity"] > 0,
             order["lines"],
         )
         downsizing_migrated = filter(
@@ -519,7 +523,8 @@ def group_items_by_type(order):
             order["lines"],
         )
         new_purchases = filter(
-            lambda line: line["quantity"] > line["oldQuantity"] and line["oldQuantity"] == 0,
+            lambda line: line["quantity"] > line["oldQuantity"]
+            and line["oldQuantity"] == 0,
             order["lines"],
         )
         return ItemGroups(
@@ -737,6 +742,7 @@ def is_transferring_item_expired(item):
 
     return False
 
+
 def get_partial_sku(full_sku):
     return full_sku[:10]
 
@@ -747,3 +753,10 @@ def get_transfer_item_sku_by_subscription(trf, sub_id):
         trf["lineItems"],
     )
     return item.get("offerId")
+
+
+def get_customer_licenses_discount_level(customer):
+    licenses_discount = find_first(
+        lambda x: x["offerType"] == OFFER_TYPE_LICENSE, customer["discounts"]
+    )
+    return licenses_discount["level"]

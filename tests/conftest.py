@@ -8,7 +8,11 @@ from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
-from adobe_vipm.adobe.constants import STATUS_PENDING, STATUS_PROCESSED
+from adobe_vipm.adobe.constants import (
+    OFFER_TYPE_LICENSE,
+    STATUS_PENDING,
+    STATUS_PROCESSED,
+)
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
@@ -192,8 +196,8 @@ def adobe_config_file():
                     "Wyoming": "WY",
                     "Armed Forces Americas": "AA",
                     "Armed Forces Europe, Canada, Africa and Middle East": "AE",
-                    "Armed Forces Pacific": "AP"
-                }
+                    "Armed Forces Pacific": "AP",
+                },
             },
             {
                 "code": "VU",
@@ -758,7 +762,6 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
         fulfillment_parameters=None,
         ordering_parameters=None,
     ):
-
         if not subscriptions:
             subscriptions = [
                 {
@@ -766,14 +769,14 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                     "status": "Active",
                     "item": {
                         "id": "ITM-0000-0001-0001",
-                    }
+                    },
                 },
                 {
                     "id": "SUB-1234-5678",
                     "status": "Terminated",
                     "item": {
                         "id": "ITM-0000-0001-0002",
-                    }
+                    },
                 },
             ]
 
@@ -826,7 +829,8 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             "subscriptions": subscriptions,
             "parameters": {
                 "ordering": ordering_parameters or order_parameters_factory(),
-                "fulfillment": fulfillment_parameters or fulfillment_parameters_factory(),
+                "fulfillment": fulfillment_parameters
+                or fulfillment_parameters_factory(),
             },
         }
 
@@ -863,7 +867,7 @@ def agreement(buyer):
                         },
                         "quantity": 10,
                     }
-                ]
+                ],
             },
             {
                 "id": "SUB-1234-5678",
@@ -880,7 +884,7 @@ def agreement(buyer):
                         },
                         "quantity": 4,
                     }
-                ]
+                ],
             },
         ],
         "listing": {
@@ -1118,7 +1122,8 @@ def adobe_subscription_factory():
                 "renewalQuantity": renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
-            "renewalDate": renewal_date or (date.today() + timedelta(days=366)).isoformat(),
+            "renewalDate": renewal_date
+            or (date.today() + timedelta(days=366)).isoformat(),
             "status": status,
         }
 
@@ -1308,6 +1313,8 @@ def adobe_customer_factory():
         commitment=None,
         commitment_request=None,
         recommitment_request=None,
+        licenses_discount_level="01",
+        coterm_date="2024-01-23",
     ):
         customer = {
             "customerId": customer_id,
@@ -1332,6 +1339,13 @@ def adobe_customer_factory():
                     },
                 ],
             },
+            "discounts": [
+                {
+                    "offerType": OFFER_TYPE_LICENSE,
+                    "level": licenses_discount_level,
+                }
+            ],
+            "cotermDate": coterm_date,
         }
         if commitment or commitment_request or recommitment_request:
             customer["benefits"] = [

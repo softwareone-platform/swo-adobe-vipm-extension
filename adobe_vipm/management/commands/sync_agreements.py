@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from swo.mpt.extensions.core.utils import setup_client
 
-from adobe_vipm.flows.sync import sync_prices
+from adobe_vipm.flows.sync import sync_agreements_by_next_sync
 
 
 class Command(BaseCommand):
@@ -16,5 +16,5 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.info("Start processing agreements...")
         client = setup_client()
-        sync_prices(client)
+        sync_agreements_by_next_sync(client)
         self.success("Processing agreements completed.")
