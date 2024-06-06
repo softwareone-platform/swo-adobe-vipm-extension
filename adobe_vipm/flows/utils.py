@@ -739,3 +739,11 @@ def is_transferring_item_expired(item):
 
 def get_partial_sku(full_sku):
     return full_sku[:10]
+
+
+def get_transfer_item_sku_by_subscription(trf, sub_id):
+    item = find_first(
+        lambda x: x["subscriptionId"] == sub_id,
+        trf["lineItems"],
+    )
+    return item.get("offerId")
