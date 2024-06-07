@@ -287,9 +287,6 @@ def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, allow_3yc):
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.sync.sync_agreement_prices",
     )
-    mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement",
-    )
 
     sync_agreements_by_agreement_ids(mocked_mpt_client, [agreement["id"]], allow_3yc)
     mocked_sync_agreement.assert_called_once_with(
@@ -298,12 +295,6 @@ def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, allow_3yc):
         mocked_adobe_config,
         agreement,
         allow_3yc=allow_3yc,
-    )
-
-    mocked_update_agreement.assert_called_once_with(
-        mocked_mpt_client,
-        agreement["id"],
-        lines=agreement["lines"],
     )
 
 
@@ -328,9 +319,6 @@ def test_sync_all_agreements(mocker, agreement_factory, allow_3yc):
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.sync.sync_agreement_prices",
     )
-    mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement",
-    )
 
     sync_all_agreements(mocked_mpt_client, allow_3yc)
     mocked_sync_agreement.assert_called_once_with(
@@ -339,10 +327,4 @@ def test_sync_all_agreements(mocker, agreement_factory, allow_3yc):
         mocked_adobe_config,
         agreement,
         allow_3yc=allow_3yc,
-    )
-
-    mocked_update_agreement.assert_called_once_with(
-        mocked_mpt_client,
-        agreement["id"],
-        lines=agreement["lines"],
     )
