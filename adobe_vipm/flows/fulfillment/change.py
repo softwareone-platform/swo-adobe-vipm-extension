@@ -10,7 +10,7 @@ from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.flows.constants import ITEM_TYPE_ORDER_LINE, TEMPLATE_NAME_CHANGE
+from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
@@ -309,7 +309,7 @@ def fulfill_change_order(mpt_client, order):
             )
             if not order_subscription:
                 add_subscription(
-                    mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+                    mpt_client, adobe_client, customer_id, order, item
                 )
             else:
                 adobe_sku = item["offerId"]

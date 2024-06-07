@@ -16,7 +16,6 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
-    ITEM_TYPE_ORDER_LINE,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     PARAM_MEMBERSHIP_ID,
@@ -692,6 +691,7 @@ def test_fulfill_transfer_order_already_migrated(
     items_factory,
     transfer_order_parameters_factory,
     fulfillment_parameters_factory,
+    subscriptions_factory,
     adobe_transfer_factory,
     adobe_items_factory,
     adobe_authorizations_file,
@@ -761,6 +761,7 @@ def test_fulfill_transfer_order_already_migrated(
 
     mocked_add_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
+        return_value=subscriptions_factory(commitment_date="2024-04-18")[0],
     )
 
     mocked_process_order = mocker.patch(
@@ -827,14 +828,20 @@ def test_fulfill_transfer_order_already_migrated(
         order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
-        "parameters": updated_order["parameters"],
+        "parameters": {
+            "ordering": updated_order["parameters"]["ordering"],
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-04-19",
+            ),
+        }
     }
     mocked_add_subscription.assert_called_once_with(
         m_client,
         mocked_adobe_client,
         mocked_transfer.customer_id,
         updated_order,
-        ITEM_TYPE_ORDER_LINE,
         transfer_items[0],
     )
 
@@ -871,6 +878,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     order_factory,
     transfer_order_parameters_factory,
     fulfillment_parameters_factory,
+    subscriptions_factory,
     adobe_transfer_factory,
     adobe_items_factory,
     adobe_authorizations_file,
@@ -932,13 +940,14 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         return_value=mocked_transfer,
     )
 
-    mocked_add_subscription = mocker.patch(
+    mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=[],
     )
 
     mocked_add_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
+        return_value=subscriptions_factory(commitment_date="2024-08-04")[0],
     )
 
     mocked_process_order = mocker.patch(
@@ -1001,14 +1010,20 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
-        "parameters": updated_order["parameters"],
+        "parameters": {
+            "ordering": updated_order["parameters"]["ordering"],
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-08-05",
+            )
+        }
     }
     mocked_add_subscription.assert_called_once_with(
         m_client,
         mocked_adobe_client,
         mocked_transfer.customer_id,
         updated_order,
-        ITEM_TYPE_ORDER_LINE,
         transfer_items[0],
     )
 
