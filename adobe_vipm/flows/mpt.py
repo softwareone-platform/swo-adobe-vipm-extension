@@ -227,7 +227,8 @@ def get_agreements_by_next_sync(mpt_client):
     status_condition = "eq(status,Active)"
 
     rql_query = (
-        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
+        f"and({status_condition},{param_condition})"
+        "&select=lines,parameters,subscriptions,product,listing"
     )
     return get_agreements_by_query(mpt_client, rql_query)
 
@@ -257,7 +258,9 @@ def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=
         if not is_recommitment
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
-    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_ext_id = (
+        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    )
     request_type_param_phase = (
         PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
     )
@@ -279,7 +282,8 @@ def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=
     status_condition = "eq(status,Active)"
 
     rql_query = (
-        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+        f"and({status_condition},{enroll_status_condition},"
+        f"{request_3yc_condition})&select=parameters"
     )
     return get_agreements_by_query(mpt_client, rql_query)
 
@@ -292,7 +296,9 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
 
-    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_ext_id = (
+        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    )
     request_type_param_phase = (
         PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
     )
@@ -316,7 +322,8 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
     status_condition = "eq(status,Active)"
 
     rql_query = (
-        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+        f"and({status_condition},{enroll_status_condition},"
+        f"{request_3yc_condition})&select=parameters"
     )
     return get_agreements_by_query(mpt_client, rql_query)
 
@@ -394,10 +401,19 @@ def get_product_onetime_items_by_ids(mpt_client, product_id, item_ids):
 
     return items
 
+
 def get_agreements_by_ids(mpt_client, ids):
-    rql_query = f"and(in(id,({','.join(ids)})),eq(status,Active))"
+    rql_query = (
+        f"and(in(id,({','.join(ids)})),eq(status,Active))"
+        "&select=lines,parameters,subscriptions,product,listing"
+    )
     return get_agreements_by_query(mpt_client, rql_query)
 
 
-def get_all_agreements(mpt_client,):
-    return get_agreements_by_query(mpt_client, "eq(status,Active))")
+def get_all_agreements(
+    mpt_client,
+):
+    return get_agreements_by_query(
+        mpt_client,
+        "eq(status,Active))&select=lines,parameters,subscriptions,product,listing",
+    )

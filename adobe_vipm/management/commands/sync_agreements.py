@@ -32,6 +32,12 @@ class Command(BaseCommand):
             default=False,
             help="Allow synchronization for customers that commited for 3y",
         )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            default=False,
+            help="Test synchronization without making changes",
+        )
 
     def success(self, message):
         self.stdout.write(self.style.SUCCESS(message), ending="\n")
@@ -43,9 +49,13 @@ class Command(BaseCommand):
         self.info("Start processing agreements...")
         client = setup_client()
         if options["agreements"]:
-            sync_agreements_by_agreement_ids(client, options["agreements"], options["allow_3yc"])
+            sync_agreements_by_agreement_ids(
+                client, options["agreements"], options["allow_3yc"], options["dry_run"]
+            )
         elif options["all"]:
-            sync_all_agreements(client, options["allow_3yc"])
+            sync_all_agreements(client, options["allow_3yc"], options["dry_run"])
         else:
-            sync_agreements_by_next_sync(client, options["allow_3yc"])
+            sync_agreements_by_next_sync(
+                client, options["allow_3yc"], options["dry_run"]
+            )
         self.success("Processing agreements completed.")

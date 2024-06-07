@@ -1,4 +1,5 @@
 import logging
+import sys
 from datetime import datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -25,38 +26,39 @@ logger = logging.getLogger(__name__)
 
 
 def sync_agreement_prices(
-    mpt_client, adobe_client, adobe_config, agreement, allow_3yc=False
+    mpt_client, agreement, allow_3yc, dry_run,
 ):
-    agreement_id = agreement["id"]
-    authorization_id = agreement["authorization"]["id"]
-    customer_id = get_adobe_customer_id(agreement)
-    pricelist_id = agreement["listing"]["priceList"]["id"]
-    product_id = agreement["product"]["id"]
-    subscriptions = agreement["subscriptions"]
-
-    logger.info(f"Processing renewal for agreement {agreement_id}...")
-
-    processing_subscriptions = list(
-        filter(lambda sub: sub["status"] in ("Updating", "Terminating"), subscriptions),
-    )
-
-    if len(processing_subscriptions) > 0:
-        logger.info(f"Agreement {agreement_id} has processing subscriptions, skip it")
-        return
-
-    customer = adobe_client.get_customer(authorization_id, customer_id)
-    commitment = get_3yc_commitment(customer)
-    if commitment and commitment["status"] == STATUS_3YC_COMMITTED and not allow_3yc:
-        logger.info(
-            f"Customer of agreement {agreement_id} has commited for 3y, skip it"
-        )
-        return
-
-    discount_level = get_customer_licenses_discount_level(customer)
-
-    coterm_date = customer["cotermDate"]
-
     try:
+        adobe_client = get_adobe_client()
+        adobe_config = get_config()
+        agreement_id = agreement["id"]
+        authorization_id = agreement["authorization"]["id"]
+        customer_id = get_adobe_customer_id(agreement)
+        pricelist_id = agreement["listing"]["priceList"]["id"]
+        product_id = agreement["product"]["id"]
+        subscriptions = agreement["subscriptions"]
+
+        logger.info(f"Synchronizing agreement {agreement_id}...")
+
+        processing_subscriptions = list(
+            filter(lambda sub: sub["status"] in ("Updating", "Terminating"), subscriptions),
+        )
+
+        if len(processing_subscriptions) > 0:
+            logger.info(f"Agreement {agreement_id} has processing subscriptions, skip it")
+            return
+
+        customer = adobe_client.get_customer(authorization_id, customer_id)
+        commitment = get_3yc_commitment(customer)
+        if commitment and commitment["status"] == STATUS_3YC_COMMITTED and not allow_3yc:
+            logger.info(
+                f"Customer of agreement {agreement_id} has commited for 3y, skip it"
+            )
+            return
+
+        discount_level = get_customer_licenses_discount_level(customer)
+        coterm_date = customer["cotermDate"]
+
         for subscription in subscriptions:
             if subscription["status"] == "Terminated":
                 continue
@@ -79,14 +81,16 @@ def sync_agreement_prices(
                 mpt_client, pricelist_id, [prod_item["id"]]
             )[0]
 
+            line_id = subscription["lines"][0]["id"]
             lines = [
                 {
                     "price": {
                         "unitPP": price_item["unitPP"],
                     },
-                    "id": subscription["lines"][0]["id"],
+                    "id": line_id,
                 }
             ]
+
 
             parameters = {
                 "fulfillment": [
@@ -97,14 +101,27 @@ def sync_agreement_prices(
                 ],
             }
 
-            logger.info(f"updating subscription {subscription['id']}")
 
-            update_agreement_subscription(
-                mpt_client,
-                subscription["id"],
-                lines=lines,
-                parameters=parameters,
-            )
+            if not dry_run:
+                update_agreement_subscription(
+                    mpt_client,
+                    subscription["id"],
+                    lines=lines,
+                    parameters=parameters,
+                )
+                logger.info(
+                    f"Subscription: {subscription['id']} ({line_id}): "
+                    f"sku={actual_sku} ({prod_item['id']} - {price_item['id']})"
+                )
+            else:
+                current_price = subscription["lines"][0]["price"]["unitPP"]
+                sys.stdout.write(
+                    f"Subscription: {subscription['id']} ({line_id}): "
+                    f"sku={actual_sku} ({prod_item['id']}), "
+                    f"current_price={current_price}, "
+                    f"new_price={price_item['unitPP']} ({price_item['id']})\n"
+                )
+
 
         for line in agreement["lines"]:
             actual_sku = adobe_config.get_adobe_product(
@@ -117,21 +134,36 @@ def sync_agreement_prices(
             price_item = get_pricelist_items_by_product_items(
                 mpt_client, pricelist_id, [prod_item["id"]]
             )[0]
+            current_price = line["price"]["unitPP"]
             line["price"]["unitPP"] = price_item["unitPP"]
+
+            if dry_run:
+                sys.stdout.write(
+                    f"OneTime item: {line['id']}: "
+                    f"sku={actual_sku} ({prod_item['id']}), "
+                    f"current_price={current_price}, "
+                    f"new_price={price_item['unitPP']} ({price_item['id']})\n",
+                )
+            else:
+                logger.info(
+                    f"OneTime item: {line['id']}: "
+                    f"sku={actual_sku} ({prod_item['id']} - {price_item['id']})"
+                )
 
         next_sync = (
             (datetime.fromisoformat(coterm_date) + timedelta(days=1))
             .date()
             .isoformat()
         )
-        update_agreement(
-            mpt_client,
-            agreement["id"],
-            lines=agreement["lines"],
-            parameters={
-                "fulfillment": [{"externalId": "nextSync", "value": next_sync}]
-            },
-        )
+        if not dry_run:
+            update_agreement(
+                mpt_client,
+                agreement["id"],
+                lines=agreement["lines"],
+                parameters={
+                    "fulfillment": [{"externalId": "nextSync", "value": next_sync}]
+                },
+            )
 
         logger.info(f"agreement updated {agreement['id']}")
         return coterm_date
@@ -140,31 +172,25 @@ def sync_agreement_prices(
         logger.exception(f"Cannot sync agreement {agreement_id}")
 
 
-def sync_agreements_by_next_sync(mpt_client, allow_3yc=False):
-    adobe_client = get_adobe_client()
-    adobe_config = get_config()
+def sync_agreements_by_next_sync(mpt_client, allow_3yc, dry_run):
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
-            mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
+            mpt_client, agreement, allow_3yc, dry_run,
         )
 
 
-def sync_agreements_by_agreement_ids(mpt_client, ids, allow_3yc):
-    adobe_client = get_adobe_client()
-    adobe_config = get_config()
+def sync_agreements_by_agreement_ids(mpt_client, ids, allow_3yc, dry_run):
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
         sync_agreement_prices(
-            mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
+            mpt_client, agreement, allow_3yc, dry_run,
         )
 
 
-def sync_all_agreements(mpt_client, allow_3yc):
-    adobe_client = get_adobe_client()
-    adobe_config = get_config()
+def sync_all_agreements(mpt_client, allow_3yc, dry_run):
     agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
-            mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
+            mpt_client, agreement, allow_3yc, dry_run,
         )

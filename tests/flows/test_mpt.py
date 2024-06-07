@@ -732,7 +732,8 @@ def test_get_agreements_by_next_sync(mocker):
     status_condition = "eq(status,Active)"
 
     rql_query = (
-        f"and({status_condition},{param_condition})&select=subscriptions,parameters,listing,product"
+        f"and({status_condition},{param_condition})"
+        "&select=lines,parameters,subscriptions,product,listing"
     )
 
 
@@ -981,7 +982,10 @@ def test_get_product_onetime_items_by_ids_error(
 
 
 def test_get_agreements_by_ids(mocker):
-    rql_query = "and(in(id,(AGR-0001)),eq(status,Active))"
+    rql_query = (
+        "and(in(id,(AGR-0001)),eq(status,Active))"
+        "&select=lines,parameters,subscriptions,product,listing"
+    )
 
     mocked_get_by_query = mocker.patch(
         "adobe_vipm.flows.mpt.get_agreements_by_query",
@@ -995,7 +999,7 @@ def test_get_agreements_by_ids(mocker):
 
 
 def test_get_all_agreements(mocker):
-    rql_query = "eq(status,Active))"
+    rql_query = "eq(status,Active))&select=lines,parameters,subscriptions,product,listing"
 
     mocked_get_by_query = mocker.patch(
         "adobe_vipm.flows.mpt.get_agreements_by_query",
