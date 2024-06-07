@@ -119,6 +119,20 @@ def sync_agreement_prices(
             )[0]
             line["price"]["unitPP"] = price_item["unitPP"]
 
+        next_sync = (
+            (datetime.fromisoformat(coterm_date) + timedelta(days=1))
+            .date()
+            .isoformat()
+        )
+        update_agreement(
+            mpt_client,
+            agreement["id"],
+            lines=agreement["lines"],
+            parameters={
+                "fulfillment": [{"externalId": "nextSync", "value": next_sync}]
+            },
+        )
+
         logger.info(f"agreement updated {agreement['id']}")
         return coterm_date
 
@@ -131,23 +145,9 @@ def sync_agreements_by_next_sync(mpt_client, allow_3yc=False):
     adobe_config = get_config()
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
-        coterm_date = sync_agreement_prices(
+        sync_agreement_prices(
             mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
         )
-        if coterm_date:
-            next_sync = (
-                (datetime.fromisoformat(coterm_date) + timedelta(days=1))
-                .date()
-                .isoformat()
-            )
-            update_agreement(
-                mpt_client,
-                agreement["id"],
-                lines=agreement["lines"],
-                parameters={
-                    "fulfillment": [{"externalId": "nextSync", "value": next_sync}]
-                },
-            )
 
 
 def sync_agreements_by_agreement_ids(mpt_client, ids, allow_3yc):
@@ -159,12 +159,6 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, allow_3yc):
             mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
         )
 
-        update_agreement(
-            mpt_client,
-            agreement["id"],
-            lines=agreement["lines"],
-        )
-
 
 def sync_all_agreements(mpt_client, allow_3yc):
     adobe_client = get_adobe_client()
@@ -173,10 +167,4 @@ def sync_all_agreements(mpt_client, allow_3yc):
     for agreement in agreements:
         sync_agreement_prices(
             mpt_client, adobe_client, adobe_config, agreement, allow_3yc=allow_3yc
-        )
-
-        update_agreement(
-            mpt_client,
-            agreement["id"],
-            lines=agreement["lines"],
         )
