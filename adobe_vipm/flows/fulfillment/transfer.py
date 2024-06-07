@@ -8,7 +8,7 @@ program.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
@@ -28,7 +28,6 @@ from adobe_vipm.flows.airtable import (
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
-    ITEM_TYPE_ORDER_LINE,
     PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
@@ -234,25 +233,32 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
 
     one_time_skus = get_one_time_skus(mpt_client, order)
 
+    commitment_date = None
     for line in adobe_transfer["lineItems"]:
         if get_partial_sku(line["offerId"]) in one_time_skus:
             continue
 
-        add_subscription(
+        subscription = add_subscription(
             mpt_client,
             adobe_client,
             transfer.customer_id,
             order,
-            ITEM_TYPE_ORDER_LINE,
             line,
         )
-        if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
+        if subscription and not commitment_date:  # pragma: no branch
+            # subscription are cotermed so it's ok to take the first created
+            commitment_date = subscription["commitmentDate"]
+
+        if subscription and transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
             adobe_client.update_subscription(
                 authorization_id,
                 transfer.customer_id,
                 line["subscriptionId"],
                 auto_renewal=True,
             )
+
+    if commitment_date:  # pragma: no branch
+        order = save_next_sync_date(mpt_client, order, commitment_date)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
@@ -326,16 +332,13 @@ def fulfill_transfer_order(mpt_client, order):
             continue
 
         subscription = add_subscription(
-            mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+            mpt_client, adobe_client, customer_id, order, item
         )
         if subscription and not commitment_date:
             # subscription are cotermed so it's ok to take the first created
             commitment_date = subscription["commitmentDate"]
 
     if commitment_date:  # pragma: no branch
-        next_sync = (
-            (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
-        )
-        order = save_next_sync_date(mpt_client, order, next_sync)
+        order = save_next_sync_date(mpt_client, order, commitment_date)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)

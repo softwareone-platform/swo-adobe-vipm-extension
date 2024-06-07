@@ -15,9 +15,6 @@ ORDER_TYPE_PURCHASE = "Purchase"
 ORDER_TYPE_CHANGE = "Change"
 ORDER_TYPE_TERMINATION = "Termination"
 
-ITEM_TYPE_ORDER_LINE = "order-line"
-ITEM_TYPE_SUBSCRIPTION = "subscription"
-
 PARAM_ADDRESS = "address"
 PARAM_ADOBE_SKU = "adobeSKU"
 PARAM_COMPANY_NAME = "companyName"

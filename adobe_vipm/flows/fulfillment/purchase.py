@@ -6,7 +6,6 @@ processing.
 
 import logging
 from collections import Counter
-from datetime import datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -23,7 +22,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
-    ITEM_TYPE_ORDER_LINE,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
@@ -251,20 +249,20 @@ def fulfill_purchase_order(mpt_client, order):
     if not adobe_order:
         return
     one_time_skus = get_one_time_skus(mpt_client, order)
-    subscription = None
+    commitment_date = None
     for item in adobe_order["lineItems"]:
         if get_partial_sku(item["offerId"]) in one_time_skus:
             continue
 
         subscription = add_subscription(
-            mpt_client, adobe_client, customer_id, order, ITEM_TYPE_ORDER_LINE, item
+            mpt_client, adobe_client, customer_id, order, item
         )
+        if subscription and not commitment_date:  # pragma: no branch
+            # subscription are cotermed so it's ok to take the last created
+            commitment_date = subscription["commitmentDate"]
 
-    if subscription:  # pragma: no branch
-    # subscription are cotermed so it's ok to take the last created
-        commitment_date = subscription["commitmentDate"]
-        next_sync = (datetime.fromisoformat(commitment_date) + timedelta(days=1)).date().isoformat()
-        order = save_next_sync_date(mpt_client, order, next_sync)
+    if commitment_date:  # pragma: no branch
+        order = save_next_sync_date(mpt_client, order, commitment_date)
 
     update_order_actual_price(
         mpt_client, order, order["lines"], adobe_order["lineItems"]

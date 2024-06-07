@@ -3,6 +3,7 @@ This module contains shared functions used by the different fulfillment flows.
 """
 
 import logging
+from datetime import datetime, timedelta
 from operator import itemgetter
 
 from django.conf import settings
@@ -15,7 +16,6 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.constants import (
-    ITEM_TYPE_ORDER_LINE,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     MPT_ORDER_STATUS_QUERYING,
@@ -388,7 +388,7 @@ def switch_order_to_completed(mpt_client, order, template_name):
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
-def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, item):
+def add_subscription(mpt_client, adobe_client, customer_id, order, line):
     """
     Adds a subscription to the correspoding MPT order based on the provided parameters.
 
@@ -398,33 +398,30 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
             Adobe API.
         customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
         order (dict): The MPT order to which the subscription will be added.
-        item_type (str): Type of the item (subscription or order line.)
-        item (dict): The subscription item details, including offer ID and subscription ID.
+        line (dict): The order line.
 
     Returns:
         None
     """
     authorization_id = order["authorization"]["id"]
-    if item_type == ITEM_TYPE_ORDER_LINE:
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id,
-            customer_id,
-            item["subscriptionId"],
-        )
-        if adobe_subscription["status"] != STATUS_PROCESSED:
-            logger.warning(
-                f"Subscription {adobe_subscription['subscriptionId']} "
-                f"for customer {customer_id} is in status "
-                f"{adobe_subscription['status']}, skip it"
-            )
-            return
-    else:
-        adobe_subscription = item
+    adobe_subscription = adobe_client.get_subscription(
+        authorization_id,
+        customer_id,
+        line["subscriptionId"],
+    )
 
-    order_line = get_order_line_by_sku(order, item["offerId"])
+    if adobe_subscription["status"] != STATUS_PROCESSED:
+        logger.warning(
+            f"Subscription {adobe_subscription['subscriptionId']} "
+            f"for customer {customer_id} is in status "
+            f"{adobe_subscription['status']}, skip it"
+        )
+        return
+
+    order_line = get_order_line_by_sku(order, line["offerId"])
 
     subscription = get_subscription_by_external_id(
-        mpt_client, order["id"], item["subscriptionId"]
+        mpt_client, order["id"], line["subscriptionId"]
     )
     if not subscription:
         subscription = {
@@ -433,12 +430,12 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
                 "fulfillment": [
                     {
                         "externalId": PARAM_ADOBE_SKU,
-                        "value": item["offerId"],
+                        "value": line["offerId"],
                     }
                 ]
             },
             "externalIds": {
-                "vendor": item["subscriptionId"],
+                "vendor": line["subscriptionId"],
             },
             "lines": [
                 {
@@ -450,7 +447,7 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, item_type, it
         }
         subscription = create_subscription(mpt_client, order["id"], subscription)
         logger.info(
-            f'Subscription {item["subscriptionId"]} ({subscription["id"]}) '
+            f'Subscription {line["subscriptionId"]} ({subscription["id"]}) '
             f'created for order {order["id"]}'
         )
     return subscription
@@ -559,7 +556,10 @@ def send_processing_notification(mpt_client, order):
         send_email_notification(mpt_client, order)
 
 
-def save_next_sync_date(client, order, next_sync):
+def save_next_sync_date(client, order, coterm_date):
+    next_sync = (
+        (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
+    )
     order = set_next_sync(order, next_sync)
     update_order(client, order["id"], parameters=order["parameters"])
     return order
