@@ -102,6 +102,7 @@ def test_termination(
         mocked_mpt_client,
         processing_order["id"],
         {"id": "TPL-1111"},
+        parameters=processing_order["parameters"],
     )
     mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.assert_called_once_with(
         authorization_id,
@@ -271,4 +272,5 @@ def test_termination_out_window(
         mocked_mpt_client,
         processing_order["id"],
         {"id": "TPL-1111"},
+        parameters=processing_order["parameters"],
     )

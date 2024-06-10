@@ -135,15 +135,29 @@ def test_upsizing(
         processing_change_order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "externalIds": {
-            "vendor": adobe_order["orderId"],
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="1",
+            ),
+            "ordering": processing_change_order["parameters"]["ordering"],
         },
     }
+
     assert mocked_update_order.mock_calls[1].args == (
         mocked_mpt_client,
         processing_change_order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
+        "externalIds": {
+            "vendor": adobe_order["orderId"],
+        },
+    }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        processing_change_order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "lines": [
             {
                 "id": updated_change_order["lines"][0]["id"],
@@ -152,19 +166,6 @@ def test_upsizing(
                 },
             }
         ],
-    }
-    assert mocked_update_order.mock_calls[2].args == (
-        mocked_mpt_client,
-        processing_change_order["id"],
-    )
-    assert mocked_update_order.mock_calls[2].kwargs == {
-        "parameters": {
-            "fulfillment": fulfillment_parameters_factory(
-                customer_id="a-client-id",
-                retry_count="0",
-            ),
-            "ordering": [],
-        },
     }
     mocked_update_subscription.assert_called_once_with(
         mocked_mpt_client,
@@ -183,6 +184,13 @@ def test_upsizing(
         mocked_mpt_client,
         processing_change_order["id"],
         {"id": "TPL-1111"},
+        parameters={
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+            ),
+            "ordering": [],
+        }
     )
 
     assert mocked_get_template.mock_calls[0].args == (
@@ -305,6 +313,7 @@ def test_upsizing_create_adobe_preview_order_error(
         mocked_mpt_client,
         order["id"],
         str(adobe_error),
+        parameters=order["parameters"],
     )
 
 
@@ -433,7 +442,13 @@ def test_downsizing(
         processing_order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "parameters": processing_order["parameters"],
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="1",
+            ),
+            "ordering": processing_order["parameters"]["ordering"],
+        },
     }
 
     assert mocked_update_order.mock_calls[1].args == (
@@ -479,6 +494,7 @@ def test_downsizing(
         mocked_mpt_client,
         processing_order["id"],
         {"id": "TPL-1111"},
+        parameters=processing_order["parameters"],
     )
     mocked_adobe_client.search_new_and_returned_orders_by_sku_line_number.assert_called_once_with(
         authorization_id,
@@ -600,7 +616,13 @@ def test_downsizing_return_order_exists(
         processing_order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "parameters": processing_order["parameters"],
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="1",
+            ),
+            "ordering": processing_order["parameters"]["ordering"],
+        },
     }
 
     assert mocked_update_order.mock_calls[1].args == (
@@ -644,6 +666,7 @@ def test_downsizing_return_order_exists(
         mocked_mpt_client,
         processing_order["id"],
         {"id": "TPL-1111"},
+        parameters=processing_order["parameters"],
     )
     mocked_adobe_client.create_return_order.assert_not_called()
 
@@ -778,17 +801,19 @@ def test_downsizing_new_order_pending(
 
     mocked_adobe_client.create_return_order.assert_not_called()
     mocked_complete_order.assert_not_called()
-    mocked_update_order.assert_called_once_with(
+    assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
         order["id"],
-        parameters={
-            "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
-                customer_id="a-client-id",
-            ),
-            "ordering": [],
-        },
     )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="1",
+            ),
+            "ordering": order["parameters"]["ordering"],
+        },
+    }
 
 
 def test_downsizing_create_new_order_error(
@@ -857,6 +882,7 @@ def test_downsizing_create_new_order_error(
         mocked_mpt_client,
         order["id"],
         str(adobe_error),
+        parameters=order["parameters"],
     )
 
 
@@ -1149,6 +1175,17 @@ def test_mixed(
         mocked_mpt_client,
         processing_change_order["id"],
     )
+
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                retry_count="1",
+                customer_id="a-client-id",
+            ),
+            "ordering": processing_change_order["parameters"]["ordering"],
+        },
+    }
+
     expected_lines = []
     for line in sorted(order_items, key=itemgetter("id")):
         if line["id"] == downsizing_items_out_of_window[0]["id"]:
@@ -1165,15 +1202,11 @@ def test_mixed(
             }
         )
 
-    assert mocked_update_order.mock_calls[0].kwargs == {"lines": expected_lines}
-
     assert mocked_update_order.mock_calls[1].args == (
         mocked_mpt_client,
         processing_change_order["id"],
     )
-    assert mocked_update_order.mock_calls[1].kwargs == {
-        "parameters": processing_change_order["parameters"],
-    }
+    assert mocked_update_order.mock_calls[1].kwargs == {"lines": expected_lines}
 
     assert mocked_update_order.mock_calls[2].args == (
         mocked_mpt_client,
@@ -1262,6 +1295,7 @@ def test_mixed(
         mocked_mpt_client,
         processing_change_order["id"],
         {"id": "TPL-1111"},
+        parameters=processing_change_order["parameters"],
     )
 
 
@@ -1346,6 +1380,7 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
         mocked_mpt_client,
         processing_change_order["id"],
         {"id": "TPL-1111"},
+        parameters=processing_change_order["parameters"],
     )
 
 
@@ -1505,6 +1540,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         mocked_mpt_client,
         processing_change_order["id"],
         {"id": "TPL-1111"},
+        parameters=processing_change_order["parameters"],
     )
 
 
