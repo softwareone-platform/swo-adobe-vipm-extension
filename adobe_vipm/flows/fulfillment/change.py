@@ -23,6 +23,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     update_order_actual_price,
 )
+from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_line_item_by_subscription_id,
@@ -325,3 +326,4 @@ def fulfill_change_order(mpt_client, order):
         mpt_client, order, updated_lines, adobe_order["lineItems"]
     )
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_CHANGE)
+    sync_agreements_by_agreement_ids(mpt_client, [order["agreement"]["id"]], False, False)
