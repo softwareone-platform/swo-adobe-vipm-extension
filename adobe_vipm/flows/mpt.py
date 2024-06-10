@@ -386,7 +386,7 @@ def get_rendered_template(mpt_client, order_id):
 def get_product_onetime_items_by_ids(mpt_client, product_id, item_ids):
     items = []
     rql_query = (
-        f"and(eq(product.id,{product_id}),in(id,({','.join(item_ids)})),eq(terms.period,OneTime))"
+        f"and(eq(product.id,{product_id}),in(id,({','.join(item_ids)})),eq(terms.period,one-time))"
     )
     url = f"/items?{rql_query}"
     page = None

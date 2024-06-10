@@ -923,7 +923,7 @@ def test_get_product_onetime_items_by_ids(mpt_client, requests_mocker):
     product_id = "PRD-1234-5678"
     ids = ["ITM-0001", "ITM-0002"]
     rql_query = (
-        f"and(eq(product.id,{product_id}),in(id,({','.join(ids)})),eq(terms.period,OneTime))"
+        f"and(eq(product.id,{product_id}),in(id,({','.join(ids)})),eq(terms.period,one-time))"
     )
     url = f"items?{rql_query}"
     page1_url = f"{url}&limit=10&offset=0"
