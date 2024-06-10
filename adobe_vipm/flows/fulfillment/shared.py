@@ -169,9 +169,9 @@ def switch_order_to_failed(client, order, status_notes):
     Returns:
         dict: The updated order with the appropriate status and notes.
     """
-    order = reset_retries(client, order)
+    order = reset_retry_count(order)
     agreement = order["agreement"]
-    order = fail_order(client, order["id"], status_notes)
+    order = fail_order(client, order["id"], status_notes, parameters=order["parameters"])
     order["agreement"] = agreement
     send_email_notification(client, order)
     return order
@@ -230,8 +230,6 @@ def handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
     retry_count = get_retry_count(order)
     max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
     if retry_count < max_attemps:
-        order = increment_retry_count(order)
-        update_order(mpt_client, order["id"], parameters=order["parameters"])
         logger.info(
             f"Order {order['id']} ({adobe_order_id}: {adobe_order_type}) "
             "is still processing on Adobe side, wait.",
@@ -244,22 +242,6 @@ def handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
     reason = f"Max processing attemps reached ({max_attemps})."
     fail_order(mpt_client, order["id"], reason)
     logger.warning(f"Order {order['id']} has been failed: {reason}.")
-
-
-def reset_retries(mpt_client, order):
-    """
-    Updates the order to set the retry count parameter to zero.
-
-    Args:
-        mpt_client (MPTClient): an instance of the Marketplace platform client.
-        order (dct): The MPT order.
-
-    Returns:
-        order (dct): The updated MPT order.
-    """
-    order = reset_retry_count(order)
-    update_order(mpt_client, order["id"], parameters=order["parameters"])
-    return order
 
 
 def check_adobe_order_fulfilled(
@@ -350,7 +332,6 @@ def handle_return_orders(mpt_client, adobe_client, customer_id, order, lines):
                 break
             else:
                 completed_order_ids.append(return_order["orderId"])
-                order = reset_retries(mpt_client, order)
 
     if pending_order_ids:
         handle_retries(
@@ -370,7 +351,7 @@ def switch_order_to_completed(mpt_client, order, template_name):
         mpt_client (MPTClient):  an instance of the Marketplace platform client.
         order (dict): The MPT order that have to be switched to completed.
     """
-    order = reset_retries(mpt_client, order)
+    order = reset_retry_count(order)
     template = get_product_template_or_default(
         mpt_client,
         order["agreement"]["product"]["id"],
@@ -382,6 +363,7 @@ def switch_order_to_completed(mpt_client, order, template_name):
         mpt_client,
         order["id"],
         template,
+        parameters=order["parameters"],
     )
     order["agreement"] = agreement
     send_email_notification(mpt_client, order)
@@ -553,6 +535,8 @@ def check_processing_template(mpt_client, order, template_name):
 
 def send_processing_notification(mpt_client, order):
     if get_retry_count(order) == 0:
+        order = increment_retry_count(order)
+        order = update_order(mpt_client, order["id"], parameters=order["parameters"])
         send_email_notification(mpt_client, order)
 
 

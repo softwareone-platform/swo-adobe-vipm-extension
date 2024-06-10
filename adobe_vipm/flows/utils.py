@@ -42,7 +42,7 @@ from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import find_first
 
-TRACE_ID_REGEX = re.compile(r"(\(00-[0-9a-f]{32}-[0-9a-f]{16}-00\))")
+TRACE_ID_REGEX = re.compile(r"(\(00-[0-9a-f]{32}-[0-9a-f]{16}-01\))")
 
 
 def get_parameter(parameter_phase, source, param_external_id):

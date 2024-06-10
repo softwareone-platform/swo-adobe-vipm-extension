@@ -71,20 +71,23 @@ def query_order(mpt_client, order_id, **kwargs):
 
 
 @wrap_http_error
-def fail_order(mpt_client, order_id, reason):
+def fail_order(mpt_client, order_id, reason, **kwargs):
     response = mpt_client.post(
         f"/commerce/orders/{order_id}/fail",
-        json={"statusNotes": ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason)},
+        json={
+            "statusNotes": ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
+            **kwargs,
+        },
     )
     response.raise_for_status()
     return response.json()
 
 
 @wrap_http_error
-def complete_order(mpt_client, order_id, template):
+def complete_order(mpt_client, order_id, template, **kwargs):
     response = mpt_client.post(
         f"/commerce/orders/{order_id}/complete",
-        json={"template": template},
+        json={"template": template, **kwargs},
     )
     response.raise_for_status()
     return response.json()
@@ -385,9 +388,9 @@ def get_rendered_template(mpt_client, order_id):
 @wrap_http_error
 def get_product_onetime_items_by_ids(mpt_client, product_id, item_ids):
     items = []
-    rql_query = (
-        f"and(eq(product.id,{product_id}),in(id,({','.join(item_ids)})),eq(terms.period,one-time))"
-    )
+    product_cond = f"eq(product.id,{product_id})"
+    items_cond = f"in(id,({','.join(item_ids)}))"
+    rql_query = f"and({product_cond},{items_cond},eq(terms.period,one-time))"
     url = f"/items?{rql_query}"
     page = None
     limit = 10

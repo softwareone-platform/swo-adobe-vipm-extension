@@ -102,6 +102,12 @@ def test_no_customer(
         side_effect=[
             order_factory(
                 fulfillment_parameters=fulfillment_parameters_factory(
+                    retry_count="1",
+                ),
+                external_ids={"vendor": adobe_order["orderId"]},
+            ),
+            order_factory(
+                fulfillment_parameters=fulfillment_parameters_factory(
                     customer_id="a-client-id",
                     retry_count="1",
                 ),
@@ -182,13 +188,17 @@ def test_no_customer(
         order_with_customer_param["lines"],
     )
 
+
     assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
         order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "externalIds": {
-            "vendor": adobe_order["orderId"],
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                retry_count="1",
+            ),
+            "ordering": order_parameters_factory(),
         },
     }
     assert mocked_update_order.mock_calls[1].args == (
@@ -196,6 +206,15 @@ def test_no_customer(
         order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
+        "externalIds": {
+            "vendor": adobe_order["orderId"],
+        },
+    }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -205,11 +224,11 @@ def test_no_customer(
             "ordering": order_parameters_factory(),
         },
     }
-    assert mocked_update_order.mock_calls[2].args == (
+    assert mocked_update_order.mock_calls[3].args == (
         mocked_mpt_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[2].kwargs == {
+    assert mocked_update_order.mock_calls[3].kwargs == {
         "lines": [
             {
                 "id": order["lines"][0]["id"],
@@ -218,20 +237,6 @@ def test_no_customer(
                 },
             }
         ],
-    }
-    assert mocked_update_order.mock_calls[3].args == (
-        mocked_mpt_client,
-        order["id"],
-    )
-    assert mocked_update_order.mock_calls[3].kwargs == {
-        "parameters": {
-            "fulfillment": fulfillment_parameters_factory(
-                customer_id="a-client-id",
-                retry_count="0",
-                next_sync_date="2024-01-02",
-            ),
-            "ordering": order_parameters_factory(),
-        },
     }
 
     mocked_create_subscription.assert_called_once_with(
@@ -265,7 +270,10 @@ def test_no_customer(
 
     assert mocked_send_notification.mock_calls[0].args == (
         mocked_mpt_client,
-        order,
+        order_factory(
+            fulfillment_parameters=fulfillment_parameters_factory(retry_count="1"),
+            external_ids={"vendor": "P0123456789"},
+        ),
     )
 
     assert mocked_send_notification.mock_calls[1].args == (
@@ -277,6 +285,14 @@ def test_no_customer(
         mocked_mpt_client,
         order["id"],
         {"id": "TPL-1111"},
+        parameters={
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-01-02",
+            ),
+            "ordering": order_parameters_factory(),
+        },
     )
     mocked_adobe_client.get_order.assert_called_once_with(
         authorization_id, "a-client-id", adobe_order["orderId"]
@@ -427,21 +443,33 @@ def test_no_customer_subscription_already_created(
         order_with_customer_param["id"],
         order_with_customer_param["lines"],
     )
-
     assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
         order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "externalIds": {
-            "vendor": adobe_order["orderId"],
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                retry_count="1",
+            ),
+            "ordering": order_parameters_factory(),
         },
     }
+
     assert mocked_update_order.mock_calls[1].args == (
         mocked_mpt_client,
         order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
+        "externalIds": {
+            "vendor": adobe_order["orderId"],
+        },
+    }
+    assert mocked_update_order.mock_calls[2].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -451,11 +479,11 @@ def test_no_customer_subscription_already_created(
             "ordering": order_parameters_factory(),
         },
     }
-    assert mocked_update_order.mock_calls[2].args == (
+    assert mocked_update_order.mock_calls[3].args == (
         mocked_mpt_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[2].kwargs == {
+    assert mocked_update_order.mock_calls[3].kwargs == {
         "lines": [
             {
                 "id": order["lines"][0]["id"],
@@ -464,20 +492,6 @@ def test_no_customer_subscription_already_created(
                 },
             }
         ],
-    }
-    assert mocked_update_order.mock_calls[3].args == (
-        mocked_mpt_client,
-        order["id"],
-    )
-    assert mocked_update_order.mock_calls[3].kwargs == {
-        "parameters": {
-            "fulfillment": fulfillment_parameters_factory(
-                customer_id="a-client-id",
-                retry_count="0",
-                next_sync_date="2024-01-02",
-            ),
-            "ordering": order_parameters_factory(),
-        },
     }
 
     mocked_process_order.assert_called_once_with(
@@ -489,6 +503,14 @@ def test_no_customer_subscription_already_created(
         mocked_mpt_client,
         order["id"],
         {"id": "TPL-1111"},
+        parameters={
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                retry_count="0",
+                next_sync_date="2024-01-02",
+            ),
+            "ordering": order_parameters_factory(),
+        },
     )
     mocked_adobe_client.get_order.assert_called_once_with(
         authorization_id, "a-client-id", adobe_order["orderId"]
@@ -573,8 +595,12 @@ def test_customer_already_created(
         order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "externalIds": {
-            "vendor": adobe_order["orderId"],
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                retry_count="1",
+                customer_id="a-client-id",
+            ),
+            "ordering": order["parameters"]["ordering"],
         },
     }
     assert mocked_update_order.mock_calls[1].args == (
@@ -582,12 +608,8 @@ def test_customer_already_created(
         order["id"],
     )
     assert mocked_update_order.mock_calls[1].kwargs == {
-        "parameters": {
-            "fulfillment": fulfillment_parameters_factory(
-                customer_id="a-client-id",
-                retry_count="1",
-            ),
-            "ordering": order_parameters_factory(),
+        "externalIds": {
+            "vendor": adobe_order["orderId"],
         },
     }
 
@@ -660,6 +682,7 @@ def test_create_adobe_preview_order_error(
         mocked_mpt_client,
         order["id"],
         str(adobe_error),
+        parameters=order["parameters"],
     )
 
 
@@ -1148,6 +1171,7 @@ def test_create_customer_account_other_error(
         mocked_mpt_client,
         order["id"],
         str(adobe_error),
+        parameters=order["parameters"],
     )
     assert updated_order is None
 
@@ -1687,6 +1711,13 @@ def test_one_time_items(
         mocked_mpt_client,
         order["id"],
         {"id": "TPL-1111"},
+        parameters={
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                next_sync_date="2024-01-02",
+            ),
+            "ordering": order["parameters"]["ordering"],
+        },
     )
 
     mocked_get_onetime.assert_called_once_with(

@@ -91,18 +91,31 @@ def test_send_email_notification_no_recipient(mocker, settings, order_factory, c
     mocked_send_email.assert_not_called()
 
 
-def test_send_processing_notification(mocker, order_factory):
+def test_send_processing_notification(mocker, order_factory, fulfillment_parameters_factory):
+    order = order_factory()
+    updated_order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            retry_count="1",
+        ),
+    )
     mocked_send = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.send_email_notification"
+    )
+    mocked_update = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=updated_order,
     )
 
     mocked_client = mocker.MagicMock()
 
-    order = order_factory()
-
     send_processing_notification(mocked_client, order)
 
-    mocked_send.assert_called_once_with(mocked_client, order)
+    mocked_send.assert_called_once_with(mocked_client, updated_order)
+    mocked_update.assert_called_once_with(
+        mocked_client,
+        updated_order["id"],
+        parameters=updated_order["parameters"],
+    )
 
 
 def test_send_processing_notification_retries(
