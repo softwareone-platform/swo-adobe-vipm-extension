@@ -113,6 +113,11 @@ def test_upsizing(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
+
+    mocked_sync = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.sync_agreements_by_agreement_ids"
+    )
+
     fulfill_order(mocked_mpt_client, processing_change_order)
 
     authorization_id = processing_change_order["authorization"]["id"]
@@ -205,6 +210,12 @@ def test_upsizing(
         processing_change_order["agreement"]["product"]["id"],
         MPT_ORDER_STATUS_COMPLETED,
         TEMPLATE_NAME_CHANGE,
+    )
+    mocked_sync.assert_called_once_with(
+        mocked_mpt_client,
+        [processing_change_order["agreement"]["id"]],
+        False,
+        False,
     )
 
 
@@ -426,6 +437,10 @@ def test_downsizing(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
+    mocked_sync = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.sync_agreements_by_agreement_ids"
+    )
+
     fulfill_order(mocked_mpt_client, processing_order)
 
     authorization_id = processing_order["authorization"]["id"]
@@ -501,6 +516,12 @@ def test_downsizing(
         "a-client-id",
         processing_order["lines"][0]["item"]["externalIds"]["vendor"],
         processing_order["lines"][0]["id"],
+    )
+    mocked_sync.assert_called_once_with(
+        mocked_mpt_client,
+        [processing_order["agreement"]["id"]],
+        False,
+        False,
     )
 
 
@@ -608,6 +629,9 @@ def test_downsizing_return_order_exists(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
+    mocked_sync = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.sync_agreements_by_agreement_ids"
+    )
 
     fulfill_order(mocked_mpt_client, processing_order)
 
@@ -669,7 +693,12 @@ def test_downsizing_return_order_exists(
         parameters=processing_order["parameters"],
     )
     mocked_adobe_client.create_return_order.assert_not_called()
-
+    mocked_sync.assert_called_once_with(
+        mocked_mpt_client,
+        [processing_order["agreement"]["id"]],
+        False,
+        False,
+    )
 
 def test_downsizing_return_order_pending(
     mocker,
@@ -1153,6 +1182,9 @@ def test_mixed(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
+    mocked_sync = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.sync_agreements_by_agreement_ids"
+    )
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 
@@ -1296,6 +1328,12 @@ def test_mixed(
         processing_change_order["id"],
         {"id": "TPL-1111"},
         parameters=processing_change_order["parameters"],
+    )
+    mocked_sync.assert_called_once_with(
+        mocked_mpt_client,
+        [processing_change_order["agreement"]["id"]],
+        False,
+        False,
     )
 
 
@@ -1504,6 +1542,9 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
+    mocked_sync = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.sync_agreements_by_agreement_ids"
+    )
 
     fulfill_order(mocked_mpt_client, processing_change_order)
 
@@ -1541,6 +1582,12 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         processing_change_order["id"],
         {"id": "TPL-1111"},
         parameters=processing_change_order["parameters"],
+    )
+    mocked_sync.assert_called_once_with(
+        mocked_mpt_client,
+        [processing_change_order["agreement"]["id"]],
+        False,
+        False,
     )
 
 
@@ -1678,7 +1725,17 @@ def test_one_time_items(
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
     )
+    mocked_sync = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.sync_agreements_by_agreement_ids"
+    )
+
     fulfill_order(mocked_mpt_client, processing_change_order)
 
 
     mocked_update_subscription.assert_not_called()
+    mocked_sync.assert_called_once_with(
+        mocked_mpt_client,
+        [processing_change_order["agreement"]["id"]],
+        False,
+        False,
+    )
