@@ -19,14 +19,19 @@ from adobe_vipm.flows.mpt import (
 )
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
+    get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
+    is_consumables_sku,
 )
 
 logger = logging.getLogger(__name__)
 
 
 def sync_agreement_prices(
-    mpt_client, agreement, allow_3yc, dry_run,
+    mpt_client,
+    agreement,
+    allow_3yc,
+    dry_run,
 ):
     try:
         adobe_client = get_adobe_client()
@@ -41,22 +46,29 @@ def sync_agreement_prices(
         logger.info(f"Synchronizing agreement {agreement_id}...")
 
         processing_subscriptions = list(
-            filter(lambda sub: sub["status"] in ("Updating", "Terminating"), subscriptions),
+            filter(
+                lambda sub: sub["status"] in ("Updating", "Terminating"), subscriptions
+            ),
         )
 
         if len(processing_subscriptions) > 0:
-            logger.info(f"Agreement {agreement_id} has processing subscriptions, skip it")
+            logger.info(
+                f"Agreement {agreement_id} has processing subscriptions, skip it"
+            )
             return
 
         customer = adobe_client.get_customer(authorization_id, customer_id)
         commitment = get_3yc_commitment(customer)
-        if commitment and commitment["status"] == STATUS_3YC_COMMITTED and not allow_3yc:
+        if (
+            commitment
+            and commitment["status"] == STATUS_3YC_COMMITTED
+            and not allow_3yc
+        ):
             logger.info(
                 f"Customer of agreement {agreement_id} has commited for 3y, skip it"
             )
             return
 
-        discount_level = get_customer_licenses_discount_level(customer)
         coterm_date = customer["cotermDate"]
 
         for subscription in subscriptions:
@@ -73,6 +85,13 @@ def sync_agreement_prices(
             )
 
             actual_sku = adobe_subscription["offerId"]
+
+            discount_level = (
+                get_customer_licenses_discount_level(customer)
+                if not is_consumables_sku(actual_sku)
+                else get_customer_consumables_discount_level(customer)
+            )
+
             actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
             prod_item = get_product_items_by_skus(mpt_client, product_id, [actual_sku])[
                 0
@@ -91,7 +110,6 @@ def sync_agreement_prices(
                 }
             ]
 
-
             parameters = {
                 "fulfillment": [
                     {
@@ -100,7 +118,6 @@ def sync_agreement_prices(
                     },
                 ],
             }
-
 
             if not dry_run:
                 update_agreement_subscription(
@@ -122,11 +139,15 @@ def sync_agreement_prices(
                     f"new_price={price_item['unitPP']} ({price_item['id']})\n"
                 )
 
-
         for line in agreement["lines"]:
             actual_sku = adobe_config.get_adobe_product(
                 line["item"]["externalIds"]["vendor"]
             ).sku
+            discount_level = (
+                get_customer_licenses_discount_level(customer)
+                if not is_consumables_sku(actual_sku)
+                else get_customer_consumables_discount_level(customer)
+            )
             actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
             prod_item = get_product_items_by_skus(mpt_client, product_id, [actual_sku])[
                 0
@@ -151,9 +172,7 @@ def sync_agreement_prices(
                 )
 
         next_sync = (
-            (datetime.fromisoformat(coterm_date) + timedelta(days=1))
-            .date()
-            .isoformat()
+            (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
         )
         if not dry_run:
             update_agreement(
@@ -176,7 +195,10 @@ def sync_agreements_by_next_sync(mpt_client, allow_3yc, dry_run):
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
-            mpt_client, agreement, allow_3yc, dry_run,
+            mpt_client,
+            agreement,
+            allow_3yc,
+            dry_run,
         )
 
 
@@ -184,7 +206,10 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, allow_3yc, dry_run):
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
         sync_agreement_prices(
-            mpt_client, agreement, allow_3yc, dry_run,
+            mpt_client,
+            agreement,
+            allow_3yc,
+            dry_run,
         )
 
 
@@ -192,5 +217,8 @@ def sync_all_agreements(mpt_client, allow_3yc, dry_run):
     agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
-            mpt_client, agreement, allow_3yc, dry_run,
+            mpt_client,
+            agreement,
+            allow_3yc,
+            dry_run,
         )

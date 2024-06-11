@@ -7,6 +7,7 @@ import phonenumbers
 from markdown_it import MarkdownIt
 
 from adobe_vipm.adobe.constants import (
+    OFFER_TYPE_CONSUMABLES,
     OFFER_TYPE_LICENSE,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
 )
@@ -760,3 +761,14 @@ def get_customer_licenses_discount_level(customer):
         lambda x: x["offerType"] == OFFER_TYPE_LICENSE, customer["discounts"]
     )
     return licenses_discount["level"]
+
+
+def get_customer_consumables_discount_level(customer):
+    licenses_discount = find_first(
+        lambda x: x["offerType"] == OFFER_TYPE_CONSUMABLES, customer["discounts"]
+    )
+    return licenses_discount["level"]
+
+
+def is_consumables_sku(sku):
+    return sku[10] == "T"

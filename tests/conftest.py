@@ -9,6 +9,7 @@ from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import (
+    OFFER_TYPE_CONSUMABLES,
     OFFER_TYPE_LICENSE,
     STATUS_PENDING,
     STATUS_PROCESSED,
@@ -1323,6 +1324,7 @@ def adobe_customer_factory():
         commitment_request=None,
         recommitment_request=None,
         licenses_discount_level="01",
+        consumables_discount_level="T1",
         coterm_date="2024-01-23",
     ):
         customer = {
@@ -1352,7 +1354,11 @@ def adobe_customer_factory():
                 {
                     "offerType": OFFER_TYPE_LICENSE,
                     "level": licenses_discount_level,
-                }
+                },
+                {
+                    "offerType": OFFER_TYPE_CONSUMABLES,
+                    "level": consumables_discount_level,
+                },
             ],
             "cotermDate": coterm_date,
         }

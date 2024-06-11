@@ -8,6 +8,8 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS, RENEWAL_WINDOW_DAYS
 from adobe_vipm.flows.utils import (
+    get_customer_consumables_discount_level,
+    get_customer_licenses_discount_level,
     get_transfer_item_sku_by_subscription,
     group_items_by_type,
     is_transferring_item_expired,
@@ -398,4 +400,25 @@ def test_get_transfer_item_sku_by_subscription(
 ):
     items = adobe_items_factory(subscription_id="my-awesome-sub")
     transfer = adobe_transfer_factory(items=items)
-    assert get_transfer_item_sku_by_subscription(transfer, "my-awesome-sub") == items[0]["offerId"]
+    assert (
+        get_transfer_item_sku_by_subscription(transfer, "my-awesome-sub")
+        == items[0]["offerId"]
+    )
+
+
+def test_get_customer_licenses_discount_level(adobe_customer_factory):
+    assert (
+        get_customer_licenses_discount_level(
+            adobe_customer_factory(licenses_discount_level="05")
+        )
+        == "05"
+    )
+
+
+def test_get_customer_consumables_discount_level(adobe_customer_factory):
+    assert (
+        get_customer_consumables_discount_level(
+            adobe_customer_factory(consumables_discount_level="T2")
+        )
+        == "T2"
+    )
