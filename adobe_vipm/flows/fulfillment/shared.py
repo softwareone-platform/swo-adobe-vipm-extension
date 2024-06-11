@@ -536,9 +536,10 @@ def check_processing_template(mpt_client, order, template_name):
 def start_processing_attempt(mpt_client, order):
     current_attempt = get_retry_count(order)
     order = increment_retry_count(order)
-    order = update_order(mpt_client, order["id"], parameters=order["parameters"])
+    update_order(mpt_client, order["id"], parameters=order["parameters"])
     if current_attempt == 0:
         send_email_notification(mpt_client, order)
+    return order
 
 
 def save_next_sync_date(client, order, coterm_date):

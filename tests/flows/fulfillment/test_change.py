@@ -1591,16 +1591,23 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     )
 
 
-def test_duplicate_items(mocker, order_factory, lines_factory):
-    mocked_fail = mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
-    )
-    mocked_client = mocker.MagicMock()
-
+def test_duplicate_items(mocker, order_factory, lines_factory, fulfillment_parameters_factory):
     order = order_factory(
         order_type="Change",
         lines=lines_factory() + lines_factory(),
     )
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.start_processing_attempt",
+        return_value=order,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info",
+        return_value=order,
+    )
+    mocked_client = mocker.MagicMock()
 
     fulfill_order(mocked_client, order)
 
@@ -1620,6 +1627,15 @@ def test_existing_items(mocker, order_factory, lines_factory):
     order = order_factory(
         order_type="Change",
         lines=lines_factory(line_id=2, item_id=10),
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.start_processing_attempt",
+        return_value=order,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info",
+        return_value=order,
     )
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=order["agreement"])
