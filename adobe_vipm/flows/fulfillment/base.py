@@ -35,7 +35,7 @@ def fulfill_order(client, order):
     try:
         order = populate_order_info(client, order)
 
-        start_processing_attempt(client, order)
+        order = start_processing_attempt(client, order)
 
         if is_purchase_order(order):
             fulfill_purchase_order(client, order)

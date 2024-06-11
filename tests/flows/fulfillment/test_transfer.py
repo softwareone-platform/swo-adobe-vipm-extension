@@ -177,7 +177,7 @@ def test_transfer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                retry_count="1",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
@@ -210,7 +210,7 @@ def test_transfer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                retry_count="1",
                 next_sync_date="2024-01-02",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -765,7 +765,7 @@ def test_fulfill_transfer_order_already_migrated(
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
-            retry_count="0",
+            retry_count="1",
         ),
         order_parameters=transfer_order_parameters_factory(
             company_name=adobe_customer["companyProfile"]["companyName"],
@@ -959,7 +959,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
-            retry_count="0",
+            retry_count="1",
         ),
         order_parameters=transfer_order_parameters_factory(
             company_name=adobe_customer["companyProfile"]["companyName"],
@@ -1347,7 +1347,7 @@ def test_transfer_3yc_customer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                retry_count="1",
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
@@ -1386,7 +1386,7 @@ def test_transfer_3yc_customer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                retry_count="1",
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
