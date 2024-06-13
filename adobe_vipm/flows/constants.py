@@ -150,6 +150,10 @@ ERR_ADOBE_ERROR = ValidationError(
     "VIPMV011",
     "Adobe returned an error: {details}."
 )
+ERR_ADOBE_MEMBERSHIP_ID_EMPTY = ValidationError(
+    "VIPMV012",
+    "No active items have been found for this membership."
+)
 
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
 ERR_ADOBE_UNEXPECTED_ERROR = "Adobe returned an unexpected error"
