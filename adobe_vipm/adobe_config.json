@@ -940,6 +940,39 @@
       "unit": "User"
     },
     {
+      "vendor_external_id": "65318386CA",
+      "sku": "65318386CA01012",
+      "segment": "Commercial",
+      "group": "CC",
+      "name": "Express for Teams",
+      "type": "Teams",
+      "unit": "User",
+      "intro_offer": true,
+      "intro_offer_detail": ""
+    },
+    {
+      "vendor_external_id": "65318387CA",
+      "sku": "65318387CA01012",
+      "segment": "Commercial",
+      "group": "CC",
+      "name": "Express for Teams",
+      "type": "Teams",
+      "unit": "User",
+      "intro_offer": true,
+      "intro_offer_detail": ""
+    },
+    {
+      "vendor_external_id": "65318388CA",
+      "sku": "65318388CA01012",
+      "segment": "Commercial",
+      "group": "CC",
+      "name": "Express for Teams",
+      "type": "Teams",
+      "unit": "User",
+      "intro_offer": true,
+      "intro_offer_detail": ""
+    },
+    {
       "vendor_external_id": "65322417CA",
       "sku": "65322417CA01A12",
       "segment": "Commercial",
