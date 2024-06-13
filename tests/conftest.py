@@ -1143,7 +1143,11 @@ def adobe_subscription_factory():
 @pytest.fixture()
 def adobe_preview_transfer_factory(adobe_items_factory):
     def _preview(items=None):
-        items = items or adobe_items_factory(renewal_date=date.today().isoformat())
+        items = (
+            items
+            if items is not None
+            else adobe_items_factory(renewal_date=date.today().isoformat())
+        )
         return {
             "totalCount": len(items),
             "items": items,

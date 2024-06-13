@@ -10,6 +10,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
+    ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_UNEXPECTED_ERROR,
@@ -374,5 +375,32 @@ def test_validate_transfer_migration_synchronized(
         title=param["name"],
         details="Membership has already been migrated",
     )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["required"] is True
+
+
+def test_validate_transfer_no_items(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    adobe_preview_transfer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    m_client = mocker.MagicMock()
+    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    adobe_preview_transfer = adobe_preview_transfer_factory(items=[])
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+
+    has_errors, validated_order, _ = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+
+    assert has_errors is True
+    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict()
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True

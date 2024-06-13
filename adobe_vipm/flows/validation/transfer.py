@@ -9,6 +9,7 @@ from adobe_vipm.flows.airtable import (
 )
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
+    ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_UNEXPECTED_ERROR,
@@ -34,6 +35,15 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
         for item in adobe_object["items"]
         if not is_transferring_item_expired(item)
     ]
+
+    if not returned_skus:
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
+        )
+        return True, order, adobe_object
 
     items_map = {
         item["externalIds"]["vendor"]: item
