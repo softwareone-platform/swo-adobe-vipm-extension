@@ -164,6 +164,7 @@ def test_create_customer_account(
         "companyProfile": {
             "companyName": company_name,
             "preferredLanguage": "en-US",
+            "marketSegments": ["COM"],
             "address": {
                 "country": customer_data["address"]["country"],
                 "region": customer_data["address"]["state"],
@@ -206,7 +207,7 @@ def test_create_customer_account(
     )
 
     customer_id = client.create_customer_account(
-        authorization_uk, seller_id, "external_id", customer_data
+        authorization_uk, seller_id, "external_id", "COM", customer_data
     )
     assert customer_id == {"customerId": "A-customer-id"}
 
@@ -241,7 +242,7 @@ def test_create_customer_account_bad_request(
 
     with pytest.raises(AdobeError) as cv:
         client.create_customer_account(
-            authorization_uk, seller_id, "external_id", customer_data
+            authorization_uk, seller_id, "external_id", "GOV", customer_data
         )
 
     assert repr(cv.value) == str(error)
@@ -1716,6 +1717,7 @@ def test_create_customer_account_3yc(
         "companyProfile": {
             "companyName": company_name,
             "preferredLanguage": "en-US",
+            "marketSegments": ["EDU"],
             "address": {
                 "country": modified_customer["address"]["country"],
                 "region": modified_customer["address"]["state"],
@@ -1769,7 +1771,7 @@ def test_create_customer_account_3yc(
     )
 
     customer_id = client.create_customer_account(
-        authorization_uk, seller_id, "external_id", modified_customer
+        authorization_uk, seller_id, "external_id", "EDU", modified_customer
     )
     assert customer_id == {"customerId": "A-customer-id"}
 

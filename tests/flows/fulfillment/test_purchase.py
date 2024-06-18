@@ -878,11 +878,13 @@ def test_customer_already_created_order_already_created_unexpected_status(
     )
 
 
+@pytest.mark.parametrize("segment", ["COM", "EDU", "GOV"])
 def test_create_customer_account(
     mocker,
     order,
     order_parameters_factory,
     fulfillment_parameters_factory,
+    segment,
 ):
     """
     Test create a customer account in Adobe.
@@ -904,6 +906,10 @@ def test_create_customer_account(
         "adobe_vipm.flows.fulfillment.shared.update_order",
         return_value=copy.deepcopy(order),
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_for_product",
+        return_value=segment,
+    )
     order = set_adobe_customer_id(order, "adobe-customer-id")
 
     updated_order = create_customer_account(
@@ -915,6 +921,7 @@ def test_create_customer_account(
         order["authorization"]["id"],
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
+        segment,
         {
             param["externalId"]: param.get("value")
             for param in order_parameters_factory()
@@ -981,6 +988,7 @@ def test_create_customer_account_empty_order_parameters(
         order["authorization"]["id"],
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
+        "COM",
         {
             param["externalId"]: param.get("value")
             for param in order_parameters_factory()
@@ -1245,6 +1253,7 @@ def test_create_customer_account_3yc(
         order["authorization"]["id"],
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
+        "COM",
         {
             param["externalId"]: param.get("value")
             for param in order_parameters_factory(p3yc=["Yes"], p3yc_licenses=10)
@@ -1459,6 +1468,7 @@ def test_create_customer_account_from_licensee(
         order["authorization"]["id"],
         order["agreement"]["seller"]["id"],
         order["agreement"]["id"],
+        "COM",
         {
             param["externalId"]: param.get("value")
             for param in order_parameters_factory(
