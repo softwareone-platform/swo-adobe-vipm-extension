@@ -171,7 +171,9 @@ def switch_order_to_failed(client, order, status_notes):
     """
     order = reset_retry_count(order)
     agreement = order["agreement"]
-    order = fail_order(client, order["id"], status_notes, parameters=order["parameters"])
+    order = fail_order(
+        client, order["id"], status_notes, parameters=order["parameters"]
+    )
     order["agreement"] = agreement
     send_email_notification(client, order)
     return order
@@ -566,7 +568,9 @@ def send_email_notification(mpt_client, order):
 
         context = {
             "order": order,
-            "activation_template": md2html(get_rendered_template(mpt_client, order["id"])),
+            "activation_template": md2html(
+                get_rendered_template(mpt_client, order["id"])
+            ),
             "api_base_url": settings.MPT_API_BASE_URL,
             "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         }
@@ -591,6 +595,6 @@ def get_one_time_skus(mpt_client, order):
     one_time_items = get_product_onetime_items_by_ids(
         mpt_client,
         order["agreement"]["product"]["id"],
-        [line["item"]["id"] for line in order["lines"]]
+        [line["item"]["id"] for line in order["lines"]],
     )
     return [item["externalIds"]["vendor"] for item in one_time_items]

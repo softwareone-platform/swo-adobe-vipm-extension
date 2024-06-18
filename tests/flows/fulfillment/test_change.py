@@ -195,7 +195,7 @@ def test_upsizing(
                 retry_count="0",
             ),
             "ordering": [],
-        }
+        },
     )
 
     assert mocked_get_template.mock_calls[0].args == (
@@ -699,6 +699,7 @@ def test_downsizing_return_order_exists(
         False,
         False,
     )
+
 
 def test_downsizing_return_order_pending(
     mocker,
@@ -1591,7 +1592,9 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
     )
 
 
-def test_duplicate_items(mocker, order_factory, lines_factory, fulfillment_parameters_factory):
+def test_duplicate_items(
+    mocker, order_factory, lines_factory, fulfillment_parameters_factory
+):
     order = order_factory(
         order_type="Change",
         lines=lines_factory() + lines_factory(),
@@ -1638,7 +1641,9 @@ def test_existing_items(mocker, order_factory, lines_factory):
         return_value=order,
     )
 
-    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=order["agreement"])
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_agreement", return_value=order["agreement"]
+    )
 
     fulfill_order(mocked_client, order)
 
@@ -1647,7 +1652,6 @@ def test_existing_items(mocker, order_factory, lines_factory):
         order,
         "The order cannot contain new lines for an existing item: ITM-1234-1234-1234-0010.",
     )
-
 
 
 def test_one_time_items(
@@ -1746,7 +1750,6 @@ def test_one_time_items(
     )
 
     fulfill_order(mocked_mpt_client, processing_change_order)
-
 
     mocked_update_subscription.assert_not_called()
     mocked_sync.assert_called_once_with(

@@ -212,7 +212,9 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
         return
 
     if transfer.status == STATUS_SYNCHRONIZED:
-        switch_order_to_failed(mpt_client, order, "Membership has already been migrated.")
+        switch_order_to_failed(
+            mpt_client, order, "Membership has already been migrated."
+        )
         return
 
     adobe_client = get_adobe_client()
@@ -249,7 +251,10 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
             # subscription are cotermed so it's ok to take the first created
             commitment_date = subscription["commitmentDate"]
 
-        if subscription and transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
+        if (
+            subscription
+            and transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED
+        ):
             adobe_client.update_subscription(
                 authorization_id,
                 transfer.customer_id,

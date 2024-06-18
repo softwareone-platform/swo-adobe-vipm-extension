@@ -115,11 +115,12 @@ def test_transfer(
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory() + items_factory(item_id=2, external_vendor_id="99999999CA"),
+        return_value=items_factory()
+        + items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocked_get_onetime = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
-        return_value=items_factory(item_id=2, external_vendor_id="99999999CA")
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
@@ -300,7 +301,7 @@ def test_transfer(
                     ),
                 },
             ),
-        }
+        },
     )
     mocked_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
@@ -332,7 +333,7 @@ def test_transfer(
     mocked_get_onetime.assert_called_once_with(
         mocked_mpt_client,
         order["agreement"]["product"]["id"],
-        [line["item"]["id"] for line in order["lines"]]
+        [line["item"]["id"] for line in order["lines"]],
     )
 
 
@@ -819,7 +820,9 @@ def test_fulfill_transfer_order_already_migrated(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
 
-    transfer_items = adobe_items_factory(subscription_id="sub-id") + adobe_items_factory(
+    transfer_items = adobe_items_factory(
+        subscription_id="sub-id"
+    ) + adobe_items_factory(
         line_number=2,
         offer_id="99999999CA01A12",
         subscription_id="onetime-sub-id",
@@ -863,7 +866,7 @@ def test_fulfill_transfer_order_already_migrated(
                 retry_count="0",
                 next_sync_date="2024-04-19",
             ),
-        }
+        },
     )
 
     assert mocked_update_order.mock_calls[0].args == (
@@ -1052,8 +1055,8 @@ def test_fulfill_transfer_order_already_migrated_3yc(
                 customer_id="a-client-id",
                 retry_count="0",
                 next_sync_date="2024-08-05",
-            )
-        }
+            ),
+        },
     )
 
     assert mocked_update_order.mock_calls[0].args == (
@@ -1477,7 +1480,7 @@ def test_transfer_3yc_customer(
                 p3yc_licenses="15",
                 p3yc_consumables="37",
             ),
-        }
+        },
     )
     mocked_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]

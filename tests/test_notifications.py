@@ -113,7 +113,7 @@ def test_send_notification_exception(mocker, settings, caplog):
         (send_warning, "#ffa500", "\u2622"),
         (send_error, "#df3422", "\U0001f4a3"),
         (send_exception, "#541c2e", "\U0001f525"),
-    ]
+    ],
 )
 def test_send_others(mocker, function, color, icon):
     mocked_send_notification = mocker.patch(
@@ -167,16 +167,16 @@ def test_send_email(mocker, settings):
         region_name="aws-region",
     )
     mocked_ses_client.send_email.assert_called_once_with(
-            Source="mpt@domain.com",
-            Destination={
-                "ToAddresses": ["customer@domain.com"],
+        Source="mpt@domain.com",
+        Destination={
+            "ToAddresses": ["customer@domain.com"],
+        },
+        Message={
+            "Subject": {"Data": "email-subject", "Charset": "UTF-8"},
+            "Body": {
+                "Html": {"Data": "rendered-template", "Charset": "UTF-8"},
             },
-            Message={
-                "Subject": {"Data": "email-subject", "Charset": "UTF-8"},
-                "Body": {
-                    "Html": {"Data": "rendered-template", "Charset": "UTF-8"},
-                },
-            },
+        },
     )
 
 

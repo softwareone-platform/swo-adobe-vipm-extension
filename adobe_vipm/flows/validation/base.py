@@ -51,20 +51,23 @@ def validate_order(mpt_client, order):
                     try:
                         order = update_purchase_prices(mpt_client, adobe_client, order)
                     except AdobeAPIError as e:
-                        order = set_order_error(order, ERR_ADOBE_ERROR.to_dict(details=str(e)))
+                        order = set_order_error(
+                            order, ERR_ADOBE_ERROR.to_dict(details=str(e))
+                        )
                         has_errors = True
 
         elif is_change_order(order) and order["lines"]:
             has_errors, order = validate_duplicate_or_existing_lines(order)
-        elif (
-            is_transfer_order(order)
-            and is_transfer_validation_enabled(order)
+        elif is_transfer_order(order) and is_transfer_validation_enabled(
+            order
         ):  # pragma: no branch
             has_errors, order, adobe_object = validate_transfer(
                 mpt_client, adobe_client, order
             )
             if not has_errors:
-                order = update_purchase_prices_for_transfer(mpt_client, order, adobe_object)
+                order = update_purchase_prices_for_transfer(
+                    mpt_client, order, adobe_object
+                )
 
         order = update_parameters_visibility(order)
 

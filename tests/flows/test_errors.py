@@ -27,11 +27,7 @@ def test_detailed_error(mpt_error_factory):
         "Bad Request",
         "One or more validation errors occurred.",
         trace_id="trace-id",
-        errors={
-            "id": [
-                "The value of 'id' does not match expected format."
-            ]
-        }
+        errors={"id": ["The value of 'id' does not match expected format."]},
     )
     error = MPTAPIError(400, error_data)
     assert error.trace_id == "trace-id"
@@ -48,11 +44,7 @@ def test_wrap_http_error(mocker, mpt_error_factory):
         "Bad Request",
         "One or more validation errors occurred.",
         trace_id="trace-id",
-        errors={
-            "id": [
-                "The value of 'id' does not match expected format."
-            ]
-        }
+        errors={"id": ["The value of 'id' does not match expected format."]},
     )
 
     def func():

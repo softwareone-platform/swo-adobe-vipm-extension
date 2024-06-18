@@ -736,7 +736,6 @@ def test_get_agreements_by_next_sync(mocker):
         "&select=lines,parameters,subscriptions,product,listing"
     )
 
-
     mocked_get_by_query = mocker.patch(
         "adobe_vipm.flows.mpt.get_agreements_by_query",
         return_value=[{"id": "AGR-0001"}],
@@ -755,10 +754,10 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_re
         if not is_recommitment
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
-    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
-    request_type_param_phase = (
-        "ordering" if not is_recommitment else "fulfillment"
+    request_type_param_ext_id = (
+        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
     )
+    request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
@@ -858,10 +857,10 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
 
-    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
-    request_type_param_phase = (
-        "ordering" if not is_recommitment else "fulfillment"
+    request_type_param_ext_id = (
+        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
     )
+    request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
     error_statuses = [STATUS_3YC_DECLINED, STATUS_3YC_NONCOMPLIANT, STATUS_3YC_EXPIRED]
 
@@ -896,7 +895,8 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
     mocked_client = mocker.MagicMock()
 
     assert get_agreements_for_3yc_resubmit(
-        mocked_client, is_recommitment=is_recommitment,
+        mocked_client,
+        is_recommitment=is_recommitment,
     ) == [{"id": "AGR-0001"}]
     mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
 
@@ -910,9 +910,7 @@ def test_get_rendered_template(mpt_client, requests_mocker):
     assert get_rendered_template(mpt_client, "ORD-1234") == "rendered-template"
 
 
-def test_get_rendered_template_error(
-    mpt_client, requests_mocker, mpt_error_factory
-):
+def test_get_rendered_template_error(mpt_client, requests_mocker, mpt_error_factory):
     requests_mocker.get(
         urljoin(mpt_client.base_url, "commerce/orders/ORD-1234/template"),
         status=404,
@@ -929,7 +927,8 @@ def test_get_product_onetime_items_by_ids(mpt_client, requests_mocker):
     product_id = "PRD-1234-5678"
     ids = ["ITM-0001", "ITM-0002"]
     rql_query = (
-        f"and(eq(product.id,{product_id}),in(id,({','.join(ids)})),eq(terms.period,one-time))"
+        f"and(eq(product.id,{product_id}),"
+        f"in(id,({','.join(ids)})),eq(terms.period,one-time))"
     )
     url = f"items?{rql_query}"
     page1_url = f"{url}&limit=10&offset=0"
@@ -971,7 +970,8 @@ def test_get_product_onetime_items_by_ids_error(
     product_id = "PRD-1234-5678"
     ids = ["ITM-0001", "ITM-0002"]
     rql_query = (
-        f"and(eq(product.id,{product_id}),in(id,({','.join(ids)})),eq(terms.period,OneTime))"
+        f"and(eq(product.id,{product_id}),"
+        f"in(id,({','.join(ids)})),eq(terms.period,OneTime))"
     )
     url = f"items?{rql_query}&limit=10&offset=0"
 

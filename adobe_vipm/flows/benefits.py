@@ -57,11 +57,13 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
         )
 
         status_param_ext_id = (
-           PARAM_3YC_COMMITMENT_REQUEST_STATUS
+            PARAM_3YC_COMMITMENT_REQUEST_STATUS
             if not is_recommitment
             else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
         )
-        request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+        request_type_param_ext_id = (
+            PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+        )
         request_type_param_phase = (
             PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
         )
@@ -91,7 +93,10 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                         "externalId": PARAM_3YC_START_DATE,
                         "value": commitment_info["startDate"],
                     },
-                    {"externalId": PARAM_3YC_END_DATE, "value": commitment_info["endDate"]},
+                    {
+                        "externalId": PARAM_3YC_END_DATE,
+                        "value": commitment_info["endDate"],
+                    },
                 ],
             )
 
@@ -129,7 +134,9 @@ def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
     adobe_client = get_adobe_client()
-    agreements = get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=is_recommitment)
+    agreements = get_agreements_for_3yc_resubmit(
+        mpt_client, is_recommitment=is_recommitment
+    )
     for agreement in agreements:
         authorization_id = agreement["authorization"]["id"]
         customer_id = get_adobe_customer_id(agreement)
@@ -150,7 +157,9 @@ def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
             is_recommitment=is_recommitment,
         )
 
-        commitment_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
+        commitment_info = get_3yc_commitment_request(
+            customer, is_recommitment=is_recommitment
+        )
         status = commitment_info["status"]
         parameters = {
             PARAM_PHASE_FULFILLMENT: [

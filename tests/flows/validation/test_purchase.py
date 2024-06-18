@@ -211,7 +211,9 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
     assert param["constraints"]["required"] is True
 
 
-def test_validate_address_invalid_state_did_u_mean(order_factory, order_parameters_factory):
+def test_validate_address_invalid_state_did_u_mean(
+    order_factory, order_parameters_factory
+):
     order = order_factory(
         order_parameters=order_parameters_factory(
             address={

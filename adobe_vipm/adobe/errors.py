@@ -34,6 +34,7 @@ class AdobeHttpError(AdobeError):
         self.content = content
         super().__init__(f"{self.status_code} - {self.content}")
 
+
 class AdobeAPIError(AdobeHttpError):
     def __init__(self, status_code: int, payload: dict) -> None:
         super().__init__(status_code, json.dumps(payload))
@@ -61,6 +62,8 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
             try:
                 raise AdobeAPIError(e.response.status_code, e.response.json())
             except JSONDecodeError:
-                raise AdobeHttpError(e.response.status_code, e.response.content.decode())
+                raise AdobeHttpError(
+                    e.response.status_code, e.response.content.decode()
+                )
 
     return _wrapper
