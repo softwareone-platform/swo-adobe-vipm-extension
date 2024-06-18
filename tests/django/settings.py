@@ -184,4 +184,5 @@ EXTENSION_CONFIG = {
     "ADOBE_AUTH_ENDPOINT_URL": "https://authenticate.adobe",
     "WEBHOOKS_SECRETS": {"PRD-1111-1111": "that's my awesome test secret"},
     "AIRTABLE_BASES": {"PRD-1111-1111": "some-bases"},
+    "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM", "PRD-2222-2222": "GOV"},
 }
