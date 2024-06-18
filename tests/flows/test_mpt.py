@@ -749,7 +749,7 @@ def test_get_agreements_by_next_sync(mocker):
 
 
 @pytest.mark.parametrize("is_recommitment", [True, False])
-def test_get_agreements_by_3yc_commitment_request_status(mocker, is_recommitment):
+def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_recommitment):
     param_external_id = (
         PARAM_3YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment
@@ -775,9 +775,11 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, is_recommitment
         ")"
     )
     status_condition = "eq(status,Active)"
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
 
     rql_query = (
-        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+        f"and({status_condition},{enroll_status_condition}"
+        f",{request_3yc_condition},{product_condition})&select=parameters"
     )
 
     mocked_get_by_query = mocker.patch(
@@ -794,7 +796,7 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, is_recommitment
 
 
 @freeze_time("2024-01-01 03:00:00")
-def test_get_agreements_for_3yc_recommitment(mocker):
+def test_get_agreements_for_3yc_recommitment(mocker, settings):
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{PARAM_3YC_ENROLL_STATUS}),"
@@ -824,6 +826,7 @@ def test_get_agreements_for_3yc_recommitment(mocker):
         ")"
     )
     status_condition = "eq(status,Active)"
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
 
     all_conditions = (
         enroll_status_condition,
@@ -831,6 +834,7 @@ def test_get_agreements_for_3yc_recommitment(mocker):
         enddate_gt_condition,
         enddate_le_condition,
         status_condition,
+        product_condition,
     )
 
     rql_query = f"and({','.join(all_conditions)})&select=parameters"
@@ -847,7 +851,7 @@ def test_get_agreements_for_3yc_recommitment(mocker):
 
 
 @pytest.mark.parametrize("is_recommitment", [True, False])
-def test_get_agreements_for_3yc_resubmit(mocker, is_recommitment):
+def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
     param_external_id = (
         PARAM_3YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment
@@ -877,9 +881,11 @@ def test_get_agreements_for_3yc_resubmit(mocker, is_recommitment):
         ")"
     )
     status_condition = "eq(status,Active)"
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
 
     rql_query = (
-        f"and({status_condition},{enroll_status_condition},{request_3yc_condition})&select=parameters"
+        f"and({status_condition},{enroll_status_condition},"
+        f"{request_3yc_condition},{product_condition})&select=parameters"
     )
 
     mocked_get_by_query = mocker.patch(
@@ -998,8 +1004,12 @@ def test_get_agreements_by_ids(mocker):
     mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
 
 
-def test_get_all_agreements(mocker):
-    rql_query = "eq(status,Active))&select=lines,parameters,subscriptions,product,listing"
+def test_get_all_agreements(mocker, settings):
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
+    rql_query = (
+        f"and(eq(status,Active),{product_condition})"
+        f"&select=lines,parameters,subscriptions,product,listing"
+    )
 
     mocked_get_by_query = mocker.patch(
         "adobe_vipm.flows.mpt.get_agreements_by_query",

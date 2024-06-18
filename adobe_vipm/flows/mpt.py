@@ -2,6 +2,8 @@ import logging
 from datetime import date, timedelta
 from functools import cache
 
+from django.conf import settings
+
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_ACCEPTED,
     STATUS_3YC_COMMITTED,
@@ -283,10 +285,11 @@ def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=
         ")"
     )
     status_condition = "eq(status,Active)"
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
 
     rql_query = (
         f"and({status_condition},{enroll_status_condition},"
-        f"{request_3yc_condition})&select=parameters"
+        f"{request_3yc_condition},{product_condition})&select=parameters"
     )
     return get_agreements_by_query(mpt_client, rql_query)
 
@@ -323,10 +326,11 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
         ")"
     )
     status_condition = "eq(status,Active)"
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
 
     rql_query = (
         f"and({status_condition},{enroll_status_condition},"
-        f"{request_3yc_condition})&select=parameters"
+        f"{request_3yc_condition},{product_condition})&select=parameters"
     )
     return get_agreements_by_query(mpt_client, rql_query)
 
@@ -363,6 +367,7 @@ def get_agreements_for_3yc_recommitment(mpt_client):
         ")"
     )
     status_condition = "eq(status,Active)"
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
 
     all_conditions = (
         enroll_status_condition,
@@ -370,6 +375,7 @@ def get_agreements_for_3yc_recommitment(mpt_client):
         enddate_gt_condition,
         enddate_le_condition,
         status_condition,
+        product_condition,
     )
 
     rql_query = f"and({','.join(all_conditions)})&select=parameters"
@@ -416,7 +422,9 @@ def get_agreements_by_ids(mpt_client, ids):
 def get_all_agreements(
     mpt_client,
 ):
+    product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
+
     return get_agreements_by_query(
         mpt_client,
-        "eq(status,Active))&select=lines,parameters,subscriptions,product,listing",
+        f"and(eq(status,Active),{product_condition})&select=lines,parameters,subscriptions,product,listing",
     )
