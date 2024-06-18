@@ -7,6 +7,9 @@ processing.
 import logging
 from collections import Counter
 
+from django.conf import settings
+from swo.mpt.extensions.runtime.djapp.conf import get_for_product
+
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     STATUS_INVALID_ADDRESS,
@@ -164,10 +167,12 @@ def create_customer_account(client, order):
             return
 
         external_id = order["agreement"]["id"]
+        product_id = order["agreement"]["product"]["id"]
         seller_id = order["agreement"]["seller"]["id"]
         authorization_id = order["authorization"]["id"]
+        market_segment = get_for_product(settings, "PRODUCT_SEGMENT", product_id)
         customer = adobe_client.create_customer_account(
-            authorization_id, seller_id, external_id, customer_data
+            authorization_id, seller_id, external_id, market_segment, customer_data
         )
         customer_id = customer["customerId"]
 

@@ -116,6 +116,7 @@ class AdobeClient:
         authorization_id: str,
         seller_id: str,
         agreement_id: str,
+        market_segment: str,
         customer_data: dict,
     ) -> str:
         """
@@ -125,6 +126,7 @@ class AdobeClient:
             authorization_id (str): Id of the authorization to use.
             seller_id (str): Id of the seller to use.
             agreement_id (str): id of the Marketplace platform agreement for this customer.
+            market_segment (str): COM, EDU, GOV.
             customer_data (dict): Data of the customer to create.
 
         Returns:
@@ -148,6 +150,7 @@ class AdobeClient:
                 "preferredLanguage": self._config.get_preferred_language(
                     customer_data["address"]["country"],
                 ),
+                "marketSegments": [market_segment],
                 "address": {
                     "country": customer_data["address"]["country"],
                     "region": state_code,
