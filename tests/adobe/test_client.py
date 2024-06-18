@@ -208,7 +208,7 @@ def test_create_customer_account(
     customer_id = client.create_customer_account(
         authorization_uk, seller_id, "external_id", customer_data
     )
-    assert customer_id == {'customerId': 'A-customer-id'}
+    assert customer_id == {"customerId": "A-customer-id"}
 
 
 def test_create_customer_account_bad_request(
@@ -1571,7 +1571,6 @@ def test_get_subscriptions(
     }
 
 
-
 def test_get_customer(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
@@ -1604,9 +1603,7 @@ def test_get_customer(
         ],
     )
 
-    assert client.get_customer(authorization_uk, customer_id) == {
-        "a": "customer"
-    }
+    assert client.get_customer(authorization_uk, customer_id) == {"a": "customer"}
 
 
 def test_get_customer_not_found(
@@ -1651,7 +1648,7 @@ def test_get_customer_not_found(
                     "offerType": "LICENSE",
                     "quantity": 12,
                 },
-            ]
+            ],
         ),
         (
             {"3YCConsumables": "500"},
@@ -1660,7 +1657,7 @@ def test_get_customer_not_found(
                     "offerType": "CONSUMABLES",
                     "quantity": 500,
                 },
-            ]
+            ],
         ),
         (
             {
@@ -1678,7 +1675,7 @@ def test_get_customer_not_found(
                 },
             ],
         ),
-    ]
+    ],
 )
 def test_create_customer_account_3yc(
     mocker,
@@ -1733,7 +1730,9 @@ def test_create_customer_account_3yc(
                     "firstName": modified_customer["contact"]["firstName"],
                     "lastName": modified_customer["contact"]["lastName"],
                     "email": modified_customer["contact"]["email"],
-                    "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
+                    "phoneNumber": join_phone_number(
+                        modified_customer["contact"]["phone"]
+                    ),
                 }
             ],
         },
@@ -1744,7 +1743,7 @@ def test_create_customer_account_3yc(
                     "minimumQuantities": expected,
                 },
             },
-        ]
+        ],
     }
 
     correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
@@ -1772,7 +1771,7 @@ def test_create_customer_account_3yc(
     customer_id = client.create_customer_account(
         authorization_uk, seller_id, "external_id", modified_customer
     )
-    assert customer_id == {'customerId': 'A-customer-id'}
+    assert customer_id == {"customerId": "A-customer-id"}
 
 
 @pytest.mark.parametrize(
@@ -1788,7 +1787,7 @@ def test_create_customer_account_3yc(
                     "offerType": "LICENSE",
                     "quantity": 12,
                 },
-            ]
+            ],
         ),
         (
             {
@@ -1800,7 +1799,7 @@ def test_create_customer_account_3yc(
                     "offerType": "CONSUMABLES",
                     "quantity": 500,
                 },
-            ]
+            ],
         ),
         (
             {
@@ -1818,7 +1817,7 @@ def test_create_customer_account_3yc(
                 },
             ],
         ),
-    ]
+    ],
 )
 @pytest.mark.parametrize("is_recommitment", [False, True])
 def test_create_3yc_request(
@@ -1843,32 +1842,31 @@ def test_create_3yc_request(
 
     client, authorization, api_token = adobe_client_factory()
 
-
     modified_customer = copy.copy(customer_data)
 
     company_name = f"{modified_customer['companyName']} (external_id)"
 
     companyProfile = {
-            "companyName": company_name,
-            "preferredLanguage": "en-US",
-            "address": {
-                "country": modified_customer["address"]["country"],
-                "region": modified_customer["address"]["state"],
-                "city": modified_customer["address"]["city"],
-                "addressLine1": modified_customer["address"]["addressLine1"],
-                "addressLine2": modified_customer["address"]["addressLine2"],
-                "postalCode": modified_customer["address"]["postCode"],
+        "companyName": company_name,
+        "preferredLanguage": "en-US",
+        "address": {
+            "country": modified_customer["address"]["country"],
+            "region": modified_customer["address"]["state"],
+            "city": modified_customer["address"]["city"],
+            "addressLine1": modified_customer["address"]["addressLine1"],
+            "addressLine2": modified_customer["address"]["addressLine2"],
+            "postalCode": modified_customer["address"]["postCode"],
+            "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
+        },
+        "contacts": [
+            {
+                "firstName": modified_customer["contact"]["firstName"],
+                "lastName": modified_customer["contact"]["lastName"],
+                "email": modified_customer["contact"]["email"],
                 "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
-            },
-            "contacts": [
-                {
-                    "firstName": modified_customer["contact"]["firstName"],
-                    "lastName": modified_customer["contact"]["lastName"],
-                    "email": modified_customer["contact"]["email"],
-                    "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
-                }
-            ],
-        }
+            }
+        ],
+    }
 
     client.get_customer = mocker.MagicMock(
         return_value={"companyProfile": companyProfile},
@@ -1885,12 +1883,15 @@ def test_create_3yc_request(
                     "minimumQuantities": expected,
                 },
             },
-        ]
+        ],
     }
 
     correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
     requests_mocker.patch(
-        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers/a-customer-id"),
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/a-customer-id",
+        ),
         status=200,
         json={
             "customerId": "a-customer-id",
@@ -1916,4 +1917,4 @@ def test_create_3yc_request(
         quantities,
         is_recommitment=is_recommitment,
     )
-    assert customer_id == {'customerId': 'a-customer-id'}
+    assert customer_id == {"customerId": "a-customer-id"}

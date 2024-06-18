@@ -40,7 +40,9 @@ REQUIRED_CUSTOMER_ORDER_PARAMS = (
     PARAM_CONTACT,
 )
 OPTIONAL_CUSTOMER_ORDER_PARAMS = (PARAM_3YC, PARAM_3YC_CONSUMABLES, PARAM_3YC_LICENSES)
-NEW_CUSTOMER_PARAMETERS = REQUIRED_CUSTOMER_ORDER_PARAMS + OPTIONAL_CUSTOMER_ORDER_PARAMS
+NEW_CUSTOMER_PARAMETERS = (
+    REQUIRED_CUSTOMER_ORDER_PARAMS + OPTIONAL_CUSTOMER_ORDER_PARAMS
+)
 
 PARAM_PHASE_ORDERING = "ordering"
 PARAM_PHASE_FULFILLMENT = "fulfillment"
@@ -136,23 +138,18 @@ ERR_3YC_QUANTITY_CONSUMABLES = ValidationError(
 ERR_3YC_NO_MINIMUMS = ValidationError(
     "VIPMV008",
     "To request 3-year commitment benefits you must fill at least one parameter between "
-    "`{title_min_licenses}` and `{title_min_consumables}`."
+    "`{title_min_licenses}` and `{title_min_consumables}`.",
 )
 ERR_DUPLICATED_ITEMS = ValidationError(
     "VIPMV009",
-    "The order cannot contain multiple lines for the same item: {duplicates}."
+    "The order cannot contain multiple lines for the same item: {duplicates}.",
 )
 ERR_EXISTING_ITEMS = ValidationError(
-    "VIPMV010",
-    "The order cannot contain new lines for an existing item: {duplicates}."
+    "VIPMV010", "The order cannot contain new lines for an existing item: {duplicates}."
 )
-ERR_ADOBE_ERROR = ValidationError(
-    "VIPMV011",
-    "Adobe returned an error: {details}."
-)
+ERR_ADOBE_ERROR = ValidationError("VIPMV011", "Adobe returned an error: {details}.")
 ERR_ADOBE_MEMBERSHIP_ID_EMPTY = ValidationError(
-    "VIPMV012",
-    "No active items have been found for this membership."
+    "VIPMV012", "No active items have been found for this membership."
 )
 
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
@@ -163,7 +160,7 @@ MPT_ORDER_STATUS_PROCESSING = "Processing"
 MPT_ORDER_STATUS_QUERYING = "Querying"
 MPT_ORDER_STATUS_COMPLETED = "Completed"
 
-TEMPLATE_NAME_TRANSFER="Transfer"
+TEMPLATE_NAME_TRANSFER = "Transfer"
 TEMPLATE_NAME_BULK_MIGRATE = "BulkMigrate"
 TEMPLATE_NAME_PURCHASE = "Purchase"
 TEMPLATE_NAME_CHANGE = "Change"

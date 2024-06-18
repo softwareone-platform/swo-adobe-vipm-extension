@@ -152,7 +152,9 @@ def validate_address(order, customer_data):
             )
             if suggestions:
                 if len(suggestions) > 1:
-                    did_u_mean = ERR_STATE_DID_YOU_MEAN.format(suggestion=", ".join(suggestions))
+                    did_u_mean = ERR_STATE_DID_YOU_MEAN.format(
+                        suggestion=", ".join(suggestions)
+                    )
                     state_error = f"{state_error}{did_u_mean}"
                     errors.append(state_error)
                 else:
@@ -173,7 +175,9 @@ def validate_address(order, customer_data):
         if not validator_func(address[field]):
             errors.append(err_msg)
 
-    if address["addressLine2"] and not is_valid_address_line_2_length(address["addressLine2"]):
+    if address["addressLine2"] and not is_valid_address_line_2_length(
+        address["addressLine2"]
+    ):
         errors.append(ERR_ADDRESS_LINE_2_LENGTH)
 
     if errors:
@@ -260,8 +264,7 @@ def validate_duplicate_lines(order):
     duplicates = [item for item, count in Counter(items).items() if count > 1]
     if duplicates:
         order = set_order_error(
-            order,
-            ERR_DUPLICATED_ITEMS.to_dict(duplicates=",".join(duplicates))
+            order, ERR_DUPLICATED_ITEMS.to_dict(duplicates=",".join(duplicates))
         )
         return True, order
 

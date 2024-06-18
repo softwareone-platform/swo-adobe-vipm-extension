@@ -42,12 +42,12 @@ def test_validate_transfer(
         lines=[],
     )
     product_items = items_factory()
-    valid_items = adobe_items_factory(
-        renewal_date=date.today().isoformat()
-    )
+    valid_items = adobe_items_factory(renewal_date=date.today().isoformat())
     expired_items = adobe_items_factory(
         line_number=2,
-        renewal_date=(date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)).isoformat()
+        renewal_date=(
+            date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)
+        ).isoformat(),
     )
     items = valid_items + expired_items
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
@@ -93,12 +93,12 @@ def test_validate_transfer_lines_exist(
         order_parameters=transfer_order_parameters_factory(),
     )
     product_items = items_factory()
-    valid_items = adobe_items_factory(
-        renewal_date=date.today().isoformat()
-    )
+    valid_items = adobe_items_factory(renewal_date=date.today().isoformat())
     expired_items = adobe_items_factory(
         line_number=2,
-        renewal_date=(date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)).isoformat()
+        renewal_date=(
+            date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)
+        ).isoformat(),
     )
     items = valid_items + expired_items
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)

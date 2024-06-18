@@ -13,6 +13,7 @@ from adobe_vipm.flows.utils import get_adobe_customer_id
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
+
 def test_sync_agreement_prices(
     mocker,
     agreement_factory,
@@ -55,7 +56,10 @@ def test_sync_agreement_prices(
 
     mocker.patch(
         "adobe_vipm.flows.sync.get_product_items_by_skus",
-        side_effect=[items_factory(), items_factory(item_id=2, external_vendor_id="77777777CA")],
+        side_effect=[
+            items_factory(),
+            items_factory(item_id=2, external_vendor_id="77777777CA"),
+        ],
     )
     mocker.patch(
         "adobe_vipm.flows.sync.get_pricelist_items_by_product_items",
@@ -66,7 +70,7 @@ def test_sync_agreement_prices(
                 external_vendor_id="77777777CA",
                 unit_purchase_price=20.22,
             ),
-        ]
+        ],
     )
 
     mocked_update_agreement_subscription = mocker.patch(
@@ -110,6 +114,7 @@ def test_sync_agreement_prices(
         parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
     )
 
+
 def test_sync_agreement_prices_dry_run(
     mocker,
     agreement_factory,
@@ -152,7 +157,10 @@ def test_sync_agreement_prices_dry_run(
 
     mocker.patch(
         "adobe_vipm.flows.sync.get_product_items_by_skus",
-        side_effect=[items_factory(), items_factory(item_id=2, external_vendor_id="77777777CA")],
+        side_effect=[
+            items_factory(),
+            items_factory(item_id=2, external_vendor_id="77777777CA"),
+        ],
     )
     mocker.patch(
         "adobe_vipm.flows.sync.get_pricelist_items_by_product_items",
@@ -163,7 +171,7 @@ def test_sync_agreement_prices_dry_run(
                 external_vendor_id="77777777CA",
                 unit_purchase_price=20.22,
             ),
-        ]
+        ],
     )
 
     mocked_update_agreement_subscription = mocker.patch(
@@ -328,7 +336,9 @@ def test_sync_agreement_prices_skip_3yc(
 
 @pytest.mark.parametrize("allow_3yc", [True, False])
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, allow_3yc, dry_run):
+def test_sync_agreements_by_agreement_ids(
+    mocker, agreement_factory, allow_3yc, dry_run
+):
     agreement = agreement_factory()
     mocked_mpt_client = mocker.MagicMock()
     mocker.patch(
@@ -339,7 +349,9 @@ def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, allow_3yc, 
         "adobe_vipm.flows.sync.sync_agreement_prices",
     )
 
-    sync_agreements_by_agreement_ids(mocked_mpt_client, [agreement["id"]], allow_3yc, dry_run)
+    sync_agreements_by_agreement_ids(
+        mocked_mpt_client, [agreement["id"]], allow_3yc, dry_run
+    )
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         agreement,

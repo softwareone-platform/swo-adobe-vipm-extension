@@ -9,8 +9,7 @@ def validate_duplicate_or_existing_lines(order):
     duplicates = [item for item, count in Counter(items).items() if count > 1]
     if duplicates:
         order = set_order_error(
-            order,
-            ERR_DUPLICATED_ITEMS.to_dict(duplicates=",".join(duplicates))
+            order, ERR_DUPLICATED_ITEMS.to_dict(duplicates=",".join(duplicates))
         )
         return True, order
 
@@ -19,12 +18,13 @@ def validate_duplicate_or_existing_lines(order):
         for line in subscription["lines"]:
             items.append(line["item"]["id"])
 
-    items.extend([line["item"]["id"] for line in order["lines"] if line["oldQuantity"] == 0])
+    items.extend(
+        [line["item"]["id"] for line in order["lines"] if line["oldQuantity"] == 0]
+    )
     duplicates = [item for item, count in Counter(items).items() if count > 1]
     if duplicates:
         order = set_order_error(
-            order,
-            ERR_EXISTING_ITEMS.to_dict(duplicates=",".join(duplicates))
+            order, ERR_EXISTING_ITEMS.to_dict(duplicates=",".join(duplicates))
         )
         return True, order
     return False, order

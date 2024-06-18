@@ -46,7 +46,9 @@ def get_transfer_link_button(transfer):
 
 def fill_customer_data(transfer, customer):
     transfer.customer_company_name = customer["companyProfile"]["companyName"]
-    transfer.customer_preferred_language = customer["companyProfile"]["preferredLanguage"]
+    transfer.customer_preferred_language = customer["companyProfile"][
+        "preferredLanguage"
+    ]
 
     address = customer["companyProfile"]["address"]
     transfer.customer_address_address_line_1 = address["addressLine1"]
@@ -67,7 +69,9 @@ def fill_customer_data(transfer, customer):
     if not commitment:
         return transfer
 
-    transfer.customer_benefits_3yc_start_date = date.fromisoformat(commitment["startDate"])
+    transfer.customer_benefits_3yc_start_date = date.fromisoformat(
+        commitment["startDate"]
+    )
     transfer.customer_benefits_3yc_end_date = date.fromisoformat(commitment["endDate"])
     transfer.customer_benefits_3yc_status = commitment["status"]
 
@@ -101,9 +105,7 @@ def check_retries(transfer):
     if transfer.adobe_error_code:
         facts = FactsSection(
             "Last error from Adobe",
-            {
-                transfer.adobe_error_code: transfer.adobe_error_description
-            }
+            {transfer.adobe_error_code: transfer.adobe_error_description},
         )
     send_error(
         "Migration max retries exceeded.",
@@ -124,7 +126,9 @@ def check_reschedules(transfer):
         transfer.save()
         return
 
-    transfer.migration_error_description = f"Max reschedules ({max_reschedule}) exceeded."
+    transfer.migration_error_description = (
+        f"Max reschedules ({max_reschedule}) exceeded."
+    )
     transfer.status = "failed"
     transfer.updated_at = datetime.now()
     transfer.save()
@@ -134,11 +138,9 @@ def check_reschedules(transfer):
         f"has been exceeded for the Membership **{transfer.membership_id}**.",
         facts=FactsSection(
             "Last error from Adobe",
-            {
-                transfer.adobe_error_code: transfer.adobe_error_description
-            }
+            {transfer.adobe_error_code: transfer.adobe_error_description},
         ),
-        button=get_transfer_link_button(transfer)
+        button=get_transfer_link_button(transfer),
     )
 
 
@@ -196,9 +198,9 @@ def start_transfers_for_product(product_id):
                             "Last error from Adobe",
                             {
                                 transfer.adobe_error_code: transfer.adobe_error_description
-                            }
+                            },
                         ),
-                        button=get_transfer_link_button(transfer)
+                        button=get_transfer_link_button(transfer),
                     )
                 continue
 
@@ -233,11 +235,9 @@ def start_transfers_for_product(product_id):
                 f"transfer for Membership **{transfer.membership_id}**.",
                 facts=FactsSection(
                     "Last error from Adobe",
-                    {
-                        transfer.adobe_error_code: transfer.adobe_error_description
-                    }
+                    {transfer.adobe_error_code: transfer.adobe_error_description},
                 ),
-                button=get_transfer_link_button(transfer)
+                button=get_transfer_link_button(transfer),
             )
             continue
 
@@ -286,11 +286,9 @@ def check_running_transfers_for_product(product_id):
                 f"retrieving the transfer for Membership **{transfer.membership_id}**.",
                 facts=FactsSection(
                     "Last error from Adobe",
-                    {
-                        transfer.adobe_error_code: transfer.adobe_error_description
-                    }
+                    {transfer.adobe_error_code: transfer.adobe_error_description},
                 ),
-                button=get_transfer_link_button(transfer)
+                button=get_transfer_link_button(transfer),
             )
             continue
 
@@ -298,7 +296,9 @@ def check_running_transfers_for_product(product_id):
 
         customer = None
         try:
-            customer = client.get_customer(transfer.authorization_uk, transfer.customer_id)
+            customer = client.get_customer(
+                transfer.authorization_uk, transfer.customer_id
+            )
         except AdobeAPIError as api_err:
             transfer.adobe_error_code = api_err.code
             transfer.adobe_error_description = str(api_err)
@@ -338,6 +338,7 @@ def check_running_transfers_for_product(product_id):
         transfer.updated_at = datetime.now()
         transfer.completed_at = datetime.now()
         transfer.save()
+
 
 def process_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:

@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 def dateformat(date_string):
     return (
-        datetime.fromisoformat(date_string).strftime("%-d %B %Y")
-        if date_string else ""
+        datetime.fromisoformat(date_string).strftime("%-d %B %Y") if date_string else ""
     )
+
 
 env = Environment(
     loader=FileSystemLoader(

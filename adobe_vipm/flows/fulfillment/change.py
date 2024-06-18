@@ -95,7 +95,9 @@ def _upsize_out_of_win_or_migrated_subscriptions(customer_id, order, lines):
     return lines_to_order
 
 
-def _downsize_out_of_win_or_migrated_subscriptions(mpt_client, customer_id, order, lines):
+def _downsize_out_of_win_or_migrated_subscriptions(
+    mpt_client, customer_id, order, lines
+):
     """
     Reduces the renewal quantity for subscriptions that need to be downsized but were created
     X days before the change order (outside the cancellation window) or migrated from Adobe VIP.
@@ -159,7 +161,6 @@ def _downsize_out_of_win_or_migrated_subscriptions(mpt_client, customer_id, orde
         line_item for _, line_item in mpt_subscription_to_adobe_line_item_map
     ]
     update_order_actual_price(mpt_client, order, lines, adobe_line_items)
-
 
 
 def _submit_change_order(mpt_client, customer_id, order):
@@ -252,7 +253,7 @@ def fulfill_change_order(mpt_client, order):
         switch_order_to_failed(
             mpt_client,
             order,
-            f"The order cannot contain multiple lines for the same item: {','.join(duplicates)}."
+            f"The order cannot contain multiple lines for the same item: {','.join(duplicates)}.",
         )
         return
 
@@ -261,13 +262,15 @@ def fulfill_change_order(mpt_client, order):
         for line in subscription["lines"]:
             items.append(line["item"]["id"])
 
-    items.extend([line["item"]["id"] for line in order["lines"] if line["oldQuantity"] == 0])
+    items.extend(
+        [line["item"]["id"] for line in order["lines"] if line["oldQuantity"] == 0]
+    )
     duplicates = [item for item, count in Counter(items).items() if count > 1]
     if duplicates:
         switch_order_to_failed(
             mpt_client,
             order,
-            f"The order cannot contain new lines for an existing item: {','.join(duplicates)}."
+            f"The order cannot contain new lines for an existing item: {','.join(duplicates)}.",
         )
         return
 
@@ -292,7 +295,6 @@ def fulfill_change_order(mpt_client, order):
     if not adobe_order:
         return
 
-
     one_time_skus = get_one_time_skus(mpt_client, order)
     updated_lines = []
 
@@ -309,9 +311,7 @@ def fulfill_change_order(mpt_client, order):
                 order_line["id"],
             )
             if not order_subscription:
-                add_subscription(
-                    mpt_client, adobe_client, customer_id, order, item
-                )
+                add_subscription(mpt_client, adobe_client, customer_id, order, item)
             else:
                 adobe_sku = item["offerId"]
 
@@ -326,4 +326,6 @@ def fulfill_change_order(mpt_client, order):
         mpt_client, order, updated_lines, adobe_order["lineItems"]
     )
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_CHANGE)
-    sync_agreements_by_agreement_ids(mpt_client, [order["agreement"]["id"]], False, False)
+    sync_agreements_by_agreement_ids(
+        mpt_client, [order["agreement"]["id"]], False, False
+    )

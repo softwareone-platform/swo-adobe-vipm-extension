@@ -68,7 +68,9 @@ def test_no_customer(
     )
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
-    mocker.patch("adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"])
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
+    )
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
         return_value=order_factory(
@@ -188,7 +190,7 @@ def test_no_customer(
             fulfillment_parameters=fulfillment_parameters_factory(
                 retry_count="1",
             )
-        )
+        ),
     )
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         authorization_id,
@@ -196,7 +198,6 @@ def test_no_customer(
         order_with_customer_param["id"],
         order_with_customer_param["lines"],
     )
-
 
     assert mocked_update_order.mock_calls[0].args == (
         mocked_mpt_client,
@@ -344,7 +345,9 @@ def test_no_customer_subscription_already_created(
     )
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
-    mocker.patch("adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"])
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
+    )
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
         return_value=order_factory(
@@ -452,7 +455,7 @@ def test_no_customer_subscription_already_created(
             fulfillment_parameters=fulfillment_parameters_factory(
                 retry_count="1",
             ),
-        )
+        ),
     )
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         authorization_id,
@@ -1590,7 +1593,9 @@ def test_one_time_items(
     pricelist_items_factory,
 ):
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
-    mocker.patch("adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"])
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
+    )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -1687,7 +1692,8 @@ def test_one_time_items(
 
     order_with_customer_param = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
-            customer_id="a-client-id", retry_count="1",
+            customer_id="a-client-id",
+            retry_count="1",
         ),
         lines=order_lines,
     )
@@ -1703,7 +1709,7 @@ def test_one_time_items(
                 retry_count="1",
             ),
             lines=order_lines,
-        )
+        ),
     )
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         authorization_id,

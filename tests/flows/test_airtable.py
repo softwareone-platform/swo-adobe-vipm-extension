@@ -187,7 +187,10 @@ def test_get_transfer_link(mocker):
     table_mock.schema.return_value = schema_mock
     transfer.get_table.return_value = table_mock
 
-    assert get_transfer_link(transfer) == "https://airtable.com/base-id/table-id/view-id/record-id"
+    assert (
+        get_transfer_link(transfer)
+        == "https://airtable.com/base-id/table-id/view-id/record-id"
+    )
 
 
 def test_get_transfer_link_exception(mocker):

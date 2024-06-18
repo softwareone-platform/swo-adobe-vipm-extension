@@ -785,7 +785,9 @@ class AdobeClient:
 
         customer = self.get_customer(authorization_id, customer_id)
 
-        request_type = "commitmentRequest" if not is_recommitment else "recommitmentRequest"
+        request_type = (
+            "commitmentRequest" if not is_recommitment else "recommitmentRequest"
+        )
 
         quantities = []
         if commitment_request["3YCLicenses"]:
@@ -811,7 +813,7 @@ class AdobeClient:
                         "minimumQuantities": quantities,
                     },
                 },
-            ]
+            ],
         }
 
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()

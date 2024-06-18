@@ -157,7 +157,9 @@ def create_customer_account(client, order):
             order = set_ordering_parameter_error(
                 order,
                 PARAM_CONTACT,
-                ERR_ADOBE_CONTACT.to_dict(title=param["name"], details="it is mandatory."),
+                ERR_ADOBE_CONTACT.to_dict(
+                    title=param["name"], details="it is mandatory."
+                ),
             )
 
             switch_order_to_query(client, order)
@@ -222,7 +224,7 @@ def fulfill_purchase_order(mpt_client, order):
         switch_order_to_failed(
             mpt_client,
             order,
-            f"The order cannot contain multiple lines for the same item: {','.join(duplicates)}."
+            f"The order cannot contain multiple lines for the same item: {','.join(duplicates)}.",
         )
         return
 

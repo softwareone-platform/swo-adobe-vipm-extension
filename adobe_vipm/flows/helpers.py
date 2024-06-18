@@ -41,7 +41,9 @@ def populate_order_info(client, order):
         dict: The enriched order.
     """
     order["agreement"] = get_agreement(client, order["agreement"]["id"])
-    order["agreement"]["licensee"] = get_licensee(client, order["agreement"]["licensee"]["id"])
+    order["agreement"]["licensee"] = get_licensee(
+        client, order["agreement"]["licensee"]["id"]
+    )
 
     return order
 
@@ -116,7 +118,9 @@ def _update_purchase_prices(mpt_client, order, line_items):
     }
     updated_lines = []
     for preview_item in line_items:
-        order_line = get_order_line_by_sku(order, get_partial_sku(preview_item["offerId"]))
+        order_line = get_order_line_by_sku(
+            order, get_partial_sku(preview_item["offerId"])
+        )
         order_line.setdefault("price", {})
         order_line["price"]["unitPP"] = sku_pricelist_item_map[preview_item["offerId"]][
             "unitPP"

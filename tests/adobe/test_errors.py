@@ -37,8 +37,8 @@ def test_wrap_http_error(mocker, adobe_api_error_factory):
         response = mocker.MagicMock()
         response.status_code = 400
         response.json.return_value = adobe_api_error_factory(
-        "5678", "error message with details", details=["detail1", "detail2"]
-    )
+            "5678", "error message with details", details=["detail1", "detail2"]
+        )
         raise HTTPError(response=response)
 
     wrapped_func = wrap_http_error(func)
