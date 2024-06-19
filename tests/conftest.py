@@ -31,6 +31,7 @@ from adobe_vipm.flows.constants import (
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
+    PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
     PARAM_RETRY_COUNT,
@@ -571,6 +572,7 @@ def fulfillment_parameters_factory():
         p3yc_start_date="",
         p3yc_end_date="",
         next_sync_date="",
+        market_segment_eligibility_status=None,
     ):
         return [
             {
@@ -635,6 +637,13 @@ def fulfillment_parameters_factory():
                 "externalId": PARAM_3YC_RECOMMITMENT,
                 "type": "Checkbox",
                 "value": p3yc_recommitment or [],
+            },
+            {
+                "id": "PAR-0000-6666",
+                "name": "Eligibility Status",
+                "externalId": PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
+                "type": "Dropdown",
+                "value": market_segment_eligibility_status,
             },
         ]
 

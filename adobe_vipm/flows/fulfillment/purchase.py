@@ -7,9 +7,6 @@ processing.
 import logging
 from collections import Counter
 
-from django.conf import settings
-from swo.mpt.extensions.runtime.djapp.conf import get_for_product
-
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     STATUS_INVALID_ADDRESS,
@@ -25,11 +22,14 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
+    MARKET_SEGMENT_COMMERCIAL,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
+    STATUS_MARKET_SEGMENT_PENDING,
     TEMPLATE_NAME_PURCHASE,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -49,8 +49,11 @@ from adobe_vipm.flows.helpers import prepare_customer_data
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
+    get_market_segment,
+    get_market_segment_eligibility_status,
     get_ordering_parameter,
     get_partial_sku,
+    set_market_segment_eligibility_status_pending,
     set_order_error,
     set_ordering_parameter_error,
 )
@@ -169,10 +172,9 @@ def create_customer_account(client, order):
             return
 
         external_id = order["agreement"]["id"]
-        product_id = order["agreement"]["product"]["id"]
         seller_id = order["agreement"]["seller"]["id"]
         authorization_id = order["authorization"]["id"]
-        market_segment = get_for_product(settings, "PRODUCT_SEGMENT", product_id)
+        market_segment = get_market_segment(order["agreement"]["product"]["id"])
         customer = adobe_client.create_customer_account(
             authorization_id, seller_id, external_id, market_segment, customer_data
         )
@@ -211,6 +213,25 @@ def _submit_new_order(mpt_client, customer_id, order):
     return save_adobe_order_id(mpt_client, order, adobe_order["orderId"])
 
 
+def _check_market_segment_eligibility(mpt_client, order):
+    market_segment = get_market_segment(order["agreement"]["product"]["id"])
+    if market_segment != MARKET_SEGMENT_COMMERCIAL:
+        status = get_market_segment_eligibility_status(order)
+        if not status:
+            order = set_market_segment_eligibility_status_pending(order)
+            switch_order_to_query(mpt_client, order)
+            return False
+        if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
+            switch_order_to_failed(
+                mpt_client,
+                order,
+                f"The agreement is not eligible for market segment {market_segment}.",
+            )
+            return False
+        if status == STATUS_MARKET_SEGMENT_PENDING:
+            return False
+    return True
+
 def fulfill_purchase_order(mpt_client, order):
     """
     Fulfills a purchase order by processing the necessary actions based on the provided parameters.
@@ -234,6 +255,9 @@ def fulfill_purchase_order(mpt_client, order):
         return
 
     check_processing_template(mpt_client, order, TEMPLATE_NAME_PURCHASE)
+
+    if not _check_market_segment_eligibility(mpt_client, order):
+        return
 
     adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)

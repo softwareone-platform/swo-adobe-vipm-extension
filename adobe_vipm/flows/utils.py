@@ -4,7 +4,9 @@ import re
 from datetime import UTC, date, datetime
 
 import phonenumbers
+from django.conf import settings
 from markdown_it import MarkdownIt
+from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.constants import (
     OFFER_TYPE_CONSUMABLES,
@@ -31,12 +33,14 @@ from adobe_vipm.flows.constants import (
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
     PARAM_CUSTOMER_ID,
+    PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
     PARAM_RETRY_COUNT,
     REQUIRED_CUSTOMER_ORDER_PARAMS,
+    STATUS_MARKET_SEGMENT_PENDING,
 )
 from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.notifications import send_exception
@@ -767,3 +771,24 @@ def get_customer_consumables_discount_level(customer):
 
 def is_consumables_sku(sku):
     return sku[10] == "T"
+
+
+def get_market_segment(product_id):
+    return get_for_product(settings, "PRODUCT_SEGMENT", product_id)
+
+
+def get_market_segment_eligibility_status(order):
+    return get_fulfillment_parameter(
+        order,
+        PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
+    ).get("value")
+
+
+def set_market_segment_eligibility_status_pending(order):
+    updated_order = copy.deepcopy(order)
+    ff_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
+    )
+    ff_param["value"] = STATUS_MARKET_SEGMENT_PENDING
+    return updated_order
