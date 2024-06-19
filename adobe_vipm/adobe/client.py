@@ -150,7 +150,7 @@ class AdobeClient:
                 "preferredLanguage": self._config.get_preferred_language(
                     customer_data["address"]["country"],
                 ),
-                "marketSegments": [market_segment],
+                "marketSegment": market_segment,
                 "address": {
                     "country": customer_data["address"]["country"],
                     "region": state_code,
