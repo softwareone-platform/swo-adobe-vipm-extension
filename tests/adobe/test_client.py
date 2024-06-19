@@ -164,7 +164,7 @@ def test_create_customer_account(
         "companyProfile": {
             "companyName": company_name,
             "preferredLanguage": "en-US",
-            "marketSegments": ["COM"],
+            "marketSegment": "COM",
             "address": {
                 "country": customer_data["address"]["country"],
                 "region": customer_data["address"]["state"],
@@ -1717,7 +1717,7 @@ def test_create_customer_account_3yc(
         "companyProfile": {
             "companyName": company_name,
             "preferredLanguage": "en-US",
-            "marketSegments": ["EDU"],
+            "marketSegment": "EDU",
             "address": {
                 "country": modified_customer["address"]["country"],
                 "region": modified_customer["address"]["state"],
