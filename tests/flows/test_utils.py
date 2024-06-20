@@ -6,7 +6,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
     STATUS_PROCESSED,
 )
-from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS, RENEWAL_WINDOW_DAYS
+from adobe_vipm.flows.constants import CANCELLATION_WINDOW_DAYS
 from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
@@ -375,7 +375,7 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
         is_transferring_item_expired(
             adobe_items_factory(
                 renewal_date=(
-                    date.today() - timedelta(days=RENEWAL_WINDOW_DAYS)
+                    date.today() + timedelta(days=5)
                 ).isoformat()
             )[0]
         )
@@ -386,7 +386,7 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
         is_transferring_item_expired(
             adobe_items_factory(
                 renewal_date=(
-                    date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)
+                    date.today() - timedelta(days=5)
                 ).isoformat()
             )[0]
         )
