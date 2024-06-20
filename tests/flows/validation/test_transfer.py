@@ -15,7 +15,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_UNEXPECTED_ERROR,
     PARAM_MEMBERSHIP_ID,
-    RENEWAL_WINDOW_DAYS,
 )
 from adobe_vipm.flows.utils import get_ordering_parameter
 from adobe_vipm.flows.validation.transfer import validate_transfer
@@ -46,7 +45,7 @@ def test_validate_transfer(
     expired_items = adobe_items_factory(
         line_number=2,
         renewal_date=(
-            date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)
+            date.today() - timedelta(days=5)
         ).isoformat(),
     )
     items = valid_items + expired_items
@@ -97,7 +96,7 @@ def test_validate_transfer_lines_exist(
     expired_items = adobe_items_factory(
         line_number=2,
         renewal_date=(
-            date.today() - timedelta(days=RENEWAL_WINDOW_DAYS + 1)
+            date.today() - timedelta(days=5)
         ).isoformat(),
     )
     items = valid_items + expired_items

@@ -36,7 +36,6 @@ from adobe_vipm.flows.constants import (
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
     PARAM_RETRY_COUNT,
-    RENEWAL_WINDOW_DAYS,
     REQUIRED_CUSTOMER_ORDER_PARAMS,
 )
 from adobe_vipm.flows.dataclasses import ItemGroups
@@ -737,11 +736,7 @@ def is_transferring_item_expired(item):
         return True
 
     renewal_date = date.fromisoformat(item["renewalDate"])
-
-    if (date.today() - renewal_date).days > RENEWAL_WINDOW_DAYS:
-        return True
-
-    return False
+    return date.today() > renewal_date
 
 
 def get_partial_sku(full_sku):
