@@ -30,6 +30,9 @@ from adobe_vipm.flows.constants import (
     PARAM_AGREEMENT_TYPE,
     PARAM_CONTACT,
     PARAM_MEMBERSHIP_ID,
+    STATUS_MARKET_SEGMENT_ELIGIBLE,
+    STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
+    STATUS_MARKET_SEGMENT_PENDING,
     TEMPLATE_NAME_PURCHASE,
 )
 from adobe_vipm.flows.fulfillment import fulfill_order
@@ -654,6 +657,9 @@ def test_create_customer_fails(
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info", return_value=order
+    )
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -694,6 +700,9 @@ def test_create_adobe_preview_order_error(
 
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(customer_id="a-client-id")
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info", return_value=order
     )
 
     fulfill_order(mocked_mpt_client, order)
@@ -737,6 +746,9 @@ def test_customer_and_order_already_created_adobe_order_not_ready(
             customer_id="a-client-id",
         ),
         external_ids={"vendor": "an-order-id"},
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info", return_value=order
     )
 
     fulfill_order(mocked_mpt_client, order)
@@ -784,6 +796,9 @@ def test_customer_already_created_order_already_created_max_retries_reached(
         ),
         external_ids={"vendor": "an-order-id"},
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info", return_value=order
+    )
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -827,6 +842,9 @@ def test_customer_already_created_order_already_created_unrecoverable_status(
         ),
         external_ids={"vendor": "an-order-id"},
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info", return_value=order
+    )
 
     fulfill_order(mocked_mpt_client, order)
 
@@ -866,6 +884,9 @@ def test_customer_already_created_order_already_created_unexpected_status(
             retry_count=10,
         ),
         external_ids={"vendor": "an-order-id"},
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info", return_value=order
     )
 
     fulfill_order(mocked_mpt_client, order)
@@ -907,7 +928,7 @@ def test_create_customer_account(
         return_value=copy.deepcopy(order),
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.purchase.get_for_product",
+        "adobe_vipm.flows.fulfillment.purchase.get_market_segment",
         return_value=segment,
     )
     order = set_adobe_customer_id(order, "adobe-customer-id")
@@ -1774,4 +1795,162 @@ def test_one_time_items(
         mocked_mpt_client,
         order["agreement"]["product"]["id"],
         [line["item"]["id"] for line in order_lines],
+    )
+
+
+@pytest.mark.parametrize("segment", ["EDU", "GOV"])
+def test_segment_eligibility_status_not_set(
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    segment,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_market_segment",
+        return_value=segment,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.check_processing_template",
+    )
+    mocked_switch_to_query = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
+    )
+    order = order_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info",
+        return_value=order,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.start_processing_attempt",
+        return_value=order,
+    )
+    mocked_mpt_client = mocker.MagicMock()
+    fulfill_order(mocked_mpt_client, order)
+
+    mocked_switch_to_query.assert_called_once_with(
+        mocked_mpt_client,
+        order_factory(
+            fulfillment_parameters=fulfillment_parameters_factory(
+                market_segment_eligibility_status=STATUS_MARKET_SEGMENT_PENDING,
+            ),
+        )
+    )
+
+
+@pytest.mark.parametrize("segment", ["EDU", "GOV"])
+def test_segment_eligibility_status_not_eligible(
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    segment,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_market_segment",
+        return_value=segment,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.check_processing_template",
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_failed",
+    )
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            market_segment_eligibility_status=STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
+        ),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info",
+        return_value=order,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.start_processing_attempt",
+        return_value=order,
+    )
+    mocked_mpt_client = mocker.MagicMock()
+    fulfill_order(mocked_mpt_client, order)
+
+    mocked_switch_to_failed.assert_called_once_with(
+        mocked_mpt_client,
+        order,
+        f"The agreement is not eligible for market segment {segment}.",
+    )
+
+
+@pytest.mark.parametrize("segment", ["EDU", "GOV"])
+def test_segment_eligibility_status_pending(
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    segment,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_market_segment",
+        return_value=segment,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.check_processing_template",
+    )
+    mocked_create_account = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
+    )
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            market_segment_eligibility_status=STATUS_MARKET_SEGMENT_PENDING,
+        ),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info",
+        return_value=order,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.start_processing_attempt",
+        return_value=order,
+    )
+    mocked_mpt_client = mocker.MagicMock()
+    fulfill_order(mocked_mpt_client, order)
+
+    mocked_create_account.assert_not_called()
+
+
+@pytest.mark.parametrize("segment", ["EDU", "GOV"])
+def test_segment_eligibility_status_eligible(
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    segment,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_market_segment",
+        return_value=segment,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.check_processing_template",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+    )
+    mocked_create_account = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
+        return_value=None,
+    )
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            market_segment_eligibility_status=STATUS_MARKET_SEGMENT_ELIGIBLE,
+        ),
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.populate_order_info",
+        return_value=order,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.start_processing_attempt",
+        return_value=order,
+    )
+    mocked_mpt_client = mocker.MagicMock()
+    fulfill_order(mocked_mpt_client, order)
+
+    mocked_create_account.assert_called_once_with(
+        mocked_mpt_client,
+        order,
     )
