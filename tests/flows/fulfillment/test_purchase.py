@@ -1833,7 +1833,7 @@ def test_segment_eligibility_status_not_set(
             fulfillment_parameters=fulfillment_parameters_factory(
                 market_segment_eligibility_status=STATUS_MARKET_SEGMENT_PENDING,
             ),
-        )
+        ),
     )
 
 

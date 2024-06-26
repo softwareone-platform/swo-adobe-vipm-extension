@@ -232,6 +232,7 @@ def _check_market_segment_eligibility(mpt_client, order):
             return False
     return True
 
+
 def fulfill_purchase_order(mpt_client, order):
     """
     Fulfills a purchase order by processing the necessary actions based on the provided parameters.

@@ -5,7 +5,7 @@ This module contains orders helper functions.
 import logging
 
 from adobe_vipm.flows.constants import (
-    FAKE_CUSTOMER_ID,
+    FAKE_CUSTOMERS_IDS,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -20,6 +20,7 @@ from adobe_vipm.flows.mpt import (
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_customer_data,
+    get_market_segment,
     get_order_line_by_sku,
     get_partial_sku,
     set_customer_data,
@@ -145,7 +146,8 @@ def update_purchase_prices(mpt_client, adobe_client, order):
     Returns:
         dict: The updated order
     """
-    customer_id = get_adobe_customer_id(order) or FAKE_CUSTOMER_ID
+    product_segment = get_market_segment(order["agreement"]["product"]["id"])
+    customer_id = get_adobe_customer_id(order) or FAKE_CUSTOMERS_IDS[product_segment]
     authorization_id = order["authorization"]["id"]
     preview_order = adobe_client.create_preview_order(
         authorization_id, customer_id, order["id"], order["lines"]
