@@ -748,7 +748,9 @@ def test_get_agreements_by_next_sync(mocker):
 
 
 @pytest.mark.parametrize("is_recommitment", [True, False])
-def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_recommitment):
+def test_get_agreements_by_3yc_commitment_request_status(
+    mocker, settings, is_recommitment
+):
     param_external_id = (
         PARAM_3YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment

@@ -374,9 +374,7 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
     assert (
         is_transferring_item_expired(
             adobe_items_factory(
-                renewal_date=(
-                    date.today() + timedelta(days=5)
-                ).isoformat()
+                renewal_date=(date.today() + timedelta(days=5)).isoformat()
             )[0]
         )
         is False
@@ -385,9 +383,7 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
     assert (
         is_transferring_item_expired(
             adobe_items_factory(
-                renewal_date=(
-                    date.today() - timedelta(days=5)
-                ).isoformat()
+                renewal_date=(date.today() - timedelta(days=5)).isoformat()
             )[0]
         )
         is True
