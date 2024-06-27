@@ -219,7 +219,7 @@ def _check_market_segment_eligibility(mpt_client, order):
         status = get_market_segment_eligibility_status(order)
         if not status:
             order = set_market_segment_eligibility_status_pending(order)
-            switch_order_to_query(mpt_client, order)
+            switch_order_to_query(mpt_client, order, template_name="Purchase")
             return False
         if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
             switch_order_to_failed(

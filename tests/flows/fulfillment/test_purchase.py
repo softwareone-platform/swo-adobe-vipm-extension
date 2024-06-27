@@ -1179,6 +1179,7 @@ def test_create_customer_account_fields_error(
         mocked_mpt_client,
         mocker.ANY,
         MPT_ORDER_STATUS_QUERYING,
+        name=None,
     )
 
     assert updated_order is None
@@ -1834,6 +1835,7 @@ def test_segment_eligibility_status_not_set(
                 market_segment_eligibility_status=STATUS_MARKET_SEGMENT_PENDING,
             ),
         ),
+        template_name="Purchase",
     )
 
 
