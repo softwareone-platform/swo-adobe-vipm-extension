@@ -179,7 +179,7 @@ def switch_order_to_failed(client, order, status_notes):
     return order
 
 
-def switch_order_to_query(client, order):
+def switch_order_to_query(client, order, template_name=None):
     """
     Switches the status of an MPT order to 'query' and resetting any retry attempts and
     initiating a query order process.
@@ -187,12 +187,16 @@ def switch_order_to_query(client, order):
     Args:
         client (MPTClient): An instance of the Marketplace platform client.
         order (dict): The MPT order to be switched to 'query' status.
+        template_name: The name of the template to use, if None -> use default
 
     Returns:
         None
     """
     template = get_product_template_or_default(
-        client, order["agreement"]["product"]["id"], MPT_ORDER_STATUS_QUERYING
+        client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_QUERYING,
+        name=template_name,
     )
     order = reset_retry_count(order)
     kwargs = {
