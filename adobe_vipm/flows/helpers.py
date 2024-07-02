@@ -78,7 +78,7 @@ def prepare_customer_data(client, order):
             "state": address["state"],
             "city": address["city"],
             "addressLine1": address["addressLine1"],
-            "addressLine2": address["addressLine2"],
+            "addressLine2": address.get("addressLine2"),
             "postCode": address["postCode"],
         }
 
