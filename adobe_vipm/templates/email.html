@@ -196,7 +196,7 @@ Order status update
 											<td style="padding: 8px 0;">
 												
 <!-- ORDER.ASSIGNEE -->
-{{ order.assignee.name if order.assignee is not none else '-' }}
+{{ order.assignee.name if 'assignee' in order else '-' }}
 
 											</td>
 										</tr>
