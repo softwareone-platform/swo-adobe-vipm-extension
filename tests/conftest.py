@@ -798,6 +798,14 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                 },
             ]
 
+        licensee = {
+            "name": licensee_name,
+            "address": licensee_address,
+            "useBuyerAddress": use_buyer_address,
+        }
+        if licensee_contact:
+            licensee["contact"] = licensee_contact
+
         return {
             "id": "AGR-2119-4550-8674-5962",
             "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
@@ -818,12 +826,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                     "href": "/v1/price-lists/PRC-9457-4272-3691",
                 },
             },
-            "licensee": {
-                "name": licensee_name,
-                "address": licensee_address,
-                "useBuyerAddress": use_buyer_address,
-                "contact": licensee_contact,
-            },
+            "licensee": licensee,
             "buyer": buyer,
             "seller": {
                 "id": "SEL-9121-8944",
