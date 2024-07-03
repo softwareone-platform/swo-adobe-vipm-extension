@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 def _response_hook(span, request, response):
     if not response.ok:
-        span.set_attribute("http.error", response.content)
+        span.set_attribute("request.body", request.body)
+        span.set_attribute("response.body", response.content)
 
 
 def instrument_logging():
