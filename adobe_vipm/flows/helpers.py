@@ -65,7 +65,7 @@ def prepare_customer_data(client, order):
     """
     licensee = order["agreement"]["licensee"]
     address = licensee["address"]
-    contact = licensee["contact"]
+    contact = licensee.get("contact")
 
     customer_data = get_customer_data(order)
 
