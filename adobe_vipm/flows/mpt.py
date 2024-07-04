@@ -314,7 +314,10 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
-        f"in(displayValue,({','.join(error_statuses)}))"
+        "or("
+        f"in(displayValue,({','.join(error_statuses)})),"
+        "eq(displayValue,null())"
+        ")"
         ")"
         ")"
     )
