@@ -7,6 +7,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_3YC_EXPIRED,
     STATUS_3YC_NONCOMPLIANT,
 )
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.benefits import (
     check_3yc_commitment_request,
     resubmit_3yc_commitment_request,
@@ -342,3 +343,154 @@ def test_submit_3yc_recommitment_request(
             ],
         },
     )
+
+
+@pytest.mark.parametrize("is_recommitment", [False, True])
+def test_check_3yc_commitment_request_exception(
+    mocker,
+    agreement_factory,
+    adobe_api_error_factory,
+    is_recommitment,
+):
+    req_type = "Recommitment" if is_recommitment else "Commitment"
+    agreement = agreement_factory()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_customer.side_effect = AdobeAPIError(
+        500,
+        adobe_api_error_factory(code="1224", message="Internal Server Error"),
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
+    )
+    mocked_get_agreements = mocker.patch(
+        "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
+        return_value=[agreement],
+    )
+
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.benefits.send_exception")
+
+    check_3yc_commitment_request(mocked_mpt_client, is_recommitment=is_recommitment)
+
+    mocked_get_agreements.assert_called_once_with(
+        mocked_mpt_client, is_recommitment=is_recommitment
+    )
+    mocked_adobe_client.get_customer.assert_called_once_with(
+        agreement["authorization"]["id"],
+        get_adobe_customer_id(agreement),
+    )
+
+    assert (
+        mocked_send_exception.mock_calls[0].args[0]
+        == f"3YC {req_type} Request exception for {agreement['id']}"
+    )
+    assert "Traceback" in mocked_send_exception.mock_calls[0].args[1]
+
+
+@pytest.mark.parametrize("is_recommitment", [False, True])
+def test_resubmit_3yc_commitment_request_exception(
+    mocker,
+    agreement_factory,
+    order_parameters_factory,
+    adobe_api_error_factory,
+    is_recommitment,
+):
+    req_type = "Recommitment" if is_recommitment else "Commitment"
+    agreement = agreement_factory(
+        ordering_parameters=order_parameters_factory(
+            p3yc_licenses="13",
+            p3yc_consumables="1021",
+        )
+    )
+
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_3yc_request.side_effect = AdobeAPIError(
+        500, adobe_api_error_factory(code="1234", message="Internal Server Error")
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
+    )
+    mocked_get_agreements = mocker.patch(
+        "adobe_vipm.flows.benefits.get_agreements_for_3yc_resubmit",
+        return_value=[agreement],
+    )
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.benefits.send_exception")
+
+    resubmit_3yc_commitment_request(mocked_mpt_client, is_recommitment=is_recommitment)
+
+    mocked_get_agreements.assert_called_once_with(
+        mocked_mpt_client, is_recommitment=is_recommitment
+    )
+
+    mocked_adobe_client.create_3yc_request.assert_called_once_with(
+        agreement["authorization"]["id"],
+        get_adobe_customer_id(agreement),
+        {
+            PARAM_3YC_CONSUMABLES: "1021",
+            PARAM_3YC_LICENSES: "13",
+        },
+        is_recommitment=is_recommitment,
+    )
+
+    assert (
+        mocked_send_exception.mock_calls[0].args[0]
+        == f"3YC {req_type} Request exception for {agreement['id']}"
+    )
+    assert "Traceback" in mocked_send_exception.mock_calls[0].args[1]
+
+
+def test_submit_3yc_recommitment_request_exception(
+    mocker,
+    agreement_factory,
+    order_parameters_factory,
+    adobe_api_error_factory,
+):
+    agreement = agreement_factory(
+        ordering_parameters=order_parameters_factory(
+            p3yc_licenses="13",
+            p3yc_consumables="1021",
+        )
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_3yc_request.side_effect = AdobeAPIError(
+        500, adobe_api_error_factory(code=1234, message="Internal Server Error"),
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
+    )
+    mocked_get_agreements = mocker.patch(
+        "adobe_vipm.flows.benefits.get_agreements_for_3yc_recommitment",
+        return_value=[agreement],
+    )
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.benefits.send_exception")
+
+    submit_3yc_recommitment_request(mocked_mpt_client)
+
+    mocked_get_agreements.assert_called_once_with(mocked_mpt_client)
+
+    mocked_adobe_client.create_3yc_request.assert_called_once_with(
+        agreement["authorization"]["id"],
+        get_adobe_customer_id(agreement),
+        {
+            PARAM_3YC_CONSUMABLES: "1021",
+            PARAM_3YC_LICENSES: "13",
+        },
+        is_recommitment=True,
+    )
+
+    assert (
+        mocked_send_exception.mock_calls[0].args[0]
+        == f"3YC Recommitment Request exception for {agreement['id']}"
+    )
+    assert "Traceback" in mocked_send_exception.mock_calls[0].args[1]
