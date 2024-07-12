@@ -115,7 +115,7 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
         },
     }
     if commitment:
-        customer_data[PARAM_3YC] = ["Yes"]
+        customer_data[PARAM_3YC] = None
         for mq in commitment["minimumQuantities"]:
             if mq["offerType"] == "LICENSE":
                 customer_data[PARAM_3YC_LICENSES] = str(mq["quantity"])
@@ -579,12 +579,12 @@ def send_email_notification(mpt_client, order):
             "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         }
         subject = (
-            f"Order status update {order["id"]} "
+            f"Order status update {order['id']} "
             f"for {order['agreement']['buyer']['name']}"
         )
         if order["status"] == "Querying":
             subject = (
-                f"This order need your attention {order["id"]} "
+                f"This order need your attention {order['id']} "
                 f"for {order['agreement']['buyer']['name']}"
             )
         send_email(
