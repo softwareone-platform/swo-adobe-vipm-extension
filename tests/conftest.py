@@ -339,8 +339,6 @@ def order_parameters_factory():
         p3yc_licenses="",
         p3yc_consumables="",
     ):
-        if p3yc is None:
-            p3yc = []
 
         if address is None:
             address = {
@@ -527,7 +525,7 @@ def transfer_order_parameters_factory():
                 "name": "3YC",
                 "externalId": PARAM_3YC,
                 "type": "Checkbox",
-                "value": p3yc or [],
+                "value": p3yc,
                 "constraints": {
                     "hidden": True,
                     "required": False,
