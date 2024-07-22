@@ -16,9 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 def _response_hook(span, request, response):
+    span.set_attribute(
+        "request.header.x-correlation-id",
+        request.headers.get("x-correlation-id", ""),
+    )
+    span.set_attribute(
+        "request.header.x-request-id",
+        request.headers.get("x-request-id", ""),
+    )
     if not response.ok:
-        span.set_attribute("request.body", request.body)
-        span.set_attribute("response.body", response.content)
+        span.set_attribute("request.body", request.body or "")
+        span.set_attribute("response.body", response.content or "")
 
 
 def instrument_logging():
