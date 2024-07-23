@@ -39,7 +39,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     get_one_time_skus,
     save_adobe_customer_data,
     save_adobe_order_id,
-    save_next_sync_date,
+    save_next_sync_and_coterm_dates,
     switch_order_to_completed,
     switch_order_to_failed,
     switch_order_to_query,
@@ -294,7 +294,7 @@ def fulfill_purchase_order(mpt_client, order):
             commitment_date = subscription["commitmentDate"]
 
     if commitment_date:  # pragma: no branch
-        order = save_next_sync_date(mpt_client, order, commitment_date)
+        order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
     update_order_actual_price(
         mpt_client, order, order["lines"], adobe_order["lineItems"]

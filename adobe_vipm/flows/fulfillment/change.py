@@ -10,7 +10,10 @@ from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE
+from adobe_vipm.flows.constants import (
+    TEMPLATE_NAME_CHANGE,
+    TEMPLATE_NAME_DELAYED,
+)
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_adobe_order_fulfilled,
@@ -18,6 +21,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     get_one_time_skus,
     handle_return_orders,
     save_adobe_order_id,
+    set_customer_coterm_date_if_null,
     set_subscription_actual_sku,
     switch_order_to_completed,
     switch_order_to_failed,
@@ -33,6 +37,7 @@ from adobe_vipm.flows.utils import (
     get_partial_sku,
     get_subscription_by_line_and_item_id,
     group_items_by_type,
+    is_renewal_window_open,
 )
 
 logger = logging.getLogger(__name__)
@@ -274,9 +279,14 @@ def fulfill_change_order(mpt_client, order):
         )
         return
 
+    adobe_client = get_adobe_client()
+    order = set_customer_coterm_date_if_null(mpt_client, adobe_client, order)
+    if is_renewal_window_open(order):
+        check_processing_template(mpt_client, order, TEMPLATE_NAME_DELAYED)
+        return
+
     check_processing_template(mpt_client, order, TEMPLATE_NAME_CHANGE)
 
-    adobe_client = get_adobe_client()
     customer_id = get_adobe_customer_id(order)
     adobe_order_id = get_adobe_order_id(order)
     if not adobe_order_id:

@@ -11,6 +11,7 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     ORDER_TYPE_TERMINATION,
+    TEMPLATE_NAME_DELAYED,
     TEMPLATE_NAME_TERMINATION,
 )
 from adobe_vipm.flows.fulfillment import fulfill_order
@@ -56,6 +57,10 @@ def test_termination(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.is_renewal_window_open",
+        return_value=False,
+    )
 
     processing_order = order_factory(
         order_type=ORDER_TYPE_TERMINATION,
@@ -66,6 +71,7 @@ def test_termination(
         subscriptions=subscriptions_factory(lines=lines_factory(quantity=10)),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -161,6 +167,10 @@ def test_termination_return_order_pending(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.is_renewal_window_open",
+        return_value=False,
+    )
 
     processing_order = order_factory(
         order_type=ORDER_TYPE_TERMINATION,
@@ -171,6 +181,7 @@ def test_termination_return_order_pending(
         subscriptions=subscriptions_factory(lines=lines_factory(quantity=10)),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -229,6 +240,10 @@ def test_termination_out_window(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.is_renewal_window_open",
+        return_value=False,
+    )
 
     processing_order = order_factory(
         order_type=ORDER_TYPE_TERMINATION,
@@ -242,6 +257,7 @@ def test_termination_out_window(
         ),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -273,4 +289,71 @@ def test_termination_out_window(
         processing_order["id"],
         {"id": "TPL-1111"},
         parameters=processing_order["parameters"],
+    )
+
+
+def test_in_renewal_window(
+    mocker,
+    agreement,
+    order_factory,
+    lines_factory,
+    fulfillment_parameters_factory,
+):
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.is_renewal_window_open",
+        return_value=True,
+    )
+
+    processing_order = order_factory(
+        order_type=ORDER_TYPE_TERMINATION,
+        lines=lines_factory(
+            old_quantity=20,
+            quantity=10,
+        ),
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+            coterm_date="whatever",
+        ),
+        order_parameters=[],
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+        return_value=processing_order,
+    )
+    mocked_set_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
+    )
+
+    fulfill_order(mocked_mpt_client, processing_order)
+
+    mocked_set_template.assert_called_once_with(
+        mocked_mpt_client,
+        processing_order["id"],
+        {"id": "TPL-0000"},
+    )
+    mocked_complete_order.assert_not_called()
+
+    mocked_get_template.assert_called_once_with(
+        mocked_mpt_client,
+        processing_order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_PROCESSING,
+        TEMPLATE_NAME_DELAYED,
     )

@@ -213,6 +213,7 @@ def test_transfer(
                 customer_id="a-client-id",
                 retry_count="1",
                 next_sync_date="2024-01-02",
+                coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
@@ -280,6 +281,7 @@ def test_transfer(
                 customer_id="a-client-id",
                 retry_count="0",
                 next_sync_date="2024-01-02",
+                coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
@@ -865,6 +867,7 @@ def test_fulfill_transfer_order_already_migrated(
                 customer_id="a-client-id",
                 retry_count="0",
                 next_sync_date="2024-04-19",
+                coterm_date="2024-04-18",
             ),
         },
     )
@@ -1055,6 +1058,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
                 customer_id="a-client-id",
                 retry_count="0",
                 next_sync_date="2024-08-05",
+                coterm_date="2024-08-04",
             ),
         },
     )
@@ -1394,6 +1398,7 @@ def test_transfer_3yc_customer(
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
                 next_sync_date="2024-01-02",
+                coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
@@ -1456,6 +1461,7 @@ def test_transfer_3yc_customer(
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
                 next_sync_date="2024-01-02",
+                coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
