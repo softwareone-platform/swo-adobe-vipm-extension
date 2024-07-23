@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
@@ -12,6 +13,7 @@ from adobe_vipm.flows.utils import (
     get_customer_licenses_discount_level,
     get_transfer_item_sku_by_subscription,
     group_items_by_type,
+    is_renewal_window_open,
     is_transferring_item_expired,
     notify_unhandled_exception_in_teams,
     reset_order_error,
@@ -418,3 +420,27 @@ def test_get_customer_consumables_discount_level(adobe_customer_factory):
         )
         == "T2"
     )
+
+
+@freeze_time("2024-03-11")
+@pytest.mark.parametrize(
+    ("coterm_date", "expected_result"),
+    [
+        ("2024-03-06", False),
+        ("2024-03-07", True),
+        ("2024-03-08", True),
+        ("2024-03-09", True),
+        ("2024-03-10", True),
+        ("2024-03-11", True),
+        ("2024-03-12", False),
+    ],
+)
+def test_is_renewal_window_open(
+    order_factory, fulfillment_parameters_factory, coterm_date, expected_result
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            coterm_date=coterm_date,
+        )
+    )
+    assert is_renewal_window_open(order) is expected_result

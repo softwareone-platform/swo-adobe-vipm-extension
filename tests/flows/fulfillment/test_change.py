@@ -14,6 +14,7 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     TEMPLATE_NAME_CHANGE,
+    TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.fulfillment import fulfill_order
 
@@ -55,7 +56,10 @@ def test_upsizing(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
     subscriptions = subscriptions_factory(lines=lines_factory(quantity=10))
     processing_change_order = order_factory(
         order_type="Change",
@@ -65,6 +69,7 @@ def test_upsizing(
         ),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         subscriptions=subscriptions,
         order_parameters=[],
@@ -79,6 +84,7 @@ def test_upsizing(
         subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
@@ -106,7 +112,7 @@ def test_upsizing(
         "adobe_vipm.flows.fulfillment.shared.update_subscription",
     )
 
-    mocked_process_order = mocker.patch(
+    mocked_set_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
@@ -122,7 +128,7 @@ def test_upsizing(
 
     authorization_id = processing_change_order["authorization"]["id"]
 
-    mocked_process_order.assert_called_once_with(
+    mocked_set_template.assert_called_once_with(
         mocked_mpt_client,
         processing_change_order["id"],
         {"id": "TPL-0000"},
@@ -144,6 +150,7 @@ def test_upsizing(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 retry_count="1",
+                coterm_date="whatever",
             ),
             "ordering": processing_change_order["parameters"]["ordering"],
         },
@@ -193,6 +200,7 @@ def test_upsizing(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 retry_count="0",
+                coterm_date="whatever",
             ),
             "ordering": [],
         },
@@ -247,6 +255,11 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
+
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory(
@@ -257,6 +270,7 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
         ),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
@@ -271,6 +285,7 @@ def test_upsizing_order_already_created_adobe_order_not_ready(
             "fulfillment": fulfillment_parameters_factory(
                 retry_count="1",
                 customer_id="a-client-id",
+                coterm_date="whatever",
             ),
             "ordering": [],
         },
@@ -302,6 +317,10 @@ def test_upsizing_create_adobe_preview_order_error(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
 
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
@@ -315,6 +334,7 @@ def test_upsizing_create_adobe_preview_order_error(
         ),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -382,7 +402,10 @@ def test_downsizing(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
     subscriptions = subscriptions_factory(lines=lines_factory(quantity=20))
 
     updated_order = order_factory(
@@ -394,6 +417,7 @@ def test_downsizing(
         subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
@@ -408,6 +432,7 @@ def test_downsizing(
         subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -461,6 +486,7 @@ def test_downsizing(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 retry_count="1",
+                coterm_date="whatever",
             ),
             "ordering": processing_order["parameters"]["ordering"],
         },
@@ -576,6 +602,10 @@ def test_downsizing_return_order_exists(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
 
     subscriptions = subscriptions_factory(lines=lines_factory(quantity=20))
 
@@ -588,6 +618,7 @@ def test_downsizing_return_order_exists(
         subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -601,6 +632,7 @@ def test_downsizing_return_order_exists(
         subscriptions=subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
@@ -644,6 +676,7 @@ def test_downsizing_return_order_exists(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 retry_count="1",
+                coterm_date="whatever",
             ),
             "ordering": processing_order["parameters"]["ordering"],
         },
@@ -739,6 +772,11 @@ def test_downsizing_return_order_pending(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
+
     mocked_mpt_client = mocker.MagicMock()
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
@@ -756,6 +794,7 @@ def test_downsizing_return_order_pending(
         subscriptions=subscriptions_factory(lines=lines_factory(quantity=20)),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -768,6 +807,7 @@ def test_downsizing_return_order_pending(
             "fulfillment": fulfillment_parameters_factory(
                 retry_count="1",
                 customer_id="a-client-id",
+                coterm_date="whatever",
             ),
             "ordering": [],
         },
@@ -804,6 +844,10 @@ def test_downsizing_new_order_pending(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory(
@@ -814,6 +858,7 @@ def test_downsizing_new_order_pending(
         ),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
@@ -840,6 +885,7 @@ def test_downsizing_new_order_pending(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 retry_count="1",
+                coterm_date="whatever",
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -887,6 +933,11 @@ def test_downsizing_create_new_order_error(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
+
     mocked_mpt_client = mocker.MagicMock()
 
     order = order_factory(
@@ -898,6 +949,7 @@ def test_downsizing_create_new_order_error(
         subscriptions=subscriptions_factory(lines=lines_factory(quantity=20)),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
     )
@@ -1056,6 +1108,10 @@ def test_mixed(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
 
     downsizing_items = lines_factory(
         line_id=1,
@@ -1133,6 +1189,7 @@ def test_mixed(
         lines=order_items,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         subscriptions=order_subscriptions,
@@ -1144,6 +1201,7 @@ def test_mixed(
         subscriptions=order_subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
@@ -1214,6 +1272,7 @@ def test_mixed(
             "fulfillment": fulfillment_parameters_factory(
                 retry_count="1",
                 customer_id="a-client-id",
+                coterm_date="whatever",
             ),
             "ordering": processing_change_order["parameters"]["ordering"],
         },
@@ -1371,6 +1430,10 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
 
     upsizing_items_out_of_window = lines_factory(
         line_id=4,
@@ -1393,6 +1456,7 @@ def test_upsize_of_previously_downsized_out_of_win_without_new_order(
         lines=upsizing_items_out_of_window,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         subscriptions=order_subscriptions,
@@ -1481,6 +1545,11 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
+
 
     upsizing_items_out_of_window = lines_factory(
         line_id=4,
@@ -1503,6 +1572,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         lines=upsizing_items_out_of_window,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         subscriptions=order_subscriptions,
@@ -1514,6 +1584,7 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         subscriptions=order_subscriptions,
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever",
         ),
         order_parameters=[],
         external_ids={"vendor": adobe_order["orderId"]},
@@ -1688,6 +1759,11 @@ def test_one_time_items(
         return_value=mocked_adobe_client,
     )
 
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=False,
+    )
+
     subscriptions = subscriptions_factory(lines=lines_factory(quantity=10))
     processing_change_order = order_factory(
         order_type="Change",
@@ -1697,6 +1773,7 @@ def test_one_time_items(
         ),
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
+            coterm_date="whatever"
         ),
         subscriptions=subscriptions,
         order_parameters=[],
@@ -1758,3 +1835,76 @@ def test_one_time_items(
         False,
         False,
     )
+
+
+def test_in_renewal_window(
+    mocker,
+    agreement,
+    order_factory,
+    lines_factory,
+    fulfillment_parameters_factory,
+):
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+    mocked_set_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.is_renewal_window_open",
+        return_value=True,
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    order = order_factory(
+        order_type="Change",
+        lines=lines_factory(
+            old_quantity=10,
+            quantity=20,
+        ),
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+            coterm_date="whatever",
+        ),
+        order_parameters=[],
+        external_ids={"vendor": "adobe-order-id"},
+    )
+    fulfill_order(mocked_mpt_client, order)
+
+    mocked_update_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "fulfillment": fulfillment_parameters_factory(
+                retry_count="1",
+                customer_id="a-client-id",
+                coterm_date="whatever",
+            ),
+            "ordering": [],
+        },
+    )
+
+    mocked_get_template.assert_called_once_with(
+        mocked_mpt_client,
+        order["agreement"]["product"]["id"],
+        MPT_ORDER_STATUS_PROCESSING,
+        TEMPLATE_NAME_DELAYED,
+    )
+    mocked_set_template.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        {"id": "TPL-0000"},
+    )
+    mocked_complete_order.assert_not_called()

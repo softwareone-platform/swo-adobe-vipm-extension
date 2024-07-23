@@ -1,7 +1,7 @@
 import copy
 import functools
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import phonenumbers
 from django.conf import settings
@@ -32,6 +32,7 @@ from adobe_vipm.flows.constants import (
     PARAM_AGREEMENT_TYPE,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
@@ -792,3 +793,26 @@ def set_market_segment_eligibility_status_pending(order):
     )
     ff_param["value"] = STATUS_MARKET_SEGMENT_PENDING
     return updated_order
+
+
+def set_coterm_date(order, coterm_date):
+    updated_order = copy.deepcopy(order)
+    customer_ff_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_COTERM_DATE,
+    )
+    customer_ff_param["value"] = coterm_date
+    return updated_order
+
+
+def get_coterm_date(order):
+    return get_fulfillment_parameter(
+        order,
+        PARAM_COTERM_DATE,
+    ).get("value")
+
+
+def is_renewal_window_open(order):
+    coterm_date = get_coterm_date(order)
+    today = date.today()
+    return today - timedelta(days=4) <= datetime.fromisoformat(coterm_date).date() <= today

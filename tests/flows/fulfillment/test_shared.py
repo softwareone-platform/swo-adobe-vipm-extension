@@ -4,9 +4,10 @@ import pytest
 
 from adobe_vipm.flows.fulfillment.shared import (
     send_email_notification,
+    set_customer_coterm_date_if_null,
     start_processing_attempt,
 )
-from adobe_vipm.flows.utils import get_notifications_recipient
+from adobe_vipm.flows.utils import get_coterm_date, get_notifications_recipient
 
 
 @pytest.mark.parametrize(
@@ -138,3 +139,51 @@ def test_start_processing_attempt_other_attempts(
     start_processing_attempt(mocked_client, order)
 
     mocked_send.assert_not_called()
+
+
+def test_set_customer_coterm_date_if_null(
+    mocker, order_factory, adobe_customer_factory, fulfillment_parameters_factory
+):
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock()
+    customer = adobe_customer_factory()
+    mocked_adobe_client.get_customer.return_value = customer
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    order = order_factory()
+    order = set_customer_coterm_date_if_null(
+        mocked_mpt_client, mocked_adobe_client, order
+    )
+    assert get_coterm_date(order) == customer["cotermDate"]
+    mocked_update_order.assert_called_once_with(
+        mocked_mpt_client,
+        order["id"],
+        parameters={
+            "ordering": order["parameters"]["ordering"],
+            "fulfillment": fulfillment_parameters_factory(
+                coterm_date=customer["cotermDate"],
+            ),
+        },
+    )
+
+
+def test_set_customer_coterm_date_if_null_already_set(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            coterm_date="whatever"
+        )
+    )
+    assert set_customer_coterm_date_if_null(
+        mocked_mpt_client, mocked_adobe_client, order
+    ) == order
+
+    mocked_update_order.assert_not_called()
+    mocked_adobe_client.get_customer_assert_not_called()
