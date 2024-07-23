@@ -552,11 +552,10 @@ def start_processing_attempt(mpt_client, order):
 
 
 def save_next_sync_and_coterm_dates(client, order, coterm_date):
-    order = set_coterm_date(order, coterm_date)
-    next_sync = (
-        (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
-    )
-    order = set_next_sync(order, next_sync)
+    coterm_date = datetime.fromisoformat(coterm_date).date()
+    order = set_coterm_date(order, coterm_date.isoformat())
+    next_sync = coterm_date + timedelta(days=1)
+    order = set_next_sync(order, next_sync.isoformat())
     update_order(client, order["id"], parameters=order["parameters"])
     return order
 
