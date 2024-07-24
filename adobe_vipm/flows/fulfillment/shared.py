@@ -14,7 +14,11 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
 )
-from adobe_vipm.adobe.utils import get_3yc_commitment
+from adobe_vipm.adobe.utils import (
+    get_3yc_commitment,
+    sanitize_company_name,
+    sanitize_first_last_name,
+)
 from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -101,7 +105,7 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     commitment = get_3yc_commitment(customer)
 
     customer_data = {
-        PARAM_COMPANY_NAME: customer["companyProfile"]["companyName"],
+        PARAM_COMPANY_NAME: sanitize_company_name(customer["companyProfile"]["companyName"]),
         PARAM_ADDRESS: {
             "country": address["country"],
             "state": address["region"],
@@ -111,8 +115,8 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
             "postCode": address["postalCode"],
         },
         PARAM_CONTACT: {
-            "firstName": contact["firstName"],
-            "lastName": contact["lastName"],
+            "firstName": sanitize_first_last_name(contact["firstName"]),
+            "lastName": sanitize_first_last_name(contact["lastName"]),
             "email": contact["email"],
             "phone": split_phone_number(contact.get("phoneNumber"), address["country"]),
         },
