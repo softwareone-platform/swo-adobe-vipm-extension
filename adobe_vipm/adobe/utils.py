@@ -1,3 +1,9 @@
+import re
+
+from adobe_vipm.adobe.constants import (
+    REGEX_SANITIZE_COMPANY_NAME,
+    REGEX_SANITIZE_FIRST_LAST_NAME,
+)
 from adobe_vipm.utils import find_first
 
 
@@ -60,3 +66,11 @@ def get_3yc_commitment_request(customer, is_recommitment=False):
         )
         or {}
     )
+
+
+def sanitize_company_name(company_name):
+    return re.sub(REGEX_SANITIZE_COMPANY_NAME, " ", company_name).strip()
+
+
+def sanitize_first_last_name(first_last_name):
+    return re.sub(REGEX_SANITIZE_FIRST_LAST_NAME, " ", first_last_name).strip()
