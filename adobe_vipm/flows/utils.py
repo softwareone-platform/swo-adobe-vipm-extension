@@ -813,6 +813,6 @@ def get_coterm_date(order):
 
 
 def is_renewal_window_open(order):
-    coterm_date = get_coterm_date(order)
+    coterm_date = datetime.fromisoformat(get_coterm_date(order)).date()
     today = date.today()
-    return today - timedelta(days=4) <= datetime.fromisoformat(coterm_date).date() <= today
+    return coterm_date - timedelta(days=4) <= today <= coterm_date
