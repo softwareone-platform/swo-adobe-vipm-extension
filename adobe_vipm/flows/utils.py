@@ -1,9 +1,9 @@
 import copy
 import functools
-import re
 from datetime import UTC, date, datetime, timedelta
 
 import phonenumbers
+import regex as re
 from django.conf import settings
 from markdown_it import MarkdownIt
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
