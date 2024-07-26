@@ -1,4 +1,4 @@
-import re
+import regex as re
 
 STATUS_PROCESSED = "1000"
 STATUS_PENDING = "1002"
@@ -62,7 +62,7 @@ REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")
 REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")
 REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")
-REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\w ,.＆&'\\\"]")
+REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")
 
 STATUS_3YC_ACCEPTED = "ACCEPTED"
 STATUS_3YC_DECLINED = "DECLINED"
