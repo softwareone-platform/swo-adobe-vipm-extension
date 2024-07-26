@@ -1,5 +1,6 @@
 import functools
-import re
+
+import regex as re
 
 from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
