@@ -39,7 +39,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     handle_retries,
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
-    save_next_sync_date,
+    save_next_sync_and_coterm_dates,
     switch_order_to_completed,
     switch_order_to_failed,
     switch_order_to_query,
@@ -263,7 +263,7 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
             )
 
     if commitment_date:  # pragma: no branch
-        order = save_next_sync_date(mpt_client, order, commitment_date)
+        order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
@@ -344,6 +344,6 @@ def fulfill_transfer_order(mpt_client, order):
             commitment_date = subscription["commitmentDate"]
 
     if commitment_date:  # pragma: no branch
-        order = save_next_sync_date(mpt_client, order, commitment_date)
+        order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)

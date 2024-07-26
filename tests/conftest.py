@@ -30,6 +30,7 @@ from adobe_vipm.flows.constants import (
     PARAM_AGREEMENT_TYPE,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
@@ -571,6 +572,7 @@ def fulfillment_parameters_factory():
         p3yc_end_date="",
         next_sync_date="",
         market_segment_eligibility_status=None,
+        coterm_date="",
     ):
         return [
             {
@@ -642,6 +644,13 @@ def fulfillment_parameters_factory():
                 "externalId": PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
                 "type": "Dropdown",
                 "value": market_segment_eligibility_status,
+            },
+            {
+                "id": "PAR-7373-1919",
+                "name": "Customer Coterm date",
+                "externalId": PARAM_COTERM_DATE,
+                "type": "Date",
+                "value": coterm_date,
             },
         ]
 
