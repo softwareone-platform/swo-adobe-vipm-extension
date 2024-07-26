@@ -5,10 +5,11 @@ processing.
 """
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.flows.constants import TEMPLATE_NAME_TERMINATION
+from adobe_vipm.flows.constants import TEMPLATE_NAME_DELAYED, TEMPLATE_NAME_TERMINATION
 from adobe_vipm.flows.fulfillment.shared import (
     check_processing_template,
     handle_return_orders,
+    set_customer_coterm_date_if_null,
     switch_order_to_completed,
 )
 from adobe_vipm.flows.utils import (
@@ -16,6 +17,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_subscription_id,
     get_subscription_by_line_and_item_id,
     group_items_by_type,
+    is_renewal_window_open,
 )
 
 
@@ -65,8 +67,14 @@ def fulfill_termination_order(mpt_client, order):
         mpt_client (MPTClient):  an instance of the Marketplace platform client.
         order (dct): The MPT termination order.
     """
-    check_processing_template(mpt_client, order, TEMPLATE_NAME_TERMINATION)
     adobe_client = get_adobe_client()
+
+    order = set_customer_coterm_date_if_null(mpt_client, adobe_client, order)
+    if is_renewal_window_open(order):
+        check_processing_template(mpt_client, order, TEMPLATE_NAME_DELAYED)
+        return
+    check_processing_template(mpt_client, order, TEMPLATE_NAME_TERMINATION)
+
     customer_id = get_adobe_customer_id(order)
 
     grouped_items = group_items_by_type(order)

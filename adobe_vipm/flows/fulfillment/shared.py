@@ -48,6 +48,8 @@ from adobe_vipm.flows.mpt import (
     update_subscription,
 )
 from adobe_vipm.flows.utils import (
+    get_adobe_customer_id,
+    get_coterm_date,
     get_notifications_recipient,
     get_order_line_by_sku,
     get_price_item_by_line_sku,
@@ -61,6 +63,7 @@ from adobe_vipm.flows.utils import (
     set_adobe_3yc_start_date,
     set_adobe_customer_id,
     set_adobe_order_id,
+    set_coterm_date,
     set_customer_data,
     set_next_sync,
     split_phone_number,
@@ -552,11 +555,11 @@ def start_processing_attempt(mpt_client, order):
     return order
 
 
-def save_next_sync_date(client, order, coterm_date):
-    next_sync = (
-        (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
-    )
-    order = set_next_sync(order, next_sync)
+def save_next_sync_and_coterm_dates(client, order, coterm_date):
+    coterm_date = datetime.fromisoformat(coterm_date).date()
+    order = set_coterm_date(order, coterm_date.isoformat())
+    next_sync = coterm_date + timedelta(days=1)
+    order = set_next_sync(order, next_sync.isoformat())
     update_order(client, order["id"], parameters=order["parameters"])
     return order
 
@@ -606,3 +609,16 @@ def get_one_time_skus(mpt_client, order):
         [line["item"]["id"] for line in order["lines"]],
     )
     return [item["externalIds"]["vendor"] for item in one_time_items]
+
+
+def set_customer_coterm_date_if_null(client, adobe_client, order):
+    coterm_date = get_coterm_date(order)
+    if coterm_date:
+        return order
+    customer_id = get_adobe_customer_id(order)
+    authorization_id = order["authorization"]["id"]
+    customer = adobe_client.get_customer(authorization_id, customer_id)
+    coterm_date = customer["cotermDate"]
+    order = set_coterm_date(order, coterm_date)
+    update_order(client, order["id"], parameters=order["parameters"])
+    return order
