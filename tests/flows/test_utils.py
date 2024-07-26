@@ -422,9 +422,8 @@ def test_get_customer_consumables_discount_level(adobe_customer_factory):
     )
 
 
-@freeze_time("2024-03-11")
 @pytest.mark.parametrize(
-    ("coterm_date", "expected_result"),
+    ("today", "expected_result"),
     [
         ("2024-03-06", False),
         ("2024-03-07", True),
@@ -436,11 +435,12 @@ def test_get_customer_consumables_discount_level(adobe_customer_factory):
     ],
 )
 def test_is_renewal_window_open(
-    order_factory, fulfillment_parameters_factory, coterm_date, expected_result
+    order_factory, fulfillment_parameters_factory, today, expected_result
 ):
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
-            coterm_date=coterm_date,
+            coterm_date="2024-03-11",
         )
     )
-    assert is_renewal_window_open(order) is expected_result
+    with freeze_time(today):
+        assert is_renewal_window_open(order) is expected_result
