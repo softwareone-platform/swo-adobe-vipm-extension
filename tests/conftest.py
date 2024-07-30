@@ -1073,9 +1073,9 @@ def seller():
 def webhook(settings):
     return {
         "id": "WH-123-123",
-        "criteria": [
-            {"key": "product.id", "value": settings.MPT_PRODUCTS_IDS[0]},
-        ],
+        "criteria": {
+            "product.id": settings.MPT_PRODUCTS_IDS[0]
+        },
     }
 
 
