@@ -7,6 +7,7 @@ from adobe_vipm.flows.airtable import (
     create_offers,
     get_offer_ids_by_membership_id,
     get_offer_model,
+    get_pricelist_model,
     get_transfer_by_authorization_membership_or_customer,
     get_transfer_link,
     get_transfer_model,
@@ -212,3 +213,10 @@ def test_airtable_base_info_for_pricing(settings):
 
     assert base_info.api_key == api_key
     assert base_info.base_id == base_id
+
+
+def test_get_pricelist_model():
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    PriceList = get_pricelist_model(base_info)
+    assert PriceList.get_api().api_key == base_info.api_key
+    assert PriceList.get_base().id == base_info.base_id
