@@ -6,9 +6,12 @@ from pyairtable.formulas import (
     AND,
     EQUAL,
     FIELD,
+    GREATER,
+    LESS_EQUAL,
     NOT_EQUAL,
     OR,
     STR_VALUE,
+    to_airtable_value,
 )
 from pyairtable.orm import Model, fields
 from requests import HTTPError
@@ -214,3 +217,51 @@ def get_pricelist_model(base_info):
             base_id = base_info.base_id
 
     return PriceList
+
+
+def get_prices_for_skus(product_id, currency, skus):
+    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    items =  PriceList.all(
+        formula=AND(
+            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            EQUAL(FIELD("valid_until"), "BLANK()"),
+            OR(
+                *[
+                    EQUAL(FIELD("sku"), to_airtable_value(sku))
+                    for sku in skus
+                ],
+            ),
+        ),
+    )
+    return {
+        item.sku: item.unit_pp
+        for item in items
+    }
+
+
+def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
+    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    prices = {}
+    items =  PriceList.all(
+        formula=AND(
+            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            OR(
+                EQUAL(FIELD("valid_until"), "BLANK()"),
+                AND(
+                    LESS_EQUAL(FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))),
+                    GREATER(FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))),
+                ),
+            ),
+            OR(
+                *[
+                    EQUAL(FIELD("sku"), to_airtable_value(sku))
+                    for sku in skus
+                ],
+            ),
+        ),
+        sort=["-valid_until"],
+    )
+    for item in items:
+        if item.sku not in prices:
+            prices[item.sku] = item.unit_pp
+    return prices
