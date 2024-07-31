@@ -15,7 +15,7 @@ from adobe_vipm.flows.airtable import (
 )
 
 
-def test_airtable_base_info_for_product(settings):
+def test_airtable_base_info_for_migrations(settings):
     api_key = "airtable-token"
     base_id = "base-id"
     settings.EXTENSION_CONFIG = {
@@ -23,7 +23,7 @@ def test_airtable_base_info_for_product(settings):
         "AIRTABLE_BASES": {"PRD-1111": "base-id"},
     }
 
-    base_info = AirTableBaseInfo.for_product("PRD-1111")
+    base_info = AirTableBaseInfo.for_migrations("PRD-1111")
 
     assert base_info.api_key == api_key
     assert base_info.base_id == base_id
@@ -198,3 +198,17 @@ def test_get_transfer_link_exception(mocker):
     transfer.get_table.side_effect = HTTPError()
 
     assert get_transfer_link(transfer) is None
+
+
+def test_airtable_base_info_for_pricing(settings):
+    api_key = "airtable-token"
+    base_id = "pricing-base-id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_PRICING_BASES": {"PRD-1111": "pricing-base-id"},
+    }
+
+    base_info = AirTableBaseInfo.for_pricing("PRD-1111")
+
+    assert base_info.api_key == api_key
+    assert base_info.base_id == base_id
