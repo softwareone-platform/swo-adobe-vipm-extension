@@ -27,10 +27,17 @@ class AirTableBaseInfo:
     base_id: str
 
     @staticmethod
-    def for_product(product_id):
+    def for_migrations(product_id):
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
             base_id=get_for_product(settings, "AIRTABLE_BASES", product_id),
+        )
+
+    @staticmethod
+    def for_pricing(product_id):
+        return AirTableBaseInfo(
+            api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
+            base_id=get_for_product(settings, "AIRTABLE_PRICING_BASES", product_id),
         )
 
 
@@ -122,7 +129,7 @@ def get_offer_model(base_info):
 
 
 def get_offer_ids_by_membership_id(product_id, membership_id):
-    Offer = get_offer_model(AirTableBaseInfo.for_product(product_id))
+    Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
     return [
         offer.offer_id
         for offer in Offer.all(
@@ -132,12 +139,12 @@ def get_offer_ids_by_membership_id(product_id, membership_id):
 
 
 def create_offers(product_id, offers):
-    Offer = get_offer_model(AirTableBaseInfo.for_product(product_id))
+    Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
     Offer.batch_save([Offer(**offer) for offer in offers])
 
 
 def get_transfers_to_process(product_id):
-    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return Transfer.all(
         formula=OR(
             EQUAL(FIELD("status"), STR_VALUE(STATUS_INIT)),
@@ -147,7 +154,7 @@ def get_transfers_to_process(product_id):
 
 
 def get_transfers_to_check(product_id):
-    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return Transfer.all(
         formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
     )
@@ -156,7 +163,7 @@ def get_transfers_to_check(product_id):
 def get_transfer_by_authorization_membership_or_customer(
     product_id, authorization_uk, membership_or_customer_id
 ):
-    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     transfers = Transfer.all(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
