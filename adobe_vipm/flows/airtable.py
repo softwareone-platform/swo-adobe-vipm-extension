@@ -187,3 +187,30 @@ def get_transfer_link(transfer):
         return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
     except HTTPError:
         pass
+
+
+@cache
+def get_pricelist_model(base_info):
+    class PriceList(Model):
+        record_id = fields.TextField("id", readonly=True)
+        sku = fields.TextField("sku", readonly=True)
+        partial_sku = fields.TextField("partial_sku", readonly=True)
+        item_name = fields.TextField("item_name", readonly=True)
+        discount_level = fields.TextField("discount_level", readonly=True)
+        valid_from = fields.DateField("valid_from", readonly=True)
+        valid_until = fields.DateField("valid_until", readonly=True)
+        currency = fields.SelectField("currency", readonly=True)
+        unit_pp = fields.NumberField("unit_pp", readonly=True)
+        unit_lp = fields.NumberField("unit_lp", readonly=True)
+        status = fields.SelectField("status", readonly=True)
+        created_at = fields.CreatedTimeField("created_at", readonly=True)
+        created_by = fields.CreatedByField("created_by", readonly=True)
+        updated_at = fields.LastModifiedTimeField("updated_at", readonly=True)
+        updated_by = fields.LastModifiedByField("updated_by", readonly=True)
+
+        class Meta:
+            table_name = "PriceList"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+    return PriceList
