@@ -46,7 +46,6 @@ def test_validate_purchase_order(mocker, caplog, order_factory, customer_data):
     )
     m_validate_customer_data.assert_called_once_with(order, customer_data)
     m_update_purchase_prices.assert_called_once_with(
-        m_client,
         m_adobe_cli,
         order,
     )
@@ -121,7 +120,6 @@ def test_validate_transfer_order(
         reset_ordering_parameters_error(order),
     )
     m_update_purchase_prices.assert_called_once_with(
-        m_client,
         order,
         adobe_preview_transfer,
     )

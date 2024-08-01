@@ -49,7 +49,7 @@ def validate_order(mpt_client, order):
                     has_errors, order = validate_duplicate_lines(order)
                 if not has_errors and order["lines"]:
                     try:
-                        order = update_purchase_prices(mpt_client, adobe_client, order)
+                        order = update_purchase_prices(adobe_client, order)
                     except AdobeAPIError as e:
                         order = set_order_error(
                             order, ERR_ADOBE_ERROR.to_dict(details=str(e))
@@ -65,9 +65,7 @@ def validate_order(mpt_client, order):
                 mpt_client, adobe_client, order
             )
             if not has_errors:
-                order = update_purchase_prices_for_transfer(
-                    mpt_client, order, adobe_object
-                )
+                order = update_purchase_prices_for_transfer(order, adobe_object)
 
         order = update_parameters_visibility(order)
 
