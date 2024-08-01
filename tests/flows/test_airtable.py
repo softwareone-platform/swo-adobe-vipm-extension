@@ -8,6 +8,8 @@ from adobe_vipm.flows.airtable import (
     get_offer_ids_by_membership_id,
     get_offer_model,
     get_pricelist_model,
+    get_prices_for_3yc_skus,
+    get_prices_for_skus,
     get_transfer_by_authorization_membership_or_customer,
     get_transfer_link,
     get_transfer_model,
@@ -220,3 +222,79 @@ def test_get_pricelist_model():
     PriceList = get_pricelist_model(base_info)
     assert PriceList.get_api().api_key == base_info.api_key
     assert PriceList.get_base().id == base_info.base_id
+
+
+def test_get_prices_for_skus(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    price_item_1 = mocker.MagicMock()
+    price_item_1.sku = "sku-1"
+    price_item_1.unit_pp = 12.44
+    price_item_2 = mocker.MagicMock()
+    price_item_2.sku = "sku-2"
+    price_item_2.unit_pp = 31.23
+    mocked_pricelist_model.all.return_value = [price_item_1, price_item_2]
+
+    prices = get_prices_for_skus("product_id", "currency", ["sku-1", "sku-2"])
+
+    assert prices == {
+        "sku-1": 12.44,
+        "sku-2": 31.23,
+    }
+
+    mocked_pricelist_model.all.assert_called_once_with(
+        formula=(
+            "AND({currency}='currency',{valid_until}=BLANK(),OR({sku}='sku-1',{sku}='sku-2'))"
+        ),
+    )
+
+
+def test_get_prices_for_3yc_skus(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    price_item_1 = mocker.MagicMock()
+    price_item_1.sku = "sku-1"
+    price_item_1.unit_pp = 12.44
+    price_item_2 = mocker.MagicMock()
+    price_item_2.sku = "sku-2"
+    price_item_2.unit_pp = 31.23
+    price_item_3 = mocker.MagicMock()
+    price_item_3.sku = "sku-1"
+    price_item_3.unit_pp = 43.10
+    mocked_pricelist_model.all.return_value = [price_item_1, price_item_2, price_item_3]
+
+
+    prices = get_prices_for_3yc_skus(
+        "product_id",
+        "currency",
+        date.fromisoformat("2024-03-03"),
+        ["sku-1", "sku-2"],
+    )
+
+    assert prices == {
+        "sku-1": 12.44,
+        "sku-2": 31.23,
+    }
+
+    mocked_pricelist_model.all.assert_called_once_with(
+        formula=(
+            "AND({currency}='currency',"
+            "OR({valid_until}=BLANK(),AND({valid_from}<='2024-03-03',{valid_until}>'2024-03-03')),"
+            "OR({sku}='sku-1',{sku}='sku-2'))"
+        ),
+        sort=["-valid_until"]
+    )
