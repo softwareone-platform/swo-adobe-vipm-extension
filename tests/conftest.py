@@ -831,6 +831,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                 "priceList": {
                     "id": "PRC-9457-4272-3691",
                     "href": "/v1/price-lists/PRC-9457-4272-3691",
+                    "currency": "USD",
                 },
             },
             "licensee": licensee,
@@ -922,6 +923,7 @@ def agreement(buyer):
             "priceList": {
                 "id": "PRC-9457-4272-3691",
                 "href": "/v1/price-lists/PRC-9457-4272-3691",
+                "currency": "USD",
             },
         },
         "licensee": {

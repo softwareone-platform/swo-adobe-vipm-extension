@@ -4,6 +4,7 @@ This module contains orders helper functions.
 
 import logging
 
+from adobe_vipm.flows.airtable import get_prices_for_skus
 from adobe_vipm.flows.constants import (
     FAKE_CUSTOMERS_IDS,
     PARAM_ADDRESS,
@@ -13,8 +14,6 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.mpt import (
     get_agreement,
     get_licensee,
-    get_pricelist_items_by_product_items,
-    get_product_items_by_skus,
     update_order,
 )
 from adobe_vipm.flows.utils import (
@@ -100,39 +99,26 @@ def prepare_customer_data(client, order):
 
     return order, get_customer_data(order)
 
-
-def _update_purchase_prices(mpt_client, order, line_items):
+def _update_purchase_prices(order, line_items):
     adobe_skus = [item["offerId"] for item in line_items]
-    pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
+    currency = order["agreement"]["listing"]["priceList"]["currency"]
     product_id = order["agreement"]["product"]["id"]
-    product_items = get_product_items_by_skus(mpt_client, product_id, adobe_skus)
-    pricelist_items = get_pricelist_items_by_product_items(
-        mpt_client,
-        pricelist_id,
-        [product_item["id"] for product_item in product_items],
-    )
+    prices = get_prices_for_skus(product_id, currency, adobe_skus)
 
-    product_items_map = {item["id"]: item for item in product_items}
-    sku_pricelist_item_map = {
-        product_items_map[item["item"]["id"]]["externalIds"]["vendor"]: item
-        for item in pricelist_items
-    }
     updated_lines = []
     for preview_item in line_items:
         order_line = get_order_line_by_sku(
             order, get_partial_sku(preview_item["offerId"])
         )
         order_line.setdefault("price", {})
-        order_line["price"]["unitPP"] = sku_pricelist_item_map[preview_item["offerId"]][
-            "unitPP"
-        ]
+        order_line["price"]["unitPP"] = prices[preview_item["offerId"]]
         updated_lines.append(order_line)
     order["lines"] = updated_lines
 
     return order
 
 
-def update_purchase_prices(mpt_client, adobe_client, order):
+def update_purchase_prices(adobe_client, order):
     """
     Creates a preview order in adobe to get the full SKU list to update items prices
     during draft validation.
@@ -153,15 +139,13 @@ def update_purchase_prices(mpt_client, adobe_client, order):
         authorization_id, customer_id, order["id"], order["lines"]
     )
     return _update_purchase_prices(
-        mpt_client,
         order,
         preview_order["lineItems"],
     )
 
 
-def update_purchase_prices_for_transfer(mpt_client, order, adobe_object):
+def update_purchase_prices_for_transfer(order, adobe_object):
     return _update_purchase_prices(
-        mpt_client,
         order,
         adobe_object["items"],
     )
