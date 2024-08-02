@@ -335,10 +335,10 @@ def get_order_line_by_sku(order, sku):
     )
 
 
-def get_price_item_by_line_sku(price_items, line_sku):
+def get_price_item_by_line_sku(prices, line_sku):
     return find_first(
-        lambda price_item: line_sku in price_item["item"]["externalIds"]["vendor"],
-        price_items,
+        lambda price_item: price_item[0].startswith(line_sku),
+        list(prices.items()),
     )
 
 

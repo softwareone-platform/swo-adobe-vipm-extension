@@ -297,7 +297,7 @@ def fulfill_purchase_order(mpt_client, order):
         order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
     update_order_actual_price(
-        mpt_client, order, order["lines"], adobe_order["lineItems"]
+        mpt_client, adobe_client, order, order["lines"], adobe_order["lineItems"]
     )
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_PURCHASE)
