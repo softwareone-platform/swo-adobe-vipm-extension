@@ -2,9 +2,8 @@ import pytest
 from django.core.management import call_command
 
 
-@pytest.mark.parametrize("allow_3yc", [True, False])
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_process_sync_agreements(mocker, allow_3yc, dry_run):
+def test_process_sync_agreements(mocker, dry_run):
     mocked_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.management.commands.sync_agreements.setup_client",
@@ -14,14 +13,13 @@ def test_process_sync_agreements(mocker, allow_3yc, dry_run):
         "adobe_vipm.management.commands.sync_agreements.sync_agreements_by_next_sync"
     )
 
-    call_command("sync_agreements", allow_3yc=allow_3yc, dry_run=dry_run)
+    call_command("sync_agreements",dry_run=dry_run)
 
-    mocked.assert_called_once_with(mocked_client, allow_3yc, dry_run)
+    mocked.assert_called_once_with(mocked_client, dry_run)
 
 
-@pytest.mark.parametrize("allow_3yc", [True, False])
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_process_by_agreement_ids(mocker, allow_3yc, dry_run):
+def test_process_by_agreement_ids(mocker, dry_run):
     mocked_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.management.commands.sync_agreements.setup_client",
@@ -34,18 +32,16 @@ def test_process_by_agreement_ids(mocker, allow_3yc, dry_run):
     call_command(
         "sync_agreements",
         agreements=["AGR-0001", "AGR-0002"],
-        allow_3yc=allow_3yc,
         dry_run=dry_run,
     )
 
     mocked.assert_called_once_with(
-        mocked_client, ["AGR-0001", "AGR-0002"], allow_3yc, dry_run
+        mocked_client, ["AGR-0001", "AGR-0002"], dry_run
     )
 
 
-@pytest.mark.parametrize("allow_3yc", [True, False])
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_process_all(mocker, allow_3yc, dry_run):
+def test_process_all(mocker, dry_run):
     mocked_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.management.commands.sync_agreements.setup_client",
@@ -58,8 +54,7 @@ def test_process_all(mocker, allow_3yc, dry_run):
     call_command(
         "sync_agreements",
         all=True,
-        allow_3yc=allow_3yc,
         dry_run=dry_run,
     )
 
-    mocked.assert_called_once_with(mocked_client, allow_3yc, dry_run)
+    mocked.assert_called_once_with(mocked_client, dry_run)
