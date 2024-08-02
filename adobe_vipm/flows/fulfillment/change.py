@@ -337,5 +337,5 @@ def fulfill_change_order(mpt_client, order):
     )
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_CHANGE)
     sync_agreements_by_agreement_ids(
-        mpt_client, [order["agreement"]["id"]], False, False
+        mpt_client, [order["agreement"]["id"]], False
     )

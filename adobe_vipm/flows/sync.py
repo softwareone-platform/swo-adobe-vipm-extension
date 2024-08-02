@@ -1,19 +1,18 @@
 import logging
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.utils import get_3yc_commitment
+from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
 from adobe_vipm.flows.constants import PARAM_ADOBE_SKU
 from adobe_vipm.flows.mpt import (
     get_agreement_subscription,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
     get_all_agreements,
-    get_pricelist_items_by_product_items,
-    get_product_items_by_skus,
     update_agreement,
     update_agreement_subscription,
 )
@@ -30,7 +29,6 @@ logger = logging.getLogger(__name__)
 def sync_agreement_prices(
     mpt_client,
     agreement,
-    allow_3yc,
     dry_run,
 ):
     try:
@@ -39,7 +37,7 @@ def sync_agreement_prices(
         agreement_id = agreement["id"]
         authorization_id = agreement["authorization"]["id"]
         customer_id = get_adobe_customer_id(agreement)
-        pricelist_id = agreement["listing"]["priceList"]["id"]
+        currency = agreement["listing"]["priceList"]["currency"]
         product_id = agreement["product"]["id"]
         subscriptions = agreement["subscriptions"]
 
@@ -59,17 +57,17 @@ def sync_agreement_prices(
 
         customer = adobe_client.get_customer(authorization_id, customer_id)
         commitment = get_3yc_commitment(customer)
+        commitment_start_date = None
         if (
             commitment
             and commitment["status"] == STATUS_3YC_COMMITTED
-            and not allow_3yc
+            and date.fromisoformat(commitment["endDate"]) >= date.today()
         ):
-            logger.info(
-                f"Customer of agreement {agreement_id} has commited for 3y, skip it"
-            )
-            return
+            commitment_start_date = date.fromisoformat(commitment["startDate"])
 
         coterm_date = customer["cotermDate"]
+
+        to_update = []
 
         for subscription in subscriptions:
             if subscription["status"] == "Terminated":
@@ -93,18 +91,22 @@ def sync_agreement_prices(
             )
 
             actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
-            prod_item = get_product_items_by_skus(mpt_client, product_id, [actual_sku])[
-                0
-            ]
-            price_item = get_pricelist_items_by_product_items(
-                mpt_client, pricelist_id, [prod_item["id"]]
-            )[0]
+            to_update.append((subscription, actual_sku))
 
+        skus = [item[1] for item in to_update]
+
+        if commitment_start_date:
+            prices = get_prices_for_3yc_skus(product_id, currency, commitment_start_date, skus)
+        else:
+            prices = get_prices_for_skus(product_id, currency, skus)
+
+
+        for subscription, actual_sku in to_update:
             line_id = subscription["lines"][0]["id"]
             lines = [
                 {
                     "price": {
-                        "unitPP": price_item["unitPP"],
+                        "unitPP": prices[actual_sku]
                     },
                     "id": line_id,
                 }
@@ -128,17 +130,18 @@ def sync_agreement_prices(
                 )
                 logger.info(
                     f"Subscription: {subscription['id']} ({line_id}): "
-                    f"sku={actual_sku} ({prod_item['id']} - {price_item['id']})"
+                    f"sku={actual_sku}"
                 )
             else:
                 current_price = subscription["lines"][0]["price"]["unitPP"]
                 sys.stdout.write(
                     f"Subscription: {subscription['id']} ({line_id}): "
-                    f"sku={actual_sku} ({prod_item['id']}), "
+                    f"sku={actual_sku}, "
                     f"current_price={current_price}, "
-                    f"new_price={price_item['unitPP']} ({price_item['id']})\n"
+                    f"new_price={prices[actual_sku]}\n"
                 )
 
+        to_update = []
         for line in agreement["lines"]:
             actual_sku = adobe_config.get_adobe_product(
                 line["item"]["externalIds"]["vendor"]
@@ -149,26 +152,33 @@ def sync_agreement_prices(
                 else get_customer_consumables_discount_level(customer)
             )
             actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
-            prod_item = get_product_items_by_skus(mpt_client, product_id, [actual_sku])[
-                0
-            ]
-            price_item = get_pricelist_items_by_product_items(
-                mpt_client, pricelist_id, [prod_item["id"]]
-            )[0]
+
+            to_update.append((line, actual_sku))
+
+        skus = [item[1] for item in to_update]
+
+        if commitment_start_date:
+            prices = get_prices_for_3yc_skus(product_id, currency, commitment_start_date, skus)
+        else:
+            prices = get_prices_for_skus(product_id, currency, skus)
+
+        for line, actual_sku in to_update:
+
+
             current_price = line["price"]["unitPP"]
-            line["price"]["unitPP"] = price_item["unitPP"]
+            line["price"]["unitPP"] = prices[actual_sku]
 
             if dry_run:
                 sys.stdout.write(
                     f"OneTime item: {line['id']}: "
-                    f"sku={actual_sku} ({prod_item['id']}), "
+                    f"sku={actual_sku}, "
                     f"current_price={current_price}, "
-                    f"new_price={price_item['unitPP']} ({price_item['id']})\n",
+                    f"new_price={prices[actual_sku]}\n",
                 )
             else:
                 logger.info(
                     f"OneTime item: {line['id']}: "
-                    f"sku={actual_sku} ({prod_item['id']} - {price_item['id']})"
+                    f"sku={actual_sku}\n"
                 )
 
         next_sync = (
@@ -191,34 +201,31 @@ def sync_agreement_prices(
         logger.exception(f"Cannot sync agreement {agreement_id}")
 
 
-def sync_agreements_by_next_sync(mpt_client, allow_3yc, dry_run):
+def sync_agreements_by_next_sync(mpt_client, dry_run):
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
             mpt_client,
             agreement,
-            allow_3yc,
             dry_run,
         )
 
 
-def sync_agreements_by_agreement_ids(mpt_client, ids, allow_3yc, dry_run):
+def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run):
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
         sync_agreement_prices(
             mpt_client,
             agreement,
-            allow_3yc,
             dry_run,
         )
 
 
-def sync_all_agreements(mpt_client, allow_3yc, dry_run):
+def sync_all_agreements(mpt_client, dry_run):
     agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
             mpt_client,
             agreement,
-            allow_3yc,
             dry_run,
         )

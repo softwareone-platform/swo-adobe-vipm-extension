@@ -203,7 +203,6 @@ def test_upsizing(
         mocked_mpt_client,
         [processing_change_order["agreement"]["id"]],
         False,
-        False,
     )
 
 
@@ -337,8 +336,6 @@ def test_downsizing(
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
-    items_factory,
-    pricelist_items_factory,
 ):
     """
     Tests the processing of a change order (downsizing) including:
@@ -507,7 +504,6 @@ def test_downsizing(
         mocked_mpt_client,
         [processing_order["agreement"]["id"]],
         False,
-        False,
     )
 
 
@@ -520,8 +516,6 @@ def test_downsizing_return_order_exists(
     subscriptions_factory,
     adobe_order_factory,
     adobe_items_factory,
-    items_factory,
-    pricelist_items_factory,
 ):
     """
     Tests the processing of a change order (downsizing) when the return order
@@ -671,7 +665,6 @@ def test_downsizing_return_order_exists(
     mocked_sync.assert_called_once_with(
         mocked_mpt_client,
         [processing_order["agreement"]["id"]],
-        False,
         False,
     )
 
@@ -1305,7 +1298,6 @@ def test_mixed(
         mocked_mpt_client,
         [processing_change_order["agreement"]["id"]],
         False,
-        False,
     )
 
 
@@ -1566,7 +1558,6 @@ def test_upsize_of_previously_downsized_out_of_win_with_new_order(
         mocked_mpt_client,
         [processing_change_order["agreement"]["id"]],
         False,
-        False,
     )
 
 
@@ -1734,7 +1725,6 @@ def test_one_time_items(
     mocked_sync.assert_called_once_with(
         mocked_mpt_client,
         [processing_change_order["agreement"]["id"]],
-        False,
         False,
     )
 
