@@ -113,18 +113,9 @@ def test_transfer(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscription,
     )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory()
-        + items_factory(item_id=2, external_vendor_id="99999999CA"),
-    )
     mocked_get_onetime = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
     )
 
     mocked_process_order = mocker.patch(
@@ -1292,16 +1283,8 @@ def test_transfer_3yc_customer(
         return_value=subscription,
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory(),
-    )
-    mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=[],
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
     )
 
     mocked_complete_order = mocker.patch(
