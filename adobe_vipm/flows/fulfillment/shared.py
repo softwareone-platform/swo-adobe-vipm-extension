@@ -3,13 +3,14 @@ This module contains shared functions used by the different fulfillment flows.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from operator import itemgetter
 
 from django.conf import settings
 
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
+    STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
@@ -19,6 +20,7 @@ from adobe_vipm.adobe.utils import (
     sanitize_company_name,
     sanitize_first_last_name,
 )
+from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
 from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -35,8 +37,6 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
-    get_pricelist_items_by_product_items,
-    get_product_items_by_skus,
     get_product_onetime_items_by_ids,
     get_product_template_or_default,
     get_rendered_template,
@@ -485,32 +485,42 @@ def set_subscription_actual_sku(
 
 def update_order_actual_price(
     mpt_client,
+    adobe_client,
     order,
     lines_to_update,
     adobe_items,
 ):
     actual_skus = [item["offerId"] for item in adobe_items]
-    pricelist_id = order["agreement"]["listing"]["priceList"]["id"]
+    currency = order["agreement"]["listing"]["priceList"]["currency"]
+    authorization_id = order["authorization"]["id"]
     product_id = order["agreement"]["product"]["id"]
-    product_actual_items = get_product_items_by_skus(
-        mpt_client, product_id, actual_skus
-    )
-    price_items = get_pricelist_items_by_product_items(
-        mpt_client,
-        pricelist_id,
-        [item["id"] for item in product_actual_items],
-    )
+    adobe_customer_id = get_adobe_customer_id(order)
+    customer = adobe_client.get_customer(authorization_id, adobe_customer_id)
+    commitment = get_3yc_commitment(customer)
+    if (
+        commitment
+        and commitment["status"] == STATUS_3YC_COMMITTED
+        and date.fromisoformat(commitment["endDate"]) >= date.today()
+    ):
+        prices = get_prices_for_3yc_skus(
+            product_id,
+            currency,
+            date.fromisoformat(commitment["startDate"]),
+            actual_skus,
+        )
+    else:
+        prices = get_prices_for_skus(product_id, currency, actual_skus)
 
     lines = []
     for line in lines_to_update:
         new_price_item = get_price_item_by_line_sku(
-            price_items, line["item"]["externalIds"]["vendor"]
+            prices, line["item"]["externalIds"]["vendor"]
         )
         lines.append(
             {
                 "id": line["id"],
                 "price": {
-                    "unitPP": new_price_item["unitPP"],
+                    "unitPP": new_price_item[1],
                 },
             }
         )
