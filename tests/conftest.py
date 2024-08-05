@@ -1,4 +1,5 @@
 import copy
+from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
 import jwt
@@ -1399,3 +1400,16 @@ def adobe_customer_factory():
         return customer
 
     return _customer
+
+
+@pytest.fixture()
+def mock_pricelist_cache_factory(mocker):
+    def _mocked_cache(cache=None):
+        new_cache = cache or defaultdict(list)
+        mocker.patch("adobe_vipm.flows.airtable.PRICELIST_CACHE", new_cache)
+        return new_cache
+    return _mocked_cache
+
+@pytest.fixture()
+def mocked_pricelist_cache(mock_pricelist_cache_factory):
+    return mock_pricelist_cache_factory()
