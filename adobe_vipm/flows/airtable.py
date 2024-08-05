@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cache
 
@@ -17,11 +18,15 @@ from pyairtable.orm import Model, fields
 from requests import HTTPError
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
+from adobe_vipm.utils import find_first
+
 STATUS_INIT = "init"
 STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
 STATUS_SYNCHRONIZED = "synchronized"
+
+PRICELIST_CACHE = defaultdict(list)
 
 
 @dataclass(frozen=True)
@@ -221,47 +226,69 @@ def get_pricelist_model(base_info):
 
 def get_prices_for_skus(product_id, currency, skus):
     PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
-    items =  PriceList.all(
+    items = PriceList.all(
         formula=AND(
             EQUAL(FIELD("currency"), to_airtable_value(currency)),
             EQUAL(FIELD("valid_until"), "BLANK()"),
             OR(
-                *[
-                    EQUAL(FIELD("sku"), to_airtable_value(sku))
-                    for sku in skus
-                ],
+                *[EQUAL(FIELD("sku"), to_airtable_value(sku)) for sku in skus],
             ),
         ),
     )
-    return {
-        item.sku: item.unit_pp
-        for item in items
-    }
+    return {item.sku: item.unit_pp for item in items}
 
 
 def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
-    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
     prices = {}
-    items =  PriceList.all(
+    for sku in skus:
+        pricelist_item = find_first(
+            lambda item: item["currency"] == currency
+            and item["valid_from"] <= start_date
+            and item["valid_until"] > start_date,
+            PRICELIST_CACHE[sku],
+        )
+        if pricelist_item:
+            prices[sku] = pricelist_item["unit_pp"]
+
+    skus_to_lookup = sorted(set(skus) - set(prices.keys()))
+    if not skus_to_lookup:
+        return prices
+
+    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+
+    items = PriceList.all(
         formula=AND(
             EQUAL(FIELD("currency"), to_airtable_value(currency)),
             OR(
                 EQUAL(FIELD("valid_until"), "BLANK()"),
                 AND(
-                    LESS_EQUAL(FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))),
-                    GREATER(FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))),
+                    LESS_EQUAL(
+                        FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))
+                    ),
+                    GREATER(
+                        FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))
+                    ),
                 ),
             ),
             OR(
                 *[
                     EQUAL(FIELD("sku"), to_airtable_value(sku))
-                    for sku in skus
+                    for sku in skus_to_lookup
                 ],
             ),
         ),
         sort=["-valid_until"],
     )
     for item in items:
+        if item.valid_until:
+            PRICELIST_CACHE[item.sku].append(
+                {
+                    "currency": item.currency,
+                    "valid_from": item.valid_from,
+                    "valid_until": item.valid_until,
+                    "unit_pp": item.unit_pp,
+                },
+            )
         if item.sku not in prices:
             prices[item.sku] = item.unit_pp
     return prices
