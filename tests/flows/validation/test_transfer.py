@@ -3,6 +3,8 @@ from datetime import date, timedelta
 import pytest
 
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_TRANSFER_STATUSES,
@@ -17,7 +19,7 @@ from adobe_vipm.flows.constants import (
     PARAM_MEMBERSHIP_ID,
 )
 from adobe_vipm.flows.utils import get_ordering_parameter
-from adobe_vipm.flows.validation.transfer import validate_transfer
+from adobe_vipm.flows.validation.transfer import get_prices, validate_transfer
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -41,13 +43,23 @@ def test_validate_transfer(
         lines=[],
     )
     product_items = items_factory()
-    valid_items = adobe_items_factory(renewal_date=date.today().isoformat())
+    valid_items = adobe_items_factory(
+        renewal_date=date.today().isoformat(),
+    )
     expired_items = adobe_items_factory(
+        offer_id="65304999CA01A12",
         line_number=2,
         renewal_date=(date.today() - timedelta(days=5)).isoformat(),
     )
     items = valid_items + expired_items
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
+        return_value={
+            valid_items[0]["offerId"]: 12.14,
+            expired_items[0]["offerId"]: 33.04,
+        }
+    )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
 
@@ -56,14 +68,12 @@ def test_validate_transfer(
         return_value=product_items,
     )
 
-    has_errors, validated_order, adobe_obj = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
-    lines = lines_factory(line_id=None)
-    del lines[0]["price"]
+    lines = lines_factory(line_id=None, unit_purchase_price=12.14)
     assert has_errors is False
     assert validated_order["lines"] == lines
-    assert adobe_obj == {"items": valid_items}
 
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
@@ -90,13 +100,25 @@ def test_validate_transfer_lines_exist(
         order_parameters=transfer_order_parameters_factory(),
     )
     product_items = items_factory()
-    valid_items = adobe_items_factory(renewal_date=date.today().isoformat())
+
+    valid_items = adobe_items_factory(
+        renewal_date=date.today().isoformat(),
+    )
     expired_items = adobe_items_factory(
+        offer_id="65304999CA01A12",
         line_number=2,
         renewal_date=(date.today() - timedelta(days=5)).isoformat(),
     )
     items = valid_items + expired_items
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
+        return_value={
+            valid_items[0]["offerId"]: 12.14,
+            expired_items[0]["offerId"]: 33.04,
+        }
+    )
+
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
 
@@ -105,12 +127,11 @@ def test_validate_transfer_lines_exist(
         return_value=product_items,
     )
 
-    has_errors, validated_order, adobe_obj = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
     assert has_errors is False
     assert validated_order["lines"] == lines_factory()
-    assert adobe_obj == {"items": valid_items}
 
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
@@ -147,7 +168,7 @@ def test_validate_transfer_membership_error(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.side_effect = api_error
 
-    has_errors, validated_order, _ = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 
@@ -189,7 +210,7 @@ def test_validate_transfer_http_error(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.side_effect = error
 
-    has_errors, validated_order, _ = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 
@@ -224,8 +245,12 @@ def test_validate_transfer_unknown_item(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
         return_value=[],
     )
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices",
+        return_value=[],
+    )
 
-    has_errors, validated_order, _ = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 
@@ -243,6 +268,7 @@ def test_validate_transfer_already_migrated(
     mocker,
     order_factory,
     transfer_order_parameters_factory,
+    adobe_customer_factory,
     adobe_subscription_factory,
     adobe_authorizations_file,
 ):
@@ -272,6 +298,7 @@ def test_validate_transfer_already_migrated(
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription],
     }
+    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
 
     has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
@@ -297,6 +324,7 @@ def test_validate_transfer_already_migrated(
         {
             "items": [adobe_subscription],
         },
+        {},
         "currentQuantity",
     )
     assert adobe_subscription["offerId"] == "65304578CA03A12"
@@ -323,7 +351,7 @@ def test_validate_transfer_migration_running(
         return_value=mocked_transfer,
     )
 
-    has_errors, validated_order, _ = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 
@@ -359,7 +387,7 @@ def test_validate_transfer_migration_synchronized(
         return_value=mocked_transfer,
     )
 
-    has_errors, validated_order, _ = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 
@@ -390,7 +418,7 @@ def test_validate_transfer_no_items(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
 
-    has_errors, validated_order, _ = validate_transfer(
+    has_errors, validated_order = validate_transfer(
         m_client, mocked_adobe_client, order
     )
 
@@ -399,3 +427,66 @@ def test_validate_transfer_no_items(
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict()
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
+
+
+def test_get_prices(mocker, order_factory):
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
+        return_value={"sku-1": 10.11},
+    )
+    order = order_factory()
+    assert get_prices(order, None, ["sku-1"]) == {"sku-1": 10.11}
+
+    mocked_get_prices_for_skus.assert_called_once_with(
+        order["agreement"]["product"]["id"],
+        order["agreement"]["listing"]["priceList"]["currency"],
+        ["sku-1"],
+    )
+
+
+@pytest.mark.parametrize(
+    "commitment_status",
+    [STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED],
+)
+def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitment_status):
+    commitment = adobe_commitment_factory(
+        end_date=(date.today() + timedelta(days=1)).isoformat(),
+        status=commitment_status,
+    )
+
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_3yc_skus",
+        return_value={"sku-1": 10.11},
+    )
+    order = order_factory()
+    assert get_prices(order, commitment, ["sku-1"]) == {"sku-1": 10.11}
+
+    mocked_get_prices_for_skus.assert_called_once_with(
+        order["agreement"]["product"]["id"],
+        order["agreement"]["listing"]["priceList"]["currency"],
+        date.fromisoformat(commitment["startDate"]),
+        ["sku-1"],
+    )
+
+
+def test_get_prices_3yc_expired(mocker, order_factory, adobe_commitment_factory):
+    commitment = adobe_commitment_factory(
+        end_date=(date.today() - timedelta(days=1)).isoformat(),
+    )
+
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
+        return_value={"sku-1": 10.11},
+    )
+    mocked_get_prices_for_3yc_skus = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_3yc_skus",
+    )
+    order = order_factory()
+    assert get_prices(order, commitment, ["sku-1"]) == {"sku-1": 10.11}
+
+    mocked_get_prices_for_skus.assert_called_once_with(
+        order["agreement"]["product"]["id"],
+        order["agreement"]["listing"]["priceList"]["currency"],
+        ["sku-1"],
+    )
+    mocked_get_prices_for_3yc_skus.assert_not_called()
