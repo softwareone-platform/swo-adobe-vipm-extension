@@ -1312,10 +1312,16 @@ def extension_settings(settings):
 
 @pytest.fixture()
 def adobe_commitment_factory():
-    def _commitment(licenses=None, consumables=None, status="COMMITTED"):
+    def _commitment(
+            licenses=None,
+            consumables=None,
+            start_date="2024-01-01",
+            end_date= "2025-01-01",
+            status="COMMITTED",
+        ):
         commitment = {
-            "startDate": "2024-01-01",
-            "endDate": "2025-01-01",
+            "startDate": start_date,
+            "endDate": end_date,
             "status": status,
             "minimumQuantities": [],
         }
