@@ -10,6 +10,7 @@ from django.conf import settings
 
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
+    STATUS_3YC_ACTIVE,
     STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
@@ -499,7 +500,7 @@ def update_order_actual_price(
     commitment = get_3yc_commitment(customer)
     if (
         commitment
-        and commitment["status"] == STATUS_3YC_COMMITTED
+        and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):
         prices = get_prices_for_3yc_skus(

@@ -1,10 +1,15 @@
 import logging
+from datetime import date
 
 from adobe_vipm.adobe.config import get_config
+from adobe_vipm.adobe.constants import STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
+from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
     STATUS_SYNCHRONIZED,
+    get_prices_for_3yc_skus,
+    get_prices_for_skus,
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
@@ -29,9 +34,33 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
+def get_prices(order, commitment, adobe_skus):
+    currency = order["agreement"]["listing"]["priceList"]["currency"]
+    product_id = order["agreement"]["product"]["id"]
+    if (
+        commitment
+        and commitment["status"] in (STATUS_3YC_COMMITTED, "ACTIVE")
+        and date.fromisoformat(commitment["endDate"]) >= date.today()
+    ):
+        return get_prices_for_3yc_skus(
+            product_id,
+            currency,
+            date.fromisoformat(commitment["startDate"]),
+            adobe_skus,
+        )
+    else:
+        return get_prices_for_skus(product_id, currency, adobe_skus)
+
+
+
+def add_lines_to_order(mpt_client, order, adobe_object, commitment, quantity_field):
     returned_skus = [
         get_partial_sku(item["offerId"])
+        for item in adobe_object["items"]
+        if not is_transferring_item_expired(item)
+    ]
+    returned_full_skus = [
+        item["offerId"]
         for item in adobe_object["items"]
         if not is_transferring_item_expired(item)
     ]
@@ -43,7 +72,9 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
         )
-        return True, order, adobe_object
+        return True, order
+
+    prices = get_prices(order, commitment, returned_full_skus)
 
     items_map = {
         item["externalIds"]["vendor"]: item
@@ -66,20 +97,22 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
                     item_sku=get_partial_sku(adobe_line["offerId"]),
                 ),
             )
-            return True, order, adobe_object
+            return True, order
         current_line = get_order_line_by_sku(
             order, get_partial_sku(adobe_line["offerId"])
         )
         if current_line:
             current_line["quantity"] = adobe_line[quantity_field]
         else:
-            order["lines"].append(
-                {
-                    "item": item,
-                    "quantity": adobe_line[quantity_field],
-                    "oldQuantity": 0,
-                },
-            )
+            new_line = {
+                "item": item,
+                "quantity": adobe_line[quantity_field],
+                "oldQuantity": 0,
+            }
+            new_line.setdefault("price", {})
+            new_line["price"]["unitPP"] = prices.get(adobe_line["offerId"], 0)
+            logger.info(f"new line: {new_line}")
+            order["lines"].append(new_line)
 
         valid_adobe_lines.append(adobe_line)
 
@@ -90,7 +123,7 @@ def add_lines_to_order(mpt_client, order, adobe_object, quantity_field):
     ]
     order["lines"] = lines
 
-    return False, order, {"items": valid_adobe_lines}
+    return False, order
 
 
 def validate_transfer_not_migrated(mpt_client, adobe_client, order):
@@ -110,7 +143,7 @@ def validate_transfer_not_migrated(mpt_client, adobe_client, order):
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
         )
-        return True, order, None
+        return True, order
     except AdobeHttpError as he:
         err_msg = (
             ERR_ADOBE_MEMBERSHIP_NOT_FOUND
@@ -123,9 +156,9 @@ def validate_transfer_not_migrated(mpt_client, adobe_client, order):
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=err_msg),
         )
-        return True, order, None
-
-    return add_lines_to_order(mpt_client, order, transfer_preview, "quantity")
+        return True, order
+    commitment = get_3yc_commitment(transfer_preview)
+    return add_lines_to_order(mpt_client, order, transfer_preview, commitment, "quantity")
 
 
 def validate_transfer(mpt_client, adobe_client, order):
@@ -153,7 +186,7 @@ def validate_transfer(mpt_client, adobe_client, order):
                 title=param["name"], details="Migration in progress, retry later"
             ),
         )
-        return True, order, None
+        return True, order
 
     if transfer.status == STATUS_SYNCHRONIZED:
         param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
@@ -164,7 +197,7 @@ def validate_transfer(mpt_client, adobe_client, order):
                 title=param["name"], details="Membership has already been migrated"
             ),
         )
-        return True, order, None
+        return True, order
 
     subscriptions = adobe_client.get_subscriptions(
         authorization_id,
@@ -180,5 +213,6 @@ def validate_transfer(mpt_client, adobe_client, order):
             adobe_transfer, subscription["subscriptionId"]
         )
         subscription["offerId"] = correct_sku or subscription["offerId"]
-
-    return add_lines_to_order(mpt_client, order, subscriptions, "currentQuantity")
+    customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
+    commitment = get_3yc_commitment(customer)
+    return add_lines_to_order(mpt_client, order, subscriptions, commitment, "currentQuantity")

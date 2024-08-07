@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
-from adobe_vipm.adobe.constants import STATUS_3YC_COMMITTED
+from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
 from adobe_vipm.flows.constants import PARAM_ADOBE_SKU
@@ -60,7 +60,7 @@ def sync_agreement_prices(
         commitment_start_date = None
         if (
             commitment
-            and commitment["status"] == STATUS_3YC_COMMITTED
+            and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
             and date.fromisoformat(commitment["endDate"]) >= date.today()
         ):
             commitment_start_date = date.fromisoformat(commitment["startDate"])
