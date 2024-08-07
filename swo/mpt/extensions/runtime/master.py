@@ -24,11 +24,6 @@ def _display_path(path):
 
 
 class Master:
-    PROC_TARGETS = {
-        "event-consumer": start_event_consumer,
-        "gunicorn": start_gunicorn,
-    }
-
     def __init__(self, options):
         self.workers = {}
         self.options = options
@@ -44,6 +39,26 @@ class Master:
         self.monitor_thread = None
         self.setup_signals_handler()
 
+        match self.options["command"]:
+            case "all":
+                self.proc_targets = {
+                    "event-consumer": start_event_consumer,
+                    "gunicorn": start_gunicorn,
+                }
+            case "api":
+                self.proc_targets = {
+                    "gunicorn": start_gunicorn,
+                }
+            case "consumer":
+                self.proc_targets = {
+                    "event-consumer": start_event_consumer,
+                }
+            case _:
+                self.proc_targets = {
+                    "event-consumer": start_event_consumer,
+                    "gunicorn": start_gunicorn,
+                }
+
     def setup_signals_handler(self):
         for sig in HANDLED_SIGNALS:
             signal.signal(sig, self.handle_signal)
@@ -52,7 +67,7 @@ class Master:
         self.stop_event.set()
 
     def start(self):
-        for worker_type, target in self.PROC_TARGETS.items():
+        for worker_type, target in self.proc_targets.items():
             self.start_worker_process(worker_type, target)
         self.monitor_thread = threading.Thread(target=self.monitor_processes)
         self.monitor_event.set()
@@ -70,7 +85,7 @@ class Master:
                 if not p.is_alive():
                     if p.exitcode != 0:
                         logger.info(f"Process of type {worker_type} is dead, restart it")
-                        self.start_worker_process(worker_type, self.PROC_TARGETS[worker_type])
+                        self.start_worker_process(worker_type, self.proc_targets[worker_type])
                     else:
                         exited_workers.append(worker_type)
                         logger.info(f"{worker_type.capitalize()} worker exited")
