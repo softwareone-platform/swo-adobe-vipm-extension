@@ -142,10 +142,3 @@ def update_purchase_prices(adobe_client, order):
         order,
         preview_order["lineItems"],
     )
-
-
-def update_purchase_prices_for_transfer(order, adobe_object):
-    return _update_purchase_prices(
-        order,
-        adobe_object["items"],
-    )
