@@ -39,7 +39,7 @@ class Master:
         self.monitor_thread = None
         self.setup_signals_handler()
 
-        match self.options["command"]:
+        match self.options["component"]:
             case "all":
                 self.proc_targets = {
                     "event-consumer": start_event_consumer,
