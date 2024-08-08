@@ -113,18 +113,9 @@ def test_transfer(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscription,
     )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory()
-        + items_factory(item_id=2, external_vendor_id="99999999CA"),
-    )
     mocked_get_onetime = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
     )
 
     mocked_process_order = mocker.patch(
@@ -133,6 +124,9 @@ def test_transfer(
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
+    )
+    mocked_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
 
     fulfill_order(mocked_mpt_client, order)
@@ -336,6 +330,11 @@ def test_transfer(
         mocked_mpt_client,
         order["agreement"]["product"]["id"],
         [line["item"]["id"] for line in order["lines"]],
+    )
+    mocked_sync_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        [order["agreement"]["id"]],
+        False,
     )
 
 
@@ -1292,20 +1291,15 @@ def test_transfer_3yc_customer(
         return_value=subscription,
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory(),
-    )
-    mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=[],
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=[{"unitPP": 200.12}],
     )
 
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
+    )
+    mocked_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
@@ -1495,4 +1489,9 @@ def test_transfer_3yc_customer(
         authorization_id,
         "a-client-id",
         adobe_subscription["subscriptionId"],
+    )
+    mocked_sync_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        [order["agreement"]["id"]],
+        False,
     )

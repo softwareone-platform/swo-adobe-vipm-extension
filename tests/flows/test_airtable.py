@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date
 
 from requests import HTTPError
@@ -7,6 +8,9 @@ from adobe_vipm.flows.airtable import (
     create_offers,
     get_offer_ids_by_membership_id,
     get_offer_model,
+    get_pricelist_model,
+    get_prices_for_3yc_skus,
+    get_prices_for_skus,
     get_transfer_by_authorization_membership_or_customer,
     get_transfer_link,
     get_transfer_model,
@@ -15,7 +19,7 @@ from adobe_vipm.flows.airtable import (
 )
 
 
-def test_airtable_base_info_for_product(settings):
+def test_airtable_base_info_for_migrations(settings):
     api_key = "airtable-token"
     base_id = "base-id"
     settings.EXTENSION_CONFIG = {
@@ -23,7 +27,7 @@ def test_airtable_base_info_for_product(settings):
         "AIRTABLE_BASES": {"PRD-1111": "base-id"},
     }
 
-    base_info = AirTableBaseInfo.for_product("PRD-1111")
+    base_info = AirTableBaseInfo.for_migrations("PRD-1111")
 
     assert base_info.api_key == api_key
     assert base_info.base_id == base_id
@@ -198,3 +202,206 @@ def test_get_transfer_link_exception(mocker):
     transfer.get_table.side_effect = HTTPError()
 
     assert get_transfer_link(transfer) is None
+
+
+def test_airtable_base_info_for_pricing(settings):
+    api_key = "airtable-token"
+    base_id = "pricing-base-id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_PRICING_BASES": {"PRD-1111": "pricing-base-id"},
+    }
+
+    base_info = AirTableBaseInfo.for_pricing("PRD-1111")
+
+    assert base_info.api_key == api_key
+    assert base_info.base_id == base_id
+
+
+def test_get_pricelist_model():
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    PriceList = get_pricelist_model(base_info)
+    assert PriceList.get_api().api_key == base_info.api_key
+    assert PriceList.get_base().id == base_info.base_id
+
+
+def test_get_prices_for_skus(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    price_item_1 = mocker.MagicMock()
+    price_item_1.sku = "sku-1"
+    price_item_1.unit_pp = 12.44
+    price_item_2 = mocker.MagicMock()
+    price_item_2.sku = "sku-2"
+    price_item_2.unit_pp = 31.23
+    mocked_pricelist_model.all.return_value = [price_item_1, price_item_2]
+
+    prices = get_prices_for_skus("product_id", "currency", ["sku-1", "sku-2"])
+
+    assert prices == {
+        "sku-1": 12.44,
+        "sku-2": 31.23,
+    }
+
+    mocked_pricelist_model.all.assert_called_once_with(
+        formula=(
+            "AND({currency}='currency',{valid_until}=BLANK(),OR({sku}='sku-1',{sku}='sku-2'))"
+        ),
+    )
+
+
+def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    price_item_1 = mocker.MagicMock()
+    price_item_1.sku = "sku-1"
+    price_item_1.currency = "currency"
+    price_item_1.valid_from = date.fromisoformat("2024-01-01")
+    price_item_1.valid_until = date.fromisoformat("2025-01-01")
+    price_item_1.unit_pp = 12.44
+    price_item_2 = mocker.MagicMock()
+    price_item_2.sku = "sku-2"
+    price_item_2.currency = "currency"
+    price_item_2.valid_from = date.fromisoformat("2024-01-01")
+    price_item_2.valid_until = None
+    price_item_2.unit_pp = 31.23
+    price_item_3 = mocker.MagicMock()
+    price_item_3.sku = "sku-1"
+    price_item_3.unit_pp = 43.10
+    price_item_3.currency = "currency"
+    price_item_3.valid_from = date.fromisoformat("2024-01-01")
+    price_item_3.valid_until = None
+    mocked_pricelist_model.all.return_value = [price_item_1, price_item_2, price_item_3]
+
+
+    prices = get_prices_for_3yc_skus(
+        "product_id",
+        "currency",
+        date.fromisoformat("2024-03-03"),
+        ["sku-1", "sku-2"],
+    )
+
+    assert prices == {
+        "sku-1": 12.44,
+        "sku-2": 31.23,
+    }
+
+    mocked_pricelist_model.all.assert_called_once_with(
+        formula=(
+            "AND({currency}='currency',"
+            "OR({valid_until}=BLANK(),AND({valid_from}<='2024-03-03',{valid_until}>'2024-03-03')),"
+            "OR({sku}='sku-1',{sku}='sku-2'))"
+        ),
+        sort=["-valid_until"]
+    )
+    assert mocked_pricelist_cache == {
+        "sku-1": [
+            {
+                "currency": price_item_1.currency,
+                "valid_from": price_item_1.valid_from,
+                "valid_until": price_item_1.valid_until,
+                "unit_pp": price_item_1.unit_pp,
+            }
+        ],
+        "sku-2": [],
+    }
+
+
+def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cache_factory):
+    cache = defaultdict(list)
+    cache["sku-1"].append(
+            {
+                "currency": "currency",
+                "valid_from": date.fromisoformat("2024-01-01"),
+                "valid_until": date.fromisoformat("2025-01-01"),
+                "unit_pp": 12.44,
+            }
+    )
+    mock_pricelist_cache_factory(cache=cache)
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    price_item_2 = mocker.MagicMock()
+    price_item_2.sku = "sku-2"
+    price_item_2.currency = "currency"
+    price_item_2.valid_from = date.fromisoformat("2024-01-01")
+    price_item_2.valid_until = None
+    price_item_2.unit_pp = 31.23
+    mocked_pricelist_model.all.return_value = [price_item_2]
+
+
+    prices = get_prices_for_3yc_skus(
+        "product_id",
+        "currency",
+        date.fromisoformat("2024-03-03"),
+        ["sku-1", "sku-2"],
+    )
+
+    assert prices == {
+        "sku-1": 12.44,
+        "sku-2": 31.23,
+    }
+
+    mocked_pricelist_model.all.assert_called_once_with(
+        formula=(
+            "AND({currency}='currency',"
+            "OR({valid_until}=BLANK(),AND({valid_from}<='2024-03-03',{valid_until}>'2024-03-03')),"
+            "OR({sku}='sku-2'))"
+        ),
+        sort=["-valid_until"]
+    )
+
+
+def test_get_prices_for_3yc_skus_just_cache(mocker, settings, mock_pricelist_cache_factory):
+    cache = defaultdict(list)
+    cache["sku-1"].append(
+            {
+                "currency": "currency",
+                "valid_from": date.fromisoformat("2024-01-01"),
+                "valid_until": date.fromisoformat("2025-01-01"),
+                "unit_pp": 12.44,
+            }
+    )
+    mock_pricelist_cache_factory(cache=cache)
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+
+    prices = get_prices_for_3yc_skus(
+        "product_id",
+        "currency",
+        date.fromisoformat("2024-03-03"),
+        ["sku-1"],
+    )
+
+    assert prices == {
+        "sku-1": 12.44,
+    }
+
+    mocked_pricelist_model.all.assert_not_called()

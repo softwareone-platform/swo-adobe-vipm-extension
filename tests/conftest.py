@@ -1,4 +1,5 @@
 import copy
+from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
 import jwt
@@ -831,6 +832,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                 "priceList": {
                     "id": "PRC-9457-4272-3691",
                     "href": "/v1/price-lists/PRC-9457-4272-3691",
+                    "currency": "USD",
                 },
             },
             "licensee": licensee,
@@ -922,6 +924,7 @@ def agreement(buyer):
             "priceList": {
                 "id": "PRC-9457-4272-3691",
                 "href": "/v1/price-lists/PRC-9457-4272-3691",
+                "currency": "USD",
             },
         },
         "licensee": {
@@ -1309,10 +1312,16 @@ def extension_settings(settings):
 
 @pytest.fixture()
 def adobe_commitment_factory():
-    def _commitment(licenses=None, consumables=None, status="COMMITTED"):
+    def _commitment(
+            licenses=None,
+            consumables=None,
+            start_date="2024-01-01",
+            end_date= "2025-01-01",
+            status="COMMITTED",
+        ):
         commitment = {
-            "startDate": "2024-01-01",
-            "endDate": "2025-01-01",
+            "startDate": start_date,
+            "endDate": end_date,
             "status": status,
             "minimumQuantities": [],
         }
@@ -1397,3 +1406,16 @@ def adobe_customer_factory():
         return customer
 
     return _customer
+
+
+@pytest.fixture()
+def mock_pricelist_cache_factory(mocker):
+    def _mocked_cache(cache=None):
+        new_cache = cache or defaultdict(list)
+        mocker.patch("adobe_vipm.flows.airtable.PRICELIST_CACHE", new_cache)
+        return new_cache
+    return _mocked_cache
+
+@pytest.fixture()
+def mocked_pricelist_cache(mock_pricelist_cache_factory):
+    return mock_pricelist_cache_factory()

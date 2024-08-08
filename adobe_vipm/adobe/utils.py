@@ -41,10 +41,10 @@ def join_phone_number(phone: dict) -> str:
     return f"{phone['prefix']}{phone['number']}" if phone else ""
 
 
-def get_3yc_commitment(customer):
+def get_3yc_commitment(customer_or_transfer_preview):
     benefit_3yc = find_first(
         lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
-        customer.get("benefits", []),
+        customer_or_transfer_preview.get("benefits", []),
         {},
     )
 

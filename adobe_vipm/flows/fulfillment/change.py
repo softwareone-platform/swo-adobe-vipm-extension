@@ -165,7 +165,7 @@ def _downsize_out_of_win_or_migrated_subscriptions(
     adobe_line_items = [
         line_item for _, line_item in mpt_subscription_to_adobe_line_item_map
     ]
-    update_order_actual_price(mpt_client, order, lines, adobe_line_items)
+    update_order_actual_price(mpt_client, adobe_client, order, lines, adobe_line_items)
 
 
 def _submit_change_order(mpt_client, customer_id, order):
@@ -333,9 +333,9 @@ def fulfill_change_order(mpt_client, order):
                 )
 
     update_order_actual_price(
-        mpt_client, order, updated_lines, adobe_order["lineItems"]
+        mpt_client, adobe_client, order, updated_lines, adobe_order["lineItems"]
     )
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_CHANGE)
     sync_agreements_by_agreement_ids(
-        mpt_client, [order["agreement"]["id"]], False, False
+        mpt_client, [order["agreement"]["id"]], False
     )
