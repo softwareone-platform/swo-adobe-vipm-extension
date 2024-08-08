@@ -111,7 +111,6 @@ def add_lines_to_order(mpt_client, order, adobe_object, commitment, quantity_fie
             }
             new_line.setdefault("price", {})
             new_line["price"]["unitPP"] = prices.get(adobe_line["offerId"], 0)
-            logger.info(f"new line: {new_line}")
             order["lines"].append(new_line)
 
         valid_adobe_lines.append(adobe_line)
