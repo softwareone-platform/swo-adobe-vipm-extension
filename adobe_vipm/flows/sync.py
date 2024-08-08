@@ -127,6 +127,7 @@ def sync_agreement_prices(
                     subscription["id"],
                     lines=lines,
                     parameters=parameters,
+                    commitmentDate=coterm_date,
                 )
                 logger.info(
                     f"Subscription: {subscription['id']} ({line_id}): "
