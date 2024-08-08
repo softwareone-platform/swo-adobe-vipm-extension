@@ -20,8 +20,6 @@ def test_sync_agreement_prices(
     subscriptions_factory,
     lines_factory,
     adobe_subscription_factory,
-    items_factory,
-    pricelist_items_factory,
     adobe_customer_factory,
 ):
     agreement = agreement_factory(
@@ -86,6 +84,7 @@ def test_sync_agreement_prices(
         parameters={
             "fulfillment": [{"externalId": "adobeSKU", "value": "65304578CA01A12"}]
         },
+        commitmentDate="2025-04-04",
     )
 
     expected_lines = lines_factory(
@@ -398,6 +397,7 @@ def test_sync_agreement_prices_with_3yc(
         parameters={
             "fulfillment": [{"externalId": "adobeSKU", "value": "65304578CA01A12"}]
         },
+        commitmentDate="2025-04-04",
     )
 
     expected_lines = lines_factory(
