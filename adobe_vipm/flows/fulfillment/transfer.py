@@ -44,6 +44,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
+from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_adobe_order_id,
@@ -347,3 +348,6 @@ def fulfill_transfer_order(mpt_client, order):
         order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)
+    sync_agreements_by_agreement_ids(
+        mpt_client, [order["agreement"]["id"]], False
+    )
