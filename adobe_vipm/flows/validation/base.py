@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 
 
 def validate_order(mpt_client, order):
+    """
+    Performs the validation of a draft order.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        order (dict): The order to validate
+
+    Returns:
+        dict: The validated order.
+    """
     try:
         adobe_client = get_adobe_client()
         order = populate_order_info(mpt_client, order)

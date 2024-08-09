@@ -36,6 +36,16 @@ class AirTableBaseInfo:
 
     @staticmethod
     def for_migrations(product_id):
+        """
+        Returns an AirTableBaseInfo object with the base identifier of the base that
+        contains the migrations tables and the API key for a given product.
+
+        Args:
+            product_id (str): Identifier of the product.
+
+        Returns:
+            AirTableBaseInfo: The base info.
+        """
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
             base_id=get_for_product(settings, "AIRTABLE_BASES", product_id),
@@ -43,6 +53,16 @@ class AirTableBaseInfo:
 
     @staticmethod
     def for_pricing(product_id):
+        """
+        Returns an AirTableBaseInfo object with the base identifier of the base that
+        contains the pricing tables and the API key for a given product.
+
+        Args:
+            product_id (str): Identifier of the product.
+
+        Returns:
+            AirTableBaseInfo: The base info.
+        """
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
             base_id=get_for_product(settings, "AIRTABLE_PRICING_BASES", product_id),
@@ -51,6 +71,16 @@ class AirTableBaseInfo:
 
 @cache
 def get_transfer_model(base_info):
+    """
+    Returns the Transfer model class connected to the right base and with
+    the right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        Transfer: The AirTable Tranfer model.
+    """
     class Transfer(Model):
         membership_id = fields.TextField("membership_id")
         authorization_uk = fields.TextField("authorization_uk")
@@ -117,6 +147,16 @@ def get_transfer_model(base_info):
 
 @cache
 def get_offer_model(base_info):
+    """
+    Returns the Offer model class connected to the right base and with
+    the right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        Offer: The AirTable Offer model.
+    """
     Transfer = get_transfer_model(base_info)
 
     class Offer(Model):
@@ -137,6 +177,16 @@ def get_offer_model(base_info):
 
 
 def get_offer_ids_by_membership_id(product_id, membership_id):
+    """
+    Returns a list of SKUs associated with a given membership_id.
+
+    Args:
+        product_id (str): The ID of the product to which the membership refers to.
+        membership_id (str): The membership ID used to retrieve the list of SKUs.
+
+    Returns:
+        list: List of SKUs that belong to the given membership.
+    """
     Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
     return [
         offer.offer_id
@@ -147,11 +197,27 @@ def get_offer_ids_by_membership_id(product_id, membership_id):
 
 
 def create_offers(product_id, offers):
+    """
+    Creates a list of Offer objects in batch.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        offers (list): List of Offer objects to create.
+    """
     Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
     Offer.batch_save([Offer(**offer) for offer in offers])
 
 
 def get_transfers_to_process(product_id):
+    """
+    Get a list of transfers that must be submitted to Adobe.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+
+    Returns:
+        list: List of Transfer objects.
+    """
     Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return Transfer.all(
         formula=OR(
@@ -162,6 +228,15 @@ def get_transfers_to_process(product_id):
 
 
 def get_transfers_to_check(product_id):
+    """
+    Returns a list of transfers currently in running state.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+
+    Returns:
+        list: List of running transfers.
+    """
     Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return Transfer.all(
         formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
@@ -171,6 +246,18 @@ def get_transfers_to_check(product_id):
 def get_transfer_by_authorization_membership_or_customer(
     product_id, authorization_uk, membership_or_customer_id
 ):
+    """
+    Retrieve a Transfer object given the authorization ID and
+    the membership ID or the customer ID.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        authorization_uk (str): The ID of the authorization.
+        membership_or_customer_id (str): Either a membership ID or a customer ID.
+
+    Returns:
+        Transfer: The Transfer if it has been found, None otherwise.
+    """
     Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     transfers = Transfer.all(
         formula=AND(
@@ -187,6 +274,16 @@ def get_transfer_by_authorization_membership_or_customer(
 
 
 def get_transfer_link(transfer):
+    """
+    Generate a link to a record of the Transfer table in the AirTable UI.
+
+    Args:
+        transfer (Transfer): The Transfer object for which the link must be
+        generated.
+
+    Returns:
+        str: The link to the transfer record or None in case of an error.
+    """
     try:
         base_id = transfer.Meta.base_id
         table_id = transfer.get_table().id
@@ -199,6 +296,16 @@ def get_transfer_link(transfer):
 
 @cache
 def get_pricelist_model(base_info):
+    """
+    Returns the PriceList model class connected to the right base and with
+    the right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        PriceList: The AirTable PriceList model.
+    """
     class PriceList(Model):
         record_id = fields.TextField("id", readonly=True)
         sku = fields.TextField("sku")
@@ -225,6 +332,18 @@ def get_pricelist_model(base_info):
 
 
 def get_prices_for_skus(product_id, currency, skus):
+    """
+    Given a currency and a list of SKUs it retrieves
+    the purchase price for each SKU in the given currency.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        currency (str): The currency for which the price must be retrieved.
+        skus (list): List of SKUs which purchase prices must be retrieved.
+
+    Returns:
+        dict: A dictionary with SKU, purchase price items.
+    """
     PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
     items = PriceList.all(
         formula=AND(
@@ -239,6 +358,22 @@ def get_prices_for_skus(product_id, currency, skus):
 
 
 def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
+    """
+    Given a currency and a list of SKUs and the 3YC start date it retrieves
+    the purchase price for each SKU in the given currency from the pricelist that was valid
+    when the 3YC started.
+    Such prices are cached since they will not change ever to reduce the amount of API calls
+    to the AirTable API.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        currency (str): The currency for which the price must be retrieved.
+        start_date (date): The date in which the 3YC started.
+        skus (list): List of SKUs which purchase prices must be retrieved.
+
+    Returns:
+        dict: A dictionary with SKU, purchase price items.
+    """
     prices = {}
     for sku in skus:
         pricelist_item = find_first(

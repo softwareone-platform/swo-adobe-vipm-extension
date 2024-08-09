@@ -199,6 +199,15 @@ def _check_adobe_transfer_order_fulfilled(
 
 
 def _fulfill_transfer_migrated(mpt_client, order, transfer):
+    """
+    Fulfills a transfer order when the transfer has already been processed
+    by the mass migration tool.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API-
+        order (dict): The transfer order.
+        transfer (Transfer): The AirTable transfer object.
+    """
     if transfer.status == STATUS_RUNNING:
         param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
