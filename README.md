@@ -7,8 +7,8 @@ Extension integrates Adobe VIP Marketplace Extension with the SoftwareONE Market
 
 # Run tests
 ```
-$ docker-compose build app_test
-$ docker-compose run --service-ports app_test
+$ docker compose build app_test
+$ docker compose run --service-ports app_test
 ```
 
 # Local run using mocked SoftwareONE Marketplace API
@@ -135,15 +135,15 @@ EXT_WEBHOOKS_SECRETS={"PRD-1111-1111": "<webhook-secret-for-product>", "PRD-2222
 
 1. Build and run the extension
 ```
-$ docker-compose build app
-$ docker-compose run --service-ports app
+$ docker compose build app
+$ docker compose run --service-ports app
 ```
 
 ## Generate mocked SoftwareONE Marketplace orders
 1. Build and run mocked data generator
 ```
-$ docker-compose build bash
-$ docker-compose run --service-ports bash
+$ docker compose build bash
+$ docker compose run --service-ports bash
 ```
 
 1. Inside the container, setup the data generator
