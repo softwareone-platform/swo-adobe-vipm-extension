@@ -70,12 +70,12 @@ class Config:
 
     def get_reseller(self, authorization: Authorization, id: str) -> Reseller:
         """
-        Returns a Reseller based on the Authorization and the Reseller
+        Returns a Reseller object given an Authorization and the Reseller
         identifier.
 
         Args:
             authorization (Authorization): The Authorization for looking up the
-                reseller.
+            reseller.
             id (str): Identifier of the Reseller to retrieve.
 
         Raises:
@@ -111,7 +111,7 @@ class Config:
     def get_adobe_product(self, vendor_external_id: str) -> AdobeProduct:
         """
         Returns the AdobeProduct object identified by the vendor
-        external id.
+        external id (partial SKU).
 
         Args:
             vendor_external_id (str): The vendor external id to search
@@ -154,6 +154,18 @@ class Config:
             )
 
     def get_preferred_language(self, country: str) -> str:
+        """
+        Returns the preferred language code for communications
+        based on the country code.
+
+        Args:
+            country (str): The country code for which search
+            for the preferred language code.
+
+        Returns:
+            str: The preferred language code or the English United
+            States as the default if not found.
+        """
         return find_first(
             lambda code: code.endswith(f"-{country}"),
             self.language_codes,
