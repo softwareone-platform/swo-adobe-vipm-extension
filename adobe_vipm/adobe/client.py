@@ -118,7 +118,7 @@ class AdobeClient:
         agreement_id: str,
         market_segment: str,
         customer_data: dict,
-    ) -> str:
+    ) -> dict:
         """
         Creates a customer account under the reseller identified by `seller_id`.
 
@@ -130,7 +130,7 @@ class AdobeClient:
             customer_data (dict): Data of the customer to create.
 
         Returns:
-            str: The customer object created in the Adobe VIP Markerplace.
+            dict: The customer object created in the Adobe VIP Markerplace.
         """
         authorization = self._config.get_authorization(authorization_id)
         reseller: Reseller = self._config.get_reseller(authorization, seller_id)
@@ -230,10 +230,9 @@ class AdobeClient:
 
         Args:
             authorization_id (str): Id of the authorization to use.
-            seller_id (str): Id of the seller to use.
             customer_id (str): Identifier of the customer that placed the order.
             sku (str): The SKU to search for.
-            line_number (int): the line number to search for.
+            mpt_line_id (str): the Marketplace line ID.
 
         Returns:
             list: Return a list of three values tuple with the NEW order the item identified
@@ -392,7 +391,7 @@ class AdobeClient:
             customer_id (str): Identifier of the customer that place the PREVIEW order.
             order_id: The identifier of the Marketplace platform order for which the PREVIEW
             order must be created.
-            items: The list of order items for which creating the preview order.
+            lines (list): The list of order lines for which creating the preview order.
 
         Returns:
             dict: The PREVIEW order.
@@ -611,11 +610,11 @@ class AdobeClient:
             subscription_id (str): Identifier of the subscription that must be retrieved.
             auto_renewal (boolean): Set if the subscription must be auto renewed on the anniversary
             date or not. Default to True.
-            quantity: The quantity of licenses that must be renewed on the anniversary date. Default
-            to None mean to leave it unchanged.
+            quantity (int): The quantity of licenses that must be renewed on the anniversary date.
+            Default to None mean to leave it unchanged.
 
         Returns:
-            str: The retrieved subscription.
+            dict: The updated subscription.
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
@@ -680,7 +679,7 @@ class AdobeClient:
         seller_id: str,
         order_id: str,
         membership_id: str,
-    ):
+    ) -> dict:
         """
         Creates a transfer order to move the subscriptions owned by a given
         membership identifier from the Adobe VIP program to the Adobe VIP Marketplace
@@ -722,7 +721,7 @@ class AdobeClient:
         authorization_id: str,
         membership_id: str,
         transfer_id: str,
-    ):
+    ) -> dict:
         """
         Retrieve a transfer object by the membership and transfer identifiers.
 
@@ -752,7 +751,7 @@ class AdobeClient:
         self,
         authorization_id: str,
         customer_id: str,
-    ):
+    ) -> dict:
         """
         Retrieve a customer object by the customer identifier.
 
@@ -783,7 +782,21 @@ class AdobeClient:
         customer_id: str,
         commitment_request: dict,
         is_recommitment: bool = False,
-    ) -> str:
+    ) -> dict:
+        """
+        Creates a commitment or recommitment request for a given customer.
+
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str):Id of the customer for which submit the request.
+            commitment_request (dict): data to fill the request object (minimum number or
+            licenses and/or consumables)
+            is_recommitment (bool, optional): if True creates a recommitment request. Default
+            to False.
+
+        Returns:
+            dict: the customer object containting the request.
+        """
         authorization = self._config.get_authorization(authorization_id)
 
         customer = self.get_customer(authorization_id, customer_id)

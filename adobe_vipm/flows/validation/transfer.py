@@ -35,6 +35,19 @@ logger = logging.getLogger(__name__)
 
 
 def get_prices(order, commitment, adobe_skus):
+    """
+    Get the purchase prices for the provided SKUs from airtable
+    thanking into account if the customer has committed for 3y.
+
+    Args:
+        order (dict): The order for which the prices must be retrieved for determining
+        the product and the currency.
+        commitment (dict): Customer 3YC data if any, None otherwise.
+        adobe_skus (list): list of SKUs for which the prices must be retrieved.
+
+    Returns:
+        dict: a dictionary with SKU, purchase price items.
+    """
     currency = order["agreement"]["listing"]["priceList"]["currency"]
     product_id = order["agreement"]["product"]["id"]
     if (
@@ -54,6 +67,23 @@ def get_prices(order, commitment, adobe_skus):
 
 
 def add_lines_to_order(mpt_client, order, adobe_object, commitment, quantity_field):
+    """
+    Add the lines that belongs to the provided Adobe VIP membership to the current order.
+    Updates the purchase price of each line according to the customer discount level/benefits.
+
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        order (dict): The order to validate.
+        adobe_object (dict): Either a transfer preview object or a list of subscriptions object.
+        commitment (dict): Either the customer 3y commitment data or None if the customer doesn't
+        have such benefit.
+        quantity_field (str): The name of the field that contains the quantity depending on the
+        provided `adobe_object` argument.
+
+    Returns:
+        tuple: (True, order) if there is an error adding the lines, (False, order) otherwise.
+    """
     returned_skus = [
         get_partial_sku(item["offerId"])
         for item in adobe_object["items"]
@@ -126,6 +156,17 @@ def add_lines_to_order(mpt_client, order, adobe_object, commitment, quantity_fie
 
 
 def validate_transfer_not_migrated(mpt_client, adobe_client, order):
+    """
+    Validates a transfer that has not been already migrated by the mass migration tool
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        adobe_client (AdobeClient): The client used to consume the Adobe VIPM API.
+        order (dict): The order to validate.
+
+    Returns:
+        tuple: (True, order) if there is a validation error, (False, order) otherwise.
+    """
     authorization_id = order["authorization"]["id"]
     membership_id = get_adobe_membership_id(order)
     transfer_preview = None
@@ -161,6 +202,17 @@ def validate_transfer_not_migrated(mpt_client, adobe_client, order):
 
 
 def validate_transfer(mpt_client, adobe_client, order):
+    """
+    Validates a transfer order.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        adobe_client (AdobeClient): The client used to consume the Adobe VIPM API.
+        order (dict): The order to validate.
+
+    Returns:
+        tuple: (True, order) if there is a validation error, (False, order) otherwise.
+    """
     config = get_config()
     authorization_id = order["authorization"]["id"]
     authorization = config.get_authorization(authorization_id)

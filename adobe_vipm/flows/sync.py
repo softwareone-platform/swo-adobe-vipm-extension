@@ -31,6 +31,19 @@ def sync_agreement_prices(
     agreement,
     dry_run,
 ):
+    """
+    Updates the purchase prices of an Agreement (subscriptions and One-Time items)
+    based on the customer discount level and customer benefits (3yc).
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        agreement (dict): The agreement to update.
+        dry_run (bool): if True, it just simulate the prices update but doesn't
+        perform it.
+
+    Returns:
+        str: Returns the customer coterm date.
+    """
     try:
         adobe_client = get_adobe_client()
         adobe_config = get_config()
@@ -203,6 +216,15 @@ def sync_agreement_prices(
 
 
 def sync_agreements_by_next_sync(mpt_client, dry_run):
+    """
+    Get all the agreements which nextSync date fullfilment parameter
+    has passed to update the prices for them.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        dry_run (bool): if True, it just simulate the prices update but doesn't
+        perform it.
+    """
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
@@ -213,6 +235,16 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
 
 
 def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run):
+    """
+    Get the agreements given a list of agreement IDs
+    to update the prices for them.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        ids (list): List of agreement IDs.
+        dry_run (bool): if True, it just simulate the prices update but doesn't
+        perform it.
+    """
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
         sync_agreement_prices(
@@ -223,6 +255,14 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run):
 
 
 def sync_all_agreements(mpt_client, dry_run):
+    """
+    Get all the active agreements to update the prices for them.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        dry_run (bool): if True, it just simulate the prices update but doesn't
+        perform it.
+    """
     agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
         sync_agreement_prices(
