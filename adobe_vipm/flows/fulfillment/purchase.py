@@ -192,8 +192,25 @@ def create_customer_account(client, order):
 
 
 def _submit_new_order(mpt_client, customer_id, order):
+    """
+    Create a PREVIEW order in Adobe using the base discount level SKUs
+    to receive from Adobe the SKU associated to the discount level the customer
+    has reached.
+    Then it place a NEW order in Adobe to purchase the corresponding SKUs.
+
+    Args:
+        mpt_client (MPTClient): The client to consume the MPT API.
+        customer_id (str): ID of the customer in Adobe.
+        order (dict): The MPT order that must be submitted to Adobe.
+
+    Returns:
+        dict: The order updated with the Adobe order ID (order's vendor external ID)
+    """
     adobe_client = get_adobe_client()
     adobe_order = None
+    # This function should be improved since an error returned by Adobe during the
+    # order PREVIEW creation can be retried. Only an error returned during the
+    # creation of the NEW order should make the MPT order fail.
     try:
         authorization_id = order["authorization"]["id"]
         preview_order = adobe_client.create_preview_order(
@@ -214,6 +231,18 @@ def _submit_new_order(mpt_client, customer_id, order):
 
 
 def _check_market_segment_eligibility(mpt_client, order):
+    """
+    Check if the customer is eligible to place orders for a given market segment.
+    The market segment the order refers to is determined by the product (product per segment).
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        order (dict): The order to check.
+
+    Returns:
+        bool: True if the customer is elegible for the market segment the orders
+        refers to, False otherwise.
+    """
     market_segment = get_market_segment(order["agreement"]["product"]["id"])
     if market_segment != MARKET_SEGMENT_COMMERCIAL:
         status = get_market_segment_eligibility_status(order)
@@ -238,7 +267,8 @@ def fulfill_purchase_order(mpt_client, order):
     Fulfills a purchase order by processing the necessary actions based on the provided parameters.
 
     Args:
-        mpt_client: An instance of the MPT client used for communication with the MPT system.
+        mpt_client (MPTClient): An instance of the MPT client used for communication
+        with the MPT system.
         order (dict): The MPT order representing the purchase order to be fulfilled.
 
     Returns:

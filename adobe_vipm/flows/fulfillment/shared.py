@@ -98,6 +98,22 @@ def save_adobe_customer_data(client, order, customer_id, request_3yc_status=None
 
 
 def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
+    """
+    Save the customer data retrieved from Adobe into the corresponding ordering
+    parameters. Save the Adobe order ID as the order's vendor external ID.
+
+    Args:
+        client (MPTClient): The client used to consume the MPT API.
+        order (dict): The order into which the data must be saved.
+        order_id (str): The Adobe order ID to store.
+        customer (_type_): The Adobe customer object from which the customer
+        data must be taken.
+
+    Returns:
+        dict: The updated order.
+    """
+    # This function is used by VIP -> VIPM transfer only so it should be moved to
+    # transfer module.
     order = set_adobe_order_id(order, order_id)
     order = set_adobe_customer_id(order, customer["customerId"])
 
@@ -319,6 +335,7 @@ def handle_return_orders(mpt_client, adobe_client, customer_id, order, lines):
         tuple or None: A tuple containing completed order IDs (if any) and the updated MPT order.
             If there are pending return orders, returns None.
     """
+    # Only used by change orders, should me moved to the corresponding module.
     completed_order_ids = []
     pending_order_ids = []
     authorization_id = order["authorization"]["id"]
@@ -491,6 +508,22 @@ def update_order_actual_price(
     lines_to_update,
     adobe_items,
 ):
+    """
+    Updates the purchase price of the order lines received as the `lines_to_update` function
+    argument leaving the other lines unchanged.
+    Prices are taken from AirTable pricelist table taking into account if the customer has
+    commited for 3 years.
+    Args:
+        mpt_client (MPTClient): The client to consume the MPT API.
+        adobe_client (AdobeClient): The client to consume the Adobe API.
+        order (dict): The order to update
+        lines_to_update (list): The lines which purchase prices have to be updated.
+        adobe_items (list): The list of Adobe items corresponding to the order lines
+        used to get the SKUs with the right discount level.
+
+    Returns:
+        dict: The updated order.
+    """
     actual_skus = [item["offerId"] for item in adobe_items]
     currency = order["agreement"]["listing"]["priceList"]["currency"]
     authorization_id = order["authorization"]["id"]
@@ -547,6 +580,15 @@ def update_order_actual_price(
 
 
 def check_processing_template(mpt_client, order, template_name):
+    """
+    Check if the order as the right processing template according to
+    the type of the order. Set the right one if it's not already set.
+
+    Args:
+        mpt_client (MPTClient): The client for consuming the MPT API
+        order (dict): The order to check.
+        template_name (str): Name of the template that must be used.
+    """
     template = get_product_template_or_default(
         mpt_client,
         order["agreement"]["product"]["id"],
@@ -558,6 +600,17 @@ def check_processing_template(mpt_client, order, template_name):
 
 
 def start_processing_attempt(mpt_client, order):
+    """
+    Increments the retry count parameter to register the new attempt,
+    send the processing email notification to the customer.
+
+    Args:
+        mpt_client (MPTClient): the MPT client used to update the order.
+        order (dict): The order currently processing.
+
+    Returns:
+        dict: The order with the retry count parameter updated.
+    """
     current_attempt = get_retry_count(order)
     order = increment_retry_count(order)
     update_order(mpt_client, order["id"], parameters=order["parameters"])
@@ -567,6 +620,21 @@ def start_processing_attempt(mpt_client, order):
 
 
 def save_next_sync_and_coterm_dates(client, order, coterm_date):
+    """
+    Save the customer coterm date as a fulfillment parameter.
+    It also calculates the next sync fulfillment parameter as
+    the coterm date plus 1 day. The next sync date is used by
+    the agreement synchronization process to know when the
+    agreement has to be synchronized.
+
+    Args:
+        client (MPTClient): The client used to consume the MPT API.
+        order (dict): The order that must be updated.
+        coterm_date (str): The customer coterm date.
+
+    Returns:
+        dict: The updated order.
+    """
     coterm_date = datetime.fromisoformat(coterm_date).date()
     order = set_coterm_date(order, coterm_date.isoformat())
     next_sync = coterm_date + timedelta(days=1)
@@ -576,6 +644,16 @@ def save_next_sync_and_coterm_dates(client, order, coterm_date):
 
 
 def send_email_notification(mpt_client, order):
+    """
+    Send a notification email to the customer according to the
+    current order status.
+    It embeds the current order template into the email body.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the
+        MPT API.
+        order (dict): The order for which the notification should be sent.
+    """
     email_notification_enabled = bool(
         settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
     )
@@ -614,6 +692,18 @@ def send_email_notification(mpt_client, order):
 
 
 def get_one_time_skus(mpt_client, order):
+    """
+    Get tge SKUs from the order lines that correspond
+    to One-Time items.
+
+    Args:
+        mpt_client (MPTClient): The client to consume the MPT API.
+        order (dict): The order from which the One-Time items SKUs
+        must be extracted.
+
+    Returns:
+        list: List of One-Time SKUs.
+    """
     one_time_items = get_product_onetime_items_by_ids(
         mpt_client,
         order["agreement"]["product"]["id"],
@@ -623,6 +713,20 @@ def get_one_time_skus(mpt_client, order):
 
 
 def set_customer_coterm_date_if_null(client, adobe_client, order):
+    """
+    If the customer coterm date fulfillment parameter is not set
+    for the provided order, it retrieves the customer object from Adobe and
+    set the coterm date fulfillment parameter for such order.
+
+    Args:
+        client (MPTClient): The client used to consume the MPT API.
+        adobe_client (AdobeClient): The client used to consume the Adobe VIPM API.
+        order (dict): The order that must be updated with the customer coterm date
+        fulfillment parameter.
+
+    Returns:
+        dict: The updated order.
+    """
     coterm_date = get_coterm_date(order)
     if coterm_date:
         return order
