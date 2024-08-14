@@ -4,6 +4,7 @@ This module contains orders helper functions.
 
 import logging
 
+from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows.airtable import get_prices_for_skus
 from adobe_vipm.flows.constants import (
     FAKE_CUSTOMERS_IDS,
@@ -16,14 +17,18 @@ from adobe_vipm.flows.mpt import (
     get_licensee,
     update_order,
 )
+from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
+    get_adobe_order_id,
     get_customer_data,
     get_market_segment,
     get_order_line_by_sku,
-    get_partial_sku,
+    get_retry_count,
     set_customer_data,
+    split_downsizes_and_upsizes,
 )
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -142,3 +147,36 @@ def update_purchase_prices(adobe_client, order):
         order,
         preview_order["lineItems"],
     )
+
+
+class SetupContext(Step):
+    """
+    Initialize the processing context.
+    Enrich the order with the full representations of the agreement and the licensee
+    retrieving them.
+    If the Adobe customerId fulfillment parameter is set, then retrieve the customer
+    object from adobe and set it.
+    """
+    def __call__(self, client, context, next_step):
+        adobe_client = get_adobe_client()
+        context.order["agreement"] = get_agreement(client, context.order["agreement"]["id"])
+        context.order["agreement"]["licensee"] = get_licensee(
+            client, context.order["agreement"]["licensee"]["id"]
+        )
+        context.downsize_lines, context.upsize_lines = split_downsizes_and_upsizes(context.order)
+        context.current_attempt = get_retry_count(context.order)
+        context.order_id = context.order["id"]
+        context.type = context.order["type"]
+        context.agreement_id = context.order["agreement"]["id"]
+        context.authorization_id = context.order["authorization"]["id"]
+        context.product_id = context.order["agreement"]["product"]["id"]
+        context.currency = context.order["agreement"]["listing"]["priceList"]["currency"]
+        context.adobe_customer_id = get_adobe_customer_id(context.order)
+        if context.adobe_customer_id:
+            context.adobe_customer = adobe_client.get_customer(
+                context.authorization_id,
+                context.adobe_customer_id,
+            )
+        context.adobe_new_order_id = get_adobe_order_id(context.order)
+        logger.info(f"{context}: initialization completed.")
+        next_step(client, context)

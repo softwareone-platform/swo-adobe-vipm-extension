@@ -5,7 +5,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.utils import find_first
 
 
-def get_actual_sku(items, sku):
+def get_item_by_partial_sku(items, sku):
     """
     Get the full SKU from a list of items
     given the partial sku.
@@ -18,26 +18,7 @@ def get_actual_sku(items, sku):
     Returns:
         str: The full SKU if found, None if not.
     """
-    item = find_first(lambda item: item["offerId"].startswith(sku), items, default={})
-    return item.get("offerId")
-
-
-def get_item_to_return(items, line_number):
-    """
-    Get the item for which a RETURN order must be created
-    based on the line number.
-
-    Args:
-        items (list): list of line items.
-        line_number (str): number of the line as a string.
-
-    Returns:
-        dict: the item correspoding to the provided line_number.
-    """
-    return find_first(
-        lambda adb_item: adb_item["extLineItemNumber"] == line_number,
-        items,
-    )
+    return find_first(lambda item: item["offerId"].startswith(sku), items, default={})
 
 
 def to_adobe_line_id(mpt_line_id: str) -> int:
