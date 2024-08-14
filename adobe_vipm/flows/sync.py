@@ -234,7 +234,7 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
         )
 
 
-def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run):
+def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
     """
     Get the agreements given a list of agreement IDs
     to update the prices for them.

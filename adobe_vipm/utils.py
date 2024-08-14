@@ -6,3 +6,7 @@ def get_attempt_count(event):  # pragma: no cover
     from adobe_vipm.flows.utils import get_retry_count
 
     return get_retry_count(event.data)
+
+
+def get_partial_sku(full_sku):
+    return full_sku[:10]

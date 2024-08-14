@@ -13,8 +13,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 
-from swo.mpt.extensions.runtime.djapp.conf import extract_product_ids
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -175,7 +173,7 @@ LOGGING_ATTEMPT_GETTER = os.getenv(
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
 # TODO: Should be synced with the initializer.py::initialize function
-MPT_PRODUCTS_IDS = extract_product_ids(os.getenv("MPT_PRODUCTS_IDS", "PRD-1111-1111"))
+MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
 MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30
 MPT_PORTAL_BASE_URL = "https://portal.s1.local"
 

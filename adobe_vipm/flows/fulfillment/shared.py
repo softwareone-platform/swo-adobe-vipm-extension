@@ -8,6 +8,7 @@ from operator import itemgetter
 
 from django.conf import settings
 
+from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     STATUS_3YC_ACTIVE,
@@ -33,6 +34,7 @@ from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.mpt import (
     complete_order,
@@ -48,14 +50,20 @@ from adobe_vipm.flows.mpt import (
     update_order,
     update_subscription,
 )
+from adobe_vipm.flows.pipeline import Step
+from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_coterm_date,
+    get_next_sync,
     get_notifications_recipient,
     get_order_line_by_sku,
     get_price_item_by_line_sku,
     get_retry_count,
+    get_subscription_by_line_and_item_id,
     increment_retry_count,
+    is_renewal_window_open,
+    map_returnable_to_return_orders,
     md2html,
     reset_retry_count,
     set_adobe_3yc_commitment_request_status,
@@ -67,9 +75,11 @@ from adobe_vipm.flows.utils import (
     set_coterm_date,
     set_customer_data,
     set_next_sync,
+    set_template,
     split_phone_number,
 )
 from adobe_vipm.notifications import send_email
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +132,9 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     commitment = get_3yc_commitment(customer)
 
     customer_data = {
-        PARAM_COMPANY_NAME: sanitize_company_name(customer["companyProfile"]["companyName"]),
+        PARAM_COMPANY_NAME: sanitize_company_name(
+            customer["companyProfile"]["companyName"]
+        ),
         PARAM_ADDRESS: {
             "country": address["country"],
             "state": address["region"],
@@ -240,7 +252,7 @@ def switch_order_to_query(client, order, template_name=None):
     send_email_notification(client, order)
 
 
-def handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
+def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
     """
     Handle the reprocessing of an order.
     If the maximum processing attempts has not been reached, it updates the order
@@ -270,12 +282,12 @@ def handle_retries(mpt_client, order, adobe_order_id, adobe_order_type="NEW"):
         f"has reached the maximum number ({max_attemps}) of attemps.",
     )
     reason = f"Max processing attemps reached ({max_attemps})."
-    fail_order(mpt_client, order["id"], reason)
+    fail_order(client, order["id"], reason)
     logger.warning(f"Order {order['id']} has been failed: {reason}.")
 
 
 def check_adobe_order_fulfilled(
-    mpt_client, adobe_client, order, customer_id, adobe_order_id
+    client, adobe_client, order, customer_id, adobe_order_id
 ):
     """
     Check if the order that has been placed in Adobe has been fulfilled or not.
@@ -286,7 +298,7 @@ def check_adobe_order_fulfilled(
     If the order has been fulfilled this function return it.
 
     Args:
-        mpt_client (MPTClient):  an instance of the Marketplace platform client.
+        client (MPTClient):  an instance of the Marketplace platform client.
         order (dct): The MPT order from which the Adobe order has been derived.
         customer_id (str): The id used in Adobe to identify the customer attached
         to this MPT order.
@@ -303,110 +315,55 @@ def check_adobe_order_fulfilled(
     )
 
     if adobe_order["status"] == STATUS_PENDING:
-        handle_retries(mpt_client, order, adobe_order_id)
+        handle_retries(client, order, adobe_order_id)
         return
     elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
         reason = ORDER_STATUS_DESCRIPTION[adobe_order["status"]]
-        fail_order(mpt_client, order["id"], reason)
+        fail_order(client, order["id"], reason)
         logger.warning(f"Order {order['id']} has been failed: {reason}.")
         return
     elif adobe_order["status"] != STATUS_PROCESSED:
         reason = f"Unexpected status ({adobe_order['status']}) received from Adobe."
-        fail_order(mpt_client, order["id"], reason)
+        fail_order(client, order["id"], reason)
         logger.warning(f"Order {order['id']} has been failed: {reason}.")
         return
     return adobe_order
 
 
-def handle_return_orders(mpt_client, adobe_client, customer_id, order, lines):
-    """
-    Handles return orders for a given MPT order by processing the necessary
-    actions based on the provided parameters.
-
-    Args:
-        mpt_client (MPTClient): An instance of the Marketplace platform client.
-        adobe_client (AdobeClient): An instance of the Adobe client for communication with the
-            Adobe API.
-        customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
-        order (dict): The MPT order being processed.
-        lines (list): The MPT order lines associated with the return.
-
-    Returns:
-        tuple or None: A tuple containing completed order IDs (if any) and the updated MPT order.
-            If there are pending return orders, returns None.
-    """
-    # Only used by change orders, should me moved to the corresponding module.
-    completed_order_ids = []
-    pending_order_ids = []
-    authorization_id = order["authorization"]["id"]
-    for line in lines:
-        orders_4_item = adobe_client.search_new_and_returned_orders_by_sku_line_number(
-            authorization_id,
-            customer_id,
-            line["item"]["externalIds"]["vendor"],
-            line["id"],
-        )
-        for order_to_return, item_to_return, return_order in orders_4_item:
-            if not return_order:
-                logger.debug(f"Return order not found for {line['item']['id']}")
-                return_order = adobe_client.create_return_order(
-                    authorization_id,
-                    customer_id,
-                    order_to_return,
-                    item_to_return,
-                )
-                logger.debug(
-                    f"Return order created for a return order for item: {line}"
-                )
-            if return_order["status"] == STATUS_PENDING:
-                pending_order_ids.append(return_order["orderId"])
-                break
-            else:
-                completed_order_ids.append(return_order["orderId"])
-
-    if pending_order_ids:
-        handle_retries(
-            mpt_client, order, ", ".join(pending_order_ids), adobe_order_type="RETURN"
-        )
-        return None, order
-
-    return completed_order_ids, order
-
-
-def switch_order_to_completed(mpt_client, order, template_name):
+def switch_order_to_completed(client, order, template_name):
     """
     Reset the retry count to zero and switch the MPT order
     to completed using the completed template.
 
     Args:
-        mpt_client (MPTClient):  an instance of the Marketplace platform client.
+        client (MPTClient):  an instance of the Marketplace platform client.
         order (dict): The MPT order that have to be switched to completed.
     """
     order = reset_retry_count(order)
     template = get_product_template_or_default(
-        mpt_client,
+        client,
         order["agreement"]["product"]["id"],
         MPT_ORDER_STATUS_COMPLETED,
         template_name,
     )
     agreement = order["agreement"]
     order = complete_order(
-        mpt_client,
+        client,
         order["id"],
         template,
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
-    send_email_notification(mpt_client, order)
+    send_email_notification(client, order)
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
-def add_subscription(mpt_client, adobe_client, customer_id, order, line):
+def add_subscription(client, adobe_client, customer_id, order, line):
     """
     Adds a subscription to the correspoding MPT order based on the provided parameters.
 
     Args:
-        mpt_client (MPTClient): An instance of the Marketplace platform client.
+        client (MPTClient): An instance of the Marketplace platform client.
         adobe_client (AdobeClient): An instance of the Adobe client for communication with the
             Adobe API.
         customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
@@ -434,7 +391,7 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, line):
     order_line = get_order_line_by_sku(order, line["offerId"])
 
     subscription = get_subscription_by_external_id(
-        mpt_client, order["id"], line["subscriptionId"]
+        client, order["id"], line["subscriptionId"]
     )
     if not subscription:
         subscription = {
@@ -458,7 +415,7 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, line):
             "startDate": adobe_subscription["creationDate"],
             "commitmentDate": adobe_subscription["renewalDate"],
         }
-        subscription = create_subscription(mpt_client, order["id"], subscription)
+        subscription = create_subscription(client, order["id"], subscription)
         logger.info(
             f'Subscription {line["subscriptionId"]} ({subscription["id"]}) '
             f'created for order {order["id"]}'
@@ -467,7 +424,7 @@ def add_subscription(mpt_client, adobe_client, customer_id, order, line):
 
 
 def set_subscription_actual_sku(
-    mpt_client,
+    client,
     order,
     subscription,
     sku,
@@ -477,7 +434,7 @@ def set_subscription_actual_sku(
     (Adobe SKU with discount level)
 
     Args:
-        mpt_client (MPTClient): An instance of the Marketplace platform client.
+        client (MPTClient): An instance of the Marketplace platform client.
         order (dict): The MPT order to which the subscription will be added.
         subscription (dict): The MPT subscription that need to be updated.
         sku (str, optional): The Adobe full SKU. If None a lookup to the corresponding
@@ -487,7 +444,7 @@ def set_subscription_actual_sku(
         dict: The updated MPT subscription.
     """
     return update_subscription(
-        mpt_client,
+        client,
         order["id"],
         subscription["id"],
         parameters={
@@ -502,7 +459,7 @@ def set_subscription_actual_sku(
 
 
 def update_order_actual_price(
-    mpt_client,
+    client,
     adobe_client,
     order,
     lines_to_update,
@@ -514,7 +471,7 @@ def update_order_actual_price(
     Prices are taken from AirTable pricelist table taking into account if the customer has
     commited for 3 years.
     Args:
-        mpt_client (MPTClient): The client to consume the MPT API.
+        client (MPTClient): The client to consume the MPT API.
         adobe_client (AdobeClient): The client to consume the Adobe API.
         order (dict): The order to update
         lines_to_update (list): The lines which purchase prices have to be updated.
@@ -576,36 +533,36 @@ def update_order_actual_price(
 
     lines = sorted(lines, key=itemgetter("id"))
 
-    return update_order(mpt_client, order["id"], lines=lines)
+    return update_order(client, order["id"], lines=lines)
 
 
-def check_processing_template(mpt_client, order, template_name):
+def check_processing_template(client, order, template_name):
     """
     Check if the order as the right processing template according to
     the type of the order. Set the right one if it's not already set.
 
     Args:
-        mpt_client (MPTClient): The client for consuming the MPT API
+        client (MPTClient): The client for consuming the MPT API
         order (dict): The order to check.
         template_name (str): Name of the template that must be used.
     """
     template = get_product_template_or_default(
-        mpt_client,
+        client,
         order["agreement"]["product"]["id"],
         MPT_ORDER_STATUS_PROCESSING,
         template_name,
     )
     if template != order.get("template"):
-        set_processing_template(mpt_client, order["id"], template)
+        set_processing_template(client, order["id"], template)
 
 
-def start_processing_attempt(mpt_client, order):
+def start_processing_attempt(client, order):
     """
     Increments the retry count parameter to register the new attempt,
     send the processing email notification to the customer.
 
     Args:
-        mpt_client (MPTClient): the MPT client used to update the order.
+        client (MPTClient): the MPT client used to update the order.
         order (dict): The order currently processing.
 
     Returns:
@@ -613,9 +570,9 @@ def start_processing_attempt(mpt_client, order):
     """
     current_attempt = get_retry_count(order)
     order = increment_retry_count(order)
-    update_order(mpt_client, order["id"], parameters=order["parameters"])
+    update_order(client, order["id"], parameters=order["parameters"])
     if current_attempt == 0:
-        send_email_notification(mpt_client, order)
+        send_email_notification(client, order)
     return order
 
 
@@ -643,14 +600,14 @@ def save_next_sync_and_coterm_dates(client, order, coterm_date):
     return order
 
 
-def send_email_notification(mpt_client, order):
+def send_email_notification(client, order):
     """
     Send a notification email to the customer according to the
     current order status.
     It embeds the current order template into the email body.
 
     Args:
-        mpt_client (MPTClient): The client used to consume the
+        client (MPTClient): The client used to consume the
         MPT API.
         order (dict): The order for which the notification should be sent.
     """
@@ -668,9 +625,7 @@ def send_email_notification(mpt_client, order):
 
         context = {
             "order": order,
-            "activation_template": md2html(
-                get_rendered_template(mpt_client, order["id"])
-            ),
+            "activation_template": md2html(get_rendered_template(client, order["id"])),
             "api_base_url": settings.MPT_API_BASE_URL,
             "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         }
@@ -691,13 +646,13 @@ def send_email_notification(mpt_client, order):
         )
 
 
-def get_one_time_skus(mpt_client, order):
+def get_one_time_skus(client, order):
     """
     Get tge SKUs from the order lines that correspond
     to One-Time items.
 
     Args:
-        mpt_client (MPTClient): The client to consume the MPT API.
+        client (MPTClient): The client to consume the MPT API.
         order (dict): The order from which the One-Time items SKUs
         must be extracted.
 
@@ -705,7 +660,7 @@ def get_one_time_skus(mpt_client, order):
         list: List of One-Time SKUs.
     """
     one_time_items = get_product_onetime_items_by_ids(
-        mpt_client,
+        client,
         order["agreement"]["product"]["id"],
         [line["item"]["id"] for line in order["lines"]],
     )
@@ -737,3 +692,420 @@ def set_customer_coterm_date_if_null(client, adobe_client, order):
     order = set_coterm_date(order, coterm_date)
     update_order(client, order["id"], parameters=order["parameters"])
     return order
+
+
+class IncrementAttemptsCounter(Step):
+    """
+    Increments the `retryCount` fulfillment parameter and update the order to reflect the change.
+    """
+
+    def __call__(self, client, context, next_step):
+        context.order = increment_retry_count(context.order)
+        update_order(
+            client, context.order_id, parameters=context.order["parameters"]
+        )
+        logger.info(
+            f"{context}: retry count incremented successfully "
+            f"{context.current_attempt} -> {get_retry_count(context.order)}."
+        )
+        next_step(client, context)
+
+
+class SendEmailNotification(Step):
+    """
+    Send the order status change notification to the customer.
+    """
+
+    def send(self, client, context):
+        email_notification_enabled = bool(
+            settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
+        )
+
+        if not email_notification_enabled:
+            return
+
+        if context.order["status"] == "Processing" and context.current_attempt != 0:
+            return
+
+        recipient = get_notifications_recipient(context.order)
+        if not recipient:
+            logger.warning(
+                f"{context}: cannot send email notifications, no recipient found"
+            )
+            return
+
+        render_context = {
+            "order": context.order,
+            "activation_template": md2html(
+                get_rendered_template(client, context.order_id)
+            ),
+            "api_base_url": settings.MPT_API_BASE_URL,
+            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+        }
+        subject = (
+            f"Order status update {context.order['id']} "
+            f"for {context.order['agreement']['buyer']['name']}"
+        )
+        if context.order["status"] == "Querying":
+            subject = (
+                f"This order need your attention {context.order['id']} "
+                f"for {context.order['agreement']['buyer']['name']}"
+            )
+        send_email(
+            recipient,
+            subject,
+            "email",
+            render_context,
+        )
+        logger.info(f"{context}: email notification sent.")
+
+    def __call__(self, client, context, next_step):
+        self.send(client, context)
+        next_step(client, context)
+
+
+class SetOrUpdateCotermNextSyncDates(Step):
+    """
+    Set or update the fulfillment parameters `cotermDate` and
+    `nextSync` according to the Adobe customer coterm date.
+    """
+
+    def __call__(self, client, context, next_step):
+        coterm_date = datetime.fromisoformat(
+            context.adobe_customer["cotermDate"]
+        ).date()
+        next_sync = coterm_date + timedelta(days=1)
+
+        if coterm_date.isoformat() != get_coterm_date(
+            context.order
+        ) or next_sync.isoformat() != get_next_sync(context.order):
+            context.order = set_coterm_date(context.order, coterm_date.isoformat())
+            context.order = set_next_sync(context.order, next_sync.isoformat())
+            update_order(
+                client, context.order_id, parameters=context.order["parameters"]
+            )
+            logger.info(
+                f"{context}: coterm ({coterm_date.isoformat()}) "
+                f"and next sync ({next_sync.isoformat()}) updated successfully")
+        next_step(client, context)
+
+
+class SetProcessingTemplate(Step):
+    """
+    Set the template for the processing status or the
+    delayed one if the processing is delated due to the
+    renewal window open.
+    """
+
+    def __init__(self, template_name):
+        self.template_name = template_name
+
+    def __call__(self, client, context, next_step):
+        template_name = (
+            self.template_name
+            if not is_renewal_window_open(context.order)
+            else TEMPLATE_NAME_DELAYED
+        )
+        template = get_product_template_or_default(
+            client,
+            context.order["agreement"]["product"]["id"],
+            MPT_ORDER_STATUS_PROCESSING,
+            template_name,
+        )
+        current_template_id = context.order.get("template", {}).get("id")
+        if template["id"] != current_template_id:
+            context.order = set_template(context.order, template)
+            update_order(client, context.order_id, template=context.order["template"])
+            logger.info(
+                f"{context}: processing template set to {self.template_name} "
+                f"({template['id']})"
+            )
+        logger.info(f"{context}: processing template is ok, continue")
+        next_step(client, context)
+
+
+class ValidateRenewalWindow(Step):
+    """
+    Check if the renewal window is open. In that case stop the order processing.
+    """
+
+    def __call__(self, client, context, next_step):
+        if is_renewal_window_open(context.order):
+            coterm_date = get_coterm_date(context.order)
+            logger.warning(
+                f"{context}: Renewal window is open, coterm date is '{coterm_date}'"
+            )
+            return
+        logger.info(f"{context}: not in renewal window, continue")
+        next_step(client, context)
+
+
+class GetReturnOrders(Step):
+    def __call__(self, client, context, next_step):
+        adobe_client = get_adobe_client()
+        context.adobe_return_orders = adobe_client.get_return_orders_by_external_reference(
+            context.authorization_id,
+            context.adobe_customer_id,
+            context.order_id,
+        )
+        return_orders_count = sum(len(x) for x in context.adobe_return_orders.values())
+        logger.info(f"{context}: found {return_orders_count} return order")
+        next_step(client, context)
+
+class SubmitReturnOrders(Step):
+    """
+    Creates the return orders for each returnable order
+    to match the downsize quantities.
+    Wait for the return orders to be processed before
+    moving to the next step.
+    """
+
+    def __call__(self, client, context, next_step):
+        adobe_client = get_adobe_client()
+        all_return_orders = []
+        for sku, returnable_orders in context.adobe_returnable_orders.items():
+            return_orders = context.adobe_return_orders.get(sku, [])
+            for returnable_order, return_order in map_returnable_to_return_orders(
+                returnable_orders or [], return_orders
+            ):
+                if return_order:
+                    all_return_orders.append(return_order)
+                    continue
+
+                all_return_orders.append(
+                    adobe_client.create_return_order(
+                        context.authorization_id,
+                        context.adobe_customer_id,
+                        returnable_order.order,
+                        returnable_order.line,
+                        context.order_id,
+                    )
+                )
+        pending_orders = [
+            return_order["orderId"]
+            for return_order in all_return_orders
+            if return_order["status"] != STATUS_PROCESSED
+        ]
+
+        if pending_orders:
+            logger.info(
+                f"{context}: There are pending return orders {', '.join(pending_orders)}"
+            )
+            return
+
+        next_step(client, context)
+
+
+class SubmitNewOrder(Step):
+    """
+    Submit a new order if there are new/upsizing items to purchase.
+    Wait for the order to be processed by Adobe before moving to
+    the next step.
+    """
+
+    def __call__(self, client, context, next_step):
+        if not context.upsize_lines:
+            next_step(client, context)
+            return
+        adobe_client = get_adobe_client()
+        adobe_order = None
+        if not context.adobe_new_order_id:
+            preview_order = adobe_client.create_preview_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                context.order_id,
+                context.upsize_lines,
+            )
+
+            adobe_order = adobe_client.create_new_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                preview_order,
+            )
+            logger.info(f'{context}: new adobe order created: {adobe_order["orderId"]}')
+            context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
+            update_order(client, context.order_id, externalIds=context.order["externalIds"])
+        else:
+            adobe_order = adobe_client.get_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                context.adobe_new_order_id,
+            )
+        context.adobe_new_order = adobe_order
+        if adobe_order["status"] == STATUS_PENDING:
+            logger.info(f"{context}: adobe order {context.adobe_new_order_id} is still pending.")
+            return
+        elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
+            reason = ORDER_STATUS_DESCRIPTION[adobe_order["status"]]
+            switch_order_to_failed(client, context.order_id, reason)
+            logger.warning(
+                f"{context}: The adobe order has been failed {reason}."
+            )
+            return
+        elif adobe_order["status"] != STATUS_PROCESSED:
+            reason = (
+                f"Unexpected status ({adobe_order['status']}) received from Adobe."
+            )
+            switch_order_to_failed(client, context.order_id, reason)
+            logger.warning(
+                f"{context}: the order has been failed due to {reason}."
+            )
+            return
+        next_step(client, context)
+
+
+class CreateOrUpdateSubscriptions(Step):
+    def __call__(self, client, context, next_step):
+        if context.adobe_new_order:
+            adobe_client = get_adobe_client()
+            one_time_skus = get_one_time_skus(client, context.order)
+            for line in filter(
+                lambda x: get_partial_sku(x["offerId"]) not in one_time_skus,
+                context.adobe_new_order["lineItems"]
+            ):
+                order_line = get_order_line_by_sku(context.order, line["offerId"])
+
+                order_subscription = get_subscription_by_line_and_item_id(
+                    context.order["subscriptions"],
+                    order_line["item"]["id"],
+                    order_line["id"],
+                )
+                if not order_subscription:
+                    adobe_subscription = adobe_client.get_subscription(
+                        context.authorization_id,
+                        context.adobe_customer_id,
+                        line["subscriptionId"],
+                    )
+
+                    if adobe_subscription["status"] != STATUS_PROCESSED:
+                        logger.warning(
+                            f"{context}: subscription {adobe_subscription['subscriptionId']} "
+                            f"for customer {context.adobe_customer_id} is in status "
+                            f"{adobe_subscription['status']}, skip it"
+                        )
+                        continue
+
+                    subscription = {
+                        "name": f"Subscription for {order_line['item']['name']}",
+                        "parameters": {
+                            "fulfillment": [
+                                {
+                                    "externalId": PARAM_ADOBE_SKU,
+                                    "value": line["offerId"],
+                                }
+                            ]
+                        },
+                        "externalIds": {
+                            "vendor": line["subscriptionId"],
+                        },
+                        "lines": [
+                            {
+                                "id": order_line["id"],
+                            },
+                        ],
+                        "startDate": adobe_subscription["creationDate"],
+                        "commitmentDate": adobe_subscription["renewalDate"],
+                    }
+                    subscription = create_subscription(client, context.order_id, subscription)
+                    logger.info(
+                        f'{context}: subscription {line["subscriptionId"]} '
+                        f'({subscription["id"]}) created'
+                    )
+                else:
+                    adobe_sku = line["offerId"]
+                    set_subscription_actual_sku(
+                        client,
+                        context.order,
+                        order_subscription,
+                        adobe_sku,
+                    )
+                    logger.info(
+                        f'{context}: subscription {line["subscriptionId"]} '
+                        f'({order_subscription["id"]}) updated'
+                    )
+        next_step(client, context)
+
+
+class UpdatePrices(Step):
+    def __call__(self, client, context, next_step):
+        actual_skus = [item["offerId"] for item in context.adobe_new_order["lineItems"]]
+        commitment = get_3yc_commitment(context.adobe_customer)
+        if (
+            commitment
+            and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+            and date.fromisoformat(commitment["endDate"]) >= date.today()
+        ):
+            prices = get_prices_for_3yc_skus(
+                context.product_id,
+                context.currency,
+                date.fromisoformat(commitment["startDate"]),
+                actual_skus,
+            )
+        else:
+            prices = get_prices_for_skus(context.product_id, context.currency, actual_skus)
+
+        lines = []
+        for line in [get_order_line_by_sku(context.order, sku) for sku in actual_skus]:
+            new_price_item = get_price_item_by_line_sku(
+                prices, line["item"]["externalIds"]["vendor"]
+            )
+            lines.append(
+                {
+                    "id": line["id"],
+                    "price": {
+                        "unitPP": new_price_item[1],
+                    },
+                }
+            )
+
+        # to have total list of lines, leave other not updated
+        updated_lines_ids = {line["id"] for line in lines}
+        for line in context.order["lines"]:
+            if line["id"] in updated_lines_ids:
+                continue
+
+            lines.append(
+                {
+                    "id": line["id"],
+                    "price": {
+                        "unitPP": line["price"]["unitPP"],
+                    },
+                }
+            )
+
+        lines = sorted(lines, key=itemgetter("id"))
+
+        update_order(client, context.order_id, lines=lines)
+        logger.info(f"{context}: order lines prices updated successfully")
+        next_step(client, context)
+
+
+class CompleteOrder(Step):
+    def __init__(self, template_name):
+        self.template_name = template_name
+
+    def __call__(self, client, context, next_step):
+        context.order = reset_retry_count(context.order)
+        template = get_product_template_or_default(
+            client,
+            context.product_id,
+            MPT_ORDER_STATUS_COMPLETED,
+            self.template_name,
+        )
+        agreement = context.order["agreement"]
+        context.order = complete_order(
+            client,
+            context.order_id,
+            template,
+            parameters=context.order["parameters"],
+        )
+        context.order["agreement"] = agreement
+        logger.info(f'{context}: order has been completed successfully')
+        next_step(client, context)
+
+
+class SyncAgreement(Step):
+    def __call__(self, client, context, next_step):
+        sync_agreements_by_agreement_ids(client, [context.agreement_id])
+        logger.info(f'{context}: agreement synchoronized')
+        next_step(client, context)
