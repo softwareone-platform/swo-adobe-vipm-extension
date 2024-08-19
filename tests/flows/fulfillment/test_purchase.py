@@ -74,6 +74,7 @@ def test_no_customer(
     mocker.patch(
         "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
     )
+    mocker.patch("adobe_vipm.flows.fulfillment.purchase.update_order_actual_price")
     mocked_create_customer_account = mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.create_customer_account",
         return_value=order_factory(
@@ -151,16 +152,8 @@ def test_no_customer(
         return_value=subscription,
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory(),
-    )
-    mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=[],
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=pricelist_items_factory(),
     )
     mocked_process_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
@@ -237,20 +230,6 @@ def test_no_customer(
             ),
             "ordering": order_parameters_factory(),
         },
-    }
-    assert mocked_update_order.mock_calls[3].args == (
-        mocked_mpt_client,
-        order["id"],
-    )
-    assert mocked_update_order.mock_calls[3].kwargs == {
-        "lines": [
-            {
-                "id": order["lines"][0]["id"],
-                "price": {
-                    "unitPP": 1234.55,
-                },
-            }
-        ],
     }
 
     mocked_create_subscription.assert_called_once_with(
@@ -423,17 +402,13 @@ def test_no_customer_subscription_already_created(
         "adobe_vipm.flows.fulfillment.shared.get_subscription_by_external_id",
         return_value=subscription,
     )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory(),
-    )
+
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=[],
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=pricelist_items_factory(),
+        "adobe_vipm.flows.fulfillment.purchase.update_order_actual_price",
     )
     mocked_process_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
@@ -504,20 +479,6 @@ def test_no_customer_subscription_already_created(
             ),
             "ordering": order_parameters_factory(),
         },
-    }
-    assert mocked_update_order.mock_calls[3].args == (
-        mocked_mpt_client,
-        order["id"],
-    )
-    assert mocked_update_order.mock_calls[3].kwargs == {
-        "lines": [
-            {
-                "id": order["lines"][0]["id"],
-                "price": {
-                    "unitPP": 1234.55,
-                },
-            }
-        ],
     }
 
     mocked_process_order.assert_called_once_with(
@@ -1700,20 +1661,13 @@ def test_one_time_items(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscription,
     )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_items_by_skus",
-        return_value=items_factory()
-        + items_factory(item_id=2, external_vendor_id="99999999CA"),
-    )
+    mocker.patch("adobe_vipm.flows.fulfillment.purchase.update_order_actual_price")
+
     mocked_get_onetime = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_pricelist_items_by_product_items",
-        return_value=pricelist_items_factory()
-        + pricelist_items_factory(item_id=2, external_vendor_id="99999999CA"),
-    )
+
     mocked_process_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )

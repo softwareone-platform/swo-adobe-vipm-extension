@@ -46,7 +46,6 @@ def test_validate_purchase_order(mocker, caplog, order_factory, customer_data):
     )
     m_validate_customer_data.assert_called_once_with(order, customer_data)
     m_update_purchase_prices.assert_called_once_with(
-        m_client,
         m_adobe_cli,
         order,
     )
@@ -83,26 +82,19 @@ def test_validate_transfer_order(
     caplog,
     order_factory,
     transfer_order_parameters_factory,
-    adobe_preview_transfer_factory,
 ):
     """Tests the validate order entrypoint function for transfer orders when it validates."""
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     m_client = mocker.MagicMock()
-
-    adobe_preview_transfer = adobe_preview_transfer_factory()
 
     mocker.patch(
         "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
     )
     m_validate_transfer = mocker.patch(
         "adobe_vipm.flows.validation.base.validate_transfer",
-        return_value=(False, order, adobe_preview_transfer),
+        return_value=(False, order),
     )
 
-    m_update_purchase_prices = mocker.patch(
-        "adobe_vipm.flows.validation.base.update_purchase_prices_for_transfer",
-        return_value=order,
-    )
     m_adobe_cli = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.validation.base.get_adobe_client", return_value=m_adobe_cli
@@ -119,11 +111,6 @@ def test_validate_transfer_order(
         m_client,
         m_adobe_cli,
         reset_ordering_parameters_error(order),
-    )
-    m_update_purchase_prices.assert_called_once_with(
-        m_client,
-        order,
-        adobe_preview_transfer,
     )
 
 
@@ -149,7 +136,7 @@ def test_validate_transfer_order_no_validate(
 
     mocker.patch(
         "adobe_vipm.flows.validation.base.validate_transfer",
-        return_value=(True, order, mocker.MagicMock()),
+        return_value=(True, order),
     )
 
     with caplog.at_level(logging.INFO):

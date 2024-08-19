@@ -8,7 +8,12 @@ from swo.mpt.extensions.runtime.events.utils import instrument_logging
 from swo.mpt.extensions.runtime.utils import get_extension_app_config_name
 
 
-JSON_EXT_VARIABLES = {"EXT_WEBHOOKS_SECRETS", "EXT_AIRTABLE_BASES", "EXT_PRODUCT_SEGMENT"}
+JSON_EXT_VARIABLES = {
+    "EXT_WEBHOOKS_SECRETS",
+    "EXT_AIRTABLE_BASES",
+    "EXT_AIRTABLE_PRICING_BASES",
+    "EXT_PRODUCT_SEGMENT",
+}
 
 
 def get_extension_variables():

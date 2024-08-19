@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cache
 
@@ -6,19 +7,26 @@ from pyairtable.formulas import (
     AND,
     EQUAL,
     FIELD,
+    GREATER,
+    LESS_EQUAL,
     NOT_EQUAL,
     OR,
     STR_VALUE,
+    to_airtable_value,
 )
 from pyairtable.orm import Model, fields
 from requests import HTTPError
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
+
+from adobe_vipm.utils import find_first
 
 STATUS_INIT = "init"
 STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
 STATUS_SYNCHRONIZED = "synchronized"
+
+PRICELIST_CACHE = defaultdict(list)
 
 
 @dataclass(frozen=True)
@@ -27,10 +35,17 @@ class AirTableBaseInfo:
     base_id: str
 
     @staticmethod
-    def for_product(product_id):
+    def for_migrations(product_id):
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
             base_id=get_for_product(settings, "AIRTABLE_BASES", product_id),
+        )
+
+    @staticmethod
+    def for_pricing(product_id):
+        return AirTableBaseInfo(
+            api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
+            base_id=get_for_product(settings, "AIRTABLE_PRICING_BASES", product_id),
         )
 
 
@@ -122,7 +137,7 @@ def get_offer_model(base_info):
 
 
 def get_offer_ids_by_membership_id(product_id, membership_id):
-    Offer = get_offer_model(AirTableBaseInfo.for_product(product_id))
+    Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
     return [
         offer.offer_id
         for offer in Offer.all(
@@ -132,12 +147,12 @@ def get_offer_ids_by_membership_id(product_id, membership_id):
 
 
 def create_offers(product_id, offers):
-    Offer = get_offer_model(AirTableBaseInfo.for_product(product_id))
+    Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
     Offer.batch_save([Offer(**offer) for offer in offers])
 
 
 def get_transfers_to_process(product_id):
-    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return Transfer.all(
         formula=OR(
             EQUAL(FIELD("status"), STR_VALUE(STATUS_INIT)),
@@ -147,7 +162,7 @@ def get_transfers_to_process(product_id):
 
 
 def get_transfers_to_check(product_id):
-    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return Transfer.all(
         formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
     )
@@ -156,7 +171,7 @@ def get_transfers_to_check(product_id):
 def get_transfer_by_authorization_membership_or_customer(
     product_id, authorization_uk, membership_or_customer_id
 ):
-    Transfer = get_transfer_model(AirTableBaseInfo.for_product(product_id))
+    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     transfers = Transfer.all(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
@@ -180,3 +195,100 @@ def get_transfer_link(transfer):
         return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
     except HTTPError:
         pass
+
+
+@cache
+def get_pricelist_model(base_info):
+    class PriceList(Model):
+        record_id = fields.TextField("id", readonly=True)
+        sku = fields.TextField("sku")
+        partial_sku = fields.TextField("partial_sku", readonly=True)
+        item_name = fields.TextField("item_name")
+        discount_level = fields.TextField("discount_level", readonly=True)
+        valid_from = fields.DateField("valid_from")
+        valid_until = fields.DateField("valid_until")
+        currency = fields.SelectField("currency")
+        unit_pp = fields.NumberField("unit_pp")
+        unit_lp = fields.NumberField("unit_lp")
+        status = fields.SelectField("status")
+        created_at = fields.CreatedTimeField("created_at", readonly=True)
+        created_by = fields.CreatedByField("created_by", readonly=True)
+        updated_at = fields.LastModifiedTimeField("updated_at", readonly=True)
+        updated_by = fields.LastModifiedByField("updated_by", readonly=True)
+
+        class Meta:
+            table_name = "PriceList"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+    return PriceList
+
+
+def get_prices_for_skus(product_id, currency, skus):
+    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    items = PriceList.all(
+        formula=AND(
+            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            EQUAL(FIELD("valid_until"), "BLANK()"),
+            OR(
+                *[EQUAL(FIELD("sku"), to_airtable_value(sku)) for sku in skus],
+            ),
+        ),
+    )
+    return {item.sku: item.unit_pp for item in items}
+
+
+def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
+    prices = {}
+    for sku in skus:
+        pricelist_item = find_first(
+            lambda item: item["currency"] == currency
+            and item["valid_from"] <= start_date
+            and item["valid_until"] > start_date,
+            PRICELIST_CACHE[sku],
+        )
+        if pricelist_item:
+            prices[sku] = pricelist_item["unit_pp"]
+
+    skus_to_lookup = sorted(set(skus) - set(prices.keys()))
+    if not skus_to_lookup:
+        return prices
+
+    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+
+    items = PriceList.all(
+        formula=AND(
+            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            OR(
+                EQUAL(FIELD("valid_until"), "BLANK()"),
+                AND(
+                    LESS_EQUAL(
+                        FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))
+                    ),
+                    GREATER(
+                        FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))
+                    ),
+                ),
+            ),
+            OR(
+                *[
+                    EQUAL(FIELD("sku"), to_airtable_value(sku))
+                    for sku in skus_to_lookup
+                ],
+            ),
+        ),
+        sort=["-valid_until"],
+    )
+    for item in items:
+        if item.valid_until:
+            PRICELIST_CACHE[item.sku].append(
+                {
+                    "currency": item.currency,
+                    "valid_from": item.valid_from,
+                    "valid_until": item.valid_until,
+                    "unit_pp": item.unit_pp,
+                },
+            )
+        if item.sku not in prices:
+            prices[item.sku] = item.unit_pp
+    return prices

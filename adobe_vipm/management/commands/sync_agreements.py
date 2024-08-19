@@ -27,12 +27,6 @@ class Command(BaseCommand):
             help="list of specific agreements to synchronize separated by space",
         )
         parser.add_argument(
-            "--allow-3yc",
-            action="store_true",
-            default=False,
-            help="Allow synchronization for customers that commited for 3y",
-        )
-        parser.add_argument(
             "--dry-run",
             action="store_true",
             default=False,
@@ -50,12 +44,12 @@ class Command(BaseCommand):
         client = setup_client()
         if options["agreements"]:
             sync_agreements_by_agreement_ids(
-                client, options["agreements"], options["allow_3yc"], options["dry_run"]
+                client, options["agreements"], options["dry_run"]
             )
         elif options["all"]:
-            sync_all_agreements(client, options["allow_3yc"], options["dry_run"])
+            sync_all_agreements(client, options["dry_run"])
         else:
             sync_agreements_by_next_sync(
-                client, options["allow_3yc"], options["dry_run"]
+                client, options["dry_run"]
             )
         self.success("Processing agreements completed.")

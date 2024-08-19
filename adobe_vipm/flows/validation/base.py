@@ -8,7 +8,6 @@ from adobe_vipm.flows.helpers import (
     populate_order_info,
     prepare_customer_data,
     update_purchase_prices,
-    update_purchase_prices_for_transfer,
 )
 from adobe_vipm.flows.utils import (
     is_change_order,
@@ -49,7 +48,7 @@ def validate_order(mpt_client, order):
                     has_errors, order = validate_duplicate_lines(order)
                 if not has_errors and order["lines"]:
                     try:
-                        order = update_purchase_prices(mpt_client, adobe_client, order)
+                        order = update_purchase_prices(adobe_client, order)
                     except AdobeAPIError as e:
                         order = set_order_error(
                             order, ERR_ADOBE_ERROR.to_dict(details=str(e))
@@ -61,13 +60,9 @@ def validate_order(mpt_client, order):
         elif is_transfer_order(order) and is_transfer_validation_enabled(
             order
         ):  # pragma: no branch
-            has_errors, order, adobe_object = validate_transfer(
+            has_errors, order = validate_transfer(
                 mpt_client, adobe_client, order
             )
-            if not has_errors:
-                order = update_purchase_prices_for_transfer(
-                    mpt_client, order, adobe_object
-                )
 
         order = update_parameters_visibility(order)
 

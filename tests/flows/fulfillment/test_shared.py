@@ -6,6 +6,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     send_email_notification,
     set_customer_coterm_date_if_null,
     start_processing_attempt,
+    update_order_actual_price,
 )
 from adobe_vipm.flows.utils import get_coterm_date, get_notifications_recipient
 
@@ -187,3 +188,79 @@ def test_set_customer_coterm_date_if_null_already_set(
 
     mocked_update_order.assert_not_called()
     mocked_adobe_client.get_customer_assert_not_called()
+
+
+def test_update_order_actual_price(
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_customer_factory,
+    adobe_items_factory,
+):
+    mpt_client = mocker.MagicMock()
+    adobe_client = mocker.MagicMock()
+    adobe_client.get_customer.return_value = adobe_customer_factory()
+
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-customer-id",
+        )
+    )
+    adobe_items = adobe_items_factory()
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_prices_for_skus",
+        return_value={adobe_items[0]["offerId"]: 10.12},
+    )
+
+    update_order_actual_price(mpt_client, adobe_client, order, order["lines"], adobe_items)
+
+    mocked_update_order.assert_called_once_with(
+        mpt_client,
+        order["id"],
+        lines=[{'id': 'ALI-2119-4550-8674-5962-0001', 'price': {'unitPP': 10.12}}],
+    )
+
+
+def test_update_order_actual_price_3yc(
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    lines_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_items_factory,
+):
+    mpt_client = mocker.MagicMock()
+    adobe_client = mocker.MagicMock()
+    adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(),
+    )
+
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-customer-id",
+        ),
+        lines=lines_factory() + lines_factory(line_id=2, item_id=2),
+    )
+    adobe_items = adobe_items_factory()
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_prices_for_3yc_skus",
+        return_value={adobe_items[0]["offerId"]: 10.12},
+    )
+
+    update_order_actual_price(mpt_client, adobe_client, order, [order["lines"][0]], adobe_items)
+
+    mocked_update_order.assert_called_once_with(
+        mpt_client,
+        order["id"],
+        lines=[
+            {'id': 'ALI-2119-4550-8674-5962-0001', 'price': {'unitPP': 10.12}},
+            {'id': 'ALI-2119-4550-8674-5962-0002', 'price': {'unitPP': 1234.55}}
+        ],
+    )
