@@ -59,6 +59,18 @@ logger = logging.getLogger(__name__)
 
 
 def validate_3yc(order, customer_data):
+    """
+    Validates the 3YC request data ordering parameters for the customer.
+
+    Args:
+        order (dict): The order to validate
+        customer_data (dict): The customer data extracted from the order
+        into a dictionary.
+
+    Returns:
+        tuple: (True, order) if there is a validation error, (False, order)
+        otherwise.
+    """
     p3yc = customer_data[PARAM_3YC]
 
     if p3yc != ["Yes"]:
@@ -103,6 +115,18 @@ def validate_3yc(order, customer_data):
 
 
 def validate_company_name(order, customer_data):
+    """
+    Validates the Company Name ordering parameter.
+
+    Args:
+        order (dict): The order to validate
+        customer_data (dict): The customer data extracted from the order
+        into a dictionary.
+
+    Returns:
+        tuple: (True, order) if there is a validation error, (False, order)
+        otherwise.
+    """
     param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
     name = customer_data[PARAM_COMPANY_NAME]
     if not is_valid_company_name_length(name):
@@ -123,6 +147,18 @@ def validate_company_name(order, customer_data):
 
 
 def validate_address(order, customer_data):
+    """
+    Validates the customer address ordering parameter.
+
+    Args:
+        order (dict): The order to validate
+        customer_data (dict): The customer data extracted from the order
+        into a dictionary.
+
+    Returns:
+        tuple: (True, order) if there is a validation error, (False, order)
+        otherwise.
+    """
     param = get_ordering_parameter(order, PARAM_ADDRESS)
     address = customer_data[PARAM_ADDRESS]
     errors = []
@@ -199,6 +235,18 @@ def validate_address(order, customer_data):
 
 
 def validate_contact(order, customer_data):
+    """
+    Validates the customer contact ordering parameter.
+
+    Args:
+        order (dict): The order to validate
+        customer_data (dict): The customer data extracted from the order
+        into a dictionary.
+
+    Returns:
+        tuple: (True, order) if there is a validation error, (False, order)
+        otherwise.
+    """
     contact = customer_data[PARAM_CONTACT]
     param = get_ordering_parameter(order, PARAM_CONTACT)
     errors = []
@@ -242,6 +290,18 @@ def validate_contact(order, customer_data):
 
 
 def validate_customer_data(order, customer_data):
+    """
+    Validates the customer data.
+
+    Args:
+        order (dict): The order to validate
+        customer_data (dict): The customer data extracted from the order
+        into a dictionary.
+
+    Returns:
+        tuple: (True, order) if there is a validation error, (False, order)
+        otherwise.
+    """
     has_errors = False
 
     has_error, order = validate_company_name(order, customer_data)
@@ -260,6 +320,17 @@ def validate_customer_data(order, customer_data):
 
 
 def validate_duplicate_lines(order):
+    """
+    Validates if there are multiple lines in the order with the same item ID
+    (same SKU).
+
+    Args:
+        order (dict): The order to validate
+
+    Returns:
+        tuple: return the tuple (True, order) if there are duplicated line
+        (False, order) otherwise.
+    """
     items = [line["item"]["id"] for line in order["lines"]]
     duplicates = [item for item, count in Counter(items).items() if count > 1]
     if duplicates:
