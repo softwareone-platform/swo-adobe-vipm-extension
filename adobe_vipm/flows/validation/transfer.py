@@ -2,7 +2,10 @@ import logging
 from datetime import date
 
 from adobe_vipm.adobe.config import get_config
-from adobe_vipm.adobe.constants import STATUS_3YC_COMMITTED
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_COMMITTED,
+    STATUS_TRANSFER_INACTIVE_ACCOUNT,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
@@ -15,6 +18,7 @@ from adobe_vipm.flows.airtable import (
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
+    ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_UNEXPECTED_ERROR,
@@ -259,6 +263,18 @@ def validate_transfer(mpt_client, adobe_client, order):
         transfer.membership_id,
         transfer.transfer_id,
     )
+
+    if adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
+                status=adobe_transfer["status"],
+            ),
+        )
+        return True, order
+
     for subscription in subscriptions["items"]:
         correct_sku = get_transfer_item_sku_by_subscription(
             adobe_transfer, subscription["subscriptionId"]
