@@ -66,6 +66,10 @@ ERR_ADOBE_MEMBERSHIP_ID_ITEM = ValidationError(
     "The provided `{title}` contains the item with SKU `{item_sku}` "
     "that is not part of the product definition.",
 )
+ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT = ValidationError(
+    "VIPMA007",
+    "Customer account is inactive or blocked. Adobe status code is `{status}`.",
+)
 
 ERR_COMPANY_NAME_LENGTH = ValidationError(
     "VIPMV001",

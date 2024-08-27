@@ -5,6 +5,7 @@ import pytest
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_ACTIVE,
     STATUS_3YC_COMMITTED,
+    STATUS_TRANSFER_INACTIVE_ACCOUNT,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_TRANSFER_STATUSES,
@@ -13,6 +14,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
+    ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_UNEXPECTED_ERROR,
@@ -442,6 +444,50 @@ def test_get_prices(mocker, order_factory):
         order["agreement"]["listing"]["priceList"]["currency"],
         ["sku-1"],
     )
+
+
+def test_validate_transfer_account_inactive(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    adobe_transfer_factory,
+    adobe_subscription_factory,
+):
+    m_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock()
+    adobe_subscription = adobe_subscription_factory()
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_TRANSFER_INACTIVE_ACCOUNT,
+    )
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.status = "completed"
+
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+
+    has_errors, validated_order = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+
+    assert has_errors is True
+
+    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
+        status=STATUS_TRANSFER_INACTIVE_ACCOUNT,
+    )
+    assert param["constraints"]["hidden"] is False
+    assert param["constraints"]["required"] is True
 
 
 @pytest.mark.parametrize(
