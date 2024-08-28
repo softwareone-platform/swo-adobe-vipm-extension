@@ -38,6 +38,7 @@ class GetReturnableOrders(Step):
                 context.authorization_id,
                 context.adobe_customer_id,
                 sku,
+                context.adobe_customer["cotermDate"],
             )
         returnable_orders_count = sum(len(v) for v in context.adobe_returnable_orders.values())
         logger.info(f"{context}: found {returnable_orders_count} returnable orders.")

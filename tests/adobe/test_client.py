@@ -1826,7 +1826,7 @@ def test_get_returnable_orders_by_sku(
         authorization_uk,
         customer_id,
         order_ok_1["lineItems"][0]["offerId"],
-        customer_coterm_date="2024-07-01",
+        "2024-07-01",
     ) == [
         ReturnableOrderInfo(
             order=order_ok_1,
@@ -1849,80 +1849,6 @@ def test_get_returnable_orders_by_sku(
             "end-date": "2024-06-16"
         },
     )
-
-
-@freeze_time("2024-04-15")
-def test_get_returnable_orders_by_sku_no_coterm_date(
-    mocker,
-    adobe_order_factory,
-    adobe_items_factory,
-    adobe_client_factory,
-    adobe_authorizations_file,
-):
-    order_ok_1 = adobe_order_factory(
-        order_type=ORDER_TYPE_NEW,
-        items=adobe_items_factory(status=STATUS_PROCESSED),
-        status=STATUS_PROCESSED,
-    )
-    order_ok_2 = adobe_order_factory(
-        order_type=ORDER_TYPE_RENEWAL,
-        items=adobe_items_factory(status=STATUS_PROCESSED),
-        status=STATUS_PROCESSED,
-    )
-    order_ko_1 = adobe_order_factory(
-        order_type=ORDER_TYPE_NEW,
-        items=adobe_items_factory(status=STATUS_ORDER_CANCELLED),
-        status=STATUS_PROCESSED,
-    )
-    order_ko_2 = adobe_order_factory(
-        order_type=ORDER_TYPE_NEW,
-        items=adobe_items_factory(status=STATUS_PROCESSED),
-        status=STATUS_ORDER_CANCELLED,
-    )
-    order_ko_3 = adobe_order_factory(
-        order_type=ORDER_TYPE_RENEWAL,
-        items=adobe_items_factory(offer_id="99999999CA01A12", status=STATUS_PROCESSED),
-        status=STATUS_PROCESSED,
-    )
-
-    mocked_get_orders = mocker.patch.object(
-        AdobeClient,
-        "get_orders",
-        return_value=[order_ok_1, order_ko_1, order_ko_2, order_ko_3, order_ok_2],
-    )
-
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
-    customer_id = "a-customer"
-    client, _, _ = adobe_client_factory()
-
-    assert client.get_returnable_orders_by_sku(
-        authorization_uk,
-        customer_id,
-        order_ok_1["lineItems"][0]["offerId"],
-    ) == [
-        ReturnableOrderInfo(
-            order=order_ok_1,
-            line=order_ok_1["lineItems"][0],
-            quantity=order_ok_1["lineItems"][0]["quantity"],
-        ),
-        ReturnableOrderInfo(
-            order=order_ok_2,
-            line=order_ok_2["lineItems"][0],
-            quantity=order_ok_2["lineItems"][0]["quantity"],
-        )
-    ]
-
-    mocked_get_orders.assert_called_once_with(
-        authorization_uk,
-        customer_id,
-        filters={
-            "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
-            "start-date": "2024-04-01",
-        },
-    )
-
 
 
 def test_get_return_orders_by_external_reference(
