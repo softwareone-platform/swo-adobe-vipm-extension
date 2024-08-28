@@ -97,6 +97,7 @@ def test_get_returnable_orders_step(
         context.authorization_id,
         context.adobe_customer_id,
         sku,
+        adobe_customer["cotermDate"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 

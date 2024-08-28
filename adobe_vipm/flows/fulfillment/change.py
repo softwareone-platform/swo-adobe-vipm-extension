@@ -56,7 +56,7 @@ class GetReturnableOrders(Step):
                 context.authorization_id,
                 context.adobe_customer_id,
                 sku,
-                customer_coterm_date=context.adobe_customer["cotermDate"],
+                context.adobe_customer["cotermDate"],
             )
             returnable_orders_count += len(returnable_orders)
             returnable_by_quantity = {}
