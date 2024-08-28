@@ -1,6 +1,6 @@
 import copy
 import functools
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import phonenumbers
 import regex as re
@@ -13,9 +13,7 @@ from adobe_vipm.adobe.constants import (
     OFFER_TYPE_LICENSE,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
 )
-from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
-    CANCELLATION_WINDOW_DAYS,
     NEW_CUSTOMER_PARAMETERS,
     OPTIONAL_CUSTOMER_ORDER_PARAMS,
     ORDER_TYPE_CHANGE,
@@ -302,25 +300,6 @@ def reset_ordering_parameters_error(order):
     return updated_order
 
 
-def get_order_line(order, line_id):
-    """
-    Returns an order line object by the line identifier
-    or None if not found.
-
-    Args:
-        order (dict): The order from which the line
-        must be retrieved.
-        line_id (str): The idetifier of the line.
-
-    Returns:
-        dict: The line object or None if not found.
-    """
-    return find_first(
-        lambda line: line_id == to_adobe_line_id(line["id"]),
-        order["lines"],
-    )
-
-
 def get_order_line_by_sku(order, sku):
     """
     Returns an order line object by sku or None if not found.
@@ -443,41 +422,6 @@ def get_adobe_subscription_id(subscription):
     return subscription.get("externalIds", {}).get("vendor")
 
 
-def in_cancellation_window(order, line):
-    """
-    Checks if the creation date of a subscription item
-    is within the cancellation window.
-
-    Args:
-        order (dict): The change order is being processed.
-        line (dict): the order line that should be checked.
-
-    Returns:
-        bool: True is the subscription items is within the
-        cancellation window or the subscription does not exist
-        (purchase cases), False otherwise.
-    """
-    subscription = get_subscription_by_line_and_item_id(
-        order["subscriptions"],
-        line["item"]["id"],
-        line["id"],
-    )
-    if not subscription:
-        return True
-
-    creation_date = datetime.fromisoformat(subscription["startDate"])
-    delta = datetime.now(UTC) - creation_date
-    return delta.days < CANCELLATION_WINDOW_DAYS
-
-
-def is_migrated_customer(source):
-    param = get_ordering_parameter(
-        source,
-        PARAM_AGREEMENT_TYPE,
-    )
-    return param.get("value") == "Migrate"
-
-
 def split_downsizes_and_upsizes(order):
     """
     Returns a tuple where the first element
@@ -493,24 +437,6 @@ def split_downsizes_and_upsizes(order):
     return (
         list(filter(lambda line: line["quantity"] < line["oldQuantity"], order["lines"])),
         list(filter(lambda line: line["quantity"] > line["oldQuantity"], order["lines"])),
-    )
-
-
-def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
-    """
-    Get the line item from an Adobe order which subscription id match the
-    one given as an argument.
-
-    Args:
-        line_items (list): List of order line items.
-        subscription_id (str): Identifier of the subscription to search.
-
-    Returns:
-        dict: the line item corresponding to the given subscription id.
-    """
-    return find_first(
-        lambda item: item["subscriptionId"] == subscription_id,
-        line_items,
     )
 
 
