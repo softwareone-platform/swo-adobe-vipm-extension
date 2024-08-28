@@ -5,9 +5,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     GetReturnOrders,
     IncrementAttemptsCounter,
-    SendEmailNotification,
     SetOrUpdateCotermNextSyncDates,
-    SetProcessingTemplate,
+    StartOrderProcessing,
     SubmitReturnOrders,
     ValidateRenewalWindow,
 )
@@ -221,7 +220,7 @@ def test_fulfill_termination_order(mocker):
     mocked_order = mocker.MagicMock()
 
     fulfill_termination_order(mocked_client, mocked_order)
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 12
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 10
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
@@ -230,23 +229,19 @@ def test_fulfill_termination_order(mocker):
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[2], SetOrUpdateCotermNextSyncDates
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], SetProcessingTemplate)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], StartOrderProcessing)
     assert (
         mocked_pipeline_ctor.mock_calls[0].args[3].template_name == TEMPLATE_NAME_TERMINATION
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], SendEmailNotification)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnableOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SubmitReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], SwitchAutoRenewalOff)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], CompleteOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnableOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], SubmitReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SwitchAutoRenewalOff)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], CompleteOrder)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[10].template_name
+        mocked_pipeline_ctor.mock_calls[0].args[9].template_name
         == TEMPLATE_NAME_TERMINATION
-    )
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[11], SendEmailNotification
     )
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(

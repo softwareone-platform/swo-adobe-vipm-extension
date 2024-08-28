@@ -711,59 +711,6 @@ class IncrementAttemptsCounter(Step):
         next_step(client, context)
 
 
-class SendEmailNotification(Step):
-    """
-    Send the order status change notification to the customer.
-    """
-
-    def send(self, client, context):
-        email_notification_enabled = bool(
-            settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
-        )
-
-        if not email_notification_enabled:
-            return
-
-        if context.order["status"] == "Processing" and context.current_attempt != 0:
-            return
-
-        recipient = get_notifications_recipient(context.order)
-        if not recipient:
-            logger.warning(
-                f"{context}: cannot send email notifications, no recipient found"
-            )
-            return
-
-        render_context = {
-            "order": context.order,
-            "activation_template": md2html(
-                get_rendered_template(client, context.order_id)
-            ),
-            "api_base_url": settings.MPT_API_BASE_URL,
-            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
-        }
-        subject = (
-            f"Order status update {context.order['id']} "
-            f"for {context.order['agreement']['buyer']['name']}"
-        )
-        if context.order["status"] == "Querying":
-            subject = (
-                f"This order need your attention {context.order['id']} "
-                f"for {context.order['agreement']['buyer']['name']}"
-            )
-        send_email(
-            recipient,
-            subject,
-            "email",
-            render_context,
-        )
-        logger.info(f"{context}: email notification sent.")
-
-    def __call__(self, client, context, next_step):
-        self.send(client, context)
-        next_step(client, context)
-
-
 class SetOrUpdateCotermNextSyncDates(Step):
     """
     Set or update the fulfillment parameters `cotermDate` and
@@ -790,11 +737,12 @@ class SetOrUpdateCotermNextSyncDates(Step):
         next_step(client, context)
 
 
-class SetProcessingTemplate(Step):
+class StartOrderProcessing(Step):
     """
     Set the template for the processing status or the
     delayed one if the processing is delated due to the
     renewal window open.
+
     """
 
     def __init__(self, template_name):
@@ -821,6 +769,8 @@ class SetProcessingTemplate(Step):
                 f"({template['id']})"
             )
         logger.info(f"{context}: processing template is ok, continue")
+        if context.current_attempt == 0:
+            send_email_notification(client, context.order)
         next_step(client, context)
 
 
@@ -1079,7 +1029,6 @@ class UpdatePrices(Step):
         logger.info(f"{context}: order lines prices updated successfully")
         next_step(client, context)
 
-
 class CompleteOrder(Step):
     def __init__(self, template_name):
         self.template_name = template_name
@@ -1100,9 +1049,9 @@ class CompleteOrder(Step):
             parameters=context.order["parameters"],
         )
         context.order["agreement"] = agreement
+        send_email_notification(client, context.order)
         logger.info(f'{context}: order has been completed successfully')
         next_step(client, context)
-
 
 class SyncAgreement(Step):
     def __call__(self, client, context, next_step):
