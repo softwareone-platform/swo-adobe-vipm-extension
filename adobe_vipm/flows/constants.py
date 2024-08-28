@@ -155,6 +155,7 @@ ERR_DUPLICATED_ITEMS = ValidationError(
 ERR_EXISTING_ITEMS = ValidationError(
     "VIPMV010", "The order cannot contain new lines for an existing item: {duplicates}."
 )
+
 ERR_ADOBE_ERROR = ValidationError("VIPMV011", "Adobe returned an error: {details}.")
 ERR_ADOBE_MEMBERSHIP_ID_EMPTY = ValidationError(
     "VIPMV012", "No active items have been found for this membership."
@@ -184,3 +185,16 @@ FAKE_CUSTOMERS_IDS = {
     MARKET_SEGMENT_GOVERNMENT: "1234567890GOV",
     MARKET_SEGMENT_EDUCATION: "1234567890EDU",
 }
+
+ERR_INVALID_DOWNSIZE_QUANTITY =  ValidationError(
+    "VIPMV013", "Invalid downsize quantities: {messages}"
+)
+
+
+ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = " or any combination of these values,"
+
+ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
+    "Cannot reduce item `{item}` quantity by {delta}. "
+    "Please reduce the quantity by {available_quantities},{any_combination} or wait until {date} "
+    "when there are no returnable orders to modify your renewal quantity."
+)

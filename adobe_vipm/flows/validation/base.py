@@ -22,7 +22,7 @@ from adobe_vipm.flows.utils import (
     strip_trace_id,
     update_parameters_visibility,
 )
-from adobe_vipm.flows.validation.change import validate_duplicate_or_existing_lines
+from adobe_vipm.flows.validation.change import validate_change_order
 from adobe_vipm.flows.validation.purchase import (
     validate_customer_data,
     validate_duplicate_lines,
@@ -32,7 +32,7 @@ from adobe_vipm.flows.validation.transfer import validate_transfer
 logger = logging.getLogger(__name__)
 
 
-def validate_order(mpt_client, order):
+def validate_order(client, order):
     """
     Performs the validation of a draft order.
 
@@ -44,14 +44,14 @@ def validate_order(mpt_client, order):
         dict: The validated order.
     """
     try:
-        adobe_client = get_adobe_client()
-        order = populate_order_info(mpt_client, order)
         has_errors = False
-        order = reset_ordering_parameters_error(order)
-        order = reset_order_error(order)
 
         if is_purchase_order(order):
-            order, customer_data = prepare_customer_data(mpt_client, order)
+            adobe_client = get_adobe_client()
+            order = populate_order_info(client, order)
+            order = reset_ordering_parameters_error(order)
+            order = reset_order_error(order)
+            order, customer_data = prepare_customer_data(client, order)
             if is_purchase_validation_enabled(order):
                 has_errors, order = validate_customer_data(order, customer_data)
                 if not has_errors and order["lines"]:
@@ -66,13 +66,15 @@ def validate_order(mpt_client, order):
                         has_errors = True
 
         elif is_change_order(order) and order["lines"]:
-            has_errors, order = validate_duplicate_or_existing_lines(order)
+            has_errors, order = validate_change_order(client, order)
         elif is_transfer_order(order) and is_transfer_validation_enabled(
             order
         ):  # pragma: no branch
-            has_errors, order = validate_transfer(
-                mpt_client, adobe_client, order
-            )
+            adobe_client = get_adobe_client()
+            order = populate_order_info(client, order)
+            order = reset_ordering_parameters_error(order)
+            order = reset_order_error(order)
+            has_errors, order = validate_transfer(client, adobe_client, order)
 
         order = update_parameters_visibility(order)
 

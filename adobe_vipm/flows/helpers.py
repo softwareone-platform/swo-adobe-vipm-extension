@@ -25,6 +25,8 @@ from adobe_vipm.flows.utils import (
     get_market_segment,
     get_order_line_by_sku,
     get_retry_count,
+    reset_order_error,
+    reset_ordering_parameters_error,
     set_customer_data,
     split_downsizes_and_upsizes,
 )
@@ -159,6 +161,8 @@ class SetupContext(Step):
     """
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
+        context.order = reset_order_error(context.order)
+        context.order = reset_ordering_parameters_error(context.order)
         context.order["agreement"] = get_agreement(client, context.order["agreement"]["id"])
         context.order["agreement"]["licensee"] = get_licensee(
             client, context.order["agreement"]["licensee"]["id"]

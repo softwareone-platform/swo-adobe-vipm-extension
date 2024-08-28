@@ -1122,6 +1122,7 @@ def adobe_order_factory(adobe_items_factory):
         order_id=None,
         reference_order_id=None,
         status=None,
+        creation_date=None,
     ):
         order = {
             "externalReferenceId": external_id,
@@ -1136,6 +1137,8 @@ def adobe_order_factory(adobe_items_factory):
             order["status"] = status
         if status in [STATUS_PENDING, STATUS_PROCESSED]:
             order["orderId"] = order_id or "P0123456789"
+        if creation_date:
+            order["creationDate"] = creation_date
         return order
 
     return _order

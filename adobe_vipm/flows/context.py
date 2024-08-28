@@ -13,7 +13,7 @@ class Context:
     order_id: str | None = None
     authorization_id: str | None = None
     currency: str | None = None
-    validation_succeeded: bool = False
+    validation_succeeded: bool = True
     adobe_customer_id: str | None = None
     adobe_customer: dict | None = None
     adobe_new_order_id: str | None = None
