@@ -52,11 +52,11 @@ from adobe_vipm.flows.utils import (
     get_market_segment,
     get_market_segment_eligibility_status,
     get_ordering_parameter,
-    get_partial_sku,
     set_market_segment_eligibility_status_pending,
     set_order_error,
     set_ordering_parameter_error,
 )
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 

@@ -952,7 +952,8 @@ def agreement(buyer):
 
 @pytest.fixture()
 def order_factory(
-    agreement, order_parameters_factory, fulfillment_parameters_factory, lines_factory
+    agreement, order_parameters_factory, fulfillment_parameters_factory, lines_factory,
+    status="Processing",
 ):
     """
     Marketplace platform order for tests.
@@ -966,7 +967,8 @@ def order_factory(
         lines=None,
         subscriptions=None,
         external_ids=None,
-        status="Processing",
+        status=status,
+        template=None,
     ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
@@ -1008,6 +1010,8 @@ def order_factory(
         }
         if external_ids:
             order["externalIds"] = external_ids
+        if template:
+            order["template"] = template
         return order
 
     return _order
@@ -1090,6 +1094,7 @@ def adobe_items_factory():
         quantity=170,
         subscription_id=None,
         renewal_date=None,
+        status=None,
     ):
         item = {
             "extLineItemNumber": line_number,
@@ -1100,6 +1105,8 @@ def adobe_items_factory():
             item["renewalDate"] = renewal_date
         if subscription_id:
             item["subscriptionId"] = subscription_id
+        if status:
+            item["status"] = status
         return [item]
 
     return _items
