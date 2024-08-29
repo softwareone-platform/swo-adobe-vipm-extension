@@ -1135,7 +1135,7 @@ def adobe_order_factory(adobe_items_factory):
             order["referenceOrderId"] = reference_order_id
         if status:
             order["status"] = status
-        if status in [STATUS_PENDING, STATUS_PROCESSED]:
+        if status in [STATUS_PENDING, STATUS_PROCESSED] or order_id:
             order["orderId"] = order_id or "P0123456789"
         if creation_date:
             order["creationDate"] = creation_date

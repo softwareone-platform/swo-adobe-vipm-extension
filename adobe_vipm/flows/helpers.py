@@ -174,7 +174,9 @@ class SetupContext(Step):
         context.agreement_id = context.order["agreement"]["id"]
         context.authorization_id = context.order["authorization"]["id"]
         context.product_id = context.order["agreement"]["product"]["id"]
+        context.seller_id = context.order["agreement"]["seller"]["id"]
         context.currency = context.order["agreement"]["listing"]["priceList"]["currency"]
+        context.market_segment = get_market_segment(context.product_id)
         context.adobe_customer_id = get_adobe_customer_id(context.order)
         if context.adobe_customer_id:
             context.adobe_customer = adobe_client.get_customer(

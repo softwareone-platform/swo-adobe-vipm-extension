@@ -5,7 +5,6 @@ processing.
 """
 import itertools
 import logging
-from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows.constants import (
@@ -23,6 +22,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitReturnOrders,
     SyncAgreement,
     UpdatePrices,
+    ValidateDuplicateLines,
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
@@ -103,41 +103,6 @@ class ValidateReturnableOrders(Step):
                 reason,
             )
             logger.info(f"{context}: failed due to {reason}")
-            return
-
-        next_step(client, context)
-
-
-class ValidateDuplicateLines(Step):
-    def __call__(self, client, context, next_step):
-        items = [line["item"]["id"] for line in context.order["lines"]]
-        duplicates = [item for item, count in Counter(items).items() if count > 1]
-        if duplicates:
-            switch_order_to_failed(
-                client,
-                context.order,
-                (
-                    "The order cannot contain multiple lines "
-                    f"for the same item: {','.join(duplicates)}."
-                ),
-            )
-            return
-
-        items = []
-        for subscription in context.order["agreement"]["subscriptions"]:
-            for line in subscription["lines"]:
-                items.append(line["item"]["id"])
-
-        items.extend(
-            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
-        )
-        duplicates = [item for item, count in Counter(items).items() if count > 1]
-        if duplicates:
-            switch_order_to_failed(
-                client,
-                context.order,
-                f"The order cannot contain new lines for an existing item: {','.join(duplicates)}.",
-            )
             return
 
         next_step(client, context)
