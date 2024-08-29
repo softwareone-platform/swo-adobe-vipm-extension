@@ -14,7 +14,7 @@ def test_fulfill_order_exception(mocker, mpt_error_factory, order_factory):
         "adobe_vipm.flows.fulfillment.base.notify_unhandled_exception_in_teams"
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.base.populate_order_info",
+        "adobe_vipm.flows.fulfillment.base.fulfill_purchase_order",
         side_effect=error,
     )
 
@@ -29,7 +29,7 @@ def test_fulfill_order_exception(mocker, mpt_error_factory, order_factory):
 
 
 @pytest.mark.parametrize(
-    "order_type", ["change", "termination"],
+    "order_type", ["purchase", "change", "termination"],
 )
 def test_fulfill_order_by_order_type(mocker, order_factory, order_type):
     mocked_fulfill = mocker.patch(

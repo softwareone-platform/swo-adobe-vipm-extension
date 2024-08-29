@@ -9,9 +9,11 @@ class Context:
     upsize_lines: list = field(default_factory=list)
     type: str | None = None
     product_id: str | None = None
+    market_segment: str | None = None
     agreement_id: str | None = None
     order_id: str | None = None
     authorization_id: str | None = None
+    seller_id: str | None = None
     currency: str | None = None
     validation_succeeded: bool = True
     adobe_customer_id: str | None = None
