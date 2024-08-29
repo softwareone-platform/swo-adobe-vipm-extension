@@ -26,6 +26,7 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
+    get_agreement,
     get_agreement_subscription,
     get_agreements_by_3yc_commitment_request_status,
     get_agreements_by_ids,
@@ -34,7 +35,7 @@ from adobe_vipm.flows.mpt import (
     get_agreements_for_3yc_recommitment,
     get_agreements_for_3yc_resubmit,
     get_all_agreements,
-    get_pricelist_items_by_product_items,
+    get_licensee,
     get_product_items_by_skus,
     get_product_onetime_items_by_ids,
     get_product_template_or_default,
@@ -403,74 +404,6 @@ def test_get_product_items_by_skus_error(
 
     with pytest.raises(MPTAPIError) as cv:
         get_product_items_by_skus(mpt_client, product_id, skus)
-
-    assert cv.value.payload["status"] == 500
-
-
-def test_get_pricelist_items_by_product_items(mpt_client, requests_mocker):
-    """
-    Tests the call to retrieve the pricelist items given the pricelist id and
-    the product item ids.
-    """
-
-    url = "price-lists/PRC-1234/items?in(item.id,(ITM-5678,ITM-9012))"
-    page1_url = f"{url}&limit=10&offset=0"
-    page2_url = f"{url}&limit=10&offset=10"
-    data = [{"id": f"PRI-{idx}"} for idx in range(13)]
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, page1_url),
-        json={
-            "$meta": {
-                "pagination": {
-                    "offset": 0,
-                    "limit": 10,
-                    "total": 12,
-                },
-            },
-            "data": data[:10],
-        },
-    )
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, page2_url),
-        json={
-            "$meta": {
-                "pagination": {
-                    "offset": 10,
-                    "limit": 10,
-                    "total": 12,
-                },
-            },
-            "data": data[10:],
-        },
-    )
-
-    assert (
-        get_pricelist_items_by_product_items(
-            mpt_client,
-            "PRC-1234",
-            ["ITM-5678", "ITM-9012"],
-        )
-        == data
-    )
-
-
-def test_get_pricelist_item_by_product_item_error(
-    mpt_client, requests_mocker, mpt_error_factory
-):
-    """
-    Tests the call to retrieve a pricelist item given the pricelist id and
-    the product item id when it fails.
-    """
-    url = "price-lists/PRC-1234/items?in(item.id,(ITM-5678))"
-    url = f"{url}&limit=10&offset=0"
-    requests_mocker.get(
-        urljoin(mpt_client.base_url, url),
-        status=500,
-        json=mpt_error_factory(500, "Internal server error", "Whatever"),
-    )
-
-    with pytest.raises(MPTAPIError) as cv:
-        get_pricelist_items_by_product_items(mpt_client, "PRC-1234", ["ITM-5678"])
 
     assert cv.value.payload["status"] == 500
 
@@ -1025,3 +958,66 @@ def test_get_all_agreements(mocker, settings):
 
     assert get_all_agreements(mocked_client) == [{"id": "AGR-0001"}]
     mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
+
+
+def test_get_agreement(mpt_client, requests_mocker, agreement):
+    agreement_id = agreement["id"]
+    requests_mocker.get(
+        urljoin(mpt_client.base_url,
+            f"commerce/agreements/{agreement_id}?select=seller,buyer,listing,product,subscriptions"
+        ),
+        json=agreement,
+    )
+
+    assert get_agreement(mpt_client, agreement_id) == agreement
+
+
+def test_get_agreement_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            "commerce/agreements/AGR-1234?select=seller,buyer,listing,product,subscriptions"
+        ),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Agreement not found"),
+    )
+
+
+    with pytest.raises(MPTAPIError) as cv:
+        get_agreement(mpt_client, "AGR-1234")
+
+    assert cv.value.payload["status"] == 404
+
+
+def test_get_licensee(mpt_client, requests_mocker, agreement):
+    licensee = agreement["licensee"]
+    licensee_id = licensee["id"]
+    requests_mocker.get(
+        urljoin(mpt_client.base_url,
+            f"accounts/licensees/{licensee_id}"
+        ),
+        json=licensee,
+    )
+
+    assert get_licensee(mpt_client, licensee_id) == licensee
+
+
+def test_get_licensee_error(
+    mpt_client, requests_mocker, mpt_error_factory
+):
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            "accounts/licensees/LIC-1234"
+        ),
+        status=404,
+        json=mpt_error_factory(404, "Not Found", "Licensee not found"),
+    )
+
+
+    with pytest.raises(MPTAPIError) as cv:
+        get_licensee(mpt_client, "LIC-1234")
+
+    assert cv.value.payload["status"] == 404

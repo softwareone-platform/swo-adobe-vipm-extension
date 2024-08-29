@@ -12,9 +12,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     GetReturnOrders,
     IncrementAttemptsCounter,
-    SendEmailNotification,
     SetOrUpdateCotermNextSyncDates,
-    SetProcessingTemplate,
+    StartOrderProcessing,
     SubmitReturnOrders,
     ValidateRenewalWindow,
 )
@@ -39,6 +38,7 @@ class GetReturnableOrders(Step):
                 context.authorization_id,
                 context.adobe_customer_id,
                 sku,
+                context.adobe_customer["cotermDate"],
             )
         returnable_orders_count = sum(len(v) for v in context.adobe_returnable_orders.values())
         logger.info(f"{context}: found {returnable_orders_count} returnable orders.")
@@ -95,15 +95,13 @@ def fulfill_termination_order(client, order):
         SetupContext(),
         IncrementAttemptsCounter(),
         SetOrUpdateCotermNextSyncDates(),
-        SetProcessingTemplate(TEMPLATE_NAME_TERMINATION),
+        StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
         ValidateRenewalWindow(),
-        SendEmailNotification(),
         GetReturnableOrders(),
         GetReturnOrders(),
         SubmitReturnOrders(),
         SwitchAutoRenewalOff(),
         CompleteOrder(TEMPLATE_NAME_TERMINATION),
-        SendEmailNotification(),
     )
     context = Context(order=order)
     pipeline.run(client, context)

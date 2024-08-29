@@ -24,9 +24,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetReturnOrders,
     IncrementAttemptsCounter,
-    SendEmailNotification,
     SetOrUpdateCotermNextSyncDates,
-    SetProcessingTemplate,
+    StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
@@ -340,186 +339,11 @@ def test_increment_attempts_counter_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-@pytest.mark.parametrize(
-    ("status", "subject"),
-    [
-        (
-            "Processing",
-            "Order status update ORD-1234 for A buyer",
-        ),
-        (
-            "Querying",
-            "This order need your attention ORD-1234 for A buyer",
-        ),
-        (
-            "Completed",
-            "Order status update ORD-1234 for A buyer",
-        ),
-        (
-            "Failed",
-            "Order status update ORD-1234 for A buyer",
-        ),
-    ],
-)
-def test_send_email_notification_step(mocker, settings, order_factory, status, subject):
-    """
-    Tests the status changed email notification.
-    """
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "1",
-    }
-
-    mocked_get_rendered_template = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
-        return_value="rendered-template",
-    )
-
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    order = order_factory(order_id="ORD-1234", status=status)
-
-    context = Context(
-        order=order,
-        order_id=order["id"],
-        current_attempt=0,
-    )
-
-    step = SendEmailNotification()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_get_rendered_template.assert_called_once_with(mocked_client, order["id"])
-    mocked_send_email.assert_called_once_with(
-        get_notifications_recipient(order),
-        subject,
-        "email",
-        {
-            "order": order,
-            "activation_template": "<p>rendered-template</p>\n",
-            "api_base_url": settings.MPT_API_BASE_URL,
-            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
-        },
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_send_email_notification_step_no_recipient(
-    mocker, settings, order_factory, caplog
-):
-    """
-    Tests that if not recipient is found in the order to send the
-    status change email notification, the email is not sent.
-    """
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "1",
-    }
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_notifications_recipient",
-        return_value=None,
-    )
-
-    mocked_get_rendered_template = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
-    )
-
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    order = order_factory(order_id="ORD-1234")
-
-    context = Context(
-        order=order,
-        order_id=order["id"],
-        current_attempt=0,
-    )
-
-    step = SendEmailNotification()
-    with caplog.at_level(logging.WARNING):
-        step(mocked_client, context, mocked_next_step)
-
-    assert "no recipient found" in caplog.text
-
-    mocked_get_rendered_template.assert_not_called()
-    mocked_send_email.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_send_email_notification_step_processing_not_first_attempt(
-    mocker, settings, order_factory
-):
-    """
-    Tests that while the order is in Processing status,
-    the notification is not set if the processing attempt of the
-    order is not the first attempt (avoid sending the notification multiple
-    times).
-    """
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "1",
-    }
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_notifications_recipient",
-        return_value=None,
-    )
-
-    mocked_get_rendered_template = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
-    )
-
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    order = order_factory(order_id="ORD-1234", status="Processing")
-
-    context = Context(order=order, current_attempt=1)
-
-    step = SendEmailNotification()
-
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_get_rendered_template.assert_not_called()
-    mocked_send_email.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_send_email_notification_step_notifications_disabled(
-    mocker, settings, order_factory
-):
-    """
-    Tests that if the environment variable EXT_EMAIL_NOTIFICATIONS_ENABLED
-    is set to something that evaluate to False, the email is not sent.
-    """
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "",
-    }
-
-    mocked_get_rendered_template = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
-    )
-
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    order = order_factory(order_id="ORD-1234")
-
-    context = Context(order=order, current_attempt=0)
-
-    step = SendEmailNotification()
-
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_get_rendered_template.assert_not_called()
-    mocked_send_email.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_set_processing_template_step(mocker, order_factory):
+def test_start_order_processing_step(mocker, order_factory):
     """
     Tests that the template for the `Processing` status
     with the name provided during the instantiation of the step class
-    is set for the order.
+    is set for the order and the notification email is sent.
     """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -528,6 +352,9 @@ def test_set_processing_template_step(mocker, order_factory):
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
+    mocked_send_email = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_email_notification",
+    )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     order = order_factory()
@@ -535,7 +362,7 @@ def test_set_processing_template_step(mocker, order_factory):
 
     assert "template" not in context.order
 
-    step = SetProcessingTemplate("my template")
+    step = StartOrderProcessing("my template")
     step(mocked_client, context, mocked_next_step)
 
     assert context.order["template"] == {"id": "TPL-1234"}
@@ -550,14 +377,16 @@ def test_set_processing_template_step(mocker, order_factory):
         context.order["id"],
         template={"id": "TPL-1234"},
     )
+    mocked_send_email.assert_called_once_with(mocked_client, context.order)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_set_processing_template_step_already_set(mocker, order_factory):
+def test_set_processing_template_step_already_set_not_first_attempt(mocker, order_factory):
     """
     Tests that the template for the `Processing` status
     with the name provided during the instantiation of the step class
     is not set for the order if it was already set.
+    Also the notification email is not sent since it's not the first attempt.
     """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -566,12 +395,18 @@ def test_set_processing_template_step_already_set(mocker, order_factory):
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
+    mocked_send_email = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_email_notification",
+    )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order_factory(template={"id": "TPL-1234"}))
+    context = Context(
+        order=order_factory(template={"id": "TPL-1234"}),
+        current_attempt=1,
+    )
 
-    step = SetProcessingTemplate("my template")
+    step = StartOrderProcessing("my template")
     step(mocked_client, context, mocked_next_step)
 
     mocked_get_template.assert_called_once_with(
@@ -581,6 +416,7 @@ def test_set_processing_template_step_already_set(mocker, order_factory):
         "my template",
     )
     mocked_update_order.assert_not_called()
+    mocked_send_email.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -611,11 +447,12 @@ def test_set_processing_template_to_delayed_in_renewal_win(
         order=order,
         order_id=order["id"],
         product_id=order["agreement"]["product"]["id"],
+        current_attempt=1,
     )
 
     assert "template" not in context.order
 
-    step = SetProcessingTemplate("my template")
+    step = StartOrderProcessing("my template")
     step(mocked_client, context, mocked_next_step)
 
     assert context.order["template"] == {"id": "TPL-5678"}

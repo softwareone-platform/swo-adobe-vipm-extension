@@ -17,9 +17,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetReturnOrders,
     IncrementAttemptsCounter,
-    SendEmailNotification,
     SetOrUpdateCotermNextSyncDates,
-    SetProcessingTemplate,
+    StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
@@ -57,7 +56,7 @@ class GetReturnableOrders(Step):
                 context.authorization_id,
                 context.adobe_customer_id,
                 sku,
-                customer_coterm_date=context.adobe_customer["cotermDate"],
+                context.adobe_customer["cotermDate"],
             )
             returnable_orders_count += len(returnable_orders)
             returnable_by_quantity = {}
@@ -197,9 +196,8 @@ def fulfill_change_order(client, order):
         IncrementAttemptsCounter(),
         ValidateDuplicateLines(),
         SetOrUpdateCotermNextSyncDates(),
-        SetProcessingTemplate(TEMPLATE_NAME_CHANGE),
+        StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         ValidateRenewalWindow(),
-        SendEmailNotification(),
         GetReturnableOrders(),
         GetReturnOrders(),
         ValidateReturnableOrders(),
@@ -209,7 +207,6 @@ def fulfill_change_order(client, order):
         CreateOrUpdateSubscriptions(),
         UpdatePrices(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
-        SendEmailNotification(),
         SyncAgreement(),
     )
     context = Context(order=order)

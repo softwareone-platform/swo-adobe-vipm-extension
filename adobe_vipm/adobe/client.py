@@ -223,19 +223,18 @@ class AdobeClient:
         authorization_id: str,
         customer_id: str,
         sku: str,
-        customer_coterm_date: str | None = None,
+        customer_coterm_date: str,
     ):
         start_date = date.today() - timedelta(days=CANCELLATION_WINDOW_DAYS)
 
         filters = {
             "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
             "start-date": start_date.isoformat(),
-        }
-        if customer_coterm_date:
-            filters["end-date"] = (
+            "end-date": (
                 date.fromisoformat(customer_coterm_date) - timedelta(days=15)
             ).isoformat()
 
+        }
         orders = self.get_orders(
             authorization_id,
             customer_id,
