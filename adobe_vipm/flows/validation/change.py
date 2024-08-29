@@ -65,9 +65,10 @@ class ValidateDownsizes(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         errors = []
-        last_two_weeks = datetime.fromisoformat(
-            context.adobe_customer["cotermDate"]
-        ) - timedelta(days=13)
+        last_two_weeks = (
+            datetime.fromisoformat(context.adobe_customer["cotermDate"])
+            - timedelta(days=13)
+        ).date()
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
             returnable_orders = adobe_client.get_returnable_orders_by_sku(
@@ -84,7 +85,7 @@ class ValidateDownsizes(Step):
             delta = line["oldQuantity"] - line["quantity"]
             if delta not in returnable_by_quantity:
                 end_of_cancellation_window = max(
-                    datetime.fromisoformat(roi.order["creationDate"])
+                    datetime.fromisoformat(roi.order["creationDate"]).date()
                     for roi in returnable_orders
                 ) + timedelta(days=15)
                 end_of_cancellation_window = min(
@@ -103,7 +104,7 @@ class ValidateDownsizes(Step):
                         if len(quantities) > 1
                         else ""
                     ),
-                    date=end_of_cancellation_window.date().isoformat(),
+                    date=end_of_cancellation_window.isoformat(),
                 )
                 errors.append(message)
                 context.validation_succeeded = False
