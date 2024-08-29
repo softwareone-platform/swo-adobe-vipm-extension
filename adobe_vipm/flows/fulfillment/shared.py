@@ -978,55 +978,56 @@ class CreateOrUpdateSubscriptions(Step):
 
 class UpdatePrices(Step):
     def __call__(self, client, context, next_step):
-        actual_skus = [item["offerId"] for item in context.adobe_new_order["lineItems"]]
-        commitment = get_3yc_commitment(context.adobe_customer)
-        if (
-            commitment
-            and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
-            and date.fromisoformat(commitment["endDate"]) >= date.today()
-        ):
-            prices = get_prices_for_3yc_skus(
-                context.product_id,
-                context.currency,
-                date.fromisoformat(commitment["startDate"]),
-                actual_skus,
-            )
-        else:
-            prices = get_prices_for_skus(context.product_id, context.currency, actual_skus)
+        if context.adobe_new_order:  # pragma: no branch
+            actual_skus = [item["offerId"] for item in context.adobe_new_order["lineItems"]]
+            commitment = get_3yc_commitment(context.adobe_customer)
+            if (
+                commitment
+                and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+                and date.fromisoformat(commitment["endDate"]) >= date.today()
+            ):
+                prices = get_prices_for_3yc_skus(
+                    context.product_id,
+                    context.currency,
+                    date.fromisoformat(commitment["startDate"]),
+                    actual_skus,
+                )
+            else:
+                prices = get_prices_for_skus(context.product_id, context.currency, actual_skus)
 
-        lines = []
-        for line in [get_order_line_by_sku(context.order, sku) for sku in actual_skus]:
-            new_price_item = get_price_item_by_line_sku(
-                prices, line["item"]["externalIds"]["vendor"]
-            )
-            lines.append(
-                {
-                    "id": line["id"],
-                    "price": {
-                        "unitPP": new_price_item[1],
-                    },
-                }
-            )
+            lines = []
+            for line in [get_order_line_by_sku(context.order, sku) for sku in actual_skus]:
+                new_price_item = get_price_item_by_line_sku(
+                    prices, line["item"]["externalIds"]["vendor"]
+                )
+                lines.append(
+                    {
+                        "id": line["id"],
+                        "price": {
+                            "unitPP": new_price_item[1],
+                        },
+                    }
+                )
 
-        # to have total list of lines, leave other not updated
-        updated_lines_ids = {line["id"] for line in lines}
-        for line in context.order["lines"]:
-            if line["id"] in updated_lines_ids:
-                continue
+            # to have total list of lines, leave other not updated
+            updated_lines_ids = {line["id"] for line in lines}
+            for line in context.order["lines"]:
+                if line["id"] in updated_lines_ids:
+                    continue
 
-            lines.append(
-                {
-                    "id": line["id"],
-                    "price": {
-                        "unitPP": line["price"]["unitPP"],
-                    },
-                }
-            )
+                lines.append(
+                    {
+                        "id": line["id"],
+                        "price": {
+                            "unitPP": line["price"]["unitPP"],
+                        },
+                    }
+                )
 
-        lines = sorted(lines, key=itemgetter("id"))
+            lines = sorted(lines, key=itemgetter("id"))
 
-        update_order(client, context.order_id, lines=lines)
-        logger.info(f"{context}: order lines prices updated successfully")
+            update_order(client, context.order_id, lines=lines)
+            logger.info(f"{context}: order lines prices updated successfully")
         next_step(client, context)
 
 class CompleteOrder(Step):
