@@ -30,11 +30,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitReturnOrders,
     SyncAgreement,
     UpdatePrices,
+    ValidateDuplicateLines,
     ValidateRenewalWindow,
     send_email_notification,
     set_customer_coterm_date_if_null,
     start_processing_attempt,
-    update_order_actual_price,
 )
 from adobe_vipm.flows.utils import (
     get_adobe_order_id,
@@ -226,86 +226,6 @@ def test_set_customer_coterm_date_if_null_already_set(
     mocked_adobe_client.get_customer_assert_not_called()
 
 
-def test_update_order_actual_price(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    adobe_customer_factory,
-    adobe_items_factory,
-):
-    mpt_client = mocker.MagicMock()
-    adobe_client = mocker.MagicMock()
-    adobe_client.get_customer.return_value = adobe_customer_factory()
-
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            customer_id="a-customer-id",
-        )
-    )
-    adobe_items = adobe_items_factory()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_prices_for_skus",
-        return_value={adobe_items[0]["offerId"]: 10.12},
-    )
-
-    update_order_actual_price(
-        mpt_client, adobe_client, order, order["lines"], adobe_items
-    )
-
-    mocked_update_order.assert_called_once_with(
-        mpt_client,
-        order["id"],
-        lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 10.12}}],
-    )
-
-
-def test_update_order_actual_price_3yc(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_commitment_factory,
-    adobe_items_factory,
-):
-    mpt_client = mocker.MagicMock()
-    adobe_client = mocker.MagicMock()
-    adobe_client.get_customer.return_value = adobe_customer_factory(
-        commitment=adobe_commitment_factory(),
-    )
-
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            customer_id="a-customer-id",
-        ),
-        lines=lines_factory() + lines_factory(line_id=2, item_id=2),
-    )
-    adobe_items = adobe_items_factory()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_prices_for_3yc_skus",
-        return_value={adobe_items[0]["offerId"]: 10.12},
-    )
-
-    update_order_actual_price(
-        mpt_client, adobe_client, order, [order["lines"][0]], adobe_items
-    )
-
-    mocked_update_order.assert_called_once_with(
-        mpt_client,
-        order["id"],
-        lines=[
-            {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 10.12}},
-            {"id": "ALI-2119-4550-8674-5962-0002", "price": {"unitPP": 1234.55}},
-        ],
-    )
-
-
 def test_increment_attempts_counter_step(
     mocker,
     order_factory,
@@ -337,6 +257,42 @@ def test_increment_attempts_counter_step(
         parameters=context.order["parameters"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_increment_attempts_counter_step_max_reached(
+    mocker,
+    settings,
+    order_factory,
+    fulfillment_parameters_factory,
+):
+    """
+    Tests that the `IncrementAttemptsCounter` processing step
+    fail the order if the maximum amount of attempts has been
+    reached.
+    """
+    settings.EXTENSION_CONFIG = {"MAX_RETRY_ATTEMPS": "10"}
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            retry_count="10",
+        ),
+    )
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order, order_id=order["id"])
+    step = IncrementAttemptsCounter()
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_fail.assert_called_once_with(
+        mocked_client,
+        context.order,
+        "Max processing attemps reached (10).",
+    )
+    mocked_next_step.assert_not_called()
 
 
 def test_start_order_processing_step(mocker, order_factory):
@@ -381,7 +337,9 @@ def test_start_order_processing_step(mocker, order_factory):
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_set_processing_template_step_already_set_not_first_attempt(mocker, order_factory):
+def test_set_processing_template_step_already_set_not_first_attempt(
+    mocker, order_factory
+):
     """
     Tests that the template for the `Processing` status
     with the name provided during the instantiation of the step class
@@ -892,6 +850,7 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
     new_order = adobe_order_factory(
         order_type="NEW",
         status=processing_status,
+        order_id="adobe-order-id",
     )
     order = order_factory()
 
@@ -915,7 +874,7 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
     context = Context(
         order=order,
         order_id=order["id"],
-        adobe_new_order_id="order-id",
+        adobe_new_order_id="adobe-order-id",
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
@@ -952,6 +911,7 @@ def test_submit_new_order_step_order_created_unexpected_status(
     """
 
     new_order = adobe_order_factory(
+        order_id="order-id",
         order_type="NEW",
         status="9999",
     )
@@ -1439,11 +1399,11 @@ def test_complete_order_step(mocker, order_factory):
 
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
-        return_value={"id": "TPL-0000"}
+        return_value={"id": "TPL-0000"},
     )
     mocked_complete_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
-        return_value=completed_order
+        return_value=completed_order,
     )
 
     mocked_client = mocker.MagicMock()
@@ -1502,4 +1462,85 @@ def test_sync_agreement_step(mocker, order_factory):
         [context.agreement_id],
     )
 
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_validate_duplicate_lines_step(
+    mocker,
+    order_factory,
+    lines_factory,
+):
+    order = order_factory(
+        order_type="Change",
+        lines=lines_factory() + lines_factory(),
+    )
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateDuplicateLines()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_fail.assert_called_once_with(
+        mocked_client,
+        context.order,
+        "The order cannot contain multiple lines for the same item: ITM-1234-1234-1234-0001.",
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_duplicate_lines_step_existing_item(
+    mocker,
+    order_factory,
+    lines_factory,
+):
+    order = order_factory(
+        order_type="Change",
+        lines=lines_factory(line_id=2, item_id=10),
+    )
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateDuplicateLines()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_fail.assert_called_once_with(
+        mocked_client,
+        context.order,
+        "The order cannot contain new lines for an existing item: ITM-1234-1234-1234-0010.",
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_duplicate_lines_step_no_duplicates(
+    mocker,
+    order_factory,
+):
+    order = order_factory(
+        order_type="Change",
+    )
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateDuplicateLines()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_fail.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
