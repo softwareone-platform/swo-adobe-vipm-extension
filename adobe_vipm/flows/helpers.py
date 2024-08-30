@@ -87,7 +87,7 @@ class PrepareCustomerData(Step):
             context.order = set_customer_data(context.order, context.customer_data)
             update_order(
                 client,
-                context.order,
+                context.order_id,
                 parameters=context.order["parameters"],
             )
 
