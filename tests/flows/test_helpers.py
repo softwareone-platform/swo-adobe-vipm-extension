@@ -167,7 +167,11 @@ def test_prepare_customer_data_step_no_company_name(
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(order=order, customer_data=no_company_customer_data)
+    context = Context(
+        order=order,
+        order_id="order-id",
+        customer_data=no_company_customer_data,
+    )
 
     step = PrepareCustomerData()
     step(mocked_client, context, mocked_next_step)
@@ -180,7 +184,7 @@ def test_prepare_customer_data_step_no_company_name(
 
     mocked_update_order.assert_called_once_with(
         mocked_client,
-        context.order,
+        context.order_id,
         parameters=context.order["parameters"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -197,7 +201,11 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(order=order, customer_data=no_address_customer_data)
+    context = Context(
+        order=order,
+        order_id="order-id",
+        customer_data=no_address_customer_data,
+    )
 
     step = PrepareCustomerData()
     step(mocked_client, context, mocked_next_step)
@@ -218,7 +226,7 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
 
     mocked_update_order.assert_called_once_with(
         mocked_client,
-        context.order,
+        context.order_id,
         parameters=context.order["parameters"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -235,7 +243,11 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(order=order, customer_data=no_contact_customer_data)
+    context = Context(
+        order=order,
+        order_id="order-id",
+        customer_data=no_contact_customer_data,
+    )
 
     step = PrepareCustomerData()
     step(mocked_client, context, mocked_next_step)
@@ -250,7 +262,7 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
 
     mocked_update_order.assert_called_once_with(
         mocked_client,
-        context.order,
+        context.order_id,
         parameters=context.order["parameters"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)

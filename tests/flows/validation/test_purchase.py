@@ -836,6 +836,7 @@ def test_update_prices_step(mocker, order_factory, adobe_order_factory, segment)
 
     context = Context(
         order=order,
+        order_id="order-id",
         authorization_id="auth-id",
         market_segment=segment,
         product_id="PRD-1234",
@@ -850,7 +851,7 @@ def test_update_prices_step(mocker, order_factory, adobe_order_factory, segment)
     mocked_adobe_client.create_preview_order.assert_called_once_with(
         context.authorization_id,
         FAKE_CUSTOMERS_IDS[segment],
-        context.order,
+        context.order_id,
         context.order["lines"],
     )
     mocked_get_prices_for_skus.assert_called_once_with(
