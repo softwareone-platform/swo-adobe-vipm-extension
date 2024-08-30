@@ -297,7 +297,7 @@ class UpdatePrices(Step):
             preview_order = adobe_client.create_preview_order(
                 context.authorization_id,
                 customer_id,
-                context.order,
+                context.order_id,
                 context.order["lines"],
             )
         except AdobeAPIError as e:
