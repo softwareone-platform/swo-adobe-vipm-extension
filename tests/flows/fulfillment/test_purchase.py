@@ -43,7 +43,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     UpdatePrices,
     ValidateDuplicateLines,
 )
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_fulfillment_parameter,
@@ -240,11 +240,6 @@ def test_create_customer_step(
 
     order = order_factory()
 
-    mocked_prepare_data = mocker.patch(
-        "adobe_vipm.flows.fulfillment.purchase.prepare_customer_data",
-        return_value=(order, customer_data),
-    )
-
     mocked_save_data = mocker.patch.object(
         CreateCustomer,
         "save_data",
@@ -255,6 +250,7 @@ def test_create_customer_step(
 
     context = Context(
         order=order,
+        customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
@@ -267,7 +263,6 @@ def test_create_customer_step(
     assert context.adobe_customer == adobe_customer
     assert context.adobe_customer_id == adobe_customer["customerId"]
 
-    mocked_prepare_data.assert_called_once_with(mocked_client, context.order)
     mocked_adobe_client.create_customer_account.assert_called_once_with(
         context.authorization_id,
         context.seller_id,
@@ -296,11 +291,6 @@ def test_create_customer_step_no_contact(
 
     order = order_factory()
 
-    mocked_prepare_data = mocker.patch(
-        "adobe_vipm.flows.fulfillment.purchase.prepare_customer_data",
-        return_value=(order, customer_data_without_contact),
-    )
-
     mocked_switch_to_query = mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
     )
@@ -315,6 +305,7 @@ def test_create_customer_step_no_contact(
 
     context = Context(
         order=order,
+        customer_data=customer_data_without_contact,
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
@@ -332,7 +323,6 @@ def test_create_customer_step_no_contact(
         title=param["name"], details="it is mandatory."
     )
 
-    mocked_prepare_data.assert_called_once_with(mocked_client, order)
     mocked_switch_to_query.assert_called_once_with(
         mocked_client,
         context.order,
@@ -360,11 +350,6 @@ def test_create_customer_step_exception(
 
     order = order_factory()
 
-    mocked_prepare_data = mocker.patch(
-        "adobe_vipm.flows.fulfillment.purchase.prepare_customer_data",
-        return_value=(order, customer_data),
-    )
-
     mocked_save_data = mocker.patch.object(
         CreateCustomer,
         "save_data",
@@ -380,6 +365,7 @@ def test_create_customer_step_exception(
 
     context = Context(
         order=order,
+        customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
@@ -389,7 +375,6 @@ def test_create_customer_step_exception(
     step = CreateCustomer()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_prepare_data.assert_called_once_with(mocked_client, context.order)
     mocked_adobe_client.create_customer_account.assert_called_once_with(
         context.authorization_id,
         context.seller_id,
@@ -415,10 +400,6 @@ def test_create_customer_step_already_created(
 
     order = order_factory()
 
-    mocked_prepare_data = mocker.patch(
-        "adobe_vipm.flows.fulfillment.purchase.prepare_customer_data",
-    )
-
     mocked_save_data = mocker.patch.object(
         CreateCustomer,
         "save_data",
@@ -435,7 +416,6 @@ def test_create_customer_step_already_created(
     step = CreateCustomer()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_prepare_data.assert_not_called()
     mocked_adobe_client.create_customer_account.assert_not_called()
     mocked_save_data.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -766,7 +746,7 @@ def test_fulfill_purchase_order(mocker):
 
     fulfill_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 12
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 13
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
@@ -785,19 +765,20 @@ def test_fulfill_purchase_order(mocker):
         mocked_pipeline_ctor.mock_calls[0].args[4].template_name
         == TEMPLATE_NAME_PURCHASE
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], CreateCustomer)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], SubmitNewOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], PrepareCustomerData)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], CreateCustomer)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], SubmitNewOrder)
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[7], CreateOrUpdateSubscriptions
+        mocked_pipeline_ctor.mock_calls[0].args[8], CreateOrUpdateSubscriptions
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], RefreshCustomer)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], RefreshCustomer)
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[9], SetOrUpdateCotermNextSyncDates
+        mocked_pipeline_ctor.mock_calls[0].args[10], SetOrUpdateCotermNextSyncDates
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], UpdatePrices)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[11], CompleteOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[11], UpdatePrices)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[12], CompleteOrder)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[11].template_name
+        mocked_pipeline_ctor.mock_calls[0].args[12].template_name
         == TEMPLATE_NAME_PURCHASE
     )
     mocked_context_ctor.assert_called_once_with(order=mocked_order)

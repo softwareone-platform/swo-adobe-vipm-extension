@@ -15,6 +15,7 @@ class Context:
     authorization_id: str | None = None
     seller_id: str | None = None
     currency: str | None = None
+    customer_data: dict | None = None
     validation_succeeded: bool = True
     adobe_customer_id: str | None = None
     adobe_customer: dict | None = None

@@ -1,11 +1,14 @@
 import pytest
 
+from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_3YC_QUANTITY_CONSUMABLES,
     ERR_3YC_QUANTITY_LICENSES,
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
+    ERR_ADOBE_ERROR,
     ERR_CITY_LENGTH,
     ERR_COMPANY_NAME_CHARS,
     ERR_COMPANY_NAME_LENGTH,
@@ -18,21 +21,26 @@ from adobe_vipm.flows.constants import (
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
     ERR_STATE_OR_PROVINCE,
+    FAKE_CUSTOMERS_IDS,
+    MARKET_SEGMENT_COMMERCIAL,
+    MARKET_SEGMENT_EDUCATION,
+    MARKET_SEGMENT_GOVERNMENT,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
 )
+from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
 from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
 from adobe_vipm.flows.validation.purchase import (
-    validate_3yc,
-    validate_address,
-    validate_company_name,
-    validate_contact,
-    validate_customer_data,
-    validate_duplicate_lines,
+    CheckPurchaseValidationEnabled,
+    UpdatePrices,
+    ValidateCustomerData,
+    validate_purchase_order,
 )
+from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -58,11 +66,17 @@ def test_validate_company_name(order_factory, order_parameters_factory, company_
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_company_name(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is False
+    step = ValidateCustomerData()
+    step.validate_company_name(context)
 
-    param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
+    assert context.validation_succeeded is True
+
+    param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
     assert "error" not in param
 
 
@@ -83,11 +97,18 @@ def test_validate_company_name_invalid_length(
         order_parameters=order_parameters_factory(company_name=company_name)
     )
     customer_data = get_customer_data(order)
-    has_error, order = validate_company_name(order, customer_data)
 
-    assert has_error is True
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
+    step = ValidateCustomerData()
+    step.validate_company_name(context)
+
+    assert context.validation_succeeded is False
+
+    param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -112,11 +133,17 @@ def test_validate_company_name_invalid_chars(
         order_parameters=order_parameters_factory(company_name=company_name)
     )
     customer_data = get_customer_data(order)
-    has_error, order = validate_company_name(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_company_name(context)
 
-    param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
+    assert context.validation_succeeded is False
+
+    param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -132,12 +159,18 @@ def test_validate_address(order_factory, address_line_2, state_or_province):
     customer_data = get_customer_data(order)
     customer_data[PARAM_ADDRESS]["addressLine2"] = address_line_2
     customer_data[PARAM_ADDRESS]["state"] = state_or_province
-    has_error, order = validate_address(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is False
+    step = ValidateCustomerData()
+    step.validate_address(context)
+
+    assert context.validation_succeeded is True
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_ADDRESS,
     )
     assert "error" not in param
@@ -161,12 +194,18 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_address(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_address(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -195,12 +234,18 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_address(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_address(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -228,12 +273,18 @@ def test_validate_address_invalid_state_did_u_mean(
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_address(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_address(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_ADDRESS,
     )
     error = f"{ERR_STATE_OR_PROVINCE} (Did you mean California, Colorado ?)"
@@ -264,12 +315,18 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_address(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_address(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -301,12 +358,18 @@ def test_validate_address_invalid_postal_code_length(
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_address(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_address(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -336,12 +399,18 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_address(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_address(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_ADDRESS,
     )
 
@@ -366,12 +435,18 @@ def test_validate_contact(order_factory):
     order = order_factory()
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_contact(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is False
+    step = ValidateCustomerData()
+    step.validate_contact(context)
+
+    assert context.validation_succeeded is True
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_CONTACT,
     )
     assert "error" not in param
@@ -385,12 +460,18 @@ def test_validate_contact_mandatory(order_factory, order_parameters_factory):
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_contact(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_contact(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -416,12 +497,18 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_contact(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_contact(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -447,12 +534,18 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_contact(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_contact(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -478,12 +571,18 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_contact(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_contact(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -513,12 +612,18 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_contact(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_contact(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         PARAM_CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
@@ -529,69 +634,80 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
     assert param["constraints"]["required"] is True
 
 
-def test_validate_customer_data(mocker):
+def test_validate_customer_data_step(mocker):
     """
-    Test that `validate_customer_data` calls the single validation
-    function in the right order and that the has_errors will be False in case of
-    no errors.
+    Test that the validation functions are invoked
+    and the validation pipeline continue to the next
+    step.
     """
-    order_mocks = [
-        mocker.MagicMock(),
-    ]
-    customer_data = mocker.MagicMock()
-    fn_mocks = []
-    for fnname in (
+    mocked_validate_company_name = mocker.patch.object(
+        ValidateCustomerData,
         "validate_company_name",
+    )
+    mocked_validate_address = mocker.patch.object(
+        ValidateCustomerData,
         "validate_address",
+    )
+    mocked_validate_contact = mocker.patch.object(
+        ValidateCustomerData,
         "validate_contact",
+    )
+    mocked_validate_3yc = mocker.patch.object(
+        ValidateCustomerData,
         "validate_3yc",
-    ):
-        order_mock = mocker.MagicMock()
-        order_mocks.append(order_mock)
-        fn_mocks.append(
-            mocker.patch(
-                f"adobe_vipm.flows.validation.purchase.{fnname}",
-                return_value=(False, order_mock),
-            ),
-        )
+    )
 
-    has_errors, order = validate_customer_data(order_mocks[0], customer_data)
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
 
-    assert has_errors is False
-    assert order == order_mocks[-1]
+    context = Context(order=mocker.MagicMock())
 
-    for mock_id, fn_mock in enumerate(fn_mocks):
-        fn_mock.assert_called_once_with(order_mocks[mock_id], customer_data)
+    step = ValidateCustomerData()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_validate_company_name.assert_called_once_with(context)
+    mocked_validate_address.assert_called_once_with(context)
+    mocked_validate_contact.assert_called_once_with(context)
+    mocked_validate_3yc.assert_called_once_with(context)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-@pytest.mark.parametrize(
-    "no_validating_fn",
-    [
-        "validate_company_name",
-        "validate_address",
-        "validate_contact",
-        "validate_3yc",
-    ],
-)
-def test_validate_customer_data_invalid(mocker, no_validating_fn):
+def test_validate_customer_data_step_no_validate(mocker):
     """
-    Test that if one of the validation returns has_errors=True the
-    `validate_customer_data` function returns has_errors=True
+    Test that the validation functions are invoked
+    but the validation pipeline doesn't continue to the next
+    step because at least one validation failed.
     """
-    for fnname in (
+    mocked_validate_company_name = mocker.patch.object(
+        ValidateCustomerData,
         "validate_company_name",
+    )
+    mocked_validate_address = mocker.patch.object(
+        ValidateCustomerData,
         "validate_address",
+    )
+    mocked_validate_contact = mocker.patch.object(
+        ValidateCustomerData,
         "validate_contact",
+    )
+    mocked_validate_3yc = mocker.patch.object(
+        ValidateCustomerData,
         "validate_3yc",
-    ):
-        mocker.patch(
-            f"adobe_vipm.flows.validation.purchase.{fnname}",
-            return_value=(fnname == no_validating_fn, mocker.MagicMock()),
-        )
+    )
 
-    has_errors, _ = validate_customer_data(mocker.MagicMock(), mocker.MagicMock())
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
 
-    assert has_errors is True
+    context = Context(order=mocker.MagicMock(), validation_succeeded=False)
+
+    step = ValidateCustomerData()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_validate_company_name.assert_called_once_with(context)
+    mocked_validate_address.assert_called_once_with(context)
+    mocked_validate_contact.assert_called_once_with(context)
+    mocked_validate_3yc.assert_called_once_with(context)
+    mocked_next_step.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -611,12 +727,18 @@ def test_validate_3yc(order_factory, order_parameters_factory, quantities):
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_3yc(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is False
+    step = ValidateCustomerData()
+    step.validate_3yc(context)
+
+    assert context.validation_succeeded is True
 
     for param_name in (PARAM_3YC_LICENSES, PARAM_3YC_CONSUMABLES):
-        param = get_ordering_parameter(order, param_name)
+        param = get_ordering_parameter(context.order, param_name)
         assert "error" not in param
 
 
@@ -639,12 +761,18 @@ def test_validate_3yc_invalid(
     )
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_3yc(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
+    step = ValidateCustomerData()
+    step.validate_3yc(context)
+
+    assert context.validation_succeeded is False
 
     param = get_ordering_parameter(
-        order,
+        context.order,
         param_name,
     )
     assert param["error"] == error.to_dict(
@@ -658,25 +786,197 @@ def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
     order = order_factory(order_parameters=order_parameters_factory())
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_3yc(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is False
+    step = ValidateCustomerData()
+    step.validate_3yc(context)
+
+    assert context.validation_succeeded is True
 
 
 def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
     order = order_factory(order_parameters=order_parameters_factory(p3yc=["Yes"]))
     customer_data = get_customer_data(order)
 
-    has_error, order = validate_3yc(order, customer_data)
+    context = Context(
+        order=order,
+        customer_data=customer_data,
+    )
 
-    assert has_error is True
-    assert order["error"]["id"] == "VIPMV008"
+    step = ValidateCustomerData()
+    step.validate_3yc(context)
+
+    assert context.validation_succeeded is False
+    assert context.order["error"]["id"] == "VIPMV008"
 
 
-def test_validate_duplicate_lines(order_factory, lines_factory):
-    order = order_factory(lines=lines_factory() + lines_factory())
+@pytest.mark.parametrize(
+    "segment",
+    [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
+)
+def test_update_prices_step(mocker, order_factory, adobe_order_factory, segment):
+    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
+    mocker.patch(
+        "adobe_vipm.flows.validation.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    order = order_factory()
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.validation.purchase.get_prices_for_skus",
+        return_value={"65304578CA01A12": 7892.11},
+    )
 
-    has_error, order = validate_duplicate_lines(order)
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
 
-    assert has_error is True
-    assert order["error"]["id"] == "VIPMV009"
+    context = Context(
+        order=order,
+        authorization_id="auth-id",
+        market_segment=segment,
+        product_id="PRD-1234",
+        currency="EUR",
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.validation_succeeded is True
+    assert context.order["lines"][0]["price"]["unitPP"] == 7892.11
+    mocked_adobe_client.create_preview_order.assert_called_once_with(
+        context.authorization_id,
+        FAKE_CUSTOMERS_IDS[segment],
+        context.order,
+        context.order["lines"],
+    )
+    mocked_get_prices_for_skus.assert_called_once_with(
+        context.product_id,
+        context.currency,
+        [adobe_preview_order["lineItems"][0]["offerId"]],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_prices_step_no_lines(mocker, order_factory):
+    mocked_adobe_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.validation.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    order = order_factory()
+    order["lines"] = []
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        authorization_id="auth-id",
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.validation_succeeded is True
+    mocked_adobe_client.create_preview_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_prices_step_api_error(mocker, order_factory, adobe_api_error_factory):
+    error = AdobeAPIError(400, adobe_api_error_factory("9999", "unexpected"))
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.side_effect = error
+    mocker.patch(
+        "adobe_vipm.flows.validation.purchase.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    order = order_factory()
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        authorization_id="auth-id",
+        market_segment=MARKET_SEGMENT_COMMERCIAL,
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details=str(error))
+    mocked_next_step.assert_not_called()
+
+
+def test_check_purchase_validation_enabled_step(mocker, order_factory):
+    order = order_factory()
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order)
+
+    step = CheckPurchaseValidationEnabled()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+def test_check_purchase_validation_enabled_step_disabled(mocker, order_factory):
+    order = order_factory()
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.validation.purchase.is_purchase_validation_enabled",
+        return_value=False,
+    )
+
+    context = Context(order=order)
+
+    step = CheckPurchaseValidationEnabled()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_purchase_order(mocker):
+    """Tests the validate order entrypoint function when it validates."""
+
+    mocked_pipeline_instance = mocker.MagicMock()
+
+    mocked_pipeline_ctor = mocker.patch(
+        "adobe_vipm.flows.validation.purchase.Pipeline",
+        return_value=mocked_pipeline_instance,
+    )
+    mocked_context = mocker.MagicMock()
+    mocked_context_ctor = mocker.patch(
+        "adobe_vipm.flows.validation.purchase.Context", return_value=mocked_context
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_order = mocker.MagicMock()
+
+    validate_purchase_order(mocked_client, mocked_order)
+
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 6
+
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], PrepareCustomerData)
+    assert isinstance(
+        mocked_pipeline_ctor.mock_calls[0].args[2], CheckPurchaseValidationEnabled
+    )
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], ValidateCustomerData)
+    assert isinstance(
+        mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDuplicateLines
+    )
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], UpdatePrices)
+
+    mocked_context_ctor.assert_called_once_with(order=mocked_order)
+    mocked_pipeline_instance.run.assert_called_once_with(
+        mocked_client,
+        mocked_context,
+    )
