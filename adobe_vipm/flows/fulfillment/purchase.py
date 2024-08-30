@@ -44,7 +44,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
-from adobe_vipm.flows.helpers import SetupContext, prepare_customer_data
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
 from adobe_vipm.flows.mpt import update_agreement, update_order
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
@@ -219,8 +219,7 @@ class CreateCustomer(Step):
 
         adobe_client = get_adobe_client()
         try:
-            context.order, customer_data = prepare_customer_data(client, context.order)
-            if not customer_data.get("contact"):
+            if not context.customer_data.get("contact"):
                 param = get_ordering_parameter(context.order, PARAM_CONTACT)
                 context.order = set_ordering_parameter_error(
                     context.order,
@@ -238,7 +237,7 @@ class CreateCustomer(Step):
                 context.seller_id,
                 context.agreement_id,
                 context.market_segment,
-                customer_data,
+                context.customer_data,
             )
             context.adobe_customer_id = customer["customerId"]
             context.adobe_customer = customer
@@ -260,6 +259,7 @@ def fulfill_purchase_order(client, order):
         ValidateDuplicateLines(),
         ValidateMarketSegmentEligibility(),
         StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
+        PrepareCustomerData(),
         CreateCustomer(),
         SubmitNewOrder(),
         CreateOrUpdateSubscriptions(),

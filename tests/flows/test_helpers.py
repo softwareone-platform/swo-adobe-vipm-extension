@@ -1,37 +1,19 @@
-from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
+import copy
+
+from adobe_vipm.flows.constants import (
+    PARAM_ADDRESS,
+    PARAM_COMPANY_NAME,
+    PARAM_CONTACT,
+)
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import (
+    PrepareCustomerData,
     SetupContext,
-    update_purchase_prices,
 )
+from adobe_vipm.flows.utils import get_customer_data
 
 
-def test_update_purchase_price(
-    mocker,
-    order_factory,
-    adobe_order_factory,
-):
-    """
-    Tests the update of unit purchase price based on sku with discount level
-    returned in the adobe preview order looking at the pricelist.
-    """
-    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    order = order_factory()
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={"65304578CA01A12": 7892.11},
-    )
-    updated_order = update_purchase_prices(
-        mocked_adobe_client,
-        order,
-    )
-
-    assert updated_order["lines"][0]["price"]["unitPP"] == 7892.11
-
-
-def test_initialize_step(
+def test_setup_context_step(
     mocker, agreement, order_factory, lines_factory, fulfillment_parameters_factory
 ):
     """
@@ -92,7 +74,7 @@ def test_initialize_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_initialize_step_with_adobe_customer_and_order_id(
+def test_setup_context_step_with_adobe_customer_and_order_id(
     mocker,
     agreement,
     order_factory,
@@ -151,5 +133,124 @@ def test_initialize_step_with_adobe_customer_and_order_id(
     mocked_get_licensee.assert_called_once_with(
         mocked_client,
         order["agreement"]["licensee"]["id"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_prepare_customer_data_step(mocker, order_factory, customer_data):
+    order = order_factory()
+
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order, customer_data=customer_data)
+
+    step = PrepareCustomerData()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_update_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_prepare_customer_data_step_no_company_name(
+    mocker, order_factory, customer_data
+):
+    order = order_factory()
+
+    no_company_customer_data = copy.copy(customer_data)
+    del no_company_customer_data[PARAM_COMPANY_NAME]
+
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order, customer_data=no_company_customer_data)
+
+    step = PrepareCustomerData()
+    step(mocked_client, context, mocked_next_step)
+
+    assert get_customer_data(context.order) == context.customer_data
+    assert (
+        context.customer_data[PARAM_COMPANY_NAME]
+        == context.order["agreement"]["licensee"]["name"]
+    )
+
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order,
+        parameters=context.order["parameters"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_data):
+    order = order_factory()
+
+    no_address_customer_data = copy.copy(customer_data)
+    del no_address_customer_data[PARAM_ADDRESS]
+
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order, customer_data=no_address_customer_data)
+
+    step = PrepareCustomerData()
+    step(mocked_client, context, mocked_next_step)
+
+    assert get_customer_data(context.order) == context.customer_data
+    assert context.customer_data[PARAM_ADDRESS] == {
+        "country": context.order["agreement"]["licensee"]["address"]["country"],
+        "state": context.order["agreement"]["licensee"]["address"]["state"],
+        "city": context.order["agreement"]["licensee"]["address"]["city"],
+        "addressLine1": context.order["agreement"]["licensee"]["address"][
+            "addressLine1"
+        ],
+        "addressLine2": context.order["agreement"]["licensee"]["address"].get(
+            "addressLine2"
+        ),
+        "postCode": context.order["agreement"]["licensee"]["address"]["postCode"],
+    }
+
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order,
+        parameters=context.order["parameters"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_data):
+    order = order_factory()
+
+    no_contact_customer_data = copy.copy(customer_data)
+    del no_contact_customer_data[PARAM_CONTACT]
+
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order, customer_data=no_contact_customer_data)
+
+    step = PrepareCustomerData()
+    step(mocked_client, context, mocked_next_step)
+
+    assert get_customer_data(context.order) == context.customer_data
+    assert context.customer_data[PARAM_CONTACT] == {
+        "firstName": context.order["agreement"]["licensee"]["contact"]["firstName"],
+        "lastName": context.order["agreement"]["licensee"]["contact"]["lastName"],
+        "email": context.order["agreement"]["licensee"]["contact"]["email"],
+        "phone": context.order["agreement"]["licensee"]["contact"].get("phone"),
+    }
+
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order,
+        parameters=context.order["parameters"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
