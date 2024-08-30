@@ -3,53 +3,11 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.validation.change import (
     ValidateDownsizes,
-    ValidateDuplicateLines,
     validate_change_order,
 )
-
-
-def test_validate_duplicate_lines_step(mocker, order_factory, lines_factory):
-    order = order_factory(lines=lines_factory() + lines_factory())
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(order=order)
-
-    step = ValidateDuplicateLines()
-    step(mocked_client, context, mocked_next_step)
-
-    assert context.validation_succeeded is False
-    assert context.order["error"]["id"] == "VIPMV009"
-    mocked_next_step.assert_not_called()
-
-
-def test_validate_existing_lines(mocker, order_factory, lines_factory):
-    order = order_factory(lines=lines_factory(line_id=2, item_id=10))
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(order=order)
-
-    step = ValidateDuplicateLines()
-    step(mocked_client, context, mocked_next_step)
-
-    assert context.validation_succeeded is False
-    assert context.order["error"]["id"] == "VIPMV010"
-    mocked_next_step.assert_not_called()
-
-
-def test_validate_no_duplicates_or_existing(mocker, order_factory):
-    order = order_factory()
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(order=order)
-
-    step = ValidateDuplicateLines()
-    step(mocked_client, context, mocked_next_step)
-
-    assert context.validation_succeeded is True
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+from adobe_vipm.flows.validation.shared import (
+    ValidateDuplicateLines,
+)
 
 
 def test_validate_downsizes_step(
