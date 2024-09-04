@@ -348,7 +348,7 @@ def test_get_product_items_by_skus(mpt_client, requests_mocker):
     rql_query = (
         f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
     )
-    url = f"items?{rql_query}"
+    url = f"catalog/items?{rql_query}"
     page1_url = f"{url}&limit=10&offset=0"
     page2_url = f"{url}&limit=10&offset=10"
     data = [{"id": f"ITM-{idx}"} for idx in range(13)]
@@ -394,7 +394,7 @@ def test_get_product_items_by_skus_error(
     rql_query = (
         f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
     )
-    url = f"items?{rql_query}&limit=10&offset=0"
+    url = f"catalog/items?{rql_query}&limit=10&offset=0"
 
     requests_mocker.get(
         urljoin(mpt_client.base_url, url),
@@ -456,7 +456,7 @@ def test_get_product_template_or_default(mpt_client, requests_mocker, name):
     if name:
         name_or_default_filter = f"or({name_or_default_filter},eq(name,{name}))"
     rql_filter = f"and(eq(type,OrderProcessing),{name_or_default_filter})"
-    url = f"/v1/products/PRD-1111/templates?{rql_filter}&order=default&limit=1"
+    url = f"catalog/products/PRD-1111/templates?{rql_filter}&order=default&limit=1"
     requests_mocker.get(
         urljoin(
             mpt_client.base_url,
@@ -868,7 +868,7 @@ def test_get_product_onetime_items_by_ids(mpt_client, requests_mocker):
         f"and(eq(product.id,{product_id}),"
         f"in(id,({','.join(ids)})),eq(terms.period,one-time))"
     )
-    url = f"items?{rql_query}"
+    url = f"catalog/items?{rql_query}"
     page1_url = f"{url}&limit=10&offset=0"
     page2_url = f"{url}&limit=10&offset=10"
     data = [{"id": f"ITM-{idx}"} for idx in range(13)]
@@ -911,7 +911,7 @@ def test_get_product_onetime_items_by_ids_error(
         f"and(eq(product.id,{product_id}),"
         f"in(id,({','.join(ids)})),eq(terms.period,OneTime))"
     )
-    url = f"items?{rql_query}&limit=10&offset=0"
+    url = f"catalog/items?{rql_query}&limit=10&offset=0"
 
     requests_mocker.get(
         urljoin(mpt_client.base_url, url),

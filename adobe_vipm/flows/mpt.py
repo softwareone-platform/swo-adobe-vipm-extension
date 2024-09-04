@@ -142,7 +142,7 @@ def get_product_items_by_skus(mpt_client, product_id, skus):
     rql_query = (
         f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
     )
-    url = f"/items?{rql_query}"
+    url = f"/catalog/items?{rql_query}"
     page = None
     limit = 10
     offset = 0
@@ -171,7 +171,7 @@ def get_product_template_or_default(mpt_client, product_id, status, name=None):
     if name:
         name_or_default_filter = f"or({name_or_default_filter},eq(name,{name}))"
     rql_filter = f"and(eq(type,Order{status}),{name_or_default_filter})"
-    url = f"/products/{product_id}/templates?{rql_filter}&order=default&limit=1"
+    url = f"/catalog/products/{product_id}/templates?{rql_filter}&order=default&limit=1"
     response = mpt_client.get(url)
     response.raise_for_status()
     templates = response.json()
@@ -382,7 +382,7 @@ def get_product_onetime_items_by_ids(mpt_client, product_id, item_ids):
     product_cond = f"eq(product.id,{product_id})"
     items_cond = f"in(id,({','.join(item_ids)}))"
     rql_query = f"and({product_cond},{items_cond},eq(terms.period,one-time))"
-    url = f"/items?{rql_query}"
+    url = f"/catalog/items?{rql_query}"
     page = None
     limit = 10
     offset = 0
