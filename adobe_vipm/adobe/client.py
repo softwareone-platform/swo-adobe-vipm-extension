@@ -224,6 +224,7 @@ class AdobeClient:
         customer_id: str,
         sku: str,
         customer_coterm_date: str,
+        return_orders: list | None = None,
     ):
         start_date = date.today() - timedelta(days=CANCELLATION_WINDOW_DAYS)
 
@@ -235,6 +236,11 @@ class AdobeClient:
             ).isoformat()
 
         }
+
+        returning_order_ids = [
+            order["referenceOrderId"] for order in (return_orders or [])
+        ]
+
         orders = self.get_orders(
             authorization_id,
             customer_id,
@@ -243,11 +249,16 @@ class AdobeClient:
 
         result = []
         for order in orders:
-            if order["status"] != STATUS_PROCESSED:
-                continue
-
             item = get_item_by_partial_sku(order["lineItems"], sku)
-            if item and item["status"] == STATUS_PROCESSED:
+            if not item:
+                continue
+            if (
+                order["orderId"] in returning_order_ids
+                or (
+                    order["status"] == STATUS_PROCESSED and
+                    item["status"] == STATUS_PROCESSED
+                )
+            ):
                 result.append(
                     ReturnableOrderInfo(
                         order=order,
