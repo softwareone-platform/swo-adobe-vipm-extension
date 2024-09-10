@@ -57,6 +57,7 @@ class GetReturnableOrders(Step):
                 context.adobe_customer_id,
                 sku,
                 context.adobe_customer["cotermDate"],
+                return_orders=context.adobe_return_orders.get(sku),
             )
             returnable_orders_count += len(returnable_orders)
             returnable_by_quantity = {}
@@ -163,8 +164,8 @@ def fulfill_change_order(client, order):
         SetOrUpdateCotermNextSyncDates(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         ValidateRenewalWindow(),
-        GetReturnableOrders(),
         GetReturnOrders(),
+        GetReturnableOrders(),
         ValidateReturnableOrders(),
         SubmitReturnOrders(),
         SubmitNewOrder(),

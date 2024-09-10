@@ -1,3 +1,5 @@
+import pytest
+
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.constants import (
     TEMPLATE_NAME_CHANGE,
@@ -26,6 +28,13 @@ from adobe_vipm.flows.fulfillment.shared import (
 from adobe_vipm.flows.helpers import SetupContext
 
 
+@pytest.mark.parametrize(
+    "return_orders",
+    [
+        None,
+        [{"orderId": "a"}, {"orderId": "b"}],
+    ],
+)
 def test_get_returnable_orders_step(
     mocker,
     order_factory,
@@ -33,6 +42,7 @@ def test_get_returnable_orders_step(
     adobe_customer_factory,
     adobe_order_factory,
     adobe_items_factory,
+    return_orders,
 ):
     """
     Tests the computation of the map of returnable orders by sku/quantity.
@@ -95,6 +105,7 @@ def test_get_returnable_orders_step(
         downsize_lines=order["lines"],
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
+        adobe_return_orders={sku: return_orders},
     )
 
     step = GetReturnableOrders()
@@ -106,6 +117,7 @@ def test_get_returnable_orders_step(
         context.adobe_customer_id,
         sku,
         context.adobe_customer["cotermDate"],
+        return_orders=return_orders,
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -181,6 +193,7 @@ def test_get_returnable_orders_step_quantity_mismatch(
         downsize_lines=order["lines"],
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
+        adobe_return_orders={},
     )
 
     step = GetReturnableOrders()
@@ -192,6 +205,7 @@ def test_get_returnable_orders_step_quantity_mismatch(
         context.adobe_customer_id,
         sku,
         context.adobe_customer["cotermDate"],
+        return_orders=None,
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -389,8 +403,8 @@ def test_fulfill_change_order(mocker):
         mocked_pipeline_ctor.mock_calls[0].args[4].template_name == TEMPLATE_NAME_CHANGE
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], ValidateRenewalWindow)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnableOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetReturnableOrders)
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[8], ValidateReturnableOrders
     )
