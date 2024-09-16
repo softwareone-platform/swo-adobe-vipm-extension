@@ -91,6 +91,57 @@ def test_validate_downsizes_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+
+
+def test_validate_downsizes_step_no_returnable_orders(
+    mocker,
+    order_factory,
+    lines_factory,
+    adobe_customer_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+    order = order_factory(
+        lines=lines_factory(
+            quantity=7,
+            old_quantity=14,
+        )
+    )
+    adobe_customer = adobe_customer_factory()
+    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
+
+    mocker.patch(
+        "adobe_vipm.flows.validation.change.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+        adobe_customer_id=adobe_customer["customerId"],
+        adobe_customer=adobe_customer,
+    )
+
+    step = ValidateDownsizes()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.validation_succeeded is True
+    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        sku,
+        context.adobe_customer["cotermDate"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+
 def test_validate_downsizes_step_invalid_quantity(
     mocker,
     order_factory,
@@ -175,7 +226,7 @@ def test_validate_downsizes_step_invalid_quantity(
     assert context.order["error"] == {
         "id": "VIPMV013",
         "message": (
-            "Invalid downsize quantities: Cannot reduce item "
+            "Could not find suitable returnable orders for all items. Cannot reduce item "
             "`Awesome product` quantity by 9. Please reduce the quantity "
             "by 1, 2, 4, or any combination of these values, or wait until 2024-05-26 "
             "when there are no returnable "
@@ -269,7 +320,7 @@ def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
     assert context.order["error"] == {
         "id": "VIPMV013",
         "message": (
-            "Invalid downsize quantities: Cannot reduce item "
+            "Could not find suitable returnable orders for all items. Cannot reduce item "
             "`Awesome product` quantity by 9. Please reduce the quantity "
             "by 1, 2, 4, or any combination of these values, or wait until 2024-05-25 "
             "when there are no returnable "
