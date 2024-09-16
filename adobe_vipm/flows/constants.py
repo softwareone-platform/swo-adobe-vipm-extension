@@ -187,11 +187,16 @@ FAKE_CUSTOMERS_IDS = {
 }
 
 ERR_INVALID_DOWNSIZE_QUANTITY =  ValidationError(
-    "VIPMV013", "Invalid downsize quantities: {messages}"
+    "VIPMV013", "Could not find suitable returnable orders for all items. {messages}"
 )
 
-
 ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = " or any combination of these values,"
+
+ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
+    "Cannot reduce item `{item}` quantity by {delta}. "
+    "Please reduce the quantity by {available_quantities},{any_combination} or wait until {date} "
+    "when there are no returnable orders to modify your renewal quantity."
+)
 
 ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
     "Cannot reduce item `{item}` quantity by {delta}. "
