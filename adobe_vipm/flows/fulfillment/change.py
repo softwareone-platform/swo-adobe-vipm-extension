@@ -59,6 +59,9 @@ class GetReturnableOrders(Step):
                 context.adobe_customer["cotermDate"],
                 return_orders=context.adobe_return_orders.get(sku),
             )
+            if not returnable_orders:
+                logger.info(f"{context}: no returnable orders found for sku {sku}")
+                continue
             returnable_orders_count += len(returnable_orders)
             returnable_by_quantity = {}
             for r in range(len(returnable_orders), 0, -1):
