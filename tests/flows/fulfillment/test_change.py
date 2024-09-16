@@ -122,6 +122,61 @@ def test_get_returnable_orders_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_get_returnable_orders_step_no_returnable_order(
+    mocker,
+    order_factory,
+    lines_factory,
+    adobe_customer_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+    """
+    Tests the computation of the map of returnable orders by sku/quantity
+    when no returnable orders are found for a given sku.
+    """
+    order = order_factory(
+        lines=lines_factory(
+            quantity=3,
+            old_quantity=7,
+        )
+    )
+    adobe_customer = adobe_customer_factory()
+
+    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+        adobe_customer_id=adobe_customer["customerId"],
+        adobe_customer=adobe_customer,
+        adobe_return_orders={sku: []},
+    )
+
+    step = GetReturnableOrders()
+    step(mocked_client, context, mocked_next_step)
+
+    assert sku not in context.adobe_returnable_orders
+    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        sku,
+        context.adobe_customer["cotermDate"],
+        return_orders=[],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
 def test_get_returnable_orders_step_quantity_mismatch(
     mocker,
     order_factory,
