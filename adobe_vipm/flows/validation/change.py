@@ -34,6 +34,9 @@ class ValidateDownsizes(Step):
                 sku,
                 context.adobe_customer["cotermDate"],
             )
+            if not returnable_orders:
+                continue
+
             returnable_by_quantity = {}
             for r in range(len(returnable_orders), 0, -1):
                 for sub in itertools.combinations(returnable_orders, r):
