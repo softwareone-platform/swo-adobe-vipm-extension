@@ -29,11 +29,11 @@ from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_order_line_by_sku,
     get_ordering_parameter,
-    get_partial_sku,
     get_transfer_item_sku_by_subscription,
     is_transferring_item_expired,
     set_ordering_parameter_error,
 )
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 

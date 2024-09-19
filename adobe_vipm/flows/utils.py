@@ -1,6 +1,6 @@
 import copy
 import functools
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import phonenumbers
 import regex as re
@@ -13,9 +13,7 @@ from adobe_vipm.adobe.constants import (
     OFFER_TYPE_LICENSE,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
 )
-from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import (
-    CANCELLATION_WINDOW_DAYS,
     NEW_CUSTOMER_PARAMETERS,
     OPTIONAL_CUSTOMER_ORDER_PARAMS,
     ORDER_TYPE_CHANGE,
@@ -43,7 +41,6 @@ from adobe_vipm.flows.constants import (
     REQUIRED_CUSTOMER_ORDER_PARAMS,
     STATUS_MARKET_SEGMENT_PENDING,
 )
-from adobe_vipm.flows.dataclasses import ItemGroups
 from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import find_first
 
@@ -171,6 +168,13 @@ def set_next_sync(order, next_sync):
     return updated_order
 
 
+def get_next_sync(order):
+    return get_fulfillment_parameter(
+        order,
+        PARAM_NEXT_SYNC_DATE,
+    ).get("value")
+
+
 def get_adobe_order_id(order):
     """
     Retrieve the Adobe order identifier from the order vendor external id.
@@ -296,25 +300,6 @@ def reset_ordering_parameters_error(order):
     return updated_order
 
 
-def get_order_line(order, line_id):
-    """
-    Returns an order line object by the line identifier
-    or None if not found.
-
-    Args:
-        order (dict): The order from which the line
-        must be retrieved.
-        line_id (str): The idetifier of the line.
-
-    Returns:
-        dict: The line object or None if not found.
-    """
-    return find_first(
-        lambda line: line_id == to_adobe_line_id(line["id"]),
-        order["lines"],
-    )
-
-
 def get_order_line_by_sku(order, sku):
     """
     Returns an order line object by sku or None if not found.
@@ -437,124 +422,21 @@ def get_adobe_subscription_id(subscription):
     return subscription.get("externalIds", {}).get("vendor")
 
 
-def in_cancellation_window(order, line):
+def split_downsizes_and_upsizes(order):
     """
-    Checks if the creation date of a subscription item
-    is within the cancellation window.
+    Returns a tuple where the first element
+    is a list of items to downsize and the second
+    a list of items to upsize.
 
     Args:
-        order (dict): The change order is being processed.
-        line (dict): the order line that should be checked.
+        order (dict): The order which lines must be splitted.
 
     Returns:
-        bool: True is the subscription items is within the
-        cancellation window or the subscription does not exist
-        (purchase cases), False otherwise.
+        tuple: (downsizes, upsizes)
     """
-    subscription = get_subscription_by_line_and_item_id(
-        order["subscriptions"],
-        line["item"]["id"],
-        line["id"],
-    )
-    if not subscription:
-        return True
-
-    creation_date = datetime.fromisoformat(subscription["startDate"])
-    delta = datetime.now(UTC) - creation_date
-    return delta.days < CANCELLATION_WINDOW_DAYS
-
-
-def is_migrated_customer(source):
-    param = get_ordering_parameter(
-        source,
-        PARAM_AGREEMENT_TYPE,
-    )
-    return param.get("value") == "Migrate"
-
-
-def group_items_by_type(order):
-    """
-    Grups the items of a change order in the following groups:
-
-    - upsizing_items_in_window: item bought within the
-      cancellation window which quantity have been increased
-    - upsizing_items_out_window: item bought outside the
-      cancellation window which have been quantity increased
-    - downsizing_items_in_window: item bought within the
-      cancellation window which quantity have been descreased
-    - downsizing_items_out_window: item bought outside the
-      cancellation window which have been quantity descreased
-    Args:
-        order (dict): the change order is being processed.
-
-    Returns:
-        ItemGroups: a data class with the three item groups.
-    """
-    if not is_migrated_customer(order):
-        upsizing_items_in_window = filter(
-            lambda line: line["quantity"] > line["oldQuantity"]
-            and in_cancellation_window(order, line),
-            order["lines"],
-        )
-        upsizing_items_out_window = filter(
-            lambda line: line["quantity"] > line["oldQuantity"]
-            and not in_cancellation_window(order, line),
-            order["lines"],
-        )
-        downsizing_items_in_window = filter(
-            lambda line: line["quantity"] < line["oldQuantity"]
-            and in_cancellation_window(order, line),
-            order["lines"],
-        )
-        downsizing_items_out_window = filter(
-            lambda line: line["quantity"] < line["oldQuantity"]
-            and not in_cancellation_window(order, line),
-            order["lines"],
-        )
-        return ItemGroups(
-            upsizing_in_win=list(upsizing_items_in_window),
-            upsizing_out_win_or_migrated=list(upsizing_items_out_window),
-            downsizing_in_win=list(downsizing_items_in_window),
-            downsizing_out_win_or_migrated=list(downsizing_items_out_window),
-        )
-    else:
-        upsizing_migrated = filter(
-            lambda line: line["quantity"] > line["oldQuantity"]
-            and line["oldQuantity"] > 0,
-            order["lines"],
-        )
-        downsizing_migrated = filter(
-            lambda line: line["quantity"] < line["oldQuantity"],
-            order["lines"],
-        )
-        new_purchases = filter(
-            lambda line: line["quantity"] > line["oldQuantity"]
-            and line["oldQuantity"] == 0,
-            order["lines"],
-        )
-        return ItemGroups(
-            upsizing_in_win=list(new_purchases),
-            upsizing_out_win_or_migrated=list(upsizing_migrated),
-            downsizing_in_win=[],
-            downsizing_out_win_or_migrated=list(downsizing_migrated),
-        )
-
-
-def get_adobe_line_item_by_subscription_id(line_items, subscription_id):
-    """
-    Get the line item from an Adobe order which subscription id match the
-    one given as an argument.
-
-    Args:
-        line_items (list): List of order line items.
-        subscription_id (str): Identifier of the subscription to search.
-
-    Returns:
-        dict: the line item corresponding to the given subscription id.
-    """
-    return find_first(
-        lambda item: item["subscriptionId"] == subscription_id,
-        line_items,
+    return (
+        list(filter(lambda line: line["quantity"] < line["oldQuantity"], order["lines"])),
+        list(filter(lambda line: line["quantity"] > line["oldQuantity"], order["lines"])),
     )
 
 
@@ -744,10 +626,6 @@ def is_transferring_item_expired(item):
     return date.today() > renewal_date
 
 
-def get_partial_sku(full_sku):
-    return full_sku[:10]
-
-
 def get_transfer_item_sku_by_subscription(trf, sub_id):
     item = find_first(
         lambda x: x["subscriptionId"] == sub_id,
@@ -813,6 +691,29 @@ def get_coterm_date(order):
 
 
 def is_renewal_window_open(order):
+    if not get_coterm_date(order):
+        return False
     coterm_date = datetime.fromisoformat(get_coterm_date(order)).date()
     today = date.today()
     return coterm_date - timedelta(days=4) <= today <= coterm_date
+
+
+def map_returnable_to_return_orders(returnable_orders, return_orders):
+    mapped = []
+    def filter_by_reference_order(reference_order_id, item):
+        return item["referenceOrderId"] == reference_order_id
+
+    for returnable_order in returnable_orders:
+        return_order = find_first(
+            functools.partial(filter_by_reference_order, returnable_order.order["orderId"]),
+            return_orders,
+        )
+        mapped.append((returnable_order, return_order))
+
+    return mapped
+
+
+def set_template(order, template):
+    updated_order = copy.deepcopy(order)
+    updated_order["template"] = template
+    return updated_order

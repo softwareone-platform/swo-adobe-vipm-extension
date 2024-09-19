@@ -3,59 +3,82 @@ This module contains the logic to implement the termination fulfillment flow.
 It exposes a single function that is the entrypoint for termination order
 processing.
 """
+import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.flows.constants import TEMPLATE_NAME_DELAYED, TEMPLATE_NAME_TERMINATION
+from adobe_vipm.flows.constants import TEMPLATE_NAME_TERMINATION
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    check_processing_template,
-    handle_return_orders,
-    set_customer_coterm_date_if_null,
-    switch_order_to_completed,
+    CompleteOrder,
+    GetReturnOrders,
+    IncrementAttemptsCounter,
+    SetOrUpdateCotermNextSyncDates,
+    StartOrderProcessing,
+    SubmitReturnOrders,
+    ValidateRenewalWindow,
 )
+from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
-    get_adobe_customer_id,
     get_adobe_subscription_id,
     get_subscription_by_line_and_item_id,
-    group_items_by_type,
-    is_renewal_window_open,
 )
 
+logger = logging.getLogger(__name__)
 
-def _terminate_out_of_win_or_migrated_subscriptions(customer_id, order, lines):
+class GetReturnableOrders(Step):
     """
-    Switch off auto renewal for subscriptions that have to be cancelled but that
-    have been more that X days before the termination order (outside cancellation window).
-
-    Args:
-        customer_id (str): The id used in Adobe to identify the customer attached
-        to this MPT order.
-        order (dct): The MPT order from which the Adobe order has been derived.
-        lines (list): The MPT order lines that have to process.
+    For each SKU retrieve all the orders that can be returned.
     """
-    adobe_client = get_adobe_client()
-    authorization_id = order["authorization"]["id"]
-    for line in lines:
-        subcription = get_subscription_by_line_and_item_id(
-            order["subscriptions"],
-            line["item"]["id"],
-            line["id"],
-        )
-        adobe_sub_id = get_adobe_subscription_id(subcription)
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id,
-            customer_id,
-            adobe_sub_id,
-        )
-        if adobe_subscription["autoRenewal"]["enabled"]:
-            adobe_client.update_subscription(
-                authorization_id,
-                customer_id,
-                adobe_sub_id,
-                auto_renewal=False,
+    def __call__(self, client, context, next_step):
+        adobe_client = get_adobe_client()
+        for line in context.downsize_lines:
+            sku = line["item"]["externalIds"]["vendor"]
+            context.adobe_returnable_orders[sku] = adobe_client.get_returnable_orders_by_sku(
+                context.authorization_id,
+                context.adobe_customer_id,
+                sku,
+                context.adobe_customer["cotermDate"],
             )
+        returnable_orders_count = sum(len(v) for v in context.adobe_returnable_orders.values())
+        logger.info(f"{context}: found {returnable_orders_count} returnable orders.")
+        next_step(client, context)
 
 
-def fulfill_termination_order(mpt_client, order):
+class SwitchAutoRenewalOff(Step):
+    """
+    Set the autoRenewal flag to False for
+    subscription that must be cancelled.
+    """
+    def __call__(self, client, context, next_step):
+        adobe_client = get_adobe_client()
+        for line in context.downsize_lines:
+            subcription = get_subscription_by_line_and_item_id(
+                context.order["subscriptions"],
+                line["item"]["id"],
+                line["id"],
+            )
+            adobe_sub_id = get_adobe_subscription_id(subcription)
+            adobe_subscription = adobe_client.get_subscription(
+                context.authorization_id,
+                context.adobe_customer_id,
+                adobe_sub_id,
+            )
+            if adobe_subscription["autoRenewal"]["enabled"]:
+                adobe_client.update_subscription(
+                    context.authorization_id,
+                    context.adobe_customer_id,
+                    adobe_sub_id,
+                    auto_renewal=False,
+                )
+                logger.info(
+                    f"{context}: autorenewal switched off for {subcription['id']} "
+                    f"({adobe_subscription['subscriptionId']})"
+                )
+        next_step(client, context)
+
+
+def fulfill_termination_order(client, order):
     """
     Fulfills a termination order with Adobe.
     Adobe allow to terminate a subscription with a cancellation window
@@ -67,36 +90,18 @@ def fulfill_termination_order(mpt_client, order):
         mpt_client (MPTClient):  an instance of the Marketplace platform client.
         order (dct): The MPT termination order.
     """
-    adobe_client = get_adobe_client()
 
-    order = set_customer_coterm_date_if_null(mpt_client, adobe_client, order)
-    if is_renewal_window_open(order):
-        check_processing_template(mpt_client, order, TEMPLATE_NAME_DELAYED)
-        return
-    check_processing_template(mpt_client, order, TEMPLATE_NAME_TERMINATION)
-
-    customer_id = get_adobe_customer_id(order)
-
-    grouped_items = group_items_by_type(order)
-    if grouped_items.downsizing_out_win_or_migrated:
-        _terminate_out_of_win_or_migrated_subscriptions(
-            customer_id, order, grouped_items.downsizing_out_win_or_migrated
-        )
-
-    has_orders_to_return = bool(
-        grouped_items.upsizing_in_win + grouped_items.downsizing_in_win
+    pipeline = Pipeline(
+        SetupContext(),
+        IncrementAttemptsCounter(),
+        SetOrUpdateCotermNextSyncDates(),
+        StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
+        ValidateRenewalWindow(),
+        GetReturnableOrders(),
+        GetReturnOrders(),
+        SubmitReturnOrders(),
+        SwitchAutoRenewalOff(),
+        CompleteOrder(TEMPLATE_NAME_TERMINATION),
     )
-    if not has_orders_to_return:
-        switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TERMINATION)
-        return
-
-    completed_return_orders, order = handle_return_orders(
-        mpt_client,
-        adobe_client,
-        customer_id,
-        order,
-        grouped_items.upsizing_in_win + grouped_items.downsizing_in_win,
-    )
-
-    if completed_return_orders:
-        switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TERMINATION)
+    context = Context(order=order)
+    pipeline.run(client, context)

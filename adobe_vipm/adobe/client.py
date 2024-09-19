@@ -1,22 +1,24 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import date, datetime, timedelta
 from hashlib import sha256
-from typing import List, MutableMapping, Tuple
-from urllib.parse import urlencode, urljoin
+from typing import MutableMapping
+from urllib.parse import urljoin
 from uuid import uuid4
 
 import requests
 
 from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.constants import (
+    CANCELLATION_WINDOW_DAYS,
     OFFER_TYPE_CONSUMABLES,
     OFFER_TYPE_LICENSE,
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_PREVIEW_RENEWAL,
+    ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
-    STATUS_ORDER_CANCELLED,
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
@@ -25,14 +27,15 @@ from adobe_vipm.adobe.dataclasses import (
     APIToken,
     Authorization,
     Reseller,
+    ReturnableOrderInfo,
 )
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.adobe.utils import (
-    get_actual_sku,
-    get_item_to_return,
+    get_item_by_partial_sku,
     join_phone_number,
     to_adobe_line_id,
 )
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -215,107 +218,97 @@ class AdobeClient:
         )
         return created_customer
 
-    @wrap_http_error
-    def search_new_and_returned_orders_by_sku_line_number(
+    def get_returnable_orders_by_sku(
         self,
         authorization_id: str,
         customer_id: str,
         sku: str,
-        mpt_line_id: str,
-    ) -> List[Tuple[dict, dict, dict | None]]:
-        """
-        Search all the NEW orders placed by the customer identified by `customer_id`
-        for a a given `sku` and `line_number` and the corresponding RETURN order
-        if it exists.
+        customer_coterm_date: str,
+        return_orders: list | None = None,
+    ):
+        start_date = date.today() - timedelta(days=CANCELLATION_WINDOW_DAYS)
 
-        Args:
-            authorization_id (str): Id of the authorization to use.
-            customer_id (str): Identifier of the customer that placed the order.
-            sku (str): The SKU to search for.
-            mpt_line_id (str): the Marketplace line ID.
+        filters = {
+            "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
+            "start-date": start_date.isoformat(),
+            "end-date": (
+                date.fromisoformat(customer_coterm_date) - timedelta(days=15)
+            ).isoformat()
 
-        Returns:
-            list: Return a list of three values tuple with the NEW order the item identified
-            by the pair sku, line_number and the RETURN order if it exists or None.
-        """
+        }
+
+        returning_order_ids = [
+            order["referenceOrderId"] for order in (return_orders or [])
+        ]
+
+        orders = self.get_orders(
+            authorization_id,
+            customer_id,
+            filters=filters,
+        )
+
+        result = []
+        for order in orders:
+            item = get_item_by_partial_sku(order["lineItems"], sku)
+            if not item:
+                continue
+            if (
+                order["orderId"] in returning_order_ids
+                or (
+                    order["status"] == STATUS_PROCESSED and
+                    item["status"] == STATUS_PROCESSED
+                )
+            ):
+                result.append(
+                    ReturnableOrderInfo(
+                        order=order,
+                        line=item,
+                        quantity=item["quantity"],
+                    )
+                )
+
+        return result
+
+    def get_return_orders_by_external_reference(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        external_reference: str,
+    ):
+        orders = self.get_orders(
+            authorization_id,
+            customer_id,
+            filters={
+                "order-type": ORDER_TYPE_RETURN,
+                "status": [STATUS_PROCESSED, STATUS_PENDING],
+            },
+        )
+        results = defaultdict(list)
+        for order in orders:
+            if not order["externalReferenceId"].startswith(external_reference):
+                continue
+            for item in order["lineItems"]:
+                results[get_partial_sku(item["offerId"])].append(order)
+        return results
+
+    @wrap_http_error
+    def get_orders(self, authorization_id, customer_id, filters=None):
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-
-        line_number = to_adobe_line_id(mpt_line_id)
-
         orders = []
         orders_base_url = f"/v3/customers/{customer_id}/orders"
 
-        new_orders_params = {
-            "order-type": ORDER_TYPE_NEW,
-            "limit": 100,
-            "offset": 0,
-        }
-
-        new_orders_next_url = f"{orders_base_url}?{urlencode(new_orders_params)}"
-
-        while new_orders_next_url:
-            new_orders_response = requests.get(
-                urljoin(self._config.api_base_url, new_orders_next_url),
+        next_url = f"{orders_base_url}?limit=100&offset=0"
+        while next_url:
+            response = requests.get(
+                urljoin(self._config.api_base_url, next_url),
                 headers=headers,
+                params=filters,
             )
-            new_orders_response.raise_for_status()
-            new_orders_page = new_orders_response.json()
-            for order in new_orders_page["items"]:
-                if order["status"] not in [STATUS_PROCESSED, STATUS_ORDER_CANCELLED]:
-                    continue
-                actual_sku = get_actual_sku(order["lineItems"], sku)
-                if not actual_sku:
-                    continue
-
-                logger.debug(
-                    f"Found order to return for sku {actual_sku}: {order['orderId']}"
-                )
-
-                item_to_return = get_item_to_return(order["lineItems"], line_number)
-                external_id = f"{order['externalReferenceId']}-{line_number}"
-
-                returned_orders_response = requests.get(
-                    urljoin(self._config.api_base_url, orders_base_url),
-                    headers=headers,
-                    params={
-                        "reference-order-id": order["orderId"],
-                        "offer-id": actual_sku,
-                        "order-type": ORDER_TYPE_RETURN,
-                        "status": [STATUS_PROCESSED, STATUS_PENDING],
-                        "limit": 1,
-                        "offset": 0,
-                    },
-                )
-                returned_orders_response.raise_for_status()
-                returned_orders_page = returned_orders_response.json()
-                if returned_orders_page["totalCount"] == 0:
-                    logger.debug(
-                        f"No return order found for order {order['orderId']} "
-                        f"and external_id {external_id}",
-                    )
-                    orders.append((order, item_to_return, None))
-                    continue
-
-                return_order = returned_orders_page["items"][0]
-
-                if return_order["externalReferenceId"] != external_id:
-                    logger.debug(
-                        f"No return order found for order {order['orderId']} "
-                        f"and external_id {external_id}",
-                    )
-                    orders.append((order, item_to_return, None))
-                    continue
-
-                logger.debug(
-                    f"Return order found for order {order['orderId']} "
-                    f"and external_id {external_id}",
-                )
-
-                orders.append((order, item_to_return, return_order))
-
-            new_orders_next_url = new_orders_page["links"].get("next", {}).get("uri")
-
+            response.raise_for_status()
+            page = response.json()
+            orders.extend(page["items"])
+            next_url = page["links"].get("next", {}).get("uri")
         return orders
 
     @wrap_http_error
@@ -325,6 +318,7 @@ class AdobeClient:
         customer_id: str,
         returning_order: dict,
         returning_item: dict,
+        external_reference: str,
     ) -> dict:
         """
         Creates an order of type RETURN for a given `item` that was purchased in the
@@ -343,7 +337,7 @@ class AdobeClient:
         line_number = returning_item["extLineItemNumber"]
         quantity = returning_item["quantity"]
         sku = returning_item["offerId"]
-        external_id = f"{returning_order['externalReferenceId']}-{line_number}"
+        external_id = f"{external_reference}_{returning_order['externalReferenceId']}_{line_number}"
         payload = {
             "externalReferenceId": external_id,
             "referenceOrderId": returning_order["orderId"],

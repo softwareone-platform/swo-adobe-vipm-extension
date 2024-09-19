@@ -49,9 +49,9 @@ from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_adobe_order_id,
     get_ordering_parameter,
-    get_partial_sku,
     set_ordering_parameter_error,
 )
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 

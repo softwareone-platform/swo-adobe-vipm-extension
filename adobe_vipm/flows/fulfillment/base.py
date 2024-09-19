@@ -33,13 +33,11 @@ def fulfill_order(client, order):
     """
     logger.info(f'Start processing {order["type"]} order {order["id"]}')
     try:
-        order = populate_order_info(client, order)
-
-        order = start_processing_attempt(client, order)
-
         if is_purchase_order(order):
             fulfill_purchase_order(client, order)
         elif is_transfer_order(order):
+            order = populate_order_info(client, order)
+            order = start_processing_attempt(client, order)
             fulfill_transfer_order(client, order)
         elif is_change_order(order):
             fulfill_change_order(client, order)

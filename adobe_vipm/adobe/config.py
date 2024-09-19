@@ -208,7 +208,7 @@ class Config:
             )
             self.authorizations[auth_uk] = authorization
 
-            if authorization.authorization_id:
+            if authorization.authorization_id:  # pragma: no branch
                 self.authorizations[authorization.authorization_id] = authorization
 
             for reseller_data in authorization_data["resellers"]:
@@ -222,7 +222,7 @@ class Config:
                 )
                 self.resellers[(authorization, seller_uk)] = reseller
 
-                if seller_id:
+                if seller_id:  # pragma: no branch
                     self.resellers[(authorization, seller_id)] = reseller
 
         for product in config_data["skus_mapping"]:

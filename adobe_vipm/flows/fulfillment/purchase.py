@@ -5,7 +5,6 @@ processing.
 """
 
 import logging
-from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -32,27 +31,27 @@ from adobe_vipm.flows.constants import (
     STATUS_MARKET_SEGMENT_PENDING,
     TEMPLATE_NAME_PURCHASE,
 )
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    add_subscription,
-    check_adobe_order_fulfilled,
-    check_processing_template,
-    get_one_time_skus,
-    save_adobe_customer_data,
-    save_adobe_order_id,
-    save_next_sync_and_coterm_dates,
-    switch_order_to_completed,
+    CompleteOrder,
+    CreateOrUpdateSubscriptions,
+    IncrementAttemptsCounter,
+    SetOrUpdateCotermNextSyncDates,
+    StartOrderProcessing,
+    SubmitNewOrder,
+    UpdatePrices,
+    ValidateDuplicateLines,
     switch_order_to_failed,
     switch_order_to_query,
-    update_order_actual_price,
 )
-from adobe_vipm.flows.helpers import prepare_customer_data
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
+from adobe_vipm.flows.mpt import update_agreement, update_order
+from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
-    get_adobe_customer_id,
-    get_adobe_order_id,
-    get_market_segment,
     get_market_segment_eligibility_status,
     get_ordering_parameter,
-    get_partial_sku,
+    set_adobe_3yc_commitment_request_status,
+    set_adobe_customer_id,
     set_market_segment_eligibility_status_pending,
     set_order_error,
     set_ordering_parameter_error,
@@ -61,273 +60,214 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def _handle_customer_error(client, order, error):
+class RefreshCustomer(Step):
     """
-    Processes the error received from the Adobe API during customer creation.
-    If the error is related to a customer parameter, the parameter error attribute
-    is set, and the MPT order is switched to the 'query' status.
-    Other errors will result in the MPT order being marked as failed.
-
-    Args:
-        client (MPTClient): An instance of the Marketplace platform client.
-        order (dict): The MPT order that is being processed.
-        error (AdobeAPIError): The error received from the Adobe API.
-
-    Returns:
-        None
+    Refresh the processing context
+    retrieving the Adobe customer object through the
+    VIPM API.
     """
-    if error.code not in (
-        STATUS_INVALID_ADDRESS,
-        STATUS_INVALID_FIELDS,
-        STATUS_INVALID_MINIMUM_QUANTITY,
-    ):
-        switch_order_to_failed(client, order, str(error))
-        return
-    if error.code == STATUS_INVALID_ADDRESS:
-        param = get_ordering_parameter(order, PARAM_ADDRESS)
-        order = set_ordering_parameter_error(
-            order,
-            PARAM_ADDRESS,
-            ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
+
+    def __call__(self, client, context, next_step):
+        adobe_client = get_adobe_client()
+        context.adobe_customer = adobe_client.get_customer(
+            context.authorization_id,
+            context.adobe_customer_id,
         )
-    elif error.code == STATUS_INVALID_MINIMUM_QUANTITY:
-        if "LICENSE" in str(error):
-            param = get_ordering_parameter(order, PARAM_3YC_LICENSES)
-            order = set_ordering_parameter_error(
-                order,
-                PARAM_3YC_LICENSES,
-                ERR_3YC_QUANTITY_LICENSES.to_dict(title=param["name"]),
-                required=False,
-            )
-        if "CONSUMABLES" in str(error):
-            param = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
-            order = set_ordering_parameter_error(
-                order,
-                PARAM_3YC_CONSUMABLES,
-                ERR_3YC_QUANTITY_CONSUMABLES.to_dict(title=param["name"]),
-                required=False,
-            )
-        if not error.details:
-            param_licenses = get_ordering_parameter(order, PARAM_3YC_LICENSES)
-            param_consumables = get_ordering_parameter(order, PARAM_3YC_CONSUMABLES)
-            order = set_order_error(
-                order,
-                ERR_3YC_NO_MINIMUMS.to_dict(
-                    title_min_licenses=param_licenses["name"],
-                    title_min_consumables=param_consumables["name"],
-                ),
-            )
-    else:
-        if "companyProfile.companyName" in error.details:
-            param = get_ordering_parameter(order, PARAM_COMPANY_NAME)
-            order = set_ordering_parameter_error(
-                order,
-                PARAM_COMPANY_NAME,
-                ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(error)),
-            )
-        if len(
-            list(
-                filter(
-                    lambda x: x.startswith("companyProfile.contacts[0]"), error.details
+        next_step(client, context)
+
+
+class ValidateMarketSegmentEligibility(Step):
+    """
+    Validate if the customer is eligible to place orders for a given market segment.
+    The market segment the order refers to is determined by the product (product per segment).
+    """
+
+    def __call__(self, client, context, next_step):
+        if context.market_segment != MARKET_SEGMENT_COMMERCIAL:
+            status = get_market_segment_eligibility_status(context.order)
+            if not status:
+                context.order = set_market_segment_eligibility_status_pending(
+                    context.order
                 )
+                switch_order_to_query(
+                    client, context.order, template_name=TEMPLATE_NAME_PURCHASE
+                )
+                logger.info(
+                    f"{context}: customer is pending eligibility "
+                    f"approval for segment {context.market_segment}"
+                )
+                return
+            if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
+                logger.info(
+                    f"{context}: customer is not eligible for segment {context.market_segment}"
+                )
+                switch_order_to_failed(
+                    client,
+                    context.order,
+                    f"The agreement is not eligible for market segment {context.market_segment}.",
+                )
+                return
+            if status == STATUS_MARKET_SEGMENT_PENDING:
+                return
+            logger.info(
+                f"{context}: customer is eligible for segment {context.market_segment}"
             )
-        ):
-            param = get_ordering_parameter(order, PARAM_CONTACT)
-            order = set_ordering_parameter_error(
-                order,
-                PARAM_CONTACT,
-                ERR_ADOBE_CONTACT.to_dict(title=param["name"], details=str(error)),
-            )
-
-    switch_order_to_query(client, order)
+        next_step(client, context)
 
 
-def create_customer_account(client, order):
+class CreateCustomer(Step):
     """
     Creates a customer account in Adobe for the new agreement that belongs to the order
     currently being processed.
-
-    Args:
-        client (MPTClient): An instance of the Marketplace platform client.
-        order (dict): The order that is being processed.
-
-    Returns:
-        dict: The order updated with the customer ID set on the corresponding
-        fulfillment parameter.
     """
-    adobe_client = get_adobe_client()
-    try:
-        order, customer_data = prepare_customer_data(client, order)
-        if not customer_data.get("contact"):
-            param = get_ordering_parameter(order, PARAM_CONTACT)
-            order = set_ordering_parameter_error(
-                order,
-                PARAM_CONTACT,
-                ERR_ADOBE_CONTACT.to_dict(
-                    title=param["name"], details="it is mandatory."
-                ),
-            )
 
-            switch_order_to_query(client, order)
-            return
-
-        external_id = order["agreement"]["id"]
-        seller_id = order["agreement"]["seller"]["id"]
-        authorization_id = order["authorization"]["id"]
-        market_segment = get_market_segment(order["agreement"]["product"]["id"])
-        customer = adobe_client.create_customer_account(
-            authorization_id, seller_id, external_id, market_segment, customer_data
+    def save_data(self, client, context):
+        request_3yc_status = get_3yc_commitment_request(context.adobe_customer).get(
+            "status"
         )
-        customer_id = customer["customerId"]
-
-        return save_adobe_customer_data(
+        context.order = set_adobe_customer_id(context.order, context.adobe_customer_id)
+        if request_3yc_status:
+            context.order = set_adobe_3yc_commitment_request_status(
+                context.order, request_3yc_status
+            )
+        update_order(client, context.order_id, parameters=context.order["parameters"])
+        update_agreement(
             client,
-            order,
-            customer_id,
-            request_3yc_status=get_3yc_commitment_request(customer).get("status"),
+            context.agreement_id,
+            externalIds={"vendor": context.adobe_customer_id},
         )
-    except AdobeError as e:
-        logger.error(repr(e))
-        _handle_customer_error(client, order, e)
 
-
-def _submit_new_order(mpt_client, customer_id, order):
-    """
-    Create a PREVIEW order in Adobe using the base discount level SKUs
-    to receive from Adobe the SKU associated to the discount level the customer
-    has reached.
-    Then it place a NEW order in Adobe to purchase the corresponding SKUs.
-
-    Args:
-        mpt_client (MPTClient): The client to consume the MPT API.
-        customer_id (str): ID of the customer in Adobe.
-        order (dict): The MPT order that must be submitted to Adobe.
-
-    Returns:
-        dict: The order updated with the Adobe order ID (order's vendor external ID)
-    """
-    adobe_client = get_adobe_client()
-    adobe_order = None
-    # This function should be improved since an error returned by Adobe during the
-    # order PREVIEW creation can be retried. Only an error returned during the
-    # creation of the NEW order should make the MPT order fail.
-    try:
-        authorization_id = order["authorization"]["id"]
-        preview_order = adobe_client.create_preview_order(
-            authorization_id, customer_id, order["id"], order["lines"]
-        )
-        adobe_order = adobe_client.create_new_order(
-            authorization_id,
-            customer_id,
-            preview_order,
-        )
-        logger.info(f'New order created for {order["id"]}: {adobe_order["orderId"]}')
-    except AdobeError as e:
-        switch_order_to_failed(mpt_client, order, str(e))
-        logger.warning(f"Order {order['id']} has been failed: {str(e)}.")
-        return None
-
-    return save_adobe_order_id(mpt_client, order, adobe_order["orderId"])
-
-
-def _check_market_segment_eligibility(mpt_client, order):
-    """
-    Check if the customer is eligible to place orders for a given market segment.
-    The market segment the order refers to is determined by the product (product per segment).
-
-    Args:
-        mpt_client (MPTClient): The client used to consume the MPT API.
-        order (dict): The order to check.
-
-    Returns:
-        bool: True if the customer is elegible for the market segment the orders
-        refers to, False otherwise.
-    """
-    market_segment = get_market_segment(order["agreement"]["product"]["id"])
-    if market_segment != MARKET_SEGMENT_COMMERCIAL:
-        status = get_market_segment_eligibility_status(order)
-        if not status:
-            order = set_market_segment_eligibility_status_pending(order)
-            switch_order_to_query(mpt_client, order, template_name="Purchase")
-            return False
-        if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
-            switch_order_to_failed(
-                mpt_client,
-                order,
-                f"The agreement is not eligible for market segment {market_segment}.",
+    def handle_error(self, client, context, error):
+        if error.code not in (
+            STATUS_INVALID_ADDRESS,
+            STATUS_INVALID_FIELDS,
+            STATUS_INVALID_MINIMUM_QUANTITY,
+        ):
+            switch_order_to_failed(client, context.order, str(error))
+            return
+        if error.code == STATUS_INVALID_ADDRESS:
+            param = get_ordering_parameter(context.order, PARAM_ADDRESS)
+            context.order = set_ordering_parameter_error(
+                context.order,
+                PARAM_ADDRESS,
+                ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
             )
-            return False
-        if status == STATUS_MARKET_SEGMENT_PENDING:
-            return False
-    return True
+        elif error.code == STATUS_INVALID_MINIMUM_QUANTITY:
+            if "LICENSE" in str(error):
+                param = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
+                context.order = set_ordering_parameter_error(
+                    context.order,
+                    PARAM_3YC_LICENSES,
+                    ERR_3YC_QUANTITY_LICENSES.to_dict(title=param["name"]),
+                    required=False,
+                )
 
+            if "CONSUMABLES" in str(error):
+                param = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
+                context.order = set_ordering_parameter_error(
+                    context.order,
+                    PARAM_3YC_CONSUMABLES,
+                    ERR_3YC_QUANTITY_CONSUMABLES.to_dict(title=param["name"]),
+                    required=False,
+                )
 
-def fulfill_purchase_order(mpt_client, order):
-    """
-    Fulfills a purchase order by processing the necessary actions based on the provided parameters.
+            if not error.details:
+                param_licenses = get_ordering_parameter(
+                    context.order, PARAM_3YC_LICENSES
+                )
+                param_consumables = get_ordering_parameter(
+                    context.order, PARAM_3YC_CONSUMABLES
+                )
+                context.order = set_order_error(
+                    context.order,
+                    ERR_3YC_NO_MINIMUMS.to_dict(
+                        title_min_licenses=param_licenses["name"],
+                        title_min_consumables=param_consumables["name"],
+                    ),
+                )
+        else:
+            if "companyProfile.companyName" in error.details:
+                param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
+                context.order = set_ordering_parameter_error(
+                    context.order,
+                    PARAM_COMPANY_NAME,
+                    ERR_ADOBE_COMPANY_NAME.to_dict(
+                        title=param["name"], details=str(error)
+                    ),
+                )
+            if len(
+                list(
+                    filter(
+                        lambda x: x.startswith("companyProfile.contacts[0]"),
+                        error.details,
+                    )
+                )
+            ):
+                param = get_ordering_parameter(context.order, PARAM_CONTACT)
+                context.order = set_ordering_parameter_error(
+                    context.order,
+                    PARAM_CONTACT,
+                    ERR_ADOBE_CONTACT.to_dict(title=param["name"], details=str(error)),
+                )
 
-    Args:
-        mpt_client (MPTClient): An instance of the MPT client used for communication
-        with the MPT system.
-        order (dict): The MPT order representing the purchase order to be fulfilled.
+        switch_order_to_query(client, context.order)
 
-    Returns:
-        None
-    """
-
-    items = [line["item"]["id"] for line in order["lines"]]
-    duplicates = [item for item, count in Counter(items).items() if count > 1]
-    if duplicates:
-        switch_order_to_failed(
-            mpt_client,
-            order,
-            f"The order cannot contain multiple lines for the same item: {','.join(duplicates)}.",
-        )
-        return
-
-    check_processing_template(mpt_client, order, TEMPLATE_NAME_PURCHASE)
-
-    if not _check_market_segment_eligibility(mpt_client, order):
-        return
-
-    adobe_client = get_adobe_client()
-    customer_id = get_adobe_customer_id(order)
-
-    if not customer_id:
-        order = create_customer_account(mpt_client, order)
-        if not order:
+    def __call__(self, client, context, next_step):
+        if context.adobe_customer_id:
+            next_step(client, context)
             return
 
-    customer_id = get_adobe_customer_id(order)
-    adobe_order_id = get_adobe_order_id(order)
-    if not adobe_order_id:
-        order = _submit_new_order(mpt_client, customer_id, order)
-        if not order:
-            return
-    adobe_order_id = order["externalIds"]["vendor"]
-    adobe_order = check_adobe_order_fulfilled(
-        mpt_client, adobe_client, order, customer_id, adobe_order_id
+        adobe_client = get_adobe_client()
+        try:
+            if not context.customer_data.get("contact"):
+                param = get_ordering_parameter(context.order, PARAM_CONTACT)
+                context.order = set_ordering_parameter_error(
+                    context.order,
+                    PARAM_CONTACT,
+                    ERR_ADOBE_CONTACT.to_dict(
+                        title=param["name"], details="it is mandatory."
+                    ),
+                )
+
+                switch_order_to_query(client, context.order)
+                return
+
+            customer = adobe_client.create_customer_account(
+                context.authorization_id,
+                context.seller_id,
+                context.agreement_id,
+                context.market_segment,
+                context.customer_data,
+            )
+            context.adobe_customer_id = customer["customerId"]
+            context.adobe_customer = customer
+
+            self.save_data(
+                client,
+                context,
+            )
+            next_step(client, context)
+        except AdobeError as e:
+            logger.error(repr(e))
+            self.handle_error(client, context, e)
+
+
+def fulfill_purchase_order(client, order):
+    pipeline = Pipeline(
+        SetupContext(),
+        IncrementAttemptsCounter(),
+        ValidateDuplicateLines(),
+        ValidateMarketSegmentEligibility(),
+        StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
+        PrepareCustomerData(),
+        CreateCustomer(),
+        SubmitNewOrder(),
+        CreateOrUpdateSubscriptions(),
+        RefreshCustomer(),
+        SetOrUpdateCotermNextSyncDates(),
+        UpdatePrices(),
+        CompleteOrder(TEMPLATE_NAME_PURCHASE),
     )
-    if not adobe_order:
-        return
-    one_time_skus = get_one_time_skus(mpt_client, order)
-    commitment_date = None
-    for item in adobe_order["lineItems"]:
-        if get_partial_sku(item["offerId"]) in one_time_skus:
-            continue
 
-        subscription = add_subscription(
-            mpt_client, adobe_client, customer_id, order, item
-        )
-        if subscription and not commitment_date:  # pragma: no branch
-            # subscription are cotermed so it's ok to take the last created
-            commitment_date = subscription["commitmentDate"]
-
-    if commitment_date:  # pragma: no branch
-        order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
-
-    update_order_actual_price(
-        mpt_client, adobe_client, order, order["lines"], adobe_order["lineItems"]
-    )
-
-    switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_PURCHASE)
+    context = Context(order=order)
+    pipeline.run(client, context)
