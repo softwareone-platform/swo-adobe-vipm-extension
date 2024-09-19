@@ -7,7 +7,12 @@ from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
-from adobe_vipm.flows.constants import PARAM_ADOBE_SKU
+from adobe_vipm.flows.constants import (
+    PARAM_ADOBE_SKU,
+    PARAM_CURRENT_QUANTITY,
+    PARAM_RENEWAL_DATE,
+    PARAM_RENEWAL_QUANTITY,
+)
 from adobe_vipm.flows.mpt import (
     get_agreement_subscription,
     get_agreements_by_ids,
@@ -109,18 +114,17 @@ def sync_agreement_prices(
         skus = [item[1] for item in to_update]
 
         if commitment_start_date:
-            prices = get_prices_for_3yc_skus(product_id, currency, commitment_start_date, skus)
+            prices = get_prices_for_3yc_skus(
+                product_id, currency, commitment_start_date, skus
+            )
         else:
             prices = get_prices_for_skus(product_id, currency, skus)
-
 
         for subscription, actual_sku in to_update:
             line_id = subscription["lines"][0]["id"]
             lines = [
                 {
-                    "price": {
-                        "unitPP": prices[actual_sku]
-                    },
+                    "price": {"unitPP": prices[actual_sku]},
                     "id": line_id,
                 }
             ]
@@ -130,6 +134,20 @@ def sync_agreement_prices(
                     {
                         "externalId": PARAM_ADOBE_SKU,
                         "value": actual_sku,
+                    },
+                    {
+                        "externalId": PARAM_CURRENT_QUANTITY,
+                        "value": str(adobe_subscription["currentQuantity"]),
+                    },
+                    {
+                        "externalId": PARAM_RENEWAL_QUANTITY,
+                        "value": str(
+                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                        ),
+                    },
+                    {
+                        "externalId": PARAM_RENEWAL_DATE,
+                        "value": str(adobe_subscription["renewalDate"]),
                     },
                 ],
             }
@@ -172,13 +190,13 @@ def sync_agreement_prices(
         skus = [item[1] for item in to_update]
 
         if commitment_start_date:
-            prices = get_prices_for_3yc_skus(product_id, currency, commitment_start_date, skus)
+            prices = get_prices_for_3yc_skus(
+                product_id, currency, commitment_start_date, skus
+            )
         else:
             prices = get_prices_for_skus(product_id, currency, skus)
 
         for line, actual_sku in to_update:
-
-
             current_price = line["price"]["unitPP"]
             line["price"]["unitPP"] = prices[actual_sku]
 
@@ -190,10 +208,7 @@ def sync_agreement_prices(
                     f"new_price={prices[actual_sku]}\n",
                 )
             else:
-                logger.info(
-                    f"OneTime item: {line['id']}: "
-                    f"sku={actual_sku}\n"
-                )
+                logger.info(f"OneTime item: {line['id']}: sku={actual_sku}\n")
 
         next_sync = (
             (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
