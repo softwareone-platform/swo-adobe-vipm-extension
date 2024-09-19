@@ -249,6 +249,18 @@ def test_transfer(
                         "externalId": "adobeSKU",
                         "value": adobe_subscription["offerId"],
                     },
+                    {
+                        "externalId": "currentQuantity",
+                        "value": str(adobe_subscription["currentQuantity"]),
+                    },
+                    {
+                        "externalId": "renewalQuantity",
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                    },
+                    {
+                        "externalId": "renewalDate",
+                        "value": adobe_subscription["renewalDate"],
+                    },
                 ],
             },
             "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
@@ -1430,6 +1442,18 @@ def test_transfer_3yc_customer(
                     {
                         "externalId": "adobeSKU",
                         "value": adobe_subscription["offerId"],
+                    },
+                    {
+                        "externalId": "currentQuantity",
+                        "value": str(adobe_subscription["currentQuantity"]),
+                    },
+                    {
+                        "externalId": "renewalQuantity",
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                    },
+                    {
+                        "externalId": "renewalDate",
+                        "value": adobe_subscription["renewalDate"],
                     },
                 ],
             },
