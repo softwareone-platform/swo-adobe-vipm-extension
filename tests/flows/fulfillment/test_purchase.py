@@ -36,6 +36,7 @@ from adobe_vipm.flows.fulfillment.purchase import (
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
     IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
     StartOrderProcessing,
@@ -746,7 +747,7 @@ def test_fulfill_purchase_order(mocker):
 
     fulfill_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 13
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 14
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
@@ -767,18 +768,19 @@ def test_fulfill_purchase_order(mocker):
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], PrepareCustomerData)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], CreateCustomer)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], SubmitNewOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetPreviewOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SubmitNewOrder)
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[8], CreateOrUpdateSubscriptions
+        mocked_pipeline_ctor.mock_calls[0].args[9], CreateOrUpdateSubscriptions
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], RefreshCustomer)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], RefreshCustomer)
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[10], SetOrUpdateCotermNextSyncDates
+        mocked_pipeline_ctor.mock_calls[0].args[11], SetOrUpdateCotermNextSyncDates
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[11], UpdatePrices)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[12], CompleteOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[12], UpdatePrices)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[13], CompleteOrder)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[12].template_name
+        mocked_pipeline_ctor.mock_calls[0].args[13].template_name
         == TEMPLATE_NAME_PURCHASE
     )
     mocked_context_ctor.assert_called_once_with(order=mocked_order)

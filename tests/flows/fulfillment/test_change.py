@@ -15,6 +15,7 @@ from adobe_vipm.flows.fulfillment.change import (
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
     GetReturnOrders,
     IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
@@ -441,7 +442,7 @@ def test_fulfill_change_order(mocker):
     mocked_order = mocker.MagicMock()
 
     fulfill_change_order(mocked_client, mocked_order)
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 16
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 17
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
@@ -463,21 +464,22 @@ def test_fulfill_change_order(mocker):
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[8], ValidateReturnableOrders
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], SubmitReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], SubmitNewOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], GetPreviewOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], SubmitReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[11], SubmitNewOrder)
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[11], UpdateRenewalQuantities
+        mocked_pipeline_ctor.mock_calls[0].args[12], UpdateRenewalQuantities
     )
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[12], CreateOrUpdateSubscriptions
+        mocked_pipeline_ctor.mock_calls[0].args[13], CreateOrUpdateSubscriptions
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[13], UpdatePrices)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[14], CompleteOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[14], UpdatePrices)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[15], CompleteOrder)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[14].template_name
+        mocked_pipeline_ctor.mock_calls[0].args[15].template_name
         == TEMPLATE_NAME_CHANGE
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[15], SyncAgreement)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[16], SyncAgreement)
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(
         mocked_client,

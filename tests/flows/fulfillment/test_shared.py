@@ -13,6 +13,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -22,6 +23,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
     GetReturnOrders,
     IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
@@ -689,7 +691,6 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
     new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = preview_order
     mocked_adobe_client.create_new_order.return_value = new_order
 
     mocker.patch(
@@ -709,17 +710,12 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
+        adobe_preview_order=preview_order,
     )
 
     step = SubmitNewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        context.order_id,
-        context.upsize_lines,
-    )
     mocked_adobe_client.create_new_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
@@ -1544,3 +1540,172 @@ def test_validate_duplicate_lines_step_no_duplicates(
 
     mocked_fail.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
+    order = order_factory()
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.return_value = preview_order
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+    )
+
+    step = GetPreviewOrder()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.adobe_preview_order == preview_order
+
+    mocked_adobe_client.create_preview_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        context.order_id,
+        context.upsize_lines,
+    )
+
+
+def test_get_preview_order_step_order_no_upsize_lines(
+    mocker,
+    order_factory,
+    lines_factory,
+):
+    """
+    Test that if there are no upsize lines in the order
+    no PREVIEW order will be retrieved and the order processing
+    pipeline will continue.
+    """
+
+    order = order_factory(
+        lines=lines_factory(quantity=10, old_quantity=12),
+    )
+    mocked_adobe_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        downsize_lines=order["lines"],
+    )
+
+    step = GetPreviewOrder()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.create_preview_order.assert_not_called()
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_get_preview_order_step_order_new_order_created(
+    mocker,
+    order_factory,
+    lines_factory,
+):
+    """
+    Test that if there are  upsize lines but the NEW order
+    has already been submitted
+    no PREVIEW order will be retrieved and the order processing
+    pipeline will continue.
+    """
+
+    order = order_factory(
+        lines=lines_factory(quantity=12, old_quantity=10),
+    )
+    mocked_adobe_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+        adobe_new_order_id="new-order-id"
+    )
+
+    step = GetPreviewOrder()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.create_preview_order.assert_not_called()
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+
+def test_get_preview_order_step_adobe_error(
+    mocker,
+    order_factory,
+    lines_factory,
+    adobe_api_error_factory,
+):
+    """
+    Test that if adobe returns an error retrieving the PREVIEW
+    order, the order is failed and stop the order processing
+    pipeline
+    """
+
+    order = order_factory(
+        lines=lines_factory(quantity=12, old_quantity=10),
+    )
+
+    error_data = adobe_api_error_factory("1234", "error message")
+    error = AdobeAPIError(400, error_data)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.side_effect = error
+
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+    )
+
+    step = GetPreviewOrder()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_switch_to_failed.assert_called_once_with(mocked_client, context.order, str(error))
+    mocked_next_step.assert_not_called()
