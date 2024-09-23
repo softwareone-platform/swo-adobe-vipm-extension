@@ -18,6 +18,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
 )
+from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment,
     sanitize_company_name,
@@ -710,6 +711,32 @@ class SubmitReturnOrders(Step):
         next_step(client, context)
 
 
+class GetPreviewOrder(Step):
+    """
+    Retrieve a preview order for the upsize/new lines. If there are incompatible SKUs
+    within the PREVIEW order an error will be thrown by the Adobe API the order will
+    be failed and the processing pipeline will stop.
+    In case a new order as already been submitted by a previous attempt, this step will be
+    skipped and the order processing pipeline will continue.
+    """
+
+    def __call__(self, client, context, next_step):
+        adobe_client = get_adobe_client()
+        if context.upsize_lines and not context.adobe_new_order_id:
+            try:
+                context.adobe_preview_order = adobe_client.create_preview_order(
+                    context.authorization_id,
+                    context.adobe_customer_id,
+                    context.order_id,
+                    context.upsize_lines,
+                )
+            except AdobeError as e:
+                switch_order_to_failed(client, context.order, str(e))
+                return
+
+        next_step(client, context)
+
+
 class SubmitNewOrder(Step):
     """
     Submit a new order if there are new/upsizing items to purchase.
@@ -724,17 +751,10 @@ class SubmitNewOrder(Step):
         adobe_client = get_adobe_client()
         adobe_order = None
         if not context.adobe_new_order_id:
-            preview_order = adobe_client.create_preview_order(
-                context.authorization_id,
-                context.adobe_customer_id,
-                context.order_id,
-                context.upsize_lines,
-            )
-
             adobe_order = adobe_client.create_new_order(
                 context.authorization_id,
                 context.adobe_customer_id,
-                preview_order,
+                context.adobe_preview_order,
             )
             logger.info(f'{context}: new adobe order created: {adobe_order["orderId"]}')
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])

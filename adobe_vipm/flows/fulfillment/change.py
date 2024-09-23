@@ -14,6 +14,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
     GetReturnOrders,
     IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
@@ -170,6 +171,7 @@ def fulfill_change_order(client, order):
         GetReturnOrders(),
         GetReturnableOrders(),
         ValidateReturnableOrders(),
+        GetPreviewOrder(),
         SubmitReturnOrders(),
         SubmitNewOrder(),
         UpdateRenewalQuantities(),
