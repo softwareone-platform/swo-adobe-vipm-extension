@@ -35,6 +35,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
     IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
     StartOrderProcessing,
@@ -261,6 +262,7 @@ def fulfill_purchase_order(client, order):
         StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         PrepareCustomerData(),
         CreateCustomer(),
+        GetPreviewOrder(),
         SubmitNewOrder(),
         CreateOrUpdateSubscriptions(),
         RefreshCustomer(),
