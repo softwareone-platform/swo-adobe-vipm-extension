@@ -20,6 +20,7 @@ class Context:
     adobe_customer_id: str | None = None
     adobe_customer: dict | None = None
     adobe_new_order_id: str | None = None
+    adobe_preview_order: dict | None = None
     adobe_new_order: dict | None = None
     adobe_returnable_orders: dict = field(default_factory=dict)
     adobe_return_orders: dict = field(default_factory=dict)
