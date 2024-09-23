@@ -1,9 +1,7 @@
 import logging
 from difflib import get_close_matches
 
-from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
-from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import join_phone_number
 from adobe_vipm.adobe.validation import (
     is_valid_address_line_1_length,
@@ -29,7 +27,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
-    ERR_ADOBE_ERROR,
     ERR_CITY_LENGTH,
     ERR_COMPANY_NAME_CHARS,
     ERR_COMPANY_NAME_LENGTH,
@@ -43,7 +40,6 @@ from adobe_vipm.flows.constants import (
     ERR_POSTAL_CODE_LENGTH,
     ERR_STATE_DID_YOU_MEAN,
     ERR_STATE_OR_PROVINCE,
-    FAKE_CUSTOMERS_IDS,
     PARAM_3YC,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
@@ -62,7 +58,7 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
     update_ordering_parameter_value,
 )
-from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
+from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -271,12 +267,15 @@ class ValidateCustomerData(Step):
 
 
 class UpdatePrices(Step):
-    def update_purchase_prices(self, context, line_items):
-        adobe_skus = [item["offerId"] for item in line_items]
+    def __call__(self, client, context, next_step):
+        if not context.adobe_preview_order:
+            next_step(client, context)
+            return
+        adobe_skus = [item["offerId"] for item in context.adobe_preview_order["lineItems"]]
         prices = get_prices_for_skus(context.product_id, context.currency, adobe_skus)
 
         updated_lines = []
-        for preview_item in line_items:
+        for preview_item in context.adobe_preview_order["lineItems"]:
             order_line = get_order_line_by_sku(
                 context.order, get_partial_sku(preview_item["offerId"])
             )
@@ -284,29 +283,6 @@ class UpdatePrices(Step):
             order_line["price"]["unitPP"] = prices[preview_item["offerId"]]
             updated_lines.append(order_line)
         context.order["lines"] = updated_lines
-
-    def __call__(self, client, context, next_step):
-        if not context.order["lines"]:
-            next_step(client, context)
-            return
-        adobe_client = get_adobe_client()
-        customer_id = (
-            context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
-        )
-        try:
-            preview_order = adobe_client.create_preview_order(
-                context.authorization_id,
-                customer_id,
-                context.order_id,
-                context.order["lines"],
-            )
-        except AdobeAPIError as e:
-            context.validation_succeeded = False
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_ERROR.to_dict(details=str(e))
-            )
-            return
-        self.update_purchase_prices(context, preview_order["lineItems"])
         next_step(client, context)
 
 
@@ -317,6 +293,7 @@ def validate_purchase_order(client, order):
         CheckPurchaseValidationEnabled(),
         ValidateCustomerData(),
         ValidateDuplicateLines(),
+        GetPreviewOrder(),
         UpdatePrices(),
     )
     context = Context(order=order)

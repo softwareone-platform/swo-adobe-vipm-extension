@@ -1,14 +1,12 @@
 import pytest
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
-from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_3YC_QUANTITY_CONSUMABLES,
     ERR_3YC_QUANTITY_LICENSES,
     ERR_ADDRESS,
     ERR_ADDRESS_LINE_1_LENGTH,
     ERR_ADDRESS_LINE_2_LENGTH,
-    ERR_ADOBE_ERROR,
     ERR_CITY_LENGTH,
     ERR_COMPANY_NAME_CHARS,
     ERR_COMPANY_NAME_LENGTH,
@@ -21,10 +19,6 @@ from adobe_vipm.flows.constants import (
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
     ERR_STATE_OR_PROVINCE,
-    FAKE_CUSTOMERS_IDS,
-    MARKET_SEGMENT_COMMERCIAL,
-    MARKET_SEGMENT_EDUCATION,
-    MARKET_SEGMENT_GOVERNMENT,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
     PARAM_ADDRESS,
@@ -40,7 +34,7 @@ from adobe_vipm.flows.validation.purchase import (
     ValidateCustomerData,
     validate_purchase_order,
 )
-from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
+from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -813,18 +807,8 @@ def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
     assert context.order["error"]["id"] == "VIPMV008"
 
 
-@pytest.mark.parametrize(
-    "segment",
-    [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
-)
-def test_update_prices_step(mocker, order_factory, adobe_order_factory, segment):
+def test_update_prices_step(mocker, order_factory, adobe_order_factory):
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocker.patch(
-        "adobe_vipm.flows.validation.purchase.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     order = order_factory()
     mocked_get_prices_for_skus = mocker.patch(
         "adobe_vipm.flows.validation.purchase.get_prices_for_skus",
@@ -838,9 +822,9 @@ def test_update_prices_step(mocker, order_factory, adobe_order_factory, segment)
         order=order,
         order_id="order-id",
         authorization_id="auth-id",
-        market_segment=segment,
         product_id="PRD-1234",
         currency="EUR",
+        adobe_preview_order=adobe_preview_order,
     )
 
     step = UpdatePrices()
@@ -848,12 +832,6 @@ def test_update_prices_step(mocker, order_factory, adobe_order_factory, segment)
 
     assert context.validation_succeeded is True
     assert context.order["lines"][0]["price"]["unitPP"] == 7892.11
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        FAKE_CUSTOMERS_IDS[segment],
-        context.order_id,
-        context.order["lines"],
-    )
     mocked_get_prices_for_skus.assert_called_once_with(
         context.product_id,
         context.currency,
@@ -862,15 +840,8 @@ def test_update_prices_step(mocker, order_factory, adobe_order_factory, segment)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_update_prices_step_no_lines(mocker, order_factory):
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.validation.purchase.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+def test_update_prices_step_no_preview_order(mocker, order_factory):
     order = order_factory()
-    order["lines"] = []
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -883,35 +854,7 @@ def test_update_prices_step_no_lines(mocker, order_factory):
     step(mocked_client, context, mocked_next_step)
 
     assert context.validation_succeeded is True
-    mocked_adobe_client.create_preview_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_update_prices_step_api_error(mocker, order_factory, adobe_api_error_factory):
-    error = AdobeAPIError(400, adobe_api_error_factory("9999", "unexpected"))
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.validation.purchase.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    order = order_factory()
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-        authorization_id="auth-id",
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
-    )
-
-    step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
-
-    assert context.validation_succeeded is False
-    assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details=str(error))
-    mocked_next_step.assert_not_called()
 
 
 def test_check_purchase_validation_enabled_step(mocker, order_factory):
@@ -963,7 +906,7 @@ def test_validate_purchase_order(mocker):
 
     validate_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 6
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], PrepareCustomerData)
@@ -974,7 +917,8 @@ def test_validate_purchase_order(mocker):
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDuplicateLines
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], UpdatePrices)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetPreviewOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], UpdatePrices)
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(
