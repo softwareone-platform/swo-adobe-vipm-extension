@@ -2,6 +2,7 @@ from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.validation.change import (
+    GetPreviewOrder,
     ValidateDownsizes,
     validate_change_order,
 )
@@ -419,7 +420,7 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 3
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 4
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
@@ -427,6 +428,9 @@ def test_validate_change_order(mocker):
     )
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDownsizes
+    )
+    assert isinstance(
+        mocked_pipeline_ctor.mock_calls[0].args[3], GetPreviewOrder,
     )
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
