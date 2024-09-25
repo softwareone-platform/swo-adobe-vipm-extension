@@ -14,7 +14,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import set_order_error
-from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
+from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,7 @@ def validate_change_order(client, order):
         SetupContext(),
         ValidateDuplicateLines(),
         ValidateDownsizes(),
+        GetPreviewOrder(),
     )
     context = Context(order=order)
     pipeline.run(client, context)
