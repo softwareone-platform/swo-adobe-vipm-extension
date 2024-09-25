@@ -365,6 +365,7 @@ def add_subscription(client, adobe_client, customer_id, order, line):
             ],
             "startDate": adobe_subscription["creationDate"],
             "commitmentDate": adobe_subscription["renewalDate"],
+            "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
         }
         subscription = create_subscription(client, order["id"], subscription)
         logger.info(

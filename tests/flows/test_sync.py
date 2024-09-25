@@ -102,6 +102,7 @@ def test_sync_agreement_prices(
             ]
         },
         commitmentDate="2025-04-04",
+        autoRenew=adobe_subscription["autoRenewal"]["enabled"],
     )
 
     expected_lines = lines_factory(
@@ -432,6 +433,7 @@ def test_sync_agreement_prices_with_3yc(
             ]
         },
         commitmentDate="2025-04-04",
+        autoRenew=adobe_subscription["autoRenewal"]["enabled"],
     )
 
     expected_lines = lines_factory(

@@ -271,6 +271,7 @@ def test_transfer(
             ],
             "startDate": adobe_subscription["creationDate"],
             "commitmentDate": adobe_subscription["renewalDate"],
+            "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
         },
     )
     mocked_process_order.assert_called_once_with(
@@ -1465,6 +1466,7 @@ def test_transfer_3yc_customer(
             ],
             "startDate": adobe_subscription["creationDate"],
             "commitmentDate": adobe_subscription["renewalDate"],
+            "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
         },
     )
     mocked_complete_order.assert_called_once_with(
