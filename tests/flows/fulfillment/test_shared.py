@@ -1068,7 +1068,19 @@ def test_create_or_update_subscriptions_step(
                     {
                         "externalId": "adobeSKU",
                         "value": adobe_order["lineItems"][0]["offerId"],
-                    }
+                    },
+                    {
+                        "externalId": "currentQuantity",
+                        "value": str(adobe_subscription["currentQuantity"]),
+                    },
+                    {
+                        "externalId": "renewalQuantity",
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                    },
+                    {
+                        "externalId": "renewalDate",
+                        "value": adobe_subscription["renewalDate"],
+                    },
                 ]
             },
             "externalIds": {"vendor": adobe_order["lineItems"][0]["subscriptionId"]},

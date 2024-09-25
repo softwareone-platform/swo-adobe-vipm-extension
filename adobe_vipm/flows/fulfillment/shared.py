@@ -36,6 +36,9 @@ from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    PARAM_CURRENT_QUANTITY,
+    PARAM_RENEWAL_DATE,
+    PARAM_RENEWAL_QUANTITY,
     TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.mpt import (
@@ -335,7 +338,21 @@ def add_subscription(client, adobe_client, customer_id, order, line):
                     {
                         "externalId": PARAM_ADOBE_SKU,
                         "value": line["offerId"],
-                    }
+                    },
+                    {
+                        "externalId": PARAM_CURRENT_QUANTITY,
+                        "value": str(adobe_subscription["currentQuantity"]),
+                    },
+                    {
+                        "externalId": PARAM_RENEWAL_QUANTITY,
+                        "value": str(
+                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                        ),
+                    },
+                    {
+                        "externalId": PARAM_RENEWAL_DATE,
+                        "value": str(adobe_subscription["renewalDate"]),
+                    },
                 ]
             },
             "externalIds": {
@@ -560,14 +577,13 @@ class IncrementAttemptsCounter(Step):
         next_attempt_count = get_retry_count(context.order)
         max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
         if next_attempt_count > max_attemps:
-            logger.info(f"{context}: maximum ({max_attemps}) of attemps reached.",
+            logger.info(
+                f"{context}: maximum ({max_attemps}) of attemps reached.",
             )
             reason = f"Max processing attemps reached ({max_attemps})."
             switch_order_to_failed(client, context.order, reason)
             return
-        update_order(
-            client, context.order_id, parameters=context.order["parameters"]
-        )
+        update_order(client, context.order_id, parameters=context.order["parameters"])
         logger.info(
             f"{context}: retry count incremented successfully "
             f"{context.current_attempt} -> {next_attempt_count}."
@@ -597,7 +613,8 @@ class SetOrUpdateCotermNextSyncDates(Step):
             )
             logger.info(
                 f"{context}: coterm ({coterm_date.isoformat()}) "
-                f"and next sync ({next_sync.isoformat()}) updated successfully")
+                f"and next sync ({next_sync.isoformat()}) updated successfully"
+            )
         next_step(client, context)
 
 
@@ -657,10 +674,12 @@ class ValidateRenewalWindow(Step):
 class GetReturnOrders(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
-        context.adobe_return_orders = adobe_client.get_return_orders_by_external_reference(
-            context.authorization_id,
-            context.adobe_customer_id,
-            context.order_id,
+        context.adobe_return_orders = (
+            adobe_client.get_return_orders_by_external_reference(
+                context.authorization_id,
+                context.adobe_customer_id,
+                context.order_id,
+            )
         )
         return_orders_count = sum(len(x) for x in context.adobe_return_orders.values())
         logger.info(f"{context}: found {return_orders_count} return order")
@@ -758,7 +777,9 @@ class SubmitNewOrder(Step):
             )
             logger.info(f'{context}: new adobe order created: {adobe_order["orderId"]}')
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
-            update_order(client, context.order_id, externalIds=context.order["externalIds"])
+            update_order(
+                client, context.order_id, externalIds=context.order["externalIds"]
+            )
         else:
             adobe_order = adobe_client.get_order(
                 context.authorization_id,
@@ -768,23 +789,19 @@ class SubmitNewOrder(Step):
         context.adobe_new_order = adobe_order
         context.adobe_new_order_id = adobe_order["orderId"]
         if adobe_order["status"] == STATUS_PENDING:
-            logger.info(f"{context}: adobe order {context.adobe_new_order_id} is still pending.")
+            logger.info(
+                f"{context}: adobe order {context.adobe_new_order_id} is still pending."
+            )
             return
         elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
             reason = ORDER_STATUS_DESCRIPTION[adobe_order["status"]]
             switch_order_to_failed(client, context.order_id, reason)
-            logger.warning(
-                f"{context}: The adobe order has been failed {reason}."
-            )
+            logger.warning(f"{context}: The adobe order has been failed {reason}.")
             return
         elif adobe_order["status"] != STATUS_PROCESSED:
-            reason = (
-                f"Unexpected status ({adobe_order['status']}) received from Adobe."
-            )
+            reason = f"Unexpected status ({adobe_order['status']}) received from Adobe."
             switch_order_to_failed(client, context.order_id, reason)
-            logger.warning(
-                f"{context}: the order has been failed due to {reason}."
-            )
+            logger.warning(f"{context}: the order has been failed due to {reason}.")
             return
         next_step(client, context)
 
@@ -796,7 +813,7 @@ class CreateOrUpdateSubscriptions(Step):
             one_time_skus = get_one_time_skus(client, context.order)
             for line in filter(
                 lambda x: get_partial_sku(x["offerId"]) not in one_time_skus,
-                context.adobe_new_order["lineItems"]
+                context.adobe_new_order["lineItems"],
             ):
                 order_line = get_order_line_by_sku(context.order, line["offerId"])
 
@@ -827,7 +844,23 @@ class CreateOrUpdateSubscriptions(Step):
                                 {
                                     "externalId": PARAM_ADOBE_SKU,
                                     "value": line["offerId"],
-                                }
+                                },
+                                {
+                                    "externalId": PARAM_CURRENT_QUANTITY,
+                                    "value": str(adobe_subscription["currentQuantity"]),
+                                },
+                                {
+                                    "externalId": PARAM_RENEWAL_QUANTITY,
+                                    "value": str(
+                                        adobe_subscription["autoRenewal"][
+                                            "renewalQuantity"
+                                        ]
+                                    ),
+                                },
+                                {
+                                    "externalId": PARAM_RENEWAL_DATE,
+                                    "value": str(adobe_subscription["renewalDate"]),
+                                },
                             ]
                         },
                         "externalIds": {
@@ -841,7 +874,9 @@ class CreateOrUpdateSubscriptions(Step):
                         "startDate": adobe_subscription["creationDate"],
                         "commitmentDate": adobe_subscription["renewalDate"],
                     }
-                    subscription = create_subscription(client, context.order_id, subscription)
+                    subscription = create_subscription(
+                        client, context.order_id, subscription
+                    )
                     logger.info(
                         f'{context}: subscription {line["subscriptionId"]} '
                         f'({subscription["id"]}) created'
@@ -864,7 +899,9 @@ class CreateOrUpdateSubscriptions(Step):
 class UpdatePrices(Step):
     def __call__(self, client, context, next_step):
         if context.adobe_new_order:  # pragma: no branch
-            actual_skus = [item["offerId"] for item in context.adobe_new_order["lineItems"]]
+            actual_skus = [
+                item["offerId"] for item in context.adobe_new_order["lineItems"]
+            ]
             commitment = get_3yc_commitment(context.adobe_customer)
             if (
                 commitment
@@ -878,10 +915,14 @@ class UpdatePrices(Step):
                     actual_skus,
                 )
             else:
-                prices = get_prices_for_skus(context.product_id, context.currency, actual_skus)
+                prices = get_prices_for_skus(
+                    context.product_id, context.currency, actual_skus
+                )
 
             lines = []
-            for line in [get_order_line_by_sku(context.order, sku) for sku in actual_skus]:
+            for line in [
+                get_order_line_by_sku(context.order, sku) for sku in actual_skus
+            ]:
                 new_price_item = get_price_item_by_line_sku(
                     prices, line["item"]["externalIds"]["vendor"]
                 )
@@ -937,14 +978,14 @@ class CompleteOrder(Step):
         )
         context.order["agreement"] = agreement
         send_email_notification(client, context.order)
-        logger.info(f'{context}: order has been completed successfully')
+        logger.info(f"{context}: order has been completed successfully")
         next_step(client, context)
 
 
 class SyncAgreement(Step):
     def __call__(self, client, context, next_step):
         sync_agreements_by_agreement_ids(client, [context.agreement_id])
-        logger.info(f'{context}: agreement synchoronized')
+        logger.info(f"{context}: agreement synchoronized")
         next_step(client, context)
 
 
@@ -969,7 +1010,11 @@ class ValidateDuplicateLines(Step):
                 items.append(line["item"]["id"])
 
         items.extend(
-            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
+            [
+                line["item"]["id"]
+                for line in context.order["lines"]
+                if line["oldQuantity"] == 0
+            ]
         )
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:

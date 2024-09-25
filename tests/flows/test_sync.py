@@ -82,7 +82,24 @@ def test_sync_agreement_prices(
         mpt_subscription["id"],
         lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
         parameters={
-            "fulfillment": [{"externalId": "adobeSKU", "value": "65304578CA01A12"}]
+            "fulfillment": [
+                {
+                    "externalId": "adobeSKU",
+                    "value": "65304578CA01A12",
+                },
+                {
+                    "externalId": "currentQuantity",
+                    "value": str(adobe_subscription["currentQuantity"]),
+                },
+                {
+                    "externalId": "renewalQuantity",
+                    "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                },
+                {
+                    "externalId": "renewalDate",
+                    "value": adobe_subscription["renewalDate"],
+                },
+            ]
         },
         commitmentDate="2025-04-04",
     )
@@ -395,7 +412,24 @@ def test_sync_agreement_prices_with_3yc(
         mpt_subscription["id"],
         lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
         parameters={
-            "fulfillment": [{"externalId": "adobeSKU", "value": "65304578CA01A12"}]
+            "fulfillment": [
+                {
+                    "externalId": "adobeSKU",
+                    "value": "65304578CA01A12"
+                },
+                {
+                    "externalId": "currentQuantity",
+                    "value": str(adobe_subscription["currentQuantity"]),
+                },
+                {
+                    "externalId": "renewalQuantity",
+                    "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                },
+                {
+                    "externalId": "renewalDate",
+                    "value": adobe_subscription["renewalDate"],
+                },
+            ]
         },
         commitmentDate="2025-04-04",
     )
