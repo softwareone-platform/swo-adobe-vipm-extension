@@ -85,6 +85,7 @@ def test_sync_agreement_prices(
             "fulfillment": [{"externalId": "adobeSKU", "value": "65304578CA01A12"}]
         },
         commitmentDate="2025-04-04",
+        autoRenew=adobe_subscription["autoRenewal"]["enabled"],
     )
 
     expected_lines = lines_factory(
@@ -398,6 +399,7 @@ def test_sync_agreement_prices_with_3yc(
             "fulfillment": [{"externalId": "adobeSKU", "value": "65304578CA01A12"}]
         },
         commitmentDate="2025-04-04",
+        autoRenew=adobe_subscription["autoRenewal"]["enabled"],
     )
 
     expected_lines = lines_factory(

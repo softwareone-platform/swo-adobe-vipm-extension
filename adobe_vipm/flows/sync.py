@@ -141,6 +141,7 @@ def sync_agreement_prices(
                     lines=lines,
                     parameters=parameters,
                     commitmentDate=coterm_date,
+                    autoRenew=adobe_subscription["autoRenewal"]["enabled"],
                 )
                 logger.info(
                     f"Subscription: {subscription['id']} ({line_id}): "
