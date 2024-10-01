@@ -10,7 +10,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_TRANSFER_ALREADY_TRANSFERRED,
     STATUS_TRANSFER_INELIGIBLE,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, ResellerNotFoundError
 from adobe_vipm.flows.migration import (
     check_running_transfers,
     check_running_transfers_for_product,
@@ -350,6 +350,91 @@ def test_start_transfers_for_product_error(
         "the transfer for Membership **membership-id**.",
         facts=FactsSection(
             title="Last error from Adobe", data={"9999": "9999 - Unexpected error"}
+        ),
+        button=Button(label="membership-id", url="https://link.to.transfer"),
+    )
+
+
+def test_start_transfers_for_product_reseller_not_found_error(
+    mocker,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+):
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+
+    mocked_get_transfer_to_process = mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_process",
+        return_value=[mocked_transfer],
+    )
+
+    mocked_send_exception = mocker.patch(
+        "adobe_vipm.flows.migration.send_exception",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfer_link",
+        return_value="https://link.to.transfer",
+    )
+
+    mocked_get_offer_ids_by_membership_id = mocker.patch(
+        "adobe_vipm.flows.migration.get_offer_ids_by_membership_id",
+        return_value=[],
+    )
+    mocked_create_offers = mocker.patch(
+        "adobe_vipm.flows.migration.create_offers",
+    )
+
+    adobe_preview_transfer = adobe_preview_transfer_factory(
+        items=adobe_items_factory(renewal_date="2022-10-11"),
+    )
+    error = ResellerNotFoundError("Reseller is not found")
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+
+    mocked_adobe_client.create_transfer.side_effect = error
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    start_transfers_for_product("product-id")
+
+    mocked_get_transfer_to_process.assert_called_once_with("product-id")
+    mocked_adobe_client.preview_transfer.assert_called_once_with(
+        mocked_transfer.authorization_uk,
+        mocked_transfer.membership_id,
+    )
+    mocked_get_offer_ids_by_membership_id.assert_called_once_with(
+        "product-id",
+        mocked_transfer.membership_id,
+    )
+    mocked_create_offers.assert_called_once_with(
+        "product-id",
+        [
+            {
+                "transfer": [mocked_transfer],
+                "offer_id": adobe_preview_transfer["items"][0]["offerId"],
+                "quantity": adobe_preview_transfer["items"][0]["quantity"],
+                "renewal_date": date.fromisoformat(
+                    adobe_preview_transfer["items"][0]["renewalDate"]
+                ),
+            },
+        ],
+    )
+    mocked_transfer.save.assert_called_once()
+    assert mocked_transfer.status == "failed"
+    assert mocked_transfer.migration_error_description == str(error)
+
+    mocked_send_exception.assert_called_once_with(
+        "Marketplace Platform configuration error during transfer.",
+        "Reseller is not found",
+        facts=FactsSection(
+            title="Transfer error",
+            data={"ResellerNotFoundError": mocked_transfer.migration_error_description},
         ),
         button=Button(label="membership-id", url="https://link.to.transfer"),
     )

@@ -10,7 +10,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
     STATUS_TRANSFER_ALREADY_TRANSFERRED,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, ResellerNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
     create_offers,
@@ -236,6 +236,21 @@ def start_transfers_for_product(product_id):
                 facts=FactsSection(
                     "Last error from Adobe",
                     {transfer.adobe_error_code: transfer.adobe_error_description},
+                ),
+                button=get_transfer_link_button(transfer),
+            )
+            continue
+        except ResellerNotFoundError as e:
+            transfer.status = "failed"
+            transfer.migration_error_description = str(e)
+            transfer.updated_at = datetime.now()
+            transfer.save()
+            send_exception(
+                "Marketplace Platform configuration error during transfer.",
+                f"{str(e)}",
+                facts=FactsSection(
+                    "Transfer error",
+                    {"ResellerNotFoundError": transfer.migration_error_description},
                 ),
                 button=get_transfer_link_button(transfer),
             )
