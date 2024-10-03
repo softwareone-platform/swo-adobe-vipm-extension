@@ -10,7 +10,11 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
     STATUS_TRANSFER_ALREADY_TRANSFERRED,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, ResellerNotFoundError
+from adobe_vipm.adobe.errors import (
+    AdobeAPIError,
+    AuthorizationNotFoundError,
+    ResellerNotFoundError,
+)
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
     create_offers,
@@ -203,6 +207,23 @@ def start_transfers_for_product(product_id):
                         button=get_transfer_link_button(transfer),
                     )
                 continue
+        except AuthorizationNotFoundError as e:
+            transfer.status = "failed"
+            transfer.migration_error_description = str(e)
+            transfer.updated_at = datetime.now()
+            transfer.save()
+            send_exception(
+                "Marketplace Platform configuration error during transfer.",
+                str(e),
+                facts=FactsSection(
+                    "Transfer error",
+                    {
+                        "AuthorizationNotFoundError": transfer.migration_error_description
+                    },
+                ),
+                button=get_transfer_link_button(transfer),
+            )
+            continue
 
         if transfer_preview:
             populate_offers_for_transfer(
@@ -247,7 +268,7 @@ def start_transfers_for_product(product_id):
             transfer.save()
             send_exception(
                 "Marketplace Platform configuration error during transfer.",
-                f"{str(e)}",
+                str(e),
                 facts=FactsSection(
                     "Transfer error",
                     {"ResellerNotFoundError": transfer.migration_error_description},
