@@ -109,9 +109,9 @@ def sync_agreement_prices(
             )
 
             actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
-            to_update.append((subscription, actual_sku))
+            to_update.append((subscription, adobe_subscription, actual_sku))
 
-        skus = [item[1] for item in to_update]
+        skus = [item[2] for item in to_update]
 
         if commitment_start_date:
             prices = get_prices_for_3yc_skus(
@@ -120,7 +120,7 @@ def sync_agreement_prices(
         else:
             prices = get_prices_for_skus(product_id, currency, skus)
 
-        for subscription, actual_sku in to_update:
+        for subscription, adobe_subscription, actual_sku in to_update:
             line_id = subscription["lines"][0]["id"]
             lines = [
                 {
@@ -171,7 +171,12 @@ def sync_agreement_prices(
                     f"Subscription: {subscription['id']} ({line_id}): "
                     f"sku={actual_sku}, "
                     f"current_price={current_price}, "
-                    f"new_price={prices[actual_sku]}\n"
+                    f"new_price={prices[actual_sku]}, "
+                    f"auto_renew={adobe_subscription['autoRenewal']['enabled']}, "
+                    f"current_quantity={adobe_subscription['currentQuantity']}, "
+                    f"renewal_quantity={adobe_subscription['autoRenewal']['renewalQuantity']}, "
+                    f"renewal_date={str(adobe_subscription['renewalDate'])}, "
+                    f"commitment_date={coterm_date}\n"
                 )
 
         to_update = []
