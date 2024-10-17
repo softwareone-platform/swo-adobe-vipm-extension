@@ -41,6 +41,7 @@ from adobe_vipm.flows.constants import (
     REQUIRED_CUSTOMER_ORDER_PARAMS,
     STATUS_MARKET_SEGMENT_PENDING,
 )
+from adobe_vipm.flows.mpt import get_product_onetime_items_by_ids
 from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import find_first
 
@@ -435,8 +436,12 @@ def split_downsizes_and_upsizes(order):
         tuple: (downsizes, upsizes)
     """
     return (
-        list(filter(lambda line: line["quantity"] < line["oldQuantity"], order["lines"])),
-        list(filter(lambda line: line["quantity"] > line["oldQuantity"], order["lines"])),
+        list(
+            filter(lambda line: line["quantity"] < line["oldQuantity"], order["lines"])
+        ),
+        list(
+            filter(lambda line: line["quantity"] > line["oldQuantity"], order["lines"])
+        ),
     )
 
 
@@ -626,6 +631,19 @@ def is_transferring_item_expired(item):
     return date.today() > renewal_date
 
 
+def are_all_transferring_items_expired(adobe_items):
+    """
+    Check if all Adobe subscriptions to be transferred are expired.
+    Args:
+        adobe_items (list): List of adobe items to be transferred.
+        must be extracted.
+
+    Returns:
+        bool: True if all Adobe subscriptions are expired, False otherwise.
+    """
+    return all(is_transferring_item_expired(item) for item in adobe_items)
+
+
 def get_transfer_item_sku_by_subscription(trf, sub_id):
     item = find_first(
         lambda x: x["subscriptionId"] == sub_id,
@@ -700,12 +718,15 @@ def is_renewal_window_open(order):
 
 def map_returnable_to_return_orders(returnable_orders, return_orders):
     mapped = []
+
     def filter_by_reference_order(reference_order_id, item):
         return item["referenceOrderId"] == reference_order_id
 
     for returnable_order in returnable_orders:
         return_order = find_first(
-            functools.partial(filter_by_reference_order, returnable_order.order["orderId"]),
+            functools.partial(
+                filter_by_reference_order, returnable_order.order["orderId"]
+            ),
             return_orders,
         )
         mapped.append((returnable_order, return_order))
@@ -717,3 +738,24 @@ def set_template(order, template):
     updated_order = copy.deepcopy(order)
     updated_order["template"] = template
     return updated_order
+
+
+def get_one_time_skus(client, order):
+    """
+    Get tge SKUs from the order lines that correspond
+    to One-Time items.
+
+    Args:
+        client (MPTClient): The client to consume the MPT API.
+        order (dict): The order from which the One-Time items SKUs
+        must be extracted.
+
+    Returns:
+        list: List of One-Time SKUs.
+    """
+    one_time_items = get_product_onetime_items_by_ids(
+        client,
+        order["agreement"]["product"]["id"],
+        [line["item"]["id"] for line in order["lines"]],
+    )
+    return [item["externalIds"]["vendor"] for item in one_time_items]
