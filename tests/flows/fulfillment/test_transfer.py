@@ -114,7 +114,7 @@ def test_transfer(
         return_value=subscription,
     )
     mocked_get_onetime = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
 
@@ -813,7 +813,7 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
 
@@ -1010,7 +1010,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=[],
     )
 
@@ -1304,7 +1304,7 @@ def test_transfer_3yc_customer(
         return_value=subscription,
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=[],
     )
 

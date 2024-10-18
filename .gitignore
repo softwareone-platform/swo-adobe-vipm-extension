@@ -169,3 +169,4 @@ devmock/data/**/*.json
 
 .DS_Store
 .ruff_cache
+.idea
