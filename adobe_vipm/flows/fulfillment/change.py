@@ -3,6 +3,7 @@ This module contains the logic to implement the change fulfillment flow.
 It exposes a single function that is the entrypoint for change order
 processing.
 """
+
 import itertools
 import logging
 
@@ -27,7 +28,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_adobe_subscription_id,
@@ -92,9 +93,11 @@ class ValidateReturnableOrders(Step):
     """
 
     def __call__(self, client, context, next_step):
-        if context.adobe_returnable_orders and not all(
-            context.adobe_returnable_orders.values()
-        ) and not context.adobe_return_orders:
+        if (
+            context.adobe_returnable_orders
+            and not all(context.adobe_returnable_orders.values())
+            and not context.adobe_return_orders
+        ):
             non_returnable_skus = [
                 k for k, v in context.adobe_returnable_orders.items() if v is None
             ]
@@ -118,6 +121,7 @@ class UpdateRenewalQuantities(Step):
     Updates the Adobe subscriptions renewal quantity if it doesn't match
     the agreement current quantity.
     """
+
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines + context.upsize_lines:
@@ -171,6 +175,7 @@ def fulfill_change_order(client, order):
         GetReturnOrders(),
         GetReturnableOrders(),
         ValidateReturnableOrders(),
+        ValidateDownsizes3YC(),
         GetPreviewOrder(),
         SubmitReturnOrders(),
         SubmitNewOrder(),
