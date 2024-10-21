@@ -189,11 +189,13 @@ FAKE_CUSTOMERS_IDS = {
     MARKET_SEGMENT_EDUCATION: "1234567890EDU",
 }
 
-ERR_INVALID_DOWNSIZE_QUANTITY =  ValidationError(
+ERR_INVALID_DOWNSIZE_QUANTITY = ValidationError(
     "VIPMV013", "Could not find suitable returnable orders for all items.\n{messages}"
 )
 
-ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = " or any combination of these values,"
+ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = (
+    " or any combination of these values,"
+)
 
 ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
     "Cannot reduce item `{item}` quantity by {delta}. "
@@ -206,4 +208,27 @@ ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
     "is only one returnable order which would reduce the quantity to zero. "
     "Consider placing a Termination order for this subscription instead and "
     "place a new order for {quantity} licenses."
+)
+
+ERR_DOWNSIZE_MINIMUN_3YC_LICENSES = (
+    "The order has failed. The reduction in quantity would place the account"
+    " below the minimum commitment of {minimum_licenses} licenses for the three-year commitment."
+)
+
+
+ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES = (
+    "The order has failed. The reduction in quantity would place the account below the minimum"
+    " commitment of {minimun_consumables} consumables for the three-year commitment."
+)
+
+
+ERR_DOWNSIZE_MINIMUN_3YC_GENERIC = (
+    "The order has failed. The reduction in quantity would place the account below the "
+    "minimum commitment of {minimum_licenses} licenses or {minimun_consumables} consumables"
+    " for the three-year commitment."
+)
+
+ERR_UPDATING_TRANSFER_ITEMS = (
+    "Do not add or remove items, and do not modify the quantities of any items. "
+    "You may make these changes using a Change order once this order completes."
 )
