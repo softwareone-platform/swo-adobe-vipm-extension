@@ -35,7 +35,6 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.fulfillment.shared import (
     add_subscription,
     check_processing_template,
-    get_one_time_skus,
     handle_retries,
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
@@ -48,6 +47,7 @@ from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_membership_id,
     get_adobe_order_id,
+    get_one_time_skus,
     get_ordering_parameter,
     set_ordering_parameter_error,
 )
