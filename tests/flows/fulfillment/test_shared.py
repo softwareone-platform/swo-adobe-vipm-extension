@@ -1087,6 +1087,7 @@ def test_create_or_update_subscriptions_step(
             "lines": [{"id": order["lines"][0]["id"]}],
             "startDate": adobe_subscription["creationDate"],
             "commitmentDate": adobe_subscription["renewalDate"],
+            "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
         },
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
