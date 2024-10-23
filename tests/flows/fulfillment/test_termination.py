@@ -15,7 +15,7 @@ from adobe_vipm.flows.fulfillment.termination import (
     SwitchAutoRenewalOff,
     fulfill_termination_order,
 )
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 
 
 def test_get_returnable_orders_step(
@@ -221,7 +221,7 @@ def test_fulfill_termination_order(mocker):
     mocked_order = mocker.MagicMock()
 
     fulfill_termination_order(mocked_client, mocked_order)
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 10
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 11
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
@@ -236,12 +236,13 @@ def test_fulfill_termination_order(mocker):
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnableOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], SubmitReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SwitchAutoRenewalOff)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], CompleteOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], ValidateDownsizes3YC)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SubmitReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], SwitchAutoRenewalOff)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], CompleteOrder)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[9].template_name
+        mocked_pipeline_ctor.mock_calls[0].args[10].template_name
         == TEMPLATE_NAME_TERMINATION
     )
     mocked_context_ctor.assert_called_once_with(order=mocked_order)

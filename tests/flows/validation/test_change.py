@@ -1,6 +1,11 @@
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
+from adobe_vipm.flows.constants import (
+    ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES,
+    ERR_DOWNSIZE_MINIMUN_3YC_GENERIC,
+    ERR_DOWNSIZE_MINIMUN_3YC_LICENSES,
+)
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.validation.change import (
     GetPreviewOrder,
     ValidateDownsizes,
@@ -92,8 +97,6 @@ def test_validate_downsizes_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-
-
 def test_validate_downsizes_step_no_returnable_orders(
     mocker,
     order_factory,
@@ -140,7 +143,6 @@ def test_validate_downsizes_step_no_returnable_orders(
         context.adobe_customer["cotermDate"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
 
 
 def test_validate_downsizes_step_invalid_quantity(
@@ -420,17 +422,20 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 4
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 5
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[1], ValidateDuplicateLines
     )
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDownsizes)
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDownsizes
+        mocked_pipeline_ctor.mock_calls[0].args[3],
+        ValidateDownsizes3YC,
     )
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[3], GetPreviewOrder,
+        mocked_pipeline_ctor.mock_calls[0].args[4],
+        GetPreviewOrder,
     )
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
@@ -438,3 +443,214 @@ def test_validate_change_order(mocker):
         mocked_client,
         mocked_context,
     )
+
+
+def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
+    mocker,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_commitment_factory,
+    adobe_customer_factory,
+    lines_factory,
+):
+    """
+    Tests the validate returnable orders step when the user has 3YC commitment benefits and
+    the resulting number of licenses after the return is greater or equal to the minimum 3YC
+    quantity.
+    """
+    adobe_3yc_commitment = adobe_commitment_factory(licenses=25, consumables=0)
+
+    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
+    order_lines = lines_factory(
+        line_id=None,
+        item_id=1,
+        quantity=10,
+        old_quantity=20,
+        name="Awesome Expired product 1",
+        external_vendor_id="65304990CA",
+        unit_purchase_price=33.04,
+    )
+    order_lines.extend(
+        lines_factory(
+            line_id=None,
+            item_id=2,
+            quantity=20,
+            old_quantity=25,
+            name="Awesome Expired product 2",
+            external_vendor_id="65304991CA",
+            unit_purchase_price=35.09,
+        )
+    )
+
+    order = order_factory(lines=order_lines)
+    context = Context(
+        order=order,
+        downsize_lines=order["lines"],
+        adobe_returnable_orders={
+            "sku1": (mocker.MagicMock(),),
+            "sku2": (mocker.MagicMock(),),
+        },
+        adobe_customer_id="adobe-customer-id",
+        adobe_customer=adobe_customer,
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    adobe_subscription = adobe_subscription_factory(offer_id="65304990CA01A12")
+    adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CA01A12")
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription, adobe_subscription_2],
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    step = ValidateDownsizes3YC(True)
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.order["error"] == ERR_DOWNSIZE_MINIMUN_3YC_LICENSES.format(
+        minimum_licenses=25
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
+    mocker,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_commitment_factory,
+    adobe_customer_factory,
+    lines_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+
+    adobe_3yc_commitment = adobe_commitment_factory(licenses=0, consumables=37)
+
+    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
+    order_lines = lines_factory(
+        line_id=None,
+        item_id=1,
+        quantity=10,
+        old_quantity=20,
+        name="Awesome Expired product 1",
+        external_vendor_id="65304990CA",
+        unit_purchase_price=33.04,
+    )
+    order_lines.extend(
+        lines_factory(
+            line_id=None,
+            item_id=2,
+            quantity=20,
+            old_quantity=25,
+            name="Awesome Expired product 2",
+            external_vendor_id="65304991CA",
+            unit_purchase_price=35.09,
+        )
+    )
+
+    order = order_factory(lines=order_lines)
+
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+        adobe_customer_id=adobe_customer["customerId"],
+        adobe_customer=adobe_customer,
+        adobe_return_orders={},
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    adobe_subscription = adobe_subscription_factory(offer_id="65304990CAT1A12")
+    adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CAT1A12")
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription, adobe_subscription_2],
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    step = ValidateDownsizes3YC(True)
+    step(mocked_client, context, mocked_next_step)
+    assert context.order["error"] == ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES.format(
+        minimun_consumables=37
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
+    mocker,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_commitment_factory,
+    adobe_customer_factory,
+    lines_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+
+    adobe_3yc_commitment = adobe_commitment_factory(licenses=20, consumables=37)
+
+    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
+    order_lines = lines_factory(
+        line_id=None,
+        item_id=1,
+        quantity=10,
+        old_quantity=20,
+        name="Awesome Expired product 1",
+        external_vendor_id="65304990CA",
+        unit_purchase_price=33.04,
+    )
+    order_lines.extend(
+        lines_factory(
+            line_id=None,
+            item_id=2,
+            quantity=20,
+            old_quantity=37,
+            name="Awesome Expired product 2",
+            external_vendor_id="65304991CA",
+            unit_purchase_price=35.09,
+        )
+    )
+
+    order = order_factory(lines=order_lines)
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+        adobe_customer_id=adobe_customer["customerId"],
+        adobe_customer=adobe_customer,
+        adobe_return_orders={},
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    adobe_subscription = adobe_subscription_factory(offer_id="65304990CA01A12")
+    adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CAT1A12")
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription, adobe_subscription_2],
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    step = ValidateDownsizes3YC(True)
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.order["error"] == ERR_DOWNSIZE_MINIMUN_3YC_GENERIC.format(
+        minimun_consumables=37, minimum_licenses=20
+    )
+    mocked_next_step.assert_not_called()

@@ -11,7 +11,7 @@ from adobe_vipm.flows.constants import (
     ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import set_order_error
 from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
@@ -46,7 +46,9 @@ class ValidateDownsizes(Step):
             if not returnable_orders:
                 continue
 
-            returnable_by_quantity = self.get_returnable_by_quantity_map(returnable_orders)
+            returnable_by_quantity = self.get_returnable_by_quantity_map(
+                returnable_orders
+            )
 
             delta = line["oldQuantity"] - line["quantity"]
 
@@ -102,6 +104,7 @@ def validate_change_order(client, order):
         SetupContext(),
         ValidateDuplicateLines(),
         ValidateDownsizes(),
+        ValidateDownsizes3YC(True),
         GetPreviewOrder(),
     )
     context = Context(order=order)
