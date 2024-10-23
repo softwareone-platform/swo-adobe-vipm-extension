@@ -210,6 +210,24 @@ ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
     "place a new order for {quantity} licenses."
 )
 
+ERR_DOWNSIZE_MINIMUN_3YC_LICENSES = (
+    "The order has failed. The reduction in quantity would place the account"
+    " below the minimum commitment of {minimum_licenses} licenses for the three-year commitment."
+)
+
+
+ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES = (
+    "The order has failed. The reduction in quantity would place the account below the minimum"
+    " commitment of {minimun_consumables} consumables for the three-year commitment."
+)
+
+
+ERR_DOWNSIZE_MINIMUN_3YC_GENERIC = (
+    "The order has failed. The reduction in quantity would place the account below the "
+    "minimum commitment of {minimum_licenses} licenses or {minimun_consumables} consumables"
+    " for the three-year commitment."
+)
+
 ERR_UPDATING_TRANSFER_ITEMS = (
     "Do not add or remove items, and do not modify the quantities of any items. "
     "You may make these changes using a Change order once this order completes."

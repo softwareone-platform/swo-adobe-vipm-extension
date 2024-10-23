@@ -3,6 +3,7 @@ This module contains the logic to implement the termination fulfillment flow.
 It exposes a single function that is the entrypoint for termination order
 processing.
 """
+
 import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -17,7 +18,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitReturnOrders,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_adobe_subscription_id,
@@ -26,21 +27,27 @@ from adobe_vipm.flows.utils import (
 
 logger = logging.getLogger(__name__)
 
+
 class GetReturnableOrders(Step):
     """
     For each SKU retrieve all the orders that can be returned.
     """
+
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
-            context.adobe_returnable_orders[sku] = adobe_client.get_returnable_orders_by_sku(
-                context.authorization_id,
-                context.adobe_customer_id,
-                sku,
-                context.adobe_customer["cotermDate"],
+            context.adobe_returnable_orders[sku] = (
+                adobe_client.get_returnable_orders_by_sku(
+                    context.authorization_id,
+                    context.adobe_customer_id,
+                    sku,
+                    context.adobe_customer["cotermDate"],
+                )
             )
-        returnable_orders_count = sum(len(v) for v in context.adobe_returnable_orders.values())
+        returnable_orders_count = sum(
+            len(v) for v in context.adobe_returnable_orders.values()
+        )
         logger.info(f"{context}: found {returnable_orders_count} returnable orders.")
         next_step(client, context)
 
@@ -50,6 +57,7 @@ class SwitchAutoRenewalOff(Step):
     Set the autoRenewal flag to False for
     subscription that must be cancelled.
     """
+
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
@@ -98,6 +106,7 @@ def fulfill_termination_order(client, order):
         StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
         ValidateRenewalWindow(),
         GetReturnableOrders(),
+        ValidateDownsizes3YC(),
         GetReturnOrders(),
         SubmitReturnOrders(),
         SwitchAutoRenewalOff(),
