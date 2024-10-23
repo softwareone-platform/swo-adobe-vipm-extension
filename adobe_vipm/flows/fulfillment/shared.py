@@ -853,6 +853,7 @@ class CreateOrUpdateSubscriptions(Step):
                         ],
                         "startDate": adobe_subscription["creationDate"],
                         "commitmentDate": adobe_subscription["renewalDate"],
+                        "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
                     }
                     subscription = create_subscription(
                         client, context.order_id, subscription
