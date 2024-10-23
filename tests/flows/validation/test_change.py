@@ -654,3 +654,53 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
         minimun_consumables=37, minimum_licenses=20
     )
     mocked_next_step.assert_not_called()
+
+
+def test_validate_downsize_3yc_orders_step_not_commitment(
+    mocker,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_commitment_factory,
+    adobe_customer_factory,
+    lines_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+
+    adobe_customer = adobe_customer_factory()
+    order_lines = lines_factory(
+        line_id=None,
+        item_id=1,
+        quantity=10,
+        old_quantity=20,
+        name="Awesome Expired product 1",
+        external_vendor_id="65304990CA",
+        unit_purchase_price=33.04,
+    )
+    order_lines.extend(
+        lines_factory(
+            line_id=None,
+            item_id=2,
+            quantity=20,
+            old_quantity=37,
+            name="Awesome Expired product 2",
+            external_vendor_id="65304991CA",
+            unit_purchase_price=35.09,
+        )
+    )
+
+    order = order_factory(lines=order_lines)
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+        adobe_customer_id=adobe_customer["customerId"],
+        adobe_customer=adobe_customer,
+        adobe_return_orders={},
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    step = ValidateDownsizes3YC()
+    step(mocked_client, context, mocked_next_step)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
