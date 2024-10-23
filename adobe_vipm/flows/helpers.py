@@ -161,13 +161,12 @@ class ValidateDownsizes3YC:
 
         # Check if the Adobe customer has a 3YC commitment
         commitment = get_3yc_commitment(context.adobe_customer)
-        if all(
-            [
-                commitment,
-                commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE),
-                date.today() <= date.fromisoformat(commitment["endDate"]),
-                context.downsize_lines,
-            ]
+
+        if (
+            commitment
+            and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+            and date.today() <= date.fromisoformat(commitment["endDate"])
+            and context.downsize_lines
         ):
             adobe_client = get_adobe_client()
             # get Adobe customer subscriptions
