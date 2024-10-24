@@ -33,6 +33,7 @@ from adobe_vipm.flows.utils import (
     get_order_line_by_sku,
     get_ordering_parameter,
     get_transfer_item_sku_by_subscription,
+    has_order_line_updated,
     is_transferring_item_expired,
     set_order_error,
     set_ordering_parameter_error,
@@ -73,29 +74,45 @@ def get_prices(order, commitment, adobe_skus):
         return get_prices_for_skus(product_id, currency, adobe_skus)
 
 
-def has_order_line_updated(order_lines, adobe_items, quantity_field):
-    """
-    Compare order lines and Adobe items to be transferred
-    Args:
-        order_lines (list): List of order lines
-        adobe_items (list): List of adobe items to be transferred.
-        quantity_field (str): The name of the field that contains the quantity depending on the
-        provided `adobe_object` argument.
+def update_order_lines(
+    order, adobe_items, prices, items_map, quantity_field, order_error, returned_skus
+):
+    for adobe_line in adobe_items:
+        item = items_map.get(get_partial_sku(adobe_line["offerId"]))
+        if not item:
+            param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_MEMBERSHIP_ID,
+                ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
+                    title=param["name"],
+                    item_sku=get_partial_sku(adobe_line["offerId"]),
+                ),
+            )
+            return True, order
+        current_line = get_order_line_by_sku(
+            order, get_partial_sku(adobe_line["offerId"])
+        )
+        if current_line:
+            current_line["quantity"] = adobe_line[quantity_field]
+        else:
+            new_line = {
+                "item": item,
+                "quantity": adobe_line[quantity_field],
+                "oldQuantity": 0,
+            }
+            new_line.setdefault("price", {})
+            new_line["price"]["unitPP"] = prices.get(adobe_line["offerId"], 0)
+            order["lines"].append(new_line)
 
-    Returns:
-        bool: True if order line is not equal to adobe items, False otherwise.
+    lines = [
+        line
+        for line in order["lines"]
+        if line["item"]["externalIds"]["vendor"] in returned_skus
+    ]
+    order["lines"] = lines
 
-    """
-    order_line_map = {
-        order_line["item"]["externalIds"]["vendor"]: order_line["quantity"]
-        for order_line in order_lines
-    }
-
-    adobe_items_map = {
-        get_partial_sku(adobe_item["offerId"]): adobe_item[quantity_field]
-        for adobe_item in adobe_items
-    }
-    return order_line_map != adobe_items_map
+    return order_error, order
 
 
 def add_lines_to_order(
@@ -158,7 +175,7 @@ def add_lines_to_order(
         ]
 
     if len(adobe_items) == 0:
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
@@ -177,42 +194,15 @@ def add_lines_to_order(
         )
     }
 
-    for adobe_line in adobe_items:
-        item = items_map.get(get_partial_sku(adobe_line["offerId"]))
-        if not item:
-            param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
-            order = set_ordering_parameter_error(
-                order,
-                PARAM_MEMBERSHIP_ID,
-                ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
-                    title=param["name"],
-                    item_sku=get_partial_sku(adobe_line["offerId"]),
-                ),
-            )
-            return True, order
-        current_line = get_order_line_by_sku(
-            order, get_partial_sku(adobe_line["offerId"])
-        )
-        if current_line:
-            current_line["quantity"] = adobe_line[quantity_field]
-        else:
-            new_line = {
-                "item": item,
-                "quantity": adobe_line[quantity_field],
-                "oldQuantity": 0,
-            }
-            new_line.setdefault("price", {})
-            new_line["price"]["unitPP"] = prices.get(adobe_line["offerId"], 0)
-            order["lines"].append(new_line)
-
-    lines = [
-        line
-        for line in order["lines"]
-        if line["item"]["externalIds"]["vendor"] in returned_skus
-    ]
-    order["lines"] = lines
-
-    return order_error, order
+    return update_order_lines(
+        order,
+        adobe_items,
+        prices,
+        items_map,
+        quantity_field,
+        order_error,
+        returned_skus,
+    )
 
 
 def validate_transfer_not_migrated(mpt_client, adobe_client, order):
@@ -323,7 +313,7 @@ def validate_transfer(mpt_client, adobe_client, order):
     )
 
     if adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
