@@ -31,6 +31,7 @@ from adobe_vipm.adobe.dataclasses import (
 )
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.adobe.utils import (
+    find_first,
     get_item_by_partial_sku,
     join_phone_number,
     to_adobe_line_id,
@@ -38,6 +39,11 @@ from adobe_vipm.adobe.utils import (
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
+
+
+def _is_processed(order_item):
+    order, item = order_item
+    return order["status"] == STATUS_PROCESSED and item["status"] == STATUS_PROCESSED
 
 
 class AdobeClient:
@@ -241,31 +247,57 @@ class AdobeClient:
             order["referenceOrderId"] for order in (return_orders or [])
         ]
 
+        # by default orders a sorted in descending way by creationDate
         orders = self.get_orders(
             authorization_id,
             customer_id,
             filters=filters,
         )
 
+        order_items = (
+            (
+                order,
+                get_item_by_partial_sku(order["lineItems"], sku),
+            )
+            for order in orders
+        )
+        # filter out orders that are not related to provided sku
+        order_items = filter(lambda order_item: order_item[1], order_items)
+        # filter out orders that are not processed
+        order_items = list(
+            filter(
+                lambda order_item: (
+                    order_item[0]["orderId"] in returning_order_ids
+                    or _is_processed(order_item)
+                ),
+                order_items,
+            )
+        )
+
+        renewal_order_item = find_first(
+            lambda order_item: order_item[0]["orderType"] == ORDER_TYPE_RENEWAL,
+            order_items,
+        )
+        # if there is renewal - ignore orders that were before renewal
+        if renewal_order_item:
+            renewal_order_date = datetime.fromisoformat(
+                renewal_order_item[0]["creationDate"]
+            )
+            order_items = filter(
+                lambda order_item: datetime.fromisoformat(order_item[0]["creationDate"])
+                >= renewal_order_date,
+                order_items,
+            )
+
         result = []
-        for order in orders:
-            item = get_item_by_partial_sku(order["lineItems"], sku)
-            if not item:
-                continue
-            if (
-                order["orderId"] in returning_order_ids
-                or (
-                    order["status"] == STATUS_PROCESSED and
-                    item["status"] == STATUS_PROCESSED
+        for order, item in order_items:
+            result.append(
+                ReturnableOrderInfo(
+                    order=order,
+                    line=item,
+                    quantity=item["quantity"],
                 )
-            ):
-                result.append(
-                    ReturnableOrderInfo(
-                        order=order,
-                        line=item,
-                        quantity=item["quantity"],
-                    )
-                )
+            )
 
         return result
 
