@@ -43,7 +43,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import get_product_onetime_items_by_ids
 from adobe_vipm.notifications import send_exception
-from adobe_vipm.utils import find_first
+from adobe_vipm.utils import find_first, get_partial_sku
 
 TRACE_ID_REGEX = re.compile(r"(\(00-[0-9a-f]{32}-[0-9a-f]{16}-01\))")
 
@@ -759,3 +759,29 @@ def get_one_time_skus(client, order):
         [line["item"]["id"] for line in order["lines"]],
     )
     return [item["externalIds"]["vendor"] for item in one_time_items]
+
+
+def has_order_line_updated(order_lines, adobe_items, quantity_field):
+    """
+    Compare order lines and Adobe items to be transferred
+    Args:
+        order_lines (list): List of order lines
+        adobe_items (list): List of adobe items to be transferred.
+        quantity_field (str): The name of the field that contains the quantity depending on the
+        provided `adobe_object` argument.
+
+    Returns:
+        bool: True if order line is not equal to adobe items, False otherwise.
+
+    """
+    order_line_map = {
+        order_line["item"]["externalIds"]["vendor"]: order_line["quantity"]
+        for order_line in order_lines
+    }
+
+    adobe_items_map = {
+        get_partial_sku(adobe_item["offerId"]): adobe_item[quantity_field]
+        for adobe_item in adobe_items
+    }
+    return order_line_map != adobe_items_map
+
