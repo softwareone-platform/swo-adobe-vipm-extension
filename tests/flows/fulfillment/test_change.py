@@ -5,9 +5,9 @@ import pytest
 from adobe_vipm.adobe.constants import STATUS_3YC_ACCEPTED
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.constants import (
-    ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES,
-    ERR_DOWNSIZE_MINIMUN_3YC_GENERIC,
-    ERR_DOWNSIZE_MINIMUN_3YC_LICENSES,
+    ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
+    ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
+    ERR_DOWNSIZE_MINIMUM_3YC_LICENSES,
     TEMPLATE_NAME_CHANGE,
 )
 from adobe_vipm.flows.context import Context
@@ -402,7 +402,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        ERR_DOWNSIZE_MINIMUN_3YC_LICENSES.format(minimum_licenses=25),
+        ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(minimum_licenses=25),
     )
     mocked_next_step.assert_not_called()
 
@@ -478,7 +478,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES.format(minimun_consumables=37),
+        ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37),
     )
     mocked_next_step.assert_not_called()
 
@@ -552,8 +552,8 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        ERR_DOWNSIZE_MINIMUN_3YC_GENERIC.format(
-            minimun_consumables=37, minimum_licenses=20
+        ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
+            minimum_consumables=37, minimum_licenses=20
         ),
     )
     mocked_next_step.assert_not_called()
