@@ -13,7 +13,7 @@ def test_process_sync_agreements(mocker, dry_run):
         "adobe_vipm.management.commands.sync_agreements.sync_agreements_by_next_sync"
     )
 
-    call_command("sync_agreements",dry_run=dry_run)
+    call_command("sync_agreements", dry_run=dry_run)
 
     mocked.assert_called_once_with(mocked_client, dry_run)
 
