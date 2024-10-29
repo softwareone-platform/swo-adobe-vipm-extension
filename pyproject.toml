@@ -23,13 +23,6 @@ regex = "^2024.7.24"
 requests = "2.32.*"
 types-openpyxl = "3.1.*"
 
-[tool.poetry.group.devmock.dependencies] # Remove when devmock is not needed anymore
-faker = "22.2.*"
-fastapi = "0.109.*"
-lib-rql = "2.0.*"
-rich = "13.7.*"
-uvicorn = "0.25.*"
-
 [tool.poetry.group.dev.dependencies]
 freezegun = "1.4.*"
 ipdb = "0.13.*"
@@ -71,8 +64,6 @@ watchfiles = "0.21.*"
 
 [tool.poetry.scripts]
 swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
-mockgendata = 'devmock.mockgendata:main' # Remove when devmock is not needed anymore
-devmock = 'devmock.app:main' # Remove when devmock is not needed anymore
 
 
 [tool.poetry.plugins."swo.mpt.ext"]
@@ -98,7 +89,7 @@ filterwarnings = [
 branch = true
 
 [tool.ruff]
-extend-exclude = [".vscode", ".devcontainer", "swo", "devmock"]
+extend-exclude = [".vscode", ".devcontainer", "swo"]
 output-format = "full"
 
 [tool.ruff.lint]

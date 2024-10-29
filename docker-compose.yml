@@ -10,24 +10,10 @@ services:
       - .:/extension
     env_file:
       - .env
-    depends_on:
-      - devmock
     ports:
       - "8080:8080"
     expose:
       - "8080"
-
-  devmock:
-    container_name: adobe_vipm_devmock
-    build:
-      context: .
-      dockerfile: prod.Dockerfile
-    working_dir: /extension
-    command: uvicorn --host 0.0.0.0 devmock.app:app
-    volumes: 
-      - .:/extension
-    env_file:
-      - .env
 
   bash:
     container_name: adobe_vipm_bash

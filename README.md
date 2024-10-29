@@ -11,7 +11,7 @@ $ docker-compose build app_test
 $ docker-compose run --service-ports app_test
 ```
 
-# Local run using mocked SoftwareONE Marketplace API
+# Local run using SoftwareONE Marketplace API
 
 ## Create configuration files
 
@@ -138,36 +138,6 @@ EXT_WEBHOOKS_SECRETS={"PRD-1111-1111": "<webhook-secret-for-product>", "PRD-2222
 $ docker-compose build app
 $ docker-compose run --service-ports app
 ```
-
-## Generate mocked SoftwareONE Marketplace orders
-1. Build and run mocked data generator
-```
-$ docker-compose build bash
-$ docker-compose run --service-ports bash
-```
-
-1. Inside the container, setup the data generator
-```
-$ mockgendata setup
-```
-
-1. Use data generator
-```
-$ mockgendata sku <name>
-$ mockgendata purchase <listing-id> <sku>
-```
-
-Where listing ID is one of the following:
-LST-1111-1111 - Adobe for Commercial
-LST-2222-2222 - Adobe for Government
-LST-3333-3333 - Adobe for Education products
-
-For more information use `--help` option
-```
-$ mockgendata --help
-```
-
-Find generated data in the `devmock/data` folder. Extension automatically retrieve generated order from the mocked data
 
 # Configuration
 
