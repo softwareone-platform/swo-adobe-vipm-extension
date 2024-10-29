@@ -165,8 +165,6 @@ adobe_authorizations.json
 .devcontainer/
 .vscode
 
-devmock/data/**/*.json
-
 .DS_Store
 .ruff_cache
 .idea

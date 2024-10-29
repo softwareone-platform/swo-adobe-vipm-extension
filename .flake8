@@ -1,5 +1,5 @@
 [flake8]
-exclude = .idea,.vscode,.git,venv,env,swo,devmock
+exclude = .idea,.vscode,.git,venv,env,swo
 show-source = True
 max-line-length = 100
 max-cognitive-complexity = 15
