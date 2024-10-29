@@ -20,6 +20,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
+from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
     STATUS_RUNNING,
     STATUS_SYNCHRONIZED,
@@ -130,7 +131,7 @@ def _check_transfer(mpt_client, order, membership_id):
             f"match the order (sku or quantity): {','.join([line[0] for line in adobe_lines])}."
         )
         switch_order_to_failed(mpt_client, order, reason)
-        logger.warning(f"Transfer 0rder {order['id']} has been failed: {reason}.")
+        logger.warning(f"Transfer Order {order['id']} has been failed: {reason}.")
         return False
     return True
 
@@ -198,6 +199,13 @@ def _check_adobe_transfer_order_fulfilled(
     return adobe_order
 
 
+def get_commitment_date(subscription, commitment_date):
+    if subscription and not commitment_date:
+        # subscription are cotermed so it's ok to take the first created
+        commitment_date = subscription["commitmentDate"]
+    return commitment_date
+
+
 def _fulfill_transfer_migrated(mpt_client, order, transfer):
     """
     Fulfills a transfer order when the transfer has already been processed
@@ -249,28 +257,28 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
     for line in adobe_transfer["lineItems"]:
         if get_partial_sku(line["offerId"]) in one_time_skus:
             continue
-
-        subscription = add_subscription(
-            mpt_client,
-            adobe_client,
+        adobe_subscription = adobe_client.get_subscription(
+            authorization_id,
             transfer.customer_id,
-            order,
-            line,
+            line["subscriptionId"],
         )
-        if subscription and not commitment_date:  # pragma: no branch
-            # subscription are cotermed so it's ok to take the first created
-            commitment_date = subscription["commitmentDate"]
+        if adobe_subscription["status"] != STATUS_PROCESSED:
+            logger.warning(
+                f"Subscription {adobe_subscription['subscriptionId']} "
+                f"for customer {transfer.customer_id} is in status "
+                f"{adobe_subscription['status']}, skip it"
+            )
+            continue
 
-        if (
-            subscription
-            and transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED
-        ):
-            adobe_client.update_subscription(
+        if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
+            adobe_subscription = adobe_client.update_subscription(
                 authorization_id,
                 transfer.customer_id,
                 line["subscriptionId"],
                 auto_renewal=True,
             )
+        subscription = add_subscription(mpt_client, adobe_subscription, order, line)
+        commitment_date = get_commitment_date(subscription, commitment_date)
 
     if commitment_date:  # pragma: no branch
         order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
@@ -346,17 +354,33 @@ def fulfill_transfer_order(mpt_client, order):
         if get_partial_sku(item["offerId"]) in one_time_skus:
             continue
 
-        subscription = add_subscription(
-            mpt_client, adobe_client, customer_id, order, item
+        adobe_subscription = adobe_client.get_subscription(
+            authorization_id,
+            customer_id,
+            item["subscriptionId"],
         )
-        if subscription and not commitment_date:
-            # subscription are cotermed so it's ok to take the first created
-            commitment_date = subscription["commitmentDate"]
+        if adobe_subscription["status"] != STATUS_PROCESSED:
+            logger.warning(
+                f"Subscription {adobe_subscription['subscriptionId']} "
+                f"for customer {customer_id} is in status "
+                f"{adobe_subscription['status']}, skip it"
+            )
+            continue
+
+        commitment = get_3yc_commitment(customer)
+        if commitment.get("status", "") != STATUS_3YC_COMMITTED:
+            adobe_subscription = adobe_client.update_subscription(
+                authorization_id,
+                customer_id,
+                item["subscriptionId"],
+                auto_renewal=True,
+            )
+
+        subscription = add_subscription(mpt_client, adobe_subscription, order, item)
+        commitment_date = get_commitment_date(subscription, commitment_date)
 
     if commitment_date:  # pragma: no branch
         order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)
-    sync_agreements_by_agreement_ids(
-        mpt_client, [order["agreement"]["id"]], False
-    )
+    sync_agreements_by_agreement_ids(mpt_client, [order["agreement"]["id"]], False)
