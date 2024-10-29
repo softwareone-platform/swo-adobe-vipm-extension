@@ -9,9 +9,9 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.utils import get_3yc_commitment, get_item_by_partial_sku
 from adobe_vipm.flows.constants import (
-    ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES,
-    ERR_DOWNSIZE_MINIMUN_3YC_GENERIC,
-    ERR_DOWNSIZE_MINIMUN_3YC_LICENSES,
+    ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
+    ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
+    ERR_DOWNSIZE_MINIMUM_3YC_LICENSES,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -159,29 +159,19 @@ class ValidateDownsizes3YC:
 
     def __call__(self, client, context, next_step):
 
-        # Check if the Adobe customer has a 3YC commitment
-        commitment = get_3yc_commitment(context.adobe_customer)
+        # Get the 3YC commitment if it is enabled
+        commitment = self.get_3yc_commitment_enabled(context.adobe_customer)
 
-        if (
-            commitment
-            and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
-            and date.today() <= date.fromisoformat(commitment["endDate"])
-            and context.downsize_lines
-        ):
+        if commitment and context.downsize_lines:
             adobe_client = get_adobe_client()
             # get Adobe customer subscriptions
             subscriptions = adobe_client.get_subscriptions(
                 context.authorization_id,
                 context.adobe_customer_id,
             )
-            count_licenses = 0
-            count_consumables = 0
-            for subscription in subscriptions["items"]:
-                if is_consumables_sku(subscription["offerId"]):
-                    count_consumables += subscription["currentQuantity"]
-                else:
-                    count_licenses += subscription["currentQuantity"]
-
+            count_licenses, count_consumables = self.get_licenses_and_consumables_count(
+                subscriptions
+            )
             for line in context.downsize_lines:
                 adobe_item = get_item_by_partial_sku(
                     subscriptions["items"], line["item"]["externalIds"]["vendor"]
@@ -199,63 +189,11 @@ class ValidateDownsizes3YC:
                     count_consumables -= delta
                 else:
                     count_licenses -= delta
-
-            is_invalid_license_minimum = False
-            is_invalid_consumable_minimum = False
-            minimum_licenses = 0
-            minimum_consumables = 0
-
-            for mq in commitment["minimumQuantities"]:
-                if mq["offerType"] == "LICENSE":
-                    if count_licenses < mq["quantity"]:
-                        is_invalid_license_minimum = True
-                        minimum_licenses = mq["quantity"]
-                if mq["offerType"] == "CONSUMABLES":
-                    if count_consumables < mq["quantity"]:
-                        is_invalid_consumable_minimum = True
-                        minimum_consumables = mq["quantity"]
-
-            if is_invalid_consumable_minimum and is_invalid_license_minimum:
-                self.manage_order_error(
-                    client,
-                    context,
-                    ERR_DOWNSIZE_MINIMUN_3YC_GENERIC.format(
-                        minimum_licenses=minimum_licenses,
-                        minimun_consumables=minimum_consumables,
-                    ),
-                )
-                logger.error(
-                    f"{context}: failed due to reduction quantity is not allowed below "
-                    f"the minimum commitment of licenses and consumables"
-                )
-                return
-
-            if is_invalid_license_minimum:
-                self.manage_order_error(
-                    client,
-                    context,
-                    ERR_DOWNSIZE_MINIMUN_3YC_LICENSES.format(
-                        minimum_licenses=minimum_licenses
-                    ),
-                )
-                logger.error(
-                    f"{context}: failed due to reduction quantity is not allowed below "
-                    f"the minimum commitment of licenses"
-                )
-                return
-
-            if is_invalid_consumable_minimum:
-                self.manage_order_error(
-                    client,
-                    context,
-                    ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES.format(
-                        minimun_consumables=minimum_consumables
-                    ),
-                )
-                logger.error(
-                    f"{context}: failed due to reduction quantity is not allowed below"
-                    f" the minimum commitment of consumables"
-                )
+            error = self.validate_minimum_quantity(
+                context, commitment, count_licenses, count_consumables
+            )
+            if error:
+                self.manage_order_error(client, context, error)
                 return
 
         next_step(client, context)
@@ -272,3 +210,92 @@ class ValidateDownsizes3YC:
                 context.order,
                 error,
             )
+
+    @staticmethod
+    def get_licenses_and_consumables_count(subscriptions):
+        """
+        Get the count of licenses and consumables from the Adobe customer subscriptions.
+        Args:
+            subscriptions (dict): Adobe customer subscriptions.
+        Returns:
+            tuple: The count of licenses and consumables.
+
+        """
+        count_licenses = 0
+        count_consumables = 0
+        for subscription in subscriptions["items"]:
+            if is_consumables_sku(subscription["offerId"]):
+                count_consumables += subscription["currentQuantity"]
+            else:
+                count_licenses += subscription["currentQuantity"]
+
+        return count_licenses, count_consumables
+
+    @staticmethod
+    def validate_minimum_quantity(
+        context,
+        commitment,
+        count_licenses,
+        count_consumables,
+    ):
+
+        is_invalid_license_minimum = False
+        is_invalid_consumable_minimum = False
+        minimum_licenses = 0
+        minimum_consumables = 0
+
+        for mq in commitment["minimumQuantities"]:
+            if mq["offerType"] == "LICENSE" and count_licenses < mq["quantity"]:
+                is_invalid_license_minimum = True
+                minimum_licenses = mq["quantity"]
+            if mq["offerType"] == "CONSUMABLES" and count_consumables < mq["quantity"]:
+                is_invalid_consumable_minimum = True
+                minimum_consumables = mq["quantity"]
+
+        if is_invalid_consumable_minimum and is_invalid_license_minimum:
+            logger.error(
+                f"{context}: failed due to reduction quantity is not allowed below "
+                f"the minimum commitment of licenses and consumables"
+            )
+            return ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
+                minimum_licenses=minimum_licenses,
+                minimum_consumables=minimum_consumables,
+            )
+
+        if is_invalid_license_minimum:
+            logger.error(
+                f"{context}: failed due to reduction quantity is not allowed below "
+                f"the minimum commitment of licenses"
+            )
+            return ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(
+                minimum_licenses=minimum_licenses
+            )
+
+        if is_invalid_consumable_minimum:
+            logger.error(
+                f"{context}: failed due to reduction quantity is not allowed below"
+                f" the minimum commitment of consumables"
+            )
+            return ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(
+                minimum_consumables=minimum_consumables
+            )
+
+    @staticmethod
+    def get_3yc_commitment_enabled(adobe_customer):
+        """
+        Get the 3YC commitment if it is enabled.
+        Args:
+            adobe_customer (dict): Adobe customer object.
+
+        Returns: Commitment object if it is enabled, otherwise None.
+
+        """
+        commitment = get_3yc_commitment(adobe_customer)
+
+        if (
+            commitment
+            and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+            and date.today() <= date.fromisoformat(commitment["endDate"])
+        ):
+            return commitment
+        return None
