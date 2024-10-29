@@ -295,35 +295,20 @@ def switch_order_to_completed(client, order, template_name):
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
-def add_subscription(client, adobe_client, customer_id, order, line):
+def add_subscription(client, adobe_subscription, order, line):
     """
     Adds a subscription to the correspoding MPT order based on the provided parameters.
 
     Args:
         client (MPTClient): An instance of the Marketplace platform client.
-        adobe_client (AdobeClient): An instance of the Adobe client for communication with the
+        adobe_subscription(dict): A subscription object retrieved from the
             Adobe API.
-        customer_id (str): The ID used in Adobe to identify the customer attached to this MPT order.
         order (dict): The MPT order to which the subscription will be added.
         line (dict): The order line.
 
     Returns:
         None
     """
-    authorization_id = order["authorization"]["id"]
-    adobe_subscription = adobe_client.get_subscription(
-        authorization_id,
-        customer_id,
-        line["subscriptionId"],
-    )
-
-    if adobe_subscription["status"] != STATUS_PROCESSED:
-        logger.warning(
-            f"Subscription {adobe_subscription['subscriptionId']} "
-            f"for customer {customer_id} is in status "
-            f"{adobe_subscription['status']}, skip it"
-        )
-        return
 
     order_line = get_order_line_by_sku(order, line["offerId"])
 
