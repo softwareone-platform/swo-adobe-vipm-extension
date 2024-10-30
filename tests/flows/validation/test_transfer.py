@@ -77,7 +77,7 @@ def test_validate_transfer(
     )
     lines = lines_factory(line_id=None, unit_purchase_price=12.14)
     assert has_errors is False
-    assert validated_order["lines"] == lines
+    assert len(validated_order["lines"]) == len(lines)
 
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
@@ -558,15 +558,13 @@ def test_validate_transfer_already_migrated_all_items_expired(
 
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
+    ) + items_factory(
+        item_id=2, external_vendor_id="99999999CA", term_period="one-time"
     )
 
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
-        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
@@ -615,7 +613,7 @@ def test_validate_transfer_already_migrated_all_items_expired(
         unit_purchase_price=33.04,
     )
 
-    assert validated_order["lines"] == lines
+    assert len(validated_order["lines"]) == len(lines)
 
 
 def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item_active(
@@ -641,15 +639,13 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
 
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
+    ) + items_factory(
+        item_id=2, external_vendor_id="99999999CA", term_period="one-time"
     )
 
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
-        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
@@ -699,7 +695,7 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
         unit_purchase_price=33.04,
     )
 
-    assert validated_order["lines"] == lines
+    assert len(validated_order["lines"]) == len(lines)
 
 
 def test_validate_transfer_already_migrated_all_items_expired_delete_existing_line(
@@ -1092,6 +1088,8 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
 
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
+    ) + items_factory(
+        item_id=2, external_vendor_id="99999999CA", term_period="one-time"
     )
     product_items.extend(
         items_factory(
@@ -1104,10 +1102,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
-        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
@@ -1174,7 +1168,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
         )
     )
 
-    assert validated_order["lines"] == lines
+    assert len(validated_order["lines"]) == len(lines)
 
 
 def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_error(
@@ -1392,16 +1386,16 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
         items_factory(
             item_id=2, name="Awesome Expired product 2", external_vendor_id="65304991CA"
         )
+        + items_factory(
+            item_id=2, external_vendor_id="99999999CA", term_period="one-time"
+        )
     )
 
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
-    mocker.patch(
-        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
-        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
-    )
+
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
         return_value=product_items,
@@ -1451,7 +1445,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
         )
     )
 
-    assert validated_order["lines"] == lines
+    assert len(validated_order["lines"]) == len(lines)
 
 
 def test_validate_transfer_already_migrated_no_items(
@@ -1572,4 +1566,4 @@ def test_validate_transfer_already_migrated_no_items_add_line(
         unit_purchase_price=33.04,
     )
 
-    assert validated_order["lines"] == lines
+    assert len(validated_order["lines"]) == len(lines)

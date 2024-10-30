@@ -370,6 +370,11 @@ def _transfer_migrated(mpt_client, order, transfer):
     adobe_client = get_adobe_client()
     authorization_id = order["authorization"]["id"]
 
+    adobe_subscriptions = adobe_client.get_subscriptions(
+        authorization_id,
+        transfer.customer_id,
+    )
+
     adobe_transfer = adobe_client.get_transfer(
         authorization_id,
         transfer.membership_id,
@@ -379,7 +384,7 @@ def _transfer_migrated(mpt_client, order, transfer):
     one_time_skus = get_one_time_skus(mpt_client, order)
     adobe_items_without_one_time_offers = [
         item
-        for item in adobe_transfer["lineItems"]
+        for item in adobe_subscriptions["items"]
         if get_partial_sku(item["offerId"]) not in one_time_skus
     ]
 

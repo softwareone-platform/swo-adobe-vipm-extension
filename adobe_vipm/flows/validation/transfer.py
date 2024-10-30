@@ -29,7 +29,6 @@ from adobe_vipm.flows.mpt import get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
     get_adobe_membership_id,
-    get_one_time_skus,
     get_order_line_by_sku,
     get_ordering_parameter,
     get_transfer_item_sku_by_subscription,
@@ -139,8 +138,15 @@ def add_lines_to_order(
     order_error = False
 
     if is_transferred:
-        one_time_skus = get_one_time_skus(mpt_client, order)
-
+        returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
+        items = get_product_items_by_skus(
+            mpt_client, order["agreement"]["product"]["id"], returned_skus
+        )
+        one_time_skus = [
+            item["externalIds"]["vendor"]
+            for item in items
+            if item["terms"]["period"] == "one-time"
+        ]
         adobe_items_without_one_time_offers = [
             item
             for item in adobe_items

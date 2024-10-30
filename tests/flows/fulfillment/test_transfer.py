@@ -856,6 +856,9 @@ def test_fulfill_transfer_order_already_migrated(
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
@@ -951,6 +954,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     adobe_authorizations_file,
     adobe_customer_factory,
     agreement,
+    adobe_subscription_factory,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -999,10 +1003,14 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
+    adobe_subscription = adobe_subscription_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
@@ -1142,6 +1150,9 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
@@ -1312,9 +1323,7 @@ def test_fulfill_transfer_order_already_migrated_(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     transfer_items = adobe_items_factory(
         subscription_id="sub-id", renewal_date=date.today().isoformat()
@@ -1327,6 +1336,9 @@ def test_fulfill_transfer_order_already_migrated_(
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
