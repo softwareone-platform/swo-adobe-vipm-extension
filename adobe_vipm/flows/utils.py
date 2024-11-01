@@ -649,7 +649,7 @@ def get_transfer_item_sku_by_subscription(trf, sub_id):
         lambda x: x["subscriptionId"] == sub_id,
         trf["lineItems"],
     )
-    return item.get("offerId")
+    return item.get("offerId") if item else None
 
 
 def get_customer_licenses_discount_level(customer):

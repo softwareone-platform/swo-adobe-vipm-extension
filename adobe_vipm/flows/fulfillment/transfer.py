@@ -225,16 +225,20 @@ def _fulfill_transfer_migrated(
     adobe_client, mpt_client, order, transfer, adobe_transfer, one_time_skus
 ):
     authorization_id = order["authorization"]["id"]
+    adobe_subscriptions = adobe_client.get_subscriptions(
+        authorization_id,
+        transfer.customer_id,
+    )
 
     # remove expired items from adobe items
     adobe_items = [
         item
-        for item in adobe_transfer["lineItems"]
+        for item in adobe_subscriptions["items"]
         if not is_transferring_item_expired(item)
     ]
 
     # If the order items has been updated, the validation order will fail
-    if has_order_line_updated(order["lines"], adobe_items, "quantity"):
+    if has_order_line_updated(order["lines"], adobe_items, "currentQuantity"):
         switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS)
         return
 
@@ -302,11 +306,10 @@ class UpdateTransferStatus(Step):
 class SaveCustomerData(Step):
     def __call__(self, client, context, next_step):
 
-        adobe_client = get_adobe_client()
         context.order = save_adobe_order_id_and_customer_data(
-            adobe_client,
+            client,
             context.order,
-            "None",
+            "",
             context.adobe_customer,
         )
         next_step(client, context)
