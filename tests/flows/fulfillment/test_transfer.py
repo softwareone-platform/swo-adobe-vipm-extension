@@ -846,11 +846,11 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
     transfer_items = adobe_items_factory(
-        subscription_id="sub-id", renewal_date=date.today().isoformat()
+        subscription_id="sub-id"
     )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    adobe_subscription = adobe_subscription_factory()
+    adobe_subscription = adobe_subscription_factory(current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -999,7 +999,6 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         line_number=2,
         offer_id="99999999CA01A12",
         subscription_id="onetime-sub-id",
-        renewal_date=date.today().isoformat(),
     )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
@@ -1140,11 +1139,11 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     )
 
     transfer_items = adobe_items_factory(
-        subscription_id="sub-id", renewal_date=date.today().isoformat()
+        subscription_id="sub-id"
     )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    adobe_subscription = adobe_subscription_factory()
+    adobe_subscription = adobe_subscription_factory(current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1326,11 +1325,11 @@ def test_fulfill_transfer_order_already_migrated_(
     mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     transfer_items = adobe_items_factory(
-        subscription_id="sub-id", renewal_date=date.today().isoformat()
+        subscription_id="sub-id"
     )
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING)
+    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING, current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1874,7 +1873,6 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
         subscription_id="sub-id",
         status=STATUS_INACTIVE_OR_GENERIC_FAILURE,
         offer_id="65304990CA",
-        renewal_date=date.today().isoformat(),
     )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
