@@ -1305,7 +1305,7 @@ def test_fulfill_transfer_order_already_migrated_(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=[],
     )
 
