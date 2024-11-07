@@ -29,14 +29,21 @@ from adobe_vipm.flows.airtable import (
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_UPDATING_TRANSFER_ITEMS,
     PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
 )
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
+    CompleteOrder,
+    CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
+    SetOrUpdateCotermNextSyncDates,
+    SubmitNewOrder,
+    UpdatePrices,
     add_subscription,
     check_processing_template,
-    get_one_time_skus,
     handle_retries,
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
@@ -45,11 +52,19 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
+from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
+    are_all_transferring_items_expired,
+    get_adobe_customer_id,
     get_adobe_membership_id,
     get_adobe_order_id,
+    get_one_time_skus,
     get_ordering_parameter,
+    has_order_line_updated,
+    is_transferring_item_expired,
+    set_adobe_customer_id,
     set_ordering_parameter_error,
 )
 from adobe_vipm.utils import get_partial_sku
@@ -206,52 +221,26 @@ def get_commitment_date(subscription, commitment_date):
     return commitment_date
 
 
-def _fulfill_transfer_migrated(mpt_client, order, transfer):
-    """
-    Fulfills a transfer order when the transfer has already been processed
-    by the mass migration tool.
-
-    Args:
-        mpt_client (MPTClient): The client used to consume the MPT API-
-        order (dict): The transfer order.
-        transfer (Transfer): The AirTable transfer object.
-    """
-    if transfer.status == STATUS_RUNNING:
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
-        order = set_ordering_parameter_error(
-            order,
-            PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                title=param["name"], details="Migration in progress, retry later"
-            ),
-        )
-
-        switch_order_to_query(mpt_client, order)
-        return
-
-    if transfer.status == STATUS_SYNCHRONIZED:
-        switch_order_to_failed(
-            mpt_client, order, "Membership has already been migrated."
-        )
-        return
-
-    adobe_client = get_adobe_client()
+def _fulfill_transfer_migrated(
+    adobe_client, mpt_client, order, transfer, adobe_transfer, one_time_skus
+):
     authorization_id = order["authorization"]["id"]
-    customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
-    order = save_adobe_order_id_and_customer_data(
-        mpt_client,
-        order,
-        transfer.transfer_id,
-        customer,
-    )
-
-    adobe_transfer = adobe_client.get_transfer(
+    adobe_subscriptions = adobe_client.get_subscriptions(
         authorization_id,
-        transfer.membership_id,
-        transfer.transfer_id,
+        transfer.customer_id,
     )
 
-    one_time_skus = get_one_time_skus(mpt_client, order)
+    # remove expired items from adobe items
+    adobe_items = [
+        item
+        for item in adobe_subscriptions["items"]
+        if not is_transferring_item_expired(item)
+    ]
+
+    # If the order items has been updated, the validation order will fail
+    if has_order_line_updated(order["lines"], adobe_items, "currentQuantity"):
+        switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS)
+        return
 
     commitment_date = None
     for line in adobe_transfer["lineItems"]:
@@ -283,11 +272,137 @@ def _fulfill_transfer_migrated(mpt_client, order, transfer):
     if commitment_date:  # pragma: no branch
         order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
+    # Fulfills order with active items
+    customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
+    order = save_adobe_order_id_and_customer_data(
+        mpt_client,
+        order,
+        transfer.transfer_id,
+        customer,
+    )
+
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
     transfer.mpt_order_id = order["id"]
     transfer.synchronized_at = datetime.now()
     transfer.save()
+
+
+class UpdateTransferStatus(Step):
+    def __init__(self, transfer, status):
+        self.transfer = transfer
+        self.status = status
+
+    def __call__(self, client, context, next_step):
+
+        self.transfer.status = "synchronized"
+        self.transfer.mpt_order_id = context.order["id"]
+        self.transfer.synchronized_at = datetime.now()
+        self.transfer.save()
+
+        next_step(client, context)
+
+
+class SaveCustomerData(Step):
+    def __call__(self, client, context, next_step):
+
+        context.order = save_adobe_order_id_and_customer_data(
+            client,
+            context.order,
+            "",
+            context.adobe_customer,
+        )
+        next_step(client, context)
+
+
+def _create_new_adobe_order(mpt_client, order, transfer):
+    # Create new order on Adobe with the items selected by the client
+    adobe_customer_id = get_adobe_customer_id(order)
+    if not adobe_customer_id:
+        order = set_adobe_customer_id(order, transfer.customer_id)
+
+    pipeline = Pipeline(
+        SetupContext(),
+        SaveCustomerData(),
+        GetPreviewOrder(),
+        SubmitNewOrder(),
+        CreateOrUpdateSubscriptions(),
+        SetOrUpdateCotermNextSyncDates(),
+        UpdatePrices(),
+        CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
+        UpdateTransferStatus(transfer, STATUS_SYNCHRONIZED),
+    )
+
+    context = Context(order=order)
+    pipeline.run(mpt_client, context)
+
+
+def _transfer_migrated(mpt_client, order, transfer):
+    """
+    Fulfills a transfer order when the transfer has already been processed
+    by the mass migration tool.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API
+        order (dict): The transfer order.
+        transfer (Transfer): The AirTable transfer object.
+    """
+    if transfer.status == STATUS_RUNNING:
+        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+                title=param["name"], details="Migration in progress, retry later"
+            ),
+        )
+
+        switch_order_to_query(mpt_client, order)
+        return
+
+    if transfer.status == STATUS_SYNCHRONIZED:
+        switch_order_to_failed(
+            mpt_client, order, "Membership has already been migrated."
+        )
+        return
+
+    # If the order has order id, it means that new order has been created on Adobe
+    # and, it is pending to review the order status
+    adobe_order_id = get_adobe_order_id(order)
+    if adobe_order_id:
+        _create_new_adobe_order(mpt_client, order, transfer)
+        return
+
+    adobe_client = get_adobe_client()
+    authorization_id = order["authorization"]["id"]
+
+    adobe_subscriptions = adobe_client.get_subscriptions(
+        authorization_id,
+        transfer.customer_id,
+    )
+
+    adobe_transfer = adobe_client.get_transfer(
+        authorization_id,
+        transfer.membership_id,
+        transfer.transfer_id,
+    )
+
+    one_time_skus = get_one_time_skus(mpt_client, order)
+    adobe_items_without_one_time_offers = [
+        item
+        for item in adobe_subscriptions["items"]
+        if get_partial_sku(item["offerId"]) not in one_time_skus
+    ]
+
+    if (
+        are_all_transferring_items_expired(adobe_items_without_one_time_offers)
+        or len(adobe_transfer["lineItems"]) == 0
+    ):
+        _create_new_adobe_order(mpt_client, order, transfer)
+    else:
+        _fulfill_transfer_migrated(
+            adobe_client, mpt_client, order, transfer, adobe_transfer, one_time_skus
+        )
 
 
 def fulfill_transfer_order(mpt_client, order):
@@ -315,7 +430,7 @@ def fulfill_transfer_order(mpt_client, order):
 
     if transfer:
         check_processing_template(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
-        _fulfill_transfer_migrated(mpt_client, order, transfer)
+        _transfer_migrated(mpt_client, order, transfer)
         return
 
     check_processing_template(mpt_client, order, TEMPLATE_NAME_TRANSFER)

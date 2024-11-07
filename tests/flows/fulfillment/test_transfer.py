@@ -4,6 +4,8 @@ import pytest
 from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
+    ORDER_TYPE_NEW,
+    ORDER_TYPE_PREVIEW,
     STATUS_3YC_COMMITTED,
     STATUS_3YC_EXPIRED,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
@@ -14,16 +16,20 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_TRANSFER_STATUSES,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
+from adobe_vipm.flows.airtable import STATUS_SYNCHRONIZED
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_UPDATING_TRANSFER_ITEMS,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
 )
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import fulfill_order
+from adobe_vipm.flows.fulfillment.transfer import UpdateTransferStatus
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
     set_ordering_parameter_error,
@@ -116,7 +122,7 @@ def test_transfer(
         return_value=subscription,
     )
     mocked_get_onetime = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
 
@@ -257,7 +263,9 @@ def test_transfer(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "value": str(
+                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -816,11 +824,11 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
 
-    mocked_add_subscription = mocker.patch(
+    mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
         return_value=subscriptions_factory(commitment_date="2024-04-18")[0],
     )
@@ -839,20 +847,18 @@ def test_fulfill_transfer_order_already_migrated(
 
     transfer_items = adobe_items_factory(
         subscription_id="sub-id"
-    ) + adobe_items_factory(
-        line_number=2,
-        offer_id="99999999CA01A12",
-        subscription_id="onetime-sub-id",
     )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    adobe_subscription = adobe_subscription_factory()
+    adobe_subscription = adobe_subscription_factory(current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
-    mocked_adobe_client.update_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
@@ -907,17 +913,6 @@ def test_fulfill_transfer_order_already_migrated(
         m_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[1].kwargs == {
-        "externalIds": updated_order["externalIds"],
-        "parameters": updated_order["parameters"],
-    }
-
-    mocked_add_subscription.assert_called_once_with(
-        m_client,
-        adobe_subscription,
-        updated_order,
-        transfer_items[0],
-    )
 
     assert mocked_transfer.status == "synchronized"
     assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
@@ -944,6 +939,110 @@ def test_fulfill_transfer_order_already_migrated(
         transfer_items[0]["subscriptionId"],
         auto_renewal=True,
     )
+
+
+@freeze_time("2012-01-14 12:00:01")
+def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
+    mocker,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
+    adobe_authorizations_file,
+    adobe_customer_factory,
+    agreement,
+    adobe_subscription_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.customer_benefits_3yc_status = None
+
+    adobe_customer = adobe_customer_factory()
+    m_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
+    )
+
+    mocked_process_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
+    )
+
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+
+    transfer_items = adobe_items_factory(
+        subscription_id="sub-id", renewal_date=date.today().isoformat()
+    ) + adobe_items_factory(
+        line_number=2,
+        offer_id="99999999CA01A12",
+        subscription_id="onetime-sub-id",
+    )
+
+    adobe_transfer = adobe_transfer_factory(items=transfer_items)
+    adobe_subscription = adobe_subscription_factory()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = adobe_customer
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
+
+    fulfill_order(m_client, order)
+
+    mocked_process_order.assert_called_once_with(
+        m_client,
+        order["id"],
+        {"id": "TPL-0000"},
+    )
+    mocked_fail_order.assert_called_once_with(
+        m_client,
+        order["id"],
+        ERR_UPDATING_TRANSFER_ITEMS,
+        parameters=order["parameters"],
+    )
+
+    assert mocked_update_order.mock_calls[0].args == (
+        m_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                retry_count="1",
+            ),
+            "ordering": order["parameters"]["ordering"],
+        },
+    }
 
 
 @freeze_time("2012-01-14 12:00:01")
@@ -984,6 +1083,8 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
             retry_count="1",
+            next_sync_date="2024-08-05",
+            coterm_date="2024-08-04",
         ),
         order_parameters=transfer_order_parameters_factory(
             company_name=adobe_customer["companyProfile"]["companyName"],
@@ -1016,11 +1117,11 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=[],
     )
 
-    mocked_add_subscription = mocker.patch(
+    mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
         return_value=subscriptions_factory(commitment_date="2024-08-04")[0],
     )
@@ -1037,16 +1138,21 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
 
-    transfer_items = adobe_items_factory(subscription_id="sub-id")
+    transfer_items = adobe_items_factory(
+        subscription_id="sub-id"
+    )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    adobe_subscription = adobe_subscription_factory()
+    adobe_subscription = adobe_subscription_factory(current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
-    mocked_adobe_client.update_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
+
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1100,17 +1206,10 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         m_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[1].kwargs == {
+    assert mocked_update_order.mock_calls[2].kwargs == {
         "externalIds": updated_order["externalIds"],
         "parameters": updated_order["parameters"],
     }
-
-    mocked_add_subscription.assert_called_once_with(
-        m_client,
-        adobe_subscription,
-        updated_order,
-        transfer_items[0],
-    )
 
     assert mocked_transfer.status == "synchronized"
     assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
@@ -1206,7 +1305,7 @@ def test_fulfill_transfer_order_already_migrated_(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=[],
     )
 
@@ -1226,16 +1325,19 @@ def test_fulfill_transfer_order_already_migrated_(
     mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     transfer_items = adobe_items_factory(
-        subscription_id="sub-id", renewal_date=date.today().isoformat()
+        subscription_id="sub-id"
     )
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING)
+    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING, current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
@@ -1462,7 +1564,7 @@ def test_transfer_3yc_customer(
         return_value=subscription,
     )
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=[],
     )
 
@@ -1608,7 +1710,9 @@ def test_transfer_3yc_customer(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "value": str(
+                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -1679,3 +1783,196 @@ def test_transfer_3yc_customer(
         [order["agreement"]["id"]],
         False,
     )
+
+
+@freeze_time("2012-01-14 12:00:01")
+def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_order(
+    mocker,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
+    adobe_authorizations_file,
+    adobe_customer_factory,
+    adobe_order_factory,
+    agreement,
+):
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.customer_benefits_3yc_status = None
+
+    adobe_customer = adobe_customer_factory()
+
+    adobe_customer_address = adobe_customer["companyProfile"]["address"]
+    adobe_customer_contact = adobe_customer["companyProfile"]["contacts"][0]
+
+    updated_order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            customer_id="a-client-id",
+            retry_count="1",
+        ),
+        order_parameters=transfer_order_parameters_factory(
+            company_name=adobe_customer["companyProfile"]["companyName"],
+            address={
+                "country": adobe_customer_address["country"],
+                "state": adobe_customer_address["region"],
+                "city": adobe_customer_address["city"],
+                "addressLine1": adobe_customer_address["addressLine1"],
+                "addressLine2": adobe_customer_address["addressLine2"],
+                "postCode": adobe_customer_address["postalCode"],
+            },
+            contact={
+                "firstName": adobe_customer_contact["firstName"],
+                "lastName": adobe_customer_contact["lastName"],
+                "email": adobe_customer_contact["email"],
+                "phone": split_phone_number(
+                    adobe_customer_contact.get("phoneNumber"),
+                    adobe_customer_address["country"],
+                ),
+            },
+        ),
+        external_ids={"vendor": "transfer-id"},
+    )
+
+    m_client = mocker.MagicMock()
+
+    mocked_get_transfer = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
+    )
+
+    mocked_process_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template",
+    )
+
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+
+    transfer_items = adobe_items_factory(
+        subscription_id="sub-id",
+        status=STATUS_INACTIVE_OR_GENERIC_FAILURE,
+        offer_id="65304990CA",
+    )
+
+    adobe_transfer = adobe_transfer_factory(items=transfer_items)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = adobe_customer
+
+    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
+    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
+    mocked_adobe_client.create_new_order.return_value = new_order
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    fulfill_order(m_client, order)
+
+    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+
+    mocked_get_transfer.assert_called_once_with(
+        order["agreement"]["product"]["id"],
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
+        membership_id_param["value"],
+    )
+
+    mocked_process_order.assert_called_once_with(
+        m_client,
+        order["id"],
+        {"id": "TPL-0000"},
+    )
+
+    assert mocked_update_order.mock_calls[0].args == (
+        m_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                retry_count="1",
+            ),
+            "ordering": order["parameters"]["ordering"],
+        },
+    }
+
+    assert mocked_update_order.mock_calls[2].args == (
+        m_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[2].kwargs == {
+        "externalIds": {"vendor": new_order["orderId"]}
+    }
+
+
+@freeze_time("2012-01-14 12:00:01")
+def test_update_transfer_status_step(
+    mocker,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
+    adobe_authorizations_file,
+    adobe_customer_factory,
+    adobe_order_factory,
+    agreement,
+):
+
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+    )
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.customer_benefits_3yc_status = None
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    step = UpdateTransferStatus(transfer=mocked_transfer, status=STATUS_SYNCHRONIZED)
+    step(mocked_client, context, mocked_next_step)
+
+    assert mocked_transfer.status == "synchronized"
+    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.mpt_order_id == order["id"]
+    mocked_next_step.assert_called_once_with(mocked_client, context)

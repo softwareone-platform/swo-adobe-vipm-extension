@@ -45,7 +45,6 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
-    get_product_onetime_items_by_ids,
     get_product_template_or_default,
     get_rendered_template,
     get_subscription_by_external_id,
@@ -62,6 +61,7 @@ from adobe_vipm.flows.utils import (
     get_coterm_date,
     get_next_sync,
     get_notifications_recipient,
+    get_one_time_skus,
     get_order_line_by_sku,
     get_price_item_by_line_sku,
     get_retry_count,
@@ -503,27 +503,6 @@ def send_email_notification(client, order):
             "email",
             context,
         )
-
-
-def get_one_time_skus(client, order):
-    """
-    Get tge SKUs from the order lines that correspond
-    to One-Time items.
-
-    Args:
-        client (MPTClient): The client to consume the MPT API.
-        order (dict): The order from which the One-Time items SKUs
-        must be extracted.
-
-    Returns:
-        list: List of One-Time SKUs.
-    """
-    one_time_items = get_product_onetime_items_by_ids(
-        client,
-        order["agreement"]["product"]["id"],
-        [line["item"]["id"] for line in order["lines"]],
-    )
-    return [item["externalIds"]["vendor"] for item in one_time_items]
 
 
 def set_customer_coterm_date_if_null(client, adobe_client, order):
