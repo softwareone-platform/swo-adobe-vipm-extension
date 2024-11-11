@@ -1027,7 +1027,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     mocked_fail_order.assert_called_once_with(
         m_client,
         order["id"],
-        ERR_UPDATING_TRANSFER_ITEMS,
+        ERR_UPDATING_TRANSFER_ITEMS.message,
         parameters=order["parameters"],
     )
 

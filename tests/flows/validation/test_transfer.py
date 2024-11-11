@@ -1253,7 +1253,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     )
 
     assert has_errors is True
-    assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS
+    assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
 
     lines = lines_factory(
         line_id=None,
@@ -1334,7 +1334,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
     )
 
     assert has_errors is True
-    assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS
+    assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
 
     lines = lines_factory(
         line_id=None,
@@ -1424,7 +1424,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
     )
 
     assert has_errors is True
-    assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS
+    assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
 
     lines = lines_factory(
         line_id=None,

@@ -173,7 +173,7 @@ def add_lines_to_order(
                 order["lines"], adobe_items, quantity_field
             ):
                 order_error = True
-                order = set_order_error(order, ERR_UPDATING_TRANSFER_ITEMS)
+                order = set_order_error(order, ERR_UPDATING_TRANSFER_ITEMS.to_dict())
     else:
         # remove expired items from adobe items
         adobe_items = [
