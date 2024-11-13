@@ -228,7 +228,8 @@ ERR_DOWNSIZE_MINIMUN_3YC_GENERIC = (
     " for the three-year commitment."
 )
 
-ERR_UPDATING_TRANSFER_ITEMS = (
+ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
+    "VIPMV014",
     "Do not add or remove items, and do not modify the quantities of any items. "
-    "You may make these changes using a Change order once this order completes."
+    "You may make these changes using a Change order once this order completes.",
 )

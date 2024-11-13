@@ -239,7 +239,7 @@ def _fulfill_transfer_migrated(
 
     # If the order items has been updated, the validation order will fail
     if has_order_line_updated(order["lines"], adobe_items, "currentQuantity"):
-        switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS)
+        switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS.message)
         return
 
     commitment_date = None
