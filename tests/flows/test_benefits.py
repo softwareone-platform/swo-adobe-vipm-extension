@@ -406,7 +406,6 @@ def test_resubmit_3yc_commitment_request_exception(
         )
     )
 
-
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_3yc_request.side_effect = AdobeAPIError(
         500, adobe_api_error_factory(code="1234", message="Internal Server Error")
@@ -461,7 +460,8 @@ def test_submit_3yc_recommitment_request_exception(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_3yc_request.side_effect = AdobeAPIError(
-        500, adobe_api_error_factory(code=1234, message="Internal Server Error"),
+        500,
+        adobe_api_error_factory(code=1234, message="Internal Server Error"),
     )
 
     mocked_mpt_client = mocker.MagicMock()

@@ -100,7 +100,7 @@ def test_validate_change_order(mocker, caplog, order_factory):
     mocked_client = mocker.MagicMock()
     mocked_validate = mocker.patch(
         "adobe_vipm.flows.validation.base.validate_change_order",
-        return_value=(False, order)
+        return_value=(False, order),
     )
 
     with caplog.at_level(logging.INFO):
@@ -120,7 +120,7 @@ def test_validate_purchase_order(mocker, caplog, order_factory):
     mocked_client = mocker.MagicMock()
     mocked_validate = mocker.patch(
         "adobe_vipm.flows.validation.base.validate_purchase_order",
-        return_value=(False, order)
+        return_value=(False, order),
     )
 
     with caplog.at_level(logging.INFO):

@@ -789,4 +789,3 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
         for adobe_item in adobe_items
     }
     return order_line_map != adobe_items_map
-

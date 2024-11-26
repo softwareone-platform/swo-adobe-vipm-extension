@@ -81,6 +81,7 @@ def get_transfer_model(base_info):
     Returns:
         Transfer: The AirTable Tranfer model.
     """
+
     class Transfer(Model):
         membership_id = fields.TextField("membership_id")
         authorization_uk = fields.TextField("authorization_uk")
@@ -306,6 +307,7 @@ def get_pricelist_model(base_info):
     Returns:
         PriceList: The AirTable PriceList model.
     """
+
     class PriceList(Model):
         record_id = fields.TextField("id", readonly=True)
         sku = fields.TextField("sku")

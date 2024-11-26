@@ -49,7 +49,5 @@ class Command(BaseCommand):
         elif options["all"]:
             sync_all_agreements(client, options["dry_run"])
         else:
-            sync_agreements_by_next_sync(
-                client, options["dry_run"]
-            )
+            sync_agreements_by_next_sync(client, options["dry_run"])
         self.success("Processing agreements completed.")

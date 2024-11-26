@@ -239,8 +239,7 @@ class AdobeClient:
             "start-date": start_date.isoformat(),
             "end-date": (
                 date.fromisoformat(customer_coterm_date) - timedelta(days=15)
-            ).isoformat()
-
+            ).isoformat(),
         }
 
         returning_order_ids = [

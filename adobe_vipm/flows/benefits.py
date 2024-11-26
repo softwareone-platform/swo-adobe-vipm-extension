@@ -79,7 +79,9 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                     },
                 ]
             }
-            logger.info(f"3YC request for agreement {agreement['id']} is {request_info['status']}")
+            logger.info(
+                f"3YC request for agreement {agreement['id']} is {request_info['status']}"
+            )
             commitment_info = get_3yc_commitment(customer)
             if commitment_info:
                 parameters.setdefault(request_type_param_phase, [])
@@ -115,7 +117,8 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 STATUS_3YC_NONCOMPLIANT,
             ):
                 agreement_link = urljoin(
-                    settings.MPT_PORTAL_BASE_URL, f"/commerce/agreements/{agreement['id']}"
+                    settings.MPT_PORTAL_BASE_URL,
+                    f"/commerce/agreements/{agreement['id']}",
                 )
                 send_warning(
                     f"3YC {request_type_title.capitalize()} Request {status.capitalize()}",
@@ -133,7 +136,7 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
             )
             send_exception(
                 f"3YC {request_type_title.capitalize()} Request exception for {agreement['id']}",
-                traceback.format_exc()
+                traceback.format_exc(),
             )
 
 
@@ -189,8 +192,9 @@ def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
             )
             send_exception(
                 f"3YC {request_type_title} Request exception for {agreement['id']}",
-                traceback.format_exc()
+                traceback.format_exc(),
             )
+
 
 def submit_3yc_recommitment_request(mpt_client):
     adobe_client = get_adobe_client()
@@ -235,5 +239,5 @@ def submit_3yc_recommitment_request(mpt_client):
             )
             send_exception(
                 f"3YC Recommitment Request exception for {agreement['id']}",
-                traceback.format_exc()
+                traceback.format_exc(),
             )
