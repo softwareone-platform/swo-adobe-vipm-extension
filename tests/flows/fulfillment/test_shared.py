@@ -25,8 +25,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
-    IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
+    SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
@@ -235,7 +235,7 @@ def test_setup_due_date_for_first_time(
     order_factory,
 ):
     """
-    Tests that the `IncrementAttemptsCounter` processing step
+    Tests that the `SetupDueDate` processing step
     setups the fulfillment parameter `dueDate` to now
     if it is not set
     and updates the order to reflect the change.
@@ -249,7 +249,7 @@ def test_setup_due_date_for_first_time(
     mocked_next_step = mocker.MagicMock()
 
     context = Context(order=order, order_id=order["id"])
-    step = IncrementAttemptsCounter()
+    step = SetupDueDate()
 
     assert get_due_date(order) is None
 
@@ -272,7 +272,7 @@ def test_increment_attempts_counter_step_max_reached(
     fulfillment_parameters_factory,
 ):
     """
-    Tests that the `IncrementAttemptsCounter` processing step
+    Tests that the `SetupDueDate` processing step
     fail the order if the current date is more than due date
     parameter
     """
@@ -289,7 +289,7 @@ def test_increment_attempts_counter_step_max_reached(
     mocked_next_step = mocker.MagicMock()
 
     context = Context(order=order, order_id=order["id"])
-    step = IncrementAttemptsCounter()
+    step = SetupDueDate()
 
     step(mocked_client, context, mocked_next_step)
 

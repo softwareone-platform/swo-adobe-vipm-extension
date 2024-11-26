@@ -36,8 +36,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
-    IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
+    SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
     UpdatePrices,
@@ -256,7 +256,7 @@ class CreateCustomer(Step):
 def fulfill_purchase_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
-        IncrementAttemptsCounter(),
+        SetupDueDate(),
         ValidateDuplicateLines(),
         ValidateMarketSegmentEligibility(),
         StartOrderProcessing(TEMPLATE_NAME_PURCHASE),

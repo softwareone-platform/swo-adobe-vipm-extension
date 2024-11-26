@@ -233,13 +233,10 @@ def switch_order_to_query(client, order, template_name=None):
     send_email_notification(client, order)
 
 
-# TODO: Rename and change comments
 def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
     """
     Handle the reprocessing of an order.
-    If the maximum processing attempts has not been reached, it updates the order
-    incrementing the retry count fulfillment parameter otherwise it fails the
-    order.
+    If the due date is reached - fail the order
 
     Args:
         mpt_client (MPTClient): an instance of the Marketplace platform client.
@@ -535,10 +532,9 @@ def set_customer_coterm_date_if_null(client, adobe_client, order):
     return order
 
 
-# TODO rename to SetupDueDate and change comments
-class IncrementAttemptsCounter(Step):
+class SetupDueDate(Step):
     """
-    Increments the `retryCount` fulfillment parameter and update the order to reflect the change.
+    Setups properly due date
     """
 
     def __call__(self, client, context, next_step):
@@ -586,13 +582,11 @@ class SetOrUpdateCotermNextSyncDates(Step):
         next_step(client, context)
 
 
-# TODO: change comment
 class StartOrderProcessing(Step):
     """
     Set the template for the processing status or the
     delayed one if the processing is delated due to the
     renewal window open.
-
     """
 
     def __init__(self, template_name):

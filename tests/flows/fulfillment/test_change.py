@@ -23,8 +23,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
-    IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
+    SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
@@ -861,9 +861,7 @@ def test_fulfill_change_order(mocker):
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 18
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[1], IncrementAttemptsCounter
-    )
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], SetupDueDate)
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDuplicateLines
     )
