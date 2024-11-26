@@ -28,8 +28,8 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
     get_customer_data,
+    get_due_date,
     get_market_segment,
-    get_retry_count,
     is_consumables_sku,
     map_returnable_to_return_orders,
     reset_order_error,
@@ -127,7 +127,7 @@ class SetupContext(Step):
         context.downsize_lines, context.upsize_lines = split_downsizes_and_upsizes(
             context.order
         )
-        context.current_attempt = get_retry_count(context.order)
+        context.due_date = get_due_date(context.order)
         context.order_id = context.order["id"]
         context.type = context.order["type"]
         context.agreement_id = context.order["agreement"]["id"]
