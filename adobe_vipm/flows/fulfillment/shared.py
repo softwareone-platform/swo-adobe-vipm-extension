@@ -59,18 +59,17 @@ from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_coterm_date,
+    get_due_date,
     get_next_sync,
     get_notifications_recipient,
     get_one_time_skus,
     get_order_line_by_sku,
     get_price_item_by_line_sku,
-    get_retry_count,
     get_subscription_by_line_and_item_id,
-    increment_retry_count,
     is_renewal_window_open,
     map_returnable_to_return_orders,
     md2html,
-    reset_retry_count,
+    reset_due_date,
     set_adobe_3yc_end_date,
     set_adobe_3yc_enroll_status,
     set_adobe_3yc_start_date,
@@ -78,6 +77,7 @@ from adobe_vipm.flows.utils import (
     set_adobe_order_id,
     set_coterm_date,
     set_customer_data,
+    set_due_date,
     set_next_sync,
     set_template,
     split_phone_number,
@@ -176,7 +176,7 @@ def save_adobe_order_id(client, order, order_id):
 
 def switch_order_to_failed(client, order, status_notes):
     """
-    Marks an MPT order as failed by resetting any retry attempts and updating its status.
+    Marks an MPT order as failed by resetting due date and updating its status.
 
     Args:
         client (MPTClient): An instance of the Marketplace platform client.
@@ -186,7 +186,7 @@ def switch_order_to_failed(client, order, status_notes):
     Returns:
         dict: The updated order with the appropriate status and notes.
     """
-    order = reset_retry_count(order)
+    order = reset_due_date(order)
     agreement = order["agreement"]
     order = fail_order(
         client, order["id"], status_notes, parameters=order["parameters"]
@@ -198,7 +198,7 @@ def switch_order_to_failed(client, order, status_notes):
 
 def switch_order_to_query(client, order, template_name=None):
     """
-    Switches the status of an MPT order to 'query' and resetting any retry attempts and
+    Switches the status of an MPT order to 'query' and resetting due date and
     initiating a query order process.
 
     Args:
@@ -215,7 +215,7 @@ def switch_order_to_query(client, order, template_name=None):
         MPT_ORDER_STATUS_QUERYING,
         name=template_name,
     )
-    order = reset_retry_count(order)
+    order = reset_due_date(order)
     kwargs = {
         "parameters": order["parameters"],
         "template": template,
@@ -233,6 +233,7 @@ def switch_order_to_query(client, order, template_name=None):
     send_email_notification(client, order)
 
 
+# TODO: Rename and change comments
 def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
     """
     Handle the reprocessing of an order.
@@ -250,9 +251,9 @@ def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
     Returns:
         None
     """
-    retry_count = get_retry_count(order)
-    max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
-    if retry_count < max_attemps:
+    due_date = get_due_date(order)
+    due_date_str = due_date.strftime("%Y-%m-%d")
+    if date.today() > due_date:
         logger.info(
             f"Order {order['id']} ({adobe_order_id}: {adobe_order_type}) "
             "is still processing on Adobe side, wait.",
@@ -260,9 +261,9 @@ def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
         return
     logger.info(
         f'The order {order["id"]} ({adobe_order_id}) '
-        f"has reached the maximum number ({max_attemps}) of attemps.",
+        f"has reached the due date ({due_date_str}).",
     )
-    reason = f"Max processing attemps reached ({max_attemps})."
+    reason = f"Due date is reached ({due_date_str})."
     fail_order(client, order["id"], reason)
     logger.warning(f"Order {order['id']} has been failed: {reason}.")
 
@@ -276,7 +277,7 @@ def switch_order_to_completed(client, order, template_name):
         client (MPTClient):  an instance of the Marketplace platform client.
         order (dict): The MPT order that have to be switched to completed.
     """
-    order = reset_retry_count(order)
+    order = reset_due_date(order)
     template = get_product_template_or_default(
         client,
         order["agreement"]["product"]["id"],
@@ -417,21 +418,23 @@ def check_processing_template(client, order, template_name):
 
 def start_processing_attempt(client, order):
     """
-    Increments the retry count parameter to register the new attempt,
-    send the processing email notification to the customer.
+    Sets due date and send email notification
 
     Args:
         client (MPTClient): the MPT client used to update the order.
         order (dict): The order currently processing.
 
     Returns:
-        dict: The order with the retry count parameter updated.
+        dict: The order with the due date parameter updated.
     """
-    current_attempt = get_retry_count(order)
-    order = increment_retry_count(order)
+    current_due_date = get_due_date(order)
+    if current_due_date:
+        return order
+
+    order = set_due_date(order)
     update_order(client, order["id"], parameters=order["parameters"])
-    if current_attempt == 0:
-        send_email_notification(client, order)
+    send_email_notification(client, order)
+
     return order
 
 
@@ -532,27 +535,27 @@ def set_customer_coterm_date_if_null(client, adobe_client, order):
     return order
 
 
+# TODO rename to SetupDueDate and change comments
 class IncrementAttemptsCounter(Step):
     """
     Increments the `retryCount` fulfillment parameter and update the order to reflect the change.
     """
 
     def __call__(self, client, context, next_step):
-        context.order = increment_retry_count(context.order)
-        next_attempt_count = get_retry_count(context.order)
-        max_attemps = int(settings.EXTENSION_CONFIG.get("MAX_RETRY_ATTEMPS", "10"))
-        if next_attempt_count > max_attemps:
+        context.order = set_due_date(context.order)
+        due_date = get_due_date(context.order)
+        context.due_date = due_date
+        due_date_str = due_date.strftime("%Y-%m-%d")
+
+        if date.today() > due_date:
             logger.info(
-                f"{context}: maximum ({max_attemps}) of attemps reached.",
+                f"{context}: due date ({due_date_str}) is reached.",
             )
-            reason = f"Max processing attemps reached ({max_attemps})."
+            reason = f"Due date {due_date_str} for order processing is reached."
             switch_order_to_failed(client, context.order, reason)
             return
         update_order(client, context.order_id, parameters=context.order["parameters"])
-        logger.info(
-            f"{context}: retry count incremented successfully "
-            f"{context.current_attempt} -> {next_attempt_count}."
-        )
+        logger.info(f"{context}: due date is set to {due_date_str} successfully.")
         next_step(client, context)
 
 
@@ -583,6 +586,7 @@ class SetOrUpdateCotermNextSyncDates(Step):
         next_step(client, context)
 
 
+# TODO: change comment
 class StartOrderProcessing(Step):
     """
     Set the template for the processing status or the
@@ -615,7 +619,7 @@ class StartOrderProcessing(Step):
                 f"({template['id']})"
             )
         logger.info(f"{context}: processing template is ok, continue")
-        if context.current_attempt == 0:
+        if not context.due_date:
             send_email_notification(client, context.order)
         next_step(client, context)
 
@@ -928,7 +932,7 @@ class CompleteOrder(Step):
         self.template_name = template_name
 
     def __call__(self, client, context, next_step):
-        context.order = reset_retry_count(context.order)
+        context.order = reset_due_date(context.order)
         template = get_product_template_or_default(
             client,
             context.product_id,

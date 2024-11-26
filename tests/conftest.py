@@ -33,10 +33,10 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
+    PARAM_DUE_DATE,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
-    PARAM_RETRY_COUNT,
 )
 
 
@@ -564,7 +564,7 @@ def transfer_order_parameters_factory():
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
         customer_id="",
-        retry_count="0",
+        due_date=None,
         p3yc_recommitment=None,
         p3yc_enroll_status="",
         p3yc_commitment_request_status="",
@@ -585,10 +585,10 @@ def fulfillment_parameters_factory():
             },
             {
                 "id": "PAR-7771-1777",
-                "name": "Retry Count",
-                "externalId": PARAM_RETRY_COUNT,
-                "type": "SingleLineText",
-                "value": retry_count,
+                "name": "Due Date",
+                "externalId": PARAM_DUE_DATE,
+                "type": "Date",
+                "value": due_date,
             },
             {
                 "id": "PAR-9876-5432",

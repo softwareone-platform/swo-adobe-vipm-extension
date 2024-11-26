@@ -55,14 +55,8 @@ def wrap_for_trace(func, event_type):
         tracer = trace.get_tracer(event_type)
         object_id = event.id
 
-        try:
-            attempt_func = import_string(settings.LOGGING_ATTEMPT_GETTER)
-        except ImportError:
-            attempt_func = lambda _: 0  # noqa: E731
-
-        attempt = attempt_func(event)
         with tracer.start_as_current_span(
-            f"Event {event_type} for {object_id} attempt {attempt}"
+            f"Event {event_type} for {object_id}"
         ) as span:
             try:
                 func(client, event)
@@ -71,7 +65,6 @@ def wrap_for_trace(func, event_type):
             finally:
                 if span.is_recording():
                     span.set_attribute("order.id", object_id)
-                    span.set_attribute("attempt", attempt)
 
     @wraps(func)
     def wrapper(client, event):

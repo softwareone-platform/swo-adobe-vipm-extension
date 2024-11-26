@@ -1,5 +1,7 @@
 import copy
 
+from freezegun import freeze_time
+
 from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
@@ -13,6 +15,7 @@ from adobe_vipm.flows.helpers import (
 from adobe_vipm.flows.utils import get_customer_data
 
 
+@freeze_time("2024-01-01")
 def test_setup_context_step(
     mocker, agreement, order_factory, lines_factory, fulfillment_parameters_factory
 ):
@@ -46,7 +49,7 @@ def test_setup_context_step(
     order = order_factory(
         lines=downsizing_items + upsizing_items,
         fulfillment_parameters=fulfillment_parameters_factory(
-            retry_count="12",
+            due_date="2025-01-01",
         ),
     )
 
@@ -60,7 +63,7 @@ def test_setup_context_step(
 
     assert context.order["agreement"] == agreement
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
-    assert context.current_attempt == 12
+    assert context.due_date.strftime("%Y-%m-%d") == "2025-01-01"
     assert context.downsize_lines == downsizing_items
     assert context.upsize_lines == upsizing_items
     mocked_get_agreement.assert_called_once_with(
@@ -120,7 +123,7 @@ def test_setup_context_step_with_adobe_customer_and_order_id(
 
     assert context.order["agreement"] == agreement
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
-    assert context.current_attempt == 0
+    assert context.due_date is None
     assert context.downsize_lines == []
     assert context.upsize_lines == order["lines"]
     assert context.adobe_customer_id == "adobe-customer-id"

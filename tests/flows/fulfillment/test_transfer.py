@@ -39,6 +39,7 @@ from adobe_vipm.flows.utils import (
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
+@freeze_time("2024-01-01")
 def test_transfer(
     mocker,
     agreement,
@@ -155,7 +156,7 @@ def test_transfer(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
+                due_date="2024-01-31",
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -180,7 +181,7 @@ def test_transfer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="1",
+                due_date="2024-01-31",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
@@ -213,7 +214,7 @@ def test_transfer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="1",
+                due_date=None,
                 next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
@@ -296,7 +297,7 @@ def test_transfer(
         parameters={
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                due_date=None,
                 next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
@@ -361,6 +362,7 @@ def test_transfer(
     )
 
 
+@freeze_time("2025-01-01")
 def test_transfer_not_ready(
     mocker,
     agreement,
@@ -415,7 +417,7 @@ def test_transfer_not_ready(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
+                due_date="2025-01-31",
             ),
             "ordering": transfer_order_parameters_factory(),
         },
@@ -791,7 +793,7 @@ def test_fulfill_transfer_order_already_migrated(
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
-            retry_count="1",
+            due_date="2012-02-13",
         ),
         order_parameters=transfer_order_parameters_factory(
             company_name=adobe_customer["companyProfile"]["companyName"],
@@ -889,7 +891,7 @@ def test_fulfill_transfer_order_already_migrated(
             "ordering": updated_order["parameters"]["ordering"],
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                due_date=None,
                 next_sync_date="2024-04-19",
                 coterm_date="2024-04-18",
             ),
@@ -903,7 +905,7 @@ def test_fulfill_transfer_order_already_migrated(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
+                due_date="2012-02-13",
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -1038,7 +1040,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
+                due_date=None,
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -1082,7 +1084,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
-            retry_count="1",
+            due_date="2012-02-14",
             next_sync_date="2024-08-05",
             coterm_date="2024-08-04",
         ),
@@ -1182,7 +1184,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
             "ordering": updated_order["parameters"]["ordering"],
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                due_date=None,
                 next_sync_date="2024-08-05",
                 coterm_date="2024-08-04",
             ),
@@ -1196,7 +1198,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
+                due_date="2012-02-13",
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -1208,7 +1210,15 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     )
     assert mocked_update_order.mock_calls[2].kwargs == {
         "externalIds": updated_order["externalIds"],
-        "parameters": updated_order["parameters"],
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                due_date=None,
+                coterm_date="2024-08-04",
+                next_sync_date="2024-08-05",
+            ),
+            "ordering": updated_order["parameters"]["ordering"],
+        },
     }
 
     assert mocked_transfer.status == "synchronized"
@@ -1270,7 +1280,7 @@ def test_fulfill_transfer_order_already_migrated_(
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
-            retry_count="1",
+            due_date="2025-01-01",
             next_sync_date="2024-08-05",
             coterm_date="2024-08-04",
         ),
@@ -1502,6 +1512,7 @@ def test_fulfill_transfer_order_migration_synchronized(
     )
 
 
+@freeze_time("2024-01-01")
 def test_transfer_3yc_customer(
     mocker,
     agreement,
@@ -1595,7 +1606,7 @@ def test_transfer_3yc_customer(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
+                due_date="2024-01-31",
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -1621,7 +1632,7 @@ def test_transfer_3yc_customer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="1",
+                due_date="2024-01-31",
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
@@ -1660,7 +1671,7 @@ def test_transfer_3yc_customer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="1",
+                due_date=None,
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
@@ -1738,7 +1749,7 @@ def test_transfer_3yc_customer(
         parameters={
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                retry_count="0",
+                due_date=None,
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
@@ -1820,7 +1831,7 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
-            retry_count="1",
+            due_date="2012-02-13",
         ),
         order_parameters=transfer_order_parameters_factory(
             company_name=adobe_customer["companyProfile"]["companyName"],
@@ -1922,7 +1933,7 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                retry_count="1",
+                due_date="2012-02-13",
             ),
             "ordering": order["parameters"]["ordering"],
         },
