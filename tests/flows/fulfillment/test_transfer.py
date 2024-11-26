@@ -847,9 +847,7 @@ def test_fulfill_transfer_order_already_migrated(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
 
-    transfer_items = adobe_items_factory(
-        subscription_id="sub-id"
-    )
+    transfer_items = adobe_items_factory(subscription_id="sub-id")
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
     adobe_subscription = adobe_subscription_factory(current_quantity=170)
@@ -1140,9 +1138,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         "adobe_vipm.flows.fulfillment.shared.complete_order"
     )
 
-    transfer_items = adobe_items_factory(
-        subscription_id="sub-id"
-    )
+    transfer_items = adobe_items_factory(subscription_id="sub-id")
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
     adobe_subscription = adobe_subscription_factory(current_quantity=170)
@@ -1334,12 +1330,12 @@ def test_fulfill_transfer_order_already_migrated_(
 
     mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
-    transfer_items = adobe_items_factory(
-        subscription_id="sub-id"
-    )
+    transfer_items = adobe_items_factory(subscription_id="sub-id")
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING, current_quantity=170)
+    adobe_subscription = adobe_subscription_factory(
+        status=STATUS_PENDING, current_quantity=170
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1811,7 +1807,6 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
     adobe_order_factory,
     agreement,
 ):
-
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
 
@@ -1963,7 +1958,6 @@ def test_update_transfer_status_step(
     adobe_order_factory,
     agreement,
 ):
-
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
     context = Context(

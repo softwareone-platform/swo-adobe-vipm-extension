@@ -9,7 +9,7 @@ services:
     volumes: 
       - .:/extension
     env_file:
-      - .env
+      - .env.test
     ports:
       - "8080:8080"
     expose:

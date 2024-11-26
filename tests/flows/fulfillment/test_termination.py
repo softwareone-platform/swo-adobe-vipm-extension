@@ -232,7 +232,8 @@ def test_fulfill_termination_order(mocker):
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], StartOrderProcessing)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[3].template_name == TEMPLATE_NAME_TERMINATION
+        mocked_pipeline_ctor.mock_calls[0].args[3].template_name
+        == TEMPLATE_NAME_TERMINATION
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnableOrders)

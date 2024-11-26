@@ -271,7 +271,9 @@ class UpdatePrices(Step):
         if not context.adobe_preview_order:
             next_step(client, context)
             return
-        adobe_skus = [item["offerId"] for item in context.adobe_preview_order["lineItems"]]
+        adobe_skus = [
+            item["offerId"] for item in context.adobe_preview_order["lineItems"]
+        ]
         prices = get_prices_for_skus(context.product_id, context.currency, adobe_skus)
 
         updated_lines = []

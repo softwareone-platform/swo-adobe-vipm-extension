@@ -35,7 +35,9 @@ def test_validate_duplicate_lines_step_duplicates(mocker, order_factory, lines_f
     mocked_next_step.assert_not_called()
 
 
-def test_validate_duplicate_lines_step_existing_lines(mocker, order_factory, lines_factory):
+def test_validate_duplicate_lines_step_existing_lines(
+    mocker, order_factory, lines_factory
+):
     order = order_factory(lines=lines_factory(line_id=2, item_id=10))
 
     mocked_client = mocker.MagicMock()
@@ -149,7 +151,9 @@ def test_get_preview_order_step_no_lines(mocker, order_factory):
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_get_preview_order_step_api_error(mocker, order_factory, adobe_api_error_factory):
+def test_get_preview_order_step_api_error(
+    mocker, order_factory, adobe_api_error_factory
+):
     error = AdobeAPIError(400, adobe_api_error_factory("9999", "unexpected"))
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.side_effect = error

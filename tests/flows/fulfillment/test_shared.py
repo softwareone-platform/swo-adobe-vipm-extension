@@ -1079,7 +1079,9 @@ def test_create_or_update_subscriptions_step(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "value": str(
+                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -1665,7 +1667,7 @@ def test_get_preview_order_step_order_new_order_created(
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
-        adobe_new_order_id="new-order-id"
+        adobe_new_order_id="new-order-id",
     )
 
     step = GetPreviewOrder()
@@ -1674,7 +1676,6 @@ def test_get_preview_order_step_order_new_order_created(
     mocked_adobe_client.create_preview_order.assert_not_called()
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
 
 
 def test_get_preview_order_step_adobe_error(
@@ -1699,7 +1700,6 @@ def test_get_preview_order_step_adobe_error(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.side_effect = error
 
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1723,5 +1723,7 @@ def test_get_preview_order_step_adobe_error(
     step = GetPreviewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_switch_to_failed.assert_called_once_with(mocked_client, context.order, str(error))
+    mocked_switch_to_failed.assert_called_once_with(
+        mocked_client, context.order, str(error)
+    )
     mocked_next_step.assert_not_called()

@@ -217,7 +217,6 @@ def _check_adobe_transfer_order_fulfilled(
 def _fulfill_transfer_migrated(
     adobe_client, mpt_client, order, transfer, adobe_transfer, one_time_skus
 ):
-
     authorization_id = order["authorization"]["id"]
     adobe_subscriptions = adobe_client.get_subscriptions(
         authorization_id,
@@ -291,7 +290,6 @@ class UpdateTransferStatus(Step):
         self.status = status
 
     def __call__(self, client, context, next_step):
-
         self.transfer.status = "synchronized"
         self.transfer.mpt_order_id = context.order["id"]
         self.transfer.synchronized_at = datetime.now()
@@ -302,7 +300,6 @@ class UpdateTransferStatus(Step):
 
 class SaveCustomerData(Step):
     def __call__(self, client, context, next_step):
-
         context.order = save_adobe_order_id_and_customer_data(
             client,
             context.order,

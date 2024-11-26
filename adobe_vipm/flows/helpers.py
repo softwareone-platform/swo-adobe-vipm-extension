@@ -160,7 +160,6 @@ class ValidateDownsizes3YC:
         self.is_validation = is_validation
 
     def __call__(self, client, context, next_step):
-
         # Get the 3YC commitment if it is enabled
         commitment = self.get_3yc_commitment_enabled(context.adobe_customer)
         if (
@@ -243,7 +242,6 @@ class ValidateDownsizes3YC:
         count_licenses,
         count_consumables,
     ):
-
         is_invalid_license_minimum = False
         is_invalid_consumable_minimum = False
         minimum_licenses = 0

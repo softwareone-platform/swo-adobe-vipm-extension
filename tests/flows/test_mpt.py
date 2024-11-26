@@ -963,8 +963,9 @@ def test_get_all_agreements(mocker, settings):
 def test_get_agreement(mpt_client, requests_mocker, agreement):
     agreement_id = agreement["id"]
     requests_mocker.get(
-        urljoin(mpt_client.base_url,
-            f"commerce/agreements/{agreement_id}?select=seller,buyer,listing,product,subscriptions"
+        urljoin(
+            mpt_client.base_url,
+            f"commerce/agreements/{agreement_id}?select=seller,buyer,listing,product,subscriptions",
         ),
         json=agreement,
     )
@@ -972,18 +973,15 @@ def test_get_agreement(mpt_client, requests_mocker, agreement):
     assert get_agreement(mpt_client, agreement_id) == agreement
 
 
-def test_get_agreement_error(
-    mpt_client, requests_mocker, mpt_error_factory
-):
+def test_get_agreement_error(mpt_client, requests_mocker, mpt_error_factory):
     requests_mocker.get(
         urljoin(
             mpt_client.base_url,
-            "commerce/agreements/AGR-1234?select=seller,buyer,listing,product,subscriptions"
+            "commerce/agreements/AGR-1234?select=seller,buyer,listing,product,subscriptions",
         ),
         status=404,
         json=mpt_error_factory(404, "Not Found", "Agreement not found"),
     )
-
 
     with pytest.raises(MPTAPIError) as cv:
         get_agreement(mpt_client, "AGR-1234")
@@ -995,27 +993,19 @@ def test_get_licensee(mpt_client, requests_mocker, agreement):
     licensee = agreement["licensee"]
     licensee_id = licensee["id"]
     requests_mocker.get(
-        urljoin(mpt_client.base_url,
-            f"accounts/licensees/{licensee_id}"
-        ),
+        urljoin(mpt_client.base_url, f"accounts/licensees/{licensee_id}"),
         json=licensee,
     )
 
     assert get_licensee(mpt_client, licensee_id) == licensee
 
 
-def test_get_licensee_error(
-    mpt_client, requests_mocker, mpt_error_factory
-):
+def test_get_licensee_error(mpt_client, requests_mocker, mpt_error_factory):
     requests_mocker.get(
-        urljoin(
-            mpt_client.base_url,
-            "accounts/licensees/LIC-1234"
-        ),
+        urljoin(mpt_client.base_url, "accounts/licensees/LIC-1234"),
         status=404,
         json=mpt_error_factory(404, "Not Found", "Licensee not found"),
     )
-
 
     with pytest.raises(MPTAPIError) as cv:
         get_licensee(mpt_client, "LIC-1234")
