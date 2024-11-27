@@ -12,6 +12,7 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_DOWNSIZE_MINIMUM_3YC_LICENSES,
+    ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION,
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
@@ -30,6 +31,7 @@ from adobe_vipm.flows.utils import (
     get_market_segment,
     get_retry_count,
     is_consumables_sku,
+    map_returnable_to_return_orders,
     reset_order_error,
     reset_ordering_parameters_error,
     set_customer_data,
@@ -161,8 +163,11 @@ class ValidateDownsizes3YC:
 
         # Get the 3YC commitment if it is enabled
         commitment = self.get_3yc_commitment_enabled(context.adobe_customer)
-
-        if commitment and context.downsize_lines:
+        if (
+            commitment
+            and context.downsize_lines
+            and not self.is_return_order_created(context)
+        ):
             adobe_client = get_adobe_client()
             # get Adobe customer subscriptions
             subscriptions = adobe_client.get_subscriptions(
@@ -202,7 +207,7 @@ class ValidateDownsizes3YC:
         if self.is_validation:
             context.order = set_order_error(
                 context.order,
-                error,
+                ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(error=error),
             )
         else:
             switch_order_to_failed(
@@ -299,3 +304,14 @@ class ValidateDownsizes3YC:
         ):
             return commitment
         return None
+
+    @staticmethod
+    def is_return_order_created(context):
+        for sku, returnable_orders in context.adobe_returnable_orders.items():
+            return_orders = context.adobe_return_orders.get(sku, [])
+            for _returnable_order, return_order in map_returnable_to_return_orders(
+                returnable_orders or [], return_orders
+            ):
+                if return_order:
+                    return True
+        return False
