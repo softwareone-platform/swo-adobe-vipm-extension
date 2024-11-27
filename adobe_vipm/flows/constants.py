@@ -228,6 +228,11 @@ ERR_DOWNSIZE_MINIMUM_3YC_GENERIC = (
     " for the three-year commitment."
 )
 
+ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION = ValidationError(
+    "VIPMV015",
+    "{error}",
+)
+
 ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
     "VIPMV014",
     "Do not add or remove items, and do not modify the quantities of any items. "
