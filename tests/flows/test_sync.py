@@ -3,13 +3,17 @@ import logging
 import pytest
 
 from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.flows.constants import OBJECT_TYPES
+from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     sync_agreement_prices,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_next_sync,
     sync_all_agreements,
 )
-from adobe_vipm.flows.utils import get_adobe_customer_id
+from adobe_vipm.flows.utils import (
+    get_adobe_customer_id,
+)
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -49,7 +53,7 @@ def test_sync_agreement_prices(
                     "id": "ITM-0000-0001-0003",
                 },
             },
-        ]
+        ],
     )
     mpt_subscription = subscriptions_factory()[0]
     another_mpt_subscription = subscriptions_factory(
@@ -72,7 +76,8 @@ def test_sync_agreement_prices(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.side_effect = [
-        adobe_subscription, another_adobe_subscription,
+        adobe_subscription,
+        another_adobe_subscription,
     ]
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
         coterm_date="2025-04-04"
@@ -90,13 +95,10 @@ def test_sync_agreement_prices(
 
     mocker.patch(
         "adobe_vipm.flows.sync.get_prices_for_skus",
-        side_effect=[{
-            "65304578CA01A12": 1234.55,
-            "77777777CA01A12": 20.22
-        }, {
-            "65304578CA01A12": 1234.55,
-            "77777777CA01A12": 20.22
-        }],
+        side_effect=[
+            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
+            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
+        ],
     )
 
     mocked_update_agreement_subscription = mocker.patch(
@@ -136,7 +138,9 @@ def test_sync_agreement_prices(
         mocker.call(
             mocked_mpt_client,
             mpt_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}
+            ],
             parameters={
                 "fulfillment": [
                     {
@@ -149,7 +153,9 @@ def test_sync_agreement_prices(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "value": str(
+                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -291,6 +297,10 @@ def test_sync_agreement_prices_exception(
         adobe_api_error_factory(code="9999", message="Error from Adobe."),
     )
 
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.sync.notify_unhandled_exception_in_teams"
+    )
+
     mocker.patch(
         "adobe_vipm.flows.sync.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -314,11 +324,73 @@ def test_sync_agreement_prices_exception(
 
     assert f"Cannot sync agreement {agreement['id']}" in caplog.text
 
+    process, object_type, object_id, tb = mocked_notify.mock_calls[0].args
+    assert process == "sync prices"
+    assert object_type == OBJECT_TYPES["AGREEMENT"]
+    assert object_id == agreement["id"]
+
     mocked_get_agreement_subscription.assert_called_once_with(
         mocked_mpt_client,
         mpt_subscription["id"],
     )
 
+    mocked_update_agreement_subscription.assert_not_called()
+    mocked_update_agreement.assert_not_called()
+
+
+def test_sync_agreement_prices_mpt_exception(
+    mocker,
+    mpt_error_factory,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    caplog,
+):
+    error_data = mpt_error_factory(404, "Resource Not Found", "Not Found")
+    error = MPTAPIError(404, error_data)
+
+    agreement = agreement_factory()
+    mpt_subscription = subscriptions_factory()[0]
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_customer.side_effect = adobe_customer_factory()
+    mocked_adobe_client.get_subscription.side_effect = error
+
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.sync.notify_unhandled_exception_in_teams"
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_get_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreement_subscription",
+        side_effect=mpt_subscription,
+    )
+
+    mocked_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.sync.update_agreement_subscription",
+    )
+
+    mocked_update_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.update_agreement",
+    )
+
+    with caplog.at_level(logging.ERROR):
+        sync_agreement_prices(mocked_mpt_client, agreement, False)
+
+    assert f"Cannot sync agreement {agreement['id']}" in caplog.text
+
+    process, object_type, object_id, tb = mocked_notify.mock_calls[0].args
+    assert process == "sync prices"
+    assert object_type == OBJECT_TYPES["AGREEMENT"]
+    assert object_id == agreement["id"]
+
+    mocked_get_agreement_subscription.assert_not_called()
     mocked_update_agreement_subscription.assert_not_called()
     mocked_update_agreement.assert_not_called()
 
@@ -365,9 +437,7 @@ def test_sync_agreement_prices_skip_processing(
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_agreement_ids(
-    mocker, agreement_factory, dry_run
-):
+def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, dry_run):
     agreement = agreement_factory()
     mocked_mpt_client = mocker.MagicMock()
     mocker.patch(
@@ -378,9 +448,7 @@ def test_sync_agreements_by_agreement_ids(
         "adobe_vipm.flows.sync.sync_agreement_prices",
     )
 
-    sync_agreements_by_agreement_ids(
-        mocked_mpt_client, [agreement["id"]], dry_run
-    )
+    sync_agreements_by_agreement_ids(mocked_mpt_client, [agreement["id"]], dry_run)
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         agreement,
@@ -426,7 +494,6 @@ def test_sync_agreements_by_next_sync(mocker, agreement_factory, dry_run):
         agreement,
         dry_run,
     )
-
 
 
 def test_sync_agreement_prices_with_3yc(
@@ -500,10 +567,7 @@ def test_sync_agreement_prices_with_3yc(
         lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
         parameters={
             "fulfillment": [
-                {
-                    "externalId": "adobeSKU",
-                    "value": "65304578CA01A12"
-                },
+                {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                 {
                     "externalId": "currentQuantity",
                     "value": str(adobe_subscription["currentQuantity"]),

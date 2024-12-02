@@ -2,6 +2,7 @@ import logging
 
 import pytest
 
+from adobe_vipm.flows.constants import OBJECT_TYPES
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.utils import reset_ordering_parameters_error, strip_trace_id
 from adobe_vipm.flows.validation.base import validate_order
@@ -87,9 +88,10 @@ def test_validate_order_exception(mocker, mpt_error_factory, order_factory):
     with pytest.raises(MPTAPIError):
         validate_order(mocker.MagicMock(), order)
 
-    process, order_id, tb = mocked_notify.mock_calls[0].args
+    process, object_type, object_id, tb = mocked_notify.mock_calls[0].args
     assert process == "validation"
-    assert order_id == order["id"]
+    assert object_type == OBJECT_TYPES["ORDER"]
+    assert object_id == order["id"]
     assert strip_trace_id(str(error)) in tb
 
 

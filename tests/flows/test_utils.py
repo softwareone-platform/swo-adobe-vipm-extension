@@ -7,6 +7,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
     STATUS_PROCESSED,
 )
+from adobe_vipm.flows.constants import OBJECT_TYPES
 from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
@@ -24,6 +25,7 @@ def test_notify_unhandled_exception_in_teams(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
     notify_unhandled_exception_in_teams(
         "validation",
+        OBJECT_TYPES["ORDER"],
         "ORD-0000",
         "exception-traceback",
     )
@@ -35,6 +37,20 @@ def test_notify_unhandled_exception_in_teams(mocker):
         "```exception-traceback```",
     )
 
+def test_notify_unhandled_exception_in_teams_for_agreement(mocker):
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    notify_unhandled_exception_in_teams(
+        "sync prices",
+        OBJECT_TYPES["AGREEMENT"],
+        "AGR-0000-0000",
+        "exception-traceback",
+    )
+    mocked_send_exc.assert_called_once_with(
+        "Agreement sync prices unhandled exception!",
+        "An unhandled exception has been raised while performing sync prices "
+        "of the agreement **AGR-0000-0000**:\n\n"
+        "```exception-traceback```",
+    )
 
 def test_reset_order_error(order_factory):
     order = order_factory()
