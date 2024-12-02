@@ -2,6 +2,7 @@ import logging
 import traceback
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.flows.constants import OBJECT_TYPES
 from adobe_vipm.flows.helpers import (
     populate_order_info,
 )
@@ -65,6 +66,7 @@ def validate_order(client, order):
     except Exception:
         notify_unhandled_exception_in_teams(
             "validation",
+            OBJECT_TYPES["ORDER"],
             order["id"],
             strip_trace_id(traceback.format_exc()),
         )

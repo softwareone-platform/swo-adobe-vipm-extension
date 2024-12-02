@@ -593,14 +593,13 @@ def strip_trace_id(traceback):
 
 
 @functools.cache
-def notify_unhandled_exception_in_teams(process, order_id, traceback):
+def notify_unhandled_exception_in_teams(process, object_type, object_id, traceback):
     send_exception(
-        f"Order {process} unhandled exception!",
+        f"{object_type} {process} unhandled exception!",
         f"An unhandled exception has been raised while performing {process} "
-        f"of the order **{order_id}**:\n\n"
+        f"of the {object_type.lower()} **{object_id}**:\n\n"
         f"```{traceback}```",
     )
-
 
 def get_notifications_recipient(order):
     return (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get(

@@ -1,6 +1,7 @@
 import logging
 import traceback
 
+from adobe_vipm.flows.constants import OBJECT_TYPES
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
 from adobe_vipm.flows.fulfillment.shared import start_processing_attempt
@@ -46,6 +47,7 @@ def fulfill_order(client, order):
     except Exception:
         notify_unhandled_exception_in_teams(
             "fulfillment",
+            OBJECT_TYPES["ORDER"],
             order["id"],
             strip_trace_id(traceback.format_exc()),
         )
