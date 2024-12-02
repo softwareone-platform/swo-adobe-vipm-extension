@@ -210,22 +210,27 @@ ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
     "place a new order for {quantity} licenses."
 )
 
-ERR_DOWNSIZE_MINIMUN_3YC_LICENSES = (
+ERR_DOWNSIZE_MINIMUM_3YC_LICENSES = (
     "The order has failed. The reduction in quantity would place the account"
     " below the minimum commitment of {minimum_licenses} licenses for the three-year commitment."
 )
 
 
-ERR_DOWNSIZE_MINIMUN_3YC_CONSUMABLES = (
+ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES = (
     "The order has failed. The reduction in quantity would place the account below the minimum"
-    " commitment of {minimun_consumables} consumables for the three-year commitment."
+    " commitment of {minimum_consumables} consumables for the three-year commitment."
 )
 
 
-ERR_DOWNSIZE_MINIMUN_3YC_GENERIC = (
+ERR_DOWNSIZE_MINIMUM_3YC_GENERIC = (
     "The order has failed. The reduction in quantity would place the account below the "
-    "minimum commitment of {minimum_licenses} licenses or {minimun_consumables} consumables"
+    "minimum commitment of {minimum_licenses} licenses or {minimum_consumables} consumables"
     " for the three-year commitment."
+)
+
+ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION = ValidationError(
+    "VIPMV015",
+    "{error}",
 )
 
 ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
