@@ -1,13 +1,18 @@
 import logging
 import sys
+import traceback
 from datetime import date, datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
-from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
+)
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
 from adobe_vipm.flows.constants import (
+    OBJECT_TYPE_AGREEMENT,
     PARAM_ADOBE_SKU,
     PARAM_CURRENT_QUANTITY,
     PARAM_RENEWAL_DATE,
@@ -26,6 +31,8 @@ from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
     is_consumables_sku,
+    notify_unhandled_exception_in_teams,
+    strip_trace_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -234,6 +241,12 @@ def sync_agreement_prices(
 
     except Exception:
         logger.exception(f"Cannot sync agreement {agreement_id}")
+        notify_unhandled_exception_in_teams(
+            "sync prices",
+            OBJECT_TYPE_AGREEMENT,
+            agreement_id,
+            strip_trace_id(traceback.format_exc()),
+        )
 
 
 def sync_agreements_by_next_sync(mpt_client, dry_run):

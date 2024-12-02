@@ -1,5 +1,6 @@
 import pytest
 
+from adobe_vipm.flows.constants import OBJECT_TYPE_ORDER
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.fulfillment.base import fulfill_order
 from adobe_vipm.flows.utils import strip_trace_id
@@ -22,9 +23,10 @@ def test_fulfill_order_exception(mocker, mpt_error_factory, order_factory):
     with pytest.raises(MPTAPIError):
         fulfill_order(mocker.MagicMock(), order)
 
-    process, order_id, tb = mocked_notify.mock_calls[0].args
+    process, object_type, object_id, tb = mocked_notify.mock_calls[0].args
     assert process == "fulfillment"
-    assert order_id == order["id"]
+    assert object_type == OBJECT_TYPE_ORDER
+    assert object_id == order["id"]
     assert strip_trace_id(str(error)) in tb
 
 
