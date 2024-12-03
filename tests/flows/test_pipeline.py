@@ -7,7 +7,6 @@ def test_pipeline_completes(mocker):
     mocked_client = mocker.MagicMock()
     mocked_context = mocker.MagicMock()
 
-
     class TestStep(Step):
         def __call__(self, client, context, next_step):
             next_step(client, context)
@@ -31,7 +30,6 @@ def test_pipeline_completes(mocker):
 def test_pipeline_exit_prematurely(mocker):
     mocked_client = mocker.MagicMock()
     mocked_context = mocker.MagicMock()
-
 
     class TestStep1(Step):
         def __call__(self, client, context, next_step):

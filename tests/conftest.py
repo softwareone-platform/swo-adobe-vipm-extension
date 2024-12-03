@@ -33,10 +33,10 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
+    PARAM_DUE_DATE,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
-    PARAM_RETRY_COUNT,
 )
 
 
@@ -341,7 +341,6 @@ def order_parameters_factory():
         p3yc_licenses="",
         p3yc_consumables="",
     ):
-
         if address is None:
             address = {
                 "country": "US",
@@ -564,7 +563,7 @@ def transfer_order_parameters_factory():
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
         customer_id="",
-        retry_count="0",
+        due_date=None,
         p3yc_recommitment=None,
         p3yc_enroll_status="",
         p3yc_commitment_request_status="",
@@ -585,10 +584,10 @@ def fulfillment_parameters_factory():
             },
             {
                 "id": "PAR-7771-1777",
-                "name": "Retry Count",
-                "externalId": PARAM_RETRY_COUNT,
-                "type": "SingleLineText",
-                "value": retry_count,
+                "name": "Due Date",
+                "externalId": PARAM_DUE_DATE,
+                "type": "Date",
+                "value": due_date,
             },
             {
                 "id": "PAR-9876-5432",
@@ -673,9 +672,7 @@ def items_factory():
                 "externalIds": {
                     "vendor": external_vendor_id,
                 },
-                "terms": {
-                    "period": term_period
-                },
+                "terms": {"period": term_period},
             },
         ]
 
@@ -956,7 +953,10 @@ def agreement(buyer):
 
 @pytest.fixture()
 def order_factory(
-    agreement, order_parameters_factory, fulfillment_parameters_factory, lines_factory,
+    agreement,
+    order_parameters_factory,
+    fulfillment_parameters_factory,
+    lines_factory,
     status="Processing",
 ):
     """
@@ -1084,9 +1084,7 @@ def seller():
 def webhook(settings):
     return {
         "id": "WH-123-123",
-        "criteria": {
-            "product.id": settings.MPT_PRODUCTS_IDS[0]
-        },
+        "criteria": {"product.id": settings.MPT_PRODUCTS_IDS[0]},
     }
 
 
@@ -1327,12 +1325,12 @@ def extension_settings(settings):
 @pytest.fixture()
 def adobe_commitment_factory():
     def _commitment(
-            licenses=None,
-            consumables=None,
-            start_date="2024-01-01",
-            end_date= "2025-01-01",
-            status="COMMITTED",
-        ):
+        licenses=None,
+        consumables=None,
+        start_date="2024-01-01",
+        end_date="2025-01-01",
+        status="COMMITTED",
+    ):
         commitment = {
             "startDate": start_date,
             "endDate": end_date,
@@ -1428,7 +1426,9 @@ def mock_pricelist_cache_factory(mocker):
         new_cache = cache or defaultdict(list)
         mocker.patch("adobe_vipm.flows.airtable.PRICELIST_CACHE", new_cache)
         return new_cache
+
     return _mocked_cache
+
 
 @pytest.fixture()
 def mocked_pricelist_cache(mock_pricelist_cache_factory):

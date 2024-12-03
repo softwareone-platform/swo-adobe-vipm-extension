@@ -529,7 +529,6 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     adobe_3yc_commitment = adobe_commitment_factory(licenses=0, consumables=37)
 
     adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
@@ -598,7 +597,6 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     adobe_3yc_commitment = adobe_commitment_factory(licenses=20, consumables=37)
 
     adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
@@ -667,7 +665,6 @@ def test_validate_downsize_3yc_orders_step_not_commitment(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     adobe_customer = adobe_customer_factory()
     order_lines = lines_factory(
         line_id=None,

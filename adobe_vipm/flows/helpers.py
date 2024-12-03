@@ -28,8 +28,8 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
     get_customer_data,
+    get_due_date,
     get_market_segment,
-    get_retry_count,
     is_consumables_sku,
     map_returnable_to_return_orders,
     reset_order_error,
@@ -127,7 +127,7 @@ class SetupContext(Step):
         context.downsize_lines, context.upsize_lines = split_downsizes_and_upsizes(
             context.order
         )
-        context.current_attempt = get_retry_count(context.order)
+        context.due_date = get_due_date(context.order)
         context.order_id = context.order["id"]
         context.type = context.order["type"]
         context.agreement_id = context.order["agreement"]["id"]
@@ -160,7 +160,6 @@ class ValidateDownsizes3YC:
         self.is_validation = is_validation
 
     def __call__(self, client, context, next_step):
-
         # Get the 3YC commitment if it is enabled
         commitment = self.get_3yc_commitment_enabled(context.adobe_customer)
         if (
@@ -243,7 +242,6 @@ class ValidateDownsizes3YC:
         count_licenses,
         count_consumables,
     ):
-
         is_invalid_license_minimum = False
         is_invalid_consumable_minimum = False
         minimum_licenses = 0

@@ -32,12 +32,12 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
+    PARAM_DUE_DATE,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
-    PARAM_RETRY_COUNT,
     REQUIRED_CUSTOMER_ORDER_PARAMS,
     STATUS_MARKET_SEGMENT_PENDING,
 )
@@ -328,13 +328,11 @@ def get_price_item_by_line_sku(prices, line_sku):
     )
 
 
-def increment_retry_count(order):
+def set_due_date(order):
     """
-    Increment the retry count fulfillment parameter by 1 if it exists
-    or set it to 1 if not found.
-
+    Sets DUE_DATE parameter to the value of today() + EXT_DUE_DATE_DAYS if it is not set yet
     Args:
-        order (dict): The order that containts the retry count fulfillment
+        order (dict): The order that containts the due date fulfillment
         parameter.
 
     Returns:
@@ -343,49 +341,56 @@ def increment_retry_count(order):
     updated_order = copy.deepcopy(order)
     param = get_fulfillment_parameter(
         updated_order,
-        PARAM_RETRY_COUNT,
+        PARAM_DUE_DATE,
     )
 
-    param["value"] = str(int(param["value"]) + 1) if param.get("value") else "1"
+    if not param or not param.get("value"):
+        due_date = date.today() + timedelta(
+            days=int(settings.EXTENSION_CONFIG.get("DUE_DATE_DAYS"))
+        )
+        param["value"] = due_date.strftime("%Y-%m-%d")
+
     return updated_order
 
 
-def reset_retry_count(order):
+def get_due_date(order):
     """
-    Reset the retry count fulfillment parameter to 0.
-
+    Gets DUE_DATE parameter
     Args:
-        order (dict): The order that containts the retry count fulfillment
+        order (dict): The order that containts the due date fulfillment
         parameter.
 
     Returns:
         dict: The updated order.
-    """
-    updated_order = copy.deepcopy(order)
-    param = get_fulfillment_parameter(
-        updated_order,
-        PARAM_RETRY_COUNT,
-    )
-    param["value"] = "0"
-    return updated_order
-
-
-def get_retry_count(order):
-    """
-    Returns the value of the retry count fulfillment parameter.
-
-    Args:
-        order (dict): The order that containts the retry count fulfillment
-        parameter.
-
-    Returns:
-        int: The value of the retry count parameter.
     """
     param = get_fulfillment_parameter(
         order,
-        PARAM_RETRY_COUNT,
+        PARAM_DUE_DATE,
     )
-    return int(param.get("value") or "0")
+
+    return (
+        datetime.strptime(param["value"], "%Y-%m-%d").date() if param.get("value") else None
+    )
+
+
+def reset_due_date(order):
+    """
+    Reset the due date fulfillment parameter to None. It is needed to
+    have due date empty on next order published
+    Args:
+        order (dict): The order that containts the due date fulfillment
+        parameter.
+
+    Returns:
+        dict: The updated order.
+    """
+    param = get_fulfillment_parameter(
+        order,
+        PARAM_DUE_DATE,
+    )
+    param["value"] = None
+
+    return order
 
 
 def get_subscription_by_line_and_item_id(subscriptions, item_id, line_id):
@@ -784,4 +789,3 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
         for adobe_item in adobe_items
     }
     return order_line_map != adobe_items_map
-

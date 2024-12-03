@@ -17,8 +17,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
-    IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
+    SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
@@ -167,7 +167,7 @@ def fulfill_change_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
-        IncrementAttemptsCounter(),
+        SetupDueDate(),
         ValidateDuplicateLines(),
         SetOrUpdateCotermNextSyncDates(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),

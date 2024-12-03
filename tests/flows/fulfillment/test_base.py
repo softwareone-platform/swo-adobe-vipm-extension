@@ -29,7 +29,8 @@ def test_fulfill_order_exception(mocker, mpt_error_factory, order_factory):
 
 
 @pytest.mark.parametrize(
-    "order_type", ["purchase", "change", "termination"],
+    "order_type",
+    ["purchase", "change", "termination"],
 )
 def test_fulfill_order_by_order_type(mocker, order_factory, order_type):
     mocked_fulfill = mocker.patch(

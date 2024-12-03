@@ -166,9 +166,6 @@ USE_APPLICATIONINSIGHTS = os.getenv("USE_APPLICATIONINSIGHTS", "False").lower() 
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv(
     "APPLICATIONINSIGHTS_CONNECTION_STRING", ""
 )
-LOGGING_ATTEMPT_GETTER = os.getenv(
-    "LOGGING_ATTEMPT_GETTER", "adobe_vipm.utils.get_attempt_count"
-)
 
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
@@ -183,4 +180,6 @@ EXTENSION_CONFIG = {
     "WEBHOOKS_SECRETS": {"PRD-1111-1111": "that's my awesome test secret"},
     "AIRTABLE_BASES": {"PRD-1111-1111": "some-bases"},
     "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM", "PRD-2222-2222": "GOV"},
+    "MAX_RETRY_ATTEMPS": "10",
+    "DUE_DATE_DAYS": "30",
 }

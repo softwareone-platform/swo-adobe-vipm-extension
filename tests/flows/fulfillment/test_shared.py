@@ -25,8 +25,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
-    IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
+    SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
@@ -41,10 +41,9 @@ from adobe_vipm.flows.fulfillment.shared import (
 from adobe_vipm.flows.utils import (
     get_adobe_order_id,
     get_coterm_date,
+    get_due_date,
     get_next_sync,
     get_notifications_recipient,
-    get_retry_count,
-    increment_retry_count,
     set_coterm_date,
     set_next_sync,
 )
@@ -132,13 +131,14 @@ def test_send_email_notification_no_recipient(mocker, settings, order_factory, c
     mocked_send_email.assert_not_called()
 
 
+@freeze_time("2025-01-01")
 def test_start_processing_attempt_first_attempt(
-    mocker, order_factory, fulfillment_parameters_factory
+    mocker, settings, order_factory, fulfillment_parameters_factory
 ):
     order = order_factory()
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
-            retry_count="1",
+            due_date="2025-01-31",
         ),
     )
     mocked_send = mocker.patch(
@@ -161,6 +161,7 @@ def test_start_processing_attempt_first_attempt(
     )
 
 
+@freeze_time("2025-01-01")
 def test_start_processing_attempt_other_attempts(
     mocker, order_factory, fulfillment_parameters_factory
 ):
@@ -172,7 +173,7 @@ def test_start_processing_attempt_other_attempts(
 
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
-            retry_count="1",
+            due_date="2024-01-01",
         )
     )
 
@@ -228,13 +229,15 @@ def test_set_customer_coterm_date_if_null_already_set(
     mocked_adobe_client.get_customer_assert_not_called()
 
 
-def test_increment_attempts_counter_step(
+@freeze_time("2024-01-01")
+def test_setup_due_date_for_first_time(
     mocker,
     order_factory,
 ):
     """
-    Tests that the `IncrementAttemptsCounter` processing step
-    increments the fulfillment parameter `retryCount` by 1
+    Tests that the `SetupDueDate` processing step
+    setups the fulfillment parameter `dueDate` to now
+    if it is not set
     and updates the order to reflect the change.
     """
     order = order_factory()
@@ -246,13 +249,13 @@ def test_increment_attempts_counter_step(
     mocked_next_step = mocker.MagicMock()
 
     context = Context(order=order, order_id=order["id"])
-    step = IncrementAttemptsCounter()
+    step = SetupDueDate()
 
-    assert get_retry_count(order) == 0
+    assert get_due_date(order) is None
 
     step(mocked_client, context, mocked_next_step)
 
-    assert get_retry_count(context.order) == 1
+    assert get_due_date(context.order) == date(2024, 1, 31)
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -261,6 +264,7 @@ def test_increment_attempts_counter_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@freeze_time("2025-01-01")
 def test_increment_attempts_counter_step_max_reached(
     mocker,
     settings,
@@ -268,14 +272,14 @@ def test_increment_attempts_counter_step_max_reached(
     fulfillment_parameters_factory,
 ):
     """
-    Tests that the `IncrementAttemptsCounter` processing step
-    fail the order if the maximum amount of attempts has been
-    reached.
+    Tests that the `SetupDueDate` processing step
+    fail the order if the current date is more than due date
+    parameter
     """
-    settings.EXTENSION_CONFIG = {"MAX_RETRY_ATTEMPS": "10"}
+    settings.EXTENSION_CONFIG = {"DUE_DATE_DAYS": "30"}
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
-            retry_count="10",
+            due_date="2024-06-01",
         ),
     )
     mocked_fail = mocker.patch(
@@ -285,14 +289,14 @@ def test_increment_attempts_counter_step_max_reached(
     mocked_next_step = mocker.MagicMock()
 
     context = Context(order=order, order_id=order["id"])
-    step = IncrementAttemptsCounter()
+    step = SetupDueDate()
 
     step(mocked_client, context, mocked_next_step)
 
     mocked_fail.assert_called_once_with(
         mocked_client,
         context.order,
-        "Max processing attemps reached (10).",
+        "Due date 2024-06-01 for order processing is reached.",
     )
     mocked_next_step.assert_not_called()
 
@@ -363,7 +367,7 @@ def test_set_processing_template_step_already_set_not_first_attempt(
 
     context = Context(
         order=order_factory(template={"id": "TPL-1234"}),
-        current_attempt=1,
+        due_date=date(2025, 1, 1),
     )
 
     step = StartOrderProcessing("my template")
@@ -407,7 +411,7 @@ def test_set_processing_template_to_delayed_in_renewal_win(
         order=order,
         order_id=order["id"],
         product_id=order["agreement"]["product"]["id"],
-        current_attempt=1,
+        due_date=date(2025, 1, 1),
     )
 
     assert "template" not in context.order
@@ -1075,7 +1079,9 @@ def test_create_or_update_subscriptions_step(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "value": str(
+                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -1391,6 +1397,7 @@ def test_update_prices_step_3yc(
     )
 
 
+@freeze_time("2024-01-01")
 def test_complete_order_step(mocker, order_factory):
     """
     Tests the right Completed template is set,
@@ -1399,8 +1406,6 @@ def test_complete_order_step(mocker, order_factory):
     """
 
     order = order_factory()
-
-    order = increment_retry_count(order)
 
     resetted_order = order_factory()
 
@@ -1662,7 +1667,7 @@ def test_get_preview_order_step_order_new_order_created(
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
-        adobe_new_order_id="new-order-id"
+        adobe_new_order_id="new-order-id",
     )
 
     step = GetPreviewOrder()
@@ -1671,7 +1676,6 @@ def test_get_preview_order_step_order_new_order_created(
     mocked_adobe_client.create_preview_order.assert_not_called()
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
 
 
 def test_get_preview_order_step_adobe_error(
@@ -1696,7 +1700,6 @@ def test_get_preview_order_step_adobe_error(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.side_effect = error
 
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1720,5 +1723,7 @@ def test_get_preview_order_step_adobe_error(
     step = GetPreviewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_switch_to_failed.assert_called_once_with(mocked_client, context.order, str(error))
+    mocked_switch_to_failed.assert_called_once_with(
+        mocked_client, context.order, str(error)
+    )
     mocked_next_step.assert_not_called()
