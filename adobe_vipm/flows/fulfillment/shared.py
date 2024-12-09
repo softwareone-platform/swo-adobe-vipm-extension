@@ -250,7 +250,7 @@ def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
     """
     due_date = get_due_date(order)
     due_date_str = due_date.strftime("%Y-%m-%d")
-    if date.today() > due_date:
+    if date.today() <= due_date:
         logger.info(
             f"Order {order['id']} ({adobe_order_id}: {adobe_order_type}) "
             "is still processing on Adobe side, wait.",
