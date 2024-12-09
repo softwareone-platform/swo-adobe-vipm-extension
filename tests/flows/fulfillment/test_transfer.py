@@ -429,6 +429,64 @@ def test_transfer_not_ready(
     )
 
 
+@freeze_time("2026-01-01")
+def test_transfer_reached_due_date(
+    mocker,
+    agreement,
+    order_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_transfer_factory,
+):
+    """
+    Tests that transfer order when it reaches due date fails
+    """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order"
+    )
+    mocked_fail_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.fail_order"
+    )
+
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
+        fulfillment_parameters=fulfillment_parameters_factory(
+            due_date="2025-01-01",
+        ),
+        external_ids={"vendor": "a-transfer-id"},
+    )
+
+    fulfill_order(mocked_mpt_client, order)
+
+    authorization_id = order["authorization"]["id"]
+
+    mocked_update_order.assert_not_called()
+
+    mocked_fail_order.assert_called_once_with(
+        mocked_mpt_client, order["id"], "Due date is reached (2025-01-01).",
+    )
+    mocked_adobe_client.get_transfer.assert_called_once_with(
+        authorization_id, "a-membership-id", adobe_transfer["transferId"]
+    )
+
+
 def test_transfer_unexpected_status(
     mocker,
     agreement,
