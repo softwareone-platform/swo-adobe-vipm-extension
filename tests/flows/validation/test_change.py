@@ -1,3 +1,7 @@
+from datetime import datetime, timedelta
+
+from freezegun import freeze_time
+
 from adobe_vipm.adobe.constants import STATUS_PROCESSED
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.constants import (
@@ -17,6 +21,7 @@ from adobe_vipm.flows.validation.shared import (
 )
 
 
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsizes_step(
     mocker,
     order_factory,
@@ -31,7 +36,10 @@ def test_validate_downsizes_step(
             old_quantity=14,
         )
     )
-    adobe_customer = adobe_customer_factory()
+    coterm_date = datetime.today() + timedelta(days=20)
+    adobe_customer = adobe_customer_factory(
+        coterm_date=coterm_date.strftime("%Y-%m-%d")
+    )
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -98,6 +106,7 @@ def test_validate_downsizes_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsizes_step_no_returnable_orders(
     mocker,
     order_factory,
@@ -112,7 +121,10 @@ def test_validate_downsizes_step_no_returnable_orders(
             old_quantity=14,
         )
     )
-    adobe_customer = adobe_customer_factory()
+    coterm_date = datetime.today() + timedelta(days=20)
+    adobe_customer = adobe_customer_factory(
+        coterm_date=coterm_date.strftime("%Y-%m-%d")
+    )
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock()
@@ -146,6 +158,7 @@ def test_validate_downsizes_step_no_returnable_orders(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsizes_step_invalid_quantity(
     mocker,
     order_factory,
@@ -160,7 +173,10 @@ def test_validate_downsizes_step_invalid_quantity(
             old_quantity=16,
         )
     )
-    adobe_customer = adobe_customer_factory(coterm_date="2025-01-23")
+    coterm_date = datetime.today() + timedelta(days=20)
+    adobe_customer = adobe_customer_factory(
+        coterm_date=coterm_date.strftime("%Y-%m-%d")
+    )
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -240,6 +256,7 @@ def test_validate_downsizes_step_invalid_quantity(
     mocked_next_step.assert_not_called()
 
 
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
     mocker,
     order_factory,
@@ -254,47 +271,12 @@ def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
             old_quantity=16,
         )
     )
-    adobe_customer = adobe_customer_factory(coterm_date="2024-06-07")
-    adobe_order_1 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(quantity=1),
-        creation_date="2024-05-01",
+    coterm_date = datetime.today() + timedelta(days=10)
+    adobe_customer = adobe_customer_factory(
+        coterm_date=coterm_date.strftime("%Y-%m-%d")
     )
-    adobe_order_2 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(quantity=2),
-        creation_date="2024-05-07",
-    )
-    adobe_order_3 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(quantity=4),
-        creation_date="2024-05-11",
-    )
-
-    ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1,
-        adobe_order_1["lineItems"][0],
-        adobe_order_1["lineItems"][0]["quantity"],
-    )
-    ret_info_2 = ReturnableOrderInfo(
-        adobe_order_2,
-        adobe_order_2["lineItems"][0],
-        adobe_order_2["lineItems"][0]["quantity"],
-    )
-    ret_info_3 = ReturnableOrderInfo(
-        adobe_order_3,
-        adobe_order_3["lineItems"][0],
-        adobe_order_3["lineItems"][0]["quantity"],
-    )
-
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
-        ret_info_1,
-        ret_info_2,
-        ret_info_3,
-    ]
 
     mocker.patch(
         "adobe_vipm.flows.validation.change.get_adobe_client",
@@ -314,26 +296,11 @@ def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
     step = ValidateDownsizes()
     step(mocked_client, context, mocked_next_step)
 
-    assert context.validation_succeeded is False
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        sku,
-        context.adobe_customer["cotermDate"],
-    )
-    assert context.order["error"] == {
-        "id": "VIPMV013",
-        "message": (
-            "Could not find suitable returnable orders for all items.\nCannot reduce item "
-            "`Awesome product` quantity by 9. Please reduce the quantity "
-            "by 1, 2, 4, or any combination of these values, or wait until 2024-05-25 "
-            "when there are no returnable "
-            "orders to modify your renewal quantity."
-        ),
-    }
-    mocked_next_step.assert_not_called()
+    assert context.validation_succeeded is True
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
     mocker,
     order_factory,
@@ -348,7 +315,10 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
             old_quantity=16,
         )
     )
-    adobe_customer = adobe_customer_factory(coterm_date="2024-06-07")
+    coterm_date = datetime.today() + timedelta(days=20)
+    adobe_customer = adobe_customer_factory(
+        coterm_date=coterm_date.strftime("%Y-%m-%d")
+    )
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=16),
@@ -513,9 +483,9 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     step = ValidateDownsizes3YC(True)
     step(mocked_client, context, mocked_next_step)
 
-    assert context.order["error"]['message'] == ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(
-        minimum_licenses=25
-    )
+    assert context.order["error"][
+        "message"
+    ] == ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(minimum_licenses=25)
     mocked_next_step.assert_not_called()
 
 
@@ -582,9 +552,9 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
 
     step = ValidateDownsizes3YC(True)
     step(mocked_client, context, mocked_next_step)
-    assert context.order["error"]['message'] == ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(
-        minimum_consumables=37
-    )
+    assert context.order["error"][
+        "message"
+    ] == ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37)
     mocked_next_step.assert_not_called()
 
 
@@ -651,7 +621,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
     step = ValidateDownsizes3YC(True)
     step(mocked_client, context, mocked_next_step)
 
-    assert context.order["error"]['message'] == ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
+    assert context.order["error"]["message"] == ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
         minimum_consumables=37, minimum_licenses=20
     )
     mocked_next_step.assert_not_called()

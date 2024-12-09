@@ -34,7 +34,7 @@ jobs:
 
     - name: 'Fix coverage paths for SonarCloud'
       run: |
-        sed -i 's/\/extension\/adobe_vipm/\/github\/workspace\/adobe_vipm/g' coverage.xml
+        sed -i 's/\/extension\/adobe_vipm/\/home\/runner\/work\/swo-adobe-vipm-extension\/swo-adobe-vipm-extension\/adobe_vipm/g' coverage.xml
 
     - name: 'Run SonarCloud Scan'
       uses: SonarSource/sonarcloud-github-action@master
