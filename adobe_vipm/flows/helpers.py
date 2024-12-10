@@ -3,7 +3,9 @@ This module contains orders helper functions.
 """
 
 import logging
-from datetime import date
+from datetime import date, timedelta
+
+from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
@@ -30,6 +32,7 @@ from adobe_vipm.flows.utils import (
     get_customer_data,
     get_due_date,
     get_market_segment,
+    get_retry_count,
     is_consumables_sku,
     map_returnable_to_return_orders,
     reset_order_error,
@@ -127,7 +130,26 @@ class SetupContext(Step):
         context.downsize_lines, context.upsize_lines = split_downsizes_and_upsizes(
             context.order
         )
-        context.due_date = get_due_date(context.order)
+
+        retry_count = get_retry_count(context.order)
+        if retry_count and int(retry_count) > 0:
+            # when due date parameter is created and new code to process it
+            # is released, it may happen
+            # that there are order in processing, that don't have
+            # due date parameter. If such orders were processed at least once
+            # means retry_count is set and it is > 0
+            # just setup due date to not to send email, like new order was
+            # created
+            context.due_date = date.today() + timedelta(
+                days=int(settings.EXTENSION_CONFIG.get("DUE_DATE_DAYS"))
+            )
+        else:
+            # usual due date processing for new orders
+            # or when order was in processing when due date parameter
+            # was added, but extension didn't try to process it still
+            # means process it like usual order and send email notification
+            context.due_date = get_due_date(context.order)
+
         context.order_id = context.order["id"]
         context.type = context.order["type"]
         context.agreement_id = context.order["agreement"]["id"]

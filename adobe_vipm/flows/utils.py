@@ -38,6 +38,7 @@ from adobe_vipm.flows.constants import (
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
+    PARAM_RETRY_COUNT,
     REQUIRED_CUSTOMER_ORDER_PARAMS,
     STATUS_MARKET_SEGMENT_PENDING,
 )
@@ -343,14 +344,43 @@ def set_due_date(order):
         updated_order,
         PARAM_DUE_DATE,
     )
+    if not param:
+        # in case of there is no any due date parameter
+        # when order was in processing status
+        # and due date was created and rollouted to environment
+        param = {
+            "externalId": PARAM_DUE_DATE,
+        }
+        updated_order["parameters"][PARAM_PHASE_FULFILLMENT].append(param)
 
-    if not param or not param.get("value"):
+    if not param.get("value"):
         due_date = date.today() + timedelta(
             days=int(settings.EXTENSION_CONFIG.get("DUE_DATE_DAYS"))
         )
         param["value"] = due_date.strftime("%Y-%m-%d")
 
     return updated_order
+
+
+def get_retry_count(order):
+    """
+    Gets RETRY_COUNT parameter
+    Args:
+        order (dict): The order that containts the retry count fulfillment
+        parameter.
+
+    Returns:
+        str: retry count. None if parameter doesn't exist
+    """
+    param = find_first(
+        lambda x: x["externalId"] == PARAM_RETRY_COUNT,
+        order["parameters"]["fulfillment"],
+    )
+
+    if not param:
+        return
+
+    return param["value"] if param.get("value") else ""
 
 
 def get_due_date(order):
@@ -361,7 +391,7 @@ def get_due_date(order):
         parameter.
 
     Returns:
-        dict: The updated order.
+        date: due date or None
     """
     param = get_fulfillment_parameter(
         order,
@@ -369,7 +399,9 @@ def get_due_date(order):
     )
 
     return (
-        datetime.strptime(param["value"], "%Y-%m-%d").date() if param.get("value") else None
+        datetime.strptime(param["value"], "%Y-%m-%d").date()
+        if param.get("value")
+        else None
     )
 
 

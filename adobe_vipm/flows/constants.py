@@ -38,6 +38,7 @@ PARAM_CURRENT_QUANTITY = "currentQuantity"
 PARAM_RENEWAL_QUANTITY = "renewalQuantity"
 PARAM_RENEWAL_DATE = "renewalDate"
 PARAM_DUE_DATE = "dueDate"
+PARAM_RETRY_COUNT = "retryCount"
 
 STATUS_MARKET_SEGMENT_ELIGIBLE = "eligible"
 STATUS_MARKET_SEGMENT_NOT_ELIGIBLE = "not-eligible"

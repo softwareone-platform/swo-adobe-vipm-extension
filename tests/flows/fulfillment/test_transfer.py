@@ -461,9 +461,7 @@ def test_transfer_reached_due_date(
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
-    mocked_fail_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.fail_order"
-    )
+    mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(
         order_parameters=transfer_order_parameters_factory(),
@@ -480,7 +478,9 @@ def test_transfer_reached_due_date(
     mocked_update_order.assert_not_called()
 
     mocked_fail_order.assert_called_once_with(
-        mocked_mpt_client, order["id"], "Due date is reached (2025-01-01).",
+        mocked_mpt_client,
+        order["id"],
+        "Due date is reached (2025-01-01).",
     )
     mocked_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]

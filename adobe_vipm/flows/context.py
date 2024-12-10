@@ -27,7 +27,7 @@ class Context:
     adobe_return_orders: dict = field(default_factory=dict)
 
     def __str__(self):
-        due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else '-'
+        due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else "-"
         return (
             f"{self.product_id} {(self.type or '-').upper()} {self.agreement_id} {self.order_id} "
             f"{self.authorization_id} {due_date} "

@@ -1,4 +1,5 @@
 import copy
+from datetime import date
 
 from freezegun import freeze_time
 
@@ -6,6 +7,7 @@ from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
     PARAM_CONTACT,
+    PARAM_RETRY_COUNT,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import (
@@ -129,6 +131,66 @@ def test_setup_context_step_with_adobe_customer_and_order_id(
     assert context.adobe_customer_id == "adobe-customer-id"
     assert context.adobe_customer == adobe_customer
     assert context.adobe_new_order_id == "adobe-order-id"
+    mocked_get_agreement.assert_called_once_with(
+        mocked_client,
+        order["agreement"]["id"],
+    )
+    mocked_get_licensee.assert_called_once_with(
+        mocked_client,
+        order["agreement"]["licensee"]["id"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+@freeze_time("2025-01-01")
+def test_setup_context_step_when_retry_count_was_not_zero(
+    mocker,
+    agreement,
+    order_factory,
+    lines_factory,
+    fulfillment_parameters_factory,
+    adobe_customer_factory,
+):
+    mocked_get_agreement = mocker.patch(
+        "adobe_vipm.flows.helpers.get_agreement", return_value=agreement
+    )
+    mocked_get_licensee = mocker.patch(
+        "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
+    )
+
+    adobe_customer = adobe_customer_factory()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_customer.return_value = adobe_customer
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    fulfillment_parameters = fulfillment_parameters_factory(
+        customer_id="adobe-customer-id",
+    )
+    fulfillment_parameters.append(
+        {
+            "externalId": PARAM_RETRY_COUNT,
+            "value": "1",
+        }
+    )
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters,
+        external_ids={"vendor": "adobe-order-id"},
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order)
+
+    step = SetupContext()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.due_date == date(2025, 1, 31)
     mocked_get_agreement.assert_called_once_with(
         mocked_client,
         order["agreement"]["id"],
