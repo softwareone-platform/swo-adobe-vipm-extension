@@ -98,6 +98,7 @@ def test_get_returnable_orders_step(
         context.adobe_customer_id,
         sku,
         adobe_customer["cotermDate"],
+        return_orders=None,
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -235,9 +236,9 @@ def test_fulfill_termination_order(mocker):
         mocked_pipeline_ctor.mock_calls[0].args[3].template_name == TEMPLATE_NAME_TERMINATION
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnableOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], ValidateDownsizes3YC)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnableOrders)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], ValidateDownsizes3YC)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SubmitReturnOrders)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], SwitchAutoRenewalOff)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], CompleteOrder)
