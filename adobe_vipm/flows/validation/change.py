@@ -1,6 +1,6 @@
 import itertools
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from operator import attrgetter
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -35,6 +35,13 @@ class ValidateDownsizes(Step):
             datetime.fromisoformat(context.adobe_customer["cotermDate"])
             - timedelta(days=13)
         ).date()
+
+        if date.today() >= last_two_weeks:
+            logger.info("Downsize occurs in the last two weeks before the anniversary date. "
+                        "The renewal quantity will be updated without downsize validation.")
+            next_step(client, context)
+            return
+
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
             returnable_orders = adobe_client.get_returnable_orders_by_sku(
@@ -57,9 +64,6 @@ class ValidateDownsizes(Step):
                     datetime.fromisoformat(roi.order["creationDate"]).date()
                     for roi in returnable_orders
                 ) + timedelta(days=15)
-                end_of_cancellation_window = min(
-                    end_of_cancellation_window, last_two_weeks
-                )
 
                 quantities = [
                     str(roi.quantity)
