@@ -8,6 +8,8 @@ import itertools
 import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.constants import STATUS_INVALID_RENEWAL_STATE
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     TEMPLATE_NAME_CHANGE,
 )
@@ -141,16 +143,29 @@ class UpdateRenewalQuantities(Step):
             qty = line["quantity"]
             old_qty = adobe_subscription["autoRenewal"]["renewalQuantity"]
             if old_qty != qty:
-                adobe_client.update_subscription(
-                    context.authorization_id,
-                    context.adobe_customer_id,
-                    adobe_sub_id,
-                    quantity=qty,
-                )
-                logger.info(
-                    f"{context}: update renewal quantity for sub "
-                    f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
-                )
+                try:
+                    adobe_client.update_subscription(
+                        context.authorization_id,
+                        context.adobe_customer_id,
+                        adobe_sub_id,
+                        quantity=qty,
+                    )
+                    logger.info(
+                        f"{context}: update renewal quantity for sub "
+                        f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
+                    )
+                except AdobeAPIError as e:
+                    logger.error(
+                        f"{context}: failed to update renewal quantity for "
+                        f"{subscription['id']} ({adobe_sub_id}) due to {e}"
+                    )
+                    if e.code == STATUS_INVALID_RENEWAL_STATE:
+                        switch_order_to_failed(
+                            client,
+                            context.order,
+                            e.message,
+                        )
+                    return
         next_step(client, context)
 
 

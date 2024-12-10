@@ -7,6 +7,8 @@ processing.
 import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.constants import STATUS_INVALID_RENEWAL_STATE
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import TEMPLATE_NAME_TERMINATION
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -17,6 +19,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitReturnOrders,
     ValidateRenewalWindow,
+    switch_order_to_failed,
 )
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
@@ -61,28 +64,40 @@ class SwitchAutoRenewalOff(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
-            subcription = get_subscription_by_line_and_item_id(
+            subscription = get_subscription_by_line_and_item_id(
                 context.order["subscriptions"],
                 line["item"]["id"],
                 line["id"],
             )
-            adobe_sub_id = get_adobe_subscription_id(subcription)
+            adobe_sub_id = get_adobe_subscription_id(subscription)
             adobe_subscription = adobe_client.get_subscription(
                 context.authorization_id,
                 context.adobe_customer_id,
                 adobe_sub_id,
             )
             if adobe_subscription["autoRenewal"]["enabled"]:
-                adobe_client.update_subscription(
-                    context.authorization_id,
-                    context.adobe_customer_id,
-                    adobe_sub_id,
-                    auto_renewal=False,
-                )
-                logger.info(
-                    f"{context}: autorenewal switched off for {subcription['id']} "
-                    f"({adobe_subscription['subscriptionId']})"
-                )
+                try:
+                    adobe_client.update_subscription(
+                        context.authorization_id,
+                        context.adobe_customer_id,
+                        adobe_sub_id,
+                        auto_renewal=False,
+                    )
+                    logger.info(
+                        f"{context}: autorenewal switched off for {subscription['id']} "
+                        f"({adobe_subscription['subscriptionId']})"
+                    )
+                except AdobeAPIError as e:
+                    logger.error(
+                        f"{context}: failed to switch off autorenewal for {subscription['id']} "
+                        f"({adobe_subscription['subscriptionId']}) due to {e}")
+                    if e.code == STATUS_INVALID_RENEWAL_STATE:
+                        switch_order_to_failed(
+                            client,
+                            context.order,
+                            e.message,
+                        )
+                    return
         next_step(client, context)
 
 

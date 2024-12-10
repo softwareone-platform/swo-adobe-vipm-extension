@@ -1,4 +1,5 @@
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import TEMPLATE_NAME_TERMINATION
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -249,3 +250,131 @@ def test_fulfill_termination_order(mocker):
         mocked_client,
         mocked_context,
     )
+
+
+def test_switch_autorenewal_off_invalid_renwal_state(
+    mocker,
+    order_factory,
+    lines_factory,
+    subscriptions_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    subscriptions = subscriptions_factory()
+    order = order_factory(
+        lines=lines_factory(quantity=10),
+        subscriptions=subscriptions,
+    )
+
+    adobe_sub = adobe_subscription_factory(
+        renewal_quantity=10,
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
+    )
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscription.return_value = adobe_sub
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            "3120",
+            "Update could not be performed because it would create an invalid renewal state",
+        ),
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        downsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = SwitchAutoRenewalOff()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.get_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_sub["subscriptionId"],
+    )
+    mocked_adobe_client.update_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_sub["subscriptionId"],
+        auto_renewal=False,
+    )
+    mocked_switch_to_failed.assert_called_once_with(
+        mocked_client,
+        context.order,
+        "Update could not be performed because it would create an invalid renewal state",
+    )
+
+
+def test_switch_autorenewal_off_error_updating_autorenew(
+    mocker,
+    order_factory,
+    lines_factory,
+    subscriptions_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    subscriptions = subscriptions_factory()
+    order = order_factory(
+        lines=lines_factory(quantity=10),
+        subscriptions=subscriptions,
+    )
+
+    adobe_sub = adobe_subscription_factory(
+        renewal_quantity=10,
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
+    )
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscription.return_value = adobe_sub
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            "1000",
+            "Error updating autorenewal",
+        ),
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        downsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = SwitchAutoRenewalOff()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.get_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_sub["subscriptionId"],
+    )
+    mocked_adobe_client.update_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_sub["subscriptionId"],
+        auto_renewal=False,
+    )
+    mocked_switch_to_failed.assert_not_called()
