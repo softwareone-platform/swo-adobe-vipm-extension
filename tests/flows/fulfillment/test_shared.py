@@ -17,6 +17,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
+    PARAM_DUE_DATE,
     TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.context import Context
@@ -299,6 +300,52 @@ def test_increment_attempts_counter_step_max_reached(
         "Due date 2024-06-01 for order processing is reached.",
     )
     mocked_next_step.assert_not_called()
+
+
+@freeze_time("2025-01-01")
+def test_setup_due_date_when_parameter_is_missed(
+    mocker,
+    settings,
+    order_factory,
+    fulfillment_parameters_factory,
+):
+    """
+    Tests that the `SetupDueDate` processing step
+    fail the order if the current date is more than due date
+    parameter
+    """
+    settings.EXTENSION_CONFIG = {"DUE_DATE_DAYS": "30"}
+    fulfillment_parameters = fulfillment_parameters_factory()
+    fulfillment_parameters = list(
+        filter(
+            lambda p: p["externalId"] != PARAM_DUE_DATE,
+            fulfillment_parameters,
+        )
+    )
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters,
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order"
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order, order_id=order["id"])
+    step = SetupDueDate()
+
+    assert get_due_date(order) is None
+
+    step(mocked_client, context, mocked_next_step)
+
+    assert get_due_date(context.order) == date(2025, 1, 31)
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        parameters=context.order["parameters"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_start_order_processing_step(mocker, order_factory):
