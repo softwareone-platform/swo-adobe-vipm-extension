@@ -5,6 +5,7 @@ from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    GLOBAL_CUSTOMER_MAIN_AGREEMENT_PENDING,
     STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
@@ -17,7 +18,9 @@ from adobe_vipm.adobe.errors import (
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
+    create_global_customer_main_agreement,
     create_offers,
+    get_global_customer_main_agreement_by_transfer_id_and_customer_id,
     get_offer_ids_by_membership_id,
     get_transfer_link,
     get_transfers_to_check,
@@ -384,3 +387,25 @@ def process_transfers():
 def check_running_transfers():
     for product_id in settings.MPT_PRODUCTS_IDS:
         check_running_transfers_for_product(product_id)
+
+
+def check_global_customers_main_agreement_for_transfer(product_id, transfer):
+    global_customer_main_agreement = (
+        get_global_customer_main_agreement_by_transfer_id_and_customer_id(
+            product_id, transfer.record_id, transfer.customer_id
+        )
+    )
+    if not global_customer_main_agreement:
+        global_customer_main_agreement_data = [
+            {
+                "membership_id": transfer.membership_id,
+                "main_agreement_id": "",
+                "transfer_id": transfer.transfer_id,
+                "customer_id": transfer.customer_id,
+                "status": GLOBAL_CUSTOMER_MAIN_AGREEMENT_PENDING,
+                "error_description": "",
+            }
+        ]
+        create_global_customer_main_agreement(
+            product_id, global_customer_main_agreement_data
+        )

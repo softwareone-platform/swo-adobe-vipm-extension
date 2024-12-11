@@ -429,3 +429,85 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
         if item.sku not in prices:
             prices[item.sku] = item.unit_pp
     return prices
+
+
+@cache
+def get_global_customer_main_agreements_model(base_info):
+    """
+    Returns the GlobalCustomerMainAgreements model class connected to the right base and with
+    the right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        GlobalCustomerMainAgreements: The AirTable GlobalCustomerMainAgreements model.
+    """
+
+    class GlobalCustomerMainAgreementsModel(Model):
+        membership_id = fields.TextField("membership_id")
+        main_agreement_id = fields.TextField("main_agreement_id")
+        transfer_id = fields.TextField("transfer_id")
+        customer_id = fields.TextField("customer_id")
+        status = fields.SelectField("status")
+        error_description = fields.TextField("error_description")
+
+        class Meta:
+            table_name = "Global Customer Main Agreements"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+    return GlobalCustomerMainAgreementsModel
+
+
+def get_global_customer_main_agreement_by_transfer_id_and_customer_id(
+    product_id, transfer_id, customer_id
+):
+    """
+    Retrieve a GlobalCustomerMainAgreements object given the transfer ID and
+    the customer ID.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        transfer_id (str): The ID of the transfer.
+        customer_id (str): The ID of the customer.
+
+    Returns:
+        GlobalCustomerMainAgreements: The GlobalCustomerMainAgreements if it has been found,
+        None otherwise.
+    """
+    GlobalCustomerMainAgreementsModel = get_global_customer_main_agreements_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    global_customer_main_agreements = GlobalCustomerMainAgreementsModel.all(
+        formula=AND(
+            EQUAL(FIELD("transfer_id"), STR_VALUE(transfer_id)),
+            EQUAL(FIELD("customer_id"), STR_VALUE(customer_id)),
+        ),
+    )
+
+    return (
+        global_customer_main_agreements[0] if global_customer_main_agreements else None
+    )
+
+
+def create_global_customer_main_agreement(
+    product_id, global_customer_main_agreement_data
+):
+    """
+    Create list of GlobalCustomerMainAgreements objects in batch.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        global_customer_main_agreement_data (list): List of GlobalCustomerMainAgreements objects to
+                                                    create.
+    """
+    GlobalCustomerMainAgreements = get_global_customer_main_agreements_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    GlobalCustomerMainAgreements.batch_save(
+        [
+            GlobalCustomerMainAgreements(**global_customer_main_agreement)
+            for global_customer_main_agreement in global_customer_main_agreement_data
+        ]
+    )
