@@ -25,6 +25,10 @@ STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
 STATUS_SYNCHRONIZED = "synchronized"
+STATUS_GLOBAL_CUSTOMER_PENDING = "pending"
+STATUS_GLOBAL_CUSTOMER_TRANSFERRED = "transferred"
+STATUS_GLOBAL_CUSTOMER_COMPLETED = "completed"
+STATUS_GLOBAL_CUSTOMER_ERROR = "error"
 
 PRICELIST_CACHE = defaultdict(list)
 
@@ -147,6 +151,84 @@ def get_transfer_model(base_info):
 
 
 @cache
+def get_global_customer_main_agreement_model(base_info):
+    """
+    Returns the GlobalCustomerMainAgreement model class connected to the right base and with
+    the right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        Transfer: The AirTable GlobalCustomerMainAgreement model.
+    """
+
+    class GlobalCustomerMainAgreement(Model):
+        membership_id = fields.TextField("membership_id")
+        authorization_uk = fields.TextField("authorization_uk")
+        main_agreement_id = fields.TextField("main_agreement_id")
+        transfer_id = fields.TextField("transfer_id")
+        customer_id = fields.TextField("customer_id")
+        status = fields.SelectField("status")
+        error_description = fields.TextField("error_description")
+        created_at = fields.DatetimeField("created_at", readonly=True)
+        updated_at = fields.DatetimeField("updated_at", readonly=True)
+        created_by = fields.TextField("created_by", readonly=True)
+        updated_by = fields.TextField("updated_by", readonly=True)
+
+        class Meta:
+            table_name = "Global Customer Main Agreements"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+    return GlobalCustomerMainAgreement
+
+
+@cache
+def get_global_customer_agreement_deployment_model(base_info):
+    """
+    Returns the GlobalCustomerAgreementDeployments model class connected to the right base and with
+    the right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        Transfer: The AirTable GlobalCustomerAgreementDeployments model.
+    """
+
+    class GlobalCustomerAgreementDeployment(Model):
+        deployment_id = fields.TextField("deployment_id")
+        main_agreement_id = fields.TextField("main_agreement_id")
+        account_id = fields.TextField("account_id")
+        seller_id = fields.TextField("seller_id")
+        product_id = fields.TextField("product_id")
+        membership_id = fields.TextField("membership_id")
+        transfer_id = fields.TextField("transfer_id")
+        status = fields.SelectField("status")
+        customer_id = fields.TextField("customer_id")
+        deployment_currency = fields.TextField("deployment_currency")
+        deployment_country = fields.TextField("deployment_country")
+        licensee_id = fields.TextField("licensee_id")
+        agreement_id = fields.TextField("agreement_id")
+        authorization_id = fields.TextField("authorization_id")
+        price_list_id = fields.TextField("price_list_id")
+        listing_id = fields.TextField("listing_id")
+        error_description = fields.TextField("error_description")
+        created_at = fields.DatetimeField("created_at", readonly=True)
+        updated_at = fields.DatetimeField("updated_at", readonly=True)
+        created_by = fields.TextField("created_by", readonly=True)
+        updated_by = fields.TextField("updated_by", readonly=True)
+
+        class Meta:
+            table_name = "Global Customer Agreement Deployments"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+    return GlobalCustomerAgreementDeployment
+
+
+@cache
 def get_offer_model(base_info):
     """
     Returns the Offer model class connected to the right base and with
@@ -199,7 +281,7 @@ def get_offer_ids_by_membership_id(product_id, membership_id):
 
 def create_offers(product_id, offers):
     """
-    Creates a list of Offer objects in batch.
+    GlobalCustomerAgreementDeployment
 
     Args:
         product_id (str): The ID of the product used to determine the AirTable base.
@@ -429,3 +511,113 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
         if item.sku not in prices:
             prices[item.sku] = item.unit_pp
     return prices
+
+
+def create_global_customer_agreement_deployments(product_id, agreement_deployments):
+    """
+    Create a List of GlobalCustomerAgreementDeployment object in batch.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        agreement_deployments (list): List of GlobalCustomerAgreementDeployment object to create.
+    """
+    GlobalCustomerAgreementDeployment = get_global_customer_agreement_deployment_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    GlobalCustomerAgreementDeployment.batch_save(
+        [
+            GlobalCustomerAgreementDeployment(**agreement_deployment)
+            for agreement_deployment in agreement_deployments
+        ]
+    )
+
+
+def create_global_customer_main_agreement(product_id, main_agreement):
+    """
+    Create a GlobalCustomerMainAgreement object.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        main_agreement (dict): The main agreement object to create.
+    """
+    GlobalCustomerMainAgreement = get_global_customer_main_agreement_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    GlobalCustomerMainAgreement(**main_agreement).save()
+
+
+def get_global_customer_main_agreement(
+    product_id, authorization_uk, membership_or_customer_id
+):
+    """
+    Retrieve a GlobalCustomerMainAgreement object given the authorization ID and
+    the membership ID or the customer ID.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        authorization_uk (str): The ID of the authorization.
+        membership_or_customer_id (str): Either a membership ID or a customer ID.
+
+    Returns:
+        GlobalCustomerMainAgreement: The GlobalCustomerMainOrder if it has been found,
+        None otherwise.
+    """
+    GlobalCustomerMainAgreement = get_global_customer_main_agreement_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    global_customer_main_agreements = GlobalCustomerMainAgreement.all(
+        formula=AND(
+            EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
+            OR(
+                EQUAL(FIELD("membership_id"), STR_VALUE(membership_or_customer_id)),
+                EQUAL(FIELD("customer_id"), STR_VALUE(membership_or_customer_id)),
+            ),
+        ),
+    )
+    return (
+        global_customer_main_agreements[0] if global_customer_main_agreements else None
+    )
+
+
+def get_global_customer_agreement_deployments_by_main_agreement(
+    product_id, main_agreement_id
+):
+    """
+    Retrieve the list of GlobalCustomerAgreementDeployment given the main agreement ID.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        main_agreement_id (str): The ID of the main agreement.
+
+    Returns:
+        GlobalCustomerAgreementDeployment (list): The list of GlobalCustomerAgreementDeployment
+    """
+    GlobalCustomerAgreementDeployment = get_global_customer_agreement_deployment_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    return GlobalCustomerAgreementDeployment.all(
+        formula=AND(
+            EQUAL(FIELD("main_agreement_id"), STR_VALUE(main_agreement_id)),
+        ),
+    )
+
+
+def get_global_customer_agreement_deployments_to_check(product_id):
+    """
+    Returns a list of GlobalCustomerAgreementDeployment currently in pending state.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+
+    Returns:
+        GlobalCustomerAgreementDeployment (list): The list of GlobalCustomerAgreementDeployment
+    """
+    GlobalCustomerAgreementDeployment = get_global_customer_agreement_deployment_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    return GlobalCustomerAgreementDeployment.all(
+        formula=OR(
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_GLOBAL_CUSTOMER_PENDING)),
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_GLOBAL_CUSTOMER_ERROR)),
+        ),
+    )
