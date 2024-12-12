@@ -32,7 +32,9 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
+    PARAM_DEPLOYMENTS,
     PARAM_DUE_DATE,
+    PARAM_GLOBAL_CUSTOMER,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
@@ -821,3 +823,124 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
         for adobe_item in adobe_items
     }
     return order_line_map != adobe_items_map
+
+def get_global_customer(order):
+    """
+    Get the globalCustomer parameter from the order.
+    Args:
+        order (dict): The order to update.
+
+    Returns:
+        string: The value of the globalCustomer parameter.
+    """
+    global_customer_param = get_fulfillment_parameter(
+        order,
+        PARAM_GLOBAL_CUSTOMER,
+    )
+    return global_customer_param.get("value")
+
+
+def set_global_customer(order, global_sales_enabled):
+    """
+    Set the globalCustomer parameter on the order.
+    Args:
+        order (dict): The order to update.
+        global_sales_enabled (string): The value to set.
+
+    Returns:
+        dict: The updated order.
+    """
+    updated_order = copy.deepcopy(order)
+    global_customer_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_GLOBAL_CUSTOMER,
+    )
+    global_customer_param["value"] = [global_sales_enabled]
+    return updated_order
+
+
+def get_deployments(order):
+    """
+    Get the deployments parameter from the order.
+    Args:
+        order (dict): The order to update.
+
+    Returns:
+        list: List of deployments.
+    """
+    deployments_param = get_fulfillment_parameter(
+        order,
+        PARAM_DEPLOYMENTS,
+    )
+    return deployments_param.get("value").split(",") if deployments_param.get("value") else []
+
+
+def set_deployments(order, deployments):
+    """
+    Set the deployments parameter on the order.
+    Args:
+        order (dict): The order to update.
+        deployments (list): The value to set.
+
+    Returns:
+        dict: The updated order.
+    """
+    updated_order = copy.deepcopy(order)
+    deployments_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_DEPLOYMENTS,
+    )
+    deployments_param["value"] = ",".join(deployments)
+    return updated_order
+
+
+def exclude_items_with_deployment_id(adobe_transfer):
+    """
+    Excludes items with deployment ID from the transfer order.
+
+    Args:
+        adobe_transfer (dict): The Adobe transfer order.
+
+    Returns:
+        dict: The Adobe transfer order with items without deployment ID.
+    """
+    line_items = [
+        item for item in adobe_transfer["lineItems"] if not item.get("deploymentId", "")
+    ]
+    adobe_transfer["lineItems"] = line_items
+    return adobe_transfer
+
+
+def exclude_subscriptions_with_deployment_id(adobe_subscriptions):
+    """
+    Excludes subscriptions with deployment ID from the Adobe customer subscriptions.
+
+    Args:
+        adobe_subscriptions (dict): The Adobe customer subscriptions.
+
+    Returns:
+        dict: The Adobe customer subscriptions with subscriptions without deployment ID.
+    """
+    items = [
+        item
+        for item in adobe_subscriptions["items"]
+        if not item.get("deploymentId", "")
+    ]
+    adobe_subscriptions["items"] = items
+    return adobe_subscriptions
+
+
+def get_deployment_id(source):
+    """
+    Get the deploymentId parameter from the source.
+    Args:
+        source (dict): The order to update.
+
+    Returns:
+        string: The value of the deploymentId parameter.
+    """
+    param = get_fulfillment_parameter(
+        source,
+        "deploymentId",
+    )
+    return param.get("value")

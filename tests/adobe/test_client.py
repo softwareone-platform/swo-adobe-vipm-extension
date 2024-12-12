@@ -282,6 +282,7 @@ def test_create_preview_order(
     ]
     adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
     customer_id = "a-customer"
+    deployment_id = "a_deployment_id"
 
     client, authorization, api_token = adobe_client_factory()
 
@@ -313,8 +314,102 @@ def test_create_preview_order(
             matchers.json_params_matcher(
                 {
                     "externalReferenceId": order["id"],
-                    "currencyCode": "USD",
                     "orderType": "PREVIEW",
+                    "lineItems": [
+                        {
+                            "extLineItemNumber": to_adobe_line_id(
+                                order["lines"][0]["id"]
+                            ),
+                            "offerId": adobe_full_sku,
+                            "quantity": expected_quantity,
+                            "deploymentId": deployment_id,
+                            "currencyCode": "USD",
+                        },
+                    ],
+                },
+            ),
+        ],
+    )
+
+    preview_order = client.create_preview_order(
+        authorization_uk,
+        customer_id,
+        order["id"],
+        order["lines"],
+        deployment_id,
+    )
+    assert preview_order == {
+        "orderId": "adobe-order-id",
+    }
+
+
+@pytest.mark.parametrize(
+    ("quantity", "old_quantity", "expected_quantity"),
+    [
+        (10, 0, 10),
+        (10, 2, 8),
+        (5, 10, 5),
+    ],
+)
+def test_create_preview_order_no_deployment(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_config_file,
+    adobe_authorizations_file,
+    order_factory,
+    lines_factory,
+    adobe_client_factory,
+    quantity,
+    old_quantity,
+    expected_quantity,
+):
+    """
+    Test the call to Adobe API to create a preview order.
+    """
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        side_effect=["uuid-1", "uuid-2"],
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
+    customer_id = "a-customer"
+    deployment_id = None
+
+    client, authorization, api_token = adobe_client_factory()
+
+    order = order_factory(
+        lines=lines_factory(old_quantity=old_quantity, quantity=quantity)
+    )
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=200,
+        json={
+            "orderId": "adobe-order-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": "uuid-2",
+                },
+            ),
+            matchers.json_params_matcher(
+                {
+                    "externalReferenceId": order["id"],
+                    "orderType": "PREVIEW",
+                    "currencyCode": "USD",
                     "lineItems": [
                         {
                             "extLineItemNumber": to_adobe_line_id(
@@ -334,6 +429,7 @@ def test_create_preview_order(
         customer_id,
         order["id"],
         order["lines"],
+        deployment_id,
     )
     assert preview_order == {
         "orderId": "adobe-order-id",
@@ -356,6 +452,7 @@ def test_create_preview_order_bad_request(
         "authorization_uk"
     ]
     customer_id = "a-customer"
+    deployment_id = "a_deployment_id"
 
     client, _, _ = adobe_client_factory()
 
@@ -376,6 +473,7 @@ def test_create_preview_order_bad_request(
             customer_id,
             order["id"],
             order["lines"],
+            deployment_id=deployment_id,
         )
 
     assert repr(cv.value) == str(error)
@@ -401,9 +499,15 @@ def test_create_new_order(
     ]
     customer_id = "a-customer"
 
+    deployment_id = "a_deployment_id"
+
     client, authorization, api_token = adobe_client_factory()
 
-    adobe_order = adobe_order_factory(ORDER_TYPE_NEW, external_id="mpt-order-id")
+    adobe_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        external_id="mpt-order-id",
+        deployment_id=deployment_id
+    )
 
     requests_mocker.post(
         urljoin(
@@ -433,6 +537,72 @@ def test_create_new_order(
         authorization_uk,
         customer_id,
         adobe_order,
+        deployment_id=deployment_id,
+    )
+    assert new_order == {
+        "orderId": "adobe-order-id",
+    }
+
+
+def test_create_new_order_no_deployment(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+):
+    """
+    Test the call to Adobe API to create a new order.
+    """
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer"
+
+    deployment_id = None
+
+    client, authorization, api_token = adobe_client_factory()
+
+    adobe_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        external_id="mpt-order-id",
+        deployment_id=deployment_id
+    )
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=202,
+        json={
+            "orderId": "adobe-order-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": adobe_order["externalReferenceId"],
+                },
+            ),
+            matchers.json_params_matcher(adobe_order),
+        ],
+    )
+
+    new_order = client.create_new_order(
+        authorization_uk,
+        customer_id,
+        adobe_order,
+        deployment_id=deployment_id,
     )
     assert new_order == {
         "orderId": "adobe-order-id",
@@ -733,6 +903,8 @@ def test_create_return_order(
     ]
     customer_id = "a-customer"
 
+    deployment_id = "a_deployment_id"
+
     client, authorization, api_token = adobe_client_factory()
 
     returning_order = adobe_order_factory(
@@ -740,6 +912,7 @@ def test_create_return_order(
         external_id="ORD-1234",
         order_id="returning-order-id",
         status=STATUS_PROCESSED,
+        deployment_id=deployment_id,
     )
 
     returning_item = returning_order["lineItems"][0]
@@ -754,7 +927,11 @@ def test_create_return_order(
         ORDER_TYPE_RETURN,
         reference_order_id=returning_order["orderId"],
         external_id=expected_external_id,
-        items=adobe_items_factory(),
+        items=adobe_items_factory(
+            deployment_id=deployment_id,
+            deployment_currency_code="USD"
+        ),
+        deployment_id=deployment_id,
     )
 
     requests_mocker.post(
@@ -787,6 +964,7 @@ def test_create_return_order(
         returning_order,
         returning_item,
         ext_ref_prefix,
+        deployment_id=deployment_id,
     )
     assert return_order == {
         "orderId": "adobe-order-id",
