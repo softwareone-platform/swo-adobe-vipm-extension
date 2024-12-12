@@ -37,8 +37,10 @@ class ValidateDownsizes(Step):
         ).date()
 
         if date.today() >= last_two_weeks:
-            logger.info("Downsize occurs in the last two weeks before the anniversary date. "
-                        "The renewal quantity will be updated without downsize validation.")
+            logger.info(
+                "Downsize occurs in the last two weeks before the anniversary date. "
+                "The renewal quantity will be updated without downsize validation."
+            )
             next_step(client, context)
             return
 

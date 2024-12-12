@@ -66,6 +66,7 @@ class GetPreviewOrder(Step):
     within the PREVIEW order an error will be thrown by the Adobe API the draft validation
     fails, otherwise the draft order validation pipeline will continue.
     """
+
     def __call__(self, client, context, next_step):
         if not context.upsize_lines:
             next_step(client, context)

@@ -287,7 +287,6 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
     price_item_3.valid_until = None
     mocked_pricelist_model.all.return_value = [price_item_1, price_item_2, price_item_3]
 
-
     prices = get_prices_for_3yc_skus(
         "product_id",
         "currency",
@@ -306,7 +305,7 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
             "OR({valid_until}=BLANK(),AND({valid_from}<='2024-03-03',{valid_until}>'2024-03-03')),"
             "OR({sku}='sku-1',{sku}='sku-2'))"
         ),
-        sort=["-valid_until"]
+        sort=["-valid_until"],
     )
     assert mocked_pricelist_cache == {
         "sku-1": [
@@ -321,15 +320,17 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
     }
 
 
-def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cache_factory):
+def test_get_prices_for_3yc_skus_hit_cache(
+    mocker, settings, mock_pricelist_cache_factory
+):
     cache = defaultdict(list)
     cache["sku-1"].append(
-            {
-                "currency": "currency",
-                "valid_from": date.fromisoformat("2024-01-01"),
-                "valid_until": date.fromisoformat("2025-01-01"),
-                "unit_pp": 12.44,
-            }
+        {
+            "currency": "currency",
+            "valid_from": date.fromisoformat("2024-01-01"),
+            "valid_until": date.fromisoformat("2025-01-01"),
+            "unit_pp": 12.44,
+        }
     )
     mock_pricelist_cache_factory(cache=cache)
     settings.EXTENSION_CONFIG = {
@@ -349,7 +350,6 @@ def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cach
     price_item_2.unit_pp = 31.23
     mocked_pricelist_model.all.return_value = [price_item_2]
 
-
     prices = get_prices_for_3yc_skus(
         "product_id",
         "currency",
@@ -368,19 +368,21 @@ def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cach
             "OR({valid_until}=BLANK(),AND({valid_from}<='2024-03-03',{valid_until}>'2024-03-03')),"
             "OR({sku}='sku-2'))"
         ),
-        sort=["-valid_until"]
+        sort=["-valid_until"],
     )
 
 
-def test_get_prices_for_3yc_skus_just_cache(mocker, settings, mock_pricelist_cache_factory):
+def test_get_prices_for_3yc_skus_just_cache(
+    mocker, settings, mock_pricelist_cache_factory
+):
     cache = defaultdict(list)
     cache["sku-1"].append(
-            {
-                "currency": "currency",
-                "valid_from": date.fromisoformat("2024-01-01"),
-                "valid_until": date.fromisoformat("2025-01-01"),
-                "unit_pp": 12.44,
-            }
+        {
+            "currency": "currency",
+            "valid_from": date.fromisoformat("2024-01-01"),
+            "valid_until": date.fromisoformat("2025-01-01"),
+            "unit_pp": 12.44,
+        }
     )
     mock_pricelist_cache_factory(cache=cache)
     settings.EXTENSION_CONFIG = {

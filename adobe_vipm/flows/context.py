@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
+from datetime import date
 
 
 @dataclass
 class Context:
     order: dict
-    current_attempt: int = 0
+    due_date: date | None = None
     downsize_lines: list = field(default_factory=list)
     upsize_lines: list = field(default_factory=list)
     type: str | None = None
@@ -26,8 +27,9 @@ class Context:
     adobe_return_orders: dict = field(default_factory=dict)
 
     def __str__(self):
+        due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else "-"
         return (
             f"{self.product_id} {(self.type or '-').upper()} {self.agreement_id} {self.order_id} "
-            f"{self.authorization_id} {self.current_attempt} "
+            f"{self.authorization_id} {due_date} "
             f"{self.adobe_customer_id or '-'} {self.adobe_new_order_id or '-'}"
         )

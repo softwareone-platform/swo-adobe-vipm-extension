@@ -4,8 +4,8 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     GetReturnOrders,
-    IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
+    SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
     ValidateRenewalWindow,
@@ -225,15 +225,14 @@ def test_fulfill_termination_order(mocker):
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 11
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[1], IncrementAttemptsCounter
-    )
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], SetupDueDate)
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[2], SetOrUpdateCotermNextSyncDates
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], StartOrderProcessing)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[3].template_name == TEMPLATE_NAME_TERMINATION
+        mocked_pipeline_ctor.mock_calls[0].args[3].template_name
+        == TEMPLATE_NAME_TERMINATION
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnOrders)

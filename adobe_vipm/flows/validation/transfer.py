@@ -154,7 +154,6 @@ def add_lines_to_order(
         ]
 
         if are_all_transferring_items_expired(adobe_items_without_one_time_offers):
-
             # If the order already has items and all the items on Adobe to be migrated are
             # expired, the user can add, edit or delete the expired subscriptions
             if len(order["lines"]):

@@ -401,17 +401,16 @@ def test_start_transfers_for_product_no_authorization_found_error(
     )
     mocked_transfer.save.assert_called_once()
     assert mocked_transfer.status == "failed"
-    assert (
-        mocked_transfer.migration_error_description
-        == "Authorization is not found"
-    )
+    assert mocked_transfer.migration_error_description == "Authorization is not found"
 
     mocked_send_exception.assert_called_once_with(
         "Marketplace Platform configuration error during transfer.",
         "Authorization is not found",
         facts=FactsSection(
             title="Transfer error",
-            data={"AuthorizationNotFoundError": mocked_transfer.migration_error_description},
+            data={
+                "AuthorizationNotFoundError": mocked_transfer.migration_error_description
+            },
         ),
         button=Button(label="membership-id", url="https://link.to.transfer"),
     )

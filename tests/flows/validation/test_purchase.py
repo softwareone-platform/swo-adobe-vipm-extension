@@ -870,6 +870,7 @@ def test_check_purchase_validation_enabled_step(mocker, order_factory):
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
+
 def test_check_purchase_validation_enabled_step_disabled(mocker, order_factory):
     order = order_factory()
 

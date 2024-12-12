@@ -23,8 +23,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
-    IncrementAttemptsCounter,
     SetOrUpdateCotermNextSyncDates,
+    SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
@@ -417,12 +417,10 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.helpers.switch_order_to_failed",
     )
-    adobe_3yc_commitment = adobe_commitment_factory(licenses=0,
-                                                    consumables=37)
+    adobe_3yc_commitment = adobe_commitment_factory(licenses=0, consumables=37)
 
     adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
     order_lines = lines_factory(
@@ -493,7 +491,6 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.helpers.switch_order_to_failed",
     )
@@ -569,7 +566,6 @@ def test_validate_downsize_3yc_orders_step_error_item_not_found(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.helpers.switch_order_to_failed",
     )
@@ -643,7 +639,6 @@ def test_validate_downsize_3yc_orders_step_skip_commitment_expired(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     adobe_3yc_commitment = adobe_commitment_factory(
         licenses=20,
         consumables=37,
@@ -700,7 +695,6 @@ def test_validate_downsize_3yc_orders_step_skip_commitment_accepted(
     adobe_order_factory,
     adobe_items_factory,
 ):
-
     adobe_3yc_commitment = adobe_commitment_factory(
         licenses=20, consumables=37, status=STATUS_3YC_ACCEPTED
     )
@@ -867,9 +861,7 @@ def test_fulfill_change_order(mocker):
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 18
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[1], IncrementAttemptsCounter
-    )
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], SetupDueDate)
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDuplicateLines
     )

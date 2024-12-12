@@ -35,9 +35,7 @@ def test_process_by_agreement_ids(mocker, dry_run):
         dry_run=dry_run,
     )
 
-    mocked.assert_called_once_with(
-        mocked_client, ["AGR-0001", "AGR-0002"], dry_run
-    )
+    mocked.assert_called_once_with(mocked_client, ["AGR-0001", "AGR-0002"], dry_run)
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
