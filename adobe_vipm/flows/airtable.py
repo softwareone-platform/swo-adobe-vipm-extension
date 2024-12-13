@@ -25,10 +25,10 @@ STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
 STATUS_SYNCHRONIZED = "synchronized"
-STATUS_GLOBAL_CUSTOMER_PENDING = "pending"
-STATUS_GLOBAL_CUSTOMER_TRANSFERRED = "transferred"
-STATUS_GLOBAL_CUSTOMER_COMPLETED = "completed"
-STATUS_GLOBAL_CUSTOMER_ERROR = "error"
+STATUS_GC_PENDING = "pending"
+STATUS_GC_TRANSFERRED = "transferred"
+STATUS_GC_COMPLETED = "completed"
+STATUS_GC_ERROR = "error"
 
 PRICELIST_CACHE = defaultdict(list)
 
@@ -151,19 +151,21 @@ def get_transfer_model(base_info):
 
 
 @cache
-def get_global_customer_main_agreement_model(base_info):
+def get_gc_main_agreement_model(base_info):
     """
-    Returns the GlobalCustomerMainAgreement model class connected to the right base and with
-    the right API key.
+    Retrieves the Global Customer (gc) main agreement model based on the provided base information.
+
+    This method returns the GCMainAgreement model class connected to the right base and with the
+    right API key.
 
     Args:
         base_info (AirTableBaseInfo): The base info instance.
 
     Returns:
-        Transfer: The AirTable GlobalCustomerMainAgreement model.
+        GCMainAgreement: The AirTable GCMainAgreement model.
     """
 
-    class GlobalCustomerMainAgreement(Model):
+    class GCMainAgreement(Model):
         membership_id = fields.TextField("membership_id")
         authorization_uk = fields.TextField("authorization_uk")
         main_agreement_id = fields.TextField("main_agreement_id")
@@ -181,23 +183,27 @@ def get_global_customer_main_agreement_model(base_info):
             api_key = base_info.api_key
             base_id = base_info.base_id
 
-    return GlobalCustomerMainAgreement
+    return GCMainAgreement
 
 
 @cache
-def get_global_customer_agreement_deployment_model(base_info):
+def get_gc_agreement_deployment_model(base_info):
     """
-    Returns the GlobalCustomerAgreementDeployments model class connected to the right base and with
-    the right API key.
+    Retrieves the Global Customer (gc) agreement deployment model based on the provided
+    base information.
+
+    This method returns the GCAgreementDeployments model class connected to the right base
+    and with the right API key.
 
     Args:
         base_info (AirTableBaseInfo): The base info instance.
 
     Returns:
-        Transfer: The AirTable GlobalCustomerAgreementDeployments model.
+        GCAgreementDeployments: The AirTable GCAgreementDeployments (Global Customer Agreement
+        Deployments) model.
     """
 
-    class GlobalCustomerAgreementDeployment(Model):
+    class GCAgreementDeployment(Model):
         deployment_id = fields.TextField("deployment_id")
         main_agreement_id = fields.TextField("main_agreement_id")
         account_id = fields.TextField("account_id")
@@ -225,7 +231,7 @@ def get_global_customer_agreement_deployment_model(base_info):
             api_key = base_info.api_key
             base_id = base_info.base_id
 
-    return GlobalCustomerAgreementDeployment
+    return GCAgreementDeployment
 
 
 @cache
@@ -281,7 +287,7 @@ def get_offer_ids_by_membership_id(product_id, membership_id):
 
 def create_offers(product_id, offers):
     """
-    GlobalCustomerAgreementDeployment
+    Creates a list of Offer objects in batch.
 
     Args:
         product_id (str): The ID of the product used to determine the AirTable base.
@@ -513,45 +519,47 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
     return prices
 
 
-def create_global_customer_agreement_deployments(product_id, agreement_deployments):
+def create_gc_agreement_deployments(product_id, agreement_deployments):
     """
-    Create a List of GlobalCustomerAgreementDeployment object in batch.
+    Add a new Global Customer (GC) agreement deployments on Airtable for a given product.
+    This method creates a list of GCAgreementDeployment objects on Airtable in batch.
 
     Args:
         product_id (str): The ID of the product used to determine the AirTable base.
-        agreement_deployments (list): List of GlobalCustomerAgreementDeployment object to create.
+        agreement_deployments (list): List of GCAgreementDeployment object to create.
     """
-    GlobalCustomerAgreementDeployment = get_global_customer_agreement_deployment_model(
+    GCAgreementDeployment = get_gc_agreement_deployment_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    GlobalCustomerAgreementDeployment.batch_save(
+    GCAgreementDeployment.batch_save(
         [
-            GlobalCustomerAgreementDeployment(**agreement_deployment)
+            GCAgreementDeployment(**agreement_deployment)
             for agreement_deployment in agreement_deployments
         ]
     )
 
 
-def create_global_customer_main_agreement(product_id, main_agreement):
+def create_gc_main_agreement(product_id, main_agreement):
     """
-    Create a GlobalCustomerMainAgreement object.
+    Add a new Global Customer (GC) main agreement on Airtable for a given product.
+    This method creates a GCMainAgreement object on Airtable.
 
     Args:
         product_id (str): The ID of the product used to determine the AirTable base.
         main_agreement (dict): The main agreement object to create.
     """
-    GlobalCustomerMainAgreement = get_global_customer_main_agreement_model(
+    GCMainAgreement = get_gc_main_agreement_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    GlobalCustomerMainAgreement(**main_agreement).save()
+    GCMainAgreement(**main_agreement).save()
 
 
-def get_global_customer_main_agreement(
-    product_id, authorization_uk, membership_or_customer_id
-):
+def get_gc_main_agreement(product_id, authorization_uk, membership_or_customer_id):
     """
-    Retrieve a GlobalCustomerMainAgreement object given the authorization ID and
-    the membership ID or the customer ID.
+    Retrieves the Global Customer (gc) main agreement for a given product.
+
+    This retrieve a GCMainAgreement object associated with the specified
+    product, using the provided authorization and membership or customer ID.
 
     Args:
         product_id (str): The ID of the product used to determine the AirTable base.
@@ -559,13 +567,13 @@ def get_global_customer_main_agreement(
         membership_or_customer_id (str): Either a membership ID or a customer ID.
 
     Returns:
-        GlobalCustomerMainAgreement: The GlobalCustomerMainOrder if it has been found,
+        GCMainAgreement: The GCMainOrder if it has been found,
         None otherwise.
     """
-    GlobalCustomerMainAgreement = get_global_customer_main_agreement_model(
+    GCMainAgreement = get_gc_main_agreement_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    global_customer_main_agreements = GlobalCustomerMainAgreement.all(
+    gc_main_agreements = GCMainAgreement.all(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
             OR(
@@ -574,50 +582,52 @@ def get_global_customer_main_agreement(
             ),
         ),
     )
-    return (
-        global_customer_main_agreements[0] if global_customer_main_agreements else None
-    )
+    return gc_main_agreements[0] if gc_main_agreements else None
 
 
-def get_global_customer_agreement_deployments_by_main_agreement(
-    product_id, main_agreement_id
-):
+def get_gc_agreement_deployments_by_main_agreement(product_id, main_agreement_id):
     """
-    Retrieve the list of GlobalCustomerAgreementDeployment given the main agreement ID.
+    Retrieves Global Customer (gc) agreement deployments associated with a specific main agreement.
+
+    This method retrieve the list of GCAgreementDeployment objects linked to the specified
+    main agreement ID for the given product.
 
     Args:
         product_id (str): The ID of the product used to determine the AirTable base.
         main_agreement_id (str): The ID of the main agreement.
 
     Returns:
-        GlobalCustomerAgreementDeployment (list): The list of GlobalCustomerAgreementDeployment
+        GCAgreementDeployment (list): The list of GCAgreementDeployment
     """
-    GlobalCustomerAgreementDeployment = get_global_customer_agreement_deployment_model(
+    GCAgreementDeployment = get_gc_agreement_deployment_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    return GlobalCustomerAgreementDeployment.all(
+    return GCAgreementDeployment.all(
         formula=AND(
             EQUAL(FIELD("main_agreement_id"), STR_VALUE(main_agreement_id)),
         ),
     )
 
 
-def get_global_customer_agreement_deployments_to_check(product_id):
+def get_gc_agreement_deployments_to_check(product_id):
     """
-    Returns a list of GlobalCustomerAgreementDeployment currently in pending state.
+    Retrieves Global Customer (gc) agreement deployments that require verification or review.
+
+    This method retrieve the list of GCAgreementDeployment objects associated with the
+    specified product that are in pending or error state
 
     Args:
         product_id (str): The ID of the product used to determine the AirTable base.
 
     Returns:
-        GlobalCustomerAgreementDeployment (list): The list of GlobalCustomerAgreementDeployment
+        GCAgreementDeployment (list): The list of GCAgreementDeployment
     """
-    GlobalCustomerAgreementDeployment = get_global_customer_agreement_deployment_model(
+    GCAgreementDeployment = get_gc_agreement_deployment_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    return GlobalCustomerAgreementDeployment.all(
+    return GCAgreementDeployment.all(
         formula=OR(
-            EQUAL(FIELD("status"), STR_VALUE(STATUS_GLOBAL_CUSTOMER_PENDING)),
-            EQUAL(FIELD("status"), STR_VALUE(STATUS_GLOBAL_CUSTOMER_ERROR)),
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_PENDING)),
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_ERROR)),
         ),
     )

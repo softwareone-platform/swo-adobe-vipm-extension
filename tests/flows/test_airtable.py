@@ -5,14 +5,14 @@ from requests import HTTPError
 
 from adobe_vipm.flows.airtable import (
     AirTableBaseInfo,
-    create_global_customer_agreement_deployments,
-    create_global_customer_main_agreement,
+    create_gc_agreement_deployments,
+    create_gc_main_agreement,
     create_offers,
-    get_global_customer_agreement_deployment_model,
-    get_global_customer_agreement_deployments_by_main_agreement,
-    get_global_customer_agreement_deployments_to_check,
-    get_global_customer_main_agreement,
-    get_global_customer_main_agreement_model,
+    get_gc_agreement_deployment_model,
+    get_gc_agreement_deployments_by_main_agreement,
+    get_gc_agreement_deployments_to_check,
+    get_gc_main_agreement,
+    get_gc_main_agreement_model,
     get_offer_ids_by_membership_id,
     get_offer_model,
     get_pricelist_model,
@@ -416,34 +416,34 @@ def test_get_prices_for_3yc_skus_just_cache(
     mocked_pricelist_model.all.assert_not_called()
 
 
-def test_get_global_customer_main_agreement_model():
+def test_get_gc_main_agreement_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    GlobalCustomerMainAgreement = get_global_customer_main_agreement_model(base_info)
-    assert GlobalCustomerMainAgreement.get_api().api_key == base_info.api_key
-    assert GlobalCustomerMainAgreement.get_base().id == base_info.base_id
+    GCMainAgreement = get_gc_main_agreement_model(base_info)
+    assert GCMainAgreement.get_api().api_key == base_info.api_key
+    assert GCMainAgreement.get_base().id == base_info.base_id
 
 
-def test_get_global_customer_agreement_deployment_model():
+def test_get_gc_agreement_deployment_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    GlobalCustomerAgreementDeployment = get_global_customer_agreement_deployment_model(
+    GCAgreementDeployment = get_gc_agreement_deployment_model(
         base_info
     )
-    assert GlobalCustomerAgreementDeployment.get_api().api_key == base_info.api_key
-    assert GlobalCustomerAgreementDeployment.get_base().id == base_info.base_id
+    assert GCAgreementDeployment.get_api().api_key == base_info.api_key
+    assert GCAgreementDeployment.get_base().id == base_info.base_id
 
 
-def test_create_global_customer_agreement_deployments(mocker, settings):
+def test_create_gc_agreement_deployments(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"product_id": "base_id"},
     }
-    mocked_global_customer_agreement_deployment = mocker.MagicMock()
-    mocked_global_customer_agreement_deployment_model = mocker.MagicMock(
-        return_value=mocked_global_customer_agreement_deployment
+    mocked_gc_agreement_deployment = mocker.MagicMock()
+    mocked_gc_agreement_deployment_model = mocker.MagicMock(
+        return_value=mocked_gc_agreement_deployment
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_global_customer_agreement_deployment_model",
-        return_value=mocked_global_customer_agreement_deployment_model,
+        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployment_model,
     )
 
     agreement_deployment = [
@@ -468,13 +468,13 @@ def test_create_global_customer_agreement_deployments(mocker, settings):
         }
     ]
 
-    create_global_customer_agreement_deployments("product_id", agreement_deployment)
+    create_gc_agreement_deployments("product_id", agreement_deployment)
 
-    mocked_global_customer_agreement_deployment_model.batch_save.assert_called_once_with(
-        [mocked_global_customer_agreement_deployment]
+    mocked_gc_agreement_deployment_model.batch_save.assert_called_once_with(
+        [mocked_gc_agreement_deployment]
     )
 
-    mocked_global_customer_agreement_deployment_model.assert_called_once_with(
+    mocked_gc_agreement_deployment_model.assert_called_once_with(
         deployment_id=agreement_deployment[0]["deployment_id"],
         status=agreement_deployment[0]["status"],
         customer_id=agreement_deployment[0]["customer_id"],
@@ -495,18 +495,18 @@ def test_create_global_customer_agreement_deployments(mocker, settings):
     )
 
 
-def test_create_global_customer_main_agreement(mocker, settings):
+def test_create_gc_main_agreement(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"product_id": "base_id"},
     }
-    mocked_global_customer_main_agreement = mocker.MagicMock()
-    mocked_get_global_customer_main_agreement_model = mocker.MagicMock(
-        return_value=mocked_global_customer_main_agreement
+    mocked_gc_main_agreement = mocker.MagicMock()
+    mocked_get_gc_main_agreement_model = mocker.MagicMock(
+        return_value=mocked_gc_main_agreement
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_global_customer_main_agreement_model",
-        return_value=mocked_get_global_customer_main_agreement_model,
+        "adobe_vipm.flows.airtable.get_gc_main_agreement_model",
+        return_value=mocked_get_gc_main_agreement_model,
     )
 
     main_agreement = {
@@ -519,10 +519,10 @@ def test_create_global_customer_main_agreement(mocker, settings):
         "error_description": "error_description",
     }
 
-    create_global_customer_main_agreement("product_id", main_agreement)
+    create_gc_main_agreement("product_id", main_agreement)
 
-    mocked_global_customer_main_agreement.save.assert_called_once()
-    mocked_get_global_customer_main_agreement_model.assert_called_once_with(
+    mocked_gc_main_agreement.save.assert_called_once()
+    mocked_get_gc_main_agreement_model.assert_called_once_with(
         membership_id=main_agreement["membership_id"],
         authorization_uk=main_agreement["authorization_uk"],
         main_agreement_id=main_agreement["main_agreement_id"],
@@ -533,104 +533,106 @@ def test_create_global_customer_main_agreement(mocker, settings):
     )
 
 
-def test_get_global_customer_main_agreement(mocker, settings):
+def test_get_gc_main_agreement(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"product_id": "base_id"},
     }
-    mocked_global_customer_main_agreement_model = mocker.MagicMock()
+    mocked_gc_main_agreement_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_global_customer_main_agreement_model",
-        return_value=mocked_global_customer_main_agreement_model,
+        "adobe_vipm.flows.airtable.get_gc_main_agreement_model",
+        return_value=mocked_gc_main_agreement_model,
     )
 
-    mocked_global_customer_main_agreement = mocker.MagicMock()
-    mocked_global_customer_main_agreement_model.all.return_value = [
-        mocked_global_customer_main_agreement
+    mocked_gc_main_agreement = mocker.MagicMock()
+    mocked_gc_main_agreement_model.all.return_value = [
+        mocked_gc_main_agreement
     ]
 
-    global_customer_main_agreement = get_global_customer_main_agreement(
+    gc_main_agreement = get_gc_main_agreement(
         "product_id", "authorization_uk", "main_agreement_id"
     )
 
-    assert global_customer_main_agreement == mocked_global_customer_main_agreement
-    mocked_global_customer_main_agreement_model.all.assert_called_once_with(
-        formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',{customer_id}='main_agreement_id'))",
+    assert gc_main_agreement == mocked_gc_main_agreement
+    mocked_gc_main_agreement_model.all.assert_called_once_with(
+        formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
+                "{customer_id}='main_agreement_id'))",
     )
 
 
-def test_get_global_customer_main_agreement_empty_response(mocker, settings):
+def test_get_gc_main_agreement_empty_response(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"product_id": "base_id"},
     }
-    mocked_global_customer_main_agreement_model = mocker.MagicMock()
+    mocked_gc_main_agreement_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_global_customer_main_agreement_model",
-        return_value=mocked_global_customer_main_agreement_model,
+        "adobe_vipm.flows.airtable.get_gc_main_agreement_model",
+        return_value=mocked_gc_main_agreement_model,
     )
 
-    mocked_global_customer_main_agreement_model.all.return_value = []
+    mocked_gc_main_agreement_model.all.return_value = []
 
-    global_customer_main_agreement = get_global_customer_main_agreement(
+    gc_main_agreement = get_gc_main_agreement(
         "product_id", "authorization_uk", "main_agreement_id"
     )
 
-    assert global_customer_main_agreement is None
-    mocked_global_customer_main_agreement_model.all.assert_called_once_with(
-        formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',{customer_id}='main_agreement_id'))",
+    assert gc_main_agreement is None
+    mocked_gc_main_agreement_model.all.assert_called_once_with(
+        formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
+                "{customer_id}='main_agreement_id'))",
     )
 
 
-def test_get_global_customer_agreement_deployments_by_main_agreement(mocker, settings):
+def test_get_gc_agreement_deployments_by_main_agreement(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"product_id": "base_id"},
     }
-    mocked_global_customer_agreement_deployments_model = mocker.MagicMock()
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_global_customer_agreement_deployment_model",
-        return_value=mocked_global_customer_agreement_deployments_model,
+        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
     )
 
-    global_customer_agreement_deployments = mocker.MagicMock()
-    mocked_global_customer_agreement_deployments_model.all.return_value = [
-        global_customer_agreement_deployments
+    gc_agreement_deployments = mocker.MagicMock()
+    mocked_gc_agreement_deployments_model.all.return_value = [
+        gc_agreement_deployments
     ]
 
-    global_customer_main_agreement = (
-        get_global_customer_agreement_deployments_by_main_agreement(
+    gc_main_agreement = (
+        get_gc_agreement_deployments_by_main_agreement(
             "product_id", "main_agreement_id"
         )
     )
 
-    assert global_customer_main_agreement == [global_customer_agreement_deployments]
-    mocked_global_customer_agreement_deployments_model.all.assert_called_once_with(
+    assert gc_main_agreement == [gc_agreement_deployments]
+    mocked_gc_agreement_deployments_model.all.assert_called_once_with(
         formula="AND({main_agreement_id}='main_agreement_id')",
     )
 
 
-def test_get_global_customer_agreement_deployments_to_check(mocker, settings):
+def test_get_gc_agreement_deployments_to_check(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"product_id": "base_id"},
     }
-    mocked_global_customer_agreement_deployments_model = mocker.MagicMock()
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_global_customer_agreement_deployment_model",
-        return_value=mocked_global_customer_agreement_deployments_model,
+        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
     )
 
-    global_customer_agreement_deployments = mocker.MagicMock()
-    mocked_global_customer_agreement_deployments_model.all.return_value = [
-        global_customer_agreement_deployments
+    gc_agreement_deployments = mocker.MagicMock()
+    mocked_gc_agreement_deployments_model.all.return_value = [
+        gc_agreement_deployments
     ]
 
-    global_customer_main_agreement = get_global_customer_agreement_deployments_to_check(
+    gc_main_agreement = get_gc_agreement_deployments_to_check(
         "product_id"
     )
 
-    assert global_customer_main_agreement == [global_customer_agreement_deployments]
-    mocked_global_customer_agreement_deployments_model.all.assert_called_once_with(
+    assert gc_main_agreement == [gc_agreement_deployments]
+    mocked_gc_agreement_deployments_model.all.assert_called_once_with(
         formula="OR({status}='pending',{status}='error')",
     )
