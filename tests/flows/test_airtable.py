@@ -425,9 +425,7 @@ def test_get_gc_main_agreement_model():
 
 def test_get_gc_agreement_deployment_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    GCAgreementDeployment = get_gc_agreement_deployment_model(
-        base_info
-    )
+    GCAgreementDeployment = get_gc_agreement_deployment_model(base_info)
     assert GCAgreementDeployment.get_api().api_key == base_info.api_key
     assert GCAgreementDeployment.get_base().id == base_info.base_id
 
@@ -545,9 +543,7 @@ def test_get_gc_main_agreement(mocker, settings):
     )
 
     mocked_gc_main_agreement = mocker.MagicMock()
-    mocked_gc_main_agreement_model.all.return_value = [
-        mocked_gc_main_agreement
-    ]
+    mocked_gc_main_agreement_model.all.return_value = [mocked_gc_main_agreement]
 
     gc_main_agreement = get_gc_main_agreement(
         "product_id", "authorization_uk", "main_agreement_id"
@@ -556,7 +552,7 @@ def test_get_gc_main_agreement(mocker, settings):
     assert gc_main_agreement == mocked_gc_main_agreement
     mocked_gc_main_agreement_model.all.assert_called_once_with(
         formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
-                "{customer_id}='main_agreement_id'))",
+        "{customer_id}='main_agreement_id'))",
     )
 
 
@@ -580,7 +576,7 @@ def test_get_gc_main_agreement_empty_response(mocker, settings):
     assert gc_main_agreement is None
     mocked_gc_main_agreement_model.all.assert_called_once_with(
         formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
-                "{customer_id}='main_agreement_id'))",
+        "{customer_id}='main_agreement_id'))",
     )
 
 
@@ -596,14 +592,10 @@ def test_get_gc_agreement_deployments_by_main_agreement(mocker, settings):
     )
 
     gc_agreement_deployments = mocker.MagicMock()
-    mocked_gc_agreement_deployments_model.all.return_value = [
-        gc_agreement_deployments
-    ]
+    mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployments]
 
-    gc_main_agreement = (
-        get_gc_agreement_deployments_by_main_agreement(
-            "product_id", "main_agreement_id"
-        )
+    gc_main_agreement = get_gc_agreement_deployments_by_main_agreement(
+        "product_id", "main_agreement_id"
     )
 
     assert gc_main_agreement == [gc_agreement_deployments]
@@ -624,13 +616,9 @@ def test_get_gc_agreement_deployments_to_check(mocker, settings):
     )
 
     gc_agreement_deployments = mocker.MagicMock()
-    mocked_gc_agreement_deployments_model.all.return_value = [
-        gc_agreement_deployments
-    ]
+    mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployments]
 
-    gc_main_agreement = get_gc_agreement_deployments_to_check(
-        "product_id"
-    )
+    gc_main_agreement = get_gc_agreement_deployments_to_check("product_id")
 
     assert gc_main_agreement == [gc_agreement_deployments]
     mocked_gc_agreement_deployments_model.all.assert_called_once_with(

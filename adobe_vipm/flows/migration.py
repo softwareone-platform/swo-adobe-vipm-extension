@@ -17,12 +17,16 @@ from adobe_vipm.adobe.errors import (
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
+    STATUS_GC_PENDING,
+    create_gc_main_agreement,
     create_offers,
+    get_gc_main_agreement,
     get_offer_ids_by_membership_id,
     get_transfer_link,
     get_transfers_to_check,
     get_transfers_to_process,
 )
+from adobe_vipm.flows.errors import AirTableHttpError
 from adobe_vipm.flows.nav import terminate_contract
 from adobe_vipm.notifications import (
     Button,
@@ -331,6 +335,7 @@ def check_running_transfers_for_product(product_id):
         transfer.customer_id = adobe_transfer["customerId"]
 
         customer = None
+        global_sales_enabled = False
         try:
             customer = client.get_customer(
                 transfer.authorization_uk, transfer.customer_id
@@ -343,6 +348,32 @@ def check_running_transfers_for_product(product_id):
 
         transfer = fill_customer_data(transfer, customer)
 
+        global_sales_enabled = customer.get("globalSalesEnabled", False)
+
+        if global_sales_enabled is True:
+            gc_main_agreement = get_gc_main_agreement(
+                product_id, transfer.authorization_uk, transfer.membership_id
+            )
+            if not gc_main_agreement:
+                gc_main_agreement_data = {
+                    "membership_id": transfer.membership_id,
+                    "transfer_id": transfer.transfer_id,
+                    "customer_id": transfer.customer_id,
+                    "status": STATUS_GC_PENDING,
+                    "authorization_uk": transfer.authorization_uk,
+                }
+                try:
+                    create_gc_main_agreement(product_id, gc_main_agreement_data)
+                except AirTableHttpError as e:
+                    send_error(
+                        "Error saving Global Customer Main Agreement",
+                        "An error occurred while saving the Global Customer Main Agreement.",
+                        button=get_transfer_link_button(transfer),
+                        facts=FactsSection(
+                            "Error from checking running transfers",
+                            f"{str(e)}",
+                        ),
+                    )
         if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
             subscriptions = client.get_subscriptions(
                 transfer.authorization_uk,

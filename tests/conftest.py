@@ -1288,6 +1288,28 @@ def mpt_error_factory():
 
 
 @pytest.fixture()
+def airtable_error_factory():
+    """
+    Generate an error message returned by the Airtable API.
+    """
+
+    def _airtable_error(
+        message,
+        error_type="INVALID_REQUEST_UNKNOWN",
+    ):
+        error = {
+            "error": {
+                "type": error_type,
+                "message": message,
+            }
+        }
+
+        return error
+
+    return _airtable_error
+
+
+@pytest.fixture()
 def mpt_list_response():
     def _wrap_response(objects_list):
         return {
