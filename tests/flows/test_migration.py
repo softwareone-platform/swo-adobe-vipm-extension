@@ -15,6 +15,10 @@ from adobe_vipm.adobe.errors import (
     AuthorizationNotFoundError,
     ResellerNotFoundError,
 )
+from adobe_vipm.flows.airtable import (
+    STATUS_GC_PENDING,
+)
+from adobe_vipm.flows.errors import AirTableAPIError
 from adobe_vipm.flows.migration import (
     check_running_transfers,
     check_running_transfers_for_product,
@@ -1007,6 +1011,466 @@ def test_checking_running_transfers_for_product_unexpected_status(
     )
 
 
+def test_checking_running_transfers_with_gc_exists_for_product(
+    mocker,
+    adobe_transfer_factory,
+    adobe_subscription_factory,
+):
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.nav_cco = "nav-cco"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.status = "running"
+    mocked_transfer.nav_error = None
+    mocked_transfer.customer_benefits_3yc_status = None
+
+    mocked_get_transfer_to_check = mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_check",
+        return_value=[mocked_transfer],
+    )
+    mocked_terminate_contract = mocker.patch(
+        "adobe_vipm.flows.migration.terminate_contract",
+        return_value=(True, '200 - {"id": "whatever"}'),
+    )
+
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_PROCESSED,
+        customer_id="customer-id",
+    )
+
+    customer = {
+        "companyProfile": {
+            "companyName": "Migrated Company",
+            "preferredLanguage": "en-US",
+            "address": {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": "country",
+                "phoneNumber": "phoneNumber",
+            },
+            "contacts": [
+                {
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "email": "email",
+                    "phoneNumber": "phoneNumber",
+                },
+            ],
+        },
+        "globalSalesEnabled": True,
+    }
+
+    mocked_gc_main_agreement = {
+        "membership_id": "membership-id",
+        "main_agreement_id": "main-agreement-id",
+        "transfer_id": "transfer-id",
+        "status": STATUS_GC_PENDING,
+        "error_description": "",
+    }
+
+    sub_active = adobe_subscription_factory()
+    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = customer
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [sub_active, sub_inactive]
+    }
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_gc_main_agreement",
+        return_value=mocked_gc_main_agreement,
+    )
+
+    mocked_create_gc_main_agreement = mocker.patch(
+        "adobe_vipm.flows.migration.create_gc_main_agreement"
+    )
+
+    with freeze_time("2024-01-01 12:00:00"):
+        check_running_transfers_for_product("product-id")
+
+        mocked_get_transfer_to_check.assert_called_once_with("product-id")
+        mocked_adobe_client.get_transfer.assert_called_once_with(
+            mocked_transfer.authorization_uk,
+            mocked_transfer.membership_id,
+            mocked_transfer.transfer_id,
+        )
+        mocked_transfer.save.assert_called_once()
+
+        assert (
+            mocked_transfer.customer_company_name
+            == customer["companyProfile"]["companyName"]
+        )
+        assert (
+            mocked_transfer.customer_preferred_language
+            == customer["companyProfile"]["preferredLanguage"]
+        )
+
+        address = customer["companyProfile"]["address"]
+        assert (
+            mocked_transfer.customer_address_address_line_1 == address["addressLine1"]
+        )
+        assert (
+            mocked_transfer.customer_address_address_line_2 == address["addressLine2"]
+        )
+        assert mocked_transfer.customer_address_city == address["city"]
+        assert mocked_transfer.customer_address_region == address["region"]
+        assert mocked_transfer.customer_address_postal_code == address["postalCode"]
+        assert mocked_transfer.customer_address_country == address["country"]
+        assert mocked_transfer.customer_address_phone_number == address["phoneNumber"]
+
+        contact = customer["companyProfile"]["contacts"][0]
+        assert mocked_transfer.customer_contact_first_name == contact["firstName"]
+        assert mocked_transfer.customer_contact_last_name == contact["lastName"]
+        assert mocked_transfer.customer_contact_email == contact["email"]
+        assert mocked_transfer.customer_contact_phone_number == contact["phoneNumber"]
+
+        mocked_terminate_contract.assert_called_once_with("nav-cco")
+        assert mocked_transfer.nav_terminated is True
+        assert mocked_transfer.nav_error is None
+
+        assert mocked_transfer.status == "completed"
+        assert mocked_transfer.completed_at == datetime.now()
+
+        mocked_adobe_client.update_subscription.assert_called_once_with(
+            mocked_transfer.authorization_uk,
+            mocked_transfer.customer_id,
+            sub_active["subscriptionId"],
+            auto_renewal=False,
+        )
+
+        mocked_create_gc_main_agreement.assert_not_called()
+
+
+def test_checking_running_transfers_with_gc_not_exists_for_product(
+    mocker,
+    adobe_transfer_factory,
+    adobe_subscription_factory,
+):
+    mocked_product_id = "product-id"
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.nav_cco = "nav-cco"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.status = "running"
+    mocked_transfer.nav_error = None
+    mocked_transfer.customer_benefits_3yc_status = None
+    mocked_transfer.customer_id = ""
+
+    mocked_get_transfer_to_check = mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_check",
+        return_value=[mocked_transfer],
+    )
+    mocked_terminate_contract = mocker.patch(
+        "adobe_vipm.flows.migration.terminate_contract",
+        return_value=(True, '200 - {"id": "whatever"}'),
+    )
+
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_PROCESSED,
+        customer_id="customer-id",
+    )
+
+    customer = {
+        "companyProfile": {
+            "companyName": "Migrated Company",
+            "preferredLanguage": "en-US",
+            "address": {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": "country",
+                "phoneNumber": "phoneNumber",
+            },
+            "contacts": [
+                {
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "email": "email",
+                    "phoneNumber": "phoneNumber",
+                },
+            ],
+        },
+        "globalSalesEnabled": True,
+    }
+
+    mocked_gc_main_agreement_data = {
+        "authorization_uk": mocked_transfer.authorization_uk,
+        "membership_id": mocked_transfer.membership_id,
+        "transfer_id": mocked_transfer.transfer_id,
+        "customer_id": "customer-id",
+        "status": STATUS_GC_PENDING,
+    }
+
+    sub_active = adobe_subscription_factory()
+    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = customer
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [sub_active, sub_inactive]
+    }
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_gc_main_agreement",
+        return_value=None,
+    )
+
+    mocked_create_gc_main_agreement = mocker.patch(
+        "adobe_vipm.flows.migration.create_gc_main_agreement"
+    )
+
+    with freeze_time("2024-01-01 12:00:00"):
+        check_running_transfers_for_product(mocked_product_id)
+
+        mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
+        mocked_adobe_client.get_transfer.assert_called_once_with(
+            mocked_transfer.authorization_uk,
+            mocked_transfer.membership_id,
+            mocked_transfer.transfer_id,
+        )
+        mocked_transfer.save.assert_called_once()
+
+        assert (
+            mocked_transfer.customer_company_name
+            == customer["companyProfile"]["companyName"]
+        )
+        assert (
+            mocked_transfer.customer_preferred_language
+            == customer["companyProfile"]["preferredLanguage"]
+        )
+
+        address = customer["companyProfile"]["address"]
+        assert (
+            mocked_transfer.customer_address_address_line_1 == address["addressLine1"]
+        )
+        assert (
+            mocked_transfer.customer_address_address_line_2 == address["addressLine2"]
+        )
+        assert mocked_transfer.customer_address_city == address["city"]
+        assert mocked_transfer.customer_address_region == address["region"]
+        assert mocked_transfer.customer_address_postal_code == address["postalCode"]
+        assert mocked_transfer.customer_address_country == address["country"]
+        assert mocked_transfer.customer_address_phone_number == address["phoneNumber"]
+
+        contact = customer["companyProfile"]["contacts"][0]
+        assert mocked_transfer.customer_contact_first_name == contact["firstName"]
+        assert mocked_transfer.customer_contact_last_name == contact["lastName"]
+        assert mocked_transfer.customer_contact_email == contact["email"]
+        assert mocked_transfer.customer_contact_phone_number == contact["phoneNumber"]
+
+        mocked_terminate_contract.assert_called_once_with("nav-cco")
+        assert mocked_transfer.nav_terminated is True
+        assert mocked_transfer.nav_error is None
+
+        assert mocked_transfer.status == "completed"
+        assert mocked_transfer.completed_at == datetime.now()
+
+        mocked_adobe_client.update_subscription.assert_called_once_with(
+            mocked_transfer.authorization_uk,
+            mocked_transfer.customer_id,
+            sub_active["subscriptionId"],
+            auto_renewal=False,
+        )
+
+        mocked_create_gc_main_agreement.assert_called_once_with(
+            mocked_product_id,
+            mocked_gc_main_agreement_data,
+        )
+
+
+def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_product(
+    mocker,
+    adobe_transfer_factory,
+    adobe_subscription_factory,
+    airtable_error_factory,
+):
+    mocked_product_id = "product-id"
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.seller_uk = "seller-uk"
+    mocked_transfer.nav_cco = "nav-cco"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.record_id = "record-id"
+    mocked_transfer.transfer_id = "transfer-id"
+    mocked_transfer.status = "running"
+    mocked_transfer.nav_error = None
+    mocked_transfer.customer_benefits_3yc_status = None
+    mocked_transfer.customer_id = ""
+
+    error = AirTableAPIError(
+        400,
+        airtable_error_factory(
+            "Bad Request",
+            "BAD_REQUEST",
+        ),
+    )
+
+    mocked_send_error = mocker.patch(
+        "adobe_vipm.flows.migration.send_error",
+    )
+
+    mocked_get_transfer_to_check = mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_check",
+        return_value=[mocked_transfer],
+    )
+    mocked_terminate_contract = mocker.patch(
+        "adobe_vipm.flows.migration.terminate_contract",
+        return_value=(True, '200 - {"id": "whatever"}'),
+    )
+
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_PROCESSED,
+        customer_id="customer-id",
+    )
+
+    customer = {
+        "companyProfile": {
+            "companyName": "Migrated Company",
+            "preferredLanguage": "en-US",
+            "address": {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": "country",
+                "phoneNumber": "phoneNumber",
+            },
+            "contacts": [
+                {
+                    "firstName": "firstName",
+                    "lastName": "lastName",
+                    "email": "email",
+                    "phoneNumber": "phoneNumber",
+                },
+            ],
+        },
+        "globalSalesEnabled": True,
+    }
+
+    mocked_gc_main_agreement_data = {
+        "authorization_uk": mocked_transfer.authorization_uk,
+        "membership_id": mocked_transfer.membership_id,
+        "transfer_id": mocked_transfer.transfer_id,
+        "customer_id": "customer-id",
+        "status": STATUS_GC_PENDING,
+    }
+
+    sub_active = adobe_subscription_factory()
+    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = customer
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [sub_active, sub_inactive]
+    }
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_gc_main_agreement",
+        return_value=None,
+    )
+
+    mocked_create_gc_main_agreement = mocker.patch(
+        "adobe_vipm.flows.migration.create_gc_main_agreement",
+        side_effect=error,
+    )
+
+    with freeze_time("2024-01-01 12:00:00"):
+        check_running_transfers_for_product(mocked_product_id)
+
+        mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
+        mocked_adobe_client.get_transfer.assert_called_once_with(
+            mocked_transfer.authorization_uk,
+            mocked_transfer.membership_id,
+            mocked_transfer.transfer_id,
+        )
+        mocked_transfer.save.assert_called_once()
+
+        assert (
+            mocked_transfer.customer_company_name
+            == customer["companyProfile"]["companyName"]
+        )
+        assert (
+            mocked_transfer.customer_preferred_language
+            == customer["companyProfile"]["preferredLanguage"]
+        )
+
+        address = customer["companyProfile"]["address"]
+        assert (
+            mocked_transfer.customer_address_address_line_1 == address["addressLine1"]
+        )
+        assert (
+            mocked_transfer.customer_address_address_line_2 == address["addressLine2"]
+        )
+        assert mocked_transfer.customer_address_city == address["city"]
+        assert mocked_transfer.customer_address_region == address["region"]
+        assert mocked_transfer.customer_address_postal_code == address["postalCode"]
+        assert mocked_transfer.customer_address_country == address["country"]
+        assert mocked_transfer.customer_address_phone_number == address["phoneNumber"]
+
+        contact = customer["companyProfile"]["contacts"][0]
+        assert mocked_transfer.customer_contact_first_name == contact["firstName"]
+        assert mocked_transfer.customer_contact_last_name == contact["lastName"]
+        assert mocked_transfer.customer_contact_email == contact["email"]
+        assert mocked_transfer.customer_contact_phone_number == contact["phoneNumber"]
+
+        mocked_terminate_contract.assert_called_once_with("nav-cco")
+        assert mocked_transfer.nav_terminated is True
+        assert mocked_transfer.nav_error is None
+
+        assert mocked_transfer.status == "completed"
+        assert mocked_transfer.completed_at == datetime.now()
+
+        mocked_adobe_client.update_subscription.assert_called_once_with(
+            mocked_transfer.authorization_uk,
+            mocked_transfer.customer_id,
+            sub_active["subscriptionId"],
+            auto_renewal=False,
+        )
+
+        mocked_create_gc_main_agreement.assert_called_once_with(
+            mocked_product_id,
+            mocked_gc_main_agreement_data,
+        )
+
+        mocked_send_error.assert_called_once_with(
+            "Error saving Global Customer Main Agreement",
+            "An error occurred while saving the Global Customer Main Agreement.",
+            button=get_transfer_link_button(mocked_transfer),
+            facts=FactsSection(
+                "Error from checking running transfers",
+                "400 - Bad Request",
+            ),
+        )
+
+
 def test_process_transfers(mocker, settings):
     settings.MPT_PRODUCTS_IDS = ["PRD-1111", "PRD-2222"]
     mocked_start_transfers_for_product = mocker.patch(
@@ -1166,3 +1630,33 @@ def test_get_transfer_link_button(mocker, return_value, expected_value):
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.membership_id = "label"
     assert get_transfer_link_button(mocked_transfer) == expected_value
+
+
+def test_checking_gc_main_agreement_when_exists(
+    mocker,
+):
+    mocked_transfer = mocker.MagicMock()
+
+    mocked_transfer.authorization_uk = "auth-uk"
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "transfer-id"
+
+    mocked_gc_main_agreement = {
+        "membership_id": "membership-id",
+        "main_agreement_id": "main-agreement-id",
+        "transfer_id": "transfer-id",
+        "status": STATUS_GC_PENDING,
+        "error_description": "",
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_gc_main_agreement",
+        return_value=mocked_gc_main_agreement,
+    )
+
+    mocked_create_gc_main_agreement = mocker.patch(
+        "adobe_vipm.flows.migration.create_gc_main_agreement"
+    )
+
+    mocked_create_gc_main_agreement.assert_not_called()

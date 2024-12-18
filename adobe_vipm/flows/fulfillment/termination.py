@@ -91,7 +91,8 @@ class SwitchAutoRenewalOff(Step):
                 except AdobeAPIError as e:
                     logger.error(
                         f"{context}: failed to switch off autorenewal for {subscription['id']} "
-                        f"({adobe_subscription['subscriptionId']}) due to {e}")
+                        f"({adobe_subscription['subscriptionId']}) due to {e}"
+                    )
                     if e.code == STATUS_INVALID_RENEWAL_STATE:
                         switch_order_to_failed(
                             client,
