@@ -25,10 +25,10 @@ STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
 STATUS_SYNCHRONIZED = "synchronized"
+STATUS_GC_CREATED = "created"
+STATUS_GC_ERROR = "error"
 STATUS_GC_PENDING = "pending"
 STATUS_GC_TRANSFERRED = "transferred"
-STATUS_GC_COMPLETED = "completed"
-STATUS_GC_ERROR = "error"
 
 PRICELIST_CACHE = defaultdict(list)
 
@@ -631,3 +631,31 @@ def get_gc_agreement_deployments_to_check(product_id):
             EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_ERROR)),
         ),
     )
+
+
+def get_agreement_deployment_view_link(product_id):
+    """
+    Generate a link to a record of the Agreement Deployments table in the AirTable UI.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+
+    Returns:
+        str: The link to the agreement deployments record or None in case of an error.
+    """
+    try:
+        GCAgreementDeployment = get_gc_agreement_deployment_model(
+            AirTableBaseInfo.for_migrations(product_id)
+        )
+        base_id = GCAgreementDeployment.Meta.base_id
+        table_id = GCAgreementDeployment.get_table().id
+        view_id = (
+            GCAgreementDeployment.get_table()
+            .schema()
+            .view("Agreement Deployments View")
+            .id
+        )
+        record_id = GCAgreementDeployment.id
+        return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
+    except HTTPError:
+        pass

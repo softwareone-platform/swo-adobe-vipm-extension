@@ -22,8 +22,17 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.flows.airtable import (
+    STATUS_GC_CREATED,
+    STATUS_GC_ERROR,
+    STATUS_GC_PENDING,
+    STATUS_GC_TRANSFERRED,
     STATUS_RUNNING,
     STATUS_SYNCHRONIZED,
+    create_gc_agreement_deployments,
+    create_gc_main_agreement,
+    get_agreement_deployment_view_link,
+    get_gc_agreement_deployments_by_main_agreement,
+    get_gc_main_agreement,
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
@@ -67,6 +76,7 @@ from adobe_vipm.flows.utils import (
     set_adobe_customer_id,
     set_ordering_parameter_error,
 )
+from adobe_vipm.notifications import Button, FactsSection, send_warning
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -406,6 +416,297 @@ def get_commitment_date(subscription, commitment_date):
     return commitment_date
 
 
+def generate_deployments_currency_map(line_items):
+    """
+    Generates a dictionary mapping deployment IDs to a list of their currency codes.
+
+    Args:
+        line_items (dict): The input dictionary containing transfer line items details.
+
+    Returns:
+        dict: A dictionary where the keys are deployment IDs and the values are lists of
+        currency codes.
+    """
+    deployment_currency_map = {}
+
+    for item in line_items:
+        deployment_id = item.get("deploymentId", "")
+        currency_code = item.get("currencyCode", "")
+
+        if deployment_id:
+            if deployment_id not in deployment_currency_map:
+                deployment_currency_map[deployment_id] = []
+            if currency_code not in deployment_currency_map[deployment_id]:
+                deployment_currency_map[deployment_id].append(currency_code)
+
+    return deployment_currency_map
+
+
+def get_new_agreement_deployments(
+    existing_deployments,
+    customer_deployments,
+    adobe_transfer_order,
+    product_id,
+    order,
+):
+    new_agreement_deployments = []
+    deployment_currency_map = generate_deployments_currency_map(
+        adobe_transfer_order["lineItems"]
+    )
+
+    for deployment in customer_deployments["items"]:
+        created_deployment = next(
+            (
+                gc_deployment
+                for gc_deployment in existing_deployments
+                if gc_deployment.deployment_id == deployment.get("deploymentId")
+            ),
+            None,
+        )
+        if created_deployment:
+            logger.info(
+                f"Deployment {created_deployment.deployment_id} already exists in Airtable,"
+                f" skipping"
+            )
+            continue
+
+        agreement_deployment = {
+            "deployment_id": deployment.get("deploymentId"),
+            "status": "pending",
+            "customer_id": adobe_transfer_order["customerId"],
+            "product_id": product_id,
+            "main_agreement_id": order.get("agreement", {}).get("id", ""),
+            "account_id": order.get("client", {}).get("id", ""),
+            "seller_id": order.get("seller", {}).get("id", ""),
+            "membership_id": adobe_transfer_order["membershipId"],
+            "transfer_id": adobe_transfer_order["transferId"],
+            "deployment_currency": ",".join(
+                deployment_currency_map.get(deployment.get("deploymentId"), [])
+            ),
+            "deployment_country": deployment.get("companyProfile", {})
+            .get("address", {})
+            .get("country", ""),
+            "authorization_id": order.get("authorization", {}).get("id", ""),
+            "price_list_id": order.get("agreement", {})
+            .get("listing", {})
+            .get("priceList", {})
+            .get("id", ""),
+            "listing_id": order.get("listing", {}).get("id", ""),
+        }
+        new_agreement_deployments.append(agreement_deployment)
+    return new_agreement_deployments
+
+
+def send_gc_agreement_deployments_notification(
+    agreement_id, customer_id, customer_deployments, product_id
+):
+    facts = {
+        f"Deployment ID: {deployment.get("deploymentId")}": f"Country: {
+            deployment.get("companyProfile", {}).get("address", {}).get("country", "")}"
+        for deployment in customer_deployments["items"]
+    }
+    agreement_deployment_view_link = get_agreement_deployment_view_link(product_id)
+    send_warning(
+        f"Adobe Global Customer Deployments created for {agreement_id}",
+        f"Following deployments have been created for the customer {customer_id}:",
+        facts=FactsSection("Deployments", facts),
+        button=Button(
+            "Open Agreement Deployments View", agreement_deployment_view_link
+        ),
+    )
+
+
+def are_all_deployments_synchronized(existing_deployments, customer_deployments):
+    if customer_deployments.get("totalCount", 0) > 0:
+        for customer_deployment in customer_deployments["items"]:
+            created_deployment = next(
+                (
+                    gc_deployment
+                    for gc_deployment in existing_deployments
+                    if gc_deployment.deployment_id
+                    == customer_deployment.get("deploymentId")
+                ),
+                None,
+            )
+            if not created_deployment:
+                logger.info(
+                    f"Deployment {customer_deployment.get('deploymentId')} is not created"
+                )
+                return True
+            if created_deployment.status != STATUS_GC_CREATED:
+                logger.info(
+                    "All deployments are not synchronized, wait for the deployments to be created"
+                )
+                return False
+
+    logger.info("All deployments are created, proceed to fulfill the transfer order")
+    return True
+
+
+def _check_agreement_deployments(
+    adobe_client,
+    customer,
+    adobe_transfer_order,
+    existing_deployments,
+    order,
+    gc_main_agreement,
+    customer_deployments,
+):
+    product_id = order["agreement"]["product"]["id"]
+
+    if customer.get("globalSalesEnabled", False):
+        logger.info(
+            "Adobe customer has global sales enabled, proceed to get the customer"
+            " deployments"
+        )
+        if not gc_main_agreement:
+            logger.debug(
+                "Main agreement doesn't exist in Airtable, proceed to create it"
+            )
+            main_agreement = {
+                "membership_id": adobe_transfer_order.get("membershipId", ""),
+                "authorization_uk": order.get("authorization", {}).get("id", ""),
+                "main_agreement_id": order.get("agreement", {}).get("id", ""),
+                "transfer_id": adobe_transfer_order.get("transferId", ""),
+                "customer_id": adobe_transfer_order.get("customerId", ""),
+                "status": STATUS_GC_PENDING,
+            }
+            create_gc_main_agreement(product_id, main_agreement)
+
+        if not customer_deployments:
+            customer_deployments = adobe_client.get_customer_deployments(
+                order["authorization"]["id"], adobe_transfer_order["customerId"]
+            )
+        if customer_deployments.get("totalCount", 0) > 0:
+            logger.info(
+                f"Adobe customer have {customer_deployments.get("totalCount")} deployments,"
+                f" proceed to add agreement deployments to Airtable"
+            )
+            new_agreement_deployments = get_new_agreement_deployments(
+                existing_deployments,
+                customer_deployments,
+                adobe_transfer_order,
+                product_id,
+                order,
+            )
+
+            if new_agreement_deployments:
+                create_gc_agreement_deployments(product_id, new_agreement_deployments)
+                send_gc_agreement_deployments_notification(
+                    order.get("agreement", {}).get("id", ""),
+                    adobe_transfer_order.get("customerId", ""),
+                    customer_deployments,
+                    product_id,
+                )
+                return False
+
+        else:
+            logger.info(
+                "Adobe customer doesn't have deployments, proceed to fulfill the transfer order"
+            )
+    return True
+
+
+def _check_gc_main_agreement(gc_main_agreement, order):
+    if gc_main_agreement:
+        if gc_main_agreement.main_agreement_id:
+            logger.info(
+                f"Main agreement {gc_main_agreement.main_agreement_id} already exists in Airtable"
+            )
+            if gc_main_agreement.status == STATUS_GC_ERROR:
+                logger.info(
+                    "Main agreement is in error state, wait for manual intervention"
+                )
+                return False
+
+        else:
+            logger.info(
+                "Main agreement exists in Airtable, proceed to save the current agreement ID."
+                " Continue with deployment synchronization"
+            )
+            gc_main_agreement.main_agreement_id = order.get("agreement", {}).get(
+                "id", ""
+            )
+            gc_main_agreement.save()
+    return True
+
+
+def create_agreement_subscriptions(
+    adobe_transfer_order, mpt_client, order, adobe_client, customer
+):
+    authorization_id = order["authorization"]["id"]
+    customer_id = adobe_transfer_order["customerId"]
+    one_time_skus = get_one_time_skus(mpt_client, order)
+    subscriptions = []
+
+    for item in adobe_transfer_order["lineItems"]:
+        if item.get("deploymentId", ""):
+            logger.info(
+                f"Order line item {item['offerId']} has deployment ID "
+                f"{item['deploymentId']}, skip it on main agreement"
+            )
+            continue
+        if get_partial_sku(item["offerId"]) in one_time_skus:
+            continue
+
+        adobe_subscription = adobe_client.get_subscription(
+            authorization_id,
+            customer_id,
+            item["subscriptionId"],
+        )
+        if adobe_subscription["status"] != STATUS_PROCESSED:
+            logger.warning(
+                f"Subscription {adobe_subscription['subscriptionId']} "
+                f"for customer {customer_id} is in status "
+                f"{adobe_subscription['status']}, skip it"
+            )
+            continue
+
+        commitment = get_3yc_commitment(customer)
+        if commitment.get("status", "") != STATUS_3YC_COMMITTED:
+            adobe_subscription = adobe_client.update_subscription(
+                authorization_id,
+                customer_id,
+                item["subscriptionId"],
+                auto_renewal=True,
+            )
+
+        subscriptions.append(
+            add_subscription(mpt_client, adobe_subscription, order, item)
+        )
+
+    return subscriptions
+
+
+def sync_main_agreement(
+    gc_main_agreement, product_id, authorization_id, customer_id, error=""
+):
+    if not gc_main_agreement:
+        gc_main_agreement = get_gc_main_agreement(
+            product_id, authorization_id, customer_id
+        )
+
+    if gc_main_agreement:
+        gc_main_agreement.status = STATUS_GC_ERROR if error else STATUS_GC_TRANSFERRED
+        gc_main_agreement.error_description = error
+        gc_main_agreement.save()
+
+
+def _check_pending_deployments(
+    gc_main_agreement, adobe_client, authorization_id, existing_deployments
+):
+    if gc_main_agreement:
+        customer_deployments = adobe_client.get_customer_deployments(
+            authorization_id, gc_main_agreement.customer_id
+        )
+        if not are_all_deployments_synchronized(
+            existing_deployments,
+            customer_deployments,
+        ):
+            return False
+    return True
+
+
 def fulfill_transfer_order(mpt_client, order):
     """
     Fulfills a transfer order by processing the necessary actions based on the provided parameters.
@@ -423,13 +724,33 @@ def fulfill_transfer_order(mpt_client, order):
     authorization_id = order["authorization"]["id"]
     product_id = order["agreement"]["product"]["id"]
     authorization = config.get_authorization(authorization_id)
+    customer_deployments = None
     transfer = get_transfer_by_authorization_membership_or_customer(
         product_id,
         authorization.authorization_id,
         membership_id,
     )
+    gc_main_agreement = get_gc_main_agreement(
+        product_id,
+        authorization.authorization_id,
+        membership_id,
+    )
+
+    existing_deployments = get_gc_agreement_deployments_by_main_agreement(
+        product_id, order.get("agreement", {}).get("id", "")
+    )
+
+    # Check if the main agreement exists in Airtable and if all deployments are synchronized
+    if not _check_gc_main_agreement(gc_main_agreement, order):
+        return
+
+    if not _check_pending_deployments(
+        gc_main_agreement, adobe_client, authorization_id, existing_deployments
+    ):
+        return
 
     if transfer:
+        # Adobe account has been transferred in bulk migration
         check_processing_template(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
         _transfer_migrated(mpt_client, order, transfer)
         return
@@ -456,43 +777,40 @@ def fulfill_transfer_order(mpt_client, order):
     customer_id = adobe_transfer_order["customerId"]
     customer = adobe_client.get_customer(authorization_id, customer_id)
 
+    # Check if the agreement deployments exist in Airtable and if all deployments are synchronized
+    if not _check_agreement_deployments(
+        adobe_client,
+        customer,
+        adobe_transfer_order,
+        existing_deployments,
+        order,
+        gc_main_agreement,
+        customer_deployments,
+    ):
+        return
+
     order = save_adobe_order_id_and_customer_data(
         mpt_client,
         order,
         adobe_order_id,
         customer,
     )
+
+    subscriptions = create_agreement_subscriptions(
+        adobe_transfer_order, mpt_client, order, adobe_client, customer
+    )
+
+    if not subscriptions:
+        error = "No subscriptions found without deployment ID to be added to the main agreement"
+        logger.error(error)
+        sync_main_agreement(
+            gc_main_agreement, product_id, authorization_id, customer_id, error
+        )
+        return
+
     commitment_date = None
 
-    one_time_skus = get_one_time_skus(mpt_client, order)
-
-    for item in adobe_transfer_order["lineItems"]:
-        if get_partial_sku(item["offerId"]) in one_time_skus:
-            continue
-
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id,
-            customer_id,
-            item["subscriptionId"],
-        )
-        if adobe_subscription["status"] != STATUS_PROCESSED:
-            logger.warning(
-                f"Subscription {adobe_subscription['subscriptionId']} "
-                f"for customer {customer_id} is in status "
-                f"{adobe_subscription['status']}, skip it"
-            )
-            continue
-
-        commitment = get_3yc_commitment(customer)
-        if commitment.get("status", "") != STATUS_3YC_COMMITTED:
-            adobe_subscription = adobe_client.update_subscription(
-                authorization_id,
-                customer_id,
-                item["subscriptionId"],
-                auto_renewal=True,
-            )
-
-        subscription = add_subscription(mpt_client, adobe_subscription, order, item)
+    for subscription in subscriptions:
         commitment_date = get_commitment_date(subscription, commitment_date)
 
     if commitment_date:  # pragma: no branch
@@ -500,3 +818,4 @@ def fulfill_transfer_order(mpt_client, order):
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)
     sync_agreements_by_agreement_ids(mpt_client, [order["agreement"]["id"]], False)
+    sync_main_agreement(gc_main_agreement, product_id, authorization_id, customer_id)

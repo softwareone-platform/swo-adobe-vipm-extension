@@ -8,6 +8,7 @@ from adobe_vipm.flows.airtable import (
     create_gc_agreement_deployments,
     create_gc_main_agreement,
     create_offers,
+    get_agreement_deployment_view_link,
     get_gc_agreement_deployment_model,
     get_gc_agreement_deployments_by_main_agreement,
     get_gc_agreement_deployments_to_check,
@@ -425,9 +426,7 @@ def test_get_gc_main_agreement_model():
 
 def test_get_gc_agreement_deployment_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    GCAgreementDeployment = get_gc_agreement_deployment_model(
-        base_info
-    )
+    GCAgreementDeployment = get_gc_agreement_deployment_model(base_info)
     assert GCAgreementDeployment.get_api().api_key == base_info.api_key
     assert GCAgreementDeployment.get_base().id == base_info.base_id
 
@@ -545,9 +544,7 @@ def test_get_gc_main_agreement(mocker, settings):
     )
 
     mocked_gc_main_agreement = mocker.MagicMock()
-    mocked_gc_main_agreement_model.all.return_value = [
-        mocked_gc_main_agreement
-    ]
+    mocked_gc_main_agreement_model.all.return_value = [mocked_gc_main_agreement]
 
     gc_main_agreement = get_gc_main_agreement(
         "product_id", "authorization_uk", "main_agreement_id"
@@ -556,7 +553,7 @@ def test_get_gc_main_agreement(mocker, settings):
     assert gc_main_agreement == mocked_gc_main_agreement
     mocked_gc_main_agreement_model.all.assert_called_once_with(
         formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
-                "{customer_id}='main_agreement_id'))",
+        "{customer_id}='main_agreement_id'))",
     )
 
 
@@ -580,7 +577,7 @@ def test_get_gc_main_agreement_empty_response(mocker, settings):
     assert gc_main_agreement is None
     mocked_gc_main_agreement_model.all.assert_called_once_with(
         formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
-                "{customer_id}='main_agreement_id'))",
+        "{customer_id}='main_agreement_id'))",
     )
 
 
@@ -596,14 +593,10 @@ def test_get_gc_agreement_deployments_by_main_agreement(mocker, settings):
     )
 
     gc_agreement_deployments = mocker.MagicMock()
-    mocked_gc_agreement_deployments_model.all.return_value = [
-        gc_agreement_deployments
-    ]
+    mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployments]
 
-    gc_main_agreement = (
-        get_gc_agreement_deployments_by_main_agreement(
-            "product_id", "main_agreement_id"
-        )
+    gc_main_agreement = get_gc_agreement_deployments_by_main_agreement(
+        "product_id", "main_agreement_id"
     )
 
     assert gc_main_agreement == [gc_agreement_deployments]
@@ -624,15 +617,53 @@ def test_get_gc_agreement_deployments_to_check(mocker, settings):
     )
 
     gc_agreement_deployments = mocker.MagicMock()
-    mocked_gc_agreement_deployments_model.all.return_value = [
-        gc_agreement_deployments
-    ]
+    mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployments]
 
-    gc_main_agreement = get_gc_agreement_deployments_to_check(
-        "product_id"
-    )
+    gc_main_agreement = get_gc_agreement_deployments_to_check("product_id")
 
     assert gc_main_agreement == [gc_agreement_deployments]
     mocked_gc_agreement_deployments_model.all.assert_called_once_with(
         formula="OR({status}='pending',{status}='error')",
     )
+
+
+def test_get_agreement_deployment_view_link(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
+    }
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
+    )
+    mocked_gc_agreement_deployments_model.id = "record-id"
+    mocked_gc_agreement_deployments_model.Meta.base_id = "base-id"
+    view_mock = mocker.MagicMock()
+    view_mock.id = "view-id"
+    schema_mock = mocker.MagicMock()
+    schema_mock.view.return_value = view_mock
+    table_mock = mocker.MagicMock()
+    table_mock.id = "table-id"
+    table_mock.schema.return_value = schema_mock
+    mocked_gc_agreement_deployments_model.get_table.return_value = table_mock
+
+    assert (
+        get_agreement_deployment_view_link("product_id")
+        == "https://airtable.com/base-id/table-id/view-id/record-id"
+    )
+
+
+def test_get_agreement_deployment_view_link_exception(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
+    }
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
+    )
+    mocked_gc_agreement_deployments_model.get_table.side_effect = HTTPError()
+
+    assert get_agreement_deployment_view_link("product_id") is None
