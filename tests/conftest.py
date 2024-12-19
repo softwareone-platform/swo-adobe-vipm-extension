@@ -1097,12 +1097,18 @@ def adobe_items_factory():
         subscription_id=None,
         renewal_date=None,
         status=None,
+        deployment_id=None,
+       currencyCode= None,
     ):
         item = {
             "extLineItemNumber": line_number,
             "offerId": offer_id,
             "quantity": quantity,
         }
+        if currencyCode:
+            item["currencyCode"] = currencyCode
+        if deployment_id:
+            item["deploymentId"] = deployment_id
         if renewal_date:
             item["renewalDate"] = renewal_date
         if subscription_id:
@@ -1154,6 +1160,7 @@ def adobe_subscription_factory():
         current_quantity=10,
         renewal_quantity=10,
         autorenewal_enabled=True,
+        deployment_id="",
         status=STATUS_PROCESSED,
         renewal_date=None,
     ):
@@ -1169,6 +1176,7 @@ def adobe_subscription_factory():
             "renewalDate": renewal_date
             or (date.today() + timedelta(days=366)).isoformat(),
             "status": status,
+            "deploymentId": deployment_id,
         }
 
     return _subscription
@@ -1197,11 +1205,13 @@ def adobe_transfer_factory(adobe_items_factory):
         customer_id="",
         status=STATUS_PENDING,
         items=None,
+        membership_id="membership-id",
     ):
         transfer = {
             "transferId": transfer_id,
             "customerId": customer_id,
             "status": status,
+            "membershipId": membership_id,
             "lineItems": items or adobe_items_factory(),
         }
 
@@ -1392,6 +1402,7 @@ def adobe_customer_factory():
         licenses_discount_level="01",
         consumables_discount_level="T1",
         coterm_date="2024-01-23",
+        global_sales_enabled=False,
     ):
         customer = {
             "customerId": customer_id,
@@ -1427,6 +1438,7 @@ def adobe_customer_factory():
                 },
             ],
             "cotermDate": coterm_date,
+            "globalSalesEnabled":global_sales_enabled,
         }
         if commitment or commitment_request or recommitment_request:
             customer["benefits"] = [

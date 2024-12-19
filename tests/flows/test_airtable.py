@@ -8,6 +8,7 @@ from adobe_vipm.flows.airtable import (
     create_gc_agreement_deployments,
     create_gc_main_agreement,
     create_offers,
+    get_agreement_deployment_view_link,
     get_gc_agreement_deployment_model,
     get_gc_agreement_deployments_by_main_agreement,
     get_gc_agreement_deployments_to_check,
@@ -624,3 +625,45 @@ def test_get_gc_agreement_deployments_to_check(mocker, settings):
     mocked_gc_agreement_deployments_model.all.assert_called_once_with(
         formula="OR({status}='pending',{status}='error')",
     )
+
+
+def test_get_agreement_deployment_view_link(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
+    }
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
+    )
+    mocked_gc_agreement_deployments_model.id = "record-id"
+    mocked_gc_agreement_deployments_model.Meta.base_id = "base-id"
+    view_mock = mocker.MagicMock()
+    view_mock.id = "view-id"
+    schema_mock = mocker.MagicMock()
+    schema_mock.view.return_value = view_mock
+    table_mock = mocker.MagicMock()
+    table_mock.id = "table-id"
+    table_mock.schema.return_value = schema_mock
+    mocked_gc_agreement_deployments_model.get_table.return_value = table_mock
+
+    assert (
+        get_agreement_deployment_view_link("product_id")
+        == "https://airtable.com/base-id/table-id/view-id/record-id"
+    )
+
+
+def test_get_agreement_deployment_view_link_exception(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASES": {"product_id": "base_id"},
+    }
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
+    )
+    mocked_gc_agreement_deployments_model.get_table.side_effect = HTTPError()
+
+    assert get_agreement_deployment_view_link("product_id") is None

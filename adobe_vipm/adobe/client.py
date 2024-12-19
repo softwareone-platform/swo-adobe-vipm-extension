@@ -914,6 +914,35 @@ class AdobeClient:
         token = self._token_cache[authorization]
         return token
 
+    def get_customer_deployments(
+        self,
+        authorization_id: str,
+        customer_id: str,
+    ) -> dict:
+        """
+        Retrieve the customer deployment object.
+
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str): The customer identifier.
+
+        Returns:
+            dict: A customer deployment object.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/customers/{customer_id}/deployments",
+            ),
+            headers=headers,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+
 
 _ADOBE_CLIENT = None
 
