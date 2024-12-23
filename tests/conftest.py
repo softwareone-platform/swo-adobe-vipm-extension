@@ -33,7 +33,10 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
+    PARAM_DEPLOYMENT_ID,
+    PARAM_DEPLOYMENTS,
     PARAM_DUE_DATE,
+    PARAM_GLOBAL_CUSTOMER,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
@@ -573,7 +576,11 @@ def fulfillment_parameters_factory():
         next_sync_date="",
         market_segment_eligibility_status=None,
         coterm_date="",
+        global_customer=None,
+        deployment_id="",
+        deployments=None,
     ):
+        deployments = deployments or []
         return [
             {
                 "id": "PAR-1234-5678",
@@ -652,6 +659,28 @@ def fulfillment_parameters_factory():
                 "type": "Date",
                 "value": coterm_date,
             },
+            {
+                "id": "PAR-6179-6384-0024",
+                "externalId": PARAM_GLOBAL_CUSTOMER,
+                "name": "Global Customer",
+                "type": "Checkbox",
+                "displayValue": "Yes",
+                "value": [global_customer]
+            },
+            {
+                "id": "PAR-6179-6384-0025",
+                "externalId": PARAM_DEPLOYMENT_ID,
+                "name": "Deployment ID",
+                "type": "SingleLineText",
+                "value": deployment_id
+            },
+            {
+                "id": "PAR-6179-6384-0026",
+                "externalId": PARAM_DEPLOYMENTS,
+                "name": "Deployments",
+                "type": "MultiLineText",
+                "value": ",".join(deployments)
+            }
         ]
 
     return _fulfillment_parameters
