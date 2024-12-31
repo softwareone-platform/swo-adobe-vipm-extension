@@ -2482,7 +2482,7 @@ def test_transfer_gc_account_all_deployments_created(
                 due_date=None,
                 next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
-                deployments=["deployment-id", "test1", "test2"],
+                deployments=["deployment-id - DE"],
                 global_customer="Yes",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -2829,7 +2829,7 @@ def test_transfer_gc_account_no_deployments(
                 due_date=None,
                 next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
-                deployments=["test1", "test2"],
+                deployments=[],
                 global_customer="Yes",
             ),
             "ordering": transfer_order_parameters_factory(

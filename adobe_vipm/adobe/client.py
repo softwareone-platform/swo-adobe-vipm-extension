@@ -350,6 +350,7 @@ class AdobeClient:
         returning_order: dict,
         returning_item: dict,
         external_reference: str,
+        deployment_id: str = "",
     ) -> dict:
         """
         Creates an order of type RETURN for a given `item` that was purchased in the
@@ -375,6 +376,7 @@ class AdobeClient:
             "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_RETURN,
             "lineItems": [],
+            "deploymentId": deployment_id,
         }
 
         payload["lineItems"].append(
@@ -467,6 +469,7 @@ class AdobeClient:
         authorization_id: str,
         customer_id: str,
         adobe_preview_order: dict,
+        deployment_id: str = "",
     ) -> dict:
         """
         Creates an order of type NEW (the actual order) for a given Marketplace platform order.
@@ -485,6 +488,7 @@ class AdobeClient:
             "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_NEW,
             "lineItems": adobe_preview_order["lineItems"],
+            "deploymentId": deployment_id,
         }
 
         headers = self._get_headers(

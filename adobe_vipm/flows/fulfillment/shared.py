@@ -10,6 +10,7 @@ from operator import itemgetter
 from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     STATUS_3YC_ACTIVE,
@@ -24,7 +25,12 @@ from adobe_vipm.adobe.utils import (
     sanitize_company_name,
     sanitize_first_last_name,
 )
-from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
+from adobe_vipm.flows.airtable import (
+    get_gc_agreement_deployments_by_main_agreement,
+    get_gc_main_agreement,
+    get_prices_for_3yc_skus,
+    get_prices_for_skus,
+)
 from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -45,9 +51,9 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
+    get_order_subscription_by_external_id,
     get_product_template_or_default,
     get_rendered_template,
-    get_subscription_by_external_id,
     query_order,
     set_processing_template,
     update_agreement,
@@ -58,6 +64,7 @@ from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
+    get_adobe_membership_id,
     get_coterm_date,
     get_due_date,
     get_next_sync,
@@ -66,6 +73,7 @@ from adobe_vipm.flows.utils import (
     get_order_line_by_sku,
     get_price_item_by_line_sku,
     get_subscription_by_line_and_item_id,
+    is_deployment_id_gc_main_agreement_deployment,
     is_renewal_window_open,
     map_returnable_to_return_orders,
     md2html,
@@ -310,7 +318,7 @@ def add_subscription(client, adobe_subscription, order, line):
 
     order_line = get_order_line_by_sku(order, line["offerId"])
 
-    subscription = get_subscription_by_external_id(
+    subscription = get_order_subscription_by_external_id(
         client, order["id"], line["subscriptionId"]
     )
     if not subscription:
@@ -532,6 +540,25 @@ def set_customer_coterm_date_if_null(client, adobe_client, order):
     return order
 
 
+def GetGlobalCustomerAgreementDeploymentForOrder(order):
+    """
+    Get the global customer agreement deployment by the order.
+
+    Args:
+        order (dict): The order for which the global customer agreement deployment
+        must be retrieved.
+
+    Returns:
+        dict: The global customer agreement deployment.
+    """
+    try:
+        product_id = order["agreement"]["product"]["id"]
+        agreement_id = order["agreement"]["id"]
+        return get_gc_agreement_deployments_by_main_agreement(product_id, agreement_id)
+    except Exception:
+        return None
+
+
 class SetupDueDate(Step):
     """
     Setups properly due date
@@ -659,16 +686,42 @@ class SubmitReturnOrders(Step):
 
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
+        config = get_config()
         all_return_orders = []
+        parameters = context.order["parameters"]
+        deployment_id = parameters.get("deploymentId", "")
+        membership_id = get_adobe_membership_id(context.order)
+        authorization_id = context.order["authorization"]["id"]
+        product_id = context.order["agreement"]["product"]["id"]
+        authorization = config.get_authorization(authorization_id)
+        deployment_id = parameters.get("deploymentId", "")
         for sku, returnable_orders in context.adobe_returnable_orders.items():
             return_orders = context.adobe_return_orders.get(sku, [])
             for returnable_order, return_order in map_returnable_to_return_orders(
                 returnable_orders or [], return_orders
             ):
+                gc_main_agreement = get_gc_main_agreement(
+                    product_id,
+                    authorization.authorization_id,
+                    membership_id
+                )
+                gc_main_agreement = {} if gc_main_agreement is None else gc_main_agreement
+                if is_deployment_id_gc_main_agreement_deployment(
+                    gc_main_agreement,
+                    deployment_id,
+                    product_id
+                ):
+                    reason = (
+                        "Upsize/Downsize order is created in the main order "
+                        "for an item with deployment ID"
+                    )
+                    switch_order_to_failed(client, context.order, reason)
+                    logger.info(f"{context}: failed due to {reason}")
+                    return
                 if return_order:
+                    return_order["deploymentId"] = deployment_id
                     all_return_orders.append(return_order)
                     continue
-
                 all_return_orders.append(
                     adobe_client.create_return_order(
                         context.authorization_id,
@@ -676,6 +729,7 @@ class SubmitReturnOrders(Step):
                         returnable_order.order,
                         returnable_order.line,
                         context.order_id,
+                        deployment_id,
                     )
                 )
         pending_orders = [
@@ -732,11 +786,14 @@ class SubmitNewOrder(Step):
             return
         adobe_client = get_adobe_client()
         adobe_order = None
+        parameters = context.order["parameters"]
+        deployment_id = parameters.get("deploymentId", "")
         if not context.adobe_new_order_id:
             adobe_order = adobe_client.create_new_order(
                 context.authorization_id,
                 context.adobe_customer_id,
                 context.adobe_preview_order,
+                deployment_id,
             )
             logger.info(f'{context}: new adobe order created: {adobe_order["orderId"]}')
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
@@ -747,7 +804,7 @@ class SubmitNewOrder(Step):
             adobe_order = adobe_client.get_order(
                 context.authorization_id,
                 context.adobe_customer_id,
-                context.adobe_new_order_id,
+                context.adobe_new_order_id
             )
         context.adobe_new_order = adobe_order
         context.adobe_new_order_id = adobe_order["orderId"]

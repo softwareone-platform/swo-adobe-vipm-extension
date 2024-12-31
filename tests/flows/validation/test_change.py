@@ -415,7 +415,7 @@ def test_validate_change_order(mocker):
         mocked_context,
     )
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     mocker,
     order_factory,
@@ -488,7 +488,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     ] == ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(minimum_licenses=25)
     mocked_next_step.assert_not_called()
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     mocker,
     order_factory,
@@ -556,7 +556,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     ] == ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37)
     mocked_next_step.assert_not_called()
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
     mocker,
     order_factory,

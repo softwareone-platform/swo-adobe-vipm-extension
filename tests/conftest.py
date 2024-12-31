@@ -1160,12 +1160,14 @@ def adobe_order_factory(adobe_items_factory):
         reference_order_id=None,
         status=None,
         creation_date=None,
+        deployment_id="",
     ):
         order = {
             "externalReferenceId": external_id,
             "currencyCode": currency_code,
             "orderType": order_type,
             "lineItems": items or adobe_items_factory(),
+            "deploymentId": deployment_id,
         }
 
         if reference_order_id:

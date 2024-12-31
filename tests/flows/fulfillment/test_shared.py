@@ -14,6 +14,9 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.flows.airtable import (
+    STATUS_GC_PENDING,
+)
 from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -627,13 +630,20 @@ def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
 
 
 def test_submit_return_orders_step(
-    mocker, order_factory, adobe_order_factory, adobe_items_factory
+    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
 ):
     """
     Tests the creation of a return order for a returnable order.
     The newly created return order is still pending of processing by Adobe so
     the processing pipeline will be stopped.
     """
+    api_key = "airtable-token"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base-id"},
+        "ADOBE_CREDENTIALS_FILE": "a-credentials-file.json",
+        "ADOBE_AUTHORIZATIONS_FILE": "an-authorization-file.json",
+    }
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -651,10 +661,49 @@ def test_submit_return_orders_step(
         order_type="RETURN",
         status=STATUS_PENDING,
     )
+
+    gc_agreement_deployments = [
+        {
+            "deployment_id": "deployment-id",
+            "status": "pending",
+            "customer_id": "a-client-id",
+            "product_id": "PRD-1111-1111",
+            "main_agreement_id": "AGR-2119-4550-8674-5962",
+            "account_id": "",
+            "seller_id": "",
+            "membership_id": "membership-id",
+            "transfer_id": "a-transfer-id",
+            "deployment_currency": "EUR,USD",
+            "deployment_country": "DE",
+        },
+        {
+            "deployment_id": "deployment-id-2",
+            "status": "pending",
+            "customer_id": "a-client-id",
+            "product_id": "PRD-1111-1111",
+            "main_agreement_id": "AGR-2119-4550-8674-5962",
+            "account_id": "",
+            "seller_id": "",
+            "membership_id": "membership-id",
+            "transfer_id": "a-transfer-id-2",
+            "deployment_currency": "EUR",
+            "deployment_country": "ES",
+        },
+    ]
+
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_gc_main_agreement",
+        return_value=None,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_gc_agreement_deployments_by_main_agreement",
+        return_value=gc_agreement_deployments,
+    )
+
     order = order_factory()
     context = Context(
         order=order,
@@ -676,18 +725,230 @@ def test_submit_return_orders_step(
         ret_info_1.order,
         ret_info_1.line,
         context.order["id"],
+        "",
     )
 
     mocked_next_step.assert_not_called()
 
 
+def test_submit_return_orders_step_with_deployment_id(
+    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
+):
+    """
+    Tests the creation of a return order for a returnable order.
+    The newly created return order is still pending of processing by Adobe so
+    the processing pipeline will be stopped.
+    """
+    deployment_id = "deployment-id-1"
+    api_key = "airtable-token"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base-id"},
+        "ADOBE_CREDENTIALS_FILE": "a-credentials-file.json",
+        "ADOBE_AUTHORIZATIONS_FILE": "an-authorization-file.json",
+    }
+    adobe_order_1 = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(quantity=1),
+        status=STATUS_PROCESSED,
+        deployment_id=deployment_id,
+    )
+    ret_info_1 = ReturnableOrderInfo(
+        adobe_order_1,
+        adobe_order_1["lineItems"][0],
+        adobe_order_1["lineItems"][0]["quantity"],
+    )
+    sku = adobe_order_1["lineItems"][0]["offerId"][:10]
+
+    mocked_gc_main_agreement = {
+        "membership_id": "membership-id",
+        "main_agreement_id": "main-agreement-id",
+        "transfer_id": "transfer-id",
+        "status": STATUS_GC_PENDING,
+        "error_description": "",
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN",
+        status=STATUS_PENDING,
+    )
+
+    gc_agreement_deployments = [
+        {
+            "deployment_id": "deployment-id",
+            "status": "pending",
+            "customer_id": "a-client-id",
+            "product_id": "PRD-1111-1111",
+            "main_agreement_id": "main-agreement-id",
+            "account_id": "",
+            "seller_id": "",
+            "membership_id": "membership-id",
+            "transfer_id": "transfer-id",
+            "deployment_currency": "EUR,USD",
+            "deployment_country": "DE",
+        },
+        {
+            "deployment_id": "deployment-id-1",
+            "status": "pending",
+            "customer_id": "a-client-id",
+            "product_id": "PRD-1111-1111",
+            "main_agreement_id": "main-agreement-id",
+            "account_id": "",
+            "seller_id": "",
+            "membership_id": "membership-id",
+            "transfer_id": "transfer-id-1",
+            "deployment_currency": "EUR",
+            "deployment_country": "ES",
+        },
+    ]
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_gc_main_agreement",
+        return_value=mocked_gc_main_agreement,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.get_gc_agreement_deployments_by_main_agreement",
+        return_value=gc_agreement_deployments,
+    )
+
+    order = order_factory()
+    order["parameters"]["deploymentId"] = deployment_id
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1,)},
+        adobe_return_orders={},
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    step = SubmitReturnOrders()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.create_return_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        ret_info_1.order,
+        ret_info_1.line,
+        context.order["id"],
+        deployment_id,
+    )
+
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_return_orders_step_with_only_main_deployment_id(
+    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
+):
+    """
+    Tests the creation of a return order for a returnable order.
+    The newly created return order is still pending of processing by Adobe so
+    the processing pipeline will be stopped.
+    """
+    deployment_id = "deployment-id"
+    api_key = "airtable-token"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base-id"},
+        "ADOBE_CREDENTIALS_FILE": "a-credentials-file.json",
+        "ADOBE_AUTHORIZATIONS_FILE": "an-authorization-file.json",
+    }
+    adobe_order_1 = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(quantity=1),
+        status=STATUS_PROCESSED,
+        deployment_id=deployment_id,
+    )
+    ret_info_1 = ReturnableOrderInfo(
+        adobe_order_1,
+        adobe_order_1["lineItems"][0],
+        adobe_order_1["lineItems"][0]["quantity"],
+    )
+    sku = adobe_order_1["lineItems"][0]["offerId"][:10]
+
+    mocked_gc_main_agreement = {
+        "membership_id": "membership-id",
+        "main_agreement_id": "main-agreement-id",
+        "transfer_id": "transfer-id",
+        "status": STATUS_GC_PENDING,
+        "error_description": "",
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN",
+        status=STATUS_PENDING,
+    )
+
+    gc_agreement_deployments = [
+        {
+            "deployment_id": "deployment-id",
+            "status": "pending",
+            "customer_id": "client-id",
+            "product_id": "PRD-1111-1111",
+            "main_agreement_id": "main-agreement-id",
+            "account_id": "",
+            "seller_id": "",
+            "membership_id": "membership-id",
+            "transfer_id": "transfer-id",
+            "deployment_currency": "EUR,USD",
+            "deployment_country": "DE",
+        },
+    ]
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_gc_main_agreement",
+        return_value=mocked_gc_main_agreement,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.get_gc_agreement_deployments_by_main_agreement",
+        return_value=gc_agreement_deployments,
+    )
+
+    order = order_factory()
+    order["parameters"]["deploymentId"] = deployment_id
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1,)},
+        adobe_return_orders={},
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    step = SubmitReturnOrders()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.create_return_order.assert_not_called()
+
+    mocked_next_step.assert_not_called()
+
+
 def test_submit_return_orders_step_order_processed(
-    mocker, order_factory, adobe_order_factory, adobe_items_factory
+    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
 ):
     """
     Tests that all return orders previously created have been processed
     and the order processing pipeline will continue.
     """
+    api_key = "airtable-token"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base-id"},
+    }
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -712,6 +973,10 @@ def test_submit_return_orders_step_order_processed(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_gc_main_agreement",
+        return_value=None,
+    )
     order = order_factory()
     context = Context(
         order=order,
@@ -732,7 +997,7 @@ def test_submit_return_orders_step_order_processed(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
+def test_submit_new_order_step(mocker, order_factory, adobe_order_factory, settings):
     """
     Test the creation of an Adobe new order.
     The Adobe new order id is saved as the vendor external id of the order.
@@ -752,6 +1017,10 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
     mocked_update = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_gc_main_agreement",
+        return_value=None,
+    )
 
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -763,6 +1032,7 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
         adobe_preview_order=preview_order,
+        deployment_id="",
     )
 
     step = SubmitNewOrder()
@@ -772,6 +1042,71 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
         context.authorization_id,
         context.adobe_customer_id,
         preview_order,
+        "",
+    )
+
+    mocked_update.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        externalIds=context.order["externalIds"],
+    )
+    assert get_adobe_order_id(context.order) == new_order["orderId"]
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_new_order_step_with_deployment_id(
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    settings
+):
+    """
+    Test the creation of an Adobe new order.
+    The Adobe new order id is saved as the vendor external id of the order.
+    The created new order is still in processing so the order processing pipeline will stop.
+    """
+    deployment_id = "deployment-id"
+
+    order = order_factory()
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_new_order.return_value = new_order
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_update = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_gc_main_agreement",
+        return_value=None,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+        adobe_preview_order=preview_order,
+        deployment_id=deployment_id,
+    )
+
+    step = SubmitNewOrder()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.create_new_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        preview_order,
+        "",
     )
 
     mocked_update.assert_called_once_with(
@@ -820,6 +1155,64 @@ def test_submit_new_order_step_order_created_and_processed(
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
+        deployment_id="",
+    )
+
+    step = SubmitNewOrder()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.get_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        context.adobe_new_order_id,
+    )
+    mocked_adobe_client.create_preview_order.assert_not_called()
+    mocked_adobe_client.create_new_order.assert_not_called()
+    mocked_update.assert_not_called()
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
+    mocker,
+    order_factory,
+    adobe_order_factory,
+):
+    """
+    Test that if the NEW order has already been created no new order will be sumbitted to Adobe.
+    Furthermore it retrieves the NEW order from Adobe and since it has been processed, the
+    order processing pipeline will continue.
+    """
+
+    deployment_id = "deployment-id"
+
+    new_order = adobe_order_factory(
+        order_type="NEW",
+        status=STATUS_PROCESSED,
+    )
+    order = order_factory(external_ids={"vendor": new_order["orderId"]})
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_order.return_value = new_order
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_update = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        adobe_new_order_id=new_order["orderId"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+        deployment_id=deployment_id,
     )
 
     step = SubmitNewOrder()
@@ -1373,7 +1766,7 @@ def test_update_prices_step(
         ],
     )
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_update_prices_step_3yc(
     mocker,
     order_factory,
@@ -1381,10 +1774,17 @@ def test_update_prices_step_3yc(
     adobe_customer_factory,
     adobe_commitment_factory,
     adobe_order_factory,
+    settings,
 ):
     """
     Tests that prices are updated according to actual sku when the customer has the 3yc benefit.
     """
+    api_key = "airtable-token"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base-id"},
+        "AIRTABLE_PRICING_BASES": {"PRD-1111-1111": "pricing-base-id"},
+    }
     line_1 = lines_factory()[0]
     line_2 = lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA")[0]
     order = order_factory(

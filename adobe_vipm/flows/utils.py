@@ -1,3 +1,4 @@
+
 import copy
 import functools
 from datetime import date, datetime, timedelta
@@ -13,6 +14,7 @@ from adobe_vipm.adobe.constants import (
     OFFER_TYPE_LICENSE,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
 )
+from adobe_vipm.flows.airtable import get_gc_agreement_deployments_by_main_agreement
 from adobe_vipm.flows.constants import (
     NEW_CUSTOMER_PARAMETERS,
     OPTIONAL_CUSTOMER_ORDER_PARAMS,
@@ -824,6 +826,21 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
     }
     return order_line_map != adobe_items_map
 
+def get_global_customer(order):
+    """
+    Get the globalCustomer parameter from the order.
+    Args:
+        order (dict): The order to update.
+
+    Returns:
+        string: The value of the globalCustomer parameter.
+    """
+    global_customer_param = get_fulfillment_parameter(
+        order,
+        PARAM_GLOBAL_CUSTOMER,
+    )
+    return global_customer_param.get("value")
+
 
 def set_global_customer(order, global_sales_enabled):
     """
@@ -844,6 +861,22 @@ def set_global_customer(order, global_sales_enabled):
     return updated_order
 
 
+def get_deployments(order):
+    """
+    Get the deployments parameter from the order.
+    Args:
+        order (dict): The order to update.
+
+    Returns:
+        list: List of deployments.
+    """
+    deployments_param = get_fulfillment_parameter(
+        order,
+        PARAM_DEPLOYMENTS,
+    )
+    return deployments_param.get("value").split(",") if deployments_param.get("value") else []
+
+
 def set_deployments(order, deployments):
     """
     Set the deployments parameter on the order.
@@ -859,7 +892,68 @@ def set_deployments(order, deployments):
         updated_order,
         PARAM_DEPLOYMENTS,
     )
-    deployments.append("test1")
-    deployments.append("test2")
     deployments_param["value"] = ",".join(deployments)
     return updated_order
+
+
+def exclude_items_with_deployment_id(adobe_transfer):
+    """
+    Excludes items with deployment ID from the transfer order.
+
+    Args:
+        adobe_transfer (dict): The Adobe transfer order.
+
+    Returns:
+        dict: The Adobe transfer order with items without deployment ID.
+    """
+    line_items = [
+        item for item in adobe_transfer["lineItems"] if not item.get("deploymentId", "")
+    ]
+    adobe_transfer["lineItems"] = line_items
+    return adobe_transfer
+
+
+def exclude_subscriptions_with_deployment_id(adobe_subscriptions):
+    """
+    Excludes subscriptions with deployment ID from the Adobe customer subscriptions.
+
+    Args:
+        adobe_subscriptions (dict): The Adobe customer subscriptions.
+
+    Returns:
+        dict: The Adobe customer subscriptions with subscriptions without deployment ID.
+    """
+    items = [
+        item
+        for item in adobe_subscriptions["items"]
+        if not item.get("deploymentId", "")
+    ]
+    adobe_subscriptions["items"] = items
+    return adobe_subscriptions
+
+
+def is_deployment_id_gc_main_agreement_deployment(
+    gc_main_agreement,
+    deployment_id,
+    product_id,
+):
+    gc_transfer_id = ""
+    gc_deployment_id = ""
+    if gc_main_agreement and deployment_id:
+        gc_main_agreement_transfer_id = gc_main_agreement.get("transfer_id", "")
+        gc_main_agreement_id = gc_main_agreement.get("main_agreement_id", "")
+        gc_deployments = get_gc_agreement_deployments_by_main_agreement(
+            product_id, gc_main_agreement_id
+        )
+        if gc_deployments:
+            gc_deployment = next(
+                x for x in gc_deployments if x["deployment_id"] == deployment_id
+            )
+            gc_transfer_id = gc_deployment["transfer_id"] if gc_deployment else ""
+            gc_deployment_id = gc_deployment["deployment_id"] if gc_deployment else ""
+        if (
+            gc_transfer_id == gc_main_agreement_transfer_id and
+            gc_deployment_id != ""
+        ):
+            return True
+    return False

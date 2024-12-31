@@ -61,6 +61,7 @@ PARAM_PHASE_ORDERING = "ordering"
 PARAM_PHASE_FULFILLMENT = "fulfillment"
 
 CANCELLATION_WINDOW_DAYS = 14
+GLOBAL_SUFFIX = "_global"
 
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
 
@@ -241,4 +242,8 @@ ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
     "VIPMV014",
     "Do not add or remove items, and do not modify the quantities of any items. "
     "You may make these changes using a Change order once this order completes.",
+)
+
+ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
+    "No subscriptions found without deployment ID to be added to the main agreement",
 )

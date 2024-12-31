@@ -401,9 +401,15 @@ def test_create_new_order(
     ]
     customer_id = "a-customer"
 
+    deployment_id = "a_deployment_id"
+
     client, authorization, api_token = adobe_client_factory()
 
-    adobe_order = adobe_order_factory(ORDER_TYPE_NEW, external_id="mpt-order-id")
+    adobe_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        external_id="mpt-order-id",
+        deployment_id=deployment_id
+    )
 
     requests_mocker.post(
         urljoin(
@@ -433,6 +439,7 @@ def test_create_new_order(
         authorization_uk,
         customer_id,
         adobe_order,
+        deployment_id,
     )
     assert new_order == {
         "orderId": "adobe-order-id",
