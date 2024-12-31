@@ -242,3 +242,7 @@ ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
     "Do not add or remove items, and do not modify the quantities of any items. "
     "You may make these changes using a Change order once this order completes.",
 )
+
+ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
+    "No subscriptions found without deployment ID to be added to the main agreement",
+)

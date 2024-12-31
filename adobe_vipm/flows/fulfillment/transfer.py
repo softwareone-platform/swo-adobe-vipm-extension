@@ -68,6 +68,8 @@ from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
+    exclude_items_with_deployment_id,
+    exclude_subscriptions_with_deployment_id,
     get_adobe_customer_id,
     get_adobe_membership_id,
     get_adobe_order_id,
@@ -393,42 +395,6 @@ def _create_new_adobe_order(
 
     context = Context(order=order)
     pipeline.run(mpt_client, context)
-
-
-def exclude_items_with_deployment_id(adobe_transfer):
-    """
-    Excludes items with deployment ID from the transfer order.
-
-    Args:
-        adobe_transfer (dict): The Adobe transfer order.
-
-    Returns:
-        dict: The Adobe transfer order with items without deployment ID.
-    """
-    line_items = [
-        item for item in adobe_transfer["lineItems"] if not item.get("deploymentId", "")
-    ]
-    adobe_transfer["lineItems"] = line_items
-    return adobe_transfer
-
-
-def exclude_subscriptions_with_deployment_id(adobe_subscriptions):
-    """
-    Excludes subscriptions with deployment ID from the Adobe customer subscriptions.
-
-    Args:
-        adobe_subscriptions (dict): The Adobe customer subscriptions.
-
-    Returns:
-        dict: The Adobe customer subscriptions with subscriptions without deployment ID.
-    """
-    items = [
-        item
-        for item in adobe_subscriptions["items"]
-        if not item.get("deploymentId", "")
-    ]
-    adobe_subscriptions["items"] = items
-    return adobe_subscriptions
 
 
 def _transfer_migrated(

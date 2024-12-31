@@ -1567,3 +1567,61 @@ def test_validate_transfer_already_migrated_no_items_add_line(
     )
 
     assert len(validated_order["lines"]) == len(lines)
+
+
+def test_validate_transfer_already_migrated_items_with_deployment(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    adobe_authorizations_file,
+):
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.customer_id = "customer-id"
+
+    m_client = mocker.MagicMock()
+
+    mocked_get_transfer = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
+        return_value="65304578CA03A12",
+    )
+    adobe_subscription = adobe_subscription_factory(deployment_id="deployment-id")
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription],
+    }
+    mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
+        global_sales_enabled=True
+    )
+
+    has_errors, validated_order = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+
+    membership_param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+
+    assert has_errors is True
+    assert membership_param["error"] == {
+        "id": "VIPMA005",
+        "message": "The `Membership Id` is not valid: ('No subscriptions found"
+        " without deployment ID to be added to the main agreement',).",
+    }
+
+    mocked_get_transfer.assert_called_once_with(
+        validated_order["agreement"]["product"]["id"],
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
+        membership_param["value"],
+    )
+    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+        adobe_authorizations_file["authorizations"][0]["authorization_id"],
+        mocked_transfer.customer_id,
+    )
