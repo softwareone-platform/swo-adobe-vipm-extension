@@ -169,7 +169,7 @@ def test_send_email(mocker, settings):
     mocked_ses_client.send_email.assert_called_once_with(
         Source="mpt@domain.com",
         Destination={
-            "ToAddresses": ["customer@domain.com"],
+            "ToAddresses": "customer@domain.com",
         },
         Message={
             "Subject": {"Data": "email-subject", "Charset": "UTF-8"},

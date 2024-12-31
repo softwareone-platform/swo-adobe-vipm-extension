@@ -36,6 +36,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     send_email_notification,
+    send_gc_email_notification,
     set_customer_coterm_date_if_null,
     start_processing_attempt,
 )
@@ -90,7 +91,7 @@ def test_send_email_notification(mocker, settings, order_factory, status, subjec
     mocked_get_rendered_template.assert_called_once_with(mocked_mpt_client, order["id"])
 
     mocked_send_email.assert_called_once_with(
-        get_notifications_recipient(order),
+        [get_notifications_recipient(order)],
         subject,
         "email",
         {
@@ -1774,3 +1775,67 @@ def test_get_preview_order_step_adobe_error(
         mocked_client, context.order, str(error)
     )
     mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("status", "subject"),
+    [
+        (
+            "Processing",
+            "This order need your attention ORD-1234 for A buyer",
+        )
+    ],
+)
+def test_send_gc_email_notification(mocker, settings, order_factory, status, subject):
+    settings.EXTENSION_CONFIG = {
+        "EMAIL_NOTIFICATIONS_ENABLED": "1",
+        "GC_EMAIL_NOTIFICATIONS_RECIPIENT": "test@mail.com,test1@mail.com",
+    }
+    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
+
+    order = order_factory(order_id="ORD-1234", status=status)
+
+    send_gc_email_notification(order, ["deployment 1"])
+
+    mocked_send_email.assert_called_once_with(
+        settings.EXTENSION_CONFIG.get("GC_EMAIL_NOTIFICATIONS_RECIPIENT", "").split(
+            ","
+        ),
+        subject,
+        "email",
+        {
+            "order": order,
+            "activation_template": "This order needs your attention because it contains"
+            " items with a deployment ID associated. Please remove "
+            "the following items with deployment associated manually."
+            " <ul>\n\t<li>deployment 1</li>\n</ul>Then, change the main "
+            "agreement status to 'pending' on Airtable.",
+            "api_base_url": settings.MPT_API_BASE_URL,
+            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "subject"),
+    [
+        (
+            "Processing",
+            "This order need your attention ORD-1234 for A buyer",
+        )
+    ],
+)
+def test_send_gc_email_notification_not_recipient(
+    mocker, settings, order_factory, status, subject
+):
+    settings.EXTENSION_CONFIG = {
+        "EMAIL_NOTIFICATIONS_ENABLED": "1",
+        "GC_EMAIL_NOTIFICATIONS_RECIPIENT": "",
+    }
+    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
+
+    order = order_factory(order_id="ORD-1234", status=status)
+
+    send_gc_email_notification(order, ["deployment 1"])
+
+    mocked_send_email.assert_not_called()

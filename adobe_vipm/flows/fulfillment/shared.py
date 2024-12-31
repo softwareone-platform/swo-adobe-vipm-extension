@@ -498,7 +498,7 @@ def send_email_notification(client, order):
                 f"for {order['agreement']['buyer']['name']}"
             )
         send_email(
-            recipient,
+            [recipient],
             subject,
             "email",
             context,
@@ -990,3 +990,57 @@ class ValidateDuplicateLines(Step):
             return
 
         next_step(client, context)
+
+
+def send_gc_email_notification(order, items_with_deployment):
+    """
+    Send a notification email to the customer according to the
+    current order status.
+    It embeds the current order template into the email body.
+
+    Args:
+        items_with_deployment (list): The list of items with deployment ID.
+        order (dict): The order for which the notification should be sent.
+    """
+    email_notification_enabled = bool(
+        settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
+    )
+
+    if email_notification_enabled:
+        recipient = settings.EXTENSION_CONFIG.get(
+            "GC_EMAIL_NOTIFICATIONS_RECIPIENT", None
+        )
+        if not recipient:
+            logger.warning(
+                f"Cannot send Global Customer email notifications for order {order['id']}: "
+                f"no recipient found"
+            )
+            return
+        recipient = recipient.split(",")
+        items = (
+            "<ul>\n"
+            + "\n".join(f"\t<li>{item}</li>" for item in items_with_deployment)
+            + "\n</ul>"
+        )
+
+        context = {
+            "order": order,
+            "activation_template": "This order needs your attention because it contains items with "
+            "a deployment ID associated. Please remove the following items with "
+            f"deployment associated manually. {items}"
+            "Then, change the main agreement status to 'pending' on Airtable.",
+            "api_base_url": settings.MPT_API_BASE_URL,
+            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+        }
+
+        subject = (
+            f"This order need your attention {order['id']} "
+            f"for {order['agreement']['buyer']['name']}"
+        )
+
+        send_email(
+            recipient,
+            subject,
+            "email",
+            context,
+        )

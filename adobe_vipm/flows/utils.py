@@ -32,7 +32,9 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
+    PARAM_DEPLOYMENTS,
     PARAM_DUE_DATE,
+    PARAM_GLOBAL_CUSTOMER,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
@@ -821,3 +823,43 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
         for adobe_item in adobe_items
     }
     return order_line_map != adobe_items_map
+
+
+def set_global_customer(order, global_sales_enabled):
+    """
+    Set the globalCustomer parameter on the order.
+    Args:
+        order (dict): The order to update.
+        global_sales_enabled (string): The value to set.
+
+    Returns:
+        dict: The updated order.
+    """
+    updated_order = copy.deepcopy(order)
+    global_customer_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_GLOBAL_CUSTOMER,
+    )
+    global_customer_param["value"] = [global_sales_enabled]
+    return updated_order
+
+
+def set_deployments(order, deployments):
+    """
+    Set the deployments parameter on the order.
+    Args:
+        order (dict): The order to update.
+        deployments (list): The value to set.
+
+    Returns:
+        dict: The updated order.
+    """
+    updated_order = copy.deepcopy(order)
+    deployments_param = get_fulfillment_parameter(
+        updated_order,
+        PARAM_DEPLOYMENTS,
+    )
+    deployments.append("test1")
+    deployments.append("test2")
+    deployments_param["value"] = ",".join(deployments)
+    return updated_order

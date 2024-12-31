@@ -129,7 +129,7 @@ def send_email(recipient, subject, template_name, context):
         client.send_email(
             Source=settings.EXTENSION_CONFIG["EMAIL_NOTIFICATIONS_SENDER"],
             Destination={
-                "ToAddresses": [recipient],
+                "ToAddresses": recipient,
             },
             Message={
                 "Subject": {"Data": subject, "Charset": "UTF-8"},
