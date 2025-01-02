@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 import pytest
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import STATUS_3YC_ACCEPTED
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
@@ -329,7 +330,7 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
     )
     mocked_next_step.assert_not_called()
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     mocker,
     order_factory,
@@ -407,7 +408,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     )
     mocked_next_step.assert_not_called()
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     mocker,
     order_factory,
@@ -481,7 +482,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     )
     mocked_next_step.assert_not_called()
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
     mocker,
     order_factory,
@@ -556,7 +557,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
     )
     mocked_next_step.assert_not_called()
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_item_not_found(
     mocker,
     order_factory,

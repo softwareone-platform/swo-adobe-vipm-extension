@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.sync import (
@@ -425,7 +426,7 @@ def test_sync_agreements_by_next_sync(mocker, agreement_factory, dry_run):
         dry_run,
     )
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_sync_agreement_prices_with_3yc(
     mocker,
     agreement_factory,

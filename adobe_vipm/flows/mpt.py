@@ -126,7 +126,9 @@ def update_subscription(mpt_client, order_id, subscription_id, **kwargs):
 
 
 @wrap_http_error
-def get_subscription_by_external_id(mpt_client, order_id, subscription_external_id):
+def get_order_subscription_by_external_id(
+    mpt_client, order_id, subscription_external_id
+):
     response = mpt_client.get(
         f"/commerce/orders/{order_id}/subscriptions?eq(externalIds.vendor,{subscription_external_id})&limit=1",
     )
@@ -413,3 +415,87 @@ def get_all_agreements(
         mpt_client,
         f"and(eq(status,Active),{product_condition})&select=lines,parameters,subscriptions,product,listing",
     )
+
+
+@wrap_http_error
+def get_authorizations_by_currency_and_seller_id(
+    mpt_client, product_id, currency, owner_id
+):
+    authorization_filter = (f"eq(product.id,{product_id})&eq(currency,{currency})"
+                            f"&eq(owner.id,{owner_id})")
+    response = mpt_client.get(f"/catalog/authorizations?{authorization_filter}")
+    response.raise_for_status()
+    return response.json()["data"]
+
+
+@wrap_http_error
+def get_gc_price_list_by_currency(mpt_client, product_id, currency):
+    response = mpt_client.get(
+        f"/catalog/price-lists?eq(product.id,{product_id})&eq(currency,{currency})"
+    )
+    response.raise_for_status()
+    return response.json()["data"]
+
+
+@wrap_http_error
+def get_listings_by_currency_and_by_seller_id(
+    mpt_client, product_id, currency, seller_id
+):
+    response = mpt_client.get(
+        f"/catalog/listings?eq(product.id,{product_id})&eq(priceList.currency,{currency})"
+        f"&eq(seller.id,{seller_id})"
+        f"&eq(authorization.currency,{currency})&eq(primary,True)"
+    )
+    response.raise_for_status()
+    return response.json()["data"]
+
+
+@wrap_http_error
+def create_listing(mpt_client, listing):
+    response = mpt_client.post(
+        "/commerce/listings",
+        json=listing,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def create_agreement(mpt_client, agreement):
+    response = mpt_client.post(
+        "/commerce/agreements",
+        json=agreement,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def create_agreement_subscription(mpt_client, subscription):
+    response = mpt_client.post(
+        "/commerce/subscriptions",
+        json=subscription,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def get_listing_by_id(mpt_client, listing_id):
+    response = mpt_client.get(f"/catalog/listings/{listing_id}")
+    response.raise_for_status()
+    return response.json()
+
+
+@wrap_http_error
+def get_agreement_subscription_by_external_id(mpt_client, agreement_id, subscription_external_id):
+    response = mpt_client.get(
+        f"/commerce/subscriptions?eq(externalIds.vendor,{subscription_external_id})"
+        f"&eq(agreement.id,{agreement_id})"
+        f"&in(status,(Active,Updating))"
+        f"&select=agreement.id&limit=1"
+    )
+
+    response.raise_for_status()
+    subscriptions = response.json()
+    return subscriptions["data"][0] if subscriptions["data"] else None

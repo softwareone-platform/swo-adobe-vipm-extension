@@ -24,10 +24,14 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.mpt import (
     complete_order,
+    create_agreement,
+    create_agreement_subscription,
+    create_listing,
     create_subscription,
     fail_order,
     get_agreement,
     get_agreement_subscription,
+    get_agreement_subscription_by_external_id,
     get_agreements_by_3yc_commitment_request_status,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
@@ -35,12 +39,16 @@ from adobe_vipm.flows.mpt import (
     get_agreements_for_3yc_recommitment,
     get_agreements_for_3yc_resubmit,
     get_all_agreements,
+    get_authorizations_by_currency_and_seller_id,
+    get_gc_price_list_by_currency,
     get_licensee,
+    get_listing_by_id,
+    get_listings_by_currency_and_by_seller_id,
+    get_order_subscription_by_external_id,
     get_product_items_by_skus,
     get_product_onetime_items_by_ids,
     get_product_template_or_default,
     get_rendered_template,
-    get_subscription_by_external_id,
     get_webhook,
     query_order,
     update_agreement,
@@ -425,7 +433,7 @@ def test_get_webhoook(mpt_client, requests_mocker, webhook):
         (1, [{"id": "SUB-1234"}], {"id": "SUB-1234"}),
     ],
 )
-def test_get_subscription_by_external_id(
+def test_get_order_subscription_by_external_id(
     mpt_client, requests_mocker, total, data, expected
 ):
     requests_mocker.get(
@@ -446,7 +454,8 @@ def test_get_subscription_by_external_id(
     )
 
     assert (
-        get_subscription_by_external_id(mpt_client, "ORD-1234", "a-sub-id") == expected
+        get_order_subscription_by_external_id(mpt_client, "ORD-1234", "a-sub-id")
+        == expected
     )
 
 
@@ -1011,3 +1020,160 @@ def test_get_licensee_error(mpt_client, requests_mocker, mpt_error_factory):
         get_licensee(mpt_client, "LIC-1234")
 
     assert cv.value.payload["status"] == 404
+
+
+def test_get_authorizations_by_currency_and_seller_id(mpt_client, requests_mocker):
+    product_id = "product_id"
+    currency = "currency"
+    owner_id = "owner_id"
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            f"catalog/authorizations?eq(product.id,{product_id})"
+            f"&eq(currency,{currency})&eq(owner.id,{owner_id})",
+        ),
+        json={"data": []},
+    )
+
+    assert (
+        get_authorizations_by_currency_and_seller_id(
+            mpt_client, product_id, currency, owner_id
+        )
+        == []
+    )
+
+
+def test_get_gc_price_list_by_currency(mpt_client, requests_mocker):
+    product_id = "product_id"
+    currency = "currency"
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            f"catalog/price-lists?eq(product.id,{product_id})&eq(currency,{currency})",
+        ),
+        json={"data": []},
+    )
+
+    assert get_gc_price_list_by_currency(mpt_client, product_id, currency) == []
+
+
+def test_get_listings_by_currency_and_by_seller_id(mpt_client, requests_mocker):
+    product_id = "product_id"
+    currency = "currency"
+    seller_id = "seller_id"
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            f"catalog/listings?eq(product.id,{product_id})&"
+            f"eq(priceList.currency,{currency})&eq(seller.id,{seller_id})&"
+            f"q(authorization.currency,{currency})&eq(primary,True)",
+        ),
+        json={"data": []},
+    )
+
+    assert (
+        get_listings_by_currency_and_by_seller_id(
+            mpt_client, product_id, currency, seller_id
+        )
+        == []
+    )
+
+
+def test_get_listing_by_id(mpt_client, requests_mocker):
+    listing_id = "listing_id"
+
+    requests_mocker.get(
+        urljoin(mpt_client.base_url, f"catalog/listings/{listing_id}"),
+        json={"data": []},
+    )
+
+    assert get_listing_by_id(mpt_client, listing_id) == {"data": []}
+
+
+def test_get_subscription_by_external_id(
+    mpt_client, requests_mocker, subscriptions_factory
+):
+    subscription_external_id = "subscription_external_id"
+    agreement_id = "agreement_id"
+    subscriptions = subscriptions_factory()
+
+    requests_mocker.get(
+        urljoin(
+            mpt_client.base_url,
+            f"commerce/subscriptions?eq(externalIds.vendor,{subscription_external_id})"
+            f"&eq(agreement.id,{agreement_id})"
+            f"&in(status,(Active,Updating))"
+            f"&select=agreement.id&limit=1",
+        ),
+        json={
+            "$meta": {
+                "pagination": {
+                    "offset": 0,
+                    "limit": 10,
+                    "total": 1,
+                },
+            },
+            "data": subscriptions,
+        },
+    )
+
+    assert (
+        get_agreement_subscription_by_external_id(
+            mpt_client, agreement_id, subscription_external_id
+        )
+        == subscriptions[0]
+    )
+
+
+def test_create_listing(mpt_client, requests_mocker):
+    listing = {
+        "authorization": {"id": "authorization_id"},
+        "priceList": {"id": "price_list_id"},
+        "product": {"id": "product_id"},
+        "seller": {"id": "seller_id"},
+        "notes": "",
+        "primary": True,
+    }
+    requests_mocker.post(
+        urljoin(mpt_client.base_url, "commerce/listings"),
+        json=listing,
+        status=201,
+        match=[
+            matchers.json_params_matcher(listing),
+        ],
+    )
+
+    created_listing = create_listing(mpt_client, listing)
+    assert created_listing == listing
+
+
+def test_create_agreement(mpt_client, requests_mocker, agreement):
+
+    requests_mocker.post(
+        urljoin(mpt_client.base_url, "commerce/agreements"),
+        json=agreement,
+        status=201,
+        match=[
+            matchers.json_params_matcher(agreement),
+        ],
+    )
+
+    created_agreement = create_agreement(mpt_client, agreement)
+    assert created_agreement == agreement
+
+
+def test_create_agreement_subscription(
+    mpt_client, requests_mocker, subscriptions_factory
+):
+    subscription = subscriptions_factory()
+    requests_mocker.post(
+        urljoin(mpt_client.base_url, "commerce/subscriptions"),
+        json=subscription,
+        status=201,
+        match=[
+            matchers.json_params_matcher(subscription),
+        ],
+    )
+
+    created_subscription = create_agreement_subscription(mpt_client, subscription)
+    assert created_subscription == subscription
