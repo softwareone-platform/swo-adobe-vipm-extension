@@ -1373,7 +1373,7 @@ def test_update_prices_step(
         ],
     )
 
-
+@freeze_time("2024-11-09 12:30:00")
 def test_update_prices_step_3yc(
     mocker,
     order_factory,

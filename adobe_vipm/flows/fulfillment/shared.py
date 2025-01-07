@@ -45,9 +45,9 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
+    get_order_subscription_by_external_id,
     get_product_template_or_default,
     get_rendered_template,
-    get_subscription_by_external_id,
     query_order,
     set_processing_template,
     update_agreement,
@@ -310,7 +310,7 @@ def add_subscription(client, adobe_subscription, order, line):
 
     order_line = get_order_line_by_sku(order, line["offerId"])
 
-    subscription = get_subscription_by_external_id(
+    subscription = get_order_subscription_by_external_id(
         client, order["id"], line["subscriptionId"]
     )
     if not subscription:
