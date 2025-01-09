@@ -859,8 +859,6 @@ def set_deployments(order, deployments):
         updated_order,
         PARAM_DEPLOYMENTS,
     )
-    deployments.append("test1")
-    deployments.append("test2")
     deployments_param["value"] = ",".join(deployments)
     return updated_order
 

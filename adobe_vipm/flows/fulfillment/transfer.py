@@ -239,6 +239,7 @@ def _fulfill_transfer_migrated(
     adobe_transfer,
     one_time_skus,
     gc_main_agreement,
+    customer_deployments
 ):
     authorization_id = order["authorization"]["id"]
     adobe_subscriptions = adobe_client.get_subscriptions(
@@ -311,6 +312,8 @@ def _fulfill_transfer_migrated(
         transfer.transfer_id,
         customer,
     )
+
+    save_gc_parameters(mpt_client, order, gc_main_agreement, customer_deployments)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
@@ -386,11 +389,11 @@ def _create_new_adobe_order(
         CreateOrUpdateSubscriptions(),
         SetOrUpdateCotermNextSyncDates(),
         UpdatePrices(),
-        CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
-        UpdateTransferStatus(transfer, STATUS_SYNCHRONIZED),
         SyncGCMainAgreement(
             transfer, gc_main_agreement, STATUS_GC_CREATED, customer_deployments
         ),
+        CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
+        UpdateTransferStatus(transfer, STATUS_SYNCHRONIZED),
     )
 
     context = Context(order=order)
@@ -504,8 +507,8 @@ def _transfer_migrated(
             adobe_transfer,
             one_time_skus,
             gc_main_agreement,
+            customer_deployments
         )
-        save_gc_parameters(mpt_client, order, gc_main_agreement, customer_deployments)
 
 
 def get_commitment_date(subscription, commitment_date):
@@ -933,7 +936,8 @@ def save_gc_parameters(mpt_client, order, gc_main_agreement, customer_deployment
         return order
 
     deployments = [
-        deployment["deploymentId"] for deployment in customer_deployments["items"]
+        f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
+        for deployment in customer_deployments["items"]
     ]
     order = set_global_customer(order, "Yes")
     order = set_deployments(order, deployments)
