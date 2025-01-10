@@ -10,6 +10,7 @@ from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_sk
 from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_CURRENT_QUANTITY,
+    PARAM_PHASE_FULFILLMENT,
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
 )
@@ -25,17 +26,15 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
+    get_deployments,
+    get_global_customer,
     is_consumables_sku,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def sync_agreement_prices(
-    mpt_client,
-    agreement,
-    dry_run,
-):
+def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer):
     """
     Updates the purchase prices of an Agreement (subscriptions and One-Time items)
     based on the customer discount level and customer benefits (3yc).
@@ -45,35 +44,22 @@ def sync_agreement_prices(
         agreement (dict): The agreement to update.
         dry_run (bool): if True, it just simulate the prices update but doesn't
         perform it.
+        adobe_client (AdobeClient): The client used to consume the Adobe API.
+        customer (dict): The Adobe customer information.
 
     Returns:
         str: Returns the customer coterm date.
     """
+    agreement_id = agreement["id"]
+
     try:
-        adobe_client = get_adobe_client()
         adobe_config = get_config()
-        agreement_id = agreement["id"]
         authorization_id = agreement["authorization"]["id"]
         customer_id = get_adobe_customer_id(agreement)
         currency = agreement["listing"]["priceList"]["currency"]
         product_id = agreement["product"]["id"]
         subscriptions = agreement["subscriptions"]
 
-        logger.info(f"Synchronizing agreement {agreement_id}...")
-
-        processing_subscriptions = list(
-            filter(
-                lambda sub: sub["status"] in ("Updating", "Terminating"), subscriptions
-            ),
-        )
-
-        if len(processing_subscriptions) > 0:
-            logger.info(
-                f"Agreement {agreement_id} has processing subscriptions, skip it"
-            )
-            return
-
-        customer = adobe_client.get_customer(authorization_id, customer_id)
         commitment = get_3yc_commitment(customer)
         commitment_start_date = None
         if (
@@ -248,11 +234,7 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
     """
     agreements = get_agreements_by_next_sync(mpt_client)
     for agreement in agreements:
-        sync_agreement_prices(
-            mpt_client,
-            agreement,
-            dry_run,
-        )
+        sync_agreement(mpt_client, agreement, dry_run)
 
 
 def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
@@ -268,11 +250,70 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
     """
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
-        sync_agreement_prices(
-            mpt_client,
-            agreement,
-            dry_run,
+        sync_agreement(mpt_client, agreement, dry_run)
+
+
+def sync_global_customer_parameters(mpt_client, adobe_client, customer, agreement):
+    if not customer.get("globalSalesEnabled", False):
+        return
+    try:
+        parameters = {PARAM_PHASE_FULFILLMENT: []}
+        global_customer_enabled = get_global_customer(agreement)
+        if global_customer_enabled != ["Yes"]:
+            logger.info(f"Setting global customer for agreement {agreement["id"]}")
+            parameters[PARAM_PHASE_FULFILLMENT].append(
+                {"externalId": "globalCustomer", "value": ["Yes"]}
+            )
+
+        customer_deployments = adobe_client.get_customer_deployments(
+            agreement["authorization"]["id"], customer["customerId"]
         )
+        deployments = [
+            f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
+            for deployment in customer_deployments["items"]
+        ]
+        agreement_deployments = get_deployments(agreement)
+        if deployments != agreement_deployments:
+            parameters[PARAM_PHASE_FULFILLMENT].append(
+                {"externalId": "deployments", "value": ",".join(deployments)}
+            )
+            logger.info(f"Setting deployments for agreement {agreement["id"]}")
+        if parameters[PARAM_PHASE_FULFILLMENT]:
+            update_agreement(mpt_client, agreement["id"], parameters=parameters)
+    except Exception as e:
+        logger.error(
+            f"Error setting global customer parameters for agreement "
+            f"{agreement["id"]}: {e}"
+        )
+
+
+def sync_agreement(mpt_client, agreement, dry_run):
+    try:
+        customer_id = get_adobe_customer_id(agreement)
+        adobe_client = get_adobe_client()
+        logger.info(f"Synchronizing agreement {agreement["id"]}...")
+
+        processing_subscriptions = list(
+            filter(
+                lambda sub: sub["status"] in ("Updating", "Terminating"),
+                agreement["subscriptions"],
+            ),
+        )
+
+        if len(processing_subscriptions) > 0:
+            logger.info(
+                f"Agreement {agreement["id"]} has processing subscriptions, skip it"
+            )
+            return
+
+        customer = adobe_client.get_customer(
+            agreement["authorization"]["id"], customer_id
+        )
+        sync_global_customer_parameters(mpt_client, adobe_client, customer, agreement)
+
+        sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer)
+    except Exception as e:
+        logger.error(f"Error synchronizing agreement {agreement["id"]}: {e}")
 
 
 def sync_all_agreements(mpt_client, dry_run):
@@ -286,8 +327,4 @@ def sync_all_agreements(mpt_client, dry_run):
     """
     agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
-        sync_agreement_prices(
-            mpt_client,
-            agreement,
-            dry_run,
-        )
+        sync_agreement(mpt_client, agreement, dry_run)

@@ -824,6 +824,21 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
     }
     return order_line_map != adobe_items_map
 
+def get_global_customer(order):
+    """
+    Get the globalCustomer parameter from the order.
+    Args:
+        order (dict): The order to update.
+
+    Returns:
+        string: The value of the globalCustomer parameter.
+    """
+    global_customer_param = get_fulfillment_parameter(
+        order,
+        PARAM_GLOBAL_CUSTOMER,
+    )
+    return global_customer_param.get("value")
+
 
 def set_global_customer(order, global_sales_enabled):
     """
@@ -842,6 +857,22 @@ def set_global_customer(order, global_sales_enabled):
     )
     global_customer_param["value"] = [global_sales_enabled]
     return updated_order
+
+
+def get_deployments(order):
+    """
+    Get the deployments parameter from the order.
+    Args:
+        order (dict): The order to update.
+
+    Returns:
+        list: List of deployments.
+    """
+    deployments_param = get_fulfillment_parameter(
+        order,
+        PARAM_DEPLOYMENTS,
+    )
+    return deployments_param.get("value").split(",") if deployments_param.get("value") else []
 
 
 def set_deployments(order, deployments):
