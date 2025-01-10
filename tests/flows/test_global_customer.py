@@ -314,8 +314,8 @@ def test_check_gc_agreement_deployments_get_listing_error(
         errors={"id": ["The value of 'id' does not match expected format."]},
     )
     error = MPTAPIError(400, error_data)
-    mocked_get_listings_by_currency_and_by_seller_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listings_by_currency_and_by_seller_id",
+    mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         side_effect=error,
     )
 
@@ -335,7 +335,7 @@ def test_check_gc_agreement_deployments_get_listing_error(
     check_gc_agreement_deployments()
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
-    mocked_get_listings_by_currency_and_by_seller_id.assert_called_once()
+    mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_create_listing(
@@ -360,8 +360,8 @@ def test_check_gc_agreement_deployments_create_listing(
     )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
 
-    mocked_get_listings_by_currency_and_by_seller_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listings_by_currency_and_by_seller_id",
+    mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[],
     )
 
@@ -413,7 +413,7 @@ def test_check_gc_agreement_deployments_create_listing(
 
     check_gc_agreement_deployments()
     mocked_gc_agreement_deployments_model.all.assert_called_once()
-    mocked_get_listings_by_currency_and_by_seller_id.assert_called_once()
+    mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
@@ -438,8 +438,8 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
     )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
 
-    mocked_get_listings_by_currency_and_by_seller_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listings_by_currency_and_by_seller_id",
+    mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[mocker.MagicMock(), mocker.MagicMock()],
     )
     mocker.patch(
@@ -457,7 +457,7 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
 
     check_gc_agreement_deployments()
     mocked_gc_agreement_deployments_model.all.assert_called_once()
-    mocked_get_listings_by_currency_and_by_seller_id.assert_called_once()
+    mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_create_listing_error(
@@ -474,8 +474,8 @@ def test_check_gc_agreement_deployments_create_listing_error(
     )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
 
-    mocked_get_listings_by_currency_and_by_seller_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listings_by_currency_and_by_seller_id",
+    mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[],
     )
     mocker.patch(
@@ -505,7 +505,7 @@ def test_check_gc_agreement_deployments_create_listing_error(
 
     check_gc_agreement_deployments()
     mocked_gc_agreement_deployments_model.all.assert_called_once()
-    mocked_get_listings_by_currency_and_by_seller_id.assert_called_once()
+    mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
 
 
@@ -531,8 +531,8 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
 
-    mocked_get_listings_by_currency_and_by_seller_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listings_by_currency_and_by_seller_id",
+    mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[mocker.MagicMock()],
     )
 
@@ -581,7 +581,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
 
     check_gc_agreement_deployments()
     mocked_gc_agreement_deployments_model.all.assert_called_once()
-    mocked_get_listings_by_currency_and_by_seller_id.assert_called_once()
+    mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
     mocked_adobe_client.get_customer_deployments.assert_called_once()
@@ -612,8 +612,8 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
 
-    mocked_get_listings_by_currency_and_by_seller_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listings_by_currency_and_by_seller_id",
+    mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[],
     )
 
@@ -669,7 +669,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
 
     check_gc_agreement_deployments()
     mocked_gc_agreement_deployments_model.all.assert_called_once()
-    mocked_get_listings_by_currency_and_by_seller_id.assert_called_once()
+    mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()

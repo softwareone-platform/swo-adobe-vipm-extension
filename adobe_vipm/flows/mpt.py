@@ -438,13 +438,13 @@ def get_gc_price_list_by_currency(mpt_client, product_id, currency):
 
 
 @wrap_http_error
-def get_listings_by_currency_and_by_seller_id(
-    mpt_client, product_id, currency, seller_id
+def get_listings_by_price_list_and_seller_and_authorization(
+    mpt_client, product_id, price_list_id, seller_id, authorization_id
 ):
     response = mpt_client.get(
-        f"/catalog/listings?eq(product.id,{product_id})&eq(priceList.currency,{currency})"
+        f"/catalog/listings?eq(product.id,{product_id})&eq(priceList.id,{price_list_id})"
         f"&eq(seller.id,{seller_id})"
-        f"&eq(authorization.currency,{currency})&eq(primary,True)"
+        f"&eq(authorization.id,{authorization_id})&eq(primary,True)"
     )
     response.raise_for_status()
     return response.json()["data"]

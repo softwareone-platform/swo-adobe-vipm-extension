@@ -43,7 +43,7 @@ from adobe_vipm.flows.mpt import (
     get_gc_price_list_by_currency,
     get_licensee,
     get_listing_by_id,
-    get_listings_by_currency_and_by_seller_id,
+    get_listings_by_price_list_and_seller_and_authorization,
     get_order_subscription_by_external_id,
     get_product_items_by_skus,
     get_product_onetime_items_by_ids,
@@ -1059,23 +1059,24 @@ def test_get_gc_price_list_by_currency(mpt_client, requests_mocker):
 
 def test_get_listings_by_currency_and_by_seller_id(mpt_client, requests_mocker):
     product_id = "product_id"
-    currency = "currency"
+    price_list_id = "price_list_id"
     seller_id = "seller_id"
+    authorization_id = "authorization_id"
     requests_mocker.get(
         urljoin(
             mpt_client.base_url,
             f"catalog/listings?eq(product.id,{product_id})&"
-            f"eq(priceList.currency,{currency})&eq(seller.id,{seller_id})&"
-            f"q(authorization.currency,{currency})&eq(primary,True)",
+            f"eq(priceList.id,{price_list_id})&eq(seller.id,{seller_id})&"
+            f"q(authorization.id,{authorization_id})&eq(primary,True)",
         ),
         json={"data": []},
     )
 
     assert (
-        get_listings_by_currency_and_by_seller_id(
-            mpt_client, product_id, currency, seller_id
+            get_listings_by_price_list_and_seller_and_authorization(
+            mpt_client, product_id, price_list_id, seller_id, authorization_id
         )
-        == []
+            == []
     )
 
 
