@@ -38,7 +38,7 @@ from adobe_vipm.flows.mpt import (
     get_gc_price_list_by_currency,
     get_licensee,
     get_listing_by_id,
-    get_listings_by_currency_and_by_seller_id,
+    get_listings_by_price_list_and_seller_and_authorization,
     get_product_items_by_skus,
     get_product_template_or_default,
     update_agreement,
@@ -223,11 +223,12 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
         return get_listing_by_id(mpt_client, agreement_deployment.listing_id)
 
     try:
-        listings = get_listings_by_currency_and_by_seller_id(
+        listings = get_listings_by_price_list_and_seller_and_authorization(
             mpt_client,
             agreement_deployment.product_id,
-            agreement_deployment.deployment_currency,
+            price_list_id,
             agreement_deployment.seller_id,
+            authorization_id
         )
     except Exception as e:
         logger.error(f"Error getting listings: {e}")
@@ -478,7 +479,7 @@ def process_agreement_deployment(
 
     if not agreement_deployment.licensee_id:
         logger.info(
-            f"License not found for agreement deployment {agreement_deployment.deployment_id}."
+            f"Licensee not found for agreement deployment {agreement_deployment.deployment_id}."
             f" Continue"
         )
         return
