@@ -10,7 +10,7 @@ from adobe_vipm.flows.constants import (
     FAKE_CUSTOMERS_IDS,
 )
 from adobe_vipm.flows.pipeline import Step
-from adobe_vipm.flows.utils import set_order_error
+from adobe_vipm.flows.utils import get_deployment_id, set_order_error
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +75,14 @@ class GetPreviewOrder(Step):
         customer_id = (
             context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
         )
+        deployment_id = get_deployment_id(context.order)
         try:
             context.adobe_preview_order = adobe_client.create_preview_order(
                 context.authorization_id,
                 customer_id,
                 context.order_id,
                 context.upsize_lines,
+                deployment_id=deployment_id,
             )
         except AdobeAPIError as e:
             context.validation_succeeded = False

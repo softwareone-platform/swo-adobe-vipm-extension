@@ -528,6 +528,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
         adobe_return_orders={},
+        deployment_id="",
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()

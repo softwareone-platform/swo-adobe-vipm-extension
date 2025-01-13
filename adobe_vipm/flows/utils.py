@@ -928,3 +928,19 @@ def exclude_subscriptions_with_deployment_id(adobe_subscriptions):
     ]
     adobe_subscriptions["items"] = items
     return adobe_subscriptions
+
+
+def get_deployment_id(source):
+    """
+    Get the deploymentId parameter from the source.
+    Args:
+        source (dict): The order to update.
+
+    Returns:
+        string: The value of the deploymentId parameter.
+    """
+    param = get_fulfillment_parameter(
+        source,
+        "deploymentId",
+    )
+    return param.get("value")

@@ -3665,6 +3665,7 @@ def test_transfer_gc_account_some_deployments_not_created(
             deployment_id="deployment-id",
             currencyCode="EUR",
             offer_id="653045798CA01A12",
+            deployment_currency_code="EUR",
         )
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
         + adobe_items_factory(
@@ -3673,6 +3674,7 @@ def test_transfer_gc_account_some_deployments_not_created(
             subscription_id="one-time-sub-id",
             deployment_id="deployment-id-2",
             currencyCode="EUR",
+            deployment_currency_code="EUR",
         )
         + adobe_items_factory(
             line_number=4,
@@ -3680,6 +3682,7 @@ def test_transfer_gc_account_some_deployments_not_created(
             deployment_id="deployment-id",
             currencyCode="USD",
             offer_id="65304579CA01A12",
+            deployment_currency_code="USD",
         ),
     )
 
@@ -3710,11 +3713,13 @@ def test_transfer_gc_account_some_deployments_not_created(
                 "deploymentId": "deployment-id",
                 "status": "1000",
                 "companyProfile": {"address": {"country": "DE"}},
+                "currencyCode": "EUR",
             },
             {
                 "deploymentId": "deployment-id-2",
                 "status": "1000",
                 "companyProfile": {"address": {"country": "ES"}},
+                "currencyCode": "EUR",
             },
         ],
     }

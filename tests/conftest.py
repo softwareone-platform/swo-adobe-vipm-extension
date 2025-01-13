@@ -732,7 +732,7 @@ def pricelist_items_factory():
 
 
 @pytest.fixture()
-def lines_factory(agreement):
+def lines_factory(agreement, deployment_id: str = None):
     agreement_id = agreement["id"].split("-", 1)[1]
 
     def _items(
@@ -743,6 +743,7 @@ def lines_factory(agreement):
         quantity=170,
         external_vendor_id="65304578CA",
         unit_purchase_price=1234.55,
+        deployment_id=deployment_id
     ):
         line = {
             "item": {
@@ -760,6 +761,8 @@ def lines_factory(agreement):
         }
         if line_id:
             line["id"] = f"ALI-{agreement_id}-{line_id:04d}"
+        if deployment_id:
+            line["deploymentId"] = deployment_id
         return [line]
 
     return _items
@@ -987,6 +990,7 @@ def order_factory(
     fulfillment_parameters_factory,
     lines_factory,
     status="Processing",
+    deployment_id="",
 ):
     """
     Marketplace platform order for tests.
@@ -1002,17 +1006,18 @@ def order_factory(
         external_ids=None,
         status=status,
         template=None,
+        deployment_id=deployment_id,
     ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
         )
         fulfillment_parameters = (
-            fulfillment_parameters_factory()
+            fulfillment_parameters_factory(deployment_id=deployment_id)
             if fulfillment_parameters is None
             else fulfillment_parameters
         )
 
-        lines = lines_factory() if lines is None else lines
+        lines = lines_factory(deployment_id=deployment_id) if lines is None else lines
         subscriptions = [] if subscriptions is None else subscriptions
 
         order = {
@@ -1118,7 +1123,10 @@ def webhook(settings):
 
 
 @pytest.fixture()
-def adobe_items_factory():
+def adobe_items_factory(
+    deployment_id: str = None,
+    deployment_currency_code: str = None
+):
     def _items(
         line_number=1,
         offer_id="65304578CA01A12",
@@ -1126,8 +1134,9 @@ def adobe_items_factory():
         subscription_id=None,
         renewal_date=None,
         status=None,
-        deployment_id=None,
-       currencyCode= None,
+        deployment_id=deployment_id,
+        currencyCode= None,
+        deployment_currency_code=deployment_currency_code
     ):
         item = {
             "extLineItemNumber": line_number,
@@ -1138,6 +1147,7 @@ def adobe_items_factory():
             item["currencyCode"] = currencyCode
         if deployment_id:
             item["deploymentId"] = deployment_id
+            item["currencyCode"] = deployment_currency_code
         if renewal_date:
             item["renewalDate"] = renewal_date
         if subscription_id:
@@ -1145,7 +1155,6 @@ def adobe_items_factory():
         if status:
             item["status"] = status
         return [item]
-
     return _items
 
 
@@ -1160,13 +1169,19 @@ def adobe_order_factory(adobe_items_factory):
         reference_order_id=None,
         status=None,
         creation_date=None,
+        deployment_id=None,
     ):
         order = {
             "externalReferenceId": external_id,
-            "currencyCode": currency_code,
             "orderType": order_type,
-            "lineItems": items or adobe_items_factory(),
+            "lineItems": items or adobe_items_factory(
+                deployment_id=deployment_id,
+                deployment_currency_code=currency_code
+            ),
         }
+
+        if not deployment_id:
+            order["currencyCode"] = currency_code
 
         if reference_order_id:
             order["referenceOrderId"] = reference_order_id
