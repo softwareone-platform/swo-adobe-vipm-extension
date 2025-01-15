@@ -1,5 +1,6 @@
 import logging
 import sys
+import traceback
 from datetime import date, datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -29,6 +30,7 @@ from adobe_vipm.flows.utils import (
     get_deployments,
     get_global_customer,
     is_consumables_sku,
+    notify_agreement_unhandled_exception_in_teams,
 )
 
 logger = logging.getLogger(__name__)
@@ -220,6 +222,10 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
 
     except Exception:
         logger.exception(f"Cannot sync agreement {agreement_id}")
+        notify_agreement_unhandled_exception_in_teams(
+            agreement["id"],
+            traceback.format_exc()
+        )
 
 
 def sync_agreements_by_next_sync(mpt_client, dry_run):
@@ -285,6 +291,10 @@ def sync_global_customer_parameters(mpt_client, adobe_client, customer, agreemen
             f"Error setting global customer parameters for agreement "
             f"{agreement["id"]}: {e}"
         )
+        notify_agreement_unhandled_exception_in_teams(
+            agreement["id"],
+            traceback.format_exc()
+        )
 
 
 def sync_agreement(mpt_client, agreement, dry_run):
@@ -314,6 +324,10 @@ def sync_agreement(mpt_client, agreement, dry_run):
         sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer)
     except Exception as e:
         logger.error(f"Error synchronizing agreement {agreement["id"]}: {e}")
+        notify_agreement_unhandled_exception_in_teams(
+            agreement["id"],
+            traceback.format_exc()
+        )
 
 
 def sync_all_agreements(mpt_client, dry_run):

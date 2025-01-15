@@ -312,6 +312,10 @@ def test_sync_agreement_prices_exception(
         "adobe_vipm.flows.sync.update_agreement",
     )
 
+    mocked_notifier = mocker.patch(
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
+    )
+
     with caplog.at_level(logging.ERROR):
         sync_agreement(mocked_mpt_client, agreement, False)
 
@@ -324,6 +328,9 @@ def test_sync_agreement_prices_exception(
 
     mocked_update_agreement_subscription.assert_not_called()
     mocked_update_agreement.assert_not_called()
+    mocked_notifier.assert_called_once()
+    assert mocked_notifier.call_args_list[0].args[0] == agreement['id']
+
 
 
 def test_sync_agreement_prices_skip_processing(
@@ -1056,6 +1063,10 @@ def test_sync_global_customer_update_adobe_error(
         "adobe_vipm.flows.sync.update_agreement",
     )
 
+    mocked_notifier = mocker.patch(
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
+    )
+
     sync_agreement(mocked_mpt_client, agreement, False)
 
     assert mocked_get_agreement_subscription.call_args_list == [
@@ -1155,6 +1166,8 @@ def test_sync_global_customer_update_adobe_error(
         parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
     )
     mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_notifier.assert_called_once()
+    assert mocked_notifier.call_args_list[0].args[0] == agreement['id']
 
 
 def test_sync_agreement_error_getting_adobe_customer(
@@ -1216,5 +1229,31 @@ def test_sync_agreement_error_getting_adobe_customer(
         "adobe_vipm.flows.sync.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+    mocked_notifier = mocker.patch(
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
+    )
     sync_agreement(mocked_mpt_client, agreement, False)
     mocked_adobe_client.get_customer.assert_called_once()
+    mocked_notifier.assert_called_once()
+    assert mocked_notifier.call_args_list[0].args[0] == agreement['id']
+
+
+def test_sync_agreement_notify_exception(
+    mocker,
+    agreement_factory,
+
+    ):
+    mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
+    )
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_customer_id",
+        side_effect=Exception("Test exception")
+    )
+    mpt_client=mocker.MagicMock()
+    agreement = agreement_factory()
+    sync_agreement(mpt_client, agreement, False)
+    mock_notify_agreement_unhandled_exception_in_teams.assert_called_once()
+    assert (mock_notify_agreement_unhandled_exception_in_teams.call_args_list[0].args[0]
+            == agreement['id'])
+

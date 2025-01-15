@@ -641,6 +641,18 @@ def notify_unhandled_exception_in_teams(process, order_id, traceback):
     )
 
 
+@functools.cache
+def notify_agreement_unhandled_exception_in_teams(agreement_id, traceback):
+    """
+    Notify that an agreement has been unhandled exception
+    """
+    send_exception(
+        "Agreement unhandled exception!",
+        f"An unhandled exception has been raised of the agreement **{agreement_id}**:\n\n"
+        f"```{traceback}```",
+    )
+
+
 def get_notifications_recipient(order):
     return (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get(
         "email"

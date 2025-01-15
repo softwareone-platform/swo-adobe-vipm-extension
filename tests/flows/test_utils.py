@@ -13,6 +13,7 @@ from adobe_vipm.flows.utils import (
     get_transfer_item_sku_by_subscription,
     is_renewal_window_open,
     is_transferring_item_expired,
+    notify_agreement_unhandled_exception_in_teams,
     notify_unhandled_exception_in_teams,
     reset_order_error,
     set_order_error,
@@ -32,6 +33,21 @@ def test_notify_unhandled_exception_in_teams(mocker):
         "Order validation unhandled exception!",
         "An unhandled exception has been raised while performing validation "
         "of the order **ORD-0000**:\n\n"
+        "```exception-traceback```",
+    )
+
+
+def test_notify_agreement_unhandled_exception_in_teams(mocker):
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    notify_agreement_unhandled_exception_in_teams(
+        "AGR-0000",
+        "exception-traceback",
+    )
+
+    mocked_send_exc.assert_called_once_with(
+        "Agreement unhandled exception!",
+        "An unhandled exception has been raised "
+        "of the agreement **AGR-0000**:\n\n"
         "```exception-traceback```",
     )
 
