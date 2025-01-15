@@ -350,6 +350,7 @@ class AdobeClient:
         returning_order: dict,
         returning_item: dict,
         external_reference: str,
+        deployment_id: str = None,
     ) -> dict:
         """
         Creates an order of type RETURN for a given `item` that was purchased in the
@@ -372,19 +373,20 @@ class AdobeClient:
         payload = {
             "externalReferenceId": external_id,
             "referenceOrderId": returning_order["orderId"],
-            "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_RETURN,
             "lineItems": [],
         }
-
-        payload["lineItems"].append(
-            {
-                "extLineItemNumber": line_number,
-                "offerId": sku,
-                "quantity": quantity,
-            },
-        )
-
+        if not deployment_id:
+            payload["currencyCode"] = authorization.currency
+        line_item = {
+            "extLineItemNumber": line_number,
+            "offerId": sku,
+            "quantity": quantity,
+        }
+        if deployment_id:
+            line_item["deploymentId"] = deployment_id
+            line_item["currencyCode"] = authorization.currency
+        payload["lineItems"].append(line_item)
         headers = self._get_headers(
             authorization,
             correlation_id=external_id,
@@ -404,6 +406,7 @@ class AdobeClient:
         customer_id: str,
         order_id: str,
         lines: list,
+        deployment_id: str = None,
     ) -> dict:
         """
         Creates an order of type PREVIEW for a given Marketplace platform order.
@@ -424,11 +427,11 @@ class AdobeClient:
         authorization = self._config.get_authorization(authorization_id)
         payload = {
             "externalReferenceId": order_id,
-            "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_PREVIEW,
             "lineItems": [],
         }
-
+        if not deployment_id:
+            payload["currencyCode"] = authorization.currency
         for line in lines:
             product: AdobeProduct = self._config.get_adobe_product(
                 line["item"]["externalIds"]["vendor"]
@@ -444,14 +447,15 @@ class AdobeClient:
                 # since the previous purchased quantity has been returned back
                 # through one or more RETURN orders.
                 quantity = quantity - old_quantity
-            payload["lineItems"].append(
-                {
-                    "extLineItemNumber": to_adobe_line_id(line["id"]),
-                    "offerId": product.sku,
-                    "quantity": quantity,
-                }
-            )
-
+            line_item = {
+                "extLineItemNumber": to_adobe_line_id(line["id"]),
+                "offerId": product.sku,
+                "quantity": quantity,
+            }
+            if deployment_id:
+                line_item["deploymentId"] = deployment_id
+                line_item["currencyCode"] = authorization.currency
+            payload["lineItems"].append(line_item)
         headers = self._get_headers(authorization)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
@@ -467,6 +471,7 @@ class AdobeClient:
         authorization_id: str,
         customer_id: str,
         adobe_preview_order: dict,
+        deployment_id: str = None,
     ) -> dict:
         """
         Creates an order of type NEW (the actual order) for a given Marketplace platform order.
@@ -482,10 +487,12 @@ class AdobeClient:
         authorization = self._config.get_authorization(authorization_id)
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
-            "currencyCode": authorization.currency,
             "orderType": ORDER_TYPE_NEW,
             "lineItems": adobe_preview_order["lineItems"],
         }
+
+        if not deployment_id:
+            payload["currencyCode"] = authorization.currency
 
         headers = self._get_headers(
             authorization,
