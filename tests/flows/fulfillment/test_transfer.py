@@ -4482,3 +4482,80 @@ def test_transfer_gc_account_items_with_deployment_main_agreement_bulk_migrated(
     assert order["status"] == MPT_ORDER_STATUS_PROCESSING
 
     mocked_gc_main_agreement.save.assert_called_once()
+
+@freeze_time("2025-01-01")
+def test_transfer_not_ready_not_commercial(
+    mocker,
+    agreement,
+    order_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_transfer_factory
+):
+    """
+    Tests the continuation of processing a transfer order since in the
+    previous attemp the order has been created but not yet processed
+    on Adobe side. The RetryCount fullfilment paramter must be incremented.
+    The transfer order will not be completed and the processing will be stopped.
+    """
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    mocked_get_gc_main_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_gc_main_agreement",
+        return_value=None,
+    )
+    mocked_get_gc_agreement_deployments_by_main_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
+        return_value=None,
+    )
+    agreement["product"]["id"] = "PRD-2222-2222"
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order"
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order"
+    )
+
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
+        external_ids={"vendor": "a-transfer-id"},
+    )
+
+    fulfill_order(mocked_mpt_client, order)
+
+    authorization_id = order["authorization"]["id"]
+
+    assert mocked_update_order.mock_calls[0].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                due_date="2025-01-31",
+            ),
+            "ordering": transfer_order_parameters_factory(),
+        },
+    }
+
+    mocked_complete_order.assert_not_called()
+    mocked_adobe_client.get_transfer.assert_called_once_with(
+        authorization_id, "a-membership-id", adobe_transfer["transferId"]
+    )
+    mocked_get_gc_agreement_deployments_by_main_agreement.assert_not_called()
+    mocked_get_gc_main_agreement.assert_not_called()
