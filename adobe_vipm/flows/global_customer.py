@@ -13,6 +13,7 @@ from adobe_vipm.flows.airtable import (
 )
 from adobe_vipm.flows.constants import (
     GLOBAL_SUFFIX,
+    MARKET_SEGMENT_COMMERCIAL,
     MPT_ORDER_STATUS_COMPLETED,
     PARAM_ADDRESS,
     PARAM_ADOBE_SKU,
@@ -25,6 +26,7 @@ from adobe_vipm.flows.constants import (
     PARAM_DEPLOYMENT_ID,
     PARAM_DEPLOYMENTS,
     PARAM_GLOBAL_CUSTOMER,
+    PARAM_MEMBERSHIP_ID,
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
     TEMPLATE_NAME_TRANSFER,
@@ -43,7 +45,7 @@ from adobe_vipm.flows.mpt import (
     get_product_template_or_default,
     update_agreement,
 )
-from adobe_vipm.flows.utils import split_phone_number
+from adobe_vipm.flows.utils import get_market_segment, split_phone_number
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -353,6 +355,8 @@ def create_gc_agreement_deployment(
                     },
                     {"externalId": PARAM_ADDRESS, "value": param_address},
                     {"externalId": PARAM_CONTACT, "value": param_contact},
+                    {"externalId": PARAM_MEMBERSHIP_ID,
+                     "value": agreement_deployment.membership_id},
                 ],
                 "fulfillment": [
                     {"externalId": PARAM_GLOBAL_CUSTOMER, "value": ["Yes"]},
@@ -599,6 +603,8 @@ def check_gc_agreement_deployments():
     mpt_client = setup_client()
 
     for product_id in settings.MPT_PRODUCTS_IDS:
+        if get_market_segment(product_id) != MARKET_SEGMENT_COMMERCIAL:
+            continue
         logger.info(f"Checking GC agreement deployments for product {product_id}")
         try:
             agreement_deployments = get_gc_agreement_deployments_to_check(product_id)
