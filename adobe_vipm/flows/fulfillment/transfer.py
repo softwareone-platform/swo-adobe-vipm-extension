@@ -39,6 +39,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_UPDATING_TRANSFER_ITEMS,
+    MARKET_SEGMENT_COMMERCIAL,
     PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
@@ -73,6 +74,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_membership_id,
     get_adobe_order_id,
+    get_market_segment,
     get_one_time_skus,
     get_order_line_by_sku,
     get_ordering_parameter,
@@ -239,7 +241,7 @@ def _fulfill_transfer_migrated(
     adobe_transfer,
     one_time_skus,
     gc_main_agreement,
-    customer_deployments
+    customer_deployments,
 ):
     authorization_id = order["authorization"]["id"]
     adobe_subscriptions = adobe_client.get_subscriptions(
@@ -507,7 +509,7 @@ def _transfer_migrated(
             adobe_transfer,
             one_time_skus,
             gc_main_agreement,
-            customer_deployments
+            customer_deployments,
         )
 
 
@@ -886,7 +888,7 @@ def sync_main_agreement(
         None
     """
     if not gc_main_agreement:
-        gc_main_agreement = get_gc_main_agreement(
+        gc_main_agreement = get_main_agreement(
             product_id, authorization_id, customer_id
         )
 
@@ -997,6 +999,40 @@ def _manage_order_with_deployment_id(
         )
 
 
+def get_main_agreement(product_id, authorization_id, membership_id):
+    """
+    Gets the main agreement from Airtable based on the provided parameters.
+
+    Args:
+        product_id (str): The product ID associated with the main agreement.
+        authorization_id (str): The authorization ID associated with the main agreement.
+        membership_id (str): The membership ID associated with the main agreement.
+
+    Returns:
+        GCMainAgreement or None: The main agreement in Airtable if found, None otherwise.
+    """
+    if get_market_segment(product_id) == MARKET_SEGMENT_COMMERCIAL:
+        return get_gc_main_agreement( product_id, authorization_id, membership_id)
+    return None
+
+
+def get_agreement_deployments(product_id, agreement_id):
+    """
+    Gets the agreement deployments from Airtable based on the provided parameters.
+
+    Args:
+        product_id (str): The product ID associated with the deployments.
+        agreement_id (str): The agreement ID associated with the deployments.
+
+    Returns:
+        list or None: The agreement deployments in Airtable if found, None otherwise
+    """
+
+    if get_market_segment(product_id) == MARKET_SEGMENT_COMMERCIAL:
+        return get_gc_agreement_deployments_by_main_agreement(product_id, agreement_id)
+    return None
+
+
 def fulfill_transfer_order(mpt_client, order):
     """
     Fulfills a transfer order by processing the necessary actions based on the provided parameters.
@@ -1020,13 +1056,12 @@ def fulfill_transfer_order(mpt_client, order):
         authorization.authorization_id,
         membership_id,
     )
-    gc_main_agreement = get_gc_main_agreement(
+    gc_main_agreement = get_main_agreement(
         product_id,
         authorization.authorization_id,
         membership_id,
     )
-
-    existing_deployments = get_gc_agreement_deployments_by_main_agreement(
+    existing_deployments = get_agreement_deployments(
         product_id, order.get("agreement", {}).get("id", "")
     )
 
