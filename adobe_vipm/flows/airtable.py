@@ -25,6 +25,10 @@ STATUS_RUNNING = "running"
 STATUS_RESCHEDULED = "rescheduled"
 STATUS_DUPLICATED = "duplicated"
 STATUS_SYNCHRONIZED = "synchronized"
+STATUS_GC_CREATED = "created"
+STATUS_GC_ERROR = "error"
+STATUS_GC_PENDING = "pending"
+STATUS_GC_TRANSFERRED = "transferred"
 
 PRICELIST_CACHE = defaultdict(list)
 
@@ -144,6 +148,90 @@ def get_transfer_model(base_info):
             base_id = base_info.base_id
 
     return Transfer
+
+
+@cache
+def get_gc_main_agreement_model(base_info):
+    """
+    Retrieves the Global Customer (gc) main agreement model based on the provided base information.
+
+    This method returns the GCMainAgreement model class connected to the right base and with the
+    right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        GCMainAgreement: The AirTable GCMainAgreement model.
+    """
+
+    class GCMainAgreement(Model):
+        membership_id = fields.TextField("membership_id")
+        authorization_uk = fields.TextField("authorization_uk")
+        main_agreement_id = fields.TextField("main_agreement_id")
+        transfer_id = fields.TextField("transfer_id")
+        customer_id = fields.TextField("customer_id")
+        status = fields.SelectField("status")
+        error_description = fields.TextField("error_description")
+        created_at = fields.DatetimeField("created_at", readonly=True)
+        updated_at = fields.DatetimeField("updated_at", readonly=True)
+        created_by = fields.TextField("created_by", readonly=True)
+        updated_by = fields.TextField("updated_by", readonly=True)
+
+        class Meta:
+            table_name = "Global Customer Main Agreements"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+    return GCMainAgreement
+
+
+@cache
+def get_gc_agreement_deployment_model(base_info):
+    """
+    Retrieves the Global Customer (gc) agreement deployment model based on the provided
+    base information.
+
+    This method returns the GCAgreementDeployments model class connected to the right base
+    and with the right API key.
+
+    Args:
+        base_info (AirTableBaseInfo): The base info instance.
+
+    Returns:
+        GCAgreementDeployments: The AirTable GCAgreementDeployments (Global Customer Agreement
+        Deployments) model.
+    """
+
+    class GCAgreementDeployment(Model):
+        deployment_id = fields.TextField("deployment_id")
+        main_agreement_id = fields.TextField("main_agreement_id")
+        account_id = fields.TextField("account_id")
+        seller_id = fields.TextField("seller_id")
+        product_id = fields.TextField("product_id")
+        membership_id = fields.TextField("membership_id")
+        transfer_id = fields.TextField("transfer_id")
+        status = fields.SelectField("status")
+        customer_id = fields.TextField("customer_id")
+        deployment_currency = fields.TextField("deployment_currency")
+        deployment_country = fields.TextField("deployment_country")
+        licensee_id = fields.TextField("licensee_id")
+        agreement_id = fields.TextField("agreement_id")
+        authorization_id = fields.TextField("authorization_id")
+        price_list_id = fields.TextField("price_list_id")
+        listing_id = fields.TextField("listing_id")
+        error_description = fields.TextField("error_description")
+        created_at = fields.DatetimeField("created_at", readonly=True)
+        updated_at = fields.DatetimeField("updated_at", readonly=True)
+        created_by = fields.TextField("created_by", readonly=True)
+        updated_by = fields.TextField("updated_by", readonly=True)
+
+        class Meta:
+            table_name = "Global Customer Agreement Deployments"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+    return GCAgreementDeployment
 
 
 @cache
@@ -429,3 +517,145 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
         if item.sku not in prices:
             prices[item.sku] = item.unit_pp
     return prices
+
+
+def create_gc_agreement_deployments(product_id, agreement_deployments):
+    """
+    Add a new Global Customer (GC) agreement deployments on Airtable for a given product.
+    This method creates a list of GCAgreementDeployment objects on Airtable in batch.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        agreement_deployments (list): List of GCAgreementDeployment object to create.
+    """
+    GCAgreementDeployment = get_gc_agreement_deployment_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    GCAgreementDeployment.batch_save(
+        [
+            GCAgreementDeployment(**agreement_deployment)
+            for agreement_deployment in agreement_deployments
+        ]
+    )
+
+
+def create_gc_main_agreement(product_id, main_agreement):
+    """
+    Add a new Global Customer (GC) main agreement on Airtable for a given product.
+    This method creates a GCMainAgreement object on Airtable.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        main_agreement (dict): The main agreement object to create.
+    """
+    GCMainAgreement = get_gc_main_agreement_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    GCMainAgreement(**main_agreement).save()
+
+
+def get_gc_main_agreement(product_id, authorization_uk, membership_or_customer_id):
+    """
+    Retrieves the Global Customer (gc) main agreement for a given product.
+
+    This retrieve a GCMainAgreement object associated with the specified
+    product, using the provided authorization and membership or customer ID.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        authorization_uk (str): The ID of the authorization.
+        membership_or_customer_id (str): Either a membership ID or a customer ID.
+
+    Returns:
+        GCMainAgreement: The GCMainOrder if it has been found,
+        None otherwise.
+    """
+    GCMainAgreement = get_gc_main_agreement_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    gc_main_agreements = GCMainAgreement.all(
+        formula=AND(
+            EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
+            OR(
+                EQUAL(FIELD("membership_id"), STR_VALUE(membership_or_customer_id)),
+                EQUAL(FIELD("customer_id"), STR_VALUE(membership_or_customer_id)),
+            ),
+        ),
+    )
+    return gc_main_agreements[0] if gc_main_agreements else None
+
+
+def get_gc_agreement_deployments_by_main_agreement(product_id, main_agreement_id):
+    """
+    Retrieves Global Customer (gc) agreement deployments associated with a specific main agreement.
+
+    This method retrieve the list of GCAgreementDeployment objects linked to the specified
+    main agreement ID for the given product.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+        main_agreement_id (str): The ID of the main agreement.
+
+    Returns:
+        GCAgreementDeployment (list): The list of GCAgreementDeployment
+    """
+    GCAgreementDeployment = get_gc_agreement_deployment_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    return GCAgreementDeployment.all(
+        formula=AND(
+            EQUAL(FIELD("main_agreement_id"), STR_VALUE(main_agreement_id)),
+        ),
+    )
+
+
+def get_gc_agreement_deployments_to_check(product_id):
+    """
+    Retrieves Global Customer (gc) agreement deployments that require verification or review.
+
+    This method retrieve the list of GCAgreementDeployment objects associated with the
+    specified product that are in pending or error state
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+
+    Returns:
+        GCAgreementDeployment (list): The list of GCAgreementDeployment
+    """
+    GCAgreementDeployment = get_gc_agreement_deployment_model(
+        AirTableBaseInfo.for_migrations(product_id)
+    )
+    return GCAgreementDeployment.all(
+        formula=OR(
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_PENDING)),
+            EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_ERROR)),
+        ),
+    )
+
+
+def get_agreement_deployment_view_link(product_id):
+    """
+    Generate a link to a record of the Agreement Deployments table in the AirTable UI.
+
+    Args:
+        product_id (str): The ID of the product used to determine the AirTable base.
+
+    Returns:
+        str: The link to the agreement deployments record or None in case of an error.
+    """
+    try:
+        GCAgreementDeployment = get_gc_agreement_deployment_model(
+            AirTableBaseInfo.for_migrations(product_id)
+        )
+        base_id = GCAgreementDeployment.Meta.base_id
+        table_id = GCAgreementDeployment.get_table().id
+        view_id = (
+            GCAgreementDeployment.get_table()
+            .schema()
+            .view("Agreement Deployments View")
+            .id
+        )
+        record_id = GCAgreementDeployment.id
+        return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
+    except HTTPError:
+        pass

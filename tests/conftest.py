@@ -33,7 +33,10 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
     PARAM_COTERM_DATE,
     PARAM_CUSTOMER_ID,
+    PARAM_DEPLOYMENT_ID,
+    PARAM_DEPLOYMENTS,
     PARAM_DUE_DATE,
+    PARAM_GLOBAL_CUSTOMER,
     PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
@@ -573,7 +576,11 @@ def fulfillment_parameters_factory():
         next_sync_date="",
         market_segment_eligibility_status=None,
         coterm_date="",
+        global_customer=None,
+        deployment_id="",
+        deployments=None,
     ):
+        deployments = deployments or []
         return [
             {
                 "id": "PAR-1234-5678",
@@ -652,6 +659,28 @@ def fulfillment_parameters_factory():
                 "type": "Date",
                 "value": coterm_date,
             },
+            {
+                "id": "PAR-6179-6384-0024",
+                "externalId": PARAM_GLOBAL_CUSTOMER,
+                "name": "Global Customer",
+                "type": "Checkbox",
+                "displayValue": "Yes",
+                "value": [global_customer]
+            },
+            {
+                "id": "PAR-6179-6384-0025",
+                "externalId": PARAM_DEPLOYMENT_ID,
+                "name": "Deployment ID",
+                "type": "SingleLineText",
+                "value": deployment_id
+            },
+            {
+                "id": "PAR-6179-6384-0026",
+                "externalId": PARAM_DEPLOYMENTS,
+                "name": "Deployments",
+                "type": "MultiLineText",
+                "value": ",".join(deployments)
+            }
         ]
 
     return _fulfillment_parameters
@@ -703,7 +732,7 @@ def pricelist_items_factory():
 
 
 @pytest.fixture()
-def lines_factory(agreement):
+def lines_factory(agreement, deployment_id: str = None):
     agreement_id = agreement["id"].split("-", 1)[1]
 
     def _items(
@@ -714,6 +743,7 @@ def lines_factory(agreement):
         quantity=170,
         external_vendor_id="65304578CA",
         unit_purchase_price=1234.55,
+        deployment_id=deployment_id
     ):
         line = {
             "item": {
@@ -731,6 +761,8 @@ def lines_factory(agreement):
         }
         if line_id:
             line["id"] = f"ALI-{agreement_id}-{line_id:04d}"
+        if deployment_id:
+            line["deploymentId"] = deployment_id
         return [line]
 
     return _items
@@ -958,6 +990,7 @@ def order_factory(
     fulfillment_parameters_factory,
     lines_factory,
     status="Processing",
+    deployment_id="",
 ):
     """
     Marketplace platform order for tests.
@@ -973,17 +1006,18 @@ def order_factory(
         external_ids=None,
         status=status,
         template=None,
+        deployment_id=deployment_id,
     ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
         )
         fulfillment_parameters = (
-            fulfillment_parameters_factory()
+            fulfillment_parameters_factory(deployment_id=deployment_id)
             if fulfillment_parameters is None
             else fulfillment_parameters
         )
 
-        lines = lines_factory() if lines is None else lines
+        lines = lines_factory(deployment_id=deployment_id) if lines is None else lines
         subscriptions = [] if subscriptions is None else subscriptions
 
         order = {
@@ -1089,7 +1123,10 @@ def webhook(settings):
 
 
 @pytest.fixture()
-def adobe_items_factory():
+def adobe_items_factory(
+    deployment_id: str = None,
+    deployment_currency_code: str = None
+):
     def _items(
         line_number=1,
         offer_id="65304578CA01A12",
@@ -1097,12 +1134,20 @@ def adobe_items_factory():
         subscription_id=None,
         renewal_date=None,
         status=None,
+        deployment_id=deployment_id,
+        currencyCode= None,
+        deployment_currency_code=deployment_currency_code
     ):
         item = {
             "extLineItemNumber": line_number,
             "offerId": offer_id,
             "quantity": quantity,
         }
+        if currencyCode:
+            item["currencyCode"] = currencyCode
+        if deployment_id:
+            item["deploymentId"] = deployment_id
+            item["currencyCode"] = deployment_currency_code
         if renewal_date:
             item["renewalDate"] = renewal_date
         if subscription_id:
@@ -1110,7 +1155,6 @@ def adobe_items_factory():
         if status:
             item["status"] = status
         return [item]
-
     return _items
 
 
@@ -1125,13 +1169,19 @@ def adobe_order_factory(adobe_items_factory):
         reference_order_id=None,
         status=None,
         creation_date=None,
+        deployment_id=None,
     ):
         order = {
             "externalReferenceId": external_id,
-            "currencyCode": currency_code,
             "orderType": order_type,
-            "lineItems": items or adobe_items_factory(),
+            "lineItems": items or adobe_items_factory(
+                deployment_id=deployment_id,
+                deployment_currency_code=currency_code
+            ),
         }
+
+        if not deployment_id:
+            order["currencyCode"] = currency_code
 
         if reference_order_id:
             order["referenceOrderId"] = reference_order_id
@@ -1154,6 +1204,7 @@ def adobe_subscription_factory():
         current_quantity=10,
         renewal_quantity=10,
         autorenewal_enabled=True,
+        deployment_id="",
         status=STATUS_PROCESSED,
         renewal_date=None,
     ):
@@ -1169,6 +1220,7 @@ def adobe_subscription_factory():
             "renewalDate": renewal_date
             or (date.today() + timedelta(days=366)).isoformat(),
             "status": status,
+            "deploymentId": deployment_id,
         }
 
     return _subscription
@@ -1197,11 +1249,13 @@ def adobe_transfer_factory(adobe_items_factory):
         customer_id="",
         status=STATUS_PENDING,
         items=None,
+        membership_id="membership-id",
     ):
         transfer = {
             "transferId": transfer_id,
             "customerId": customer_id,
             "status": status,
+            "membershipId": membership_id,
             "lineItems": items or adobe_items_factory(),
         }
 
@@ -1288,6 +1342,28 @@ def mpt_error_factory():
 
 
 @pytest.fixture()
+def airtable_error_factory():
+    """
+    Generate an error message returned by the Airtable API.
+    """
+
+    def _airtable_error(
+        message,
+        error_type="INVALID_REQUEST_UNKNOWN",
+    ):
+        error = {
+            "error": {
+                "type": error_type,
+                "message": message,
+            }
+        }
+
+        return error
+
+    return _airtable_error
+
+
+@pytest.fixture()
 def mpt_list_response():
     def _wrap_response(objects_list):
         return {
@@ -1370,6 +1446,7 @@ def adobe_customer_factory():
         licenses_discount_level="01",
         consumables_discount_level="T1",
         coterm_date="2024-01-23",
+        global_sales_enabled=False,
     ):
         customer = {
             "customerId": customer_id,
@@ -1405,6 +1482,7 @@ def adobe_customer_factory():
                 },
             ],
             "cotermDate": coterm_date,
+            "globalSalesEnabled":global_sales_enabled,
         }
         if commitment or commitment_request or recommitment_request:
             customer["benefits"] = [

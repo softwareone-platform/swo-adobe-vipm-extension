@@ -22,12 +22,15 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_UNEXPECTED_ERROR,
+    ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
     ERR_UPDATING_TRANSFER_ITEMS,
     PARAM_MEMBERSHIP_ID,
 )
 from adobe_vipm.flows.mpt import get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
+    exclude_items_with_deployment_id,
+    exclude_subscriptions_with_deployment_id,
     get_adobe_membership_id,
     get_order_line_by_sku,
     get_ordering_parameter,
@@ -311,11 +314,15 @@ def validate_transfer(mpt_client, adobe_client, order):
         authorization_id,
         transfer.customer_id,
     )
+    subscriptions = exclude_subscriptions_with_deployment_id(subscriptions)
+
     adobe_transfer = adobe_client.get_transfer(
         authorization_id,
         transfer.membership_id,
         transfer.transfer_id,
     )
+
+    adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
 
     if adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
         get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
@@ -338,6 +345,17 @@ def validate_transfer(mpt_client, adobe_client, order):
 
     # If there is no subscription to transfer, the order is valid
     if len(subscriptions["items"]) == 0:
+        if customer.get("globalSalesEnabled", False):
+            logger.error(ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT)
+            param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+            order = set_ordering_parameter_error(
+                order,
+                PARAM_MEMBERSHIP_ID,
+                ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+                    title=param["name"], details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
+                ),
+            )
+            return True, order
         return False, order
 
     return add_lines_to_order(

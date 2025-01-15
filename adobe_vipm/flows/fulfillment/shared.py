@@ -24,7 +24,10 @@ from adobe_vipm.adobe.utils import (
     sanitize_company_name,
     sanitize_first_last_name,
 )
-from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
+from adobe_vipm.flows.airtable import (
+    get_prices_for_3yc_skus,
+    get_prices_for_skus,
+)
 from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -45,9 +48,9 @@ from adobe_vipm.flows.mpt import (
     complete_order,
     create_subscription,
     fail_order,
+    get_order_subscription_by_external_id,
     get_product_template_or_default,
     get_rendered_template,
-    get_subscription_by_external_id,
     query_order,
     set_processing_template,
     update_agreement,
@@ -59,6 +62,7 @@ from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_coterm_date,
+    get_deployment_id,
     get_due_date,
     get_next_sync,
     get_notifications_recipient,
@@ -310,7 +314,7 @@ def add_subscription(client, adobe_subscription, order, line):
 
     order_line = get_order_line_by_sku(order, line["offerId"])
 
-    subscription = get_subscription_by_external_id(
+    subscription = get_order_subscription_by_external_id(
         client, order["id"], line["subscriptionId"]
     )
     if not subscription:
@@ -498,7 +502,7 @@ def send_email_notification(client, order):
                 f"for {order['agreement']['buyer']['name']}"
             )
         send_email(
-            recipient,
+            [recipient],
             subject,
             "email",
             context,
@@ -660,24 +664,31 @@ class SubmitReturnOrders(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         all_return_orders = []
+        deployment_id = get_deployment_id(context.order)
+        is_returnable = False
         for sku, returnable_orders in context.adobe_returnable_orders.items():
             return_orders = context.adobe_return_orders.get(sku, [])
             for returnable_order, return_order in map_returnable_to_return_orders(
                 returnable_orders or [], return_orders
             ):
-                if return_order:
-                    all_return_orders.append(return_order)
-                    continue
-
-                all_return_orders.append(
-                    adobe_client.create_return_order(
-                        context.authorization_id,
-                        context.adobe_customer_id,
-                        returnable_order.order,
-                        returnable_order.line,
-                        context.order_id,
-                    )
+                returnable_order_deployment_id = returnable_order.line.get("deploymentId", None)
+                is_returnable = (
+                    (deployment_id == returnable_order_deployment_id) if deployment_id else True
                 )
+                if is_returnable:
+                    if return_order:
+                        all_return_orders.append(return_order)
+                        continue
+                    all_return_orders.append(
+                        adobe_client.create_return_order(
+                            context.authorization_id,
+                            context.adobe_customer_id,
+                            returnable_order.order,
+                            returnable_order.line,
+                            context.order_id,
+                            deployment_id,
+                        )
+                    )
         pending_orders = [
             return_order["orderId"]
             for return_order in all_return_orders
@@ -706,11 +717,13 @@ class GetPreviewOrder(Step):
         adobe_client = get_adobe_client()
         if context.upsize_lines and not context.adobe_new_order_id:
             try:
+                deployment_id = get_deployment_id(context.order)
                 context.adobe_preview_order = adobe_client.create_preview_order(
                     context.authorization_id,
                     context.adobe_customer_id,
                     context.order_id,
                     context.upsize_lines,
+                    deployment_id=deployment_id,
                 )
             except AdobeError as e:
                 switch_order_to_failed(client, context.order, str(e))
@@ -733,10 +746,12 @@ class SubmitNewOrder(Step):
         adobe_client = get_adobe_client()
         adobe_order = None
         if not context.adobe_new_order_id:
+            deployment_id = get_deployment_id(context.order)
             adobe_order = adobe_client.create_new_order(
                 context.authorization_id,
                 context.adobe_customer_id,
                 context.adobe_preview_order,
+                deployment_id=deployment_id,
             )
             logger.info(f'{context}: new adobe order created: {adobe_order["orderId"]}')
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
@@ -990,3 +1005,57 @@ class ValidateDuplicateLines(Step):
             return
 
         next_step(client, context)
+
+
+def send_gc_email_notification(order, items_with_deployment):
+    """
+    Send a notification email to the customer according to the
+    current order status.
+    It embeds the current order template into the email body.
+
+    Args:
+        items_with_deployment (list): The list of items with deployment ID.
+        order (dict): The order for which the notification should be sent.
+    """
+    email_notification_enabled = bool(
+        settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
+    )
+
+    if email_notification_enabled:
+        recipient = settings.EXTENSION_CONFIG.get(
+            "GC_EMAIL_NOTIFICATIONS_RECIPIENT", None
+        )
+        if not recipient:
+            logger.warning(
+                f"Cannot send Global Customer email notifications for order {order['id']}: "
+                f"no recipient found"
+            )
+            return
+        recipient = recipient.split(",")
+        items = (
+            "<ul>\n"
+            + "\n".join(f"\t<li>{item}</li>" for item in items_with_deployment)
+            + "\n</ul>"
+        )
+
+        context = {
+            "order": order,
+            "activation_template": "This order needs your attention because it contains items with "
+            "a deployment ID associated. Please remove the following items with "
+            f"deployment associated manually. {items}"
+            "Then, change the main agreement status to 'pending' on Airtable.",
+            "api_base_url": settings.MPT_API_BASE_URL,
+            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+        }
+
+        subject = (
+            f"This order need your attention {order['id']} "
+            f"for {order['agreement']['buyer']['name']}"
+        )
+
+        send_email(
+            recipient,
+            subject,
+            "email",
+            context,
+        )

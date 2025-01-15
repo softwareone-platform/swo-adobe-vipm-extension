@@ -62,12 +62,12 @@ class SwitchAutoRenewalOff(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
-            subcription = get_subscription_by_line_and_item_id(
+            subscription = get_subscription_by_line_and_item_id(
                 context.order["subscriptions"],
                 line["item"]["id"],
                 line["id"],
             )
-            adobe_sub_id = get_adobe_subscription_id(subcription)
+            adobe_sub_id = get_adobe_subscription_id(subscription)
             adobe_subscription = adobe_client.get_subscription(
                 context.authorization_id,
                 context.adobe_customer_id,
@@ -81,9 +81,10 @@ class SwitchAutoRenewalOff(Step):
                     auto_renewal=False,
                 )
                 logger.info(
-                    f"{context}: autorenewal switched off for {subcription['id']} "
+                    f"{context}: autorenewal switched off for {subscription['id']} "
                     f"({adobe_subscription['subscriptionId']})"
                 )
+
         next_step(client, context)
 
 
