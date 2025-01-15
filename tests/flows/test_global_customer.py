@@ -7,7 +7,9 @@ def test_check_gc_agreement_deployments_no_licensee(mocker, mpt_client, settings
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM","PRD-2222-2222": "GOV"},
     }
+    settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111","PRD-2222-2222"]
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -33,6 +35,7 @@ def test_check_gc_agreement_deployments_unexpected_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -63,6 +66,7 @@ def test_check_gc_agreement_deployments_no_authorization_id(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -97,6 +101,7 @@ def test_check_gc_agreement_deployments_get_authorization_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -138,6 +143,7 @@ def test_check_gc_agreement_deployments_get_authorization_more_than_one(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -173,6 +179,7 @@ def test_check_gc_agreement_deployments_get_price_list_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -220,6 +227,7 @@ def test_check_gc_agreement_deployments_no_price_list(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -256,6 +264,7 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -292,6 +301,7 @@ def test_check_gc_agreement_deployments_get_listing_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -350,6 +360,7 @@ def test_check_gc_agreement_deployments_create_listing(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
 
@@ -430,6 +441,7 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -466,6 +478,7 @@ def test_check_gc_agreement_deployments_create_listing_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -521,6 +534,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
 
@@ -602,6 +616,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
 
@@ -692,6 +707,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
 
@@ -777,6 +793,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
 
@@ -861,6 +878,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
 
