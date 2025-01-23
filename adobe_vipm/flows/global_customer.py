@@ -272,7 +272,7 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             listing = create_listing(mpt_client, listing)
             logger.info(f"New listing created {listing['id']}")
         except Exception as e:
-            logger.error(f"Error creating listing: {e}")
+            logger.error(f"Error creating listing: {e}: {listing}")
             agreement_deployment.status = STATUS_GC_ERROR
             agreement_deployment.error_description = f"Error creating listing: {e}"
             agreement_deployment.save()
@@ -286,12 +286,18 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
 
 
 def create_gc_agreement_deployment(
-    agreement_deployment, vendor_id, buyer_id, adobe_customer, customer_deployment_ids
+    mpt_o_client,
+    agreement_deployment,
+    vendor_id,
+    buyer_id,
+    adobe_customer,
+    customer_deployment_ids,
 ):
     """
     Create a global customer agreement deployment.
 
     Args:
+        mpt_o_client (MPTClient): The MPT Operations client instance.
         agreement_deployment (AgreementDeployment): The agreement deployment instance.
         vendor_id (str): The vendor ID.
         buyer_id (str): The buyer ID.
@@ -305,11 +311,6 @@ def create_gc_agreement_deployment(
         return agreement_deployment.agreement_id
 
     try:
-        mpto_client = MPTClient(
-            f"{settings.MPT_API_BASE_URL}/v1/",
-            settings.MPT_API_TOKEN_OPERATIONS,
-        )
-
         address = adobe_customer["companyProfile"]["address"]
         contact = adobe_customer["companyProfile"]["contacts"][0]
         param_address = {
@@ -329,7 +330,7 @@ def create_gc_agreement_deployment(
         }
 
         template = get_product_template_or_default(
-            mpto_client,
+            mpt_o_client,
             agreement_deployment.product_id,
             MPT_ORDER_STATUS_COMPLETED,
             TEMPLATE_NAME_TRANSFER,
@@ -386,7 +387,7 @@ def create_gc_agreement_deployment(
             "termsAndConditions": [],
         }
 
-        agreement = create_agreement(mpto_client, gc_agreement_deployment)
+        agreement = create_agreement(mpt_o_client, gc_agreement_deployment)
         logger.info(f"Created GC agreement deployment {agreement['id']}")
 
         agreement_deployment.agreement_id = agreement["id"]
@@ -489,6 +490,11 @@ def process_agreement_deployment(
         return
 
     try:
+        mpt_o_client = MPTClient(
+            f"{settings.MPT_API_BASE_URL}/v1/",
+            settings.MPT_API_TOKEN_OPERATIONS,
+        )
+
         authorization_id = get_authorization(mpt_client, agreement_deployment)
         if not authorization_id:
             return
@@ -500,14 +506,14 @@ def process_agreement_deployment(
         agreement_deployment.price_list_id = price_list_id
 
         listing = get_listing(
-            mpt_client, authorization_id, price_list_id, agreement_deployment
+            mpt_o_client, authorization_id, price_list_id, agreement_deployment
         )
         if not listing:
             return
         agreement_deployment.listing_id = listing["id"]
 
         vendor_id = listing["vendor"]["id"]
-        licensee = get_licensee(mpt_client, agreement_deployment.licensee_id)
+        licensee = get_licensee(mpt_o_client, agreement_deployment.licensee_id)
         buyer_id = licensee["buyer"]["id"]
 
         adobe_customer = adobe_client.get_customer(
@@ -522,6 +528,7 @@ def process_agreement_deployment(
         ]
 
         gc_agreement_id = create_gc_agreement_deployment(
+            mpt_o_client,
             agreement_deployment,
             vendor_id,
             buyer_id,
