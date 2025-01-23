@@ -1136,7 +1136,7 @@ def test_create_listing(mpt_client, requests_mocker):
         "primary": True,
     }
     requests_mocker.post(
-        urljoin(mpt_client.base_url, "commerce/listings"),
+        urljoin(mpt_client.base_url, "catalog/listings"),
         json=listing,
         status=201,
         match=[

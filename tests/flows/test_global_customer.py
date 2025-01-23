@@ -68,6 +68,8 @@ def test_check_gc_agreement_deployments_no_authorization_id(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -103,6 +105,8 @@ def test_check_gc_agreement_deployments_get_authorization_error(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -145,6 +149,8 @@ def test_check_gc_agreement_deployments_get_authorization_more_than_one(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -181,6 +187,7 @@ def test_check_gc_agreement_deployments_get_price_list_error(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -229,6 +236,8 @@ def test_check_gc_agreement_deployments_no_price_list(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -266,6 +275,8 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -303,6 +314,8 @@ def test_check_gc_agreement_deployments_get_listing_error(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -443,6 +456,7 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",
@@ -480,6 +494,8 @@ def test_check_gc_agreement_deployments_create_listing_error(
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.global_customer.get_adobe_client",

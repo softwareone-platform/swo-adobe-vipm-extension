@@ -453,7 +453,7 @@ def get_listings_by_price_list_and_seller_and_authorization(
 @wrap_http_error
 def create_listing(mpt_client, listing):
     response = mpt_client.post(
-        "/commerce/listings",
+        "/catalog/listings",
         json=listing,
     )
     response.raise_for_status()
