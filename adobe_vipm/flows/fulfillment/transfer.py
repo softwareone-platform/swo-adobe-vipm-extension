@@ -242,12 +242,9 @@ def _fulfill_transfer_migrated(
     one_time_skus,
     gc_main_agreement,
     customer_deployments,
+    adobe_subscriptions
 ):
     authorization_id = order["authorization"]["id"]
-    adobe_subscriptions = adobe_client.get_subscriptions(
-        authorization_id,
-        transfer.customer_id,
-    )
 
     # remove expired items from adobe items
     adobe_items = [
@@ -510,6 +507,7 @@ def _transfer_migrated(
             one_time_skus,
             gc_main_agreement,
             customer_deployments,
+            adobe_subscriptions
         )
 
 
