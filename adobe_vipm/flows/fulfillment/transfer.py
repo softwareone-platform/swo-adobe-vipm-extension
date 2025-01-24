@@ -74,6 +74,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_membership_id,
     get_adobe_order_id,
+    get_global_customer,
     get_market_segment,
     get_one_time_skus,
     get_order_line_by_sku,
@@ -241,7 +242,6 @@ def _fulfill_transfer_migrated(
     adobe_transfer,
     one_time_skus,
     gc_main_agreement,
-    customer_deployments,
     adobe_subscriptions
 ):
     authorization_id = order["authorization"]["id"]
@@ -312,8 +312,6 @@ def _fulfill_transfer_migrated(
         customer,
     )
 
-    save_gc_parameters(mpt_client, order, gc_main_agreement, customer_deployments)
-
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
     transfer.mpt_order_id = order["id"]
@@ -353,11 +351,10 @@ class SaveCustomerData(Step):
 
 
 class SyncGCMainAgreement(Step):
-    def __init__(self, transfer, gc_main_agreement, status, customer_deployments):
+    def __init__(self, transfer, gc_main_agreement, status):
         self.gc_main_agreement = gc_main_agreement
         self.status = status
         self.transfer = transfer
-        self.customer_deployments = customer_deployments
 
     def __call__(self, client, context, next_step):
         sync_main_agreement(
@@ -366,14 +363,11 @@ class SyncGCMainAgreement(Step):
             context.order["authorization"]["id"],
             self.transfer.customer_id,
         )
-        save_gc_parameters(
-            client, context.order, self.gc_main_agreement, self.customer_deployments
-        )
         next_step(client, context)
 
 
 def _create_new_adobe_order(
-    mpt_client, order, transfer, gc_main_agreement, customer_deployments
+    mpt_client, order, transfer, gc_main_agreement
 ):
     # Create new order on Adobe with the items selected by the client
     adobe_customer_id = get_adobe_customer_id(order)
@@ -389,7 +383,7 @@ def _create_new_adobe_order(
         SetOrUpdateCotermNextSyncDates(),
         UpdatePrices(),
         SyncGCMainAgreement(
-            transfer, gc_main_agreement, STATUS_GC_CREATED, customer_deployments
+            transfer, gc_main_agreement, STATUS_GC_CREATED
         ),
         CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
         UpdateTransferStatus(transfer, STATUS_SYNCHRONIZED),
@@ -440,7 +434,7 @@ def _transfer_migrated(
     adobe_order_id = get_adobe_order_id(order)
     if adobe_order_id:
         _create_new_adobe_order(
-            mpt_client, order, transfer, gc_main_agreement, customer_deployments
+            mpt_client, order, transfer, gc_main_agreement
         )
         return
 
@@ -495,7 +489,7 @@ def _transfer_migrated(
         or len(adobe_transfer["lineItems"]) == 0
     ) and not gc_main_agreement:
         _create_new_adobe_order(
-            mpt_client, order, transfer, gc_main_agreement, customer_deployments
+            mpt_client, order, transfer, gc_main_agreement
         )
     else:
         _fulfill_transfer_migrated(
@@ -506,7 +500,6 @@ def _transfer_migrated(
             adobe_transfer,
             one_time_skus,
             gc_main_agreement,
-            customer_deployments,
             adobe_subscriptions
         )
 
@@ -919,7 +912,7 @@ def _check_pending_deployments(
     return True
 
 
-def save_gc_parameters(mpt_client, order, gc_main_agreement, customer_deployments):
+def save_gc_parameters(mpt_client, order, customer_deployments):
     """
     Saves the global customer and deployments parameters to the order.
 
@@ -932,7 +925,8 @@ def save_gc_parameters(mpt_client, order, gc_main_agreement, customer_deployment
         dict: The updated MPT order.
 
     """
-    if not gc_main_agreement:
+    global_customer_enabled = get_global_customer(order)
+    if global_customer_enabled == ["Yes"]:
         return order
 
     deployments = [
@@ -1059,6 +1053,7 @@ def fulfill_transfer_order(mpt_client, order):
         authorization.authorization_id,
         membership_id,
     )
+
     existing_deployments = get_agreement_deployments(
         product_id, order.get("agreement", {}).get("id", "")
     )
@@ -1069,6 +1064,9 @@ def fulfill_transfer_order(mpt_client, order):
     if gc_main_agreement:
         customer_deployments = adobe_client.get_customer_deployments(
             authorization_id, gc_main_agreement.customer_id
+        )
+        order = save_gc_parameters(
+            mpt_client, order, customer_deployments
         )
     if not _check_pending_deployments(
         gc_main_agreement, existing_deployments, customer_deployments
@@ -1159,9 +1157,7 @@ def fulfill_transfer_order(mpt_client, order):
     if commitment_date:  # pragma: no branch
         order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
 
-    order = save_gc_parameters(
-        mpt_client, order, gc_main_agreement, customer_deployments
-    )
+
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)
     sync_agreements_by_agreement_ids(mpt_client, [order["agreement"]["id"]], False)
