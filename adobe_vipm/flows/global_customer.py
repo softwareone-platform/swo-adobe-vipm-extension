@@ -288,10 +288,10 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
 def create_gc_agreement_deployment(
     mpt_o_client,
     agreement_deployment,
-    vendor_id,
-    buyer_id,
     adobe_customer,
     customer_deployment_ids,
+    listing,
+    licensee
 ):
     """
     Create a global customer agreement deployment.
@@ -299,14 +299,19 @@ def create_gc_agreement_deployment(
     Args:
         mpt_o_client (MPTClient): The MPT Operations client instance.
         agreement_deployment (AgreementDeployment): The agreement deployment instance.
-        vendor_id (str): The vendor ID.
-        buyer_id (str): The buyer ID.
         adobe_customer (dict): The Adobe customer data.
         customer_deployment_ids (list): List of customer deployment IDs.
+        listing (dict): The listing data.
+        licensee (dict): The licensee data.
 
     Returns:
         str: The agreement ID if created, None otherwise.
     """
+    product_name = listing["product"]["name"]
+    vendor_id = listing["vendor"]["id"]
+    buyer_id = licensee["buyer"]["id"]
+    account_name = licensee["account"]["name"]
+
     if agreement_deployment.agreement_id:
         return agreement_deployment.agreement_id
 
@@ -342,7 +347,8 @@ def create_gc_agreement_deployment(
             "authorization": {"id": agreement_deployment.authorization_id},
             "vendor": {"id": vendor_id},
             "client": {"id": agreement_deployment.account_id},
-            "name": "RS Adobe VIP Marketplace for Commercial for Area302 (Client)",
+            "name": f"{product_name} for {account_name} - "
+            f"{agreement_deployment.deployment_country}",
             "lines": [],
             "subscriptions": [],
             "parameters": {
@@ -356,8 +362,10 @@ def create_gc_agreement_deployment(
                     },
                     {"externalId": PARAM_ADDRESS, "value": param_address},
                     {"externalId": PARAM_CONTACT, "value": param_contact},
-                    {"externalId": PARAM_MEMBERSHIP_ID,
-                     "value": agreement_deployment.membership_id},
+                    {
+                        "externalId": PARAM_MEMBERSHIP_ID,
+                        "value": agreement_deployment.membership_id,
+                    },
                 ],
                 "fulfillment": [
                     {"externalId": PARAM_GLOBAL_CUSTOMER, "value": ["Yes"]},
@@ -386,7 +394,6 @@ def create_gc_agreement_deployment(
             "template": template,
             "termsAndConditions": [],
         }
-
         agreement = create_agreement(mpt_o_client, gc_agreement_deployment)
         logger.info(f"Created GC agreement deployment {agreement['id']}")
 
@@ -512,9 +519,7 @@ def process_agreement_deployment(
             return
         agreement_deployment.listing_id = listing["id"]
 
-        vendor_id = listing["vendor"]["id"]
         licensee = get_licensee(mpt_o_client, agreement_deployment.licensee_id)
-        buyer_id = licensee["buyer"]["id"]
 
         adobe_customer = adobe_client.get_customer(
             authorization_id, agreement_deployment.customer_id
@@ -530,10 +535,10 @@ def process_agreement_deployment(
         gc_agreement_id = create_gc_agreement_deployment(
             mpt_o_client,
             agreement_deployment,
-            vendor_id,
-            buyer_id,
             adobe_customer,
             customer_deployment_ids,
+            listing,
+            licensee
         )
         if not gc_agreement_id:
             return
@@ -573,7 +578,7 @@ def process_agreement_deployment(
                     agreement_deployment,
                     adobe_subscription,
                     gc_agreement_id,
-                    buyer_id,
+                    licensee["buyer"]["id"],
                     item,
                 )
                 logger.info(
