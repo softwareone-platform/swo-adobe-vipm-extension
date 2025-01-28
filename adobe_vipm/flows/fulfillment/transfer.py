@@ -77,7 +77,6 @@ from adobe_vipm.flows.utils import (
     get_global_customer,
     get_market_segment,
     get_one_time_skus,
-    get_order_line_by_sku,
     get_ordering_parameter,
     has_order_line_updated,
     is_transferring_item_expired,
@@ -951,11 +950,20 @@ def _get_order_line_items_with_deployment_id(adobe_transfer_order, order):
         list: The list of items with deployment ID.
     """
     items_with_deployment = []
-    for item in adobe_transfer_order["lineItems"]:
-        if item.get("deploymentId", ""):
-            order_line_item = get_order_line_by_sku(order, item["offerId"])
-            if order_line_item:
-                items_with_deployment.append(order_line_item["item"]["name"])
+
+    for line in order["lines"]:
+        adobe_items_with_same_offer_id = [
+            item
+            for item in adobe_transfer_order["lineItems"]
+            if line["item"]["externalIds"]["vendor"] in item["offerId"]
+        ]
+        if adobe_items_with_same_offer_id:
+            items_without_deployment = [
+                item for item in adobe_items_with_same_offer_id
+                if not item.get("deploymentId", "")
+            ]
+            if not items_without_deployment:
+                items_with_deployment.append(line["item"]["name"])
     return items_with_deployment
 
 
