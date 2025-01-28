@@ -4910,3 +4910,146 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     mocked_get_gc_agreement_deployments_by_main_agreement.assert_called_once_with(
         "PRD-1111-1111", "AGR-2119-4550-8674-5962"
     )
+
+
+@freeze_time("2024-01-01")
+def test_transfer_gc_account_items_with_and_without_deployment_main_agreement_bulk_migrated(
+    mocker,
+    agreement,
+    order_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_preview_transfer_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    items_factory,
+    subscriptions_factory,
+):
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.membership_id = "membership-id"
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.transfer_id = "a-transfer-id"
+    mocked_transfer.customer_benefits_3yc_status = None
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+
+    mocked_gc_main_agreement = mocker.MagicMock()
+    mocked_gc_main_agreement.main_agreement_id = "main-agreement-id"
+    mocked_gc_main_agreement.status = STATUS_GC_PENDING
+
+    mocked_gc_agreement_deployments_by_main_agreement = mocker.MagicMock()
+    mocked_gc_agreement_deployments_by_main_agreement.status = STATUS_GC_CREATED
+    mocked_gc_agreement_deployments_by_main_agreement.deployment_id = "deployment-id"
+
+    mocked_get_gc_main_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_gc_main_agreement",
+        return_value=mocked_gc_main_agreement,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
+        return_value=[mocked_gc_agreement_deployments_by_main_agreement],
+    )
+
+    adobe_transfer = adobe_transfer_factory(
+        status=STATUS_PROCESSED,
+        customer_id="a-client-id",
+        items=adobe_items_factory(
+            offer_id="65304578CACA01A12",
+            subscription_id="a-sub-id",
+            deployment_id="deployment-id",
+        )
+        + adobe_items_factory(
+            offer_id="65304578CACA01A12", subscription_id="a-sub-id1"
+        ),
+    )
+
+    adobe_transfer_preview = adobe_preview_transfer_factory()
+    adobe_customer = adobe_customer_factory(global_sales_enabled=True)
+    adobe_subscription = adobe_subscription_factory(
+        deployment_id="deployment-id", current_quantity=170
+    )
+    adobe_subscription1 = adobe_subscription_factory(current_quantity=170)
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.return_value = adobe_transfer_preview
+    mocked_adobe_client.create_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_customer.return_value = adobe_customer
+    mocked_adobe_client.get_transfer.return_value = adobe_transfer
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription, adobe_subscription1],
+    }
+    mocked_adobe_client.get_subscription.return_value = adobe_subscription
+    mocked_adobe_client.get_customer_deployments.return_value = {
+        "totalCount": 1,
+        "items": [
+            {
+                "deploymentId": "deployment-id",
+                "status": "1000",
+                "companyProfile": {"address": {"country": "DE"}},
+            }
+        ],
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_subscription",
+        return_value=subscriptions_factory(commitment_date="2024-08-04")[0],
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+    mocked_adobe_client.update_subscription.return_value = adobe_subscription
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
+    )
+
+    fulfill_order(mocked_mpt_client, order)
+
+    authorization_id = order["authorization"]["id"]
+
+    assert mocked_update_order.mock_calls[0].args == (
+        mocked_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                due_date="2024-01-31",
+            ),
+            "ordering": order["parameters"]["ordering"],
+        },
+    }
+
+    mocked_adobe_client.get_transfer.assert_called_once_with(
+        authorization_id, "membership-id", adobe_transfer["transferId"]
+    )
+    mocked_get_gc_main_agreement.assert_called_once_with(
+        "PRD-1111-1111", "AUT-1234-4567", "a-membership-id"
+    )
+    assert order["status"] == MPT_ORDER_STATUS_PROCESSING
