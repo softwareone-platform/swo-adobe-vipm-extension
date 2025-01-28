@@ -444,7 +444,7 @@ def get_listings_by_price_list_and_seller_and_authorization(
     response = mpt_client.get(
         f"/catalog/listings?eq(product.id,{product_id})&eq(priceList.id,{price_list_id})"
         f"&eq(seller.id,{seller_id})"
-        f"&eq(authorization.id,{authorization_id})&eq(primary,True)"
+        f"&eq(authorization.id,{authorization_id})"
     )
     response.raise_for_status()
     return response.json()["data"]
