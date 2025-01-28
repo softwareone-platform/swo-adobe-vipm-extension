@@ -471,6 +471,20 @@ def create_gc_agreement_subscription(
     logger.info(f"Created GC agreement subscription {subscription['id']}")
 
 
+def enable_subscription_auto_renewal(
+    adobe_client, authorization_id, adobe_customer, adobe_subscription
+):
+    if not adobe_subscription["autoRenewal"]["enabled"]:
+        logger.info(f"Enabling auto-renewal for {adobe_subscription['subscriptionId']}")
+        adobe_subscription = adobe_client.update_subscription(
+            authorization_id,
+            adobe_customer["customerId"],
+            adobe_subscription["subscriptionId"],
+            auto_renewal=True,
+        )
+    return adobe_subscription
+
+
 def process_agreement_deployment(
     mpt_client, adobe_client, agreement_deployment, product_id
 ):
@@ -573,6 +587,9 @@ def process_agreement_deployment(
                     f" exists ({subscription['id']})"
                 )
             else:
+                adobe_subscription = enable_subscription_auto_renewal(
+                    adobe_client, authorization_id, adobe_customer, adobe_subscription
+                )
                 create_gc_agreement_subscription(
                     mpt_client,
                     agreement_deployment,
