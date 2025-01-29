@@ -983,6 +983,11 @@ def test_fulfill_transfer_order_already_migrated(
         "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
@@ -1153,6 +1158,12 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
+
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
@@ -1222,6 +1233,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     adobe_customer_factory,
     agreement,
     adobe_subscription_factory,
+    items_factory,
 ):
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -1291,6 +1303,11 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     mocker.patch(
         "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=[],
+    )
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
     )
 
     mocker.patch(
@@ -1424,6 +1441,7 @@ def test_fulfill_transfer_order_already_migrated_(
     adobe_customer_factory,
     agreement,
     adobe_subscription_factory,
+    items_factory,
 ):
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -1441,6 +1459,11 @@ def test_fulfill_transfer_order_already_migrated_(
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
         return_value=None,
+    )
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
     )
 
     mocked_transfer = mocker.MagicMock()
@@ -2061,6 +2084,11 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
+    )
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_gc_main_agreement",
@@ -4006,6 +4034,7 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
     adobe_customer_factory,
     agreement,
     adobe_subscription_factory,
+    items_factory,
 ):
 
     order_params = transfer_order_parameters_factory()
@@ -4037,6 +4066,11 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.send_warning",
         return_value=None,
+    )
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
     )
 
     mocked_transfer = mocker.MagicMock()
@@ -4943,6 +4977,11 @@ def test_transfer_gc_account_items_with_and_without_deployment_main_agreement_bu
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
     mocked_gc_main_agreement = mocker.MagicMock()
@@ -5123,6 +5162,11 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
         return_value=subscriptions_factory(commitment_date="2024-08-04")[0],
     )
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -5135,7 +5179,11 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
         return_value=None,
     )
-
+    product_items = items_factory()
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
     mocker.patch(
         "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
@@ -5226,9 +5274,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
-            "fulfillment": fulfillment_parameters_factory(
-                due_date="2012-02-13",
-            ),
+            "fulfillment": fulfillment_parameters_factory(),
             "ordering": order["parameters"]["ordering"],
         },
     }
