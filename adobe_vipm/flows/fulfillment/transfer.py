@@ -64,7 +64,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_query,
 )
 from adobe_vipm.flows.helpers import SetupContext
-from adobe_vipm.flows.mpt import update_order
+from adobe_vipm.flows.mpt import get_product_items_by_skus, update_order
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
@@ -470,10 +470,18 @@ def _transfer_migrated(
         customer_deployments,
     ):
         return
-
     adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
-
-    one_time_skus = get_one_time_skus(mpt_client, order)
+    returned_skus = [
+        get_partial_sku(item["offerId"]) for item in adobe_subscriptions["items"]
+    ]
+    items = get_product_items_by_skus(
+        mpt_client, order["agreement"]["product"]["id"], returned_skus
+    )
+    one_time_skus = [
+        item["externalIds"]["vendor"]
+        for item in items
+        if item["terms"]["period"] == "one-time"
+    ]
     adobe_items_without_one_time_offers = [
         item
         for item in adobe_subscriptions["items"]
