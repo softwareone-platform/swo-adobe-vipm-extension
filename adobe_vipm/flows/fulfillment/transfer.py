@@ -238,7 +238,6 @@ def _fulfill_transfer_migrated(
     mpt_client,
     order,
     transfer,
-    adobe_transfer,
     one_time_skus,
     gc_main_agreement,
     adobe_subscriptions
@@ -250,6 +249,7 @@ def _fulfill_transfer_migrated(
         item
         for item in adobe_subscriptions["items"]
         if not is_transferring_item_expired(item)
+        and get_partial_sku(item["offerId"]) not in one_time_skus
     ]
 
     # If the order items has been updated, the validation order will fail
@@ -259,7 +259,7 @@ def _fulfill_transfer_migrated(
         return
 
     commitment_date = None
-    if not adobe_transfer["lineItems"]:
+    if not adobe_items:
         error = "No subscriptions found without deployment ID to be added to the main agreement"
         logger.error(error)
         sync_main_agreement(
@@ -270,10 +270,7 @@ def _fulfill_transfer_migrated(
             error,
         )
         return
-    for line in adobe_transfer["lineItems"]:
-        if get_partial_sku(line["offerId"]) in one_time_skus:
-            continue
-
+    for line in adobe_items:
         adobe_subscription = adobe_client.get_subscription(
             authorization_id,
             transfer.customer_id,
@@ -496,7 +493,6 @@ def _transfer_migrated(
             mpt_client,
             order,
             transfer,
-            adobe_transfer,
             one_time_skus,
             gc_main_agreement,
             adobe_subscriptions
@@ -1164,8 +1160,6 @@ def fulfill_transfer_order(mpt_client, order):
 
     if commitment_date:  # pragma: no branch
         order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
-
-
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_TRANSFER)
     sync_agreements_by_agreement_ids(mpt_client, [order["agreement"]["id"]], False)
