@@ -1,11 +1,14 @@
 import copy
+import signal
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
 import jwt
 import pytest
 import responses
+from swo.mpt.extensions.core.events.dataclasses import Event
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
+from swo.mpt.extensions.runtime.master import Master
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
@@ -1511,3 +1514,173 @@ def mock_pricelist_cache_factory(mocker):
 @pytest.fixture()
 def mocked_pricelist_cache(mock_pricelist_cache_factory):
     return mock_pricelist_cache_factory()
+
+
+@pytest.fixture()
+def mocked_setup_master_signal_handler():
+    signal_handler = signal.getsignal(signal.SIGINT)
+
+    def handler(signum, frame):
+        print("Signal handler called with signal", signum)
+        signal.signal(signal.SIGINT, signal_handler)
+
+    signal.signal(signal.SIGINT, handler)
+
+
+@pytest.fixture()
+def mock_gradient_result():
+    return [
+        "#00C9CD",
+        "#07B7D2",
+        "#0FA5D8",
+        "#1794DD",
+        "#1F82E3",
+        "#2770E8",
+        "#2F5FEE",
+        "#374DF3",
+        "#3F3BF9",
+        "#472AFF",
+    ]
+
+
+@pytest.fixture()
+def mock_runtime_master():
+    color = True
+    debug = False
+    reload = True
+    component = "all"
+    return Master(
+        {"color:": color, "debug": debug, "reload": reload, "component": component}
+    )
+
+
+@pytest.fixture()
+def mock_swoext_commands():
+    return (
+        "swo.mpt.extensions.runtime.commands.run.run",
+        "swo.mpt.extensions.runtime.commands.django.django",
+    )
+
+
+@pytest.fixture()
+def mock_dispatcher_event():
+    return {
+        "type": "event",
+        "id": "event-id",
+    }
+
+
+@pytest.fixture()
+def mock_workers_options():
+    return {
+        "color": False,
+        "debug": False,
+        "reload": False,
+        "component": "all",
+    }
+
+
+@pytest.fixture()
+def mock_gunicorn_logging_config():
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "{asctime} {name} {levelname} (pid: {process}) {message}",
+                "style": "{",
+            },
+            "rich": {
+                "format": "%(message)s",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "verbose",
+            },
+            "rich": {
+                "class": "rich.logging.RichHandler",
+                "formatter": "rich",
+                "log_time_format": lambda x: x.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                "rich_tracebacks": True,
+            },
+        },
+        "root": {
+            "handlers": ["rich"],
+            "level": "INFO",
+        },
+        "loggers": {
+            "gunicorn.access": {
+                "handlers": ["rich"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "gunicorn.error": {
+                "handlers": ["rich"],
+                "level": "INFO",
+                "propagate": False,
+            },
+        },
+    }
+
+
+@pytest.fixture()
+def mock_wrap_event():
+    return Event("evt-id", "orders", {"id": "ORD-1111-1111-1111"})
+
+
+@pytest.fixture()
+def mock_meta_with_pagination_has_more_pages():
+    return {
+        "$meta": {
+            "pagination": {
+                "offset": 0,
+                "limit": 10,
+                "total": 12,
+            },
+        },
+    }
+
+
+@pytest.fixture()
+def mock_meta_with_pagination_has_no_more_pages():
+    return {
+        "$meta": {
+            "pagination": {
+                "offset": 0,
+                "limit": 10,
+                "total": 4,
+            },
+        },
+    }
+
+@pytest.fixture()
+def mock_logging_account_prefixes():
+    return ("ACC", "BUY", "LCE", "MOD", "SEL", "USR", "AUSR", "UGR")
+
+@pytest.fixture()
+def mock_logging_catalog_prefixes():
+    return (
+        "PRD",
+        "ITM",
+        "IGR",
+        "PGR",
+        "MED",
+        "DOC",
+        "TCS",
+        "TPL",
+        "WHO",
+        "PRC",
+        "LST",
+        "AUT",
+        "UNT",
+    )
+
+@pytest.fixture()
+def mock_logging_commerce_prefixes():
+    return ("AGR", "ORD", "SUB", "REQ")
+
+@pytest.fixture()
+def mock_logging_aux_prefixes():
+    return ("FIL", "MSG")
