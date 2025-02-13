@@ -12,6 +12,14 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.sdk._logs import (
+    LoggingHandler,
+    LoggerProvider,
+)
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from azure.monitor.opentelemetry.exporter import AzureMonitorLogExporter
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -125,6 +133,16 @@ SERVICE_NAME = os.getenv("SERVICE_NAME", "Swo.Extensions.SwoDefaultExtensions")
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
 USE_APPLICATIONINSIGHTS = APPLICATIONINSIGHTS_CONNECTION_STRING != ""
 
+
+logger_provider = LoggerProvider()
+set_logger_provider(logger_provider)
+exporter = AzureMonitorLogExporter(
+    connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING
+)
+logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+
+azure_log_handler = LoggingHandler()
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -137,6 +155,10 @@ LOGGING = {
             "format": "{message}",
             "style": "{",
         },
+        "opentelemetry": {
+            "format": "(pid: {process}) {message}",
+            "style": "{",
+        }
     },
     "handlers": {
         "console": {
@@ -148,6 +170,10 @@ LOGGING = {
             "formatter": "rich",
             "log_time_format": lambda x: x.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
             "rich_tracebacks": True,
+        },
+        "opentelemetry": {
+            "class": "opentelemetry.sdk._logs.LoggingHandler",
+            "formatter": "opentelemetry",
         },
     },
     "root": {

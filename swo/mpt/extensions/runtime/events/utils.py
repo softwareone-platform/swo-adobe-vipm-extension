@@ -1,7 +1,10 @@
 import logging
 from functools import wraps
 
-from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+from azure.monitor.opentelemetry.exporter import (
+    AzureMonitorTraceExporter,
+    AzureMonitorLogExporter,
+)
 from django.conf import settings
 from django.utils.module_loading import import_string
 from opentelemetry import trace
@@ -46,7 +49,7 @@ def instrument_logging():
 
     DjangoInstrumentor().instrument()
     RequestsInstrumentor().instrument(response_hook=_response_hook)
-    LoggingInstrumentor().instrument()
+    LoggingInstrumentor().instrument(set_logging_format=True)
 
 
 def wrap_for_trace(func, event_type):
