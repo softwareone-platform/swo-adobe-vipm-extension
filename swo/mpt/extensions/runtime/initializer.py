@@ -38,18 +38,23 @@ def initialize(options):
     import django
     from django.conf import settings
 
-    logging_handler = "rich" if options.get("color") else "console"
+    root_logging_handler = "rich" if options.get("color") else "console"
+    if settings.USE_APPLICATIONINSIGHTS:
+        logging_handlers = [root_logging_handler, "opentelemetry"]
+    else:
+        logging_handlers = [root_logging_handler]
+
     logging_level = "DEBUG" if options.get("debug") else "INFO"
 
     app_config_name = get_extension_app_config_name()
     app_root_module, _ = app_config_name.split(".", 1)
     settings.DEBUG = options.get("debug", False)
     settings.INSTALLED_APPS.append(app_config_name)
-    settings.LOGGING["root"]["handlers"] = [logging_handler]
-    settings.LOGGING["loggers"]["swo.mpt"]["handlers"] = [logging_handler]
+    settings.LOGGING["root"]["handlers"] = logging_handlers
+    settings.LOGGING["loggers"]["swo.mpt"]["handlers"] = logging_handlers
     settings.LOGGING["loggers"]["swo.mpt"]["level"] = logging_level
     settings.LOGGING["loggers"][app_root_module] = {
-        "handlers": [logging_handler],
+        "handlers": logging_handlers,
         "level": logging_level,
         "propagate": False,
     }
