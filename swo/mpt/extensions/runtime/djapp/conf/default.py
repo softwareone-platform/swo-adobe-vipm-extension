@@ -13,10 +13,7 @@ import os
 from pathlib import Path
 
 from opentelemetry._logs import set_logger_provider
-from opentelemetry.sdk._logs import (
-    LoggingHandler,
-    LoggerProvider,
-)
+from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from azure.monitor.opentelemetry.exporter import AzureMonitorLogExporter
 
@@ -134,14 +131,13 @@ APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTIO
 USE_APPLICATIONINSIGHTS = APPLICATIONINSIGHTS_CONNECTION_STRING != ""
 
 
-logger_provider = LoggerProvider()
-set_logger_provider(logger_provider)
-exporter = AzureMonitorLogExporter(
-    connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING
-)
-logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
-
-azure_log_handler = LoggingHandler()
+if USE_APPLICATIONINSIGHTS:
+    logger_provider = LoggerProvider()
+    set_logger_provider(logger_provider)
+    exporter = AzureMonitorLogExporter(
+        connection_string=APPLICATIONINSIGHTS_CONNECTION_STRING
+    )
+    logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
 
 LOGGING = {
     "version": 1,
