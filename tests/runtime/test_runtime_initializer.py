@@ -3,9 +3,7 @@ from swo.mpt.extensions.runtime.initializer import get_extension_variables
 
 
 def test_get_extension_variables_valid(
-    monkeypatch,
-    mock_valid_env_values,
-    mock_ext_expected_environment_values
+    monkeypatch, mock_valid_env_values, mock_ext_expected_environment_values
 ):
     for key, value in mock_valid_env_values.items():
         monkeypatch.setenv(key, value)
@@ -15,10 +13,7 @@ def test_get_extension_variables_valid(
     assert mock_ext_expected_environment_values.items() <= extension_variables.items()
 
 
-def test_get_extension_variables_json_error(
-    monkeypatch,
-    mock_invalid_env_values
-):
+def test_get_extension_variables_json_error(monkeypatch, mock_invalid_env_values):
     for key, value in mock_invalid_env_values.items():
         monkeypatch.setenv(key, value)
 

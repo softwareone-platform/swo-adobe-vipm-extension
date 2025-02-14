@@ -836,6 +836,7 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
     }
     return order_line_map != adobe_items_map
 
+
 def get_global_customer(order):
     """
     Get the globalCustomer parameter from the order.
@@ -884,7 +885,11 @@ def get_deployments(order):
         order,
         PARAM_DEPLOYMENTS,
     )
-    return deployments_param.get("value").split(",") if deployments_param.get("value") else []
+    return (
+        deployments_param.get("value").split(",")
+        if deployments_param.get("value")
+        else []
+    )
 
 
 def set_deployments(order, deployments):

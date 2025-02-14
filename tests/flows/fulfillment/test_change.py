@@ -330,6 +330,7 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
     )
     mocked_next_step.assert_not_called()
 
+
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     mocker,
@@ -408,6 +409,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     )
     mocked_next_step.assert_not_called()
 
+
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     mocker,
@@ -481,6 +483,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
         ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37),
     )
     mocked_next_step.assert_not_called()
+
 
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
@@ -557,6 +560,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
         ),
     )
     mocked_next_step.assert_not_called()
+
 
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_item_not_found(

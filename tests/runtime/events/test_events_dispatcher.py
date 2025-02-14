@@ -47,13 +47,15 @@ def test_dispatcher_dispatch_event():
 
 def test_dispatcher_process_events(mocker):
     dispatcher = Dispatcher()
+
     def mocked_done_callback(futures, key, future):
         dispatcher.stop()
         dispatcher.executor.shutdown()
         return
+
     mocker.patch(
         "swo.mpt.extensions.runtime.events.dispatcher.done_callback",
-        mocked_done_callback
+        mocked_done_callback,
     )
     mocker.patch("adobe_vipm.extension.fulfill_order")
     mocked_fulfill_order = mocker.patch("adobe_vipm.extension.fulfill_order")

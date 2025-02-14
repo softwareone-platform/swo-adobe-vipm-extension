@@ -87,7 +87,9 @@ def test_validate_duplicate_lines_step_no_lines(mocker, order_factory):
 )
 def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segment):
     deployment_id = "deployment-id"
-    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
+    adobe_preview_order = adobe_order_factory(
+        ORDER_TYPE_PREVIEW, deployment_id=deployment_id
+    )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocker.patch(
@@ -131,9 +133,13 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segm
     "segment",
     [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
 )
-def test_get_preview_order_step_no_deployment(mocker, order_factory, adobe_order_factory, segment):
+def test_get_preview_order_step_no_deployment(
+    mocker, order_factory, adobe_order_factory, segment
+):
     deployment_id = None
-    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
+    adobe_preview_order = adobe_order_factory(
+        ORDER_TYPE_PREVIEW, deployment_id=deployment_id
+    )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocker.patch(

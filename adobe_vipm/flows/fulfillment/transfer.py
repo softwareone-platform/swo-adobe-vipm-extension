@@ -21,7 +21,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
     STATUS_GC_ERROR,
     STATUS_GC_PENDING,
@@ -240,7 +240,7 @@ def _fulfill_transfer_migrated(
     transfer,
     one_time_skus,
     gc_main_agreement,
-    adobe_subscriptions
+    adobe_subscriptions,
 ):
     authorization_id = order["authorization"]["id"]
 
@@ -362,9 +362,7 @@ class SyncGCMainAgreement(Step):
         next_step(client, context)
 
 
-def _create_new_adobe_order(
-    mpt_client, order, transfer, gc_main_agreement
-):
+def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
     # Create new order on Adobe with the items selected by the client
     adobe_customer_id = get_adobe_customer_id(order)
     if not adobe_customer_id:
@@ -378,9 +376,7 @@ def _create_new_adobe_order(
         CreateOrUpdateSubscriptions(),
         SetOrUpdateCotermNextSyncDates(),
         UpdatePrices(),
-        SyncGCMainAgreement(
-            transfer, gc_main_agreement, STATUS_GC_CREATED
-        ),
+        SyncGCMainAgreement(transfer, gc_main_agreement, STATUS_GC_CREATED),
         CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
         UpdateTransferStatus(transfer, STATUS_SYNCHRONIZED),
     )
@@ -429,9 +425,7 @@ def _transfer_migrated(
     # and, it is pending to review the order status
     adobe_order_id = get_adobe_order_id(order)
     if adobe_order_id:
-        _create_new_adobe_order(
-            mpt_client, order, transfer, gc_main_agreement
-        )
+        _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement)
         return
 
     adobe_client = get_adobe_client()
@@ -492,9 +486,7 @@ def _transfer_migrated(
         are_all_transferring_items_expired(adobe_items_without_one_time_offers)
         or len(adobe_transfer["lineItems"]) == 0
     ) and not gc_main_agreement:
-        _create_new_adobe_order(
-            mpt_client, order, transfer, gc_main_agreement
-        )
+        _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement)
     else:
         _fulfill_transfer_migrated(
             adobe_client,
@@ -503,7 +495,7 @@ def _transfer_migrated(
             transfer,
             one_time_skus,
             gc_main_agreement,
-            adobe_subscriptions
+            adobe_subscriptions,
         )
 
 
@@ -963,7 +955,8 @@ def _get_order_line_items_with_deployment_id(adobe_transfer_order, order):
         ]
         if adobe_items_with_same_offer_id:
             items_without_deployment = [
-                item for item in adobe_items_with_same_offer_id
+                item
+                for item in adobe_items_with_same_offer_id
                 if not item.get("deploymentId", "")
             ]
             if not items_without_deployment:
@@ -1016,7 +1009,7 @@ def get_main_agreement(product_id, authorization_id, membership_id):
         GCMainAgreement or None: The main agreement in Airtable if found, None otherwise.
     """
     if get_market_segment(product_id) == MARKET_SEGMENT_COMMERCIAL:
-        return get_gc_main_agreement( product_id, authorization_id, membership_id)
+        return get_gc_main_agreement(product_id, authorization_id, membership_id)
     return None
 
 
@@ -1077,9 +1070,7 @@ def fulfill_transfer_order(mpt_client, order):
         customer_deployments = adobe_client.get_customer_deployments(
             authorization_id, gc_main_agreement.customer_id
         )
-        order = save_gc_parameters(
-            mpt_client, order, customer_deployments
-        )
+        order = save_gc_parameters(mpt_client, order, customer_deployments)
     if not _check_pending_deployments(
         gc_main_agreement, existing_deployments, customer_deployments
     ):

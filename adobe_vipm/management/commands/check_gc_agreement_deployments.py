@@ -13,6 +13,8 @@ class Command(BaseCommand):
         self.stdout.write(message, ending="\n")
 
     def handle(self, *args, **options):
-        self.info("Start processing Global Customer Agreement Deployments synchronization...")
+        self.info(
+            "Start processing Global Customer Agreement Deployments synchronization..."
+        )
         check_gc_agreement_deployments()
         self.success("Processing Global Customer Agreement Deployments completed.")

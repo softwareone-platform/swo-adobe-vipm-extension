@@ -28,6 +28,7 @@ def test_extension_web_application_load_config(mock_gunicorn_logging_config):
     assert ext_web_app.application == wsgi_app
     assert ext_web_app.options == gunicorn_options
 
+
 def test_start_event_consumer(
     mocker,
     mock_gunicorn_logging_config,
@@ -44,17 +45,14 @@ def test_start_event_consumer(
     mock_initialize.assert_called_once()
     mock_call_command.assert_called_once()
 
+
 def test_start_gunicorn(
     mocker,
     mock_gunicorn_logging_config,
     mock_worker_initialize,
 ):
     mock_initialize = mock_worker_initialize
-    mock_run = mocker.patch.object(
-        ExtensionWebApplication,
-        "run",
-        return_value=None
-    )
+    mock_run = mocker.patch.object(ExtensionWebApplication, "run", return_value=None)
     gunicorn_options = {
         "bind": "localhost:8080",
         "logconfig_dict": mock_gunicorn_logging_config,
