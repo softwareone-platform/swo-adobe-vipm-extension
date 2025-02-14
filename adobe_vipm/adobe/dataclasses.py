@@ -43,13 +43,6 @@ class APIToken:
 
 
 @dataclass(frozen=True)
-class AdobeProduct:
-    sku: str
-    name: str
-    type: str
-
-
-@dataclass(frozen=True)
 class Country:
     code: str
     name: str

@@ -15,7 +15,7 @@ from adobe_vipm.adobe.errors import (
     AuthorizationNotFoundError,
     ResellerNotFoundError,
 )
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     STATUS_GC_PENDING,
 )
 from adobe_vipm.flows.errors import AirTableAPIError

@@ -172,25 +172,28 @@ Find generated data in the `devmock/data` folder. Extension automatically retrie
 # Configuration
 
 ## Application
-| Environment Variable | Default | Example | Description |
-| --- | --- | --- | --- |
-| `EXT_ADOBE_CREDENTIALS_FILE` | - | /extension/adobe_secrets.json | Path to Adobe credentials file |
-| `EXT_ADOBE_AUTHORIZATIONS_FILE` | - | /extension/adobe_authorizations.json | Path to Adobe authorizations file |
-| `EXT_ADOBE_API_BASE_URL` | - | https://partner-example.adobe.io | Path to Adobe VIPM API |
-| `EXT_ADOBE_AUTH_ENDPOINT_URL` | - | https://auth.partner-example.adobe.io | Path to Adobe VIPM authentication API |
-| `EXT_WEBHOOKS_SECRETS` | - |  {"PRD-1111-1111": "123qweasd3432234"} | Webhook secret of the Draft validation Webhook in SoftwareONE Marketplace for the product |
-| `MPT_PRODUCTS_IDS` | PRD-1111-1111 | PRD-1234-1234,PRD-4321-4321 | Comma-separated list of SoftwareONE Marketplace Product ID |
-| `MPT_API_BASE_URL` | http://localhost:8000 | https://portal.softwareone.com/mpt | SoftwareONE Marketplace API URL |
-| `MPT_API_TOKEN` | - | eyJhbGciOiJSUzI1N... | SoftwareONE Marketplace API Token |
+| Environment Variable            | Default               | Example                               | Description                                                                               |
+|---------------------------------|-----------------------|---------------------------------------|-------------------------------------------------------------------------------------------|
+| `EXT_ADOBE_CREDENTIALS_FILE`    | -                     | /extension/adobe_secrets.json         | Path to Adobe credentials file                                                            |
+| `EXT_ADOBE_AUTHORIZATIONS_FILE` | -                     | /extension/adobe_authorizations.json  | Path to Adobe authorizations file                                                         |
+| `EXT_ADOBE_API_BASE_URL`        | -                     | https://partner-example.adobe.io      | Path to Adobe VIPM API                                                                    |
+| `EXT_ADOBE_AUTH_ENDPOINT_URL`   | -                     | https://auth.partner-example.adobe.io | Path to Adobe VIPM authentication API                                                     |
+| `EXT_AIRTABLE_SKU_MAPPING_BASE` | -                     | appXXXXXXXXXXXXXXXX                   | Airtable base ID for the SKU mapping                                                      |
+| `EXT_WEBHOOKS_SECRETS`          | -                     | {"PRD-1111-1111": "123qweasd3432234"} | Webhook secret of the Draft validation Webhook in SoftwareONE Marketplace for the product |
+| `MPT_PRODUCTS_IDS`              | PRD-1111-1111         | PRD-1234-1234,PRD-4321-4321           | Comma-separated list of SoftwareONE Marketplace Product ID                                |
+| `MPT_API_BASE_URL`              | http://localhost:8000 | https://portal.softwareone.com/mpt    | SoftwareONE Marketplace API URL                                                           |
+| `MPT_API_TOKEN`                 | -                     | eyJhbGciOiJSUzI1N...                  | SoftwareONE Marketplace API Token                                                         |
+    
+    
 
 ## Azure AppInsights
-| Environment Variable | Default | Example | Description |
-| --- | --- | --- | --- |
-| `SERVICE_NAME` | Swo.Extensions.AdobeVIPM | Swo.Extensions.AdobeVIPM | Service name that is visible in the AppInsights logs |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | - | InstrumentationKey=cf280af3-b686-40fd-8183-ec87468c12ba;IngestionEndpoint=https://westeurope-1.in.applicationinsights.azure.com/;LiveEndpoint=https://westeurope.livediagnostics.monitor.azure.com/ | Azure Application Insights connection string |
-| `LOGGING_ATTEMPT_GETTER` | adobe_vipm.utils.get_attempt_count | adobe_vipm.utils.get_attempt_count | Path to python function that retrieves order processing attempt to put it into the Azure Application Insights |
+| Environment Variable                    | Default                            | Example                                                                                                                                                                                             | Description                                                                                                   |
+|-----------------------------------------|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `SERVICE_NAME`                          | Swo.Extensions.AdobeVIPM           | Swo.Extensions.AdobeVIPM                                                                                                                                                                            | Service name that is visible in the AppInsights logs                                                          |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | -                                  | InstrumentationKey=cf280af3-b686-40fd-8183-ec87468c12ba;IngestionEndpoint=https://westeurope-1.in.applicationinsights.azure.com/;LiveEndpoint=https://westeurope.livediagnostics.monitor.azure.com/ | Azure Application Insights connection string                                                                  |
+| `LOGGING_ATTEMPT_GETTER`                | adobe_vipm.utils.get_attempt_count | adobe_vipm.utils.get_attempt_count                                                                                                                                                                  | Path to python function that retrieves order processing attempt to put it into the Azure Application Insights |
 
 ## Other
-| Environment Variable | Default | Example | Description |
-| --- | --- | --- | --- |
-| `MPT_ORDERS_API_POLLING_INTERVAL_SECS` | 120| 60 | Orders polling interval from the Software Marketplace API in seconds |
+| Environment Variable                   | Default | Example | Description                                                          |
+|----------------------------------------|---------|---------|----------------------------------------------------------------------|
+| `MPT_ORDERS_API_POLLING_INTERVAL_SECS` | 120     | 60      | Orders polling interval from the Software Marketplace API in seconds |
