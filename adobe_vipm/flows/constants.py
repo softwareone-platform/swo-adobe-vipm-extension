@@ -62,6 +62,7 @@ PARAM_PHASE_FULFILLMENT = "fulfillment"
 
 CANCELLATION_WINDOW_DAYS = 14
 GLOBAL_SUFFIX = "_global"
+LAST_TWO_WEEKS_DAYS = 13
 
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
 

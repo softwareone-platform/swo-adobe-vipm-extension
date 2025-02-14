@@ -1,6 +1,6 @@
 import itertools
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from operator import attrgetter
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -13,7 +13,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.utils import set_order_error
+from adobe_vipm.flows.utils import is_within_last_two_weeks, set_order_error
 from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
 
 logger = logging.getLogger(__name__)
@@ -31,15 +31,12 @@ class ValidateDownsizes(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         errors = []
-        last_two_weeks = (
-            datetime.fromisoformat(context.adobe_customer["cotermDate"])
-            - timedelta(days=13)
-        ).date()
 
-        if date.today() >= last_two_weeks:
+        if is_within_last_two_weeks(context.adobe_customer["cotermDate"]):
             logger.info(
                 "Downsize occurs in the last two weeks before the anniversary date. "
-                "The renewal quantity will be updated without downsize validation."
+                "Returnable orders are not going to be submitted, the renewal quantity "
+                "will be updated. Skip downsize validation."
             )
             next_step(client, context)
             return

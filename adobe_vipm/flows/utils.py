@@ -14,6 +14,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
 )
 from adobe_vipm.flows.constants import (
+    LAST_TWO_WEEKS_DAYS,
     NEW_CUSTOMER_PARAMETERS,
     OPTIONAL_CUSTOMER_ORDER_PARAMS,
     ORDER_TYPE_CHANGE,
@@ -956,3 +957,12 @@ def get_deployment_id(source):
         "deploymentId",
     )
     return param.get("value")
+
+
+def is_within_last_two_weeks(coterm_date):
+    last_two_weeks = (
+            datetime.fromisoformat(coterm_date)
+            - timedelta(days=LAST_TWO_WEEKS_DAYS)
+    ).date()
+
+    return date.today() >= last_two_weeks
