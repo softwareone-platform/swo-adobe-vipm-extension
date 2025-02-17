@@ -44,6 +44,7 @@ from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
         [{"orderId": "a"}, {"orderId": "b"}],
     ],
 )
+@freeze_time("2024-11-09 12:30:00")
 def test_get_returnable_orders_step(
     mocker,
     order_factory,
@@ -62,7 +63,7 @@ def test_get_returnable_orders_step(
             old_quantity=7,
         )
     )
-    adobe_customer = adobe_customer_factory()
+    adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -131,6 +132,7 @@ def test_get_returnable_orders_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@freeze_time("2024-11-09 12:30:00")
 def test_get_returnable_orders_step_no_returnable_order(
     mocker,
     order_factory,
@@ -149,7 +151,7 @@ def test_get_returnable_orders_step_no_returnable_order(
             old_quantity=7,
         )
     )
-    adobe_customer = adobe_customer_factory()
+    adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
 
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
@@ -186,6 +188,7 @@ def test_get_returnable_orders_step_no_returnable_order(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@freeze_time("2024-11-09 12:30:00")
 def test_get_returnable_orders_step_quantity_mismatch(
     mocker,
     order_factory,
@@ -205,7 +208,7 @@ def test_get_returnable_orders_step_quantity_mismatch(
             old_quantity=16,
         )
     )
-    adobe_customer = adobe_customer_factory()
+    adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -274,6 +277,53 @@ def test_get_returnable_orders_step_quantity_mismatch(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@freeze_time("2025-02-14 12:30:00")
+def test_get_returnable_orders_step_last_two_weeks(
+    mocker,
+    order_factory,
+    lines_factory,
+    adobe_customer_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+    """
+    Tests the computation of the map of returnable orders by sku/quantity.
+    """
+    order = order_factory(
+        lines=lines_factory(
+            quantity=3,
+            old_quantity=7,
+        )
+    )
+    adobe_customer = adobe_customer_factory(coterm_date="2025-02-20")
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+        adobe_customer_id=adobe_customer["customerId"],
+        adobe_customer=adobe_customer,
+        adobe_return_orders={},
+    )
+
+    step = GetReturnableOrders()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.adobe_returnable_orders == {}
+    mocked_adobe_client.get_returnable_orders_by_sku.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
 def test_validate_returnable_orders_step(mocker, order_factory):
     """
     Tests the validate returnable orders step when all downsize SKUs
@@ -329,6 +379,7 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
         "following SKUs: sku2",
     )
     mocked_next_step.assert_not_called()
+
 
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
@@ -408,6 +459,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     )
     mocked_next_step.assert_not_called()
 
+
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     mocker,
@@ -481,6 +533,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
         ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37),
     )
     mocked_next_step.assert_not_called()
+
 
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
@@ -557,6 +610,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
         ),
     )
     mocked_next_step.assert_not_called()
+
 
 @freeze_time("2024-11-09 12:30:00")
 def test_validate_downsize_3yc_orders_step_error_item_not_found(
