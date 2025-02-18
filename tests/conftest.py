@@ -670,22 +670,22 @@ def fulfillment_parameters_factory():
                 "name": "Global Customer",
                 "type": "Checkbox",
                 "displayValue": "Yes",
-                "value": [global_customer]
+                "value": [global_customer],
             },
             {
                 "id": "PAR-6179-6384-0025",
                 "externalId": PARAM_DEPLOYMENT_ID,
                 "name": "Deployment ID",
                 "type": "SingleLineText",
-                "value": deployment_id
+                "value": deployment_id,
             },
             {
                 "id": "PAR-6179-6384-0026",
                 "externalId": PARAM_DEPLOYMENTS,
                 "name": "Deployments",
                 "type": "MultiLineText",
-                "value": ",".join(deployments)
-            }
+                "value": ",".join(deployments),
+            },
         ]
 
     return _fulfillment_parameters
@@ -748,7 +748,7 @@ def lines_factory(agreement, deployment_id: str = None):
         quantity=170,
         external_vendor_id="65304578CA",
         unit_purchase_price=1234.55,
-        deployment_id=deployment_id
+        deployment_id=deployment_id,
     ):
         line = {
             "item": {
@@ -996,6 +996,8 @@ def order_factory(
     lines_factory,
     status="Processing",
     deployment_id="",
+    licensee_seller_id="",
+    authorization_owner_id="",
 ):
     """
     Marketplace platform order for tests.
@@ -1012,6 +1014,8 @@ def order_factory(
         status=status,
         template=None,
         deployment_id=deployment_id,
+        licensee_seller_id=licensee_seller_id,
+        authorization_owner_id=authorization_owner_id,
     ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
@@ -1055,6 +1059,20 @@ def order_factory(
             order["externalIds"] = external_ids
         if template:
             order["template"] = template
+        if licensee_seller_id:
+            order["licensee"] = {
+                "seller": {
+                    "id": licensee_seller_id,
+                }
+            }
+        if authorization_owner_id:
+            order["listing"] = {
+                "authorization": {
+                    "owner": {
+                        "id": authorization_owner_id,
+                    }
+                }
+            }
         return order
 
     return _order
@@ -1129,8 +1147,7 @@ def webhook(settings):
 
 @pytest.fixture()
 def adobe_items_factory(
-    deployment_id: str = None,
-    deployment_currency_code: str = None
+    deployment_id: str = None, deployment_currency_code: str = None
 ):
     def _items(
         line_number=1,
@@ -1140,8 +1157,8 @@ def adobe_items_factory(
         renewal_date=None,
         status=None,
         deployment_id=deployment_id,
-        currencyCode= None,
-        deployment_currency_code=deployment_currency_code
+        currencyCode=None,
+        deployment_currency_code=deployment_currency_code,
     ):
         item = {
             "extLineItemNumber": line_number,
@@ -1160,6 +1177,7 @@ def adobe_items_factory(
         if status:
             item["status"] = status
         return [item]
+
     return _items
 
 
@@ -1179,9 +1197,9 @@ def adobe_order_factory(adobe_items_factory):
         order = {
             "externalReferenceId": external_id,
             "orderType": order_type,
-            "lineItems": items or adobe_items_factory(
-                deployment_id=deployment_id,
-                deployment_currency_code=currency_code
+            "lineItems": items
+            or adobe_items_factory(
+                deployment_id=deployment_id, deployment_currency_code=currency_code
             ),
         }
 
@@ -1487,7 +1505,7 @@ def adobe_customer_factory():
                 },
             ],
             "cotermDate": coterm_date,
-            "globalSalesEnabled":global_sales_enabled,
+            "globalSalesEnabled": global_sales_enabled,
         }
         if commitment or commitment_request or recommitment_request:
             customer["benefits"] = [
@@ -1543,6 +1561,7 @@ def mock_gradient_result():
         "#3F3BF9",
         "#472AFF",
     ]
+
 
 @pytest.fixture()
 def mock_runtime_master_options():
@@ -1656,9 +1675,11 @@ def mock_meta_with_pagination_has_no_more_pages():
         },
     }
 
+
 @pytest.fixture()
 def mock_logging_account_prefixes():
     return ("ACC", "BUY", "LCE", "MOD", "SEL", "USR", "AUSR", "UGR")
+
 
 @pytest.fixture()
 def mock_logging_catalog_prefixes():
@@ -1678,13 +1699,16 @@ def mock_logging_catalog_prefixes():
         "UNT",
     )
 
+
 @pytest.fixture()
 def mock_logging_commerce_prefixes():
     return ("AGR", "ORD", "SUB", "REQ")
 
+
 @pytest.fixture()
 def mock_logging_aux_prefixes():
     return ("FIL", "MSG")
+
 
 @pytest.fixture()
 def mock_logging_all_prefixes(
@@ -1700,15 +1724,18 @@ def mock_logging_all_prefixes(
         *mock_logging_aux_prefixes,
     )
 
+
 @pytest.fixture()
 def mock_highlights(mock_logging_all_prefixes):
     return _ReprHighlighter.highlights + [
         rf"(?P<mpt_id>(?:{'|'.join(mock_logging_all_prefixes)})(?:-\d{{4}})*)"
     ]
 
+
 @pytest.fixture()
 def mock_settings_product_ids():
     return ",".join(settings.MPT_PRODUCTS_IDS)
+
 
 @pytest.fixture()
 def mock_ext_expected_environment_values(
@@ -1726,29 +1753,36 @@ def mock_ext_expected_environment_values(
         "EMAIL_NOTIFICATION_SENDER": mock_email_notification_sender,
     }
 
+
 @pytest.fixture()
 def mock_env_webhook_secret():
     return '{ "webhook_secret": "WEBHOOK_SECRET" }'
+
 
 @pytest.fixture()
 def mock_env_airtable_base():
     return '{ "airtable_base": "AIRTABLE_BASE" }'
 
+
 @pytest.fixture()
 def mock_env_airtable_pricing_base():
     return '{ "airtable_pricing_base": "AIRTABLE_PRICING_BASE" }'
+
 
 @pytest.fixture()
 def mock_env_product_segment():
     return '{ "product_segment": "PRODUCT_SEGMENT" }'
 
+
 @pytest.fixture()
 def mock_email_notification_sender():
     return "email_sender"
 
+
 @pytest.fixture()
 def mock_env_invalid_product_segment():
     return '{ "field_1": , , "field2": "very bad json"}'
+
 
 @pytest.fixture()
 def mock_valid_env_values(
@@ -1766,6 +1800,7 @@ def mock_valid_env_values(
         "EXT_EMAIL_NOTIFICATION_SENDER": mock_email_notification_sender,
     }
 
+
 @pytest.fixture()
 def mock_invalid_env_values(
     mock_env_webhook_secret,
@@ -1782,9 +1817,11 @@ def mock_invalid_env_values(
         "EXT_EMAIL_NOTIFICATION_SENDER": mock_email_notification_sender,
     }
 
+
 @pytest.fixture()
 def mock_worker_initialize(mocker):
     return mocker.patch("swo.mpt.extensions.runtime.workers.initialize")
+
 
 @pytest.fixture()
 def mock_worker_call_command(mocker):
@@ -1792,13 +1829,10 @@ def mock_worker_call_command(mocker):
 
 
 @pytest.fixture()
-def mock_get_order_for_producer(
-    order,
-    order_factory
-):
+def mock_get_order_for_producer(order, order_factory):
     order = order_factory()
 
-    return  {
+    return {
         "data": [order],
         "$meta": {
             "pagination": {
