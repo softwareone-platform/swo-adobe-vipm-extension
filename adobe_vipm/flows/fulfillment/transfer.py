@@ -807,6 +807,53 @@ def _check_gc_main_agreement(gc_main_agreement, order):
     return True
 
 
+def _check_order_seller_for_main_agreement(mpt_client, gc_main_agreement, order):
+    logger.info("checking seller for main agreement")
+    if gc_main_agreement:
+        licensee_seller_id = (order
+                              .get("licensee", {})
+                              .get("seller", {})
+                              .get("id", ""))
+        authorization_owner_id = (order
+            .get("listing", {})
+            .get("authorization", {})
+            .get("owner", {})
+            .get("id", "")
+        )
+        if licensee_seller_id != authorization_owner_id:
+            reason = (
+                f"Order seller id {licensee_seller_id} is different from "
+                f"the authorization owner id {authorization_owner_id}."
+            )
+            switch_order_to_failed(mpt_client, order, reason)
+            logger.warning(f"Transfer Order {order['id']} has been failed: {reason}.")
+            return False
+    return True
+
+
+def _check_order_seller_for_deployments(
+    mpt_client, gc_main_agreement, existing_deployments, order
+):
+    logger.info("checking order seller for deployments")
+    if gc_main_agreement and existing_deployments:
+        licensee_seller_id = (order
+                              .get("licensee", {})
+                              .get("seller", {})
+                              .get("id", ""))
+        for deployment in existing_deployments:
+            if deployment.seller_id != licensee_seller_id:
+                reason = (
+                    f"Order seller id {licensee_seller_id} is different from "
+                    f"the deployment seller id {deployment.seller_id}."
+                )
+                switch_order_to_failed(mpt_client, order, reason)
+                logger.warning(
+                    f"Transfer Order {order['id']} has been failed: {reason}."
+                )
+                return False
+    return True
+
+
 def create_agreement_subscriptions(
     adobe_transfer_order, mpt_client, order, adobe_client, customer
 ):
@@ -1077,6 +1124,15 @@ def fulfill_transfer_order(mpt_client, order):
         order = save_gc_parameters(mpt_client, order, customer_deployments)
     if not _check_pending_deployments(
         gc_main_agreement, existing_deployments, customer_deployments
+    ):
+        return
+
+    # Check seller for main agreement and deployments
+    if not _check_order_seller_for_main_agreement(mpt_client, gc_main_agreement, order):
+        return
+
+    if not _check_order_seller_for_deployments(
+        mpt_client, gc_main_agreement, existing_deployments, order
     ):
         return
 

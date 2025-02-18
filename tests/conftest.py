@@ -1032,6 +1032,8 @@ def order_factory(
     lines_factory,
     status="Processing",
     deployment_id="",
+    licensee_seller_id="",
+    authorization_owner_id="",
 ):
     """
     Marketplace platform order for tests.
@@ -1048,6 +1050,8 @@ def order_factory(
         status=status,
         template=None,
         deployment_id=deployment_id,
+        licensee_seller_id=licensee_seller_id,
+        authorization_owner_id=authorization_owner_id,
     ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
@@ -1091,6 +1095,20 @@ def order_factory(
             order["externalIds"] = external_ids
         if template:
             order["template"] = template
+        if licensee_seller_id:
+            order["licensee"] = {
+                "seller": {
+                    "id": licensee_seller_id,
+                }
+            }
+        if authorization_owner_id:
+            order["listing"] = {
+                "authorization": {
+                    "owner": {
+                        "id": authorization_owner_id,
+                    }
+                }
+            }
         return order
 
     return _order
