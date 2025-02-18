@@ -18,6 +18,7 @@ from pyairtable.orm import Model, fields
 from requests import HTTPError
 from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
+from adobe_vipm.adobe.errors import AdobeProductNotFoundError
 from adobe_vipm.utils import find_first
 
 STATUS_INIT = "init"
@@ -70,6 +71,13 @@ class AirTableBaseInfo:
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
             base_id=get_for_product(settings, "AIRTABLE_PRICING_BASES", product_id),
+        )
+
+    @staticmethod
+    def for_sku_mapping():
+        return AirTableBaseInfo(
+            api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
+            base_id=settings.EXTENSION_CONFIG["AIRTABLE_SKU_MAPPING_BASE"],
         )
 
 
@@ -659,3 +667,52 @@ def get_agreement_deployment_view_link(product_id):
         return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
     except HTTPError:
         pass
+
+
+@cache
+def get_sku_adobe_mapping_model(
+    base_info: AirTableBaseInfo,
+):
+    class AdobeProductMapping(Model):
+        vendor_external_id = fields.TextField("vendor_external_id")
+        sku = fields.TextField("sku")
+        segment = fields.SelectField("segment")
+        name = fields.TextField("name")
+
+        class Meta:
+            table_name = "SKU Mapping"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+
+        @classmethod
+        def from_short_id(cls, vendor_external_id:str):
+            entity = cls.first(
+                formula=EQUAL(FIELD("vendor_external_id"), STR_VALUE(vendor_external_id))
+            )
+            if entity is None:
+                raise AdobeProductNotFoundError(
+                    f"AdobeProduct with vendor_external_id `{vendor_external_id}` not found."
+                )
+
+            return entity
+
+    return AdobeProductMapping
+
+
+def get_adobe_product_by_marketplace_sku(
+    vendor_external_id: str,
+):
+    """
+    Get an AdobeProductMapping object by the vendor_external_id.
+
+    Args:
+        vendor_external_id (str): The vendor external id to search for the AdobeProductMapping.
+
+    Raises:
+        AdobeProductNotFoundError: If no AdobeProductMapping exists for the given
+        vendor external id.
+    """
+
+    AdobeItemModel = get_sku_adobe_mapping_model(AirTableBaseInfo.for_sku_mapping())
+    return AdobeItemModel.from_short_id(vendor_external_id)
+

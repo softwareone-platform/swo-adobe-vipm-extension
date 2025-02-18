@@ -22,7 +22,13 @@ def test_sync_agreement_prices(
     lines_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
     agreement = agreement_factory(
         lines=lines_factory(
             external_vendor_id="77777777CA",
@@ -78,6 +84,11 @@ def test_sync_agreement_prices(
     ]
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
         coterm_date="2025-04-04"
+    )
+
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     mocker.patch(
@@ -214,6 +225,7 @@ def test_sync_agreement_prices_dry_run(
     lines_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -238,6 +250,11 @@ def test_sync_agreement_prices_dry_run(
     mocker.patch(
         "adobe_vipm.flows.sync.get_adobe_client",
         return_value=mocked_adobe_client,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     mocked_get_agreement_subscription = mocker.patch(
@@ -329,8 +346,7 @@ def test_sync_agreement_prices_exception(
     mocked_update_agreement_subscription.assert_not_called()
     mocked_update_agreement.assert_not_called()
     mocked_notifier.assert_called_once()
-    assert mocked_notifier.call_args_list[0].args[0] == agreement['id']
-
+    assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
 
 
 def test_sync_agreement_prices_skip_processing(
@@ -444,6 +460,7 @@ def test_sync_agreement_prices_with_3yc(
     adobe_subscription_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -487,6 +504,11 @@ def test_sync_agreement_prices_with_3yc(
 
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     sync_agreement(mocked_mpt_client, agreement, False)
@@ -546,6 +568,7 @@ def test_sync_global_customer_parameter(
     lines_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -639,6 +662,11 @@ def test_sync_global_customer_parameter(
 
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     sync_agreement(mocked_mpt_client, agreement, False)
@@ -758,6 +786,7 @@ def test_sync_global_customer_update_not_required(
     lines_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -816,6 +845,12 @@ def test_sync_global_customer_update_not_required(
         adobe_subscription,
         another_adobe_subscription,
     ]
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
     mocked_adobe_client.get_customer_deployments.return_value = {
         "totalCount": 1,
         "items": [
@@ -966,6 +1001,7 @@ def test_sync_global_customer_update_adobe_error(
     adobe_subscription_factory,
     adobe_customer_factory,
     adobe_api_error_factory,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -1065,6 +1101,11 @@ def test_sync_global_customer_update_adobe_error(
 
     mocked_notifier = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     sync_agreement(mocked_mpt_client, agreement, False)
@@ -1167,7 +1208,7 @@ def test_sync_global_customer_update_adobe_error(
     )
     mocked_adobe_client.get_customer_deployments.assert_called_once()
     mocked_notifier.assert_called_once()
-    assert mocked_notifier.call_args_list[0].args[0] == agreement['id']
+    assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
 
 
 def test_sync_agreement_error_getting_adobe_customer(
@@ -1235,25 +1276,25 @@ def test_sync_agreement_error_getting_adobe_customer(
     sync_agreement(mocked_mpt_client, agreement, False)
     mocked_adobe_client.get_customer.assert_called_once()
     mocked_notifier.assert_called_once()
-    assert mocked_notifier.call_args_list[0].args[0] == agreement['id']
+    assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
 
 
 def test_sync_agreement_notify_exception(
     mocker,
     agreement_factory,
-
-    ):
+):
     mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
     mocker.patch(
         "adobe_vipm.flows.sync.get_adobe_customer_id",
-        side_effect=Exception("Test exception")
+        side_effect=Exception("Test exception"),
     )
-    mpt_client=mocker.MagicMock()
+    mpt_client = mocker.MagicMock()
     agreement = agreement_factory()
     sync_agreement(mpt_client, agreement, False)
     mock_notify_agreement_unhandled_exception_in_teams.assert_called_once()
-    assert (mock_notify_agreement_unhandled_exception_in_teams.call_args_list[0].args[0]
-            == agreement['id'])
-
+    assert (
+        mock_notify_agreement_unhandled_exception_in_teams.call_args_list[0].args[0]
+        == agreement["id"]
+    )

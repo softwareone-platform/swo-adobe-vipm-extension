@@ -421,8 +421,10 @@ def get_all_agreements(
 def get_authorizations_by_currency_and_seller_id(
     mpt_client, product_id, currency, owner_id
 ):
-    authorization_filter = (f"eq(product.id,{product_id})&eq(currency,{currency})"
-                            f"&eq(owner.id,{owner_id})")
+    authorization_filter = (
+        f"eq(product.id,{product_id})&eq(currency,{currency})"
+        f"&eq(owner.id,{owner_id})"
+    )
     response = mpt_client.get(f"/catalog/authorizations?{authorization_filter}")
     response.raise_for_status()
     return response.json()["data"]
@@ -488,7 +490,9 @@ def get_listing_by_id(mpt_client, listing_id):
 
 
 @wrap_http_error
-def get_agreement_subscription_by_external_id(mpt_client, agreement_id, subscription_external_id):
+def get_agreement_subscription_by_external_id(
+    mpt_client, agreement_id, subscription_external_id
+):
     response = mpt_client.get(
         f"/commerce/subscriptions?eq(externalIds.vendor,{subscription_external_id})"
         f"&eq(agreement.id,{agreement_id})"

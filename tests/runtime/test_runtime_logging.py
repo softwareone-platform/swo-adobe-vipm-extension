@@ -1,4 +1,3 @@
-
 from swo.mpt.extensions.runtime.logging import ReprHighlighter
 
 

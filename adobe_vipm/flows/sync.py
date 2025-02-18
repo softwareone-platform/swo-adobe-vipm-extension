@@ -4,10 +4,13 @@ import traceback
 from datetime import date, datetime, timedelta
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.utils import get_3yc_commitment
-from adobe_vipm.flows.airtable import get_prices_for_3yc_skus, get_prices_for_skus
+from adobe_vipm.airtable.models import (
+    get_adobe_product_by_marketplace_sku,
+    get_prices_for_3yc_skus,
+    get_prices_for_skus,
+)
 from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_CURRENT_QUANTITY,
@@ -55,7 +58,6 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
     agreement_id = agreement["id"]
 
     try:
-        adobe_config = get_config()
         authorization_id = agreement["authorization"]["id"]
         customer_id = get_adobe_customer_id(agreement)
         currency = agreement["listing"]["priceList"]["currency"]
@@ -169,7 +171,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
 
         to_update = []
         for line in agreement["lines"]:
-            actual_sku = adobe_config.get_adobe_product(
+            actual_sku = get_adobe_product_by_marketplace_sku(
                 line["item"]["externalIds"]["vendor"]
             ).sku
             discount_level = (
@@ -223,8 +225,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
     except Exception:
         logger.exception(f"Cannot sync agreement {agreement_id}")
         notify_agreement_unhandled_exception_in_teams(
-            agreement["id"],
-            traceback.format_exc()
+            agreement["id"], traceback.format_exc()
         )
 
 
@@ -292,8 +293,7 @@ def sync_global_customer_parameters(mpt_client, adobe_client, customer, agreemen
             f"{agreement["id"]}: {e}"
         )
         notify_agreement_unhandled_exception_in_teams(
-            agreement["id"],
-            traceback.format_exc()
+            agreement["id"], traceback.format_exc()
         )
 
 
@@ -325,8 +325,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
     except Exception as e:
         logger.error(f"Error synchronizing agreement {agreement["id"]}: {e}")
         notify_agreement_unhandled_exception_in_teams(
-            agreement["id"],
-            traceback.format_exc()
+            agreement["id"], traceback.format_exc()
         )
 
 

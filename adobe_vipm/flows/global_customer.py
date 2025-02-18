@@ -6,7 +6,7 @@ from swo.mpt.extensions.core.utils import setup_client
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.utils import sanitize_company_name, sanitize_first_last_name
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
     STATUS_GC_ERROR,
     get_gc_agreement_deployments_to_check,
@@ -54,7 +54,6 @@ logger = logging.getLogger(__name__)
 def get_adobe_subscriptions_by_deployment(
     adobe_client, authorization_id, agreement_deployment
 ):
-
     try:
         adobe_subscriptions = adobe_client.get_subscriptions(
             authorization_id, agreement_deployment.customer_id
@@ -230,7 +229,7 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             agreement_deployment.product_id,
             price_list_id,
             agreement_deployment.seller_id,
-            authorization_id
+            authorization_id,
         )
     except Exception as e:
         logger.error(f"Error getting listings: {e}")
@@ -291,7 +290,7 @@ def create_gc_agreement_deployment(
     adobe_customer,
     customer_deployment_ids,
     listing,
-    licensee
+    licensee,
 ):
     """
     Create a global customer agreement deployment.
@@ -552,7 +551,7 @@ def process_agreement_deployment(
             adobe_customer,
             customer_deployment_ids,
             listing,
-            licensee
+            licensee,
         )
         if not gc_agreement_id:
             return

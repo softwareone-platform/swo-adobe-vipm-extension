@@ -24,7 +24,7 @@ from adobe_vipm.adobe.utils import (
     sanitize_company_name,
     sanitize_first_last_name,
 )
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     get_prices_for_3yc_skus,
     get_prices_for_skus,
 )
@@ -671,9 +671,13 @@ class SubmitReturnOrders(Step):
             for returnable_order, return_order in map_returnable_to_return_orders(
                 returnable_orders or [], return_orders
             ):
-                returnable_order_deployment_id = returnable_order.line.get("deploymentId", None)
+                returnable_order_deployment_id = returnable_order.line.get(
+                    "deploymentId", None
+                )
                 is_returnable = (
-                    (deployment_id == returnable_order_deployment_id) if deployment_id else True
+                    (deployment_id == returnable_order_deployment_id)
+                    if deployment_id
+                    else True
                 )
                 if is_returnable:
                     if return_order:

@@ -28,9 +28,7 @@ def test_event_producer_produce_events(
     )
 
     mock_get_processing_orders = mocker.patch.object(
-        OrderEventProducer,
-        "get_processing_orders",
-        return_value=[order_to_process]
+        OrderEventProducer, "get_processing_orders", return_value=[order_to_process]
     )
 
     order_event_producer.start()
@@ -38,6 +36,7 @@ def test_event_producer_produce_events(
 
     mock_get_processing_orders.assert_called()
     assert mock_dispatch_event_func.is_called
+
 
 def test_event_producer_get_processing_orders(
     mpt_client,
@@ -55,10 +54,7 @@ def test_event_producer_get_processing_orders(
         f"&limit={limit}&offset={offset}"
     )
     requests_mocker.get(
-        urljoin(
-            mpt_client.base_url,
-            url
-        ),
+        urljoin(mpt_client.base_url, url),
         json=mock_get_order_for_producer,
     )
 
@@ -114,6 +110,7 @@ def test_event_producer_start():
     dispatcher.stop()
     dispatcher.executor.shutdown()
     assert is_running
+
 
 def test_event_producer_stop():
     dispatcher = Dispatcher()

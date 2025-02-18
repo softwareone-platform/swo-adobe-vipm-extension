@@ -45,4 +45,3 @@ def test_registry_is_event_not_supported():
         pass
 
     assert not registry.is_event_supported("unknown")
-
