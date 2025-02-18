@@ -24,7 +24,7 @@ from adobe_vipm.adobe.utils import (
     sanitize_company_name,
     sanitize_first_last_name,
 )
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     get_prices_for_3yc_skus,
     get_prices_for_skus,
 )

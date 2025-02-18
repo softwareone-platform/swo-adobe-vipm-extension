@@ -17,7 +17,7 @@ def test_check_gc_agreement_deployments_no_licensee(mocker, mpt_client, settings
     )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -44,7 +44,7 @@ def test_check_gc_agreement_deployments_unexpected_error(
     )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     error = AirTableAPIError(
@@ -82,7 +82,7 @@ def test_check_gc_agreement_deployments_no_authorization_id(
         return_value=[],
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -126,7 +126,7 @@ def test_check_gc_agreement_deployments_get_authorization_error(
         side_effect=error,
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -163,7 +163,7 @@ def test_check_gc_agreement_deployments_get_authorization_more_than_one(
         return_value=[mocker.MagicMock(), mocker.MagicMock()],
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -211,7 +211,7 @@ def test_check_gc_agreement_deployments_get_price_list_error(
         return_value=[mocker.MagicMock()],
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -251,7 +251,7 @@ def test_check_gc_agreement_deployments_no_price_list(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -290,7 +290,7 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -343,7 +343,7 @@ def test_check_gc_agreement_deployments_get_listing_error(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -415,7 +415,7 @@ def test_check_gc_agreement_deployments_create_listing(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -469,7 +469,7 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
         return_value=[mocker.MagicMock(), mocker.MagicMock()],
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -508,7 +508,7 @@ def test_check_gc_agreement_deployments_create_listing_error(
         return_value=[],
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     error_data = mpt_error_factory(
@@ -589,7 +589,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -674,7 +674,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -759,7 +759,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     product_items = items_factory()
@@ -844,7 +844,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     product_items = items_factory()
@@ -937,7 +937,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     product_items = items_factory()
@@ -1023,7 +1023,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     )
 
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     product_items = items_factory()

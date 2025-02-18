@@ -16,7 +16,7 @@ from adobe_vipm.adobe.errors import (
     ResellerNotFoundError,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     STATUS_GC_PENDING,
     create_gc_main_agreement,
     create_offers,

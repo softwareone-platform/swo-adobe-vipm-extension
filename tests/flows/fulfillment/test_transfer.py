@@ -16,7 +16,7 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_TRANSFER_STATUSES,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
     STATUS_GC_ERROR,
     STATUS_GC_PENDING,
@@ -4036,7 +4036,6 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
     adobe_subscription_factory,
     items_factory,
 ):
-
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
 
@@ -4248,7 +4247,6 @@ def test_transfer_gc_account_items_with_deployment_main_agreement(
     items_factory,
     subscriptions_factory,
 ):
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],

@@ -5,13 +5,11 @@ from typing import List, MutableMapping, Tuple
 from django.conf import settings
 
 from adobe_vipm.adobe.dataclasses import (
-    AdobeProduct,
     Authorization,
     Country,
     Reseller,
 )
 from adobe_vipm.adobe.errors import (
-    AdobeProductNotFoundError,
     AuthorizationNotFoundError,
     CountryNotFoundError,
     ResellerNotFoundError,
@@ -26,7 +24,6 @@ class Config:
         self.language_codes: List[str] = []
         self.resellers: MutableMapping[Tuple[Authorization, str], Reseller] = {}
         self.authorizations: MutableMapping[str, Authorization] = {}
-        self.skus_mapping: MutableMapping[str, AdobeProduct] = {}
         self.countries: MutableMapping[str, Country] = {}
         self._setup()
 
@@ -107,29 +104,6 @@ class Config:
             bool: True if it exists False otherwise.
         """
         return (authorization, id) in self.resellers
-
-    def get_adobe_product(self, vendor_external_id: str) -> AdobeProduct:
-        """
-        Returns the AdobeProduct object identified by the vendor
-        external id (partial SKU).
-
-        Args:
-            vendor_external_id (str): The vendor external id to search
-                for the AdobeProduct.
-
-        Raises:
-            AdobeProductNotFoundError: If no AdobeProduct exists for the
-                given vendor external id.
-
-        Returns:
-            AdobeProduct: The AdobeProduct object.
-        """
-        try:
-            return self.skus_mapping[vendor_external_id]
-        except KeyError:
-            raise AdobeProductNotFoundError(
-                f"AdobeProduct with id {vendor_external_id} not found."
-            )
 
     def get_country(self, code: str) -> Country:
         """
@@ -225,12 +199,6 @@ class Config:
                 if seller_id:  # pragma: no branch
                     self.resellers[(authorization, seller_id)] = reseller
 
-        for product in config_data["skus_mapping"]:
-            self.skus_mapping[product["vendor_external_id"]] = AdobeProduct(
-                sku=product["sku"],
-                name=product["name"],
-                type=product["type"],
-            )
         self.language_codes = config_data["language_codes"]
         for country in config_data["countries"]:
             self.countries[country["code"]] = Country(**country)

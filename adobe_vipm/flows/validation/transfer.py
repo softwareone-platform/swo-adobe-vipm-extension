@@ -8,7 +8,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     STATUS_RUNNING,
     STATUS_SYNCHRONIZED,
     get_prices_for_3yc_skus,

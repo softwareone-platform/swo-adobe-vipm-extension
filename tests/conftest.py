@@ -16,6 +16,11 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
+from adobe_vipm.airtable.models import (
+    AdobeProductNotFoundError,
+    AirTableBaseInfo,
+    get_sku_adobe_mapping_model,
+)
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
     PARAM_3YC_COMMITMENT_REQUEST_STATUS,
@@ -1502,7 +1507,7 @@ def adobe_customer_factory():
 def mock_pricelist_cache_factory(mocker):
     def _mocked_cache(cache=None):
         new_cache = cache or defaultdict(list)
-        mocker.patch("adobe_vipm.flows.airtable.PRICELIST_CACHE", new_cache)
+        mocker.patch("adobe_vipm.airtable.models.PRICELIST_CACHE", new_cache)
         return new_cache
 
     return _mocked_cache
@@ -1511,3 +1516,52 @@ def mock_pricelist_cache_factory(mocker):
 @pytest.fixture()
 def mocked_pricelist_cache(mock_pricelist_cache_factory):
     return mock_pricelist_cache_factory()
+
+
+@pytest.fixture()
+def mock_sku_mapping_data():
+    return [
+        {
+            "vendor_external_id": "65304578CA",
+            "sku": "65304578CA01A12",
+            "segment": "segment_1",
+            "name": "name_1",
+        },
+        {
+            "vendor_external_id": "77777777CA",
+            "sku": "77777777CA01A12",
+            "segment": "segment_2",
+            "name": "name_2",
+        },
+    ]
+
+
+@pytest.fixture()
+def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
+    base_info = AirTableBaseInfo(
+        api_key="airtable-token",
+        base_id="base-id",
+    )
+
+    AdobeProductMapping = get_sku_adobe_mapping_model(base_info)
+
+    all_sku = {i["vendor_external_id"]:AdobeProductMapping(**i) for i in mock_sku_mapping_data}
+    mocker.patch.object(AdobeProductMapping, "all", return_value=all_sku)
+
+    def from_id(external_id):
+        if external_id not in all_sku:
+            raise AdobeProductNotFoundError("Not Found")
+        return all_sku[external_id]
+
+    AdobeProductMapping.from_id = from_id
+    AdobeProductMapping.from_short_id = from_id
+    return AdobeProductMapping
+
+
+@pytest.fixture()
+def mock_get_adobe_product_by_marketplace_sku(mock_get_sku_adobe_mapping_model):
+    def get_adobe_product_by_marketplace_sku(sku):
+        return mock_get_sku_adobe_mapping_model.from_short_id(sku)
+
+    return get_adobe_product_by_marketplace_sku
+

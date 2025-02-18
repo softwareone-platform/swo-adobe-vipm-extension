@@ -1,13 +1,16 @@
 from collections import defaultdict
 from datetime import date
 
+import pytest
 from requests import HTTPError
 
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.adobe.errors import AdobeProductNotFoundError
+from adobe_vipm.airtable.models import (
     AirTableBaseInfo,
     create_gc_agreement_deployments,
     create_gc_main_agreement,
     create_offers,
+    get_adobe_product_by_marketplace_sku,
     get_agreement_deployment_view_link,
     get_gc_agreement_deployment_model,
     get_gc_agreement_deployments_by_main_agreement,
@@ -19,6 +22,7 @@ from adobe_vipm.flows.airtable import (
     get_pricelist_model,
     get_prices_for_3yc_skus,
     get_prices_for_skus,
+    get_sku_adobe_mapping_model,
     get_transfer_by_authorization_membership_or_customer,
     get_transfer_link,
     get_transfer_model,
@@ -62,7 +66,7 @@ def test_get_offer_ids_by_membership_id(mocker, settings):
     }
     mocked_offer_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_offer_model",
+        "adobe_vipm.airtable.models.get_offer_model",
         return_value=mocked_offer_model,
     )
 
@@ -87,7 +91,7 @@ def test_create_offers(mocker, settings):
     mocked_transfer = mocker.MagicMock()
     mocked_offer_model = mocker.MagicMock(return_value=mocked_offer)
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_offer_model",
+        "adobe_vipm.airtable.models.get_offer_model",
         return_value=mocked_offer_model,
     )
 
@@ -118,7 +122,7 @@ def test_get_transfers_to_process(mocker, settings):
     }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_transfer_model",
+        "adobe_vipm.airtable.models.get_transfer_model",
         return_value=mocked_transfer_model,
     )
 
@@ -140,7 +144,7 @@ def test_get_transfers_to_check(mocker, settings):
     }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_transfer_model",
+        "adobe_vipm.airtable.models.get_transfer_model",
         return_value=mocked_transfer_model,
     )
 
@@ -162,7 +166,7 @@ def test_get_transfer_by_authorization_membership_or_customer(mocker, settings):
     }
     mocked_transfer_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_transfer_model",
+        "adobe_vipm.airtable.models.get_transfer_model",
         return_value=mocked_transfer_model,
     )
 
@@ -240,7 +244,7 @@ def test_get_prices_for_skus(mocker, settings):
     }
     mocked_pricelist_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_pricelist_model",
+        "adobe_vipm.airtable.models.get_pricelist_model",
         return_value=mocked_pricelist_model,
     )
     price_item_1 = mocker.MagicMock()
@@ -272,7 +276,7 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
     }
     mocked_pricelist_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_pricelist_model",
+        "adobe_vipm.airtable.models.get_pricelist_model",
         return_value=mocked_pricelist_model,
     )
     price_item_1 = mocker.MagicMock()
@@ -347,7 +351,7 @@ def test_get_prices_for_3yc_skus_hit_cache(
     }
     mocked_pricelist_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_pricelist_model",
+        "adobe_vipm.airtable.models.get_pricelist_model",
         return_value=mocked_pricelist_model,
     )
     price_item_2 = mocker.MagicMock()
@@ -399,7 +403,7 @@ def test_get_prices_for_3yc_skus_just_cache(
     }
     mocked_pricelist_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_pricelist_model",
+        "adobe_vipm.airtable.models.get_pricelist_model",
         return_value=mocked_pricelist_model,
     )
 
@@ -441,7 +445,7 @@ def test_create_gc_agreement_deployments(mocker, settings):
         return_value=mocked_gc_agreement_deployment
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployment_model,
     )
 
@@ -504,7 +508,7 @@ def test_create_gc_main_agreement(mocker, settings):
         return_value=mocked_gc_main_agreement
     )
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_main_agreement_model",
+        "adobe_vipm.airtable.models.get_gc_main_agreement_model",
         return_value=mocked_get_gc_main_agreement_model,
     )
 
@@ -539,7 +543,7 @@ def test_get_gc_main_agreement(mocker, settings):
     }
     mocked_gc_main_agreement_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_main_agreement_model",
+        "adobe_vipm.airtable.models.get_gc_main_agreement_model",
         return_value=mocked_gc_main_agreement_model,
     )
 
@@ -564,7 +568,7 @@ def test_get_gc_main_agreement_empty_response(mocker, settings):
     }
     mocked_gc_main_agreement_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_main_agreement_model",
+        "adobe_vipm.airtable.models.get_gc_main_agreement_model",
         return_value=mocked_gc_main_agreement_model,
     )
 
@@ -588,7 +592,7 @@ def test_get_gc_agreement_deployments_by_main_agreement(mocker, settings):
     }
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -612,7 +616,7 @@ def test_get_gc_agreement_deployments_to_check(mocker, settings):
     }
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
@@ -634,7 +638,7 @@ def test_get_agreement_deployment_view_link(mocker, settings):
     }
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     mocked_gc_agreement_deployments_model.id = "record-id"
@@ -661,9 +665,36 @@ def test_get_agreement_deployment_view_link_exception(mocker, settings):
     }
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.flows.airtable.get_gc_agreement_deployment_model",
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
     mocked_gc_agreement_deployments_model.get_table.side_effect = HTTPError()
 
     assert get_agreement_deployment_view_link("product_id") is None
+
+
+def test_get_sku_adobe_mapping_model():
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    SkuMappingModel = get_sku_adobe_mapping_model(base_info)
+    assert SkuMappingModel.get_api().api_key == base_info.api_key
+    assert SkuMappingModel.get_base().id == base_info.base_id
+
+
+def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    mocker.patch(
+        "adobe_vipm.airtable.models.AirTableBaseInfo.for_sku_mapping",
+        return_value=base_info,
+    )
+
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_sku_adobe_mapping_model",
+        return_value=mock_get_sku_adobe_mapping_model,
+    )
+
+    with pytest.raises(AdobeProductNotFoundError):
+        get_adobe_product_by_marketplace_sku("vendor_external_id")
+
+    result = get_adobe_product_by_marketplace_sku("65304578CA")
+    assert result.vendor_external_id == "65304578CA"
+    assert result.sku == "65304578CA01A12"

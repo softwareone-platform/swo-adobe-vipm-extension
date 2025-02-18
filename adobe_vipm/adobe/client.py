@@ -23,7 +23,6 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
 )
 from adobe_vipm.adobe.dataclasses import (
-    AdobeProduct,
     APIToken,
     Authorization,
     Reseller,
@@ -36,6 +35,7 @@ from adobe_vipm.adobe.utils import (
     join_phone_number,
     to_adobe_line_id,
 )
+from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -433,9 +433,9 @@ class AdobeClient:
         if not deployment_id:
             payload["currencyCode"] = authorization.currency
         for line in lines:
-            product: AdobeProduct = self._config.get_adobe_product(
+            product_sku = get_adobe_product_by_marketplace_sku(
                 line["item"]["externalIds"]["vendor"]
-            )
+            ).sku
             quantity = line["quantity"]
             old_quantity = line["oldQuantity"]
 
@@ -449,7 +449,7 @@ class AdobeClient:
                 quantity = quantity - old_quantity
             line_item = {
                 "extLineItemNumber": to_adobe_line_id(line["id"]),
-                "offerId": product.sku,
+                "offerId": product_sku,
                 "quantity": quantity,
             }
             if deployment_id:
@@ -948,7 +948,6 @@ class AdobeClient:
 
         response.raise_for_status()
         return response.json()
-
 
 
 _ADOBE_CLIENT = None

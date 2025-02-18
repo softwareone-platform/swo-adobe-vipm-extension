@@ -6,7 +6,7 @@ from swo.mpt.extensions.core.utils import setup_client
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.utils import sanitize_company_name, sanitize_first_last_name
-from adobe_vipm.flows.airtable import (
+from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
     STATUS_GC_ERROR,
     get_gc_agreement_deployments_to_check,

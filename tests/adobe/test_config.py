@@ -4,13 +4,11 @@ import pytest
 
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.dataclasses import (
-    AdobeProduct,
     Authorization,
     Country,
     Reseller,
 )
 from adobe_vipm.adobe.errors import (
-    AdobeProductNotFoundError,
     AuthorizationNotFoundError,
     CountryNotFoundError,
     ResellerNotFoundError,
@@ -113,35 +111,6 @@ def test_get_authorization_not_found(mock_adobe_config):
         assert c.get_authorization("does-not-exist")
 
     assert str(cv.value) == "Authorization with uk/id does-not-exist not found."
-
-
-def test_get_adobe_product(mock_adobe_config, adobe_config_file):
-    """
-    Test the lookup the Product object by product item identifier.
-    """
-    vendor_external_id = adobe_config_file["skus_mapping"][0]["vendor_external_id"]
-    name = adobe_config_file["skus_mapping"][0]["name"]
-    sku = adobe_config_file["skus_mapping"][0]["sku"]
-    type = adobe_config_file["skus_mapping"][0]["type"]
-
-    c = Config()
-    product = c.get_adobe_product(vendor_external_id)
-    assert isinstance(product, AdobeProduct)
-    assert product.sku == sku
-    assert product.name == name
-    assert product.type == type
-
-
-def test_get_adobe_product_not_found(mock_adobe_config):
-    """
-    Check that the lookup of the product raises `ProductNotFound`
-    if there is no product for a given product item id.
-    """
-    c = Config()
-    with pytest.raises(AdobeProductNotFoundError) as cv:
-        assert c.get_adobe_product("not-found")
-
-    assert str(cv.value) == "AdobeProduct with id not-found not found."
 
 
 def test_get_country(mock_adobe_config, adobe_config_file):
