@@ -269,10 +269,17 @@ def test_create_preview_order(
     quantity,
     old_quantity,
     expected_quantity,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     """
     Test the call to Adobe API to create a preview order.
     """
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
@@ -363,6 +370,7 @@ def test_create_preview_order_no_deployment(
     quantity,
     old_quantity,
     expected_quantity,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     """
     Test the call to Adobe API to create a preview order.
@@ -370,6 +378,11 @@ def test_create_preview_order_no_deployment(
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
+    )
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
     authorization_uk = adobe_authorizations_file["authorizations"][0][
         "authorization_uk"
@@ -437,16 +450,24 @@ def test_create_preview_order_no_deployment(
 
 
 def test_create_preview_order_bad_request(
+    mocker,
     requests_mocker,
     settings,
     adobe_authorizations_file,
     adobe_api_error_factory,
     adobe_client_factory,
     order,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     """
     Test the call to Adobe API to create a preview order when the response is 400 bad request.
     """
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     authorization_uk = adobe_authorizations_file["authorizations"][0][
         "authorization_uk"
@@ -504,9 +525,7 @@ def test_create_new_order(
     client, authorization, api_token = adobe_client_factory()
 
     adobe_order = adobe_order_factory(
-        ORDER_TYPE_NEW,
-        external_id="mpt-order-id",
-        deployment_id=deployment_id
+        ORDER_TYPE_NEW, external_id="mpt-order-id", deployment_id=deployment_id
     )
 
     requests_mocker.post(
@@ -569,9 +588,7 @@ def test_create_new_order_no_deployment(
     client, authorization, api_token = adobe_client_factory()
 
     adobe_order = adobe_order_factory(
-        ORDER_TYPE_NEW,
-        external_id="mpt-order-id",
-        deployment_id=deployment_id
+        ORDER_TYPE_NEW, external_id="mpt-order-id", deployment_id=deployment_id
     )
 
     requests_mocker.post(
@@ -928,8 +945,7 @@ def test_create_return_order(
         reference_order_id=returning_order["orderId"],
         external_id=expected_external_id,
         items=adobe_items_factory(
-            deployment_id=deployment_id,
-            deployment_currency_code="USD"
+            deployment_id=deployment_id, deployment_currency_code="USD"
         ),
         deployment_id=deployment_id,
     )

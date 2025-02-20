@@ -19,7 +19,7 @@ from adobe_vipm.adobe.validation import (
     is_valid_postal_code_length,
     is_valid_state_or_province,
 )
-from adobe_vipm.flows.airtable import get_prices_for_skus
+from adobe_vipm.airtable.models import get_prices_for_skus
 from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
     ERR_3YC_QUANTITY_CONSUMABLES,

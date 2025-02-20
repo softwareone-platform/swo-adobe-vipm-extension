@@ -627,7 +627,11 @@ def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
 
 
 def test_submit_return_orders_step(
-    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    settings,
 ):
     """
     Tests the creation of a return order for a returnable order.
@@ -689,7 +693,11 @@ def test_submit_return_orders_step(
 
 
 def test_submit_return_orders_step_with_deployment_id(
-    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    settings,
 ):
     """
     Tests the creation of a return order for a returnable order.
@@ -761,7 +769,11 @@ def test_submit_return_orders_step_with_deployment_id(
 
 
 def test_submit_return_orders_step_with_only_main_deployment_id(
-    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    settings,
 ):
     """
     Tests the creation of a return order for a returnable order.
@@ -819,7 +831,11 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
 
 
 def test_submit_return_orders_step_order_processed(
-    mocker, order_factory, adobe_order_factory, adobe_items_factory, settings,
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    settings,
 ):
     """
     Tests that all return orders previously created have been processed
@@ -928,10 +944,7 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
 
 
 def test_submit_new_order_step_with_deployment_id(
-    mocker,
-    order_factory,
-    adobe_order_factory,
-    settings
+    mocker, order_factory, adobe_order_factory, settings
 ):
     """
     Test the creation of an Adobe new order.
@@ -941,7 +954,9 @@ def test_submit_new_order_step_with_deployment_id(
     deployment_id = "deployment-id"
 
     order = order_factory(deployment_id=deployment_id)
-    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
+    preview_order = adobe_order_factory(
+        order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id
+    )
     new_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
         status=STATUS_PENDING,
@@ -1639,6 +1654,7 @@ def test_update_prices_step(
         ],
     )
 
+
 @freeze_time("2024-11-09 12:30:00")
 def test_update_prices_step_3yc(
     mocker,
@@ -1878,7 +1894,9 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
     deployment_id = "deployment-id"
 
     order = order_factory(deployment_id=deployment_id)
-    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
+    preview_order = adobe_order_factory(
+        order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = preview_order

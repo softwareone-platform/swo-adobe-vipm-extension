@@ -1073,10 +1073,10 @@ def test_get_listings_by_currency_and_by_seller_id(mpt_client, requests_mocker):
     )
 
     assert (
-            get_listings_by_price_list_and_seller_and_authorization(
+        get_listings_by_price_list_and_seller_and_authorization(
             mpt_client, product_id, price_list_id, seller_id, authorization_id
         )
-            == []
+        == []
     )
 
 
@@ -1149,7 +1149,6 @@ def test_create_listing(mpt_client, requests_mocker):
 
 
 def test_create_agreement(mpt_client, requests_mocker, agreement):
-
     requests_mocker.post(
         urljoin(mpt_client.base_url, "commerce/agreements"),
         json=agreement,
