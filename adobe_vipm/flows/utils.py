@@ -519,6 +519,19 @@ def set_parameter_hidden(order, param_external_id):
     return updated_order
 
 
+def get_3yc_fulfillment_parameters(order_or_agreement):
+    three_yc_fulfillment_parameters = [
+        PARAM_3YC_END_DATE,
+        PARAM_3YC_ENROLL_STATUS,
+        PARAM_3YC_START_DATE,
+    ]
+
+    return [
+        get_fulfillment_parameter(order_or_agreement, param_external_id)
+        for param_external_id in three_yc_fulfillment_parameters
+    ]
+
+
 def set_adobe_3yc_enroll_status(order, enroll_status):
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
@@ -966,8 +979,7 @@ def get_deployment_id(source):
 
 def is_within_last_two_weeks(coterm_date):
     last_two_weeks = (
-            datetime.fromisoformat(coterm_date)
-            - timedelta(days=LAST_TWO_WEEKS_DAYS)
+        datetime.fromisoformat(coterm_date) - timedelta(days=LAST_TWO_WEEKS_DAYS)
     ).date()
 
     return date.today() >= last_two_weeks

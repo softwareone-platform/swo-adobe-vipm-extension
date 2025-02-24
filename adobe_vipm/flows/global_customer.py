@@ -1,8 +1,7 @@
 import logging
 
 from django.conf import settings
-from swo.mpt.client import MPTClient
-from swo.mpt.extensions.core.utils import setup_client
+from swo.mpt.extensions.core.utils import setup_client, setup_operations_client
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.utils import sanitize_company_name, sanitize_first_last_name
@@ -35,6 +34,7 @@ from adobe_vipm.flows.mpt import (
     create_agreement,
     create_agreement_subscription,
     create_listing,
+    get_agreement,
     get_agreement_subscription_by_external_id,
     get_authorizations_by_currency_and_seller_id,
     get_gc_price_list_by_currency,
@@ -45,7 +45,11 @@ from adobe_vipm.flows.mpt import (
     get_product_template_or_default,
     update_agreement,
 )
-from adobe_vipm.flows.utils import get_market_segment, split_phone_number
+from adobe_vipm.flows.utils import (
+    get_3yc_fulfillment_parameters,
+    get_market_segment,
+    split_phone_number,
+)
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -289,6 +293,7 @@ def create_gc_agreement_deployment(
     agreement_deployment,
     adobe_customer,
     customer_deployment_ids,
+    main_agreement,
     listing,
     licensee,
 ):
@@ -300,6 +305,7 @@ def create_gc_agreement_deployment(
         agreement_deployment (AgreementDeployment): The agreement deployment instance.
         adobe_customer (dict): The Adobe customer data.
         customer_deployment_ids (list): List of customer deployment IDs.
+        main_agreement (dict): Main Agreement representation from MPT API
         listing (dict): The listing data.
         licensee (dict): The licensee data.
 
@@ -339,6 +345,44 @@ def create_gc_agreement_deployment(
             MPT_ORDER_STATUS_COMPLETED,
             TEMPLATE_NAME_TRANSFER,
         )
+
+        three_yc_parameters = get_3yc_fulfillment_parameters(main_agreement)
+        ordering_parameters = [
+            {"externalId": PARAM_AGREEMENT_TYPE, "value": "Migrate"},
+            {
+                "externalId": PARAM_COMPANY_NAME,
+                "value": sanitize_company_name(
+                    adobe_customer["companyProfile"]["companyName"]
+                ),
+            },
+            {"externalId": PARAM_ADDRESS, "value": param_address},
+            {"externalId": PARAM_CONTACT, "value": param_contact},
+            {
+                "externalId": PARAM_MEMBERSHIP_ID,
+                "value": agreement_deployment.membership_id,
+            },
+        ]
+        fulfillment_parameters = [
+            {"externalId": PARAM_GLOBAL_CUSTOMER, "value": ["Yes"]},
+            {
+                "externalId": PARAM_DEPLOYMENT_ID,
+                "value": agreement_deployment.deployment_id,
+            },
+            {
+                "externalId": PARAM_DEPLOYMENTS,
+                "value": ",".join(customer_deployment_ids),
+            },
+            {
+                "externalId": PARAM_CUSTOMER_ID,
+                "value": agreement_deployment.customer_id,
+            },
+            {
+                "externalId": PARAM_COTERM_DATE,
+                "value": adobe_customer["cotermDate"],
+            },
+        ]
+        fulfillment_parameters.extend(three_yc_parameters)
+
         gc_agreement_deployment = {
             "status": "Active",
             "listing": {"id": agreement_deployment.listing_id},
@@ -351,40 +395,8 @@ def create_gc_agreement_deployment(
             "lines": [],
             "subscriptions": [],
             "parameters": {
-                "ordering": [
-                    {"externalId": PARAM_AGREEMENT_TYPE, "value": "Migrate"},
-                    {
-                        "externalId": PARAM_COMPANY_NAME,
-                        "value": sanitize_company_name(
-                            adobe_customer["companyProfile"]["companyName"]
-                        ),
-                    },
-                    {"externalId": PARAM_ADDRESS, "value": param_address},
-                    {"externalId": PARAM_CONTACT, "value": param_contact},
-                    {
-                        "externalId": PARAM_MEMBERSHIP_ID,
-                        "value": agreement_deployment.membership_id,
-                    },
-                ],
-                "fulfillment": [
-                    {"externalId": PARAM_GLOBAL_CUSTOMER, "value": ["Yes"]},
-                    {
-                        "externalId": PARAM_DEPLOYMENT_ID,
-                        "value": agreement_deployment.deployment_id,
-                    },
-                    {
-                        "externalId": PARAM_DEPLOYMENTS,
-                        "value": ",".join(customer_deployment_ids),
-                    },
-                    {
-                        "externalId": PARAM_CUSTOMER_ID,
-                        "value": agreement_deployment.customer_id,
-                    },
-                    {
-                        "externalId": PARAM_COTERM_DATE,
-                        "value": adobe_customer["cotermDate"],
-                    },
-                ],
+                "ordering": ordering_parameters,
+                "fulfillment": fulfillment_parameters,
             },
             "licensee": {"id": agreement_deployment.licensee_id},
             "buyer": {"id": buyer_id},
@@ -485,7 +497,7 @@ def enable_subscription_auto_renewal(
 
 
 def process_agreement_deployment(
-    mpt_client, adobe_client, agreement_deployment, product_id
+    mpt_client, mpt_o_client, adobe_client, agreement_deployment, product_id
 ):
     """
     Process the agreement deployment by retrieving necessary data, creating or updating
@@ -493,6 +505,7 @@ def process_agreement_deployment(
 
     Args:
         mpt_client (MPTClient): The MPT client instance.
+        mpt_o_client (MPT Client): The MPT client authorized under operations account
         adobe_client (AdobeClient): The Adobe client instance.
         agreement_deployment (AgreementDeployment): The agreement deployment instance.
         product_id (str): The product ID.
@@ -510,11 +523,6 @@ def process_agreement_deployment(
         return
 
     try:
-        mpt_o_client = MPTClient(
-            f"{settings.MPT_API_BASE_URL}/v1/",
-            settings.MPT_API_TOKEN_OPERATIONS,
-        )
-
         authorization_id = get_authorization(mpt_client, agreement_deployment)
         if not authorization_id:
             return
@@ -534,6 +542,10 @@ def process_agreement_deployment(
 
         licensee = get_licensee(mpt_o_client, agreement_deployment.licensee_id)
 
+        main_agreement = get_agreement(
+            mpt_client, agreement_deployment.main_agreement_id
+        )
+
         adobe_customer = adobe_client.get_customer(
             authorization_id, agreement_deployment.customer_id
         )
@@ -550,6 +562,7 @@ def process_agreement_deployment(
             agreement_deployment,
             adobe_customer,
             customer_deployment_ids,
+            main_agreement,
             listing,
             licensee,
         )
@@ -629,6 +642,7 @@ def check_gc_agreement_deployments():
     """
     adobe_client = get_adobe_client()
     mpt_client = setup_client()
+    mpt_o_client = setup_operations_client()
 
     for product_id in settings.MPT_PRODUCTS_IDS:
         if get_market_segment(product_id) != MARKET_SEGMENT_COMMERCIAL:
@@ -638,7 +652,11 @@ def check_gc_agreement_deployments():
             agreement_deployments = get_gc_agreement_deployments_to_check(product_id)
             for agreement_deployment in agreement_deployments:
                 process_agreement_deployment(
-                    mpt_client, adobe_client, agreement_deployment, product_id
+                    mpt_client,
+                    mpt_o_client,
+                    adobe_client,
+                    agreement_deployment,
+                    product_id,
                 )
         except Exception as e:
             logger.error(
