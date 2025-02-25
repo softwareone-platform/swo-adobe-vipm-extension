@@ -20,6 +20,7 @@ from adobe_vipm.flows.constants import (
     PARAM_3YC_ENROLL_STATUS,
     PARAM_3YC_RECOMMITMENT,
     PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
+    PARAM_DEPLOYMENT_ID,
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
@@ -34,6 +35,21 @@ def _has_more_pages(page):
         return True
     pagination = page["$meta"]["pagination"]
     return pagination["total"] > pagination["limit"] + pagination["offset"]
+
+
+def _paginated(mpt_client, url):
+    items = []
+    page = None
+    limit = 10
+    offset = 0
+    while _has_more_pages(page):
+        response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
+        response.raise_for_status()
+        page = response.json()
+        items.extend(page["data"])
+        offset += limit
+
+    return items
 
 
 @wrap_http_error
@@ -140,22 +156,11 @@ def get_order_subscription_by_external_id(
 
 @wrap_http_error
 def get_product_items_by_skus(mpt_client, product_id, skus):
-    items = []
     rql_query = (
         f"and(eq(product.id,{product_id}),in(externalIds.vendor,({','.join(skus)})))"
     )
     url = f"/catalog/items?{rql_query}"
-    page = None
-    limit = 10
-    offset = 0
-    while _has_more_pages(page):
-        response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
-        response.raise_for_status()
-        page = response.json()
-        items.extend(page["data"])
-        offset += limit
-
-    return items
+    return _paginated(mpt_client, url)
 
 
 @cache
@@ -192,19 +197,8 @@ def update_agreement(mpt_client, agreement_id, **kwargs):
 
 @wrap_http_error
 def get_agreements_by_query(mpt_client, query):
-    agreements = []
     url = f"/commerce/agreements?{query}"
-    page = None
-    limit = 10
-    offset = 0
-    while _has_more_pages(page):
-        response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
-        response.raise_for_status()
-        page = response.json()
-        agreements.extend(page["data"])
-        offset += limit
-
-    return agreements
+    return _paginated(mpt_client, url)
 
 
 def get_agreements_by_next_sync(mpt_client):
@@ -380,22 +374,12 @@ def get_rendered_template(mpt_client, order_id):
 
 @wrap_http_error
 def get_product_onetime_items_by_ids(mpt_client, product_id, item_ids):
-    items = []
     product_cond = f"eq(product.id,{product_id})"
     items_cond = f"in(id,({','.join(item_ids)}))"
     rql_query = f"and({product_cond},{items_cond},eq(terms.period,one-time))"
     url = f"/catalog/items?{rql_query}"
-    page = None
-    limit = 10
-    offset = 0
-    while _has_more_pages(page):
-        response = mpt_client.get(f"{url}&limit={limit}&offset={offset}")
-        response.raise_for_status()
-        page = response.json()
-        items.extend(page["data"])
-        offset += limit
 
-    return items
+    return _paginated(mpt_client, url)
 
 
 def get_agreements_by_ids(mpt_client, ids):
@@ -499,3 +483,17 @@ def get_agreement_subscription_by_external_id(mpt_client, agreement_id, subscrip
     response.raise_for_status()
     subscriptions = response.json()
     return subscriptions["data"][0] if subscriptions["data"] else None
+
+
+@wrap_http_error
+def get_agreements_by_customer_deployments(mpt_client, deployment_ids):
+    deployments_list = ",".join(deployment_ids)
+    rql_query = (
+        f"any(parameters.fulfillment,and("
+        f"eq(externalId,{PARAM_DEPLOYMENT_ID}),"
+        f"in(displayValue,({deployments_list}))))"
+    )
+
+    url = f"/commerce/agreements?{rql_query}"
+
+    return _paginated(mpt_client, url)

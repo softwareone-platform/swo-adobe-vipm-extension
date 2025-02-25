@@ -1351,17 +1351,6 @@ def mpt_client(settings):
 
 
 @pytest.fixture()
-def mpt_o_client(settings):
-    """
-    Create an instance of the MPT client used by the extension under operations token.
-    """
-    settings.MPT_API_BASE_URL = "https://localhost"
-    from swo.mpt.extensions.core.utils import setup_o_client
-
-    return setup_o_client()
-
-
-@pytest.fixture()
 def mpt_error_factory():
     """
     Generate an error message returned by the Marketplace platform.

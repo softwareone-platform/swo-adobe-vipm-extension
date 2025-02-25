@@ -33,7 +33,9 @@ def gc_agreement_deployment(mocker):
     return gc_agreement_deployment
 
 
-def test_check_gc_agreement_deployments_no_licensee(mocker, settings, gc_agreement_deployment):
+def test_check_gc_agreement_deployments_no_licensee(
+    mocker, settings, gc_agreement_deployment
+):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
@@ -90,7 +92,9 @@ def test_check_gc_agreement_deployments_unexpected_error(
 
 
 def test_check_gc_agreement_deployments_no_authorization_id(
-    mocker, settings, gc_agreement_deployment,
+    mocker,
+    settings,
+    gc_agreement_deployment,
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -463,129 +467,77 @@ def test_check_gc_agreement_deployments_create_listing(
     mocked_create_agreement.assert_called_with(
         mocker.ANY,
         {
-            "authorization": {
-                "id": "AUT-1234-1234-1234"
-            },
-            "buyer":{
-                "id": "BUY-3731-7971"
-            },
-            "client": {
-                "id": "ACC-123-123-123"
-            },
-            "externalIds": {
-                "vendor": "a-client-id"
-            },
-            "licensee": {
-                "id": "LC-321-321-321"
-            },
+            "authorization": {"id": "AUT-1234-1234-1234"},
+            "buyer": {"id": "BUY-3731-7971"},
+            "client": {"id": "ACC-123-123-123"},
+            "externalIds": {"vendor": "a-client-id"},
+            "licensee": {"id": "LC-321-321-321"},
             "lines": [],
-            "listing": {
-                "id": "LST-9401-9279"
-            },
+            "listing": {"id": "LST-9401-9279"},
             "name": "Adobe for Commercial for Client Account - US",
-            "parameters":
-            {
+            "parameters": {
                 "fulfillment": [
-                    {
-                        "externalId": "globalCustomer",
-                        "value": ["Yes"]
-                    },
-                    {
-                        "externalId": "deploymentId",
-                        "value": "deployment_id"
-                    },
-                    {
-                        "externalId": "deployments",
-                        "value": ""
-                    },
-                    {
-                        "externalId": "customerId",
-                        "value": "P0112233"
-                    },
-                    {
-                        "externalId": "cotermDate",
-                        "value": "2024-01-23"
-                    },
+                    {"externalId": "globalCustomer", "value": ["Yes"]},
+                    {"externalId": "deploymentId", "value": "deployment_id"},
+                    {"externalId": "deployments", "value": ""},
+                    {"externalId": "customerId", "value": "P0112233"},
+                    {"externalId": "cotermDate", "value": "2024-01-23"},
                     {
                         "externalId": "3YCEndDate",
                         "id": "PAR-3528-2927",
                         "name": "3YC End Date",
                         "type": "Date",
-                        "value": "2028-01-01"
+                        "value": "2028-01-01",
                     },
                     {
                         "externalId": "3YCEnrollStatus",
                         "id": "PAR-9876-5432",
                         "name": "3YC Enroll Status",
                         "type": "SingleLineText",
-                        "value": "COMMITTED"
+                        "value": "COMMITTED",
                     },
                     {
                         "externalId": "3YCStartDate",
                         "id": "PAR-2266-4848",
                         "name": "3YC Start Date",
                         "type": "Date",
-                        "value": "2025-01-01"
-                    }
+                        "value": "2025-01-01",
+                    },
                 ],
                 "ordering": [
-                    {
-                        "externalId": "agreementType",
-                        "value": "Migrate"
-                    },
-                    {
-                        "externalId": "companyName",
-                        "value": "Migrated Company"
-                    },
+                    {"externalId": "agreementType", "value": "Migrate"},
+                    {"externalId": "companyName", "value": "Migrated Company"},
                     {
                         "externalId": "address",
-                        "value":
-                        {
+                        "value": {
                             "addressLine1": "addressLine1",
                             "addressLine2": "addressLine2",
                             "city": "city",
                             "country": "US",
                             "postCode": "postalCode",
-                            "state": "region"
-                        }
+                            "state": "region",
+                        },
                     },
                     {
                         "externalId": "contact",
-                        "value":
-                        {
+                        "value": {
                             "email": "email",
                             "firstName": "firstName",
                             "lastName": "lastName",
-                            "phone":
-                            {
-                                "number": "8004449890",
-                                "prefix": "+1"
-                            }
-                        }
+                            "phone": {"number": "8004449890", "prefix": "+1"},
+                        },
                     },
-                    {
-                        "externalId": "membershipId",
-                        "value": "membership-id"
-                    }
-                ]
+                    {"externalId": "membershipId", "value": "membership-id"},
+                ],
             },
-            "product": {
-                "id": "PRD-123-123-123"
-            },
-            "seller": {
-                "id": "SEL-321-321"
-            },
+            "product": {"id": "PRD-123-123-123"},
+            "seller": {"id": "SEL-321-321"},
             "status": "Active",
             "subscriptions": [],
-            "template": {
-                "id": "TPL-1234-1234-4321",
-                "name": "Default Template"
-            },
+            "template": {"id": "TPL-1234-1234-4321", "name": "Default Template"},
             "termsAndConditions": [],
-            "vendor": {
-                "id": "ACC-1234-vendor-id"
-            }
-        }
+            "vendor": {"id": "ACC-1234-vendor-id"},
+        },
     )
     mocked_get_agreement.assert_called_once()
 

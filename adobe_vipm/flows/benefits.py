@@ -26,6 +26,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import (
     get_agreements_by_3yc_commitment_request_status,
+    get_agreements_by_customer_deployments,
     get_agreements_for_3yc_recommitment,
     get_agreements_for_3yc_resubmit,
     update_agreement,
@@ -33,6 +34,7 @@ from adobe_vipm.flows.mpt import (
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_company_name,
+    get_global_customer,
     get_ordering_parameter,
 )
 from adobe_vipm.notifications import Button, send_exception, send_warning
@@ -110,6 +112,11 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 agreement["id"],
                 parameters=parameters,
             )
+            if get_global_customer(agreement)[0] == "Yes":
+                update_deployment_agreements_3yc(
+                    adobe_client, mpt_client, authorization_id, customer_id, parameters
+                )
+
             status = request_info["status"]
             if status in (
                 STATUS_3YC_DECLINED,
@@ -138,6 +145,27 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 f"3YC {request_type_title.capitalize()} Request exception for {agreement['id']}",
                 traceback.format_exc(),
             )
+
+
+def update_deployment_agreements_3yc(
+    adobe_client, mpt_client, authorization_id, customer_id, parameters_3yc
+):
+    customer_deployments = adobe_client.get_customer_deployments(
+        authorization_id, customer_id
+    )
+    if not customer_deployments:
+        return
+
+    deployment_agreements = get_agreements_by_customer_deployments(
+        mpt_client, [deployment["deploymentId"] for deployment in customer_deployments]
+    )
+
+    for deployment_agreement in deployment_agreements:
+        update_agreement(
+            mpt_client,
+            deployment_agreement["id"],
+            parameters=parameters_3yc,
+        )
 
 
 def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
