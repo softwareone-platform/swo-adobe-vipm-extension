@@ -468,9 +468,13 @@ def _transfer_migrated(
     returned_skus = [
         get_partial_sku(item["offerId"]) for item in adobe_subscriptions["items"]
     ]
-    items = get_product_items_by_skus(
-        mpt_client, order["agreement"]["product"]["id"], returned_skus
-    )
+
+    items = []
+    if returned_skus:
+        items = get_product_items_by_skus(
+            mpt_client, order["agreement"]["product"]["id"], returned_skus
+        )
+
     one_time_skus = [
         item["externalIds"]["vendor"]
         for item in items
