@@ -1170,9 +1170,9 @@ def adobe_items_factory(
         subscription_id=None,
         renewal_date=None,
         status=None,
-        deployment_id=deployment_id,
-        currencyCode= None,
-        deployment_currency_code=deployment_currency_code
+        deployment_id=None,
+        currencyCode=None,
+        deployment_currency_code=None,
     ):
         item = {
             "extLineItemNumber": line_number,
