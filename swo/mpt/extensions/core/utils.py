@@ -7,3 +7,10 @@ def setup_client():
         f"{settings.MPT_API_BASE_URL}/v1/",
         settings.MPT_API_TOKEN,
     )
+
+
+def setup_operations_client():
+    return MPTClient(
+        f"{settings.MPT_API_BASE_URL}/v1/",
+        settings.MPT_API_TOKEN_OPERATIONS,
+    )
