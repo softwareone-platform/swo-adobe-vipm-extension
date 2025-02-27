@@ -20,6 +20,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import (
     get_agreement_subscription,
+    get_agreements_by_customer_deployments,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
     get_all_agreements,
@@ -260,9 +261,9 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
         sync_agreement(mpt_client, agreement, dry_run)
 
 
-def sync_global_customer_parameters(mpt_client, adobe_client, customer, agreement):
-    if not customer.get("globalSalesEnabled", False):
-        return
+def sync_global_customer_parameters(
+    mpt_client, adobe_client, customer_deployments, agreement
+):
     try:
         parameters = {PARAM_PHASE_FULFILLMENT: []}
         global_customer_enabled = get_global_customer(agreement)
@@ -272,9 +273,6 @@ def sync_global_customer_parameters(mpt_client, adobe_client, customer, agreemen
                 {"externalId": "globalCustomer", "value": ["Yes"]}
             )
 
-        customer_deployments = adobe_client.get_customer_deployments(
-            agreement["authorization"]["id"], customer["customerId"]
-        )
         deployments = [
             f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
             for deployment in customer_deployments["items"]
@@ -319,13 +317,45 @@ def sync_agreement(mpt_client, agreement, dry_run):
         customer = adobe_client.get_customer(
             agreement["authorization"]["id"], customer_id
         )
-        sync_global_customer_parameters(mpt_client, adobe_client, customer, agreement)
-
         sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer)
+
+        if customer.get("globalSalesEnabled", False):
+            authorization_id = agreement["authorization"]["id"]
+            customer_deployments = adobe_client.get_customer_deployments(
+                authorization_id, customer_id
+            )
+            sync_global_customer_parameters(
+                mpt_client, adobe_client, customer_deployments, agreement
+            )
+            sync_deployments_prices(
+                mpt_client,
+                adobe_client,
+                customer,
+                customer_deployments,
+                dry_run,
+            )
+
     except Exception as e:
         logger.error(f"Error synchronizing agreement {agreement["id"]}: {e}")
         notify_agreement_unhandled_exception_in_teams(
             agreement["id"], traceback.format_exc()
+        )
+
+
+def sync_deployments_prices(
+    mpt_client, adobe_client, customer, customer_deployments, dry_run
+):
+    if not customer_deployments:
+        return
+
+    deployment_agreements = get_agreements_by_customer_deployments(
+        mpt_client,
+        [deployment["deploymentId"] for deployment in customer_deployments["items"]],
+    )
+
+    for deployment_agreement in deployment_agreements:
+        sync_agreement_prices(
+            mpt_client, deployment_agreement, dry_run, adobe_client, customer
         )
 
 
