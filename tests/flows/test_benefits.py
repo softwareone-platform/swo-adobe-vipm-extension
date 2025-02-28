@@ -447,63 +447,49 @@ def test_check_3yc_commitment_request_global_customers(
     check_3yc_commitment_request(mpt_client)
 
     mocked_get_agreements_by_deployments.assert_called_once_with(
-        mpt_client, ["0", "1"],
+        mpt_client,
+        ["0", "1"],
     )
     assert mocked_update_agreement.call_args_list == [
-        mocker.call(mpt_client, "AGR-2119-4550-8674-5962", parameters={
-            "fulfillment": [{
-                "externalId": "3YCCommitmentRequestStatus",
-                "value": "COMMITTED"
-            }, {
-                "externalId": "3YCEnrollStatus",
-                "value": "COMMITTED"
-            }, {
-                "externalId": "3YCStartDate",
-                "value": "2024-01-01"
-            }, {
-                "externalId": "3YCEndDate",
-                "value": "2025-01-01"
-            }],
-            "ordering": [{
-                "externalId": "3YC", "value": None
-            }
-        ]}),
-        mocker.call(mpt_client, "AGR-2119-4550-8674-5962", parameters={
-            "fulfillment": [{
-                "externalId": "3YCCommitmentRequestStatus",
-                "value": "COMMITTED"
-            }, {
-                "externalId": "3YCEnrollStatus",
-                "value": "COMMITTED"
-            }, {
-                "externalId": "3YCStartDate",
-                "value": "2024-01-01"
-            }, {
-                "externalId": "3YCEndDate",
-                "value": "2025-01-01"
-            }],
-            "ordering": [{
-                "externalId": "3YC", "value": None
-            }
-        ]}),
-        mocker.call(mpt_client, "AGR-2119-4550-8674-5962", parameters={
-            "fulfillment": [{
-                "externalId": "3YCCommitmentRequestStatus",
-                "value": "COMMITTED"
-            }, {
-                "externalId": "3YCEnrollStatus",
-                "value": "COMMITTED"
-            }, {
-                "externalId": "3YCStartDate",
-                "value": "2024-01-01"
-            }, {
-                "externalId": "3YCEndDate",
-                "value": "2025-01-01"
-            }],
-            "ordering": [{
-                "externalId": "3YC", "value": None
-            }
-        ]}),
+        mocker.call(
+            mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                ],
+                "ordering": [{"externalId": "3YC", "value": None}],
+            },
+        ),
+        mocker.call(
+            mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                ],
+                "ordering": [{"externalId": "3YC", "value": None}],
+            },
+        ),
+        mocker.call(
+            mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                ],
+                "ordering": [{"externalId": "3YC", "value": None}],
+            },
+        ),
     ]
 
 
