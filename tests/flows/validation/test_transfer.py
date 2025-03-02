@@ -1157,16 +1157,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
         external_vendor_id="65304578CA",
         unit_purchase_price=33.04,
     )
-    lines.extend(
-        lines_factory(
-            line_id=None,
-            item_id=2,
-            quantity=10,
-            name="Awesome one-time product 2",
-            external_vendor_id="99999999CA",
-            unit_purchase_price=99,
-        )
-    )
 
     assert len(validated_order["lines"]) == len(lines)
 

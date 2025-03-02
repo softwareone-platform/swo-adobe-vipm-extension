@@ -815,7 +815,9 @@ def test_sync_global_customer_parameter(
                     {
                         "externalId": "renewalQuantity",
                         "value": str(
-                            adobe_deployment_subscription["autoRenewal"]["renewalQuantity"]
+                            adobe_deployment_subscription["autoRenewal"][
+                                "renewalQuantity"
+                            ]
                         ),
                     },
                     {
@@ -838,7 +840,9 @@ def test_sync_global_customer_parameter(
             mocked_mpt_client,
             agreement["id"],
             lines=expected_lines,
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
+            parameters={
+                "fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]
+            },
         ),
         mocker.call(
             mocked_mpt_client,
@@ -854,7 +858,9 @@ def test_sync_global_customer_parameter(
             mocked_mpt_client,
             deployment_agreements[0]["id"],
             lines=expected_lines,
-            parameters={'fulfillment': [{'externalId': 'nextSync', 'value': '2025-04-05'}]}
+            parameters={
+                "fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]
+            },
         ),
     ]
 
@@ -1114,7 +1120,9 @@ def test_sync_global_customer_update_not_required(
         mocker.call(
             mocked_mpt_client,
             deployment_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}
+            ],
             parameters={
                 "fulfillment": [
                     {
@@ -1145,7 +1153,9 @@ def test_sync_global_customer_update_not_required(
         mocker.call(
             mocked_mpt_client,
             another_deployment_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}
+            ],
             parameters={
                 "fulfillment": [
                     {
