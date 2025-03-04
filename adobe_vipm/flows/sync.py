@@ -286,7 +286,7 @@ def sync_global_customer_parameters(
         if parameters[PARAM_PHASE_FULFILLMENT]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Error setting global customer parameters for agreement "
             f"{agreement["id"]}: {e}"
         )
@@ -336,7 +336,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
             )
 
     except Exception as e:
-        logger.error(f"Error synchronizing agreement {agreement["id"]}: {e}")
+        logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
         notify_agreement_unhandled_exception_in_teams(
             agreement["id"], traceback.format_exc()
         )

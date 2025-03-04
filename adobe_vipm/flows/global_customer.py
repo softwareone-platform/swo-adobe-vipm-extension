@@ -63,7 +63,7 @@ def get_adobe_subscriptions_by_deployment(
             authorization_id, agreement_deployment.customer_id
         )
     except Exception as e:
-        logger.error(f"Error getting Adobe transfer order: {e}")
+        logger.exception(f"Error getting Adobe transfer order: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
             f"Error getting Adobe transfer order: {e}"
@@ -101,14 +101,14 @@ def get_authorization(mpt_client, agreement_deployment):
             agreement_deployment.seller_id,
         )
     except Exception as e:
-        logger.error(f"Error getting authorization: {e}")
+        logger.exception(f"Error getting authorization: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting authorization: {e}"
         agreement_deployment.save()
         return None
 
     if not authorizations:
-        logger.error(
+        logger.exception(
             f"Authorization not found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -124,7 +124,7 @@ def get_authorization(mpt_client, agreement_deployment):
 
     if len(authorizations) > 1:
         authorization_ids = [auth["id"] for auth in authorizations]
-        logger.error(
+        logger.exception(
             f"More than one authorization found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -164,7 +164,7 @@ def get_price_list_id(mpt_client, agreement_deployment):
             agreement_deployment.deployment_currency,
         )
     except Exception as e:
-        logger.error(f"Error getting price list: {e}")
+        logger.exception(f"Error getting price list: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting price list: {e}"
         agreement_deployment.save()
@@ -176,7 +176,7 @@ def get_price_list_id(mpt_client, agreement_deployment):
             global_price_lists.append(price_list)
 
     if not global_price_lists:
-        logger.error(
+        logger.exception(
             f"Global price list not found for agreement deployment"
             f" {agreement_deployment.deployment_id}"
         )
@@ -190,7 +190,7 @@ def get_price_list_id(mpt_client, agreement_deployment):
         return None
 
     if len(global_price_lists) > 1:
-        logger.error(
+        logger.exception(
             f"More than one price list found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -236,14 +236,14 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             authorization_id,
         )
     except Exception as e:
-        logger.error(f"Error getting listings: {e}")
+        logger.exception(f"Error getting listings: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting listings: {e}"
         agreement_deployment.save()
         return None
 
     if len(listings) > 1:
-        logger.error(
+        logger.exception(
             f"More than one listing found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -275,7 +275,7 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             listing = create_listing(mpt_client, listing)
             logger.info(f"New listing created {listing['id']}")
         except Exception as e:
-            logger.error(f"Error creating listing: {e}: {listing}")
+            logger.exception(f"Error creating listing: {e}: {listing}")
             agreement_deployment.status = STATUS_GC_ERROR
             agreement_deployment.error_description = f"Error creating listing: {e}"
             agreement_deployment.save()
@@ -413,7 +413,7 @@ def create_gc_agreement_deployment(
 
         return agreement["id"]
     except Exception as e:
-        logger.error(f"Error creating agreement deployment: {e}")
+        logger.exception(f"Error creating agreement deployment: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
             f"Error creating agreement deployment: {e}"
@@ -619,7 +619,7 @@ def process_agreement_deployment(
         agreement_deployment.save()
 
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Error processing agreement deployment {agreement_deployment.deployment_id}: {e}"
         )
         agreement_deployment.status = STATUS_GC_ERROR
@@ -659,6 +659,6 @@ def check_gc_agreement_deployments():
                     product_id,
                 )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Error checking GC agreement deployments for product {product_id}: {e}"
             )
