@@ -167,7 +167,9 @@ def add_lines_to_order(
         else:
             # remove expired items from adobe items
             adobe_items = [
-                item for item in adobe_items if not is_transferring_item_expired(item)
+                item
+                for item in adobe_items_without_one_time_offers
+                if not is_transferring_item_expired(item)
             ]
 
             # If the order items has been updated, the validation order will fail

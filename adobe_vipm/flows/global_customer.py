@@ -1,8 +1,7 @@
 import logging
 
 from django.conf import settings
-from swo.mpt.client import MPTClient
-from swo.mpt.extensions.core.utils import setup_client
+from swo.mpt.extensions.core.utils import setup_client, setup_operations_client
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.utils import sanitize_company_name, sanitize_first_last_name
@@ -35,6 +34,7 @@ from adobe_vipm.flows.mpt import (
     create_agreement,
     create_agreement_subscription,
     create_listing,
+    get_agreement,
     get_agreement_subscription_by_external_id,
     get_authorizations_by_currency_and_seller_id,
     get_gc_price_list_by_currency,
@@ -45,7 +45,11 @@ from adobe_vipm.flows.mpt import (
     get_product_template_or_default,
     update_agreement,
 )
-from adobe_vipm.flows.utils import get_market_segment, split_phone_number
+from adobe_vipm.flows.utils import (
+    get_3yc_fulfillment_parameters,
+    get_market_segment,
+    split_phone_number,
+)
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -60,7 +64,7 @@ def get_adobe_subscriptions_by_deployment(
             authorization_id, agreement_deployment.customer_id
         )
     except Exception as e:
-        logger.error(f"Error getting Adobe transfer order: {e}")
+        logger.exception(f"Error getting Adobe transfer order: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
             f"Error getting Adobe transfer order: {e}"
@@ -98,14 +102,14 @@ def get_authorization(mpt_client, agreement_deployment):
             agreement_deployment.seller_id,
         )
     except Exception as e:
-        logger.error(f"Error getting authorization: {e}")
+        logger.exception(f"Error getting authorization: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting authorization: {e}"
         agreement_deployment.save()
         return None
 
     if not authorizations:
-        logger.error(
+        logger.exception(
             f"Authorization not found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -121,7 +125,7 @@ def get_authorization(mpt_client, agreement_deployment):
 
     if len(authorizations) > 1:
         authorization_ids = [auth["id"] for auth in authorizations]
-        logger.error(
+        logger.exception(
             f"More than one authorization found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -161,7 +165,7 @@ def get_price_list_id(mpt_client, agreement_deployment):
             agreement_deployment.deployment_currency,
         )
     except Exception as e:
-        logger.error(f"Error getting price list: {e}")
+        logger.exception(f"Error getting price list: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting price list: {e}"
         agreement_deployment.save()
@@ -173,7 +177,7 @@ def get_price_list_id(mpt_client, agreement_deployment):
             global_price_lists.append(price_list)
 
     if not global_price_lists:
-        logger.error(
+        logger.exception(
             f"Global price list not found for agreement deployment"
             f" {agreement_deployment.deployment_id}"
         )
@@ -187,7 +191,7 @@ def get_price_list_id(mpt_client, agreement_deployment):
         return None
 
     if len(global_price_lists) > 1:
-        logger.error(
+        logger.exception(
             f"More than one price list found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -233,14 +237,14 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             authorization_id
         )
     except Exception as e:
-        logger.error(f"Error getting listings: {e}")
+        logger.exception(f"Error getting listings: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting listings: {e}"
         agreement_deployment.save()
         return None
 
     if len(listings) > 1:
-        logger.error(
+        logger.exception(
             f"More than one listing found for agreement deployment "
             f"{agreement_deployment.deployment_id}"
         )
@@ -272,7 +276,7 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             listing = create_listing(mpt_client, listing)
             logger.info(f"New listing created {listing['id']}")
         except Exception as e:
-            logger.error(f"Error creating listing: {e}: {listing}")
+            logger.exception(f"Error creating listing: {e}: {listing}")
             agreement_deployment.status = STATUS_GC_ERROR
             agreement_deployment.error_description = f"Error creating listing: {e}"
             agreement_deployment.save()
@@ -290,6 +294,7 @@ def create_gc_agreement_deployment(
     agreement_deployment,
     adobe_customer,
     customer_deployment_ids,
+    main_agreement,
     listing,
     licensee
 ):
@@ -301,6 +306,7 @@ def create_gc_agreement_deployment(
         agreement_deployment (AgreementDeployment): The agreement deployment instance.
         adobe_customer (dict): The Adobe customer data.
         customer_deployment_ids (list): List of customer deployment IDs.
+        main_agreement (dict): Main Agreement representation from MPT API
         listing (dict): The listing data.
         licensee (dict): The licensee data.
 
@@ -340,6 +346,44 @@ def create_gc_agreement_deployment(
             MPT_ORDER_STATUS_COMPLETED,
             TEMPLATE_NAME_TRANSFER,
         )
+
+        three_yc_parameters = get_3yc_fulfillment_parameters(main_agreement)
+        ordering_parameters = [
+            {"externalId": PARAM_AGREEMENT_TYPE, "value": "Migrate"},
+            {
+                "externalId": PARAM_COMPANY_NAME,
+                "value": sanitize_company_name(
+                    adobe_customer["companyProfile"]["companyName"]
+                ),
+            },
+            {"externalId": PARAM_ADDRESS, "value": param_address},
+            {"externalId": PARAM_CONTACT, "value": param_contact},
+            {
+                "externalId": PARAM_MEMBERSHIP_ID,
+                "value": agreement_deployment.membership_id,
+            },
+        ]
+        fulfillment_parameters = [
+            {"externalId": PARAM_GLOBAL_CUSTOMER, "value": ["Yes"]},
+            {
+                "externalId": PARAM_DEPLOYMENT_ID,
+                "value": agreement_deployment.deployment_id,
+            },
+            {
+                "externalId": PARAM_DEPLOYMENTS,
+                "value": ",".join(customer_deployment_ids),
+            },
+            {
+                "externalId": PARAM_CUSTOMER_ID,
+                "value": agreement_deployment.customer_id,
+            },
+            {
+                "externalId": PARAM_COTERM_DATE,
+                "value": adobe_customer["cotermDate"],
+            },
+        ]
+        fulfillment_parameters.extend(three_yc_parameters)
+
         gc_agreement_deployment = {
             "status": "Active",
             "listing": {"id": agreement_deployment.listing_id},
@@ -352,40 +396,8 @@ def create_gc_agreement_deployment(
             "lines": [],
             "subscriptions": [],
             "parameters": {
-                "ordering": [
-                    {"externalId": PARAM_AGREEMENT_TYPE, "value": "Migrate"},
-                    {
-                        "externalId": PARAM_COMPANY_NAME,
-                        "value": sanitize_company_name(
-                            adobe_customer["companyProfile"]["companyName"]
-                        ),
-                    },
-                    {"externalId": PARAM_ADDRESS, "value": param_address},
-                    {"externalId": PARAM_CONTACT, "value": param_contact},
-                    {
-                        "externalId": PARAM_MEMBERSHIP_ID,
-                        "value": agreement_deployment.membership_id,
-                    },
-                ],
-                "fulfillment": [
-                    {"externalId": PARAM_GLOBAL_CUSTOMER, "value": ["Yes"]},
-                    {
-                        "externalId": PARAM_DEPLOYMENT_ID,
-                        "value": agreement_deployment.deployment_id,
-                    },
-                    {
-                        "externalId": PARAM_DEPLOYMENTS,
-                        "value": ",".join(customer_deployment_ids),
-                    },
-                    {
-                        "externalId": PARAM_CUSTOMER_ID,
-                        "value": agreement_deployment.customer_id,
-                    },
-                    {
-                        "externalId": PARAM_COTERM_DATE,
-                        "value": adobe_customer["cotermDate"],
-                    },
-                ],
+                "ordering": ordering_parameters,
+                "fulfillment": fulfillment_parameters,
             },
             "licensee": {"id": agreement_deployment.licensee_id},
             "buyer": {"id": buyer_id},
@@ -402,7 +414,7 @@ def create_gc_agreement_deployment(
 
         return agreement["id"]
     except Exception as e:
-        logger.error(f"Error creating agreement deployment: {e}")
+        logger.exception(f"Error creating agreement deployment: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
             f"Error creating agreement deployment: {e}"
@@ -486,7 +498,7 @@ def enable_subscription_auto_renewal(
 
 
 def process_agreement_deployment(
-    mpt_client, adobe_client, agreement_deployment, product_id
+    mpt_client, mpt_o_client, adobe_client, agreement_deployment, product_id
 ):
     """
     Process the agreement deployment by retrieving necessary data, creating or updating
@@ -494,6 +506,7 @@ def process_agreement_deployment(
 
     Args:
         mpt_client (MPTClient): The MPT client instance.
+        mpt_o_client (MPT Client): The MPT client authorized under operations account
         adobe_client (AdobeClient): The Adobe client instance.
         agreement_deployment (AgreementDeployment): The agreement deployment instance.
         product_id (str): The product ID.
@@ -511,11 +524,6 @@ def process_agreement_deployment(
         return
 
     try:
-        mpt_o_client = MPTClient(
-            f"{settings.MPT_API_BASE_URL}/v1/",
-            settings.MPT_API_TOKEN_OPERATIONS,
-        )
-
         authorization_id = get_authorization(mpt_client, agreement_deployment)
         if not authorization_id:
             return
@@ -535,6 +543,10 @@ def process_agreement_deployment(
 
         licensee = get_licensee(mpt_o_client, agreement_deployment.licensee_id)
 
+        main_agreement = get_agreement(
+            mpt_client, agreement_deployment.main_agreement_id
+        )
+
         adobe_customer = adobe_client.get_customer(
             authorization_id, agreement_deployment.customer_id
         )
@@ -551,6 +563,7 @@ def process_agreement_deployment(
             agreement_deployment,
             adobe_customer,
             customer_deployment_ids,
+            main_agreement,
             listing,
             licensee
         )
@@ -607,7 +620,7 @@ def process_agreement_deployment(
         agreement_deployment.save()
 
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Error processing agreement deployment {agreement_deployment.deployment_id}: {e}"
         )
         agreement_deployment.status = STATUS_GC_ERROR
@@ -630,6 +643,7 @@ def check_gc_agreement_deployments():
     """
     adobe_client = get_adobe_client()
     mpt_client = setup_client()
+    mpt_o_client = setup_operations_client()
 
     for product_id in settings.MPT_PRODUCTS_IDS:
         if get_market_segment(product_id) != MARKET_SEGMENT_COMMERCIAL:
@@ -639,9 +653,13 @@ def check_gc_agreement_deployments():
             agreement_deployments = get_gc_agreement_deployments_to_check(product_id)
             for agreement_deployment in agreement_deployments:
                 process_agreement_deployment(
-                    mpt_client, adobe_client, agreement_deployment, product_id
+                    mpt_client,
+                    mpt_o_client,
+                    adobe_client,
+                    agreement_deployment,
+                    product_id,
                 )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Error checking GC agreement deployments for product {product_id}: {e}"
             )

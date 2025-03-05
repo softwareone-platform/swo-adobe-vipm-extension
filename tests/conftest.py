@@ -907,7 +907,52 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
 
 
 @pytest.fixture()
-def agreement(buyer):
+def licensee(buyer):
+    return {
+        "id": "LCE-1111-2222-3333",
+        "name": "FF Buyer good enough",
+        "useBuyerAddress": True,
+        "address": buyer["address"],
+        "contact": buyer["contact"],
+        "buyer": buyer,
+        "account": {
+            "id": "ACC-1234-1234",
+            "name": "Client Account",
+        },
+    }
+
+
+@pytest.fixture()
+def listing(buyer):
+    return {
+        "id": "LST-9401-9279",
+        "href": "/listing/LST-9401-9279",
+        "priceList": {
+            "id": "PRC-9457-4272-3691",
+            "href": "/v1/price-lists/PRC-9457-4272-3691",
+            "currency": "USD",
+        },
+        "product": {
+            "id": "PRD-1234-1234",
+            "name": "Adobe for Commercial",
+        },
+        "vendor": {
+            "id": "ACC-1234-vendor-id",
+            "name": "Adobe",
+        },
+    }
+
+
+@pytest.fixture()
+def template():
+    return {
+        "id": "TPL-1234-1234-4321",
+        "name": "Default Template",
+    }
+
+
+@pytest.fixture()
+def agreement(buyer, licensee, listing):
     return {
         "id": "AGR-2119-4550-8674-5962",
         "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
@@ -956,22 +1001,8 @@ def agreement(buyer):
                 ],
             },
         ],
-        "listing": {
-            "id": "LST-9401-9279",
-            "href": "/listing/LST-9401-9279",
-            "priceList": {
-                "id": "PRC-9457-4272-3691",
-                "href": "/v1/price-lists/PRC-9457-4272-3691",
-                "currency": "USD",
-            },
-        },
-        "licensee": {
-            "id": "LCE-1111-2222-3333",
-            "name": "FF Buyer good enough",
-            "useBuyerAddress": True,
-            "address": buyer["address"],
-            "contact": buyer["contact"],
-        },
+        "listing": listing,
+        "licensee": licensee,
         "buyer": buyer,
         "seller": {
             "id": "SEL-9121-8944",
@@ -1139,9 +1170,9 @@ def adobe_items_factory(
         subscription_id=None,
         renewal_date=None,
         status=None,
-        deployment_id=deployment_id,
-        currencyCode= None,
-        deployment_currency_code=deployment_currency_code
+        deployment_id=None,
+        currencyCode=None,
+        deployment_currency_code=None,
     ):
         item = {
             "extLineItemNumber": line_number,
@@ -1545,7 +1576,9 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
 
     AdobeProductMapping = get_sku_adobe_mapping_model(base_info)
 
-    all_sku = {i["vendor_external_id"]:AdobeProductMapping(**i) for i in mock_sku_mapping_data}
+    all_sku = {
+        i["vendor_external_id"]: AdobeProductMapping(**i) for i in mock_sku_mapping_data
+    }
     mocker.patch.object(AdobeProductMapping, "all", return_value=all_sku)
 
     def from_id(external_id):

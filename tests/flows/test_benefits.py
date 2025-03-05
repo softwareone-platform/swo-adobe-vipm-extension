@@ -390,6 +390,109 @@ def test_check_3yc_commitment_request_exception(
     assert "Traceback" in mocked_send_exception.mock_calls[0].args[1]
 
 
+def test_check_3yc_commitment_request_global_customers(
+    mocker,
+    mpt_client,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="Yes",
+            deployment_id="",
+            deployments="here-should-be-deployment-ids",
+        ),
+    )
+    deployment_agreements = [
+        agreement_factory(
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="",
+                deployment_id=f"deployment-{i}",
+                deployments="",
+            ),
+        )
+        for i in range(2)
+    ]
+
+    mocker.patch(
+        "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
+        return_value=[agreement],
+    )
+    mocked_adobe_client = mocker.MagicMock()
+
+    customer_kwargs = {
+        "commitment": adobe_commitment_factory(status="COMMITTED"),
+        "commitment_request": adobe_commitment_factory(status="COMMITTED"),
+        "global_sales_enabled": True,
+    }
+    customer = adobe_customer_factory(**customer_kwargs)
+    mocked_adobe_client.get_customer.return_value = customer
+    mocked_adobe_client.get_customer_deployments.return_value = [
+        {"deploymentId": str(i)} for i in range(2)
+    ]
+
+    mocker.patch(
+        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
+    )
+
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.benefits.update_agreement")
+
+    mocked_get_agreements_by_deployments = mocker.patch(
+        "adobe_vipm.flows.benefits.get_agreements_by_customer_deployments",
+        return_value=deployment_agreements,
+    )
+
+    check_3yc_commitment_request(mpt_client)
+
+    mocked_get_agreements_by_deployments.assert_called_once_with(
+        mpt_client,
+        ["0", "1"],
+    )
+    assert mocked_update_agreement.call_args_list == [
+        mocker.call(
+            mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                ],
+                "ordering": [{"externalId": "3YC", "value": None}],
+            },
+        ),
+        mocker.call(
+            mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                ],
+                "ordering": [{"externalId": "3YC", "value": None}],
+            },
+        ),
+        mocker.call(
+            mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                ],
+                "ordering": [{"externalId": "3YC", "value": None}],
+            },
+        ),
+    ]
+
+
 @pytest.mark.parametrize("is_recommitment", [False, True])
 def test_resubmit_3yc_commitment_request_exception(
     mocker,

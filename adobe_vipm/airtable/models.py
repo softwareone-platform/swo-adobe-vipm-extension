@@ -685,9 +685,11 @@ def get_sku_adobe_mapping_model(
             base_id = base_info.base_id
 
         @classmethod
-        def from_short_id(cls, vendor_external_id:str):
+        def from_short_id(cls, vendor_external_id: str):
             entity = cls.first(
-                formula=EQUAL(FIELD("vendor_external_id"), STR_VALUE(vendor_external_id))
+                formula=EQUAL(
+                    FIELD("vendor_external_id"), STR_VALUE(vendor_external_id)
+                )
             )
             if entity is None:
                 raise AdobeProductNotFoundError(
@@ -715,4 +717,3 @@ def get_adobe_product_by_marketplace_sku(
 
     AdobeItemModel = get_sku_adobe_mapping_model(AirTableBaseInfo.for_sku_mapping())
     return AdobeItemModel.from_short_id(vendor_external_id)
-
