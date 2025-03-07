@@ -329,9 +329,6 @@ def sync_agreement(mpt_client, agreement, dry_run):
 
     except Exception as e:
         logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
-        notify_agreement_unhandled_exception_in_teams(
-            agreement["id"], traceback.format_exc()
-        )
 
 
 def sync_deployments_prices(
