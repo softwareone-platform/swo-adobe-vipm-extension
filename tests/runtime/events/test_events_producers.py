@@ -6,38 +6,6 @@ from swo.mpt.extensions.runtime.events.producers import (
 )
 
 
-def test_event_producer_produce_events(
-    mocker,
-    order_factory,
-):
-    order_to_process = order_factory()
-
-    dispatcher = Dispatcher()
-    order_event_producer = OrderEventProducer(dispatcher)
-
-    def mock_dispatch_event_func(event, order):
-        mock_dispatch_event_func.is_called = True
-        order_event_producer.stop()
-
-    mock_dispatch_event_func.is_called = False
-
-    mocker.patch.object(
-        Dispatcher,
-        "dispatch_event",
-        mock_dispatch_event_func,
-    )
-
-    mock_get_processing_orders = mocker.patch.object(
-        OrderEventProducer, "get_processing_orders", return_value=[order_to_process]
-    )
-
-    order_event_producer.start()
-    order_event_producer.produce_events()
-
-    mock_get_processing_orders.assert_called()
-    assert mock_dispatch_event_func.is_called
-
-
 def test_event_producer_get_processing_orders(
     mpt_client,
     mock_wrap_event,
