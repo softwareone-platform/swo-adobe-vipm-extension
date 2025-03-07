@@ -497,7 +497,8 @@ def get_agreements_by_customer_deployments(mpt_client, deployment_ids):
         f"eq(externalId,{PARAM_DEPLOYMENT_ID}),"
         f"in(displayValue,({deployments_list}))))"
     )
+    selects = "select=parameters,listing.priceList,product,subscriptions,lines"
 
-    url = f"/commerce/agreements?{rql_query}"
+    url = f"/commerce/agreements?{rql_query}&{selects}"
 
     return _paginated(mpt_client, url)
