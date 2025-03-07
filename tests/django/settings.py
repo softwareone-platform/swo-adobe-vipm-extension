@@ -157,7 +157,6 @@ USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # OpenTelemetry configuration
-SERVICE_NAME = os.getenv("SERVICE_NAME", "Swo.Extensions.AdobeVIPM")
 USE_APPLICATIONINSIGHTS = os.getenv("USE_APPLICATIONINSIGHTS", "False").lower() in (
     "true",
     "1",
