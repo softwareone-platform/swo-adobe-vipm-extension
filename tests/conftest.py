@@ -912,6 +912,17 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
 
 
 @pytest.fixture()
+def provisioning_agreement(agreement_factory):
+    agreement = agreement_factory()
+    agreement["parameters"]["ordering"] = []
+    agreement["parameters"]["fulfillment"] = []
+    agreement["lines"] = []
+    agreement["subscriptions"] = []
+
+    return agreement
+
+
+@pytest.fixture()
 def licensee(buyer):
     return {
         "id": "LCE-1111-2222-3333",

@@ -378,8 +378,7 @@ def test_check_gc_agreement_deployments_create_listing(
     adobe_customer_factory,
     adobe_subscription_factory,
     items_factory,
-    agreement_factory,
-    fulfillment_parameters_factory,
+    provisioning_agreement,
     gc_agreement_deployment,
     listing,
     licensee,
@@ -391,13 +390,6 @@ def test_check_gc_agreement_deployments_create_listing(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    agreement = agreement_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            p3yc_enroll_status="COMMITTED",
-            p3yc_start_date="2025-01-01",
-            p3yc_end_date="2028-01-01",
-        )
-    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -453,7 +445,7 @@ def test_check_gc_agreement_deployments_create_listing(
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=agreement,
+        return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
@@ -482,27 +474,6 @@ def test_check_gc_agreement_deployments_create_listing(
                     {"externalId": "deployments", "value": ""},
                     {"externalId": "customerId", "value": "P0112233"},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
-                    {
-                        "externalId": "3YCEndDate",
-                        "id": "PAR-3528-2927",
-                        "name": "3YC End Date",
-                        "type": "Date",
-                        "value": "2028-01-01",
-                    },
-                    {
-                        "externalId": "3YCEnrollStatus",
-                        "id": "PAR-9876-5432",
-                        "name": "3YC Enroll Status",
-                        "type": "SingleLineText",
-                        "value": "COMMITTED",
-                    },
-                    {
-                        "externalId": "3YCStartDate",
-                        "id": "PAR-2266-4848",
-                        "name": "3YC Start Date",
-                        "type": "Date",
-                        "value": "2025-01-01",
-                    },
                 ],
                 "ordering": [
                     {"externalId": "agreementType", "value": "Migrate"},
@@ -631,7 +602,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     adobe_customer_factory,
     adobe_subscription_factory,
     items_factory,
-    agreement_factory,
+    provisioning_agreement,
     gc_agreement_deployment,
     licensee,
     template,
@@ -642,7 +613,6 @@ def test_check_gc_agreement_deployments_create_agreement_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    agreement = agreement_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -695,7 +665,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=agreement,
+        return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
@@ -717,7 +687,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     adobe_subscription_factory,
     items_factory,
     adobe_api_error_factory,
-    agreement_factory,
+    provisioning_agreement,
     gc_agreement_deployment,
     licensee,
     listing,
@@ -729,7 +699,6 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    agreement = agreement_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -775,7 +744,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
 
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=agreement,
+        return_value=provisioning_agreement,
     )
 
     adobe_customer = adobe_customer_factory()
@@ -814,7 +783,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     adobe_customer_factory,
     adobe_subscription_factory,
     items_factory,
-    agreement_factory,
+    provisioning_agreement,
     gc_agreement_deployment,
     licensee,
     listing,
@@ -825,7 +794,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    agreement = agreement_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -878,7 +846,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
 
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=agreement,
+        return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
@@ -902,7 +870,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     adobe_customer_factory,
     adobe_subscription_factory,
     items_factory,
-    agreement_factory,
+    provisioning_agreement,
     gc_agreement_deployment,
     licensee,
     listing,
@@ -913,7 +881,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    agreement = agreement_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -965,7 +932,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
 
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=agreement,
+        return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
@@ -989,7 +956,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     adobe_customer_factory,
     adobe_subscription_factory,
     items_factory,
-    agreement_factory,
+    provisioning_agreement,
     gc_agreement_deployment,
 ):
     settings.EXTENSION_CONFIG = {
@@ -998,7 +965,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    agreement = agreement_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -1058,7 +1024,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
 
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=agreement,
+        return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
@@ -1082,7 +1048,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     adobe_customer_factory,
     adobe_subscription_factory,
     items_factory,
-    agreement_factory,
+    provisioning_agreement,
     gc_agreement_deployment,
 ):
     settings.EXTENSION_CONFIG = {
@@ -1091,7 +1057,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    agreement = agreement_factory()
 
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -1147,7 +1112,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=agreement,
+        return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
