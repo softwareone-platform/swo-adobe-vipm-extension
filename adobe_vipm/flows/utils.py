@@ -519,19 +519,6 @@ def set_parameter_hidden(order, param_external_id):
     return updated_order
 
 
-def get_3yc_fulfillment_parameters(order_or_agreement):
-    three_yc_fulfillment_parameters = [
-        PARAM_3YC_END_DATE,
-        PARAM_3YC_ENROLL_STATUS,
-        PARAM_3YC_START_DATE,
-    ]
-
-    return [
-        get_fulfillment_parameter(order_or_agreement, param_external_id)
-        for param_external_id in three_yc_fulfillment_parameters
-    ]
-
-
 def set_adobe_3yc_enroll_status(order, enroll_status):
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
