@@ -46,7 +46,6 @@ from adobe_vipm.flows.mpt import (
     update_agreement,
 )
 from adobe_vipm.flows.utils import (
-    get_3yc_fulfillment_parameters,
     get_market_segment,
     split_phone_number,
 )
@@ -347,7 +346,6 @@ def create_gc_agreement_deployment(
             TEMPLATE_NAME_TRANSFER,
         )
 
-        three_yc_parameters = get_3yc_fulfillment_parameters(main_agreement)
         ordering_parameters = [
             {"externalId": PARAM_AGREEMENT_TYPE, "value": "Migrate"},
             {
@@ -382,7 +380,6 @@ def create_gc_agreement_deployment(
                 "value": adobe_customer["cotermDate"],
             },
         ]
-        fulfillment_parameters.extend(three_yc_parameters)
 
         gc_agreement_deployment = {
             "status": "Active",
