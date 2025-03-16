@@ -329,6 +329,9 @@ class AdobeClient:
         orders = []
         orders_base_url = f"/v3/customers/{customer_id}/orders"
 
+        # order API works as expected by documentation of Adobe API
+        # it returns back proper next link
+        # it accepts limit/offset
         next_url = f"{orders_base_url}?limit=100&offset=0"
         while next_url:
             response = requests.get(
@@ -612,6 +615,9 @@ class AdobeClient:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
+        # subscriptions API doesn't have pagination
+        # it always returns back all subscriptions
+        # it doesn't accept limit/offset pagination
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
@@ -938,10 +944,14 @@ class AdobeClient:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
+        # deployments API doesn't work as expected in Adobe documentation
+        # it accepts limit/offset pagination
+        # but it doesn't return  next link in the response
+        # so as a w/a hard coded limit=100 is used here
         response = requests.get(
             urljoin(
                 self._config.api_base_url,
-                f"/v3/customers/{customer_id}/deployments",
+                f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
             ),
             headers=headers,
         )
