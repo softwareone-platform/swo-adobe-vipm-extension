@@ -8,7 +8,11 @@ from datetime import date, timedelta
 from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
+)
+from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import get_3yc_commitment, get_item_by_partial_sku
 from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
@@ -163,10 +167,16 @@ class SetupContext(Step):
         context.market_segment = get_market_segment(context.product_id)
         context.adobe_customer_id = get_adobe_customer_id(context.order)
         if context.adobe_customer_id:
-            context.adobe_customer = adobe_client.get_customer(
-                context.authorization_id,
-                context.adobe_customer_id,
-            )
+            try:
+                context.adobe_customer = adobe_client.get_customer(
+                    context.authorization_id,
+                    context.adobe_customer_id,
+                )
+            except AdobeAPIError as e:
+                logger.exception(
+                    f"{context}: failed to retrieve Adobe customer: {e}"
+                )
+                return
         context.adobe_new_order_id = get_adobe_order_id(context.order)
         logger.info(f"{context}: initialization completed.")
         next_step(client, context)
