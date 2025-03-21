@@ -82,7 +82,8 @@ def test_validate_transfer(
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
         order["agreement"]["product"]["id"],
-        [adobe_preview_transfer["items"][0]["offerId"][:10]],
+        [adobe_preview_transfer["items"][0]["offerId"][:10],
+         adobe_preview_transfer["items"][1]["offerId"][:10]],
     )
 
 
@@ -140,7 +141,8 @@ def test_validate_transfer_lines_exist(
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
         order["agreement"]["product"]["id"],
-        [adobe_preview_transfer["items"][0]["offerId"][:10]],
+        [adobe_preview_transfer["items"][0]["offerId"][:10],
+         adobe_preview_transfer["items"][1]["offerId"][:10]],
     )
 
 
@@ -408,7 +410,11 @@ def test_validate_transfer_no_items(
 ):
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
-        return_value=None,
+        return_value=[],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
+        return_value=[],
     )
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=transfer_order_parameters_factory())
@@ -1176,7 +1182,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
         line_id=None,
         item_id=1,
         quantity=10,
-        name="Awesome Expired product 1",
+        name="Awesome product 1",
         external_vendor_id="65304990CA",
         unit_purchase_price=33.04,
     )
@@ -1202,7 +1208,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     )
 
     product_items = items_factory(
-        item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
+        item_id=1, name="Awesome product 1", external_vendor_id="65304990CA"
     )
     product_items.extend(
         items_factory(
@@ -1249,7 +1255,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
         line_id=None,
         item_id=1,
         quantity=10,
-        name="Awesome Expired product 1",
+        name="Awesome product 1",
         external_vendor_id="65304990CA",
         unit_purchase_price=33.04,
     )
@@ -1614,4 +1620,73 @@ def test_validate_transfer_already_migrated_items_with_deployment(
     mocked_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
+    )
+
+
+def test_validate_transfer_with_one_line_items(
+    mocker,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+    lines_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    m_client = mocker.MagicMock()
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
+        lines=[],
+    )
+    product_items = items_factory()
+    product_items.extend(items_factory(
+        item_id=2, external_vendor_id="99999999CA", term_period="one-time"
+    ))
+    valid_items = adobe_items_factory(
+        renewal_date=date.today().isoformat(),
+    )
+    one_time_item = adobe_items_factory(
+        renewal_date=date.today().isoformat(),
+        line_number=3,
+        offer_id="99999999CA01A12",
+    )
+
+    expired_items = adobe_items_factory(
+        offer_id="65304999CA01A12",
+        line_number=2,
+        renewal_date=(date.today() - timedelta(days=5)).isoformat(),
+    )
+    items = valid_items + expired_items + one_time_item
+    adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
+        return_value={
+            valid_items[0]["offerId"]: 12.14,
+            expired_items[0]["offerId"]: 33.04,
+        },
+    )
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+
+    mocked_get_product_items_by_skus = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
+
+    has_errors, validated_order = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+    lines = lines_factory(line_id=None, unit_purchase_price=12.14)
+    assert has_errors is False
+    assert len(validated_order["lines"]) == len(lines)
+
+    mocked_get_product_items_by_skus.assert_called_once_with(
+        m_client,
+        order["agreement"]["product"]["id"],
+        [adobe_preview_transfer["items"][0]["offerId"][:10],
+         adobe_preview_transfer["items"][1]["offerId"][:10],
+         adobe_preview_transfer["items"][2]["offerId"][:10]],
     )

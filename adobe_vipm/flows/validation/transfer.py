@@ -140,22 +140,22 @@ def add_lines_to_order(
 
     order_error = False
 
-    if is_transferred:
-        returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
-        items = get_product_items_by_skus(
-            mpt_client, order["agreement"]["product"]["id"], returned_skus
-        )
-        one_time_skus = [
-            item["externalIds"]["vendor"]
-            for item in items
-            if item["terms"]["period"] == "one-time"
-        ]
-        adobe_items_without_one_time_offers = [
-            item
-            for item in adobe_items
-            if get_partial_sku(item["offerId"]) not in one_time_skus
-        ]
+    returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
+    items = get_product_items_by_skus(
+        mpt_client, order["agreement"]["product"]["id"], returned_skus
+    )
+    one_time_skus = [
+        item["externalIds"]["vendor"]
+        for item in items
+        if item["terms"]["period"] == "one-time"
+    ]
+    adobe_items_without_one_time_offers = [
+        item
+        for item in adobe_items
+        if get_partial_sku(item["offerId"]) not in one_time_skus
+    ]
 
+    if is_transferred:
         if are_all_transferring_items_expired(adobe_items_without_one_time_offers):
             # If the order already has items and all the items on Adobe to be migrated are
             # expired, the user can add, edit or delete the expired subscriptions
@@ -181,7 +181,8 @@ def add_lines_to_order(
     else:
         # remove expired items from adobe items
         adobe_items = [
-            item for item in adobe_items if not is_transferring_item_expired(item)
+            item for item in adobe_items_without_one_time_offers
+            if not is_transferring_item_expired(item)
         ]
 
     if len(adobe_items) == 0:
@@ -193,15 +194,13 @@ def add_lines_to_order(
         )
         return True, order
 
-    returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
+    valid_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
     returned_full_skus = [item["offerId"] for item in adobe_items]
     prices = get_prices(order, commitment, returned_full_skus)
 
     items_map = {
         item["externalIds"]["vendor"]: item
-        for item in get_product_items_by_skus(
-            mpt_client, order["agreement"]["product"]["id"], returned_skus
-        )
+        for item in items if item["externalIds"]["vendor"] in valid_skus
     }
 
     return update_order_lines(
@@ -211,7 +210,7 @@ def add_lines_to_order(
         items_map,
         quantity_field,
         order_error,
-        returned_skus,
+        valid_skus,
     )
 
 
