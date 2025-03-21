@@ -1,8 +1,12 @@
 import copy
 from datetime import date
+from urllib.parse import urljoin
 
+import pytest
 from freezegun import freeze_time
 
+from adobe_vipm.adobe.constants import STATUS_INTERNAL_SERVER_ERROR
+from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
     PARAM_COMPANY_NAME,
@@ -201,6 +205,92 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
+
+def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_error(
+    mocker,
+    requests_mocker,
+    settings,
+    agreement,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_api_error_factory,
+    adobe_authorizations_file,
+    adobe_client_factory,
+):
+    """
+    Tests the order processing initialization step when the Adobe get customer
+    API operation receives an error.
+    """
+    customer_id = "adobe-customer-id"
+    adobe_client, _, _ = adobe_client_factory()
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    adobe_api_error = adobe_api_error_factory(
+        code=STATUS_INTERNAL_SERVER_ERROR,
+        message="Internal Server Error",
+    )
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}"
+        ),
+        status=500,
+        json=adobe_api_error,
+
+    )
+
+    with pytest.raises(AdobeError) as exc_info:
+        adobe_client.get_customer(authorization_uk, customer_id)
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=adobe_client,
+    )
+    mocked_get_agreement = mocker.patch(
+        "adobe_vipm.flows.helpers.get_agreement", return_value=agreement
+    )
+    mocked_get_licensee = mocker.patch(
+        "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
+    )
+
+    fulfillment_parameters = fulfillment_parameters_factory(
+        customer_id=customer_id,
+    )
+
+    external_ids = {"vendor": customer_id}
+
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters,
+        external_ids=external_ids,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order)
+
+    step = SetupContext()
+    step(mocked_client, context, mocked_next_step)
+
+    assert str(exc_info.value) == f"{adobe_api_error["code"]} - {adobe_api_error["message"]}"
+    assert context.order["agreement"] == agreement
+    assert context.order["agreement"]["licensee"] == agreement["licensee"]
+    assert context.due_date is None
+    assert context.downsize_lines == []
+    assert context.upsize_lines == order["lines"]
+    assert context.adobe_customer_id == customer_id
+    assert context.adobe_customer is None
+    assert context.adobe_new_order_id is None
+    mocked_get_agreement.assert_called_once_with(
+        mocked_client,
+        order["agreement"]["id"],
+    )
+    mocked_get_licensee.assert_called_once_with(
+        mocked_client,
+        order["agreement"]["licensee"]["id"],
+    )
+    mocked_next_step.assert_not_called()
 
 def test_prepare_customer_data_step(mocker, order_factory, customer_data):
     order = order_factory()
