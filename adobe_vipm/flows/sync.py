@@ -28,6 +28,7 @@ from adobe_vipm.flows.mpt import (
     update_agreement_subscription,
 )
 from adobe_vipm.flows.utils import (
+    get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
@@ -330,6 +331,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
             sync_deployments_prices(
                 mpt_client,
                 adobe_client,
+                agreement,
                 customer,
                 customer_deployments,
                 dry_run,
@@ -343,7 +345,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
 
 
 def sync_deployments_prices(
-    mpt_client, adobe_client, customer, customer_deployments, dry_run
+    mpt_client, adobe_client, main_agreement, customer, customer_deployments, dry_run
 ):
     if not customer_deployments:
         return
@@ -356,6 +358,25 @@ def sync_deployments_prices(
     for deployment_agreement in deployment_agreements:
         sync_agreement_prices(
             mpt_client, deployment_agreement, dry_run, adobe_client, customer
+        )
+        sync_gc_3yc_agreements(
+            mpt_client,
+            main_agreement,
+            deployment_agreement,
+            dry_run,
+        )
+
+
+def sync_gc_3yc_agreements(mpt_client, main_agreement, deployment_agreement, dry_run):
+    parameters_3yc = get_3yc_fulfillment_parameters(main_agreement)
+
+    if not dry_run:
+        update_agreement(
+            mpt_client,
+            deployment_agreement["id"],
+            parameters={
+                "fulfillment": parameters_3yc,
+            },
         )
 
 
