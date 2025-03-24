@@ -1086,12 +1086,31 @@ def test_update_subscription(
         ],
     )
 
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
+        ),
+        status=200,
+        json={"b": "subscription"},
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+        ],
+    )
+
     assert client.update_subscription(
         authorization_uk,
         customer_id,
         sub_id,
         **update_params,
-    ) == {"a": "subscription"}
+    ) == {"b": "subscription"}
 
 
 def test_update_subscription_not_found(

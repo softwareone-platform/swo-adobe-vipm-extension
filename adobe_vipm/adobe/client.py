@@ -674,7 +674,9 @@ class AdobeClient:
         )
 
         response.raise_for_status()
-        return response.json()
+        # patch doesn't return half of the fields in subscriptions representaion
+        # missed fields are offerId, usedQuantity
+        return self.get_subscription(authorization_id, customer_id, subscription_id)
 
     @wrap_http_error
     def preview_transfer(
