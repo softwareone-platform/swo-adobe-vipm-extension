@@ -1219,7 +1219,7 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
     )
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
-        context.order_id,
+        context.order,
         ORDER_STATUS_DESCRIPTION[processing_status],
     )
     mocked_adobe_client.create_preview_order.assert_not_called()
@@ -1282,7 +1282,7 @@ def test_submit_new_order_step_order_created_unexpected_status(
     )
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
-        context.order["id"],
+        context.order,
         "Unexpected status (9999) received from Adobe.",
     )
     mocked_adobe_client.create_preview_order.assert_not_called()
