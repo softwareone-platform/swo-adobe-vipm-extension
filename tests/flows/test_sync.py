@@ -829,7 +829,7 @@ def test_sync_global_customer_parameter(
         external_vendor_id="77777777CA",
         unit_purchase_price=20.22,
     )
-    assert mocked_update_agreement.mock_calls == [
+    assert mocked_update_agreement.call_args_list == [
         mocker.call(
             mocked_mpt_client,
             agreement["id"],
@@ -854,6 +854,35 @@ def test_sync_global_customer_parameter(
             lines=expected_lines,
             parameters={
                 "fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]
+            },
+        ),
+        mocker.call(
+            mocked_mpt_client,
+            deployment_agreements[0]["id"],
+            parameters={
+                "fulfillment": [
+                    {
+                        "id": "PAR-3528-2927",
+                        "name": "3YC End Date",
+                        "externalId": "3YCEndDate",
+                        "type": "Date",
+                        "value": "",
+                    },
+                    {
+                        "id": "PAR-9876-5432",
+                        "name": "3YC Enroll Status",
+                        "externalId": "3YCEnrollStatus",
+                        "type": "SingleLineText",
+                        "value": "",
+                    },
+                    {
+                        "id": "PAR-2266-4848",
+                        "name": "3YC Start Date",
+                        "externalId": "3YCStartDate",
+                        "type": "Date",
+                        "value": "",
+                    },
+                ]
             },
         ),
     ]
