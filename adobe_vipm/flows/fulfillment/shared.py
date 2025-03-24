@@ -777,12 +777,12 @@ class SubmitNewOrder(Step):
             return
         elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
             reason = ORDER_STATUS_DESCRIPTION[adobe_order["status"]]
-            switch_order_to_failed(client, context.order_id, reason)
+            switch_order_to_failed(client, context.order, reason)
             logger.warning(f"{context}: The adobe order has been failed {reason}.")
             return
         elif adobe_order["status"] != STATUS_PROCESSED:
             reason = f"Unexpected status ({adobe_order['status']}) received from Adobe."
-            switch_order_to_failed(client, context.order_id, reason)
+            switch_order_to_failed(client, context.order, reason)
             logger.warning(f"{context}: the order has been failed due to {reason}.")
             return
         next_step(client, context)
