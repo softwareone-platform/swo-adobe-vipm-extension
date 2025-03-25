@@ -4,6 +4,7 @@ from django.conf import settings
 from swo.mpt.extensions.core.utils import setup_client, setup_operations_client
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.constants import STATUS_PROCESSED
 from adobe_vipm.adobe.utils import sanitize_company_name, sanitize_first_last_name
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
@@ -587,6 +588,13 @@ def process_agreement_deployment(
         }
 
         for adobe_subscription in adobe_subscriptions:
+            if adobe_subscription["status"] != STATUS_PROCESSED:
+                logger.warning(
+                    f"Subscription {adobe_subscription['subscriptionId']} "
+                    f"is in status {adobe_subscription['status']}, skip it"
+                )
+                continue
+
             item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
             subscription = get_agreement_subscription_by_external_id(
                 mpt_client, gc_agreement_id, adobe_subscription["subscriptionId"]

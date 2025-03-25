@@ -1,5 +1,6 @@
 import pytest
 
+from adobe_vipm.adobe.constants import STATUS_INACTIVE_OR_GENERIC_FAILURE
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
 from adobe_vipm.flows.global_customer import check_gc_agreement_deployments
@@ -839,7 +840,13 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription_factory(deployment_id="deployment_id")]
+        "items": [
+            adobe_subscription_factory(deployment_id="deployment_id"),
+            adobe_subscription_factory(deployment_id=""),
+            adobe_subscription_factory(
+                deployment_id="deployment_id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+            ),
+        ]
     }
 
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
