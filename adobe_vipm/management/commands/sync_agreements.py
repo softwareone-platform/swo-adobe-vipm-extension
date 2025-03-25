@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from swo.mpt.extensions.core.utils import setup_client
+from mpt_extension_sdk.core.utils import setup_client
 
 from adobe_vipm.flows.sync import (
     sync_agreements_by_agreement_ids,

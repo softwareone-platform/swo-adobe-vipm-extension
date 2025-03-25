@@ -1,7 +1,22 @@
 import logging
 
 from django.conf import settings
-from swo.mpt.extensions.core.utils import setup_client, setup_operations_client
+from mpt_extension_sdk.core.utils import setup_client, setup_operations_client
+from mpt_extension_sdk.mpt_http.mpt import (
+    create_agreement,
+    create_agreement_subscription,
+    create_listing,
+    get_agreement,
+    get_agreement_subscription_by_external_id,
+    get_authorizations_by_currency_and_seller_id,
+    get_gc_price_list_by_currency,
+    get_licensee,
+    get_listing_by_id,
+    get_listings_by_price_list_and_seller_and_authorization,
+    get_product_items_by_skus,
+    get_product_template_or_default,
+    update_agreement,
+)
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.utils import sanitize_company_name, sanitize_first_last_name
@@ -29,21 +44,6 @@ from adobe_vipm.flows.constants import (
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
     TEMPLATE_NAME_TRANSFER,
-)
-from adobe_vipm.flows.mpt import (
-    create_agreement,
-    create_agreement_subscription,
-    create_listing,
-    get_agreement,
-    get_agreement_subscription_by_external_id,
-    get_authorizations_by_currency_and_seller_id,
-    get_gc_price_list_by_currency,
-    get_licensee,
-    get_listing_by_id,
-    get_listings_by_price_list_and_seller_and_authorization,
-    get_product_items_by_skus,
-    get_product_template_or_default,
-    update_agreement,
 )
 from adobe_vipm.flows.utils import (
     get_market_segment,

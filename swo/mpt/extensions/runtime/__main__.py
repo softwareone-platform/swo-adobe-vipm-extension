@@ -1,4 +1,4 @@
-from swo.mpt.extensions.runtime.swoext import main
+from mpt_extension_sdk.runtime.swoext import main
 
 if __name__ == "__main__":
     main()

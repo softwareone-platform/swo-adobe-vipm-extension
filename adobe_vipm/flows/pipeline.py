@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable
 
-from swo.mpt.client import MPTClient
+from mpt_extension_sdk.mpt_http.base import MPTClient
 
 from adobe_vipm.flows.context import Context
 

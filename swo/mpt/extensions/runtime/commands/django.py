@@ -12,7 +12,11 @@ def django(ctx, management_args):
     "Execute Django subcommands."
     from swo.mpt.extensions.runtime.initializer import initialize
 
-    initialize({})
+    initialize({
+        "group": "swo.mpt.ext",
+        "name": "app_config",
+        "django_settings_module": "swo.mpt.extensions.runtime.djapp.conf.default",
+    })
     from django.core.management import execute_from_command_line
     from django.conf import settings
 

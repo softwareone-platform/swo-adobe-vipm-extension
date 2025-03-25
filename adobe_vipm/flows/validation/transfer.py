@@ -1,6 +1,8 @@
 import logging
 from datetime import date
 
+from mpt_extension_sdk.mpt_http.mpt import get_product_items_by_skus
+
 from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_COMMITTED,
@@ -26,7 +28,6 @@ from adobe_vipm.flows.constants import (
     ERR_UPDATING_TRANSFER_ITEMS,
     PARAM_MEMBERSHIP_ID,
 )
-from adobe_vipm.flows.mpt import get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
     exclude_items_with_deployment_id,
@@ -181,7 +182,8 @@ def add_lines_to_order(
     else:
         # remove expired items from adobe items
         adobe_items = [
-            item for item in adobe_items_without_one_time_offers
+            item
+            for item in adobe_items_without_one_time_offers
             if not is_transferring_item_expired(item)
         ]
 
@@ -200,7 +202,8 @@ def add_lines_to_order(
 
     items_map = {
         item["externalIds"]["vendor"]: item
-        for item in items if item["externalIds"]["vendor"] in valid_skus
+        for item in items
+        if item["externalIds"]["vendor"] in valid_skus
     }
 
     return update_order_lines(

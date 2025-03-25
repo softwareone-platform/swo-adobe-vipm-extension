@@ -3,13 +3,14 @@ from pprint import pformat
 from typing import Any, Mapping
 
 from django.conf import settings
+from mpt_extension_sdk.core.extension import Extension
+from mpt_extension_sdk.core.security import JWTAuth
+from mpt_extension_sdk.mpt_http.base import MPTClient
+from mpt_extension_sdk.mpt_http.mpt import get_webhook
+from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from ninja import Body
-from swo.mpt.client import MPTClient
-from swo.mpt.extensions.core import Extension, JWTAuth
-from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.flows.fulfillment import fulfill_order
-from adobe_vipm.flows.mpt import get_webhook
 from adobe_vipm.flows.validation import validate_order
 from adobe_vipm.models import Error
 

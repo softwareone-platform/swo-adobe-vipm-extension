@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from swo.mpt.extensions.core.utils import setup_client
+from mpt_extension_sdk.core.utils import setup_client
 
 from adobe_vipm.flows.benefits import (
     check_3yc_commitment_request,

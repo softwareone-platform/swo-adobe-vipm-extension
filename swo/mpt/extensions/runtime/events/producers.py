@@ -6,8 +6,8 @@ from contextlib import contextmanager
 
 import requests
 from django.conf import settings
-from swo.mpt.extensions.core.events import Event
-from swo.mpt.extensions.core.utils import setup_client
+from mpt_extension_sdk.core.events.dataclasses import Event
+from mpt_extension_sdk.core.utils import setup_client
 
 logger = logging.getLogger(__name__)
 

@@ -27,6 +27,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_UPDATING_TRANSFER_ITEMS,
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     PARAM_MEMBERSHIP_ID,
@@ -510,10 +511,12 @@ def test_transfer_reached_due_date(
 
     mocked_update_order.assert_not_called()
 
+    reason = "Due date is reached (2025-01-01)."
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        "Due date is reached (2025-01-01).",
+        reason,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
     )
     mocked_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
@@ -566,10 +569,12 @@ def test_transfer_unexpected_status(
 
     fulfill_order(mocked_mpt_client, order)
 
+    reason = "Unexpected status (9999) received from Adobe."
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        "Unexpected status (9999) received from Adobe.",
+        reason,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
         parameters=order["parameters"],
     )
 
@@ -625,11 +630,16 @@ def test_transfer_items_mismatch(
         "a-membership-id",
     )
 
+    reason = (
+        "The items owned by the given membership don't match the order (sku or quantity): "
+        "99999999CA."
+    )
+
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        "The items owned by the given membership don't match "
-        "the order (sku or quantity): 99999999CA.",
+        reason,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
         parameters=order["parameters"],
     )
 
@@ -846,6 +856,7 @@ def test_transfer_unrecoverable_status(
         mocked_mpt_client,
         order["id"],
         str(adobe_error),
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(adobe_error)),
         parameters=order["parameters"],
     )
 
@@ -892,10 +903,13 @@ def test_create_transfer_fail(
 
     fulfill_order(mocked_mpt_client, order)
 
+    reason = "Unexpected error"
+
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        "Unexpected error",
+        reason,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
         parameters=order["parameters"],
     )
 
@@ -1203,6 +1217,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         m_client,
         order["id"],
         ERR_UPDATING_TRANSFER_ITEMS.message,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=ERR_UPDATING_TRANSFER_ITEMS.message),
         parameters=order["parameters"],
     )
 
@@ -1720,10 +1735,13 @@ def test_fulfill_transfer_order_migration_synchronized(
         membership_param["value"],
     )
 
+    reason = "Membership has already been migrated."
+
     mocked_fail_order.assert_called_once_with(
         m_client,
         order["id"],
-        "Membership has already been migrated.",
+        reason,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
         parameters=order["parameters"],
     )
 

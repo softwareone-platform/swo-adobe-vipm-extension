@@ -8,9 +8,9 @@ import jwt
 import pytest
 import responses
 from django.conf import settings
+from mpt_extension_sdk.core.events.dataclasses import Event
+from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from rich.highlighter import ReprHighlighter as _ReprHighlighter
-from swo.mpt.extensions.core.events.dataclasses import Event
-from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
@@ -1359,7 +1359,7 @@ def mpt_client(settings):
     Create an instance of the MPT client used by the extension.
     """
     settings.MPT_API_BASE_URL = "https://localhost"
-    from swo.mpt.extensions.core.utils import setup_client
+    from mpt_extension_sdk.core.utils import setup_client
 
     return setup_client()
 
@@ -1604,7 +1604,7 @@ def mock_runtime_master_options():
 def mock_swoext_commands():
     return (
         "swo.mpt.extensions.runtime.commands.run.run",
-        "swo.mpt.extensions.runtime.commands.django.django",
+        "mpt_extension_sdk.runtime.commands.django.django",
     )
 
 
@@ -1847,12 +1847,12 @@ def mock_invalid_env_values(
 
 @pytest.fixture()
 def mock_worker_initialize(mocker):
-    return mocker.patch("swo.mpt.extensions.runtime.workers.initialize")
+    return mocker.patch("mpt_extension_sdk.runtime.workers.initialize")
 
 
 @pytest.fixture()
 def mock_worker_call_command(mocker):
-    return mocker.patch("swo.mpt.extensions.runtime.workers.call_command")
+    return mocker.patch("mpt_extension_sdk.runtime.workers.call_command")
 
 
 @pytest.fixture()

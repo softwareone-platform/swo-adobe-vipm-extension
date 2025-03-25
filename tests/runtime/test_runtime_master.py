@@ -3,7 +3,7 @@ from swo.mpt.extensions.runtime.master import Master
 
 
 @override_settings(
-    MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt": {}}}
+    MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt.ext": {}}}
 )
 def test_master_start_signals_handler(mock_runtime_master_options):
     mock_runtime_master = Master(mock_runtime_master_options)

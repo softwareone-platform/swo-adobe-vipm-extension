@@ -5,11 +5,11 @@ import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
-from swo.mpt.extensions.core.events.dataclasses import Event
-from swo.mpt.extensions.core.events.registry import EventsRegistry
-from swo.mpt.extensions.core.utils import setup_client
-from swo.mpt.extensions.runtime.events.utils import wrap_for_trace
-from swo.mpt.extensions.runtime.utils import get_events_registry
+from mpt_extension_sdk.core.events.dataclasses import Event
+from mpt_extension_sdk.core.events.registry import EventsRegistry
+from mpt_extension_sdk.core.utils import setup_client
+from mpt_extension_sdk.runtime.events.utils import wrap_for_trace
+from mpt_extension_sdk.runtime.utils import get_events_registry
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,10 @@ def done_callback(futures, key, future):
 
 class Dispatcher:
     def __init__(self):
-        self.registry: EventsRegistry = get_events_registry()
+
+        group = "swo.mpt.ext"
+        name = "app_config"
+        self.registry: EventsRegistry = get_events_registry(group=group, name=name)
         self.queue = deque()
         self.futures = {}
         self.executor = ThreadPoolExecutor()

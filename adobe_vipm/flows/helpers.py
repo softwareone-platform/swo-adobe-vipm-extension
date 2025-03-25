@@ -6,6 +6,11 @@ import logging
 from datetime import date, timedelta
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.mpt import (
+    get_agreement,
+    get_licensee,
+    update_order,
+)
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -24,11 +29,6 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
 )
 from adobe_vipm.flows.fulfillment.shared import switch_order_to_failed
-from adobe_vipm.flows.mpt import (
-    get_agreement,
-    get_licensee,
-    update_order,
-)
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
@@ -173,9 +173,7 @@ class SetupContext(Step):
                     context.adobe_customer_id,
                 )
             except AdobeAPIError as e:
-                logger.exception(
-                    f"{context}: failed to retrieve Adobe customer: {e}"
-                )
+                logger.exception(f"{context}: failed to retrieve Adobe customer: {e}")
                 return
         context.adobe_new_order_id = get_adobe_order_id(context.order)
         logger.info(f"{context}: initialization completed.")

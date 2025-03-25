@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from swo.mpt.extensions.runtime.djapp.apps import DjAppConfig
+from mpt_extension_sdk.runtime.djapp.apps import DjAppConfig
 
 from .extension import ext
 

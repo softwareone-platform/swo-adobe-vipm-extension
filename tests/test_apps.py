@@ -1,7 +1,7 @@
 import pytest
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
-from swo.mpt.extensions.core.extension import Extension
+from mpt_extension_sdk.core.extension import Extension
 
 from adobe_vipm.apps import ExtensionConfig
 

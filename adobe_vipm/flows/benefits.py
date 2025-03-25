@@ -3,6 +3,10 @@ import traceback
 from urllib.parse import urljoin
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.mpt import (
+    get_agreements_by_customer_deployments,
+    update_agreement,
+)
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -26,10 +30,8 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import (
     get_agreements_by_3yc_commitment_request_status,
-    get_agreements_by_customer_deployments,
     get_agreements_for_3yc_recommitment,
     get_agreements_for_3yc_resubmit,
-    update_agreement,
 )
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,

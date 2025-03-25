@@ -10,6 +10,8 @@ program.
 import logging
 from datetime import datetime
 
+from mpt_extension_sdk.mpt_http.mpt import get_product_items_by_skus, update_order
+
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
@@ -64,7 +66,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_query,
 )
 from adobe_vipm.flows.helpers import SetupContext
-from adobe_vipm.flows.mpt import get_product_items_by_skus, update_order
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (

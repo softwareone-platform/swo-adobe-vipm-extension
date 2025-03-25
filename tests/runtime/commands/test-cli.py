@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 from django.apps import apps
-from swo.mpt.extensions.runtime.swoext import cli
+from mpt_extension_sdk.runtime.swoext import cli
 
 
 def test_cli():

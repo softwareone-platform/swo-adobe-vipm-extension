@@ -82,8 +82,10 @@ def test_validate_transfer(
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
         order["agreement"]["product"]["id"],
-        [adobe_preview_transfer["items"][0]["offerId"][:10],
-         adobe_preview_transfer["items"][1]["offerId"][:10]],
+        [
+            adobe_preview_transfer["items"][0]["offerId"][:10],
+            adobe_preview_transfer["items"][1]["offerId"][:10],
+        ],
     )
 
 
@@ -141,8 +143,10 @@ def test_validate_transfer_lines_exist(
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
         order["agreement"]["product"]["id"],
-        [adobe_preview_transfer["items"][0]["offerId"][:10],
-         adobe_preview_transfer["items"][1]["offerId"][:10]],
+        [
+            adobe_preview_transfer["items"][0]["offerId"][:10],
+            adobe_preview_transfer["items"][1]["offerId"][:10],
+        ],
     )
 
 
@@ -1642,9 +1646,11 @@ def test_validate_transfer_with_one_line_items(
         lines=[],
     )
     product_items = items_factory()
-    product_items.extend(items_factory(
-        item_id=2, external_vendor_id="99999999CA", term_period="one-time"
-    ))
+    product_items.extend(
+        items_factory(
+            item_id=2, external_vendor_id="99999999CA", term_period="one-time"
+        )
+    )
     valid_items = adobe_items_factory(
         renewal_date=date.today().isoformat(),
     )
@@ -1686,7 +1692,9 @@ def test_validate_transfer_with_one_line_items(
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
         order["agreement"]["product"]["id"],
-        [adobe_preview_transfer["items"][0]["offerId"][:10],
-         adobe_preview_transfer["items"][1]["offerId"][:10],
-         adobe_preview_transfer["items"][2]["offerId"][:10]],
+        [
+            adobe_preview_transfer["items"][0]["offerId"][:10],
+            adobe_preview_transfer["items"][1]["offerId"][:10],
+            adobe_preview_transfer["items"][2]["offerId"][:10],
+        ],
     )

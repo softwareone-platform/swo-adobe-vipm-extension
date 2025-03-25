@@ -3,6 +3,16 @@ import sys
 import traceback
 from datetime import date, datetime, timedelta
 
+from mpt_extension_sdk.mpt_http.mpt import (
+    get_agreement_subscription,
+    get_agreements_by_customer_deployments,
+    get_agreements_by_ids,
+    get_agreements_by_next_sync,
+    get_all_agreements,
+    update_agreement,
+    update_agreement_subscription,
+)
+
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
 from adobe_vipm.adobe.utils import get_3yc_commitment
@@ -14,18 +24,10 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_CURRENT_QUANTITY,
+    PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
-)
-from adobe_vipm.flows.mpt import (
-    get_agreement_subscription,
-    get_agreements_by_customer_deployments,
-    get_agreements_by_ids,
-    get_agreements_by_next_sync,
-    get_all_agreements,
-    update_agreement,
-    update_agreement_subscription,
 )
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
@@ -241,7 +243,7 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
         dry_run (bool): if True, it just simulate the prices update but doesn't
         perform it.
     """
-    agreements = get_agreements_by_next_sync(mpt_client)
+    agreements = get_agreements_by_next_sync(mpt_client, PARAM_NEXT_SYNC_DATE)
     for agreement in agreements:
         sync_agreement(mpt_client, agreement, dry_run)
 
