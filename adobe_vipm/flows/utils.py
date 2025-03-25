@@ -645,7 +645,6 @@ def get_3yc_fulfillment_parameters(order_or_agreement):
     ]
 
 
-
 @functools.cache
 def notify_unhandled_exception_in_teams(process, order_id, traceback):
     send_exception(
