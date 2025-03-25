@@ -181,7 +181,8 @@ def add_lines_to_order(
     else:
         # remove expired items from adobe items
         adobe_items = [
-            item for item in adobe_items_without_one_time_offers
+            item
+            for item in adobe_items_without_one_time_offers
             if not is_transferring_item_expired(item)
         ]
 
@@ -200,7 +201,8 @@ def add_lines_to_order(
 
     items_map = {
         item["externalIds"]["vendor"]: item
-        for item in items if item["externalIds"]["vendor"] in valid_skus
+        for item in items
+        if item["externalIds"]["vendor"] in valid_skus
     }
 
     return update_order_lines(

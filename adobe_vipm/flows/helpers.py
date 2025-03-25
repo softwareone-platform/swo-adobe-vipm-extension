@@ -173,9 +173,7 @@ class SetupContext(Step):
                     context.adobe_customer_id,
                 )
             except AdobeAPIError as e:
-                logger.exception(
-                    f"{context}: failed to retrieve Adobe customer: {e}"
-                )
+                logger.exception(f"{context}: failed to retrieve Adobe customer: {e}")
                 return
         context.adobe_new_order_id = get_adobe_order_id(context.order)
         logger.info(f"{context}: initialization completed.")
