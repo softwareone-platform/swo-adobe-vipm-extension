@@ -86,6 +86,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
+relative_files = true
 branch = true
 
 [tool.ruff]
