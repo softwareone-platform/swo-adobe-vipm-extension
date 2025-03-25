@@ -234,11 +234,10 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
-            f"/v3/customers/{customer_id}"
+            f"/v3/customers/{customer_id}",
         ),
         status=500,
         json=adobe_api_error,
-
     )
 
     with pytest.raises(AdobeError) as exc_info:
@@ -273,7 +272,10 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     step = SetupContext()
     step(mocked_client, context, mocked_next_step)
 
-    assert str(exc_info.value) == f"{adobe_api_error["code"]} - {adobe_api_error["message"]}"
+    assert (
+        str(exc_info.value)
+        == f"{adobe_api_error["code"]} - {adobe_api_error["message"]}"
+    )
     assert context.order["agreement"] == agreement
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
     assert context.due_date is None
@@ -291,6 +293,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
         order["agreement"]["licensee"]["id"],
     )
     mocked_next_step.assert_not_called()
+
 
 def test_prepare_customer_data_step(mocker, order_factory, customer_data):
     order = order_factory()
