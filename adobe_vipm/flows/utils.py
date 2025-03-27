@@ -6,7 +6,8 @@ import phonenumbers
 import regex as re
 from django.conf import settings
 from markdown_it import MarkdownIt
-from swo.mpt.extensions.runtime.djapp.conf import get_for_product
+from mpt_extension_sdk.mpt_http.mpt import get_product_onetime_items_by_ids
+from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.constants import (
     OFFER_TYPE_CONSUMABLES,
@@ -45,7 +46,6 @@ from adobe_vipm.flows.constants import (
     REQUIRED_CUSTOMER_ORDER_PARAMS,
     STATUS_MARKET_SEGMENT_PENDING,
 )
-from adobe_vipm.flows.mpt import get_product_onetime_items_by_ids
 from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import find_first, get_partial_sku
 

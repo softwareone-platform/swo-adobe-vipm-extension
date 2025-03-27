@@ -1,7 +1,7 @@
 import json
 
-from swo.mpt.extensions.core.events import Event
-from swo.mpt.extensions.runtime.djapp.conf import get_for_product
+from mpt_extension_sdk.core.events.dataclasses import Event
+from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.extension import ext, jwt_secret_callback, process_order_fulfillment
 from adobe_vipm.flows.constants import PARAM_COMPANY_NAME

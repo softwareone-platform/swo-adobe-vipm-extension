@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "swo.mpt.extensions.runtime.djapp.apps.DjAppConfig",
+    "mpt_extension_sdk.runtime.djapp.apps.DjAppConfig",
     "adobe_vipm.apps.ExtensionConfig",
 ]
 
@@ -50,7 +50,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "swo.mpt.extensions.runtime.djapp.middleware.MPTClientMiddleware",
+    "mpt_extension_sdk.runtime.djapp.middleware.MPTClientMiddleware",
 ]
 
 ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
@@ -144,7 +144,7 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "swo.mpt.extensions.runtime": {
+        "mpt_extension_sdk.runtime": {
             "handlers": ["console"],
             "level": "DEBUG",
             "propagate": False,

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import cache
 
 from django.conf import settings
+from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from pyairtable.formulas import (
     AND,
     EQUAL,
@@ -16,7 +17,6 @@ from pyairtable.formulas import (
 )
 from pyairtable.orm import Model, fields
 from requests import HTTPError
-from swo.mpt.extensions.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
 from adobe_vipm.utils import find_first

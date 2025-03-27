@@ -8,6 +8,19 @@ from datetime import date, datetime, timedelta
 from operator import itemgetter
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.mpt import (
+    complete_order,
+    create_subscription,
+    fail_order,
+    get_order_subscription_by_external_id,
+    get_product_template_or_default,
+    get_rendered_template,
+    query_order,
+    set_processing_template,
+    update_agreement,
+    update_order,
+    update_subscription,
+)
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -29,6 +42,7 @@ from adobe_vipm.airtable.models import (
     get_prices_for_skus,
 )
 from adobe_vipm.flows.constants import (
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     MPT_ORDER_STATUS_QUERYING,
@@ -43,19 +57,6 @@ from adobe_vipm.flows.constants import (
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
     TEMPLATE_NAME_DELAYED,
-)
-from adobe_vipm.flows.mpt import (
-    complete_order,
-    create_subscription,
-    fail_order,
-    get_order_subscription_by_external_id,
-    get_product_template_or_default,
-    get_rendered_template,
-    query_order,
-    set_processing_template,
-    update_agreement,
-    update_order,
-    update_subscription,
 )
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
@@ -193,7 +194,11 @@ def switch_order_to_failed(client, order, status_notes):
     order = reset_due_date(order)
     agreement = order["agreement"]
     order = fail_order(
-        client, order["id"], status_notes, parameters=order["parameters"]
+        client,
+        order["id"],
+        status_notes,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=status_notes),
+        parameters=order["parameters"],
     )
     order["agreement"] = agreement
     send_email_notification(client, order)
@@ -265,7 +270,9 @@ def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
         f"has reached the due date ({due_date_str}).",
     )
     reason = f"Due date is reached ({due_date_str})."
-    fail_order(client, order["id"], reason)
+    fail_order(
+        client, order["id"], reason, ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason)
+    )
     logger.warning(f"Order {order['id']} has been failed: {reason}.")
 
 

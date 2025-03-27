@@ -1,6 +1,8 @@
 import logging
 from datetime import date
 
+from mpt_extension_sdk.mpt_http.mpt import get_product_items_by_skus
+
 from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_COMMITTED,
@@ -26,7 +28,6 @@ from adobe_vipm.flows.constants import (
     ERR_UPDATING_TRANSFER_ITEMS,
     PARAM_MEMBERSHIP_ID,
 )
-from adobe_vipm.flows.mpt import get_product_items_by_skus
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
     exclude_items_with_deployment_id,

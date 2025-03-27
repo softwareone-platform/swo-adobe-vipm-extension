@@ -4,10 +4,11 @@ import threading
 import time
 from pathlib import Path
 
-from swo.mpt.extensions.runtime.workers import start_event_consumer, start_gunicorn
 from watchfiles import watch
 from watchfiles.filters import PythonFilter
 from watchfiles.run import start_process
+
+from swo.mpt.extensions.runtime.workers import start_event_consumer, start_gunicorn
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +85,12 @@ class Master:
             for worker_type, p in self.workers.items():
                 if not p.is_alive():
                     if p.exitcode != 0:
-                        logger.info(f"Process of type {worker_type} is dead, restart it")
-                        self.start_worker_process(worker_type, self.proc_targets[worker_type])
+                        logger.info(
+                            f"Process of type {worker_type} is dead, restart it"
+                        )
+                        self.start_worker_process(
+                            worker_type, self.proc_targets[worker_type]
+                        )
                     else:
                         exited_workers.append(worker_type)
                         logger.info(f"{worker_type.capitalize()} worker exited")
@@ -99,7 +104,9 @@ class Master:
         self.monitor_thread.join()
         for worker_type, process in self.workers.items():
             process.stop(sigint_timeout=5, sigkill_timeout=1)
-            logger.info(f"{worker_type.capitalize()} process with pid {process.pid} stopped.")
+            logger.info(
+                f"{worker_type.capitalize()} process with pid {process.pid} stopped."
+            )
 
     def restart(self):
         self.stop()

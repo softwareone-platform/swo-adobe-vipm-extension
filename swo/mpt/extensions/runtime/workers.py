@@ -1,6 +1,7 @@
 from django.core.management import call_command
 from django.core.wsgi import get_wsgi_application
 from gunicorn.app.base import BaseApplication
+
 from swo.mpt.extensions.runtime.initializer import initialize
 
 
