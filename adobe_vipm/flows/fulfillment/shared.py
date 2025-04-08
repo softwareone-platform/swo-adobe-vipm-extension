@@ -726,14 +726,16 @@ class GetPreviewOrder(Step):
 
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
-        if context.upsize_lines and not context.adobe_new_order_id:
+        if (
+            context.upsize_lines or context.new_lines
+        ) and not context.adobe_new_order_id:
             try:
                 deployment_id = get_deployment_id(context.order)
                 context.adobe_preview_order = adobe_client.create_preview_order(
                     context.authorization_id,
                     context.adobe_customer_id,
                     context.order_id,
-                    context.upsize_lines,
+                    context.upsize_lines + context.new_lines,
                     deployment_id=deployment_id,
                 )
             except AdobeError as e:
@@ -751,7 +753,7 @@ class SubmitNewOrder(Step):
     """
 
     def __call__(self, client, context, next_step):
-        if not context.upsize_lines:
+        if not (context.upsize_lines or context.new_lines):
             next_step(client, context)
             return
         adobe_client = get_adobe_client()

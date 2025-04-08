@@ -68,7 +68,7 @@ class GetPreviewOrder(Step):
     """
 
     def __call__(self, client, context, next_step):
-        if not context.upsize_lines:
+        if not (context.upsize_lines or context.new_lines):
             next_step(client, context)
             return
         adobe_client = get_adobe_client()
@@ -81,7 +81,7 @@ class GetPreviewOrder(Step):
                 context.authorization_id,
                 customer_id,
                 context.order_id,
-                context.upsize_lines,
+                context.upsize_lines + context.new_lines,
                 deployment_id=deployment_id,
             )
         except AdobeAPIError as e:

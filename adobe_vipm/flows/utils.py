@@ -463,26 +463,29 @@ def get_adobe_subscription_id(subscription):
     return subscription.get("externalIds", {}).get("vendor")
 
 
-def split_downsizes_and_upsizes(order):
+def split_downsizes_upsizes_new(order):
     """
     Returns a tuple where the first element
-    is a list of items to downsize and the second
-    a list of items to upsize.
+    is a list of items to downsize, the second
+    a list of items to upsize and third is a list of new lines
 
     Args:
         order (dict): The order which lines must be split.
 
     Returns:
-        tuple: (downsizes, upsizes)
+        tuple: (downsizes, upsizes, new)
     """
-    return (
-        list(
-            filter(lambda line: line["quantity"] < line["oldQuantity"], order["lines"])
-        ),
-        list(
-            filter(lambda line: line["quantity"] > line["oldQuantity"], order["lines"])
-        ),
-    )
+    downsize_lines, upsize_lines, new_lines = [], [], []
+
+    for line in order["lines"]:
+        if line["quantity"] < line["oldQuantity"]:
+            downsize_lines.append(line)
+        elif line["oldQuantity"] and line["oldQuantity"] > 0:
+            upsize_lines.append(line)
+        else:
+            new_lines.append(line)
+
+    return downsize_lines, upsize_lines, new_lines
 
 
 def is_new_customer(source):
