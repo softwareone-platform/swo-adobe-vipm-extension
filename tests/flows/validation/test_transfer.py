@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 import pytest
+from mpt_extension_sdk.mpt_http.wrap_http_error import MPTAPIError
 
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_ACTIVE,
@@ -416,10 +417,14 @@ def test_validate_transfer_no_items(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=[],
     )
-    mocker.patch(
+
+    get_product_items_by_skus_mock = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
-        return_value=[],
+        side_effect=MPTAPIError(
+            400, {"rql_validation": ["Value has to be a non empty array."]}
+        ),
     )
+
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     adobe_preview_transfer = adobe_preview_transfer_factory(items=[])
@@ -435,6 +440,7 @@ def test_validate_transfer_no_items(
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict()
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
+    get_product_items_by_skus_mock.assert_not_called()
 
 
 def test_get_prices(mocker, order_factory):
