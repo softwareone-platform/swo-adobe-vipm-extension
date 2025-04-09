@@ -960,6 +960,28 @@ class AdobeClient:
 
         response.raise_for_status()
         return response.json()
+    
+
+    def get_customer_deployments_by_status(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        status: str,
+    ) -> dict:
+        customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
+
+        deployments_active = []
+        deployments_removed = []
+
+        for deployment in customer_deployments["items"]:
+            if deployment["status"] == status:
+                deployments_active.append(deployment)
+            else:
+                deployments_removed.append(deployment.get('deploymentId',''))
+
+        logger.info(f"Deployments removed by status: {deployments_removed}")
+        return deployments_active
+
 
 
 _ADOBE_CLIENT = None

@@ -112,6 +112,7 @@ ignore = [
     "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
     "B008",  # do not perform function calls in argument defaults
     "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+    "I001"
 ]
 
 [tool.ruff.lint.isort]

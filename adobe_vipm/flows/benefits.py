@@ -13,6 +13,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_3YC_DECLINED,
     STATUS_3YC_EXPIRED,
     STATUS_3YC_NONCOMPLIANT,
+    STATUS_GC_DEPLOYMENT_ACTIVE
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment, get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
@@ -152,8 +153,8 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
 def update_deployment_agreements_3yc(
     adobe_client, mpt_client, authorization_id, customer_id, parameters_3yc
 ):
-    customer_deployments = adobe_client.get_customer_deployments(
-        authorization_id, customer_id
+    customer_deployments = adobe_client.get_customer_deployments_by_status(
+        authorization_id, customer_id, STATUS_GC_DEPLOYMENT_ACTIVE
     )
     if not customer_deployments:
         return

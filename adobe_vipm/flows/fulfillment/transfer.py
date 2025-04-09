@@ -20,6 +20,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+    STATUS_GC_DEPLOYMENT_ACTIVE
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
@@ -571,8 +572,14 @@ def get_new_agreement_deployments(
     deployment_currency_map = generate_deployments_currency_map(
         adobe_transfer_order["lineItems"]
     )
-
     for deployment in customer_deployments["items"]:
+
+        if deployment.get("status") != STATUS_GC_DEPLOYMENT_ACTIVE:
+            logger.info(
+                f"Deployment {deployment.get("deploymentId",'')} is not active in Adobe."
+            )
+            continue
+
         created_deployment = next(
             (
                 gc_deployment
@@ -606,6 +613,7 @@ def get_new_agreement_deployments(
             .get("country", ""),
         }
         new_agreement_deployments.append(agreement_deployment)
+
     return new_agreement_deployments
 
 
@@ -741,8 +749,8 @@ def _check_agreement_deployments(
             add_gc_main_agreement(order, adobe_transfer_order)
 
         if not customer_deployments:
-            customer_deployments = adobe_client.get_customer_deployments(
-                order["authorization"]["id"], adobe_transfer_order["customerId"]
+            customer_deployments = adobe_client.get_customer_deployments_by_status(
+                order["authorization"]["id"], adobe_transfer_order["customerId"], STATUS_GC_DEPLOYMENT_ACTIVE
             )
         if customer_deployments.get("totalCount", 0) > 0:
             logger.info(
@@ -756,7 +764,9 @@ def _check_agreement_deployments(
                 product_id,
                 order,
             )
-            if new_agreement_deployments:
+            print(new_agreement_deployments)
+
+            if new_agreement_deployments:              
                 create_gc_agreement_deployments(product_id, new_agreement_deployments)
                 send_gc_agreement_deployments_notification(
                     order.get("agreement", {}).get("id", ""),
@@ -932,6 +942,7 @@ def save_gc_parameters(mpt_client, order, customer_deployments):
     deployments = [
         f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
         for deployment in customer_deployments["items"]
+        if deployment["status"] == STATUS_GC_DEPLOYMENT_ACTIVE
     ]
     order = set_global_customer(order, "Yes")
     order = set_deployments(order, deployments)
@@ -1072,8 +1083,8 @@ def fulfill_transfer_order(mpt_client, order):
     if not _check_gc_main_agreement(gc_main_agreement, order):
         return
     if gc_main_agreement:
-        customer_deployments = adobe_client.get_customer_deployments(
-            authorization_id, gc_main_agreement.customer_id
+        customer_deployments = adobe_client.get_customer_deployments_by_status(
+            authorization_id, gc_main_agreement.customer_id, STATUS_GC_DEPLOYMENT_ACTIVE
         )
         order = save_gc_parameters(mpt_client, order, customer_deployments)
     if not _check_pending_deployments(
