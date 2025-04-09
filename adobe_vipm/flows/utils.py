@@ -79,7 +79,7 @@ get_fulfillment_parameter = functools.partial(get_parameter, PARAM_PHASE_FULFILL
 
 def get_adobe_membership_id(source):
     """
-    Get the Adobe membership identifier from the correspoding ordering
+    Get the Adobe membership identifier from the corresponding ordering
     parameter or None if it is not set.
 
     Args:
@@ -100,7 +100,7 @@ def is_purchase_order(order):
     """
     Check if the order is a real purchase order or a subscriptions transfer order.
     Args:
-        source (str): The order to check.
+        order (str): The order to check.
 
     Returns:
         bool: True if it is a real purchase order, False otherwise.
@@ -112,7 +112,7 @@ def is_transfer_order(order):
     """
     Check if the order is a subscriptions transfer order.
     Args:
-        source (str): The order to check.
+        order (str): The order to check.
 
     Returns:
         bool: True if it is a subscriptions transfer order, False otherwise.
@@ -130,7 +130,7 @@ def is_termination_order(order):
 
 def get_adobe_customer_id(source):
     """
-    Get the Adobe customer identifier from the correspoding fulfillment
+    Get the Adobe customer identifier from the corresponding fulfillment
     parameter or None if it is not set.
 
     Args:
@@ -317,7 +317,7 @@ def get_order_line_by_sku(order, sku):
     Returns:
         dict: The line object or None if not found.
     """
-    # important to have `in` here, since line items contain cutted Adobe Item SKU
+    # important to have `in` here, since line items contain cut Adobe Item SKU
     # and sku is a full Adobe Item SKU including discount level
     return find_first(
         lambda line: line["item"]["externalIds"]["vendor"] in sku,
@@ -336,7 +336,7 @@ def set_due_date(order):
     """
     Sets DUE_DATE parameter to the value of today() + EXT_DUE_DATE_DAYS if it is not set yet
     Args:
-        order (dict): The order that containts the due date fulfillment
+        order (dict): The order that contains the due date fulfillment
         parameter.
 
     Returns:
@@ -350,7 +350,7 @@ def set_due_date(order):
     if not param:
         # in case of there is no any due date parameter
         # when order was in processing status
-        # and due date was created and rollouted to environment
+        # and due date was created and rolled out to the environment
         param = {
             "externalId": PARAM_DUE_DATE,
         }
@@ -369,7 +369,7 @@ def get_retry_count(order):
     """
     Gets RETRY_COUNT parameter
     Args:
-        order (dict): The order that containts the retry count fulfillment
+        order (dict): The order that contains the retry count fulfillment
         parameter.
 
     Returns:
@@ -390,7 +390,7 @@ def get_due_date(order):
     """
     Gets DUE_DATE parameter
     Args:
-        order (dict): The order that containts the due date fulfillment
+        order (dict): The order that contains the due date fulfillment
         parameter.
 
     Returns:
@@ -413,7 +413,7 @@ def reset_due_date(order):
     Reset the due date fulfillment parameter to None. It is needed to
     have due date empty on next order published
     Args:
-        order (dict): The order that containts the due date fulfillment
+        order (dict): The order that contains the due date fulfillment
         parameter.
 
     Returns:
@@ -433,8 +433,8 @@ def get_subscription_by_line_and_item_id(subscriptions, item_id, line_id):
     Return a subscription by line id and sku.
 
     Args:
-        subscriptions (list): a list of subscription obects.
-        vendor_external_id (str): the item SKU
+        subscriptions (list): a list of subscription objects.
+        item_id (str): the item SKU
         line_id (str): the id of the order line that should contain the given SKU.
 
     Returns:
@@ -470,7 +470,7 @@ def split_downsizes_and_upsizes(order):
     a list of items to upsize.
 
     Args:
-        order (dict): The order which lines must be splitted.
+        order (dict): The order which lines must be split.
 
     Returns:
         tuple: (downsizes, upsizes)

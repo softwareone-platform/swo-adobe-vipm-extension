@@ -30,7 +30,7 @@ def validate_order(client, order):
     Performs the validation of a draft order.
 
     Args:
-        mpt_client (MPTClient): The client used to consume the MPT API.
+        client (MPTClient): The client used to consume the MPT API.
         order (dict): The order to validate
 
     Returns:
