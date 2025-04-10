@@ -77,7 +77,7 @@ def get_prices(order, commitment, adobe_skus):
         return get_prices_for_skus(product_id, currency, adobe_skus)
 
 
-def update_order_lines(
+def _update_order_lines(
     order, adobe_items, prices, items_map, quantity_field, order_error, returned_skus
 ):
     for adobe_line in adobe_items:
@@ -92,7 +92,10 @@ def update_order_lines(
                     item_sku=get_partial_sku(adobe_line["offerId"]),
                 ),
             )
-            return True, order
+            order_error = True
+
+            return order_error, order
+
         current_line = get_order_line_by_sku(
             order, get_partial_sku(adobe_line["offerId"])
         )
@@ -140,11 +143,104 @@ def add_lines_to_order(
     """
 
     order_error = False
+    items = []
 
+    if adobe_items:
+        items = _get_items(adobe_items, mpt_client, order)
+        adobe_items_without_one_time_offers = _get_items_without_one_time_offers(
+            adobe_items, items
+        )
+
+        if is_transferred:
+            if are_all_transferring_items_expired(adobe_items_without_one_time_offers):
+                # If the order already has items and all the items on Adobe to be migrated are
+                # expired, the user can add, edit or delete the expired subscriptions
+                if len(order["lines"]):
+                    return False, order
+
+                adobe_items = adobe_items_without_one_time_offers
+
+            else:
+                adobe_items, order, order_error = _fail_validation_if_items_updated(
+                    adobe_items_without_one_time_offers,
+                    order,
+                    order_error,
+                    quantity_field,
+                )
+        else:
+            # remove expired items from adobe items
+            adobe_items = [
+                item
+                for item in adobe_items_without_one_time_offers
+                if not is_transferring_item_expired(item)
+            ]
+
+    if not adobe_items:
+        order = set_ordering_parameter_error(
+            order,
+            PARAM_MEMBERSHIP_ID,
+            ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
+        )
+        return True, order
+
+    order_error, order = _get_updated_order_lines(
+        adobe_items, commitment, items, order, order_error, quantity_field
+    )
+
+    return order_error, order
+
+
+def _get_updated_order_lines(
+    adobe_items, commitment, items, order, order_error, quantity_field
+):
+    valid_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
+    returned_full_skus = [item["offerId"] for item in adobe_items]
+    prices = get_prices(order, commitment, returned_full_skus)
+    items_map = {
+        item["externalIds"]["vendor"]: item
+        for item in items
+        if item["externalIds"]["vendor"] in valid_skus
+    }
+
+    return _update_order_lines(
+        order,
+        adobe_items,
+        prices,
+        items_map,
+        quantity_field,
+        order_error,
+        valid_skus,
+    )
+
+
+def _fail_validation_if_items_updated(
+    adobe_items_without_one_time_offers, order, order_error, quantity_field
+):
+    # remove expired items from adobe items
+    non_expired_items = [
+        item
+        for item in adobe_items_without_one_time_offers
+        if not is_transferring_item_expired(item)
+    ]
+    # If the order items has been updated, the validation order will fail
+    if len(order["lines"]) and has_order_line_updated(
+        order["lines"], non_expired_items, quantity_field
+    ):
+        order_error = True
+        order = set_order_error(order, ERR_UPDATING_TRANSFER_ITEMS.to_dict())
+
+    return non_expired_items, order, order_error
+
+
+def _get_items(adobe_items, mpt_client, order):
     returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
-    items = get_product_items_by_skus(
+
+    return get_product_items_by_skus(
         mpt_client, order["agreement"]["product"]["id"], returned_skus
     )
+
+
+def _get_items_without_one_time_offers(adobe_items, items):
     one_time_skus = [
         item["externalIds"]["vendor"]
         for item in items
@@ -156,65 +252,7 @@ def add_lines_to_order(
         if get_partial_sku(item["offerId"]) not in one_time_skus
     ]
 
-    if is_transferred:
-        if are_all_transferring_items_expired(adobe_items_without_one_time_offers):
-            # If the order already has items and all the items on Adobe to be migrated are
-            # expired, the user can add, edit or delete the expired subscriptions
-            if len(order["lines"]):
-                return False, order
-
-            adobe_items = adobe_items_without_one_time_offers
-
-        else:
-            # remove expired items from adobe items
-            adobe_items = [
-                item
-                for item in adobe_items_without_one_time_offers
-                if not is_transferring_item_expired(item)
-            ]
-
-            # If the order items has been updated, the validation order will fail
-            if len(order["lines"]) and has_order_line_updated(
-                order["lines"], adobe_items, quantity_field
-            ):
-                order_error = True
-                order = set_order_error(order, ERR_UPDATING_TRANSFER_ITEMS.to_dict())
-    else:
-        # remove expired items from adobe items
-        adobe_items = [
-            item
-            for item in adobe_items_without_one_time_offers
-            if not is_transferring_item_expired(item)
-        ]
-
-    if len(adobe_items) == 0:
-        get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
-        order = set_ordering_parameter_error(
-            order,
-            PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
-        )
-        return True, order
-
-    valid_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
-    returned_full_skus = [item["offerId"] for item in adobe_items]
-    prices = get_prices(order, commitment, returned_full_skus)
-
-    items_map = {
-        item["externalIds"]["vendor"]: item
-        for item in items
-        if item["externalIds"]["vendor"] in valid_skus
-    }
-
-    return update_order_lines(
-        order,
-        adobe_items,
-        prices,
-        items_map,
-        quantity_field,
-        order_error,
-        valid_skus,
-    )
+    return adobe_items_without_one_time_offers
 
 
 def validate_transfer_not_migrated(mpt_client, adobe_client, order):
