@@ -1928,7 +1928,8 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
         context.authorization_id,
         context.adobe_customer_id,
         context.order_id,
-        context.upsize_lines + context.new_lines,
+        context.upsize_lines,
+        context.new_lines,
         deployment_id=deployment_id,
     )
 
