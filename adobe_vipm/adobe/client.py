@@ -1,3 +1,4 @@
+# Standard library imports
 import json
 import logging
 from collections import defaultdict
@@ -7,8 +8,10 @@ from typing import MutableMapping
 from urllib.parse import urljoin
 from uuid import uuid4
 
+# Third-party imports
 import requests
 
+# Local imports
 from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.constants import (
     CANCELLATION_WINDOW_DAYS,
@@ -960,6 +963,30 @@ class AdobeClient:
 
         response.raise_for_status()
         return response.json()
+
+    def get_customer_deployments_by_status(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        status: str,
+    ) -> dict:
+        customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
+
+        deployments_active = []
+        deployments_removed = []
+
+        for deployment in customer_deployments["items"]:
+            if deployment["status"] == status:
+                deployments_active.append(deployment)
+            else:
+                deployments_removed.append(deployment.get('deploymentId',''))
+
+        logger.info(f"Deployments removed by status: {deployments_removed}")
+
+        return {
+            "totalCount": len(deployments_active),
+            "items": deployments_active
+        }
 
 
 _ADOBE_CLIENT = None
