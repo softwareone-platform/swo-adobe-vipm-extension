@@ -39,8 +39,6 @@ from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.fulfillment.transfer import (
     SyncGCMainAgreement,
     UpdateTransferStatus,
-    get_new_agreement_deployments,
-    _check_agreement_deployments
 )
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,

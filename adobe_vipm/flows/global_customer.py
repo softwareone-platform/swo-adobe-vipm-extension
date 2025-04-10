@@ -548,7 +548,7 @@ def process_agreement_deployment(
             authorization_id, agreement_deployment.customer_id
         )
         customer_deployments = adobe_client.get_customer_deployments_by_status(
-            authorization_id, agreement_deployment.customer_id
+            authorization_id, agreement_deployment.customer_id, STATUS_GC_DEPLOYMENT_ACTIVE
         )
 
         customer_deployment_ids = [

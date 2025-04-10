@@ -2495,5 +2495,3 @@ def test_get_customer_deployments_by_status(
     assert len(active_deployments) == 2
     assert active_deployments[0]["deploymentId"] == "deployment-1"
     assert active_deployments[1]["deploymentId"] == "deployment-3"
-
-    

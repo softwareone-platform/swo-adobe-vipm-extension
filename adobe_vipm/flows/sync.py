@@ -14,7 +14,11 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED, STATUS_GC_DEPLOYMENT_ACTIVE
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
+    STATUS_GC_DEPLOYMENT_ACTIVE
+)
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,

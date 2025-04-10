@@ -960,7 +960,7 @@ class AdobeClient:
 
         response.raise_for_status()
         return response.json()
-    
+
 
     def get_customer_deployments_by_status(
         self,

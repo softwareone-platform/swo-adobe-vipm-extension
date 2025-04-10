@@ -750,7 +750,8 @@ def _check_agreement_deployments(
 
         if not customer_deployments:
             customer_deployments = adobe_client.get_customer_deployments_by_status(
-                order["authorization"]["id"], adobe_transfer_order["customerId"], STATUS_GC_DEPLOYMENT_ACTIVE
+                order["authorization"]["id"], adobe_transfer_order["customerId"],
+                STATUS_GC_DEPLOYMENT_ACTIVE
             )
         if customer_deployments.get("totalCount", 0) > 0:
             logger.info(
@@ -764,9 +765,8 @@ def _check_agreement_deployments(
                 product_id,
                 order,
             )
-            print(new_agreement_deployments)
 
-            if new_agreement_deployments:              
+            if new_agreement_deployments:
                 create_gc_agreement_deployments(product_id, new_agreement_deployments)
                 send_gc_agreement_deployments_notification(
                     order.get("agreement", {}).get("id", ""),
