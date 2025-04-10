@@ -152,7 +152,7 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
 def update_deployment_agreements_3yc(
     adobe_client, mpt_client, authorization_id, customer_id, parameters_3yc
 ):
-    customer_deployments = adobe_client.get_customer_deployments(
+    customer_deployments = adobe_client.get_customer_deployments_active_status(
         authorization_id, customer_id
     )
     if not customer_deployments:

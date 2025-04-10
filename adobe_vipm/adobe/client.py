@@ -19,6 +19,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
+    STATUS_GC_DEPLOYMENT_ACTIVE,
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
@@ -297,7 +298,6 @@ class AdobeClient:
                     quantity=item["quantity"],
                 )
             )
-
         return result
 
     def get_return_orders_by_external_reference(
@@ -774,7 +774,6 @@ class AdobeClient:
             headers=headers,
             json=payload,
         )
-
         response.raise_for_status()
         # patch doesn't return half of the fields in subscriptions representaion
         # missed fields are offerId, usedQuantity
@@ -853,7 +852,6 @@ class AdobeClient:
                 "resellerId": reseller.id,
             },
         )
-
         response.raise_for_status()
         return response.json()
 
@@ -981,9 +979,7 @@ class AdobeClient:
             headers=headers,
             json=payload,
         )
-
         response.raise_for_status()
-
         updated_customer = response.json()
         return updated_customer
 
@@ -1063,9 +1059,22 @@ class AdobeClient:
         response.raise_for_status()
         return response.json()
 
+    def get_customer_deployments_active_status(
+        self,
+        authorization_id: str,
+        customer_id: str,
+    ) -> dict:
+        customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
+
+        active_deployments = []
+
+        for customer_deployment in customer_deployments.get("items", []):
+            if customer_deployment.get("status") == STATUS_GC_DEPLOYMENT_ACTIVE:
+                active_deployments.append(customer_deployment)
+
+        return active_deployments
 
 _ADOBE_CLIENT = None
-
 
 def get_adobe_client() -> AdobeClient:
     """

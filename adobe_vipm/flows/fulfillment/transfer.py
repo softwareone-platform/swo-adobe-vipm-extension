@@ -559,7 +559,7 @@ def get_new_agreement_deployments(
 
     Args:
         existing_deployments (list): The existing deployments in Airtable.
-        customer_deployments (dict): The Adobe customer deployments.
+        customer_deployments (list): The Adobe customer deployments.
         adobe_transfer_order (dict): The Adobe transfer order.
         product_id (str): The product ID.
         order (dict): The MPT order to be fulfilled.
@@ -572,7 +572,7 @@ def get_new_agreement_deployments(
         adobe_transfer_order["lineItems"]
     )
 
-    for deployment in customer_deployments["items"]:
+    for deployment in customer_deployments:
         created_deployment = next(
             (
                 gc_deployment
@@ -618,7 +618,7 @@ def send_gc_agreement_deployments_notification(
     Args:
         agreement_id (str): The agreement ID.
         customer_id (str): The customer ID.
-        customer_deployments (dict): The Adobe customer deployments.
+        customer_deployments (list): The Adobe customer deployments.
         product_id (str): The product ID.
 
     Returns:
@@ -627,7 +627,7 @@ def send_gc_agreement_deployments_notification(
     facts = {
         f"Deployment ID: {deployment.get("deploymentId")}": f"Country: {
             deployment.get("companyProfile", {}).get("address", {}).get("country", "")}"
-        for deployment in customer_deployments["items"]
+        for deployment in customer_deployments
     }
     agreement_deployment_view_link = get_agreement_deployment_view_link(product_id)
     send_warning(
@@ -646,32 +646,31 @@ def are_all_deployments_synchronized(existing_deployments, customer_deployments)
 
     Args:
         existing_deployments (list): The existing deployments in Airtable.
-        customer_deployments (dict): The Adobe customer deployments.
+        customer_deployments (list): The Adobe customer deployments.
 
     Returns:
         bool: True if all deployments are synchronized, False otherwise.
     """
-    if customer_deployments.get("totalCount", 0) > 0:
-        for customer_deployment in customer_deployments["items"]:
-            created_deployment = next(
-                (
-                    gc_deployment
-                    for gc_deployment in existing_deployments
-                    if gc_deployment.deployment_id
-                    == customer_deployment.get("deploymentId")
-                ),
-                None,
+    for customer_deployment in customer_deployments:
+        created_deployment = next(
+            (
+                gc_deployment
+                for gc_deployment in existing_deployments
+                if gc_deployment.deployment_id
+                == customer_deployment.get("deploymentId")
+            ),
+            None,
+        )
+        if not created_deployment:
+            logger.info(
+                f"Deployment {customer_deployment.get('deploymentId')} is not created"
             )
-            if not created_deployment:
-                logger.info(
-                    f"Deployment {customer_deployment.get('deploymentId')} is not created"
-                )
-                return True
-            if created_deployment.status != STATUS_GC_CREATED:
-                logger.info(
-                    "All deployments are not synchronized, wait for the deployments to be created"
-                )
-                return False
+            return True
+        if created_deployment.status != STATUS_GC_CREATED:
+            logger.info(
+                "All deployments are not synchronized, wait for the deployments to be created"
+            )
+            return False
 
     logger.info("All deployments are created, proceed to fulfill the transfer order")
     return True
@@ -725,7 +724,7 @@ def _check_agreement_deployments(
         existing_deployments (list): The existing deployments in Airtable.
         order (dict): The MPT order to be fulfilled.
         gc_main_agreement (GCMainAgreement): The main agreement in Airtable.
-        customer_deployments (dict): The Adobe customer deployments.
+        customer_deployments (list): The Adobe customer deployments.
 
     Returns:
         bool: True if the customer deployments are synchronized and the main agreement
@@ -741,12 +740,12 @@ def _check_agreement_deployments(
             add_gc_main_agreement(order, adobe_transfer_order)
 
         if not customer_deployments:
-            customer_deployments = adobe_client.get_customer_deployments(
+            customer_deployments = adobe_client.get_customer_deployments_active_status(
                 order["authorization"]["id"], adobe_transfer_order["customerId"]
             )
-        if customer_deployments.get("totalCount", 0) > 0:
+        if len(customer_deployments) > 0:
             logger.info(
-                f"Adobe customer have {customer_deployments.get("totalCount")} deployments,"
+                f"Adobe customer have {len(customer_deployments)} deployments,"
                 f" proceed to add agreement deployments to Airtable"
             )
             new_agreement_deployments = get_new_agreement_deployments(
@@ -898,7 +897,7 @@ def _check_pending_deployments(
     Args:
         gc_main_agreement (GCMainAgreement): The main agreement in Airtable.
         existing_deployments (list): The existing deployments in Airtable.
-        customer_deployments (dict): The Adobe customer deployments.
+        customer_deployments (list): The Adobe customer deployments.
 
     Returns:
         bool: True if all deployments are synchronized, False otherwise.
@@ -920,7 +919,7 @@ def save_gc_parameters(mpt_client, order, customer_deployments):
         mpt_client (MPTClient): An instance of the Marketplace platform client.
         order (dict): The MPT order to be updated.
         gc_main_agreement (GCMainAgreement): The main agreement in Airtable.
-        customer_deployments (dict): The Adobe customer deployments.
+        customer_deployments (list): The Adobe customer deployments.
     Returns:
         dict: The updated MPT order.
 
@@ -931,7 +930,7 @@ def save_gc_parameters(mpt_client, order, customer_deployments):
 
     deployments = [
         f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
-        for deployment in customer_deployments["items"]
+        for deployment in customer_deployments
     ]
     order = set_global_customer(order, "Yes")
     order = set_deployments(order, deployments)
@@ -1072,7 +1071,7 @@ def fulfill_transfer_order(mpt_client, order):
     if not _check_gc_main_agreement(gc_main_agreement, order):
         return
     if gc_main_agreement:
-        customer_deployments = adobe_client.get_customer_deployments(
+        customer_deployments = adobe_client.get_customer_deployments_active_status(
             authorization_id, gc_main_agreement.customer_id
         )
         order = save_gc_parameters(mpt_client, order, customer_deployments)
