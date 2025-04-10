@@ -184,7 +184,7 @@ def test_get_transfer_by_authorization_membership_or_customer(mocker, settings):
     mocked_transfer_model.all.assert_called_once_with(
         formula=(
             "AND({authorization_uk}='authorization_uk',"
-            "OR({membership_id}='membership_id',{customer_id}='membership_id'),"
+            "OR(LOWER({membership_id})=LOWER('membership_id'),{customer_id}='membership_id'),"
             "{status}!='duplicated')"
         ),
     )
