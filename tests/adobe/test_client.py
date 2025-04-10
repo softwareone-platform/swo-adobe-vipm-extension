@@ -2533,3 +2533,130 @@ def test_get_returnable_orders_by_sku_no_renewal_for_period(
             "end-date": "2024-02-17",
         },
     )
+
+
+def test_get_customer_deployments(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    """
+    Tests the retrieval of customer deployments.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer-id"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    expected_response = {
+        "totalCount": 1,
+        "items": [
+            {
+                "deploymentId": "deployment-id",
+                "status": "1000",
+                "companyProfile": {
+                    "address": {
+                        "country": "DE"
+                    }
+                }
+            }
+        ]
+    }
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
+        ),
+        status=200,
+        json=expected_response,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+        ],
+    )
+
+    result = client.get_customer_deployments(authorization_uk, customer_id)
+
+    assert result == expected_response
+
+
+def test_get_customer_deployments_by_status(
+        requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+    ):
+    """
+    Tests the retrieval of customer deployments filtered by status.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer-id"
+    status = "1000"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    deployments_response = {
+        "totalCount": 3,
+        "items": [
+            {
+                "deploymentId": "deployment-1",
+                "status": "1000",
+                "companyProfile": {
+                    "address": {
+                        "country": "DE"
+                    }
+                }
+            },
+            {
+                "deploymentId": "deployment-2",
+                "status": "1004",
+                "companyProfile": {
+                    "address": {
+                        "country": "US"
+                    }
+                }
+            },
+            {
+                "deploymentId": "deployment-3",
+                "status": "1000",
+                "companyProfile": {
+                    "address": {
+                        "country": "ES"
+                    }
+                }
+            }
+        ]
+    }
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
+        ),
+        status=200,
+        json=deployments_response,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+        ],
+    )
+
+    active_deployments = client.get_customer_deployments_by_status(
+        authorization_uk, customer_id, status
+    )
+
+    assert len(active_deployments) == 2
+    assert active_deployments.get("items",[])[0]["deploymentId"] == "deployment-1"
+    assert active_deployments.get("items",[])[1]["deploymentId"] == "deployment-3"

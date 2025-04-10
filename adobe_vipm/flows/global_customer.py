@@ -19,7 +19,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import STATUS_PROCESSED
+from adobe_vipm.adobe.constants import STATUS_GC_DEPLOYMENT_ACTIVE, STATUS_PROCESSED
 from adobe_vipm.adobe.utils import sanitize_company_name, sanitize_first_last_name
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
@@ -547,8 +547,9 @@ def process_agreement_deployment(
         adobe_customer = adobe_client.get_customer(
             authorization_id, agreement_deployment.customer_id
         )
-        customer_deployments = adobe_client.get_customer_deployments(
-            authorization_id, agreement_deployment.customer_id
+        customer_deployments = adobe_client.get_customer_deployments_by_status(
+            authorization_id, agreement_deployment.customer_id,
+            STATUS_GC_DEPLOYMENT_ACTIVE
         )
         customer_deployment_ids = [
             f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'

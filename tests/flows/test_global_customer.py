@@ -436,7 +436,7 @@ def test_check_gc_agreement_deployments_create_listing(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory()]
     }
@@ -455,7 +455,7 @@ def test_check_gc_agreement_deployments_create_listing(
     mocked_create_listing.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
     mocked_create_agreement.assert_called_with(
         mocker.ANY,
@@ -656,7 +656,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory()]
     }
@@ -674,7 +674,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
     mocked_create_agreement.assert_called_once()
     mocked_get_agreement.assert_called_once()
@@ -750,7 +750,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
@@ -769,7 +769,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     mocked_create_listing.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
     mocked_create_agreement.assert_called_once()
     mocked_get_agreement.assert_called_once()
@@ -838,7 +838,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(deployment_id="deployment_id"),
@@ -860,7 +860,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
 
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
@@ -930,7 +930,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
@@ -946,7 +946,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
 
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
@@ -1022,7 +1022,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
@@ -1038,7 +1038,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
 
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
@@ -1107,7 +1107,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(
@@ -1126,7 +1126,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
     mocked_adobe_client.update_subscription.assert_called_once()
 
     mocked_update_agreement.assert_called_once()
