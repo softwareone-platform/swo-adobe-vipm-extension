@@ -8,6 +8,7 @@ class Context:
     due_date: date | None = None
     downsize_lines: list = field(default_factory=list)
     upsize_lines: list = field(default_factory=list)
+    new_lines: list = field(default_factory=list)
     type: str | None = None
     product_id: str | None = None
     market_segment: str | None = None

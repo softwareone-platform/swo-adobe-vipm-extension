@@ -1914,7 +1914,8 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
         order_id=order["id"],
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
-        upsize_lines=order["lines"],
+        new_lines=order["lines"],
+        upsize_lines=[],
         deployment_id=deployment_id,
     )
 
@@ -1928,6 +1929,7 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
         context.adobe_customer_id,
         context.order_id,
         context.upsize_lines,
+        context.new_lines,
         deployment_id=deployment_id,
     )
 

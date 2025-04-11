@@ -131,7 +131,8 @@ def test_setup_context_step_with_adobe_customer_and_order_id(
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
     assert context.due_date is None
     assert context.downsize_lines == []
-    assert context.upsize_lines == order["lines"]
+    assert context.upsize_lines == []
+    assert context.new_lines == order["lines"]
     assert context.adobe_customer_id == "adobe-customer-id"
     assert context.adobe_customer == adobe_customer
     assert context.adobe_new_order_id == "adobe-order-id"
@@ -280,7 +281,8 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
     assert context.due_date is None
     assert context.downsize_lines == []
-    assert context.upsize_lines == order["lines"]
+    assert context.upsize_lines == []
+    assert context.new_lines == order["lines"]
     assert context.adobe_customer_id == customer_id
     assert context.adobe_customer is None
     assert context.adobe_new_order_id is None

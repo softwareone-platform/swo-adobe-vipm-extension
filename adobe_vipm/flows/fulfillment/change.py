@@ -136,7 +136,7 @@ class UpdateRenewalQuantities(Step):
 
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
-        for line in context.downsize_lines + context.upsize_lines:
+        for line in context.downsize_lines + context.upsize_lines + context.new_lines:
             subscription = get_subscription_by_line_and_item_id(
                 context.order["subscriptions"],
                 line["item"]["id"],

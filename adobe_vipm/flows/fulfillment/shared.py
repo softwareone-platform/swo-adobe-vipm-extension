@@ -726,7 +726,9 @@ class GetPreviewOrder(Step):
 
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
-        if context.upsize_lines and not context.adobe_new_order_id:
+        if (
+            context.upsize_lines or context.new_lines
+        ) and not context.adobe_new_order_id:
             try:
                 deployment_id = get_deployment_id(context.order)
                 context.adobe_preview_order = adobe_client.create_preview_order(
@@ -734,6 +736,7 @@ class GetPreviewOrder(Step):
                     context.adobe_customer_id,
                     context.order_id,
                     context.upsize_lines,
+                    context.new_lines,
                     deployment_id=deployment_id,
                 )
             except AdobeError as e:
@@ -751,12 +754,15 @@ class SubmitNewOrder(Step):
     """
 
     def __call__(self, client, context, next_step):
-        if not context.upsize_lines:
+        if not (context.upsize_lines or context.new_lines):
+            logger.info(
+                f"{context}: skip creating order. There are no upsize lines or new lines",
+            )
             next_step(client, context)
             return
         adobe_client = get_adobe_client()
         adobe_order = None
-        if not context.adobe_new_order_id:
+        if not context.adobe_new_order_id and context.adobe_preview_order:
             deployment_id = get_deployment_id(context.order)
             adobe_order = adobe_client.create_new_order(
                 context.authorization_id,
@@ -769,6 +775,12 @@ class SubmitNewOrder(Step):
             update_order(
                 client, context.order_id, externalIds=context.order["externalIds"]
             )
+        elif not context.adobe_new_order_id and not context.adobe_preview_order:
+            logger.info(
+                f"{context}: skip creating Adobe Order, preview order creation was skipped"
+            )
+            next_step(client, context)
+            return
         else:
             adobe_order = adobe_client.get_order(
                 context.authorization_id,

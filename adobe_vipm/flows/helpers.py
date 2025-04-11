@@ -43,7 +43,7 @@ from adobe_vipm.flows.utils import (
     reset_ordering_parameters_error,
     set_customer_data,
     set_order_error,
-    split_downsizes_and_upsizes,
+    split_downsizes_upsizes_new,
 )
 
 logger = logging.getLogger(__name__)
@@ -131,8 +131,10 @@ class SetupContext(Step):
         context.order["agreement"]["licensee"] = get_licensee(
             client, context.order["agreement"]["licensee"]["id"]
         )
-        context.downsize_lines, context.upsize_lines = split_downsizes_and_upsizes(
-            context.order
+        context.downsize_lines, context.upsize_lines, context.new_lines = (
+            split_downsizes_upsizes_new(
+                context.order,
+            )
         )
 
         retry_count = get_retry_count(context.order)
