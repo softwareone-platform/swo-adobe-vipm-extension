@@ -16,6 +16,7 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_COMMITTED,
+    STATUS_GC_DEPLOYMENT_ACTIVE,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
@@ -741,8 +742,9 @@ def _check_agreement_deployments(
             add_gc_main_agreement(order, adobe_transfer_order)
 
         if not customer_deployments:
-            customer_deployments = adobe_client.get_customer_deployments(
-                order["authorization"]["id"], adobe_transfer_order["customerId"]
+            customer_deployments = adobe_client.get_customer_deployments_by_status(
+                order["authorization"]["id"], adobe_transfer_order["customerId"],
+                STATUS_GC_DEPLOYMENT_ACTIVE
             )
         if customer_deployments.get("totalCount", 0) > 0:
             logger.info(
@@ -1072,8 +1074,8 @@ def fulfill_transfer_order(mpt_client, order):
     if not _check_gc_main_agreement(gc_main_agreement, order):
         return
     if gc_main_agreement:
-        customer_deployments = adobe_client.get_customer_deployments(
-            authorization_id, gc_main_agreement.customer_id
+        customer_deployments = adobe_client.get_customer_deployments_by_status(
+            authorization_id, gc_main_agreement.customer_id, STATUS_GC_DEPLOYMENT_ACTIVE
         )
         order = save_gc_parameters(mpt_client, order, customer_deployments)
     if not _check_pending_deployments(

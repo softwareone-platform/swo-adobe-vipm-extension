@@ -2479,7 +2479,7 @@ def test_transfer_gc_account_all_deployments_created(
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -2835,7 +2835,7 @@ def test_transfer_gc_account_no_deployments(
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 0,
         "items": [],
     }
@@ -3194,7 +3194,7 @@ def test_transfer_gc_account_create_deployments(
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -3362,7 +3362,7 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -3511,7 +3511,7 @@ def test_transfer_gc_account_pending_deployments(
     mocked_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -3593,7 +3593,7 @@ def test_transfer_gc_account_main_agreement_error_status(
     mocked_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -3689,7 +3689,7 @@ def test_transfer_gc_account_no_items_error_main_agreement(
     mocked_adobe_client.get_subscription.side_effect = [
         adobe_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -3919,7 +3919,7 @@ def test_transfer_gc_account_some_deployments_not_created(
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -4138,7 +4138,7 @@ def test_fulfill_transfer_gc_order_already_migrated_(
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription],
     }
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -4332,7 +4332,7 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription],
     }
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -4476,7 +4476,7 @@ def test_transfer_gc_account_items_with_deployment_main_agreement(
     mocked_adobe_client.get_subscription.side_effect = [
         adobe_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -4627,7 +4627,7 @@ def test_transfer_gc_account_items_with_deployment_main_agreement_bulk_migrated(
     mocked_adobe_client.get_subscription.side_effect = [
         adobe_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -4842,7 +4842,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 0,
         "items": [],
     }
@@ -5205,7 +5205,7 @@ def test_transfer_gc_account_items_with_and_without_deployment_main_agreement_bu
         "items": [adobe_subscription, adobe_subscription1],
     }
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
-    mocked_adobe_client.get_customer_deployments.return_value = {
+    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
         "totalCount": 1,
         "items": [
             {
