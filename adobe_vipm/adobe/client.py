@@ -300,7 +300,6 @@ class AdobeClient:
                     quantity=item["quantity"],
                 )
             )
-
         return result
 
     def get_return_orders_by_external_reference(
@@ -777,7 +776,6 @@ class AdobeClient:
             headers=headers,
             json=payload,
         )
-
         response.raise_for_status()
         # patch doesn't return half of the fields in subscriptions representaion
         # missed fields are offerId, usedQuantity
@@ -856,7 +854,6 @@ class AdobeClient:
                 "resellerId": reseller.id,
             },
         )
-
         response.raise_for_status()
         return response.json()
 
@@ -984,9 +981,7 @@ class AdobeClient:
             headers=headers,
             json=payload,
         )
-
         response.raise_for_status()
-
         updated_customer = response.json()
         return updated_customer
 
@@ -1090,9 +1085,7 @@ class AdobeClient:
             "items": deployments_active
         }
 
-
 _ADOBE_CLIENT = None
-
 
 def get_adobe_client() -> AdobeClient:
     """
