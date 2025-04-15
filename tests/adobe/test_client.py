@@ -250,29 +250,37 @@ def test_create_customer_account_bad_request(
 
 
 @pytest.mark.parametrize(
-    ("quantity", "old_quantity", "expected_quantity"),
+    (
+        "old_quantity",
+        "quantity",
+        "current_quantity",
+        "renewal_quantity",
+        "expected_quantity",
+    ),
     [
-        (10, 0, 10),
-        (10, 2, 8),
-        (5, 10, 5),
+        pytest.param(5, 10, 5, 5, 5, id="upsize_only"),
+        pytest.param(8, 12, 10, 8, 2, id="upsize_after_downsize"),
     ],
 )
-def test_create_preview_order(
+def test_create_preview_order_upsize(
     mocker,
     settings,
     requests_mocker,
     adobe_config_file,
     adobe_authorizations_file,
+    adobe_subscription_factory,
     order_factory,
     lines_factory,
     adobe_client_factory,
-    quantity,
-    old_quantity,
-    expected_quantity,
     mock_get_adobe_product_by_marketplace_sku,
+    old_quantity,
+    quantity,
+    current_quantity,
+    renewal_quantity,
+    expected_quantity,
 ):
     """
-    Test the call to Adobe API to create a preview order.
+    Test the call to Adobe API to create a preview order for upsizes
     """
 
     mocker.patch(
@@ -282,7 +290,7 @@ def test_create_preview_order(
 
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
-        side_effect=["uuid-1", "uuid-2"],
+        side_effect=["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
     )
     authorization_uk = adobe_authorizations_file["authorizations"][0][
         "authorization_uk"
@@ -297,6 +305,19 @@ def test_create_preview_order(
         lines=lines_factory(old_quantity=old_quantity, quantity=quantity)
     )
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+    adobe_subscription = adobe_subscription_factory(
+        current_quantity=current_quantity,
+        renewal_quantity=renewal_quantity,
+    )
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions",
+        ),
+        status=200,
+        json={"items": [adobe_subscription]},
+    )
 
     requests_mocker.post(
         urljoin(
@@ -314,8 +335,8 @@ def test_create_preview_order(
                     "Authorization": f"Bearer {api_token.token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
-                    "X-Request-Id": "uuid-1",
-                    "x-correlation-id": "uuid-2",
+                    "X-Request-Id": "uuid-3",
+                    "x-correlation-id": "uuid-4",
                 },
             ),
             matchers.json_params_matcher(
@@ -343,6 +364,7 @@ def test_create_preview_order(
         customer_id,
         order["id"],
         order["lines"],
+        [],
         deployment_id,
     )
     assert preview_order == {
@@ -350,15 +372,73 @@ def test_create_preview_order(
     }
 
 
-@pytest.mark.parametrize(
-    ("quantity", "old_quantity", "expected_quantity"),
-    [
-        (10, 0, 10),
-        (10, 2, 8),
-        (5, 10, 5),
-    ],
-)
-def test_create_preview_order_no_deployment(
+def test_create_preview_order_upsize_after_downsize_lower(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_config_file,
+    adobe_authorizations_file,
+    adobe_subscription_factory,
+    order_factory,
+    lines_factory,
+    adobe_client_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+):
+    """
+    Test the call to Adobe API to create a preview order for upsizes
+    when there was a downsize in non-returnable window, means
+    renewalQuantity < currentQuantity on Adobe subscription
+    and later upsize is done to the lower number, mean
+    renewalQuantity = 7, currentQuantity = 10
+    and client wants to have 2 licensees more
+    in that case do not create adobe order
+    """
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        side_effect=["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer"
+    deployment_id = "a_deployment_id"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    order = order_factory(lines=lines_factory(old_quantity=8, quantity=9))
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+    adobe_subscription = adobe_subscription_factory(
+        current_quantity=10,
+        renewal_quantity=8,
+    )
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions",
+        ),
+        status=200,
+        json={"items": [adobe_subscription]},
+    )
+
+    preview_order = client.create_preview_order(
+        authorization_uk,
+        customer_id,
+        order["id"],
+        order["lines"],
+        [],
+        deployment_id,
+    )
+    assert preview_order is None
+
+
+def test_create_preview_newlines(
     mocker,
     settings,
     requests_mocker,
@@ -367,35 +447,31 @@ def test_create_preview_order_no_deployment(
     order_factory,
     lines_factory,
     adobe_client_factory,
-    quantity,
-    old_quantity,
-    expected_quantity,
     mock_get_adobe_product_by_marketplace_sku,
 ):
     """
-    Test the call to Adobe API to create a preview order.
+    Test the call to Adobe API to create a preview order for new lines
     """
-    mocker.patch(
-        "adobe_vipm.adobe.client.uuid4",
-        side_effect=["uuid-1", "uuid-2"],
-    )
 
     mocker.patch(
         "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        side_effect=["uuid-1", "uuid-2"],
     )
     authorization_uk = adobe_authorizations_file["authorizations"][0][
         "authorization_uk"
     ]
     adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
     customer_id = "a-customer"
-    deployment_id = None
+    deployment_id = "a_deployment_id"
 
     client, authorization, api_token = adobe_client_factory()
 
-    order = order_factory(
-        lines=lines_factory(old_quantity=old_quantity, quantity=quantity)
-    )
+    order = order_factory(lines=lines_factory(old_quantity=0, quantity=5))
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
 
     requests_mocker.post(
@@ -422,14 +498,15 @@ def test_create_preview_order_no_deployment(
                 {
                     "externalReferenceId": order["id"],
                     "orderType": "PREVIEW",
-                    "currencyCode": "USD",
                     "lineItems": [
                         {
                             "extLineItemNumber": to_adobe_line_id(
                                 order["lines"][0]["id"]
                             ),
                             "offerId": adobe_full_sku,
-                            "quantity": expected_quantity,
+                            "quantity": 5,
+                            "deploymentId": deployment_id,
+                            "currencyCode": "USD",
                         },
                     ],
                 },
@@ -441,8 +518,95 @@ def test_create_preview_order_no_deployment(
         authorization_uk,
         customer_id,
         order["id"],
+        [],
         order["lines"],
         deployment_id,
+    )
+    assert preview_order == {
+        "orderId": "adobe-order-id",
+    }
+
+
+def test_create_preview_newlines_wo_deployment(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_config_file,
+    adobe_authorizations_file,
+    order_factory,
+    lines_factory,
+    adobe_client_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+):
+    """
+    Test the call to Adobe API to create a preview order for new lines
+    """
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        side_effect=["uuid-1", "uuid-2"],
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
+    customer_id = "a-customer"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    order = order_factory(lines=lines_factory(old_quantity=0, quantity=5))
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=200,
+        json={
+            "orderId": "adobe-order-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": "uuid-2",
+                },
+            ),
+            matchers.json_params_matcher(
+                {
+                    "externalReferenceId": order["id"],
+                    "orderType": "PREVIEW",
+                    "lineItems": [
+                        {
+                            "extLineItemNumber": to_adobe_line_id(
+                                order["lines"][0]["id"]
+                            ),
+                            "offerId": adobe_full_sku,
+                            "quantity": 5,
+                        },
+                    ],
+                    "currencyCode": "USD",
+                },
+            ),
+        ],
+    )
+
+    preview_order = client.create_preview_order(
+        authorization_uk,
+        customer_id,
+        order["id"],
+        [],
+        order["lines"],
     )
     assert preview_order == {
         "orderId": "adobe-order-id",
@@ -493,6 +657,7 @@ def test_create_preview_order_bad_request(
             authorization_uk,
             customer_id,
             order["id"],
+            [],
             order["lines"],
             deployment_id=deployment_id,
         )

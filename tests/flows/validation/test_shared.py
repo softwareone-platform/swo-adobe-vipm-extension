@@ -105,7 +105,7 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segm
     mocked_next_step = mocker.MagicMock()
     context = Context(
         order=order,
-        upsize_lines=order["lines"],
+        new_lines=order["lines"],
         order_id="order-id",
         authorization_id="auth-id",
         market_segment=segment,
@@ -124,6 +124,7 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segm
         FAKE_CUSTOMERS_IDS[segment],
         context.order_id,
         context.upsize_lines,
+        context.new_lines,
         deployment_id=deployment_id,
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -155,7 +156,7 @@ def test_get_preview_order_step_no_deployment(
     mocked_next_step = mocker.MagicMock()
     context = Context(
         order=order,
-        upsize_lines=order["lines"],
+        new_lines=order["lines"],
         order_id="order-id",
         authorization_id="auth-id",
         market_segment=segment,
@@ -174,6 +175,7 @@ def test_get_preview_order_step_no_deployment(
         FAKE_CUSTOMERS_IDS[segment],
         context.order_id,
         context.upsize_lines,
+        context.new_lines,
         deployment_id=deployment_id,
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)

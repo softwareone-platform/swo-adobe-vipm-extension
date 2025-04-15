@@ -39,7 +39,7 @@ from adobe_vipm.adobe.utils import (
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.utils import get_partial_sku, map_by
 
 logger = logging.getLogger(__name__)
 
@@ -404,15 +404,26 @@ class AdobeClient:
         response.raise_for_status()
         return response.json()
 
+    def _get_preview_order_line_item(self, line: dict, quantity: int) -> dict:
+        adobe_base_sku = line["item"]["externalIds"]["vendor"]
+        product_sku = get_adobe_product_by_marketplace_sku(adobe_base_sku).sku
+
+        return {
+            "extLineItemNumber": to_adobe_line_id(line["id"]),
+            "offerId": product_sku,
+            "quantity": quantity,
+        }
+
     @wrap_http_error
     def create_preview_order(
         self,
         authorization_id: str,
         customer_id: str,
         order_id: str,
-        lines: list,
+        upsize_lines: list,
+        new_lines: list,
         deployment_id: str = None,
-    ) -> dict:
+    ) -> dict | None:
         """
         Creates an order of type PREVIEW for a given Marketplace platform order.
         Creating a PREVIEW order allows to validate the order lines and eventually
@@ -424,7 +435,11 @@ class AdobeClient:
             customer_id (str): Identifier of the customer that place the PREVIEW order.
             order_id: The identifier of the Marketplace platform order for which the PREVIEW
             order must be created.
-            lines (list): The list of order lines for which creating the preview order.
+            upsize_lines (list): The list of order upsize lines for which creating the
+            preview order.
+            new_lines (list): the list of order new lines to which creating the preview order.
+            deployment_id (str): the deployment id if preview order is placed for deployment, not
+            for the customer
 
         Returns:
             dict: The PREVIEW order.
@@ -435,32 +450,88 @@ class AdobeClient:
             "orderType": ORDER_TYPE_PREVIEW,
             "lineItems": [],
         }
-        if not deployment_id:
-            payload["currencyCode"] = authorization.currency
-        for line in lines:
-            product_sku = get_adobe_product_by_marketplace_sku(
-                line["item"]["externalIds"]["vendor"]
-            ).sku
-            quantity = line["quantity"]
-            old_quantity = line["oldQuantity"]
 
-            if quantity > old_quantity:
-                # For purchasing new lines (oldQuantity = 0) or upsizing lines
-                # quantity it must send the delta (quantity - oldQuantity) since
-                # it is placing a new order.
-                # For downsizing lines quantity it must send the actual quantity
-                # since the previous purchased quantity has been returned back
-                # through one or more RETURN orders.
-                quantity = quantity - old_quantity
-            line_item = {
-                "extLineItemNumber": to_adobe_line_id(line["id"]),
-                "offerId": product_sku,
-                "quantity": quantity,
+        for line in new_lines:
+            line_item = self._get_preview_order_line_item(line, line["quantity"])
+            payload["lineItems"].append(line_item)
+
+        if upsize_lines:
+            offer_ids = [line["item"]["externalIds"]["vendor"] for line in upsize_lines]
+            upsize_subscriptions = self.get_subscriptions_for_offers(
+                authorization_id,
+                customer_id,
+                offer_ids,
+            )
+            map_by_offer_subscriptions = map_by("offerId", upsize_subscriptions)
+            map_by_base_offer_subscriptions = {
+                get_partial_sku(k): v for k, v in map_by_offer_subscriptions.items()
             }
-            if deployment_id:
+
+        for line in upsize_lines:
+            # My friend, if you are reading this, that means you are in a deep investigation
+            # of Adobe issues, related on how to handle upsizes after downsizes
+            # Basically, the case with non zero diff is made exactly to manage this case
+            # Imagine, that there was an order with renewalQuantity = currentQuantity = 10
+            # Later this order line was downsized to 9, but it was downsized outside of
+            # the return window, that mean extension is not going to create an Adobe Order
+            # it is going to change the renewalQuantity on subscription and that's it
+            # In that case values on Adobe subscription are following
+            # renewalQuantity = 9, currenctQuantity = 10, MPT item quantity = 9
+            # After that customer decide to upsize this line up to 11 (means +2 quantity)
+            # PREVIOUSLY extension was just placing and order to +2 for Adobe API
+            # and change renewalQuantity to 11, but that leads to the fact, that now there is
+            # +1 additional quantity on adobe side, on MPT everything is good
+            # current algorithm is following:
+            #   1. First if renewalQuantity < currentQuantity update renewalQuanity equal
+            #     to currentQuantity (means return back downsized numbers with previous order)
+            #   2. Place order with left quantity, in this example example means
+            #      - Update renewal quantity back to 10
+            #      - Place order with additional 1 quantity added
+            adobe_base_sku = line["item"]["externalIds"]["vendor"]
+            adobe_subscription = map_by_base_offer_subscriptions[adobe_base_sku]
+            renewal_quantity = adobe_subscription["autoRenewal"]["renewalQuantity"]
+            current_quantity = adobe_subscription["currentQuantity"]
+            if renewal_quantity < current_quantity:
+                diff = current_quantity - renewal_quantity
+            else:
+                diff = 0
+
+            quantity = line["quantity"] - line["oldQuantity"] - diff
+            if quantity <= 0:
+                # if the final quantity for upsize is less or equal 0
+                # that means, that new quantity is less than it was downsized
+                # before. For example original quantity was 10
+                # than it was downsized to 7
+                # and upsizing now to 9, quantity is going to be -1 in that case
+                # Do not create order for that subscription
+                # only update renewal quantity to 9
+                logger.info(
+                    f"Upsizing item {line['id']}({adobe_base_sku}) is skipped. "
+                    f"Because overall quantity is equal or below 0. "
+                    f"line quantity = {line['quantity']}, "
+                    f"line old quantity = {line['oldQuantity']}, "
+                    f"adobe renewal quantity = {renewal_quantity}, "
+                    f"adobe current quantity = {current_quantity}."
+                )
+                continue
+
+            line_item = self._get_preview_order_line_item(line, quantity)
+            payload["lineItems"].append(line_item)
+
+        if deployment_id:
+            # for deployments, currency should be passed on line item level
+            for line_item in payload["lineItems"]:
                 line_item["deploymentId"] = deployment_id
                 line_item["currencyCode"] = authorization.currency
-            payload["lineItems"].append(line_item)
+        else:
+            payload["currencyCode"] = authorization.currency
+
+        if not payload["lineItems"]:
+            logger.info(
+                f"Preview Order for {order_id} was not created: line items are empty."
+            )
+            return
+
         headers = self._get_headers(authorization)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
@@ -630,6 +701,37 @@ class AdobeClient:
 
         response.raise_for_status()
         return response.json()
+
+    @wrap_http_error
+    def get_subscriptions_for_offers(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        base_offer_ids: list[str],
+    ) -> list[dict]:
+        """
+        Retrieve all the subscriptions of the given offer ids.
+        !!! Returns only active subscriptions
+
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str): Identifier of the customer to which the subscriptions belongs to.
+            base_offer_ids: (list[str]): List of base parts of whole Adobe Offer Ids
+
+        Returns:
+            dict: The retrieved subscriptions.
+        """
+        subscriptions = self.get_subscriptions(authorization_id, customer_id)["items"]
+        active_subscriptions = filter(
+            lambda s: s["status"] == STATUS_PROCESSED, subscriptions
+        )
+
+        return list(
+            filter(
+                lambda s: get_partial_sku(s["offerId"]) in base_offer_ids,
+                active_subscriptions,
+            )
+        )
 
     @wrap_http_error
     def update_subscription(
