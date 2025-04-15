@@ -2610,8 +2610,7 @@ def test_get_customer_deployments_active_status(
     client, authorization, api_token = adobe_client_factory()
 
     deployments_response = {
-        "totalCount": 3,
-        "items": [
+       "items": [
             {
                 "deploymentId": "deployment-1",
                 "status": "1000",
@@ -2642,29 +2641,26 @@ def test_get_customer_deployments_active_status(
         ]
     }
 
-    active_deployments_response = {
-        "totalCount": 2,
-        "items": [
-            {
-                "deploymentId": "deployment-1",
-                "status": "1000",
-                "companyProfile": {
-                    "address": {
-                        "country": "DE"
-                    }
-                }
-            },
-            {
-                "deploymentId": "deployment-3",
-                "status": "1000",
-                "companyProfile": {
-                    "address": {
-                        "country": "ES"
-                    }
+    active_deployments_response = [
+        {
+            "deploymentId": "deployment-1",
+            "status": "1000",
+            "companyProfile": {
+                "address": {
+                    "country": "DE"
                 }
             }
-        ]
-    }
+        },
+        {
+            "deploymentId": "deployment-3",
+            "status": "1000",
+            "companyProfile": {
+                "address": {
+                    "country": "ES"
+                }
+            }
+        }
+    ]
 
     requests_mocker.get(
         urljoin(

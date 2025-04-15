@@ -281,7 +281,7 @@ def sync_global_customer_parameters(
 
         deployments = [
             f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
-            for deployment in customer_deployments["items"]
+            for deployment in customer_deployments
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
@@ -357,7 +357,7 @@ def sync_deployments_prices(
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
-        [deployment["deploymentId"] for deployment in customer_deployments["items"]],
+        [deployment["deploymentId"] for deployment in customer_deployments],
     )
 
     for deployment_agreement in deployment_agreements:

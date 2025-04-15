@@ -572,7 +572,7 @@ def get_new_agreement_deployments(
         adobe_transfer_order["lineItems"]
     )
 
-    for deployment in customer_deployments["items"]:
+    for deployment in customer_deployments:
         created_deployment = next(
             (
                 gc_deployment
@@ -627,7 +627,7 @@ def send_gc_agreement_deployments_notification(
     facts = {
         f"Deployment ID: {deployment.get("deploymentId")}": f"Country: {
             deployment.get("companyProfile", {}).get("address", {}).get("country", "")}"
-        for deployment in customer_deployments["items"]
+        for deployment in customer_deployments
     }
     agreement_deployment_view_link = get_agreement_deployment_view_link(product_id)
     send_warning(
@@ -651,8 +651,8 @@ def are_all_deployments_synchronized(existing_deployments, customer_deployments)
     Returns:
         bool: True if all deployments are synchronized, False otherwise.
     """
-    if customer_deployments.get("totalCount", 0) > 0:
-        for customer_deployment in customer_deployments["items"]:
+    if len(customer_deployments) > 0:
+        for customer_deployment in customer_deployments:
             created_deployment = next(
                 (
                     gc_deployment
@@ -744,9 +744,9 @@ def _check_agreement_deployments(
             customer_deployments = adobe_client.get_customer_deployments_active_status(
                 order["authorization"]["id"], adobe_transfer_order["customerId"]
             )
-        if customer_deployments.get("totalCount", 0) > 0:
+        if len(customer_deployments) > 0:
             logger.info(
-                f"Adobe customer have {customer_deployments.get("totalCount")} deployments,"
+                f"Adobe customer have {len(customer_deployments)} deployments,"
                 f" proceed to add agreement deployments to Airtable"
             )
             new_agreement_deployments = get_new_agreement_deployments(
@@ -929,9 +929,12 @@ def save_gc_parameters(mpt_client, order, customer_deployments):
     if global_customer_enabled == ["Yes"]:
         return order
 
+
+
+
     deployments = [
         f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
-        for deployment in customer_deployments["items"]
+        for deployment in customer_deployments
     ]
     order = set_global_customer(order, "Yes")
     order = set_deployments(order, deployments)

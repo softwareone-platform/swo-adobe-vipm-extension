@@ -19,6 +19,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
+    STATUS_GC_DEPLOYMENT_ACTIVE,
     STATUS_PENDING,
     STATUS_PROCESSED,
 )
@@ -33,7 +34,6 @@ from adobe_vipm.adobe.utils import (
     find_first,
     get_item_by_partial_sku,
     join_phone_number,
-    split_deployments_by_status,
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
@@ -1066,16 +1066,18 @@ class AdobeClient:
     ) -> dict:
         customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
 
-        active_deployments, non_active_deployment_ids = split_deployments_by_status(
-            customer_deployments["items"]
-        )
+        active_deployments = []
 
-        logger.info(f"Deployments removed by status: {non_active_deployment_ids}")
+        for customer_deployment in customer_deployments.get("items", []):
+            if customer_deployment.get("status") == STATUS_GC_DEPLOYMENT_ACTIVE:
+                active_deployments.append(customer_deployment)
+            else:
+                logger.info(
+                    f"Deployment with id {customer_deployment.get('deploymentId', '')} "
+                    "is not active"
+                )
 
-        return {
-            "totalCount": len(active_deployments),
-            "items": active_deployments
-        }
+        return active_deployments
 
 _ADOBE_CLIENT = None
 

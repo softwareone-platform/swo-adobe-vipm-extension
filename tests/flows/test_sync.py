@@ -638,16 +638,13 @@ def test_sync_global_customer_parameter(
         coterm_date="2025-04-04",
         global_sales_enabled=True,
     )
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = {
-        "totalCount": 1,
-        "items": [
-            {
-                "deploymentId": "deployment-id",
-                "status": "1000",
-                "companyProfile": {"address": {"country": "DE"}},
-            }
-        ],
-    }
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
     deployment_agreements = [
         agreement_factory(
             fulfillment_parameters=fulfillment_parameters_factory(
@@ -977,16 +974,13 @@ def test_sync_global_customer_update_not_required(
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = {
-        "totalCount": 1,
-        "items": [
-            {
-                "deploymentId": "deployment-id",
-                "status": "1000",
-                "companyProfile": {"address": {"country": "DE"}},
-            }
-        ],
-    }
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
         coterm_date="2025-04-04",
         global_sales_enabled=True,

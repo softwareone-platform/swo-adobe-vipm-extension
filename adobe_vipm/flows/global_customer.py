@@ -552,7 +552,7 @@ def process_agreement_deployment(
         )
         customer_deployment_ids = [
             f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
-            for deployment in customer_deployments["items"]
+            for deployment in customer_deployments
         ]
 
         gc_agreement_id = create_gc_agreement_deployment(
