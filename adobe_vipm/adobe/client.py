@@ -8,10 +8,8 @@ from typing import MutableMapping
 from urllib.parse import urljoin
 from uuid import uuid4
 
-# Third-party imports
 import requests
 
-# Local imports
 from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.constants import (
     CANCELLATION_WINDOW_DAYS,
