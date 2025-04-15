@@ -2552,8 +2552,17 @@ def test_get_customer_deployments(
         "totalCount": 1,
         "items": [
             {
-                "deploymentId": "deployment-id",
+                "deploymentId": "deployment-id-1",
                 "status": "1000",
+                "companyProfile": {
+                    "address": {
+                        "country": "DE"
+                    }
+                }
+            },
+            {
+                "deploymentId": "deployment-id-2",
+                "status": "1004",
                 "companyProfile": {
                     "address": {
                         "country": "DE"
