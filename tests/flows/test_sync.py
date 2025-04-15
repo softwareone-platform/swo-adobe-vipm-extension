@@ -638,7 +638,7 @@ def test_sync_global_customer_parameter(
         coterm_date="2025-04-04",
         global_sales_enabled=True,
     )
-    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -977,7 +977,7 @@ def test_sync_global_customer_update_not_required(
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
-    mocked_adobe_client.get_customer_deployments_by_status.return_value = {
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = {
         "totalCount": 1,
         "items": [
             {
@@ -1226,7 +1226,7 @@ def test_sync_global_customer_update_not_required(
         lines=expected_lines,
         parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
     )
-    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
 
 
 def test_sync_global_customer_update_adobe_error(
@@ -1303,7 +1303,7 @@ def test_sync_global_customer_update_adobe_error(
             "some error",
         ),
     )
-    mocked_adobe_client.get_customer_deployments_by_status.side_effect = adobe_error
+    mocked_adobe_client.get_customer_deployments_active_status.side_effect = adobe_error
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
         coterm_date="2025-04-04",
         global_sales_enabled=True,
@@ -1442,7 +1442,7 @@ def test_sync_global_customer_update_adobe_error(
         lines=expected_lines,
         parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
     )
-    mocked_adobe_client.get_customer_deployments_by_status.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
 

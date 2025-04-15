@@ -429,7 +429,7 @@ def test_check_3yc_commitment_request_global_customers(
     }
     customer = adobe_customer_factory(**customer_kwargs)
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_customer_deployments_by_status.return_value = [
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = [
         {"deploymentId": str(i)} for i in range(2)
     ]
 

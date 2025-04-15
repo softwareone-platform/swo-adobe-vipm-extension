@@ -1,6 +1,7 @@
 from adobe_vipm.adobe.constants import (
     REGEX_SANITIZE_COMPANY_NAME,
     REGEX_SANITIZE_FIRST_LAST_NAME,
+    STATUS_GC_DEPLOYMENT_ACTIVE,
 )
 from adobe_vipm.utils import find_first
 
@@ -122,3 +123,20 @@ def sanitize_first_last_name(first_last_name):
         str: The sanitized First or Last Name string.
     """
     return REGEX_SANITIZE_FIRST_LAST_NAME.sub(" ", first_last_name).strip()
+
+def split_deployments_by_status(deployments: list) -> tuple[list, list]:
+    """Split deployments by active/non-active status.
+
+    Returns:
+        A tuple of (active_deployments, non_active_deployment_ids)
+    """
+    active_deployments = []
+    non_active_deployment_ids = []
+
+    for deployment in deployments:
+        if deployment.get("status") == STATUS_GC_DEPLOYMENT_ACTIVE:
+            active_deployments.append(deployment)
+        else:
+            non_active_deployment_ids.append(deployment.get("deploymentId", ""))
+
+    return active_deployments, non_active_deployment_ids

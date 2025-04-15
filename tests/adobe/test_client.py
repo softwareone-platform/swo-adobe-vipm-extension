@@ -2587,7 +2587,7 @@ def test_get_customer_deployments(
     assert result == expected_response
 
 
-def test_get_customer_deployments_by_status(
+def test_get_customer_deployments_active_status(
         requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
     ):
     """
@@ -2597,7 +2597,6 @@ def test_get_customer_deployments_by_status(
         "authorization_uk"
     ]
     customer_id = "a-customer-id"
-    status = "1000"
 
     client, authorization, api_token = adobe_client_factory()
 
@@ -2653,8 +2652,8 @@ def test_get_customer_deployments_by_status(
         ],
     )
 
-    active_deployments = client.get_customer_deployments_by_status(
-        authorization_uk, customer_id, status
+    active_deployments = client.get_customer_deployments_active_status(
+        authorization_uk, customer_id
     )
 
     assert len(active_deployments) == 2

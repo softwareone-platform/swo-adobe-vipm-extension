@@ -36,6 +36,7 @@ from adobe_vipm.adobe.utils import (
     find_first,
     get_item_by_partial_sku,
     join_phone_number,
+    split_deployments_by_status,
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
@@ -1061,28 +1062,22 @@ class AdobeClient:
         response.raise_for_status()
         return response.json()
 
-    def get_customer_deployments_by_status(
+    def get_customer_deployments_active_status(
         self,
         authorization_id: str,
         customer_id: str,
-        status: str,
     ) -> dict:
         customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
 
-        deployments_active = []
-        deployments_removed = []
+        active_deployments, non_active_deployment_ids = split_deployments_by_status(
+            customer_deployments["items"]
+        )
 
-        for deployment in customer_deployments["items"]:
-            if deployment["status"] == status:
-                deployments_active.append(deployment)
-            else:
-                deployments_removed.append(deployment.get('deploymentId',''))
-
-        logger.info(f"Deployments removed by status: {deployments_removed}")
+        logger.info(f"Deployments removed by status: {non_active_deployment_ids}")
 
         return {
-            "totalCount": len(deployments_active),
-            "items": deployments_active
+            "totalCount": len(active_deployments),
+            "items": active_deployments
         }
 
 _ADOBE_CLIENT = None
