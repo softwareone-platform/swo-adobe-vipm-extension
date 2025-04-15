@@ -2633,6 +2633,30 @@ def test_get_customer_deployments_active_status(
         ]
     }
 
+    active_deployments_response = {
+        "totalCount": 2,
+        "items": [
+            {
+                "deploymentId": "deployment-1",
+                "status": "1000",
+                "companyProfile": {
+                    "address": {
+                        "country": "DE"
+                    }
+                }
+            },
+            {
+                "deploymentId": "deployment-3",
+                "status": "1000",
+                "companyProfile": {
+                    "address": {
+                        "country": "ES"
+                    }
+                }
+            }
+        ]
+    }
+
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -2657,5 +2681,4 @@ def test_get_customer_deployments_active_status(
     )
 
     assert len(active_deployments) == 2
-    assert active_deployments.get("items",[])[0]["deploymentId"] == "deployment-1"
-    assert active_deployments.get("items",[])[1]["deploymentId"] == "deployment-3"
+    assert active_deployments == active_deployments_response
