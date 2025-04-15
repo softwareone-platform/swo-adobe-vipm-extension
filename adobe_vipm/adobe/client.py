@@ -1,4 +1,3 @@
-# Standard library imports
 import json
 import logging
 from collections import defaultdict
