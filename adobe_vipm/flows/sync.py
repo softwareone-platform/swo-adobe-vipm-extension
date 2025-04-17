@@ -14,7 +14,10 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
+)
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
@@ -278,7 +281,7 @@ def sync_global_customer_parameters(
 
         deployments = [
             f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
-            for deployment in customer_deployments["items"]
+            for deployment in customer_deployments
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
@@ -324,7 +327,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
 
         if customer.get("globalSalesEnabled", False):
             authorization_id = agreement["authorization"]["id"]
-            customer_deployments = adobe_client.get_customer_deployments(
+            customer_deployments = adobe_client.get_customer_deployments_active_status(
                 authorization_id, customer_id
             )
             sync_global_customer_parameters(
@@ -354,7 +357,7 @@ def sync_deployments_prices(
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
-        [deployment["deploymentId"] for deployment in customer_deployments["items"]],
+        [deployment["deploymentId"] for deployment in customer_deployments],
     )
 
     for deployment_agreement in deployment_agreements:

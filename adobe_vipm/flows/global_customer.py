@@ -547,12 +547,12 @@ def process_agreement_deployment(
         adobe_customer = adobe_client.get_customer(
             authorization_id, agreement_deployment.customer_id
         )
-        customer_deployments = adobe_client.get_customer_deployments(
+        customer_deployments = adobe_client.get_customer_deployments_active_status(
             authorization_id, agreement_deployment.customer_id
         )
         customer_deployment_ids = [
             f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
-            for deployment in customer_deployments["items"]
+            for deployment in customer_deployments
         ]
 
         gc_agreement_id = create_gc_agreement_deployment(
