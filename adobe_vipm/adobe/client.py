@@ -1063,7 +1063,18 @@ class AdobeClient:
         self,
         authorization_id: str,
         customer_id: str,
-    ) -> dict:
+    ) -> list[dict]:
+        """
+        Retrieve the active deployments for a given customer.
+
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str): The customer identifier.
+
+        Returns:
+            list[dict]: A list of active deployments.
+        """
+
         customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
 
         active_deployments = []
