@@ -27,6 +27,8 @@ class ResellerNotFoundError(AdobeError):
 class CountryNotFoundError(AdobeError):
     pass
 
+class CustomerDiscountsNotFoundError(AdobeError):
+    pass
 
 class AdobeHttpError(AdobeError):
     def __init__(self, status_code: int, content: str):
