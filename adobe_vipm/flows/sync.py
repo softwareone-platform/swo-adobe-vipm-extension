@@ -3,6 +3,7 @@ import sys
 import traceback
 from datetime import date, datetime, timedelta
 
+from adobe_vipm.adobe.errors import CustomerDiscountsNotFoundError
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement_subscription,
     get_agreements_by_customer_deployments,
@@ -18,6 +19,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_3YC_ACTIVE,
     STATUS_3YC_COMMITTED,
 )
+from adobe_vipm.adobe.errors import CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
@@ -323,6 +325,13 @@ def sync_agreement(mpt_client, agreement, dry_run):
         customer = adobe_client.get_customer(
             agreement["authorization"]["id"], customer_id
         )
+
+        if not customer.get("discounts",[]):
+            raise CustomerDiscountsNotFoundError(
+                f"Customer {customer_id} does not have discounts information. "
+                f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
+            )
+
         sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer)
 
         if customer.get("globalSalesEnabled", False):

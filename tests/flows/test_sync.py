@@ -1528,3 +1528,48 @@ def test_sync_agreement_notify_exception(
         mock_notify_agreement_unhandled_exception_in_teams.call_args_list[0].args[0]
         == agreement["id"]
     )
+
+def test_sync_agreement_empty_discounts(
+    mocker,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    caplog,
+):
+    """
+    Test that sync_agreement notifies when customer discounts are empty.
+    """
+    agreement = agreement_factory(
+        subscriptions=[
+            {
+                "id": "SUB-1000-2000-3000",
+                "status": "Active",
+                "item": {
+                    "id": "ITM-0000-0001-0001",
+                },
+            },
+        ],
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock()
+
+    customer = adobe_customer_factory()
+    customer["discounts"] = []
+
+    mocked_adobe_client.get_customer.return_value = customer
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_notifier = mocker.patch(
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
+    )
+
+    sync_agreement(mocked_mpt_client, agreement, False)
+
+    mocked_notifier.assert_called_once()
+    assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
+    assert "does not have discounts information" in mocked_notifier.call_args_list[0].args[1]
