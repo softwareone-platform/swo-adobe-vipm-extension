@@ -17,6 +17,7 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_ACTIVE,
     STATUS_3YC_COMMITTED,
+    STATUS_SUBSCRIPTION_TERMINATED,
 )
 from adobe_vipm.adobe.errors import CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment
@@ -42,6 +43,7 @@ from adobe_vipm.flows.utils import (
     get_global_customer,
     is_consumables_sku,
     notify_agreement_unhandled_exception_in_teams,
+    notify_missing_prices,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
         str: Returns the customer coterm date.
     """
     agreement_id = agreement["id"]
+    missing_prices_skus = []
 
     try:
         authorization_id = agreement["authorization"]["id"]
@@ -98,6 +101,11 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                 adobe_subscription_id,
             )
 
+            if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
+                logger.info(f"Skipping subscription {subscription['id']}. "
+                            f"It is terminated")
+                continue
+
             actual_sku = adobe_subscription["offerId"]
 
             discount_level = (
@@ -119,6 +127,12 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
             prices = get_prices_for_skus(product_id, currency, skus)
 
         for subscription, adobe_subscription, actual_sku in to_update:
+            if actual_sku not in prices:
+                logger.error(f"Skipping subscription {subscription['id']} "
+                             f"because the sku {actual_sku} is not in the prices")
+                missing_prices_skus.append(actual_sku)
+                continue
+
             line_id = subscription["lines"][0]["id"]
             lines = [
                 {
@@ -225,6 +239,15 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                 parameters={
                     "fulfillment": [{"externalId": "nextSync", "value": next_sync}]
                 },
+            )
+
+        if missing_prices_skus:
+            notify_missing_prices(
+                agreement_id,
+                missing_prices_skus,
+                product_id,
+                currency,
+                commitment_start_date
             )
 
         logger.info(f"agreement updated {agreement['id']}")

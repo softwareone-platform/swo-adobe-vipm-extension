@@ -14,6 +14,7 @@ from adobe_vipm.flows.utils import (
     is_renewal_window_open,
     is_transferring_item_expired,
     notify_agreement_unhandled_exception_in_teams,
+    notify_missing_prices,
     notify_unhandled_exception_in_teams,
     reset_order_error,
     set_order_error,
@@ -49,6 +50,25 @@ def test_notify_agreement_unhandled_exception_in_teams(mocker):
         "An unhandled exception has been raised "
         "of the agreement **AGR-0000**:\n\n"
         "```exception-traceback```",
+    )
+
+def test_notify_missing_prices(mocker):
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    notify_missing_prices(
+        "AGR-0000",
+        ["65504578CA01A12"],
+        "65504575CA01A12",
+        "USD",
+        None
+    )
+
+    mocked_send_exc.assert_called_once_with(
+        "Missing prices detected",
+        "Missing prices detected in agreement **AGR-0000**\n\n"
+        "The following SKUs don't have regular prices available:\n"
+        "- Product ID: 65504575CA01A12\n"
+        "- Currency: USD\n"
+        "- SKUs:\n  - 65504578CA01A12\n"
     )
 
 
