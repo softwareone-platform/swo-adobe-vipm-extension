@@ -4,7 +4,7 @@ from adobe_vipm.flows.migration import check_running_transfers
 
 
 class Command(BaseCommand):
-    help = "Check running tranfers taking data from AirTable bases."
+    help = "Check running transfers taking data from AirTable bases."
 
     def success(self, message):
         self.stdout.write(self.style.SUCCESS(message), ending="\n")

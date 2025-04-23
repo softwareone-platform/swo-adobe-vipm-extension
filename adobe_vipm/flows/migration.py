@@ -295,7 +295,6 @@ def check_running_transfers_for_product(product_id):
         f"Found {len(transfers_to_check)} running transfers for product {product_id}"
     )
     for transfer in transfers_to_check:
-        adobe_transfer = None
         try:
             adobe_transfer = client.get_transfer(
                 transfer.authorization_uk,
@@ -306,6 +305,12 @@ def check_running_transfers_for_product(product_id):
             transfer.adobe_error_code = api_err.code
             transfer.adobe_error_description = str(api_err)
             check_retries(transfer)
+            continue
+        except AuthorizationNotFoundError as error:
+            transfer.status = "failed"
+            transfer.migration_error_description = str(error)
+            transfer.updated_at = datetime.now()
+            transfer.save()
             continue
 
         if adobe_transfer["status"] == STATUS_PENDING:
@@ -334,8 +339,6 @@ def check_running_transfers_for_product(product_id):
 
         transfer.customer_id = adobe_transfer["customerId"]
 
-        customer = None
-        global_sales_enabled = False
         try:
             customer = client.get_customer(
                 transfer.authorization_uk, transfer.customer_id
