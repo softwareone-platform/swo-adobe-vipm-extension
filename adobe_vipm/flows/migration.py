@@ -295,7 +295,6 @@ def check_running_transfers_for_product(product_id):
         f"Found {len(transfers_to_check)} running transfers for product {product_id}"
     )
     for transfer in transfers_to_check:
-        adobe_transfer = None
         try:
             adobe_transfer = client.get_transfer(
                 transfer.authorization_uk,
@@ -340,8 +339,6 @@ def check_running_transfers_for_product(product_id):
 
         transfer.customer_id = adobe_transfer["customerId"]
 
-        customer = None
-        global_sales_enabled = False
         try:
             customer = client.get_customer(
                 transfer.authorization_uk, transfer.customer_id
