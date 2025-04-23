@@ -17,6 +17,7 @@ from adobe_vipm.adobe.errors import (
 )
 from adobe_vipm.airtable.models import (
     STATUS_GC_PENDING,
+    STATUS_RUNNING,
 )
 from adobe_vipm.flows.errors import AirTableAPIError
 from adobe_vipm.flows.migration import (
@@ -1009,6 +1010,36 @@ def test_checking_running_transfers_for_product_unexpected_status(
         button=Button("membership-id", "https://link.to.transfer"),
         facts=FactsSection("Last error from Adobe", {"code": "message"}),
     )
+
+
+@freeze_time("2025-04-06 12:30:00")
+def test_checking_running_transfers_for_product_authorization_not_found(mocker):
+    mocked_transfer = mocker.MagicMock(
+        authorization_uk="auth-uk",
+        membership_id="membership-id",
+        transfer_id="transfer-id",
+        status=STATUS_RUNNING,
+        updated_at=None,
+        migration_error_description=None,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_transfers_to_check",
+        return_value=[mocked_transfer]
+    )
+    mocked_adobe_client = mocker.MagicMock()
+    message_error =  f"Authorization with uk/id {mocked_transfer.authorization_uk} not found."
+    mocked_adobe_client.get_transfer.side_effect = [AuthorizationNotFoundError(message_error)]
+    mocker.patch(
+        "adobe_vipm.flows.migration.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    check_running_transfers_for_product("product-id")
+
+    mocked_transfer.save.assert_called_once()
+    assert mocked_transfer.status == "failed"
+    assert mocked_transfer.updated_at == datetime(2025, 4, 6, 12, 30)
+    assert mocked_transfer.migration_error_description == message_error
 
 
 def test_checking_running_transfers_with_gc_exists_for_product(

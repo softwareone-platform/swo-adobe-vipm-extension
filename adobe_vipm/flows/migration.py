@@ -307,6 +307,12 @@ def check_running_transfers_for_product(product_id):
             transfer.adobe_error_description = str(api_err)
             check_retries(transfer)
             continue
+        except AuthorizationNotFoundError as error:
+            transfer.status = "failed"
+            transfer.migration_error_description = str(error)
+            transfer.updated_at = datetime.now()
+            transfer.save()
+            continue
 
         if adobe_transfer["status"] == STATUS_PENDING:
             check_retries(transfer)
