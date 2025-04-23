@@ -43,10 +43,10 @@ def make_django_command(name, django_command=None, help=None):
     @click.argument("management_args", nargs=-1, type=click.UNPROCESSED)
     @click.pass_context
     def inner(ctx, management_args):
-        from swo.mpt.extensions.runtime.commands.django import django
+        from swo.mpt.extensions.runtime.commands.django_commands import django_command
 
         ctx.params["management_args"] = (django_command,) + management_args
-        ctx.forward(django)
+        ctx.forward(django_command)
 
     return inner
 

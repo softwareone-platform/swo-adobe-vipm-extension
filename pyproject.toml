@@ -79,7 +79,7 @@ build-backend = "poetry.core.masonry.api"
 testpaths = "tests"
 pythonpath = "."
 addopts = "--cov=adobe_vipm --cov-report=term-missing --cov-report=html --cov-report=xml"
-DJANGO_SETTINGS_MODULE = "tests.django.settings"
+DJANGO_SETTINGS_MODULE = "tests.django_settings.settings"
 log_cli = false
 filterwarnings = [
     "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
