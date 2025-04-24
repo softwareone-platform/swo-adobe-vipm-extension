@@ -669,6 +669,38 @@ def notify_agreement_unhandled_exception_in_teams(agreement_id, traceback):
         f"```{traceback}```",
     )
 
+def notify_missing_prices(agreement_id, missing_skus, product_id, currency, commitment_date=None):
+    """
+    Notifies about SKUs with missing prices in the agreement.
+    Args:
+        agreement_id (str): The agreement ID
+        missing_skus (list): List of SKUs without prices
+        product_id (str): The product ID
+        currency (str): The currency code
+        commitment_date (str, optional): The 3YC commitment date if applicable
+    """
+    context = (
+        f"3YC prices (commitment date: {commitment_date})"
+        if commitment_date
+        else "regular prices"
+    )
+
+    message = (
+        f"Missing prices detected in agreement **{agreement_id}**\n\n"
+        f"The following SKUs don't have {context} available:\n"
+        f"- Product ID: {product_id}\n"
+        f"- Currency: {currency}\n"
+        f"- SKUs:\n"
+    )
+
+    for sku in missing_skus:
+        message += f"  - {sku}\n"
+
+    send_exception(
+        "Missing prices detected",
+        message
+    )
+
 
 def get_notifications_recipient(order):
     return (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get(

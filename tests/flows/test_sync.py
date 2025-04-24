@@ -1573,3 +1573,152 @@ def test_sync_agreement_empty_discounts(
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
     assert "does not have discounts information" in mocked_notifier.call_args_list[0].args[1]
+
+def test_sync_agreement_prices_with_missing_prices(
+    mocker,
+    agreement_factory,
+    subscriptions_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    caplog,
+):
+    """
+    Test that sync_agreement_prices handles missing prices correctly by:
+    - Continuing with other SKUs that have prices
+    - Generating appropriate notifications for missing prices
+    - Logging the error
+    """
+    agreement = agreement_factory(
+        lines=lines_factory(
+            external_vendor_id="77777777CA",
+            unit_purchase_price=10.11,
+        ),
+        subscriptions=[
+            {
+                "id": "SUB-1000-2000-3000",
+                "status": "Active",
+                "item": {
+                    "id": "ITM-0000-0001-0001",
+                },
+            },
+            {
+                "id": "SUB-1000-2000-5000",
+                "status": "Active",
+                "item": {
+                    "id": "ITM-0000-0001-0003",
+                },
+            },
+            {
+                "id": "SUB-1000-2000-6000",
+                "status": "Active",
+                "item": {
+                    "id": "ITM-0000-0001-0004",
+                },
+            },
+        ],
+    )
+
+    mpt_subscription = subscriptions_factory()[0]
+    another_mpt_subscription = subscriptions_factory(
+        adobe_sku="77777777CA01A12",
+        adobe_subscription_id="b-sub-id",
+        subscription_id="SUB-1000-2000-5000",
+    )[0]
+    terminated_mpt_subscription = subscriptions_factory(
+        adobe_sku="77777777CA01A13",
+        adobe_subscription_id="c-sub-id",
+        subscription_id="SUB-1000-2000-6000",
+    )[0]
+
+    adobe_subscription = adobe_subscription_factory()
+    another_adobe_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=15,
+        renewal_quantity=15,
+    )
+    terminated_adobe_subscription = adobe_subscription_factory(
+        subscription_id="c-sub-id",
+        offer_id="77777777CA01A13",
+        current_quantity=10,
+        renewal_quantity=10,
+        status="1004",
+    )
+
+    mocked_mpt_client = mocker.MagicMock()
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscription.side_effect = [
+        adobe_subscription,
+        another_adobe_subscription,
+        terminated_adobe_subscription,
+    ]
+    mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
+        coterm_date="2025-04-04"
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_agreement_subscription",
+        side_effect=[mpt_subscription, another_mpt_subscription, terminated_mpt_subscription],
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_prices_for_skus",
+        side_effect=[
+            {"77777777CA01A12": 20.22},
+            {"77777777CA01A12": 20.22},
+        ],
+    )
+
+    mocked_notify_missing_prices = mocker.patch(
+        "adobe_vipm.flows.sync.notify_missing_prices",
+    )
+
+    mocked_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.sync.update_agreement_subscription",
+    )
+    mocked_update_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.update_agreement",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
+    with caplog.at_level(logging.ERROR):
+        sync_agreement(mocked_mpt_client, agreement, False)
+
+    assert "Skipping subscription" in caplog.text
+    assert "65304578CA01A12" in caplog.text
+
+
+    mocked_notify_missing_prices.assert_called_once()
+    call_args = mocked_notify_missing_prices.call_args[0]
+    assert call_args[0] == agreement["id"]
+    assert "65304578CA01A12" in call_args[1]
+    assert call_args[2] == agreement["product"]["id"]
+    assert call_args[3] == agreement["listing"]["priceList"]["currency"]
+
+    assert len(mocked_update_agreement_subscription.call_args_list) == 1
+    update_call = mocked_update_agreement_subscription.call_args_list[0]
+    assert update_call[1]["lines"][0]["price"]["unitPP"] == 20.22
+
+    assert mocked_update_agreement.called
+    assert "nextSync" in (
+        mocked_update_agreement.call_args[1]["parameters"]["fulfillment"][0]["externalId"]
+    )
+
+    assert len(mocked_adobe_client.get_subscription.call_args_list) == 3
+
+    assert "77777777CA01A13" not in [
+        call[1]["lines"][0]["price"]["unitPP"]
+        for call in mocked_update_agreement_subscription.call_args_list
+    ]
