@@ -41,7 +41,9 @@ class AdobeAPIError(AdobeHttpError):
     def __init__(self, status_code: int, payload: dict) -> None:
         super().__init__(status_code, json.dumps(payload))
         self.payload: dict = payload
-        self.code: str = payload["code"]
+        # 504 error response doesn't follow the expected format -
+        # it uses "error_code" field instead of "code"
+        self.code: str = payload.get("code", payload.get("error_code"))
         self.message: str = payload["message"]
         self.details: list = payload.get("additionalDetails", [])
 

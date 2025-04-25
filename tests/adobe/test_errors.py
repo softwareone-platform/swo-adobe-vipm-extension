@@ -51,6 +51,23 @@ def test_wrap_http_error(mocker, adobe_api_error_factory):
     assert str(cv.value) == "5678 - error message with details: detail1, detail2"
 
 
+def test_wrap_http_error_504_error_code(mocker):
+    @wrap_http_error
+    def func():
+        response = mocker.MagicMock()
+        response.status_code = 504
+        response.json.return_value = {"error_code": "504001", "message": "Gateway Timeout"}
+        raise HTTPError(response=response)
+
+    wrapped_func = wrap_http_error(func)
+
+    with pytest.raises(AdobeError) as cv:
+        wrapped_func()
+
+    assert cv.value.status_code == 504
+    assert str(cv.value) == "504001 - Gateway Timeout"
+
+
 def test_wrap_http_error_json_decode_error(mocker):
     def func():
         response = mocker.MagicMock()
