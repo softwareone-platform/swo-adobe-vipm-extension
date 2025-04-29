@@ -8,7 +8,7 @@ from watchfiles import watch
 from watchfiles.filters import PythonFilter
 from watchfiles.run import start_process
 
-from swo.mpt.extensions.runtime.workers import start_event_consumer, start_gunicorn
+from mpt_extension_sdk.runtime.workers import start_event_consumer, start_gunicorn
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,10 @@ def _display_path(path):
 
 
 class Master:
-    def __init__(self, options):
+    def __init__(self, options, settings):
         self.workers = {}
         self.options = options
+        self.settings = settings
         self.stop_event = threading.Event()
         self.monitor_event = threading.Event()
         self.watch_filter = PythonFilter(ignore_paths=None)
@@ -43,21 +44,21 @@ class Master:
         match self.options["component"]:
             case "all":
                 self.proc_targets = {
-                    "event-consumer": start_event_consumer,
-                    "gunicorn": start_gunicorn,
+                    "event-consumer": start_event_consumer(options=self.options, settings=self.settings),
+                    "gunicorn": start_gunicorn(options=self.options, settings=self.settings),
                 }
             case "api":
                 self.proc_targets = {
-                    "gunicorn": start_gunicorn,
+                    "gunicorn": start_gunicorn(options = self.options, settings=self.settings),
                 }
             case "consumer":
                 self.proc_targets = {
-                    "event-consumer": start_event_consumer,
+                    "event-consumer": start_event_consumer(options = self.options, settings=self.settings),
                 }
             case _:
                 self.proc_targets = {
-                    "event-consumer": start_event_consumer,
-                    "gunicorn": start_gunicorn,
+                    "event-consumer": start_event_consumer(options = self.options, settings=self.settings),
+                    "gunicorn": start_gunicorn(options = self.options, settings=self.settings),
                 }
 
     def setup_signals_handler(self):

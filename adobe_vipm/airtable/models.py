@@ -361,7 +361,10 @@ def get_transfer_by_authorization_membership_or_customer(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
             OR(
-                EQUAL(LOWER(FIELD("membership_id")), LOWER(STR_VALUE(membership_or_customer_id))),
+                EQUAL(
+                    LOWER(FIELD("membership_id")),
+                    LOWER(STR_VALUE(membership_or_customer_id)),
+                ),
                 EQUAL(FIELD("customer_id"), STR_VALUE(membership_or_customer_id)),
             ),
             NOT_EQUAL(FIELD("status"), STR_VALUE(STATUS_DUPLICATED)),

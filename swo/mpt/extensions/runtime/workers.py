@@ -2,7 +2,7 @@ from django.core.management import call_command
 from django.core.wsgi import get_wsgi_application
 from gunicorn.app.base import BaseApplication
 
-from swo.mpt.extensions.runtime.initializer import initialize
+from mpt_extension_sdk.runtime.initializer import initialize
 
 
 class ExtensionWebApplication(BaseApplication):
@@ -24,13 +24,13 @@ class ExtensionWebApplication(BaseApplication):
         return self.application
 
 
-def start_event_consumer(options):
-    initialize(options)
+def start_event_consumer(options, settings):
+    initialize(options, settings)
     call_command("consume_events")
 
 
-def start_gunicorn(options):
-    initialize(options)
+def start_gunicorn(options, settings):
+    initialize(options, settings)
 
     logging_config = {
         "version": 1,

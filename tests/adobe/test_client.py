@@ -2554,22 +2554,14 @@ def test_get_customer_deployments(
             {
                 "deploymentId": "deployment-id-1",
                 "status": "1000",
-                "companyProfile": {
-                    "address": {
-                        "country": "DE"
-                    }
-                }
+                "companyProfile": {"address": {"country": "DE"}},
             },
             {
                 "deploymentId": "deployment-id-2",
                 "status": "1004",
-                "companyProfile": {
-                    "address": {
-                        "country": "DE"
-                    }
-                }
-            }
-        ]
+                "companyProfile": {"address": {"country": "DE"}},
+            },
+        ],
     }
 
     requests_mocker.get(
@@ -2597,8 +2589,8 @@ def test_get_customer_deployments(
 
 
 def test_get_customer_deployments_active_status(
-        requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
-    ):
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
     """
     Tests the retrieval of customer deployments filtered by status.
     """
@@ -2610,34 +2602,22 @@ def test_get_customer_deployments_active_status(
     client, authorization, api_token = adobe_client_factory()
 
     deployments_response = {
-       "items": [
+        "items": [
             {
                 "deploymentId": "deployment-1",
                 "status": "1000",
-                "companyProfile": {
-                    "address": {
-                        "country": "DE"
-                    }
-                }
+                "companyProfile": {"address": {"country": "DE"}},
             },
             {
                 "deploymentId": "deployment-2",
                 "status": "1004",
-                "companyProfile": {
-                    "address": {
-                        "country": "US"
-                    }
-                }
+                "companyProfile": {"address": {"country": "US"}},
             },
             {
                 "deploymentId": "deployment-3",
                 "status": "1000",
-                "companyProfile": {
-                    "address": {
-                        "country": "ES"
-                    }
-                }
-            }
+                "companyProfile": {"address": {"country": "ES"}},
+            },
         ]
     }
 
@@ -2645,21 +2625,13 @@ def test_get_customer_deployments_active_status(
         {
             "deploymentId": "deployment-1",
             "status": "1000",
-            "companyProfile": {
-                "address": {
-                    "country": "DE"
-                }
-            }
+            "companyProfile": {"address": {"country": "DE"}},
         },
         {
             "deploymentId": "deployment-3",
             "status": "1000",
-            "companyProfile": {
-                "address": {
-                    "country": "ES"
-                }
-            }
-        }
+            "companyProfile": {"address": {"country": "ES"}},
+        },
     ]
 
     requests_mocker.get(

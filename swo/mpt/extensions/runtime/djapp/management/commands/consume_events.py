@@ -1,9 +1,9 @@
 import signal
 from threading import Event
-
+from django.conf import settings
 from django.core.management.base import BaseCommand
-from swo.mpt.extensions.runtime.events.dispatcher import Dispatcher
-from swo.mpt.extensions.runtime.events.producers import OrderEventProducer
+from mpt_extension_sdk.runtime.events.dispatcher import Dispatcher
+from mpt_extension_sdk.runtime.events.producers import OrderEventProducer
 
 
 class Command(BaseCommand):
@@ -24,7 +24,7 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
         for producer_cls in self.producer_classes:
-            producer = producer_cls(self.dispatcher)
+            producer = producer_cls(self, settings)
             self.producers.append(producer)
             producer.start()
 

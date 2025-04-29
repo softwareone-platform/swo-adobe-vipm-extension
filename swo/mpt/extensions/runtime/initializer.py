@@ -17,12 +17,11 @@ JSON_EXT_VARIABLES = {
 }
 
 
-def initialize(options):
+def initialize(options, settings):
     rich.reconfigure(theme=Theme({"repr.mpt_id": "bold light_salmon3"}))
 
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "swo.mpt.extensions.runtime.djapp.conf.default")
     import django
-    from django.conf import settings
 
     root_logging_handler = "rich" if options.get("color") else "console"
     if settings.USE_APPLICATIONINSIGHTS:

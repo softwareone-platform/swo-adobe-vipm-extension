@@ -11,14 +11,14 @@ from opentelemetry import trace
 def django(ctx, management_args):
     "Execute Django subcommands."
     from swo.mpt.extensions.runtime.initializer import initialize
+    from django.conf import settings
 
     initialize({
         "group": "swo.mpt.ext",
         "name": "app_config",
         "django_settings_module": "swo.mpt.extensions.runtime.djapp.conf.default",
-    })
+    }, settings)
     from django.core.management import execute_from_command_line
-    from django.conf import settings
 
     if settings.USE_APPLICATIONINSIGHTS:
         tracer = trace.get_tracer(__name__)
