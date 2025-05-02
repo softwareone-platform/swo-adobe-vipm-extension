@@ -19,6 +19,7 @@ from adobe_vipm.flows.constants import (
     NEW_CUSTOMER_PARAMETERS,
     OPTIONAL_CUSTOMER_ORDER_PARAMS,
     ORDER_TYPE_CHANGE,
+    ORDER_TYPE_CONFIGURATION,
     ORDER_TYPE_PURCHASE,
     ORDER_TYPE_TERMINATION,
     PARAM_3YC,
@@ -126,6 +127,9 @@ def is_change_order(order):
 
 def is_termination_order(order):
     return order["type"] == ORDER_TYPE_TERMINATION
+
+def is_configuration_order(order):
+    return order["type"] == ORDER_TYPE_CONFIGURATION
 
 
 def get_adobe_customer_id(source):
@@ -700,6 +704,34 @@ def notify_missing_prices(
         message += f"  - {sku}\n"
 
     send_exception("Missing prices detected", message)
+
+
+def notify_not_updated_subscriptions(order_id, error_message, updated_subscriptions, product_id):
+    """
+    Notifies about SKUs with missing prices in the agreement.
+    Args:
+        agreement_id (str): The agreement ID
+        missing_skus (list): List of SKUs without prices
+        product_id (str): The product ID
+        currency (str): The currency code
+        commitment_date (str, optional): The 3YC commitment date if applicable
+    """
+    message = (
+        f"{error_message}\n\n"
+        f"The order **{order_id}**\n\n"
+        f"has failed changing the auto-renewal status\n\n "
+        f"- Product ID: {product_id}\n\n"
+    )
+
+    if updated_subscriptions:
+        message += "The following subscriptions has been updated and rolled back:\n"
+        message += "".join(f"  - {sub['subscription_vendor_id']}\n"
+                           for sub in updated_subscriptions)
+
+    send_exception(
+        f"Error updating the subscriptions in configuration order: {order_id}",
+        message
+    )
 
 
 def get_notifications_recipient(order):
