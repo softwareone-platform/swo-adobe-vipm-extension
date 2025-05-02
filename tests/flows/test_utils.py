@@ -15,6 +15,7 @@ from adobe_vipm.flows.utils import (
     is_transferring_item_expired,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
+    notify_not_updated_subscriptions,
     notify_unhandled_exception_in_teams,
     reset_order_error,
     set_order_error,
@@ -66,6 +67,55 @@ def test_notify_missing_prices(mocker):
         "- Product ID: 65504575CA01A12\n"
         "- Currency: USD\n"
         "- SKUs:\n  - 65504578CA01A12\n",
+    )
+
+def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    notify_not_updated_subscriptions(
+        order_id="ORD-1234",
+        error_message="Some error occurred",
+        updated_subscriptions=[],
+        product_id="PROD-5678"
+    )
+
+    expected_message = (
+        "Some error occurred\n\n"
+        "The order **ORD-1234**\n\n"
+        "has failed changing the auto-renewal status\n\n "
+        "- Product ID: PROD-5678\n\n"
+    )
+
+    mocked_send_exc.assert_called_once_with(
+        "Error updating the subscriptions in configuration order: ORD-1234",
+        expected_message
+    )
+
+
+def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    notify_not_updated_subscriptions(
+        order_id="ORD-1234",
+        error_message="Some error occurred",
+        updated_subscriptions=[
+            {"subscription_vendor_id": "SUB-1"},
+            {"subscription_vendor_id": "SUB-2"},
+        ],
+        product_id="PROD-5678"
+    )
+
+    expected_message = (
+        "Some error occurred\n\n"
+        "The order **ORD-1234**\n\n"
+        "has failed changing the auto-renewal status\n\n "
+        "- Product ID: PROD-5678\n\n"
+        "The following subscriptions has been updated and rolled back:\n"
+        "  - SUB-1\n"
+        "  - SUB-2\n"
+    )
+
+    mocked_send_exc.assert_called_once_with(
+        "Error updating the subscriptions in configuration order: ORD-1234",
+        expected_message
     )
 
 
