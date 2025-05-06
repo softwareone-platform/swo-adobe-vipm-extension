@@ -41,8 +41,8 @@ from adobe_vipm.flows.fulfillment.shared import (
     UpdatePrices,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
-    send_email_notification,
-    send_gc_email_notification,
+    send_gc_mpt_notification,
+    send_mpt_notification,
     set_customer_coterm_date_if_null,
     start_processing_attempt,
 )
@@ -51,10 +51,14 @@ from adobe_vipm.flows.utils import (
     get_coterm_date,
     get_due_date,
     get_next_sync,
-    get_notifications_recipient,
     set_coterm_date,
     set_next_sync,
 )
+
+
+@pytest.fixture(autouse=True)
+def mocked_send_mpt_notification(mocker):
+    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification")
 
 
 @pytest.mark.parametrize(
@@ -78,10 +82,7 @@ from adobe_vipm.flows.utils import (
         ),
     ],
 )
-def test_send_email_notification(mocker, settings, order_factory, status, subject):
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "1",
-    }
+def test_send_mpt_notification(mocker, settings, order_factory, status, subject):
     mocked_mpt_client = mocker.MagicMock()
 
     mocked_get_rendered_template = mocker.patch(
@@ -89,15 +90,16 @@ def test_send_email_notification(mocker, settings, order_factory, status, subjec
         return_value="rendered-template",
     )
 
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
+    mocked_mpt_notify = mocker.patch("adobe_vipm.flows.fulfillment.shared.mpt_notify")
 
     order = order_factory(order_id="ORD-1234", status=status)
 
-    send_email_notification(mocked_mpt_client, order)
+    send_mpt_notification(mocked_mpt_client, order)
     mocked_get_rendered_template.assert_called_once_with(mocked_mpt_client, order["id"])
 
-    mocked_send_email.assert_called_once_with(
-        [get_notifications_recipient(order)],
+    mocked_mpt_notify.assert_called_once_with(
+        order["agreement"]["licensee"]["account"]["id"],
+        order["agreement"]["buyer"]["id"],
         subject,
         "email",
         {
@@ -107,36 +109,6 @@ def test_send_email_notification(mocker, settings, order_factory, status, subjec
             "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         },
     )
-
-
-def test_send_email_notification_no_recipient(mocker, settings, order_factory, caplog):
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "1",
-    }
-    mocked_mpt_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_notifications_recipient",
-        return_value=None,
-    )
-
-    mocked_get_rendered_template = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
-    )
-
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
-
-    order = order_factory(order_id="ORD-1234")
-
-    with caplog.at_level(logging.WARNING):
-        send_email_notification(mocked_mpt_client, order)
-
-    assert (
-        "Cannot send email notifications "
-        f"for order {order['id']}: no recipient found"
-    ) in caplog.text
-
-    mocked_get_rendered_template.assert_not_called()
-    mocked_send_email.assert_not_called()
 
 
 @freeze_time("2025-01-01")
@@ -149,8 +121,8 @@ def test_start_processing_attempt_first_attempt(
             due_date="2025-01-31",
         ),
     )
-    mocked_send = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_email_notification"
+    mocked_send_notification = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
     )
     mocked_update = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
@@ -161,7 +133,7 @@ def test_start_processing_attempt_first_attempt(
 
     start_processing_attempt(mocked_client, order)
 
-    mocked_send.assert_called_once_with(mocked_client, updated_order)
+    mocked_send_notification.assert_called_once_with(mocked_client, updated_order)
     mocked_update.assert_called_once_with(
         mocked_client,
         updated_order["id"],
@@ -173,8 +145,8 @@ def test_start_processing_attempt_first_attempt(
 def test_start_processing_attempt_other_attempts(
     mocker, order_factory, fulfillment_parameters_factory
 ):
-    mocked_send = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_email_notification"
+    mocked_send_notification = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
     )
 
     mocked_client = mocker.MagicMock()
@@ -187,7 +159,7 @@ def test_start_processing_attempt_other_attempts(
 
     start_processing_attempt(mocked_client, order)
 
-    mocked_send.assert_not_called()
+    mocked_send_notification.assert_not_called()
 
 
 def test_set_customer_coterm_date_if_null(
@@ -368,8 +340,8 @@ def test_start_order_processing_step(mocker, order_factory):
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
-    mocked_send_email = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_email_notification",
+    mocked_send_notification = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification",
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -393,7 +365,7 @@ def test_start_order_processing_step(mocker, order_factory):
         context.order["id"],
         template={"id": "TPL-1234"},
     )
-    mocked_send_email.assert_called_once_with(mocked_client, context.order)
+    mocked_send_notification.assert_called_once_with(mocked_client, context.order)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -413,8 +385,8 @@ def test_set_processing_template_step_already_set_not_first_attempt(
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
-    mocked_send_email = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_email_notification",
+    mocked_send_notification = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification",
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -434,7 +406,7 @@ def test_set_processing_template_step_already_set_not_first_attempt(
         "my template",
     )
     mocked_update_order.assert_not_called()
-    mocked_send_email.assert_not_called()
+    mocked_send_notification.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -2089,20 +2061,15 @@ def test_get_preview_order_step_adobe_error(
     ],
 )
 def test_send_gc_email_notification(mocker, settings, order_factory, status, subject):
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "1",
-        "GC_EMAIL_NOTIFICATIONS_RECIPIENT": "test@mail.com,test1@mail.com",
-    }
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
+    mock_mpt_notify = mocker.patch("adobe_vipm.flows.fulfillment.shared.mpt_notify")
 
     order = order_factory(order_id="ORD-1234", status=status)
 
-    send_gc_email_notification(order, ["deployment 1"])
+    send_gc_mpt_notification(order, ["deployment 1"])
 
-    mocked_send_email.assert_called_once_with(
-        settings.EXTENSION_CONFIG.get("GC_EMAIL_NOTIFICATIONS_RECIPIENT", "").split(
-            ","
-        ),
+    mock_mpt_notify.assert_called_once_with(
+        order["agreement"]["licensee"]["account"]["id"],
+        order["agreement"]["buyer"]["id"],
         subject,
         "email",
         {
@@ -2116,28 +2083,3 @@ def test_send_gc_email_notification(mocker, settings, order_factory, status, sub
             "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         },
     )
-
-
-@pytest.mark.parametrize(
-    ("status", "subject"),
-    [
-        (
-            "Processing",
-            "This order need your attention ORD-1234 for A buyer",
-        )
-    ],
-)
-def test_send_gc_email_notification_not_recipient(
-    mocker, settings, order_factory, status, subject
-):
-    settings.EXTENSION_CONFIG = {
-        "EMAIL_NOTIFICATIONS_ENABLED": "1",
-        "GC_EMAIL_NOTIFICATIONS_RECIPIENT": "",
-    }
-    mocked_send_email = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_email")
-
-    order = order_factory(order_id="ORD-1234", status=status)
-
-    send_gc_email_notification(order, ["deployment 1"])
-
-    mocked_send_email.assert_not_called()
