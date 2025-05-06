@@ -53,6 +53,18 @@ from adobe_vipm.flows.utils import (
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
+@pytest.fixture(autouse=True)
+def mocked_send_mpt_notification(mocker):
+    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification")
+
+
+@pytest.fixture(autouse=True)
+def send_gc_mpt_notification(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.send_gc_mpt_notification"
+    )
+
+
 @freeze_time("2024-01-01")
 def test_transfer(
     mocker,

@@ -65,7 +65,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
     save_next_sync_and_coterm_dates,
-    send_gc_email_notification,
+    send_gc_mpt_notification,
     switch_order_to_completed,
     switch_order_to_failed,
     switch_order_to_query,
@@ -1001,7 +1001,7 @@ def _manage_order_with_deployment_id(
     logger.warning(
         "Order contains items with deployment ID, keep in pending to be reviewed"
     )
-    send_gc_email_notification(order, items_with_deployment)
+    send_gc_mpt_notification(order, items_with_deployment)
     if gc_main_agreement:
         gc_main_agreement.status = STATUS_GC_ERROR
         gc_main_agreement.error_description = "Order contains items with deployment ID"
