@@ -15,6 +15,8 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
+    ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
     PARAM_3YC_COMMITMENT_REQUEST_STATUS,
     PARAM_3YC_CONSUMABLES,
@@ -218,9 +220,7 @@ def test_validate_market_segment_eligibility_step_status_eligible(
     step(mocked_client, context, mocked_next_step)
 
     mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
-        order,
-        f"The agreement is not eligible for market segment {segment}.",
+        mocked_client, order, ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(segment=segment)
     )
 
     mocked_next_step.assert_not_called()
@@ -531,7 +531,9 @@ def test_create_customer_step_handle_error_unexpected_error(
     step.handle_error(mocked_client, context, error)
 
     mocked_switch_to_failed.assert_called_once_with(
-        mocked_client, context.order, str(error)
+        mocked_client,
+        context.order,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
     )
 
 

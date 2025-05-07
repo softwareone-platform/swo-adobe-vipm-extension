@@ -8,9 +8,13 @@ import itertools
 import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import STATUS_INVALID_RENEWAL_STATE
+from adobe_vipm.adobe.constants import (
+    STATUS_INVALID_RENEWAL_STATE,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
+    ERR_INVALID_RENEWAL_STATE,
+    ERR_NO_RETURABLE_ERRORS_FOUND,
     TEMPLATE_NAME_CHANGE,
 )
 from adobe_vipm.flows.context import Context
@@ -113,16 +117,16 @@ class ValidateReturnableOrders(Step):
             non_returnable_skus = [
                 k for k, v in context.adobe_returnable_orders.items() if v is None
             ]
-            reason = (
-                "No Adobe orders that match the desired quantity delta have been found for the "
-                f"following SKUs: {', '.join(non_returnable_skus)}"
+            error = ERR_NO_RETURABLE_ERRORS_FOUND.to_dict(
+                non_returnable_skus=", ".join(non_returnable_skus),
             )
+
             switch_order_to_failed(
                 client,
                 context.order,
-                reason,
+                error,
             )
-            logger.info(f"{context}: failed due to {reason}")
+            logger.info(f"{context}: failed due to {error['message']}")
             return
 
         next_step(client, context)
@@ -173,7 +177,7 @@ class UpdateRenewalQuantities(Step):
                         switch_order_to_failed(
                             client,
                             context.order,
-                            e.message,
+                            ERR_INVALID_RENEWAL_STATE.to_dict(error=e.message),
                         )
                     return
         next_step(client, context)

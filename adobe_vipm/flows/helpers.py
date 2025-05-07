@@ -244,7 +244,7 @@ class ValidateDownsizes3YC:
             switch_order_to_failed(
                 client,
                 context.order,
-                error,
+                ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(error=error),
             )
 
     @staticmethod

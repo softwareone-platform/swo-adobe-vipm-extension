@@ -8,6 +8,7 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_DOWNSIZE_MINIMUM_3YC_LICENSES,
+    ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
@@ -244,7 +245,7 @@ def test_validate_downsizes_step_invalid_quantity(
         context.adobe_customer["cotermDate"],
     )
     assert context.order["error"] == {
-        "id": "VIPMV013",
+        "id": "VIPM0019",
         "message": (
             "Could not find suitable returnable orders for all items.\nCannot reduce item "
             "`Awesome product` quantity by 9. Please reduce the quantity "
@@ -364,7 +365,7 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
         context.adobe_customer["cotermDate"],
     )
     assert context.order["error"] == {
-        "id": "VIPMV013",
+        "id": "VIPM0019",
         "message": (
             "Could not find suitable returnable orders for all items.\nCannot reduce item "
             "`Awesome product` quantity by 9 and there is only one returnable order which would "
@@ -553,9 +554,10 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
 
     step = ValidateDownsizes3YC(True)
     step(mocked_client, context, mocked_next_step)
-    assert context.order["error"][
-        "message"
-    ] == ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37)
+    error = ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(
+        error=ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37),
+    )
+    assert context.order["error"] == error
     mocked_next_step.assert_not_called()
 
 

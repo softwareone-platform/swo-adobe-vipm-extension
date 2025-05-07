@@ -15,6 +15,12 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
+    ERR_DUE_DATE_REACHED,
+    ERR_DUPLICATED_ITEMS,
+    ERR_EXISTING_ITEMS,
+    ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
+    ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     PARAM_DUE_DATE,
@@ -298,7 +304,7 @@ def test_increment_attempts_counter_step_max_reached(
     mocked_fail.assert_called_once_with(
         mocked_client,
         context.order,
-        "Due date 2024-06-01 for order processing is reached.",
+        ERR_DUE_DATE_REACHED.to_dict(due_date="2024-06-01"),
     )
     mocked_next_step.assert_not_called()
 
@@ -1220,7 +1226,9 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        ORDER_STATUS_DESCRIPTION[processing_status],
+        ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS.to_dict(
+            description=ORDER_STATUS_DESCRIPTION[processing_status],
+        ),
     )
     mocked_adobe_client.create_preview_order.assert_not_called()
     mocked_adobe_client.create_new_order.assert_not_called()
@@ -1283,7 +1291,7 @@ def test_submit_new_order_step_order_created_unexpected_status(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        "Unexpected status (9999) received from Adobe.",
+        ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status="9999"),
     )
     mocked_adobe_client.create_preview_order.assert_not_called()
     mocked_adobe_client.create_new_order.assert_not_called()
@@ -1833,7 +1841,7 @@ def test_validate_duplicate_lines_step(
     mocked_fail.assert_called_once_with(
         mocked_client,
         context.order,
-        "The order cannot contain multiple lines for the same item: ITM-1234-1234-1234-0001.",
+        ERR_DUPLICATED_ITEMS.to_dict(duplicates="ITM-1234-1234-1234-0001"),
     )
     mocked_next_step.assert_not_called()
 
@@ -1862,7 +1870,9 @@ def test_validate_duplicate_lines_step_existing_item(
     mocked_fail.assert_called_once_with(
         mocked_client,
         context.order,
-        "The order cannot contain new lines for an existing item: ITM-1234-1234-1234-0010.",
+        ERR_EXISTING_ITEMS.to_dict(
+            duplicates="ITM-1234-1234-1234-0010",
+        ),
     )
     mocked_next_step.assert_not_called()
 
@@ -2062,7 +2072,9 @@ def test_get_preview_order_step_adobe_error(
     step(mocked_client, context, mocked_next_step)
 
     mocked_switch_to_failed.assert_called_once_with(
-        mocked_client, context.order, str(error)
+        mocked_client,
+        context.order,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
     )
     mocked_next_step.assert_not_called()
 

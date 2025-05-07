@@ -66,33 +66,33 @@ LAST_TWO_WEEKS_DAYS = 13
 
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
 
-ERR_ADOBE_COMPANY_NAME = ValidationError("VIPMA001", ADOBE_ERR_MSG)
-ERR_ADOBE_ADDRESS = ValidationError("VIPMA003", ADOBE_ERR_MSG)
-ERR_ADOBE_CONTACT = ValidationError("VIPMA004", ADOBE_ERR_MSG)
-ERR_ADOBE_MEMBERSHIP_ID = ValidationError("VIPMA005", ADOBE_ERR_MSG)
+ERR_ADOBE_COMPANY_NAME = ValidationError("VIPM0001", ADOBE_ERR_MSG)
+ERR_ADOBE_ADDRESS = ValidationError("VIPM0003", ADOBE_ERR_MSG)
+ERR_ADOBE_CONTACT = ValidationError("VIPM0004", ADOBE_ERR_MSG)
+ERR_ADOBE_MEMBERSHIP_ID = ValidationError("VIPM0005", ADOBE_ERR_MSG)
 ERR_ADOBE_MEMBERSHIP_ID_ITEM = ValidationError(
-    "VIPMA006",
+    "VIPM0006",
     "The provided `{title}` contains the item with SKU `{item_sku}` "
     "that is not part of the product definition.",
 )
 ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT = ValidationError(
-    "VIPMA007",
+    "VIPM0007",
     "Customer account is inactive or blocked. Adobe status code is `{status}`.",
 )
 
 ERR_COMPANY_NAME_LENGTH = ValidationError(
-    "VIPMV001",
+    "VIPM0008",
     "The provided `{title}` length must be between "
     f"{MINLEN_COMPANY_NAME} and {MAXLEN_COMPANY_NAME} characters.",
 )
 ERR_COMPANY_NAME_CHARS = ValidationError(
-    "VIPMV002",
+    "VIPM0009",
     "The provided `{title}` must only contain letters, digits, spaces, "
     "commas, periods, ampersands, hyphens, apostrophes, parentheses, "
     "forward slashes, backslashes, double quotes, and underscores.",
 )
 ERR_ADDRESS = ValidationError(
-    "VIPMV004",
+    "VIPM0010",
     "The `{title}` contains invalid components: {errors}.",
 )
 
@@ -116,7 +116,7 @@ ERR_CITY_LENGTH = (
     f"The provided `City` is too long, the maximum length is {MAXLEN_CITY} characters"
 )
 ERR_CONTACT = ValidationError(
-    "VIPMV005",
+    "VIPM0011",
     "The `{title}` contains invalid components: {errors}.",
 )
 ERR_FIRST_NAME_FORMAT = (
@@ -136,67 +136,46 @@ ERR_PHONE_NUMBER_LENGTH = (
 )
 
 ERR_VIPM_UNHANDLED_EXCEPTION = ValidationError(
-    "VIPM001",
-    "Order can't be processed. Failure reason: {error}",
+    "VIPM0012",
+    "Order can't be processed. Failure reason: {error}.",
 )
 
 ERR_3YC_QUANTITY_LICENSES = ValidationError(
-    "VIPMV006",
+    "VIPM0013",
     "The `{title}` must be an integer "
     f"number equal to {MINQTY_LICENSES} or greater.",
 )
 
 ERR_3YC_QUANTITY_CONSUMABLES = ValidationError(
-    "VIPMV007",
+    "VIPM0014",
     "The `{title}` must be an integer "
     f"number equal to {MINQTY_CONSUMABLES} or greater.",
 )
 
 ERR_3YC_NO_MINIMUMS = ValidationError(
-    "VIPMV008",
+    "VIPM0015",
     "To request 3-year commitment benefits you must fill at least one parameter between "
     "`{title_min_licenses}` and `{title_min_consumables}`.",
 )
 ERR_DUPLICATED_ITEMS = ValidationError(
-    "VIPMV009",
+    "VIPM0016",
     "The order cannot contain multiple lines for the same item: {duplicates}.",
 )
 ERR_EXISTING_ITEMS = ValidationError(
-    "VIPMV010", "The order cannot contain new lines for an existing item: {duplicates}."
+    "VIPM0017", "The order cannot contain new lines for an existing item: {duplicates}."
 )
 
-ERR_ADOBE_ERROR = ValidationError("VIPMV011", "Adobe returned an error: {details}.")
+ERR_ADOBE_ERROR = ValidationError("VIPM0011", "Adobe returned an error: {details}.")
 ERR_ADOBE_MEMBERSHIP_ID_EMPTY = ValidationError(
-    "VIPMV012", "No active items have been found for this membership."
+    "VIPM0018", "No active items have been found for this membership."
 )
 
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
 ERR_ADOBE_UNEXPECTED_ERROR = "Adobe returned an unexpected error"
 
 
-MPT_ORDER_STATUS_PROCESSING = "Processing"
-MPT_ORDER_STATUS_QUERYING = "Querying"
-MPT_ORDER_STATUS_COMPLETED = "Completed"
-
-TEMPLATE_NAME_TRANSFER = "Transfer"
-TEMPLATE_NAME_BULK_MIGRATE = "BulkMigrate"
-TEMPLATE_NAME_PURCHASE = "Purchase"
-TEMPLATE_NAME_CHANGE = "Change"
-TEMPLATE_NAME_DELAYED = "Delayed"
-TEMPLATE_NAME_TERMINATION = "Termination"
-
-MARKET_SEGMENT_COMMERCIAL = "COM"
-MARKET_SEGMENT_EDUCATION = "EDU"
-MARKET_SEGMENT_GOVERNMENT = "GOV"
-
-FAKE_CUSTOMERS_IDS = {
-    MARKET_SEGMENT_COMMERCIAL: "1234567890",
-    MARKET_SEGMENT_GOVERNMENT: "1234567890GOV",
-    MARKET_SEGMENT_EDUCATION: "1234567890EDU",
-}
-
 ERR_INVALID_DOWNSIZE_QUANTITY = ValidationError(
-    "VIPMV013", "Could not find suitable returnable orders for all items.\n{messages}"
+    "VIPM0019", "Could not find suitable returnable orders for all items.\n{messages}"
 )
 
 ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = (
@@ -235,16 +214,82 @@ ERR_DOWNSIZE_MINIMUM_3YC_GENERIC = (
 )
 
 ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION = ValidationError(
-    "VIPMV015",
+    "VIPM0020",
     "{error}",
 )
 
 ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
-    "VIPMV014",
+    "VIPM0021",
     "Do not add or remove items, and do not modify the quantities of any items. "
     "You may make these changes using a Change order once this order completes.",
+)
+
+ERR_NO_RETURABLE_ERRORS_FOUND = ValidationError(
+    "VIPM0022",
+    "No Adobe orders that match the desired quantity delta have been found for the "
+    "following SKUs: {non_returnable_skus}.",
+)
+
+ERR_INVALID_RENEWAL_STATE = ValidationError(
+    "VIPM0023", "Can't update renewal quantity. Adobe API error: {error}."
+)
+
+ERR_MARKET_SEGMENT_NOT_ELIGIBLE = ValidationError(
+    "VIPM0024", "The agreement is not eligible for market segment {segment}."
+)
+
+ERR_DUE_DATE_REACHED = ValidationError(
+    "VIPM0025",
+    "Due date {due_date} for order processing is reached.",
+)
+
+ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS = ValidationError(
+    "VIPM0026",
+    "Unrecoverable Adobe Order status: {description}",
+)
+
+ERR_UNEXPECTED_ADOBE_ERROR_STATUS = ValidationError(
+    "VIPM0027",
+    "Unexpected status ({status}) received from Adobe.",
+)
+
+ERR_ADOBE_TRANSFER_PREVIEW = ValidationError(
+    "VIPM0028",
+    "Adobe API transfer validation error. {error}.",
+)
+
+ERR_MEMBERSHIP_ITEMS_DONT_MATCH = ValidationError(
+    "VIPM0029",
+    "The items owned by the given membership don't match the order (sku or quantity): {lines}.",
+)
+
+ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED = ValidationError(
+    "VIPM0030",
+    "Membership has already been migrated.",
 )
 
 ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
     "No subscriptions found without deployment ID to be added to the main agreement",
 )
+
+
+MPT_ORDER_STATUS_PROCESSING = "Processing"
+MPT_ORDER_STATUS_QUERYING = "Querying"
+MPT_ORDER_STATUS_COMPLETED = "Completed"
+
+TEMPLATE_NAME_TRANSFER = "Transfer"
+TEMPLATE_NAME_BULK_MIGRATE = "BulkMigrate"
+TEMPLATE_NAME_PURCHASE = "Purchase"
+TEMPLATE_NAME_CHANGE = "Change"
+TEMPLATE_NAME_DELAYED = "Delayed"
+TEMPLATE_NAME_TERMINATION = "Termination"
+
+MARKET_SEGMENT_COMMERCIAL = "COM"
+MARKET_SEGMENT_EDUCATION = "EDU"
+MARKET_SEGMENT_GOVERNMENT = "GOV"
+
+FAKE_CUSTOMERS_IDS = {
+    MARKET_SEGMENT_COMMERCIAL: "1234567890",
+    MARKET_SEGMENT_GOVERNMENT: "1234567890GOV",
+    MARKET_SEGMENT_EDUCATION: "1234567890EDU",
+}

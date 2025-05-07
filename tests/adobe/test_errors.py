@@ -56,7 +56,10 @@ def test_wrap_http_error_504_error_code(mocker):
     def func():
         response = mocker.MagicMock()
         response.status_code = 504
-        response.json.return_value = {"error_code": "504001", "message": "Gateway Timeout"}
+        response.json.return_value = {
+            "error_code": "504001",
+            "message": "Gateway Timeout",
+        }
         raise HTTPError(response=response)
 
     wrapped_func = wrap_http_error(func)

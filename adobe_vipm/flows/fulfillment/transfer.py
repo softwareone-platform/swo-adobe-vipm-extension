@@ -40,7 +40,12 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_TRANSFER_PREVIEW,
+    ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
+    ERR_MEMBERSHIP_ITEMS_DONT_MATCH,
+    ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UPDATING_TRANSFER_ITEMS,
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
     PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
@@ -117,7 +122,11 @@ def _handle_transfer_preview_error(client, order, error):
         switch_order_to_query(client, order)
         return
 
-    switch_order_to_failed(client, order, str(error))
+    switch_order_to_failed(
+        client,
+        order,
+        ERR_ADOBE_TRANSFER_PREVIEW.to_dict(error=str(error)),
+    )
 
 
 def _check_transfer(mpt_client, order, membership_id):
@@ -161,12 +170,13 @@ def _check_transfer(mpt_client, order, membership_id):
         key=lambda i: i[0],
     )
     if adobe_lines != order_lines:
-        reason = (
-            "The items owned by the given membership don't "
-            f"match the order (sku or quantity): {','.join([line[0] for line in adobe_lines])}."
+        error = ERR_MEMBERSHIP_ITEMS_DONT_MATCH.to_dict(
+            lines=",".join([line[0] for line in adobe_lines]),
         )
-        switch_order_to_failed(mpt_client, order, reason)
-        logger.warning(f"Transfer Order {order['id']} has been failed: {reason}.")
+        switch_order_to_failed(mpt_client, order, error)
+        logger.warning(
+            f"Transfer Order {order['id']} has been failed: {error['message']}."
+        )
         return False
     return True
 
@@ -193,8 +203,11 @@ def _submit_transfer_order(mpt_client, order, membership_id):
             authorization_id, seller_id, order["id"], membership_id
         )
     except AdobeError as e:
-        switch_order_to_failed(mpt_client, order, str(e))
-        logger.warning(f"Transfer order {order['id']} has been failed: {str(e)}.")
+        error = ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(e))
+        switch_order_to_failed(mpt_client, order, error)
+        logger.warning(
+            f"Transfer order {order['id']} has been failed: {error['message']}."
+        )
         return None
 
     adobe_transfer_order_id = adobe_transfer_order["transferId"]
@@ -227,9 +240,9 @@ def _check_adobe_transfer_order_fulfilled(
         handle_retries(mpt_client, order, adobe_transfer_id)
         return
     elif adobe_order["status"] != STATUS_PROCESSED:
-        reason = f"Unexpected status ({adobe_order['status']}) received from Adobe."
-        switch_order_to_failed(mpt_client, order, reason)
-        logger.warning(f"Transfer {order['id']} has been failed: {reason}.")
+        error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status=adobe_order["status"])
+        switch_order_to_failed(mpt_client, order, error)
+        logger.warning(f"Transfer {order['id']} has been failed: {error['message']}.")
         return
     return adobe_order
 
@@ -256,7 +269,7 @@ def _fulfill_transfer_migrated(
     # If the order items has been updated, the validation order will fail
     if has_order_line_updated(order["lines"], adobe_items, "currentQuantity"):
         logger.error(ERR_UPDATING_TRANSFER_ITEMS.message)
-        switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS.message)
+        switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS.to_dict())
         return
 
     commitment_date = None
@@ -418,7 +431,9 @@ def _transfer_migrated(
 
     if transfer.status == STATUS_SYNCHRONIZED:
         switch_order_to_failed(
-            mpt_client, order, "Membership has already been migrated."
+            mpt_client,
+            order,
+            ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
         )
         return
 

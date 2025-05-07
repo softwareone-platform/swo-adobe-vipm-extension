@@ -2,6 +2,7 @@ import pytest
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
 from adobe_vipm.flows.constants import (
+    ERR_3YC_NO_MINIMUMS,
     ERR_3YC_QUANTITY_CONSUMABLES,
     ERR_3YC_QUANTITY_LICENSES,
     ERR_ADDRESS,
@@ -804,7 +805,11 @@ def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
     step.validate_3yc(context)
 
     assert context.validation_succeeded is False
-    assert context.order["error"]["id"] == "VIPMV008"
+    error = ERR_3YC_NO_MINIMUMS.to_dict(
+        title_min_licenses="3YCLicenses",
+        title_min_consumables="3YCConsumables",
+    )
+    assert context.order["error"] == error
 
 
 def test_update_prices_step(mocker, order_factory, adobe_order_factory):

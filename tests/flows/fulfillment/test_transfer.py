@@ -26,6 +26,10 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_TRANSFER_PREVIEW,
+    ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
+    ERR_MEMBERSHIP_ITEMS_DONT_MATCH,
+    ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UPDATING_TRANSFER_ITEMS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
@@ -569,12 +573,10 @@ def test_transfer_unexpected_status(
 
     fulfill_order(mocked_mpt_client, order)
 
-    reason = "Unexpected status (9999) received from Adobe."
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        reason,
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
+        ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status="9999"),
         parameters=order["parameters"],
     )
 
@@ -630,16 +632,10 @@ def test_transfer_items_mismatch(
         "a-membership-id",
     )
 
-    reason = (
-        "The items owned by the given membership don't match the order (sku or quantity): "
-        "99999999CA."
-    )
-
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        reason,
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
+        ERR_MEMBERSHIP_ITEMS_DONT_MATCH.to_dict(lines="99999999CA"),
         parameters=order["parameters"],
     )
 
@@ -855,8 +851,7 @@ def test_transfer_unrecoverable_status(
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        str(adobe_error),
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(adobe_error)),
+        ERR_ADOBE_TRANSFER_PREVIEW.to_dict(error=str(adobe_error)),
         parameters=order["parameters"],
     )
 
@@ -903,13 +898,10 @@ def test_create_transfer_fail(
 
     fulfill_order(mocked_mpt_client, order)
 
-    reason = "Unexpected error"
-
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        reason,
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error="Unexpected error"),
         parameters=order["parameters"],
     )
 
@@ -1216,8 +1208,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     mocked_fail_order.assert_called_once_with(
         m_client,
         order["id"],
-        ERR_UPDATING_TRANSFER_ITEMS.message,
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=ERR_UPDATING_TRANSFER_ITEMS.message),
+        ERR_UPDATING_TRANSFER_ITEMS.to_dict(),
         parameters=order["parameters"],
     )
 
@@ -1735,13 +1726,10 @@ def test_fulfill_transfer_order_migration_synchronized(
         membership_param["value"],
     )
 
-    reason = "Membership has already been migrated."
-
     mocked_fail_order.assert_called_once_with(
         m_client,
         order["id"],
-        reason,
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
+        ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
         parameters=order["parameters"],
     )
 

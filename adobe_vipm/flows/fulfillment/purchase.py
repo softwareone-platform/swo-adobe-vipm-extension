@@ -23,6 +23,8 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
+    ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
     PARAM_3YC_CONSUMABLES,
     PARAM_3YC_LICENSES,
@@ -106,7 +108,9 @@ class ValidateMarketSegmentEligibility(Step):
                 switch_order_to_failed(
                     client,
                     context.order,
-                    f"The agreement is not eligible for market segment {context.market_segment}.",
+                    ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(
+                        segment=context.market_segment
+                    ),
                 )
                 return
             if status == STATUS_MARKET_SEGMENT_PENDING:
@@ -145,7 +149,11 @@ class CreateCustomer(Step):
             STATUS_INVALID_FIELDS,
             STATUS_INVALID_MINIMUM_QUANTITY,
         ):
-            switch_order_to_failed(client, context.order, str(error))
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
+            )
             return
         if error.code == STATUS_INVALID_ADDRESS:
             param = get_ordering_parameter(context.order, PARAM_ADDRESS)
