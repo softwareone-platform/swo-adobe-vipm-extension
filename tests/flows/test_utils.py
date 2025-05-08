@@ -52,14 +52,11 @@ def test_notify_agreement_unhandled_exception_in_teams(mocker):
         "```exception-traceback```",
     )
 
+
 def test_notify_missing_prices(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
     notify_missing_prices(
-        "AGR-0000",
-        ["65504578CA01A12"],
-        "65504575CA01A12",
-        "USD",
-        None
+        "AGR-0000", ["65504578CA01A12"], "65504575CA01A12", "USD", None
     )
 
     mocked_send_exc.assert_called_once_with(
@@ -68,7 +65,7 @@ def test_notify_missing_prices(mocker):
         "The following SKUs don't have regular prices available:\n"
         "- Product ID: 65504575CA01A12\n"
         "- Currency: USD\n"
-        "- SKUs:\n  - 65504578CA01A12\n"
+        "- SKUs:\n  - 65504578CA01A12\n",
     )
 
 

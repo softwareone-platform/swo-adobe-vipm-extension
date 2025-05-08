@@ -4,6 +4,8 @@ from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
+    ERR_DUPLICATED_ITEMS,
+    ERR_EXISTING_ITEMS,
     FAKE_CUSTOMERS_IDS,
     MARKET_SEGMENT_COMMERCIAL,
     MARKET_SEGMENT_EDUCATION,
@@ -31,7 +33,8 @@ def test_validate_duplicate_lines_step_duplicates(mocker, order_factory, lines_f
     step(mocked_client, context, mocked_next_step)
 
     assert context.validation_succeeded is False
-    assert context.order["error"]["id"] == "VIPMV009"
+    error = ERR_DUPLICATED_ITEMS.to_dict(duplicates="ITM-1234-1234-1234-0001")
+    assert context.order["error"] == error
     mocked_next_step.assert_not_called()
 
 
@@ -48,7 +51,8 @@ def test_validate_duplicate_lines_step_existing_lines(
     step(mocked_client, context, mocked_next_step)
 
     assert context.validation_succeeded is False
-    assert context.order["error"]["id"] == "VIPMV010"
+    error = ERR_EXISTING_ITEMS.to_dict(duplicates="ITM-1234-1234-1234-0010")
+    assert context.order["error"] == error
     mocked_next_step.assert_not_called()
 
 

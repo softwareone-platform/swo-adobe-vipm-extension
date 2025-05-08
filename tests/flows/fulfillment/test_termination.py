@@ -1,6 +1,9 @@
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.flows.constants import TEMPLATE_NAME_TERMINATION
+from adobe_vipm.flows.constants import (
+    ERR_INVALID_RENEWAL_STATE,
+    TEMPLATE_NAME_TERMINATION,
+)
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
@@ -315,7 +318,9 @@ def test_switch_autorenewal_off_invalid_renwal_state(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        "Update could not be performed because it would create an invalid renewal state",
+        ERR_INVALID_RENEWAL_STATE.to_dict(
+            error="Update could not be performed because it would create an invalid renewal state",
+        ),
     )
 
 

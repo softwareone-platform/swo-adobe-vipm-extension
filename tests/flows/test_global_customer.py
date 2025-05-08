@@ -436,7 +436,9 @@ def test_check_gc_agreement_deployments_create_listing(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mocker.MagicMock()
+    )
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory()]
     }
@@ -656,7 +658,9 @@ def test_check_gc_agreement_deployments_create_agreement_error(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mocker.MagicMock()
+    )
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory()]
     }
@@ -750,7 +754,9 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mocker.MagicMock()
+    )
     mocked_adobe_client.get_subscriptions.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
@@ -838,7 +844,9 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mocker.MagicMock()
+    )
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(deployment_id="deployment_id"),
@@ -930,7 +938,9 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mocker.MagicMock()
+    )
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
@@ -1022,7 +1032,9 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mocker.MagicMock()
+    )
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
@@ -1107,7 +1119,9 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mocker.MagicMock()
+    )
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(

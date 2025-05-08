@@ -10,6 +10,9 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_DOWNSIZE_MINIMUM_3YC_LICENSES,
+    ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION,
+    ERR_INVALID_RENEWAL_STATE,
+    ERR_NO_RETURABLE_ERRORS_FOUND,
     TEMPLATE_NAME_CHANGE,
 )
 from adobe_vipm.flows.context import Context
@@ -375,8 +378,9 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        "No Adobe orders that match the desired quantity delta have been found for the "
-        "following SKUs: sku2",
+        ERR_NO_RETURABLE_ERRORS_FOUND.to_dict(
+            non_returnable_skus="sku2",
+        ),
     )
     mocked_next_step.assert_not_called()
 
@@ -455,7 +459,9 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(minimum_licenses=25),
+        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(
+            error=ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(minimum_licenses=25),
+        ),
     )
     mocked_next_step.assert_not_called()
 
@@ -530,7 +536,9 @@ def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37),
+        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(
+            error=ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37),
+        ),
     )
     mocked_next_step.assert_not_called()
 
@@ -601,13 +609,14 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
 
     step = ValidateDownsizes3YC()
     step(mocked_client, context, mocked_next_step)
+    error_msg = ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
+        minimum_consumables=37, minimum_licenses=20
+    )
 
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
-            minimum_consumables=37, minimum_licenses=20
-        ),
+        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(error=error_msg),
     )
     mocked_next_step.assert_not_called()
 
@@ -681,7 +690,9 @@ def test_validate_downsize_3yc_orders_step_error_item_not_found(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        "Item 999999999CA not found in Adobe subscriptions",
+        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(
+            error="Item 999999999CA not found in Adobe subscriptions",
+        ),
     )
     mocked_next_step.assert_not_called()
 
@@ -1012,7 +1023,9 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
-        "Update could not be performed because it would create an invalid renewal state",
+        ERR_INVALID_RENEWAL_STATE.to_dict(
+            error="Update could not be performed because it would create an invalid renewal state",
+        ),
     )
     mocked_next_step.assert_not_called()
 

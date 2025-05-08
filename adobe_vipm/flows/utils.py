@@ -669,7 +669,10 @@ def notify_agreement_unhandled_exception_in_teams(agreement_id, traceback):
         f"```{traceback}```",
     )
 
-def notify_missing_prices(agreement_id, missing_skus, product_id, currency, commitment_date=None):
+
+def notify_missing_prices(
+    agreement_id, missing_skus, product_id, currency, commitment_date=None
+):
     """
     Notifies about SKUs with missing prices in the agreement.
     Args:
@@ -696,10 +699,7 @@ def notify_missing_prices(agreement_id, missing_skus, product_id, currency, comm
     for sku in missing_skus:
         message += f"  - {sku}\n"
 
-    send_exception(
-        "Missing prices detected",
-        message
-    )
+    send_exception("Missing prices detected", message)
 
 
 def get_notifications_recipient(order):

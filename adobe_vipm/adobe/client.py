@@ -1075,7 +1075,9 @@ class AdobeClient:
             list[dict]: A list of active deployments.
         """
 
-        customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
+        customer_deployments = self.get_customer_deployments(
+            authorization_id, customer_id
+        )
 
         active_deployments = []
 
@@ -1085,7 +1087,9 @@ class AdobeClient:
 
         return active_deployments
 
+
 _ADOBE_CLIENT = None
+
 
 def get_adobe_client() -> AdobeClient:
     """

@@ -42,6 +42,11 @@ from adobe_vipm.airtable.models import (
     get_prices_for_skus,
 )
 from adobe_vipm.flows.constants import (
+    ERR_DUE_DATE_REACHED,
+    ERR_DUPLICATED_ITEMS,
+    ERR_EXISTING_ITEMS,
+    ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
+    ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
@@ -179,14 +184,14 @@ def save_adobe_order_id(client, order, order_id):
     return order
 
 
-def switch_order_to_failed(client, order, status_notes):
+def switch_order_to_failed(client, order, error):
     """
     Marks an MPT order as failed by resetting due date and updating its status.
 
     Args:
         client (MPTClient): An instance of the Marketplace platform client.
         order (dict): The MPT order to be marked as failed.
-        status_notes (str): Additional notes or context related to the failure.
+        error (dict): Additional notes or context related to the failure.
 
     Returns:
         dict: The updated order with the appropriate status and notes.
@@ -196,8 +201,7 @@ def switch_order_to_failed(client, order, status_notes):
     order = fail_order(
         client,
         order["id"],
-        status_notes,
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=status_notes),
+        error,
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
@@ -558,8 +562,11 @@ class SetupDueDate(Step):
             logger.info(
                 f"{context}: due date ({due_date_str}) is reached.",
             )
-            reason = f"Due date {due_date_str} for order processing is reached."
-            switch_order_to_failed(client, context.order, reason)
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_DUE_DATE_REACHED.to_dict(due_date=due_date_str),
+            )
             return
         update_order(client, context.order_id, parameters=context.order["parameters"])
         logger.info(f"{context}: due date is set to {due_date_str} successfully.")
@@ -740,7 +747,11 @@ class GetPreviewOrder(Step):
                     deployment_id=deployment_id,
                 )
             except AdobeError as e:
-                switch_order_to_failed(client, context.order, str(e))
+                switch_order_to_failed(
+                    client,
+                    context.order,
+                    ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(e)),
+                )
                 return
 
         next_step(client, context)
@@ -795,14 +806,26 @@ class SubmitNewOrder(Step):
             )
             return
         elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
-            reason = ORDER_STATUS_DESCRIPTION[adobe_order["status"]]
-            switch_order_to_failed(client, context.order, reason)
-            logger.warning(f"{context}: The adobe order has been failed {reason}.")
+            error = ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS.to_dict(
+                description=ORDER_STATUS_DESCRIPTION[adobe_order["status"]],
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                error,
+            )
+            logger.warning(
+                f"{context}: The adobe order has been failed {error['message']}."
+            )
             return
         elif adobe_order["status"] != STATUS_PROCESSED:
-            reason = f"Unexpected status ({adobe_order['status']}) received from Adobe."
-            switch_order_to_failed(client, context.order, reason)
-            logger.warning(f"{context}: the order has been failed due to {reason}.")
+            error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(
+                status=adobe_order["status"]
+            )
+            switch_order_to_failed(client, context.order, error)
+            logger.warning(
+                f"{context}: the order has been failed due to {error['message']}."
+            )
             return
         next_step(client, context)
 
@@ -999,10 +1022,7 @@ class ValidateDuplicateLines(Step):
             switch_order_to_failed(
                 client,
                 context.order,
-                (
-                    "The order cannot contain multiple lines "
-                    f"for the same item: {','.join(duplicates)}."
-                ),
+                ERR_DUPLICATED_ITEMS.to_dict(duplicates=",".join(duplicates)),
             )
             return
 
@@ -1023,7 +1043,7 @@ class ValidateDuplicateLines(Step):
             switch_order_to_failed(
                 client,
                 context.order,
-                f"The order cannot contain new lines for an existing item: {','.join(duplicates)}.",
+                ERR_EXISTING_ITEMS.to_dict(duplicates=",".join(duplicates)),
             )
             return
 

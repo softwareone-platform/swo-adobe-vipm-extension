@@ -9,7 +9,10 @@ import logging
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import STATUS_INVALID_RENEWAL_STATE
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.flows.constants import TEMPLATE_NAME_TERMINATION
+from adobe_vipm.flows.constants import (
+    ERR_INVALID_RENEWAL_STATE,
+    TEMPLATE_NAME_TERMINATION,
+)
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
@@ -97,7 +100,7 @@ class SwitchAutoRenewalOff(Step):
                         switch_order_to_failed(
                             client,
                             context.order,
-                            e.message,
+                            ERR_INVALID_RENEWAL_STATE.to_dict(error=e.message),
                         )
                     return
         next_step(client, context)

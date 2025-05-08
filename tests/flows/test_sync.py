@@ -1529,6 +1529,7 @@ def test_sync_agreement_notify_exception(
         == agreement["id"]
     )
 
+
 def test_sync_agreement_empty_discounts(
     mocker,
     agreement_factory,
@@ -1572,7 +1573,11 @@ def test_sync_agreement_empty_discounts(
 
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
-    assert "does not have discounts information" in mocked_notifier.call_args_list[0].args[1]
+    assert (
+        "does not have discounts information"
+        in mocked_notifier.call_args_list[0].args[1]
+    )
+
 
 def test_sync_agreement_prices_with_missing_prices(
     mocker,
@@ -1666,7 +1671,11 @@ def test_sync_agreement_prices_with_missing_prices(
 
     mocker.patch(
         "adobe_vipm.flows.sync.get_agreement_subscription",
-        side_effect=[mpt_subscription, another_mpt_subscription, terminated_mpt_subscription],
+        side_effect=[
+            mpt_subscription,
+            another_mpt_subscription,
+            terminated_mpt_subscription,
+        ],
     )
 
     mocker.patch(
@@ -1699,7 +1708,6 @@ def test_sync_agreement_prices_with_missing_prices(
     assert "Skipping subscription" in caplog.text
     assert "65304578CA01A12" in caplog.text
 
-
     mocked_notify_missing_prices.assert_called_once()
     call_args = mocked_notify_missing_prices.call_args[0]
     assert call_args[0] == agreement["id"]
@@ -1712,8 +1720,13 @@ def test_sync_agreement_prices_with_missing_prices(
     assert update_call[1]["lines"][0]["price"]["unitPP"] == 20.22
 
     assert mocked_update_agreement.called
-    assert "nextSync" in (
-        mocked_update_agreement.call_args[1]["parameters"]["fulfillment"][0]["externalId"]
+    assert (
+        "nextSync"
+        in (
+            mocked_update_agreement.call_args[1]["parameters"]["fulfillment"][0][
+                "externalId"
+            ]
+        )
     )
 
     assert len(mocked_adobe_client.get_subscription.call_args_list) == 3

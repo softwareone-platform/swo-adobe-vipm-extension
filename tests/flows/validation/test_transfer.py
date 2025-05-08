@@ -1617,7 +1617,7 @@ def test_validate_transfer_already_migrated_items_with_deployment(
 
     assert has_errors is True
     assert membership_param["error"] == {
-        "id": "VIPMA005",
+        "id": "VIPM0005",
         "message": "The `Membership Id` is not valid: ('No subscriptions found"
         " without deployment ID to be added to the main agreement',).",
     }

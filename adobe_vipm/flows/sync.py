@@ -102,8 +102,9 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
             )
 
             if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
-                logger.info(f"Skipping subscription {subscription['id']}. "
-                            f"It is terminated")
+                logger.info(
+                    f"Skipping subscription {subscription['id']}. It is terminated"
+                )
                 continue
 
             actual_sku = adobe_subscription["offerId"]
@@ -128,8 +129,10 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
 
         for subscription, adobe_subscription, actual_sku in to_update:
             if actual_sku not in prices:
-                logger.error(f"Skipping subscription {subscription['id']} "
-                             f"because the sku {actual_sku} is not in the prices")
+                logger.error(
+                    f"Skipping subscription {subscription['id']} "
+                    f"because the sku {actual_sku} is not in the prices"
+                )
                 missing_prices_skus.append(actual_sku)
                 continue
 
@@ -247,7 +250,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                 missing_prices_skus,
                 product_id,
                 currency,
-                commitment_start_date
+                commitment_start_date,
             )
 
         logger.info(f"agreement updated {agreement['id']}")
@@ -348,7 +351,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
             agreement["authorization"]["id"], customer_id
         )
 
-        if not customer.get("discounts",[]):
+        if not customer.get("discounts", []):
             raise CustomerDiscountsNotFoundError(
                 f"Customer {customer_id} does not have discounts information. "
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
