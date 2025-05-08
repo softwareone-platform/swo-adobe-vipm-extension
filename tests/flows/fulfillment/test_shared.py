@@ -101,7 +101,7 @@ def test_send_mpt_notification(mocker, settings, order_factory, status, subject)
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
-        "email",
+        "notification",
         {
             "order": order,
             "activation_template": "<p>rendered-template</p>\n",
@@ -2071,7 +2071,7 @@ def test_send_gc_email_notification(mocker, settings, order_factory, status, sub
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
-        "email",
+        "notification",
         {
             "order": order,
             "activation_template": "This order needs your attention because it contains"

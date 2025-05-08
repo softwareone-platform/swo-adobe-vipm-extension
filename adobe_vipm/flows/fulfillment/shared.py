@@ -503,7 +503,7 @@ def send_mpt_notification(client: MPTClient, order: dict) -> None:
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
-        "email",
+        "notification",
         context,
     )
 
@@ -1072,6 +1072,6 @@ def send_gc_mpt_notification(order: dict, items_with_deployment: list) -> None:
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
-        "email",
+        "notification",
         context,
     )
