@@ -19,6 +19,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_MEMBERSHIP_PROCESSING,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_UPDATING_TRANSFER_ITEMS,
     PARAM_MEMBERSHIP_ID,
@@ -1703,4 +1704,74 @@ def test_validate_transfer_with_one_line_items(
             adobe_preview_transfer["items"][1]["offerId"][:10],
             adobe_preview_transfer["items"][2]["offerId"][:10],
         ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_error_message"),
+    [
+        (
+            AdobeHttpError(404, "Not Found"),
+            "404 - Not Found"
+        ),
+        (
+            AdobeHttpError(500, "Internal Server Error"),
+            "500 - Internal Server Error"
+        ),
+        (
+            AdobeAPIError(400, {"code": "5112", "message": "Test error"}),
+            "5112 - Test error"
+        ),
+    ],
+)
+def test_validate_transfer_adobe_errors(
+    mocker,
+    order_factory,
+    transfer_order_parameters_factory,
+    error,
+    expected_error_message,
+):
+    """
+    Test validate_transfer when Adobe API returns different types of errors.
+
+    Args:
+        mocker: pytest-mock fixture
+        order_factory: Factory for creating test orders
+        transfer_order_parameters_factory: Factory for creating transfer parameters
+        adobe_api_error_factory: Factory for creating Adobe API errors
+        error: The error to be raised by the Adobe client
+        expected_error_message: The expected error message in the response
+    """
+    # Setup
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+    mocked_transfer = mocker.MagicMock()
+    mocked_transfer.customer_id = "customer-id"
+    mocked_transfer.membership_id = "test-membership-id"
+    mocked_transfer.status = "completed"
+
+    m_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock()
+
+    # Mock the transfer lookup
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+
+    # Mock Adobe client to raise the specified error
+    mocked_adobe_client.get_subscriptions.side_effect = error
+
+    # Execute
+    has_errors, validated_order = validate_transfer(
+        m_client, mocked_adobe_client, order
+    )
+
+    # Assert
+    assert has_errors is True
+    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+
+    assert param["error"] == ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
+        membership_id=mocked_transfer.membership_id,
+        error=expected_error_message,
     )
