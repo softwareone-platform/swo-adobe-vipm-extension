@@ -8,7 +8,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_3YC_COMMITTED,
     STATUS_TRANSFER_INACTIVE_ACCOUNT,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     STATUS_RUNNING,
@@ -23,6 +23,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_MEMBERSHIP_PROCESSING,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
     ERR_UPDATING_TRANSFER_ITEMS,
@@ -330,28 +331,105 @@ def validate_transfer(mpt_client, adobe_client, order):
     if not transfer:
         return validate_transfer_not_migrated(mpt_client, adobe_client, order)
 
-    if transfer.status == STATUS_RUNNING:
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    has_error, order = _validate_transfer_status(transfer, order)
+    if has_error:
+        return True, order
+
+    try:
+        subscriptions, adobe_transfer = _get_transfer_data(
+            adobe_client,
+            authorization_id,
+            transfer
+        )
+    except AdobeError as e:
         order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                title=param["name"], details="Migration in progress, retry later"
+            ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
+                membership_id=transfer.membership_id,
+                error=str(e),
             ),
         )
         return True, order
+
+    adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
+
+    has_error, order = _validate_inactive_account(adobe_transfer, order)
+    if has_error:
+        return True, order
+
+    subscriptions = _update_subscription_skus(subscriptions, adobe_transfer)
+    customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
+    commitment = get_3yc_commitment(customer)
+
+    has_error, order = _validate_empty_subscriptions(subscriptions, customer, order)
+    if has_error is not None:
+        return has_error, order
+
+    return add_lines_to_order(
+        mpt_client, order, subscriptions["items"], commitment, "currentQuantity", True
+    )
+
+
+def _validate_transfer_status(transfer, order):
+    """
+    Validates the status of a transfer and sets appropriate errors if needed.
+
+    Args:
+        transfer: The transfer object to validate
+        order: The order being validated
+
+    Returns:
+        tuple: (has_error, order) where has_error is True if validation failed
+    """
+    if transfer.status == STATUS_RUNNING:
+        return _set_membership_error(
+            order,
+            "Migration in progress, retry later"
+        )
 
     if transfer.status == STATUS_SYNCHRONIZED:
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
-        order = set_ordering_parameter_error(
+        return _set_membership_error(
             order,
-            PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                title=param["name"], details="Membership has already been migrated"
-            ),
+            "Membership has already been migrated"
         )
-        return True, order
 
+    return False, order
+
+def _set_membership_error(order, error_message):
+    """
+    Sets a membership error on the order.
+
+    Args:
+        order: The order to set the error on
+        error_message: The error message to set
+
+    Returns:
+        tuple: (True, order) indicating an error occurred
+    """
+    param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    order = set_ordering_parameter_error(
+        order,
+        PARAM_MEMBERSHIP_ID,
+        ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+            title=param["name"],
+            details=error_message
+        ),
+    )
+    return True, order
+
+def _get_transfer_data(adobe_client, authorization_id, transfer):
+    """
+    Gets subscription and transfer data from Adobe.
+
+    Args:
+        adobe_client: The Adobe client instance
+        authorization_id: The authorization ID
+        transfer: The transfer object
+
+    Returns:
+        tuple: (subscriptions, adobe_transfer) or raises AdobeError
+    """
     subscriptions = adobe_client.get_subscriptions(
         authorization_id,
         transfer.customer_id,
@@ -364,42 +442,67 @@ def validate_transfer(mpt_client, adobe_client, order):
         transfer.transfer_id,
     )
 
-    adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
+    return subscriptions, adobe_transfer
 
+def _validate_inactive_account(adobe_transfer, order):
+    """
+    Validates if the account is inactive and sets appropriate error if needed.
+
+    Args:
+        adobe_transfer: The Adobe transfer object
+        order: The order being validated
+
+    Returns:
+        tuple: (has_error, order) where has_error is True if account is inactive
+    """
     if adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
-        get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
                 status=adobe_transfer["status"],
-            ),
+            )
         )
         return True, order
+    return False, order
 
+def _update_subscription_skus(subscriptions, adobe_transfer):
+    """
+    Updates the SKUs of subscriptions based on transfer data.
+
+    Args:
+        subscriptions: The subscriptions to update
+        adobe_transfer: The Adobe transfer data
+
+    Returns:
+        list: Updated subscriptions
+    """
     for subscription in subscriptions["items"]:
         correct_sku = get_transfer_item_sku_by_subscription(
-            adobe_transfer, subscription["subscriptionId"]
+            adobe_transfer,
+            subscription["subscriptionId"]
         )
         subscription["offerId"] = correct_sku or subscription["offerId"]
-    customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
-    commitment = get_3yc_commitment(customer)
+    return subscriptions
 
-    # If there is no subscription to transfer, the order is valid
+def _validate_empty_subscriptions(subscriptions, customer, order):
+    """
+    Validates if there are no subscriptions to transfer.
+
+    Args:
+        subscriptions: The subscriptions to validate
+        customer: The customer data
+        order: The order being validated
+
+    Returns:
+        tuple: (has_error, order) where has_error is True if validation failed
+    """
     if len(subscriptions["items"]) == 0:
         if customer.get("globalSalesEnabled", False):
             logger.error(ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT)
-            param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
-            order = set_ordering_parameter_error(
+            return _set_membership_error(
                 order,
-                PARAM_MEMBERSHIP_ID,
-                ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                    title=param["name"], details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
-                ),
+                ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
             )
-            return True, order
         return False, order
-
-    return add_lines_to_order(
-        mpt_client, order, subscriptions["items"], commitment, "currentQuantity", True
-    )
+    return None, order
