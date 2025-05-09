@@ -2,17 +2,19 @@ import logging
 
 import pymsteams
 import pytest
+from mpt_extension_sdk.mpt_http.mpt import NotifyCategories
 
 from adobe_vipm.notifications import (
     Button,
     FactsSection,
     dateformat,
-    send_email,
+    mpt_notify,
     send_error,
     send_exception,
     send_notification,
     send_warning,
 )
+from adobe_vipm.shared import mpt_o_client
 
 
 def test_send_notification_full(mocker, settings):
@@ -134,81 +136,58 @@ def test_send_others(mocker, function, color, icon):
     )
 
 
-def test_send_email(mocker, settings):
-    settings.EXTENSION_CONFIG = {
-        "AWS_SES_CREDENTIALS": "access-key:secret-key",
-        "AWS_SES_REGION": "aws-region",
-        "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
-    }
+def test_mpt_notify(mocker):
     mocked_template = mocker.MagicMock()
     mocked_template.render.return_value = "rendered-template"
     mocked_jinja_env = mocker.MagicMock()
     mocked_jinja_env.get_template.return_value = mocked_template
     mocker.patch("adobe_vipm.notifications.env", mocked_jinja_env)
 
-    mocked_ses_client = mocker.MagicMock()
-    mocked_boto3 = mocker.patch(
-        "adobe_vipm.notifications.boto3.client",
-        return_value=mocked_ses_client,
-    )
-    send_email(
-        "customer@domain.com",
-        "email-subject",
-        "template_name",
-        {"test": "context"},
+    mocked_notify = mocker.patch("adobe_vipm.notifications.notify", autospec=True)
+    mpt_notify(
+        "account_id", "buyer_id", "email-subject", "template_name", {"test": "context"}
     )
 
     mocked_jinja_env.get_template.assert_called_once_with("template_name.html")
     mocked_template.render.assert_called_once_with({"test": "context"})
-    mocked_boto3.assert_called_once_with(
-        "ses",
-        aws_access_key_id="access-key",
-        aws_secret_access_key="secret-key",
-        region_name="aws-region",
-    )
-    mocked_ses_client.send_email.assert_called_once_with(
-        Source="mpt@domain.com",
-        Destination={
-            "ToAddresses": "customer@domain.com",
-        },
-        Message={
-            "Subject": {"Data": "email-subject", "Charset": "UTF-8"},
-            "Body": {
-                "Html": {"Data": "rendered-template", "Charset": "UTF-8"},
-            },
-        },
+    mocked_notify.assert_called_once_with(
+        mpt_o_client,
+        "NTC-0000-0006",
+        "account_id",
+        "buyer_id",
+        "email-subject",
+        "rendered-template",
     )
 
 
-def test_send_email_exception(mocker, settings, caplog):
-    settings.EXTENSION_CONFIG = {
-        "AWS_SES_CREDENTIALS": "access-key:secret-key",
-        "AWS_SES_REGION": "aws-region",
-        "EMAIL_NOTIFICATIONS_SENDER": "mpt@domain.com",
-    }
+def test_mpt_notify_exception(mocker, caplog):
     mocked_template = mocker.MagicMock()
     mocked_template.render.return_value = "rendered-template"
     mocked_jinja_env = mocker.MagicMock()
     mocked_jinja_env.get_template.return_value = mocked_template
     mocker.patch("adobe_vipm.notifications.env", mocked_jinja_env)
 
-    mocked_ses_client = mocker.MagicMock()
-    mocked_ses_client.send_email.side_effect = Exception("error")
     mocker.patch(
-        "adobe_vipm.notifications.boto3.client",
-        return_value=mocked_ses_client,
+        "adobe_vipm.notifications.notify",
+        autospec=True,
+        side_effect=Exception("error"),
     )
     with caplog.at_level(logging.ERROR):
-        send_email(
-            "customer@domain.com",
+        mpt_notify(
+            "account_id",
+            "buyer_id",
             "email-subject",
             "template_name",
             {"test": "context"},
         )
 
     assert (
-        "Cannot send notification email with "
-        "subject 'email-subject' to: customer@domain.com"
+        f"Cannot send MPT API notification:"
+        f" Category: '{NotifyCategories.ORDERS.value}',"
+        f" Account ID: 'account_id',"
+        f" Buyer ID: 'buyer_id',"
+        f" Subject: 'email-subject',"
+        f" Message: 'rendered-template'"
     ) in caplog.text
 
 

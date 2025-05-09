@@ -3,10 +3,12 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 
-import boto3
 import pymsteams
 from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from mpt_extension_sdk.mpt_http.mpt import NotifyCategories, notify
+
+from adobe_vipm.shared import mpt_o_client
 
 logger = logging.getLogger(__name__)
 
@@ -113,32 +115,50 @@ def send_exception(
     )
 
 
-def send_email(recipient, subject, template_name, context):
+def mpt_notify(
+    account_id: str, buyer_id: str, subject: str, template_name: str, context: dict
+) -> None:
+    """
+    Sends a notification through the MPT API using a specified template and context.
+
+    Parameters:
+    account_id: str
+        The identifier for the account associated with the notification.
+    buyer_id: str
+        The identifier for the buyer to whom the notification is sent.
+    subject: str
+        The subject of the notification email.
+    template_name: str
+        The name of the email template to be used, excluding the file extension.
+    context: dict
+        The context data to render the given email template.
+
+    Returns:
+    None
+
+    Raises:
+    Exception
+        Logs the exception if there is an issue during the notification process,
+        including the category, subject, and the rendered message.
+    """
     template = env.get_template(f"{template_name}.html")
-    rendered_email = template.render(context)
+    rendered_template = template.render(context)
 
-    access_key, secret_key = settings.EXTENSION_CONFIG["AWS_SES_CREDENTIALS"].split(":")
-
-    client = boto3.client(
-        "ses",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=settings.EXTENSION_CONFIG["AWS_SES_REGION"],
-    )
     try:
-        client.send_email(
-            Source=settings.EXTENSION_CONFIG["EMAIL_NOTIFICATIONS_SENDER"],
-            Destination={
-                "ToAddresses": recipient,
-            },
-            Message={
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {
-                    "Html": {"Data": rendered_email, "Charset": "UTF-8"},
-                },
-            },
+        notify(
+            mpt_o_client,
+            NotifyCategories.ORDERS.value,
+            account_id,
+            buyer_id,
+            subject,
+            rendered_template,
         )
     except Exception:
         logger.exception(
-            f"Cannot send notification email with subject '{subject}' to: {recipient}",
+            f"Cannot send MPT API notification:"
+            f" Category: '{NotifyCategories.ORDERS.value}',"
+            f" Account ID: '{account_id}',"
+            f" Buyer ID: '{buyer_id}',"
+            f" Subject: '{subject}',"
+            f" Message: '{rendered_template}'"
         )

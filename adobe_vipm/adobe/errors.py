@@ -1,4 +1,5 @@
 import json
+import logging
 from functools import wraps
 from typing import Callable, ParamSpec, TypeVar
 
@@ -6,6 +7,8 @@ from requests import HTTPError, JSONDecodeError
 
 Param = ParamSpec("Param")
 RetType = TypeVar("RetType")
+
+logger = logging.getLogger(__name__)
 
 
 class AdobeError(Exception):
@@ -45,8 +48,12 @@ class AdobeAPIError(AdobeHttpError):
         self.payload: dict = payload
         # 504 error response doesn't follow the expected format -
         # it uses "error_code" field instead of "code"
-        self.code: str = payload.get("code", payload.get("error_code"))
-        self.message: str = payload["message"]
+        self.code: str = (
+            payload.get("code") or payload.get("error_code") or payload.get("error")
+        )
+        self.message: str = (
+            payload.get("message") or payload.get("error_description") or str(payload)
+        )
         self.details: list = payload.get("additionalDetails", [])
 
     def __str__(self) -> str:
@@ -65,6 +72,7 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
         try:
             return func(*args, **kwargs)
         except HTTPError as e:
+            logger.error(e)
             try:
                 raise AdobeAPIError(e.response.status_code, e.response.json())
             except JSONDecodeError:
