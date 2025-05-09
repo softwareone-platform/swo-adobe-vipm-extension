@@ -788,6 +788,7 @@ def subscriptions_factory(lines_factory):
         start_date=None,
         commitment_date=None,
         lines=None,
+        auto_renew=True,
     ):
         start_date = (
             start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
@@ -813,6 +814,7 @@ def subscriptions_factory(lines_factory):
                 "lines": lines,
                 "startDate": start_date,
                 "commitmentDate": commitment_date,
+                "autoRenew": auto_renew,
             }
         ]
 

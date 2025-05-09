@@ -61,6 +61,8 @@ from adobe_vipm.flows.constants import (
     PARAM_CURRENT_QUANTITY,
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
+    TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
+    TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
     TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.pipeline import Step
@@ -546,6 +548,21 @@ def set_customer_coterm_date_if_null(client, adobe_client, order):
     update_order(client, order["id"], parameters=order["parameters"])
     return order
 
+def get_configuration_template_name(order):
+    """
+    Helper function to determine the template name based on auto renewal status.
+
+    Args:
+        order (dict): The order containing subscription information.
+
+    Returns:
+        str: The appropriate template name based on auto renewal status.
+    """
+    auto_renewal = order["subscriptions"][0]["autoRenew"]
+    return (TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE
+            if auto_renewal
+            else TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE)
+
 
 class SetupDueDate(Step):
     """
@@ -634,7 +651,6 @@ class StartOrderProcessing(Step):
         if not context.due_date:
             send_email_notification(client, context.order)
         next_step(client, context)
-
 
 class ValidateRenewalWindow(Step):
     """
@@ -1005,7 +1021,6 @@ class CompleteOrder(Step):
         send_email_notification(client, context.order)
         logger.info(f"{context}: order has been completed successfully")
         next_step(client, context)
-
 
 class SyncAgreement(Step):
     def __call__(self, client, context, next_step):
