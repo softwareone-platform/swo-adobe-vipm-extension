@@ -2,7 +2,7 @@ import logging
 
 import pymsteams
 import pytest
-from mpt_extension_sdk.constants import NotifyCategories
+from mpt_extension_sdk.mpt_http.mpt import NotifyCategories
 
 from adobe_vipm.notifications import (
     Button,

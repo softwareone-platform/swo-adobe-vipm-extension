@@ -6,8 +6,7 @@ from datetime import datetime
 import pymsteams
 from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from mpt_extension_sdk.constants import NotifyCategories
-from mpt_extension_sdk.mpt_http.mpt import notify
+from mpt_extension_sdk.mpt_http.mpt import NotifyCategories, notify
 
 from adobe_vipm.shared import mpt_o_client
 
