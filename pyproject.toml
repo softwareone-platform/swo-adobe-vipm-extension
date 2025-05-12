@@ -64,7 +64,7 @@ rich = "13.7.*"
 watchfiles = "0.21.*"
 
 [tool.poetry.scripts]
-swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
+swoext = 'mpt_extension_sdk.runtime.swoext:main' # Move to runtime when splitting
 
 
 [tool.poetry.plugins."swo.mpt.ext"]
