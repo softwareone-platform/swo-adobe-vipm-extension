@@ -969,7 +969,14 @@ def test_fulfill_change_order(mocker):
         mocked_context,
     )
 
-
+@pytest.mark.parametrize(
+    ("error_code","error_message"),
+    [
+        ("3120", "Update could not be performed because it would create an invalid renewal state"),
+        ("3123", "Line Item offer id has expired"),
+        ("3119", "Inactive Subscription or Pending Renewal is not Editable"),
+    ],
+)
 def test_validate_update_renewal_quantity_invalid_renewal_state(
     mocker,
     order_factory,
@@ -977,9 +984,12 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
     adobe_api_error_factory,
     subscriptions_factory,
     lines_factory,
+    error_code,
+    error_message,
 ):
     """
     Tests the validate update renewal quantity step when the renewal state is invalid.
+    when the offer has expired or when the subscription is inactive/pending renewal
     """
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
@@ -1012,8 +1022,8 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
     mocked_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            "3120",
-            "Update could not be performed because it would create an invalid renewal state",
+            error_code,
+            error_message,
         ),
     )
 
@@ -1024,7 +1034,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
         mocked_client,
         context.order,
         ERR_INVALID_RENEWAL_STATE.to_dict(
-            error="Update could not be performed because it would create an invalid renewal state",
+            error=error_message,
         ),
     )
     mocked_next_step.assert_not_called()

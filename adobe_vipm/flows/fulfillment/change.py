@@ -10,6 +10,8 @@ import logging
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     STATUS_INVALID_RENEWAL_STATE,
+    STATUS_LINE_ITEM_OFFER_ID_EXPIRED,
+    STATUS_SUBSCRIPTION_INACTIVE,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
@@ -173,7 +175,9 @@ class UpdateRenewalQuantities(Step):
                         f"{context}: failed to update renewal quantity for "
                         f"{subscription['id']} ({adobe_sub_id}) due to {e}"
                     )
-                    if e.code == STATUS_INVALID_RENEWAL_STATE:
+                    if e.code in [STATUS_INVALID_RENEWAL_STATE,
+                                  STATUS_LINE_ITEM_OFFER_ID_EXPIRED,
+                                  STATUS_SUBSCRIPTION_INACTIVE]:
                         switch_order_to_failed(
                             client,
                             context.order,
