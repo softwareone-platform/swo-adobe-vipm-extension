@@ -1836,7 +1836,7 @@ def test_complete_configuration_order_selects_template(
         return_value=completed_order,
     )
     mocked_send_email = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_email_notification"
+        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
     )
 
     # Act

@@ -49,28 +49,27 @@ class SubscriptionUpdateAutoRenewal(Step):
         """
         Updates the auto renewal status of a subscription.
         """
-        logger.info(f'Start processing {context.order["type"]} order {context.order["id"]}')
         adobe_client = get_adobe_client()
-        customer_id = context.adobe_customer_id
-        auth_id = context.order["authorization"]["id"]
 
-        updated = []
+        context.updated = []
         for subscription in context.order["subscriptions"]:
             try:
-                self._process_one_subscription(adobe_client, auth_id, customer_id,
-                                               subscription, updated)
+                self._process_subscription(adobe_client, context,subscription)
             except SubscriptionUpdateError as e:
-                self._handle_subscription_error(client, adobe_client, auth_id, customer_id,
-                                                updated, context, str(e))
+                self._handle_subscription_error(client, adobe_client,context, str(e))
                 return
 
         next_step(client, context)
 
 
-    def _process_one_subscription(self, adobe_client, auth_id, customer_id, subscription, updated):
+    def _process_subscription(self, adobe_client, context, subscription):
         subscription_vendor_id = subscription["externalIds"]["vendor"]
 
-        adobe_sub = adobe_client.get_subscription(auth_id, customer_id, subscription_vendor_id)
+        adobe_sub = adobe_client.get_subscription(
+            context.order["authorization"]["id"],
+            context.adobe_customer_id,
+            subscription_vendor_id)
+
         if not adobe_sub:
             raise SubscriptionUpdateError(f"No Adobe subscription for "
                                           f"vendor {subscription_vendor_id}")
@@ -84,15 +83,18 @@ class SubscriptionUpdateAutoRenewal(Step):
 
         try:
             adobe_client.update_subscription(
-                auth_id, customer_id, adobe_sub["subscriptionId"],
-                auto_renewal=desired, quantity=qty
+                context.order["authorization"]["id"],
+                context.adobe_customer_id,
+                adobe_sub["subscriptionId"],
+                auto_renewal=desired,
+                quantity=qty
             )
         except AdobeError as e:
             raise SubscriptionUpdateError(
                 f"Error updating the subscription {subscription_vendor_id}: {str(e)}"
             )
 
-        updated.append({
+        context.updated.append({
             "subscription_vendor_id": subscription_vendor_id,
             "auto_renewal": desired,
             "quantity": qty})
@@ -100,20 +102,19 @@ class SubscriptionUpdateAutoRenewal(Step):
                     f"autoRenew={desired}, qty={qty}")
 
 
-    def _handle_subscription_error(self,client, adobe_client, authorization_id, customer_id,
-                                 update_success_subscriptions, context, error_message):
+    def _handle_subscription_error(self,client, adobe_client, context, error_message):
         """
         Handles subscription errors by rolling back changes and failing the order.
         """
         self.rollback_updated_subscriptions(
             adobe_client,
-            authorization_id,
-            customer_id,
-            update_success_subscriptions)
+            context.order["authorization"]["id"],
+            context.adobe_customer_id,
+            context.updated)
         notify_not_updated_subscriptions(
             context.order["id"],
             error_message,
-            update_success_subscriptions,
+            context.updated,
             context.product_id)
         switch_order_to_failed(client, context.order,
                                ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR.to_dict(error=error_message))
