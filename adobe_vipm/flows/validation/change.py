@@ -14,7 +14,11 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import is_within_last_two_weeks, set_order_error
-from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
+from adobe_vipm.flows.validation.shared import (
+    GetPreviewOrder,
+    UpdatePrices,
+    ValidateDuplicateLines,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +113,9 @@ def validate_change_order(client, order):
         ValidateDownsizes(),
         ValidateDownsizes3YC(True),
         GetPreviewOrder(),
+        UpdatePrices(),
     )
     context = Context(order=order)
     pipeline.run(client, context)
+
     return not context.validation_succeeded, context.order
