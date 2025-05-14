@@ -34,6 +34,11 @@ class CountryNotFoundError(AdobeError):
 class CustomerDiscountsNotFoundError(AdobeError):
     pass
 
+class SubscriptionNotFoundError(AdobeError):
+    pass
+
+class SubscriptionUpdateError(AdobeError):
+    pass
 
 class AdobeHttpError(AdobeError):
     def __init__(self, status_code: int, content: str):

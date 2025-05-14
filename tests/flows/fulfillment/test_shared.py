@@ -24,6 +24,8 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     PARAM_DUE_DATE,
+    TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
+    TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
     TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.context import Context
@@ -366,6 +368,51 @@ def test_start_order_processing_step(mocker, order_factory):
         template={"id": "TPL-1234"},
     )
     mocked_send_notification.assert_called_once_with(mocked_client, context.order)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+@pytest.mark.parametrize(
+    ("auto_renew","expected_template"),
+    [
+        (True, TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE),
+        (False, TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE),
+    ],
+)
+def test_configuration_start_order_processing_selects_template(
+    mocker, order_factory, auto_renew, expected_template
+):
+    # Arrange
+    order = order_factory(
+        subscriptions=[{"autoRenew": auto_renew}]
+    )
+    context = Context(order=order, order_id=order["id"])
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-1234"},
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order"
+    )
+
+    # Act
+    step = StartOrderProcessing(expected_template)
+    step(mocked_client, context, mocked_next_step)
+
+    # Assert
+    mocked_get_template.assert_called_once_with(
+        mocked_client,
+        context.order["agreement"]["product"]["id"],
+        "Processing",
+        expected_template,
+    )
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        template={"id": "TPL-1234"},
+    )
+    assert context.order["template"] == {"id": "TPL-1234"}
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -1754,6 +1801,62 @@ def test_complete_order_step(mocker, order_factory):
         {"id": "TPL-0000"},
         parameters=resetted_order["parameters"],
     )
+    assert context.order == completed_order
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+@pytest.mark.parametrize(
+    ("auto_renew","expected_template"),
+    [
+        (True, TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE),
+        (False, TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE),
+    ],
+)
+def test_complete_configuration_order_selects_template(
+    mocker, order_factory, auto_renew, expected_template
+):
+    # Arrange
+    order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
+    completed_order = order_factory(status="Completed")
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id=order["agreement"]["product"]["id"],
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-0000"},
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
+        return_value=completed_order,
+    )
+    mocked_send_email = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
+    )
+
+    # Act
+    step = CompleteOrder(expected_template)
+    step(mocked_client, context, mocked_next_step)
+
+    # Assert
+    mocked_get_template.assert_called_once_with(
+        mocked_client,
+        context.product_id,
+        "Completed",
+        expected_template,
+    )
+    mocked_complete_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        {"id": "TPL-0000"},
+        parameters=order["parameters"],
+    )
+    mocked_send_email.assert_called_once_with(mocked_client, completed_order)
     assert context.order == completed_order
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
