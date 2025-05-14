@@ -1,7 +1,6 @@
 import logging
 
 from django.conf import settings
-from mpt_extension_sdk.core.utils import setup_client
 from mpt_extension_sdk.mpt_http.mpt import (
     create_agreement,
     create_agreement_subscription,
@@ -50,7 +49,7 @@ from adobe_vipm.flows.utils import (
     get_market_segment,
     split_phone_number,
 )
-from adobe_vipm.shared import mpt_o_client
+from adobe_vipm.shared import mpt_client, mpt_o_client
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -647,7 +646,6 @@ def check_gc_agreement_deployments():
         None
     """
     adobe_client = get_adobe_client()
-    mpt_client = setup_client()
 
     for product_id in settings.MPT_PRODUCTS_IDS:
         if get_market_segment(product_id) != MARKET_SEGMENT_COMMERCIAL:

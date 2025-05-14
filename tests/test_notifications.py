@@ -14,7 +14,7 @@ from adobe_vipm.notifications import (
     send_notification,
     send_warning,
 )
-from adobe_vipm.shared import mpt_o_client
+from adobe_vipm.shared import mpt_client
 
 
 def test_send_notification_full(mocker, settings):
@@ -151,7 +151,7 @@ def test_mpt_notify(mocker):
     mocked_jinja_env.get_template.assert_called_once_with("template_name.html")
     mocked_template.render.assert_called_once_with({"test": "context"})
     mocked_notify.assert_called_once_with(
-        mpt_o_client,
+        mpt_client,
         "NTC-0000-0006",
         "account_id",
         "buyer_id",

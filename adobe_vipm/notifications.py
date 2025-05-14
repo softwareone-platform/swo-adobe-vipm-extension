@@ -8,7 +8,7 @@ from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mpt_extension_sdk.mpt_http.mpt import NotifyCategories, notify
 
-from adobe_vipm.shared import mpt_o_client
+from adobe_vipm.shared import mpt_client
 
 logger = logging.getLogger(__name__)
 
@@ -121,21 +121,6 @@ def mpt_notify(
     """
     Sends a notification through the MPT API using a specified template and context.
 
-    Parameters:
-    account_id: str
-        The identifier for the account associated with the notification.
-    buyer_id: str
-        The identifier for the buyer to whom the notification is sent.
-    subject: str
-        The subject of the notification email.
-    template_name: str
-        The name of the email template to be used, excluding the file extension.
-    context: dict
-        The context data to render the given email template.
-
-    Returns:
-    None
-
     Raises:
     Exception
         Logs the exception if there is an issue during the notification process,
@@ -146,7 +131,7 @@ def mpt_notify(
 
     try:
         notify(
-            mpt_o_client,
+            mpt_client,
             NotifyCategories.ORDERS.value,
             account_id,
             buyer_id,
