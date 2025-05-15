@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from operator import itemgetter
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     complete_order,
     create_subscription,
@@ -71,7 +72,6 @@ from adobe_vipm.flows.utils import (
     get_deployment_id,
     get_due_date,
     get_next_sync,
-    get_notifications_recipient,
     get_one_time_skus,
     get_order_line_by_sku,
     get_price_item_by_line_sku,
@@ -92,7 +92,7 @@ from adobe_vipm.flows.utils import (
     set_template,
     split_phone_number,
 )
-from adobe_vipm.notifications import send_email
+from adobe_vipm.notifications import mpt_notify
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -205,7 +205,7 @@ def switch_order_to_failed(client, order, error):
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
-    send_email_notification(client, order)
+    send_mpt_notification(client, order)
     return order
 
 
@@ -243,7 +243,7 @@ def switch_order_to_query(client, order, template_name=None):
         **kwargs,
     )
     order["agreement"] = agreement
-    send_email_notification(client, order)
+    send_mpt_notification(client, order)
 
 
 def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
@@ -304,7 +304,7 @@ def switch_order_to_completed(client, order, template_name):
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
-    send_email_notification(client, order)
+    send_mpt_notification(client, order)
     logger.info(f'Order {order["id"]} has been completed successfully')
 
 
@@ -445,7 +445,7 @@ def start_processing_attempt(client, order):
 
     order = set_due_date(order)
     update_order(client, order["id"], parameters=order["parameters"])
-    send_email_notification(client, order)
+    send_mpt_notification(client, order)
 
     return order
 
@@ -474,50 +474,38 @@ def save_next_sync_and_coterm_dates(client, order, coterm_date):
     return order
 
 
-def send_email_notification(client, order):
+def send_mpt_notification(client: MPTClient, order: dict) -> None:
     """
-    Send a notification email to the customer according to the
+    Send an MPT notification to the customer according to the
     current order status.
-    It embeds the current order template into the email body.
+    It embeds the current order template into the body.
 
     Args:
-        client (MPTClient): The client used to consume the
-        MPT API.
+        client (MPTClient): The client used to consume the MPT API.
         order (dict): The order for which the notification should be sent.
     """
-    email_notification_enabled = bool(
-        settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
+    context = {
+        "order": order,
+        "activation_template": md2html(get_rendered_template(client, order["id"])),
+        "api_base_url": settings.MPT_API_BASE_URL,
+        "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+    }
+    subject = (
+        f"Order status update {order['id']} "
+        f"for {order['agreement']['buyer']['name']}"
     )
-
-    if email_notification_enabled:
-        recipient = get_notifications_recipient(order)
-        if not recipient:
-            logger.warning(
-                f"Cannot send email notifications for order {order['id']}: no recipient found"
-            )
-            return
-
-        context = {
-            "order": order,
-            "activation_template": md2html(get_rendered_template(client, order["id"])),
-            "api_base_url": settings.MPT_API_BASE_URL,
-            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
-        }
+    if order["status"] == "Querying":
         subject = (
-            f"Order status update {order['id']} "
+            f"This order need your attention {order['id']} "
             f"for {order['agreement']['buyer']['name']}"
         )
-        if order["status"] == "Querying":
-            subject = (
-                f"This order need your attention {order['id']} "
-                f"for {order['agreement']['buyer']['name']}"
-            )
-        send_email(
-            [recipient],
-            subject,
-            "email",
-            context,
-        )
+    mpt_notify(
+        order["agreement"]["licensee"]["account"]["id"],
+        order["agreement"]["buyer"]["id"],
+        subject,
+        "notification",
+        context,
+    )
 
 
 def set_customer_coterm_date_if_null(client, adobe_client, order):
@@ -632,7 +620,7 @@ class StartOrderProcessing(Step):
             )
         logger.info(f"{context}: processing template is ok, continue")
         if not context.due_date:
-            send_email_notification(client, context.order)
+            send_mpt_notification(client, context.order)
         next_step(client, context)
 
 
@@ -1002,7 +990,7 @@ class CompleteOrder(Step):
             parameters=context.order["parameters"],
         )
         context.order["agreement"] = agreement
-        send_email_notification(client, context.order)
+        send_mpt_notification(client, context.order)
         logger.info(f"{context}: order has been completed successfully")
         next_step(client, context)
 
@@ -1050,55 +1038,40 @@ class ValidateDuplicateLines(Step):
         next_step(client, context)
 
 
-def send_gc_email_notification(order, items_with_deployment):
-    """
-    Send a notification email to the customer according to the
+def send_gc_mpt_notification(order: dict, items_with_deployment: list) -> None:
+    """Send MPT API notification to the subscribers according to the
     current order status.
-    It embeds the current order template into the email body.
+    It embeds the current order template.
 
     Args:
         items_with_deployment (list): The list of items with deployment ID.
         order (dict): The order for which the notification should be sent.
     """
-    email_notification_enabled = bool(
-        settings.EXTENSION_CONFIG.get("EMAIL_NOTIFICATIONS_ENABLED", False)
+    items = (
+        "<ul>\n"
+        + "\n".join(f"\t<li>{item}</li>" for item in items_with_deployment)
+        + "\n</ul>"
     )
 
-    if email_notification_enabled:
-        recipient = settings.EXTENSION_CONFIG.get(
-            "GC_EMAIL_NOTIFICATIONS_RECIPIENT", None
-        )
-        if not recipient:
-            logger.warning(
-                f"Cannot send Global Customer email notifications for order {order['id']}: "
-                f"no recipient found"
-            )
-            return
-        recipient = recipient.split(",")
-        items = (
-            "<ul>\n"
-            + "\n".join(f"\t<li>{item}</li>" for item in items_with_deployment)
-            + "\n</ul>"
-        )
+    context = {
+        "order": order,
+        "activation_template": "This order needs your attention because it contains items with "
+        "a deployment ID associated. Please remove the following items with "
+        f"deployment associated manually. {items}"
+        "Then, change the main agreement status to 'pending' on Airtable.",
+        "api_base_url": settings.MPT_API_BASE_URL,
+        "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+    }
 
-        context = {
-            "order": order,
-            "activation_template": "This order needs your attention because it contains items with "
-            "a deployment ID associated. Please remove the following items with "
-            f"deployment associated manually. {items}"
-            "Then, change the main agreement status to 'pending' on Airtable.",
-            "api_base_url": settings.MPT_API_BASE_URL,
-            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
-        }
+    subject = (
+        f"This order need your attention {order['id']} "
+        f"for {order['agreement']['buyer']['name']}"
+    )
 
-        subject = (
-            f"This order need your attention {order['id']} "
-            f"for {order['agreement']['buyer']['name']}"
-        )
-
-        send_email(
-            recipient,
-            subject,
-            "email",
-            context,
-        )
+    mpt_notify(
+        order["agreement"]["licensee"]["account"]["id"],
+        order["agreement"]["buyer"]["id"],
+        subject,
+        "notification",
+        context,
+    )

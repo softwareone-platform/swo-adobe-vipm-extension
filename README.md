@@ -153,6 +153,7 @@ $ docker-compose run --service-ports app
 | `MPT_PRODUCTS_IDS`              | PRD-1111-1111         | PRD-1234-1234,PRD-4321-4321           | Comma-separated list of SoftwareONE Marketplace Product ID                                |
 | `MPT_API_BASE_URL`              | http://localhost:8000 | https://portal.softwareone.com/mpt    | SoftwareONE Marketplace API URL                                                           |
 | `MPT_API_TOKEN`                 | -                     | eyJhbGciOiJSUzI1N...                  | SoftwareONE Marketplace API Token                                                         |
+| `MPT_NOTIFY_CATEGORIES`         | -                     | {"ORDERS": "NTC-0000-0006"}           | SoftwareONE Marketplace Notification Categories                                           |
     
     
 
