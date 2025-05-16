@@ -322,22 +322,22 @@ def create_gc_agreement_deployment(
         return agreement_deployment.agreement_id
 
     try:
-        address = adobe_customer["companyProfile"]["address"]
+        address = adobe_customer["companyProfile"].get("address", {})
         contact = adobe_customer["companyProfile"]["contacts"][0]
         param_address = {
-            "country": address["country"],
-            "state": address["region"],
-            "city": address["city"],
-            "addressLine1": address["addressLine1"],
-            "addressLine2": address["addressLine2"],
-            "postCode": address["postalCode"],
+            "country": address.get("country", ""),
+            "state": address.get("region", ""),
+            "city": address.get("city", ""),
+            "addressLine1": address.get("addressLine1", ""),
+            "addressLine2": address.get("addressLine2", ""),
+            "postCode": address.get("postalCode", ""),
         }
 
         param_contact = {
             "firstName": sanitize_first_last_name(contact["firstName"]),
             "lastName": sanitize_first_last_name(contact["lastName"]),
             "email": contact["email"],
-            "phone": split_phone_number(contact.get("phoneNumber"), address["country"]),
+            "phone": split_phone_number(contact.get("phoneNumber"), address.get("country", "")),
         }
 
         template = get_product_template_or_default(

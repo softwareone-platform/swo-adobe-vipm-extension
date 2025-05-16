@@ -1499,21 +1499,13 @@ def adobe_customer_factory():
         consumables_discount_level="T1",
         coterm_date="2024-01-23",
         global_sales_enabled=False,
+        company_profile_address_exists=True,
     ):
         customer = {
             "customerId": customer_id,
             "companyProfile": {
                 "companyName": "Migrated Company",
                 "preferredLanguage": "en-US",
-                "address": {
-                    "addressLine1": "addressLine1",
-                    "addressLine2": "addressLine2",
-                    "city": "city",
-                    "region": "region",
-                    "postalCode": "postalCode",
-                    "country": country,
-                    "phoneNumber": phone_number,
-                },
                 "contacts": [
                     {
                         "firstName": "firstName",
@@ -1536,6 +1528,16 @@ def adobe_customer_factory():
             "cotermDate": coterm_date,
             "globalSalesEnabled": global_sales_enabled,
         }
+        if company_profile_address_exists:
+            customer["companyProfile"]["address"] = {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": country,
+                "phoneNumber": phone_number,
+            }
         if commitment or commitment_request or recommitment_request:
             customer["benefits"] = [
                 {

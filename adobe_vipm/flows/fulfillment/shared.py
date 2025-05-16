@@ -120,7 +120,8 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     order = set_adobe_order_id(order, order_id)
     order = set_adobe_customer_id(order, customer["customerId"])
 
-    address = customer["companyProfile"]["address"]
+    print(f"****** customer:\n{customer}")
+    address = customer["companyProfile"].get("address", {})
     contact = customer["companyProfile"]["contacts"][0]
     commitment = get_3yc_commitment(customer)
 
@@ -129,18 +130,18 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
             customer["companyProfile"]["companyName"]
         ),
         PARAM_ADDRESS: {
-            "country": address["country"],
-            "state": address["region"],
-            "city": address["city"],
-            "addressLine1": address["addressLine1"],
-            "addressLine2": address["addressLine2"],
-            "postCode": address["postalCode"],
+            "country": address.get("country", ""),
+            "state": address.get("region", ""),
+            "city": address.get("city", ""),
+            "addressLine1": address.get("addressLine1", ""),
+            "addressLine2": address.get("addressLine2", ""),
+            "postCode": address.get("postalCode", ""),
         },
         PARAM_CONTACT: {
             "firstName": sanitize_first_last_name(contact["firstName"]),
             "lastName": sanitize_first_last_name(contact["lastName"]),
             "email": contact["email"],
-            "phone": split_phone_number(contact.get("phoneNumber"), address["country"]),
+            "phone": split_phone_number(contact.get("phoneNumber"), address.get("country", "")),
         },
     }
     if commitment:
