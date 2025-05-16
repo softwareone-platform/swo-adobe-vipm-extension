@@ -1772,14 +1772,12 @@ def mock_ext_expected_environment_values(
     mock_env_airtable_base,
     mock_env_airtable_pricing_base,
     mock_env_product_segment,
-    mock_email_notification_sender,
 ):
     return {
         "WEBHOOKS_SECRETS": json.loads(mock_env_webhook_secret),
         "AIRTABLE_BASES": json.loads(mock_env_airtable_base),
         "AIRTABLE_PRICING_BASES": json.loads(mock_env_airtable_pricing_base),
         "PRODUCT_SEGMENT": json.loads(mock_env_product_segment),
-        "EMAIL_NOTIFICATION_SENDER": mock_email_notification_sender,
     }
 
 
@@ -1804,11 +1802,6 @@ def mock_env_product_segment():
 
 
 @pytest.fixture()
-def mock_email_notification_sender():
-    return "email_sender"
-
-
-@pytest.fixture()
 def mock_env_invalid_product_segment():
     return '{ "field_1": , , "field2": "very bad json"}'
 
@@ -1819,14 +1812,12 @@ def mock_valid_env_values(
     mock_env_airtable_base,
     mock_env_airtable_pricing_base,
     mock_env_product_segment,
-    mock_email_notification_sender,
 ):
     return {
         "EXT_WEBHOOKS_SECRETS": mock_env_webhook_secret,
         "EXT_AIRTABLE_BASES": mock_env_airtable_base,
         "EXT_AIRTABLE_PRICING_BASES": mock_env_airtable_pricing_base,
         "EXT_PRODUCT_SEGMENT": mock_env_product_segment,
-        "EXT_EMAIL_NOTIFICATION_SENDER": mock_email_notification_sender,
     }
 
 
@@ -1836,14 +1827,12 @@ def mock_invalid_env_values(
     mock_env_airtable_base,
     mock_env_airtable_pricing_base,
     mock_env_invalid_product_segment,
-    mock_email_notification_sender,
 ):
     return {
         "EXT_WEBHOOKS_SECRETS": mock_env_webhook_secret,
         "EXT_AIRTABLE_BASES": mock_env_airtable_base,
         "EXT_AIRTABLE_PRICING_BASES": mock_env_airtable_pricing_base,
         "EXT_PRODUCT_SEGMENT": mock_env_invalid_product_segment,
-        "EXT_EMAIL_NOTIFICATION_SENDER": mock_email_notification_sender,
     }
 
 
