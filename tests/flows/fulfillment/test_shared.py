@@ -370,8 +370,9 @@ def test_start_order_processing_step(mocker, order_factory):
     mocked_send_notification.assert_called_once_with(mocked_client, context.order)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
+
 @pytest.mark.parametrize(
-    ("auto_renew","expected_template"),
+    ("auto_renew", "expected_template"),
     [
         (True, TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE),
         (False, TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE),
@@ -381,9 +382,7 @@ def test_configuration_start_order_processing_selects_template(
     mocker, order_factory, auto_renew, expected_template
 ):
     # Arrange
-    order = order_factory(
-        subscriptions=[{"autoRenew": auto_renew}]
-    )
+    order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
     context = Context(order=order, order_id=order["id"])
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -1806,7 +1805,7 @@ def test_complete_order_step(mocker, order_factory):
 
 
 @pytest.mark.parametrize(
-    ("auto_renew","expected_template"),
+    ("auto_renew", "expected_template"),
     [
         (True, TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE),
         (False, TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE),
@@ -2163,7 +2162,7 @@ def test_get_preview_order_step_adobe_error(
         )
     ],
 )
-def test_send_gc_email_notification(mocker, settings, order_factory, status, subject):
+def test_send_gc_mpt_notification(mocker, settings, order_factory, status, subject):
     mock_mpt_notify = mocker.patch("adobe_vipm.flows.fulfillment.shared.mpt_notify")
 
     order = order_factory(order_id="ORD-1234", status=status)
