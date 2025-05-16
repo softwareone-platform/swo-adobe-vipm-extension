@@ -1,9 +1,18 @@
+from datetime import date, timedelta
+
 import pytest
 
-from adobe_vipm.adobe.constants import STATUS_INACTIVE_OR_GENERIC_FAILURE
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_EXPIRED,
+    STATUS_INACTIVE_OR_GENERIC_FAILURE,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
-from adobe_vipm.flows.global_customer import check_gc_agreement_deployments
+from adobe_vipm.flows.global_customer import (
+    check_gc_agreement_deployments,
+    get_sku_price,
+)
 
 
 @pytest.fixture()
@@ -833,6 +842,11 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
         return_value=mocker.MagicMock(),
     )
 
+    mocked_get_sku_price = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_sku_price",
+        return_value=100.0,
+    )
+
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -876,6 +890,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     mocked_get_subscription_by_external_id.assert_called_once()
     mocked_create_agreement_subscription.assert_called_once()
     mocked_get_agreement.assert_called_once()
+    mocked_get_sku_price.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_create_agreement_subscription_already_created(
@@ -1021,6 +1036,11 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
         side_effect=error,
     )
 
+    mocked_get_sku_price = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_sku_price",
+        return_value=100.0,
+    )
+
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -1058,7 +1078,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     mocked_get_subscription_by_external_id.assert_called_once()
     mocked_create_agreement_subscription.assert_called_once()
     mocked_get_agreement.assert_called_once()
-
+    mocked_get_sku_price.assert_called_once()
 
 def test_check_gc_agreement_deployments_create_agreement_subscription_enable_auto_renew(
     mocker,
@@ -1108,6 +1128,11 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         return_value=mocker.MagicMock(),
     )
 
+    mocked_get_sku_price = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_sku_price",
+        return_value=100.0,
+    )
+
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -1149,3 +1174,254 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     mocked_get_subscription_by_external_id.assert_called_once()
     mocked_create_agreement_subscription.assert_called_once()
     mocked_get_agreement.assert_called_once()
+    mocked_get_sku_price.assert_called_once()
+
+
+def test_get_sku_price_consumable_sku(
+    mocker,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+):
+    product_id = "test_product_id"
+    deployment_currency = "USD"
+    expected_price = 100.0
+
+    adobe_customer = adobe_customer_factory()
+    subscription = adobe_subscription_factory()
+
+    mocked_is_consumables_sku = mocker.patch(
+        "adobe_vipm.flows.global_customer.is_consumables_sku",
+        return_value=True
+    )
+    mocked_get_customer_consumables_discount_level = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_customer_consumables_discount_level",
+        return_value="B"
+    )
+    mocked_get_3yc_commitment = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_3yc_commitment",
+        return_value=None
+    )
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_prices_for_skus",
+        return_value={"65304578CABA12": expected_price}
+    )
+
+    result = get_sku_price(
+        adobe_customer,
+        subscription,
+        product_id,
+        deployment_currency
+    )
+
+    assert result == expected_price
+    mocked_is_consumables_sku.assert_called_once_with(subscription["offerId"])
+    mocked_get_customer_consumables_discount_level.assert_called_once_with(adobe_customer)
+    mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
+    mocked_get_prices_for_skus.assert_called_once_with(
+        product_id,
+        deployment_currency,
+        ["65304578CABA12"]
+    )
+
+
+def test_get_sku_price_non_consumable_sku(
+    mocker,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+):
+    product_id = "test_product_id"
+    deployment_currency = "USD"
+    expected_price = 100.0
+
+    adobe_customer = adobe_customer_factory()
+    subscription = adobe_subscription_factory()
+
+    mocked_is_consumables_sku = mocker.patch(
+        "adobe_vipm.flows.global_customer.is_consumables_sku",
+        return_value=False
+    )
+    mocked_get_customer_licenses_discount_level = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_customer_licenses_discount_level",
+        return_value="A"
+    )
+    mocked_get_3yc_commitment = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_3yc_commitment",
+        return_value=None
+    )
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_prices_for_skus",
+        return_value={"65304578CAAA12": expected_price}
+    )
+
+    result = get_sku_price(
+        adobe_customer,
+        subscription,
+        product_id,
+        deployment_currency
+    )
+
+    assert result == expected_price
+    mocked_is_consumables_sku.assert_called_once_with(subscription["offerId"])
+    mocked_get_customer_licenses_discount_level.assert_called_once_with(adobe_customer)
+    mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
+    mocked_get_prices_for_skus.assert_called_once_with(
+        product_id,
+        deployment_currency,
+        ["65304578CAAA12"]
+    )
+
+def test_get_sku_price_with_active_3yc(
+    mocker,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+):
+    product_id = "test_product_id"
+    deployment_currency = "USD"
+    expected_price = 100.0
+
+    adobe_customer = adobe_customer_factory()
+    subscription = adobe_subscription_factory()
+    start_date = date.today() - timedelta(days=-1)
+    end_date = start_date + timedelta(days=365*3)
+
+    mock_commitment = {
+        "status": STATUS_3YC_ACTIVE,
+        "startDate": start_date.isoformat(),
+        "endDate": end_date.isoformat()
+    }
+
+    mocked_is_consumables_sku = mocker.patch(
+        "adobe_vipm.flows.global_customer.is_consumables_sku",
+        return_value=False
+    )
+    mocked_get_customer_licenses_discount_level = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_customer_licenses_discount_level",
+        return_value="A"
+    )
+    mocked_get_3yc_commitment = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_3yc_commitment",
+        return_value=mock_commitment
+    )
+    mocked_get_prices_for_3yc_skus = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_prices_for_3yc_skus",
+        return_value={"65304578CAAA12": expected_price}
+    )
+
+    result = get_sku_price(
+        adobe_customer,
+        subscription,
+        product_id,
+        deployment_currency
+    )
+
+    assert result == expected_price
+    mocked_is_consumables_sku.assert_called_once_with(subscription["offerId"])
+    mocked_get_customer_licenses_discount_level.assert_called_once_with(adobe_customer)
+    mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
+    mocked_get_prices_for_3yc_skus.assert_called_once_with(
+        product_id,
+        deployment_currency,
+        date.fromisoformat(mock_commitment["startDate"]),
+        ["65304578CAAA12"]
+    )
+
+
+def test_get_sku_price_with_expired_3yc(
+    mocker,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+):
+    # Arrange
+    product_id = "test_product_id"
+    deployment_currency = "USD"
+    expected_price = 100.0
+    adobe_customer = adobe_customer_factory()
+    subscription = adobe_subscription_factory()
+    start_date = date.today() - timedelta(days=-365*3)
+    end_date = start_date + timedelta(days=-1)
+
+    mock_commitment = {
+        "status": STATUS_3YC_EXPIRED,
+        "startDate": start_date.isoformat(),
+        "endDate": end_date.isoformat()
+    }
+
+    mocked_is_consumables_sku = mocker.patch(
+        "adobe_vipm.flows.global_customer.is_consumables_sku",
+        return_value=False
+    )
+    mocked_get_customer_licenses_discount_level = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_customer_licenses_discount_level",
+        return_value="A"
+    )
+    mocked_get_3yc_commitment = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_3yc_commitment",
+        return_value=mock_commitment
+    )
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_prices_for_skus",
+        return_value={"65304578CAAA12": expected_price}
+    )
+
+    result = get_sku_price(
+        adobe_customer,
+        subscription,
+        product_id,
+        deployment_currency
+    )
+
+    assert result == expected_price
+    mocked_is_consumables_sku.assert_called_once_with(subscription["offerId"])
+    mocked_get_customer_licenses_discount_level.assert_called_once_with(adobe_customer)
+    mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
+    mocked_get_prices_for_skus.assert_called_once_with(
+        product_id,
+        deployment_currency,
+        ["65304578CAAA12"]
+    )
+
+
+def test_get_sku_price_no_prices_found(
+    mocker,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+):
+    # Arrange
+    product_id = "test_product_id"
+    deployment_currency = "USD"
+    adobe_customer = adobe_customer_factory()
+    subscription = adobe_subscription_factory()
+
+    mocked_is_consumables_sku = mocker.patch(
+        "adobe_vipm.flows.global_customer.is_consumables_sku",
+        return_value=False
+    )
+    mocked_get_customer_licenses_discount_level = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_customer_licenses_discount_level",
+        return_value="A"
+    )
+    mocked_get_3yc_commitment = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_3yc_commitment",
+        return_value=None
+    )
+    mocked_get_prices_for_skus = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_prices_for_skus",
+        return_value={}
+    )
+
+    result = get_sku_price(
+        adobe_customer,
+        subscription,
+        product_id,
+        deployment_currency
+    )
+
+    assert result is None
+    mocked_is_consumables_sku.assert_called_once_with(subscription["offerId"])
+    mocked_get_customer_licenses_discount_level.assert_called_once_with(adobe_customer)
+    mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
+    mocked_get_prices_for_skus.assert_called_once_with(
+        product_id,
+        deployment_currency,
+        ["65304578CAAA12"]
+    )
