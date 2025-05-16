@@ -58,14 +58,14 @@ def fill_customer_data(transfer, customer):
         "preferredLanguage"
     ]
 
-    address = customer["companyProfile"]["address"]
-    transfer.customer_address_address_line_1 = address["addressLine1"]
-    transfer.customer_address_address_line_2 = address["addressLine2"]
-    transfer.customer_address_city = address["city"]
-    transfer.customer_address_region = address["region"]
-    transfer.customer_address_postal_code = address["postalCode"]
-    transfer.customer_address_country = address["country"]
-    transfer.customer_address_phone_number = address["phoneNumber"]
+    address = customer["companyProfile"].get("address", {})
+    transfer.customer_address_address_line_1 = address.get("addressLine1", "")
+    transfer.customer_address_address_line_2 = address.get("addressLine2", "")
+    transfer.customer_address_city = address.get("city", "")
+    transfer.customer_address_region = address.get("region", "")
+    transfer.customer_address_postal_code = address.get("postalCode", "")
+    transfer.customer_address_country = address.get("country", "")
+    transfer.customer_address_phone_number = address.get("phoneNumber", "")
 
     contact = customer["companyProfile"]["contacts"][0]
     transfer.customer_contact_first_name = contact["firstName"]

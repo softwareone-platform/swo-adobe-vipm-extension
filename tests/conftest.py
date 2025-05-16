@@ -1365,6 +1365,69 @@ def mpt_client(settings):
 
     return setup_client()
 
+@pytest.fixture()
+def created_agreement_factory():
+    def _created_agreement(deployments="", is_profile_address_exists=True):
+        created_agreement = {
+            "status": "Active",
+            "listing": {"id": "LST-9401-9279"},
+            "product": {"id": "PRD-123-123-123"},
+            "authorization": {"id": "AUT-1234-1234-1234"},
+            "vendor": {"id": "ACC-1234-vendor-id"},
+            "client": {"id": "ACC-123-123-123"},
+            "name": "Adobe for Commercial for Client Account - US",
+            "lines": [],
+            "subscriptions": [],
+            "parameters": {
+                "ordering": [
+                    {"externalId": "agreementType", "value": "Migrate"},
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
+                    {"externalId": "membershipId", "value": "membership-id"},
+                ],
+                "fulfillment": [
+                    {"externalId": "globalCustomer", "value": ["Yes"]},
+                    {"externalId": "deploymentId", "value": "deployment_id"},
+                    {
+                        "externalId": "deployments",
+                        "value": deployments
+                    },
+                    {"externalId": "customerId", "value": "P0112233"},
+                    {"externalId": "cotermDate", "value": "2024-01-23"},
+                ],
+            },
+            "licensee": {"id": "LC-321-321-321"},
+            "buyer": {"id": "BUY-3731-7971"},
+            "seller": {"id": "SEL-321-321"},
+            "externalIds": {"vendor": "a-client-id"},
+            "template": {"id": "TPL-1234-1234-4321", "name": "Default Template"},
+            "termsAndConditions": [],
+        }
+        if is_profile_address_exists:
+            created_agreement["parameters"]["ordering"].append(
+                {
+                    "externalId": "address",
+                    "value": {
+                        "addressLine1": "addressLine1",
+                        "addressLine2": "addressLine2",
+                        "city": "city",
+                        "country": "US",
+                        "postCode": "postalCode",
+                        "state": "region",
+                    },
+                }
+            )
+        return created_agreement
+    return _created_agreement
+
 
 @pytest.fixture()
 def mpt_error_factory():
@@ -1499,21 +1562,13 @@ def adobe_customer_factory():
         consumables_discount_level="T1",
         coterm_date="2024-01-23",
         global_sales_enabled=False,
+        company_profile_address_exists=True,
     ):
         customer = {
             "customerId": customer_id,
             "companyProfile": {
                 "companyName": "Migrated Company",
                 "preferredLanguage": "en-US",
-                "address": {
-                    "addressLine1": "addressLine1",
-                    "addressLine2": "addressLine2",
-                    "city": "city",
-                    "region": "region",
-                    "postalCode": "postalCode",
-                    "country": country,
-                    "phoneNumber": phone_number,
-                },
                 "contacts": [
                     {
                         "firstName": "firstName",
@@ -1536,6 +1591,16 @@ def adobe_customer_factory():
             "cotermDate": coterm_date,
             "globalSalesEnabled": global_sales_enabled,
         }
+        if company_profile_address_exists:
+            customer["companyProfile"]["address"] = {
+                "addressLine1": "addressLine1",
+                "addressLine2": "addressLine2",
+                "city": "city",
+                "region": "region",
+                "postalCode": "postalCode",
+                "country": country,
+                "phoneNumber": phone_number,
+            }
         if commitment or commitment_request or recommitment_request:
             customer["benefits"] = [
                 {
@@ -1548,6 +1613,32 @@ def adobe_customer_factory():
         return customer
 
     return _customer
+
+
+@pytest.fixture()
+def mock_adobe_customer_deployments_items():
+    return [
+            {
+                "deploymentId": "deployment-1",
+                "status": "1000",
+                "companyProfile": {"address": {"country": "DE"}},
+            },
+            {
+                "deploymentId": "deployment-2",
+                "status": "1004",
+                "companyProfile": {"address": {"country": "US"}},
+            },
+            {
+                "deploymentId": "deployment-3",
+                "status": "1000",
+                "companyProfile": {"address": {"country": "ES"}},
+            },
+        ]
+
+
+@pytest.fixture()
+def mock_adobe_customer_deployments_external_ids():
+    return "deployment-1 - DE,deployment-2 - US,deployment-3 - ES"
 
 
 @pytest.fixture()
