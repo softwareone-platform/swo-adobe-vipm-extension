@@ -394,7 +394,7 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 5
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 6
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(

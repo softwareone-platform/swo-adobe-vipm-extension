@@ -23,7 +23,7 @@ def django(ctx, management_args):
     if settings.USE_APPLICATIONINSIGHTS:
         tracer = trace.get_tracer(__name__)
         tracer_context = tracer.start_as_current_span(
-            f"Running Django command {management_args[0]}",
+            f"Running Django command {management_args}",
         )
     else:
         tracer_context = nullcontext()

@@ -19,7 +19,6 @@ from adobe_vipm.adobe.validation import (
     is_valid_postal_code_length,
     is_valid_state_or_province,
 )
-from adobe_vipm.airtable.models import get_prices_for_skus
 from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
     ERR_3YC_QUANTITY_CONSUMABLES,
@@ -51,15 +50,17 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
-    get_order_line_by_sku,
     get_ordering_parameter,
     is_purchase_validation_enabled,
     set_order_error,
     set_ordering_parameter_error,
     update_ordering_parameter_value,
 )
-from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.flows.validation.shared import (
+    GetPreviewOrder,
+    UpdatePrices,
+    ValidateDuplicateLines,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -263,28 +264,6 @@ class ValidateCustomerData(Step):
         if not context.validation_succeeded:
             return
 
-        next_step(client, context)
-
-
-class UpdatePrices(Step):
-    def __call__(self, client, context, next_step):
-        if not context.adobe_preview_order:
-            next_step(client, context)
-            return
-        adobe_skus = [
-            item["offerId"] for item in context.adobe_preview_order["lineItems"]
-        ]
-        prices = get_prices_for_skus(context.product_id, context.currency, adobe_skus)
-
-        updated_lines = []
-        for preview_item in context.adobe_preview_order["lineItems"]:
-            order_line = get_order_line_by_sku(
-                context.order, get_partial_sku(preview_item["offerId"])
-            )
-            order_line.setdefault("price", {})
-            order_line["price"]["unitPP"] = prices[preview_item["offerId"]]
-            updated_lines.append(order_line)
-        context.order["lines"] = updated_lines
         next_step(client, context)
 
 
