@@ -402,6 +402,34 @@ class AdobeClient:
         response.raise_for_status()
         return response.json()
 
+
+    @wrap_http_error
+    def create_return_order_by_adobe_order(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        order_created: dict,
+    ) -> dict:
+        """
+        Creates a return order for a given Adobe order.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        payload = {
+            "referenceOrderId": order_created["orderId"],
+            "orderType": ORDER_TYPE_RETURN,
+            "currencyCode": authorization.currency,
+            "lineItems": order_created["lineItems"],
+        }
+        headers = self._get_headers(authorization)
+        response = requests.post(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
     def _get_preview_order_line_item(self, line: dict, quantity: int) -> dict:
         adobe_base_sku = line["item"]["externalIds"]["vendor"]
         product_sku = get_adobe_product_by_marketplace_sku(adobe_base_sku).sku

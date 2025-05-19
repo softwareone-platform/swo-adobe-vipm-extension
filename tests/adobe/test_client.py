@@ -1194,6 +1194,117 @@ def test_create_return_order_bad_request(
     assert repr(cv.value) == str(error)
 
 
+def test_create_return_order_by_adobe_order(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+):
+    """
+    Test the call to Adobe API to create a return order using an Adobe order as input.
+    """
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    order_created = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        external_id="ORD-1234",
+        order_id="order-id",
+        status=STATUS_PROCESSED,
+    )
+
+    expected_body = {
+        "referenceOrderId": order_created["orderId"],
+        "orderType": ORDER_TYPE_RETURN,
+        "currencyCode": "USD",
+        "lineItems": order_created["lineItems"],
+    }
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=202,
+        json={
+            "orderId": "adobe-order-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": "uuid-1",
+                },
+            ),
+            matchers.json_params_matcher(expected_body),
+        ],
+    )
+
+    return_order = client.create_return_order_by_adobe_order(
+        authorization_uk,
+        customer_id,
+        order_created,
+    )
+    assert return_order == {
+        "orderId": "adobe-order-id",
+    }
+
+
+def test_create_return_order_by_adobe_order_bad_request(
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+    adobe_api_error_factory,
+):
+    """
+    Test the call to Adobe API to create a return order using an Adobe
+    order as input when the response is 400 bad request.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer"
+
+    client, _, _ = adobe_client_factory()
+
+    error = adobe_api_error_factory("1234", "An error")
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=400,
+        json=error,
+    )
+    order_created = adobe_order_factory(ORDER_TYPE_NEW, status=STATUS_PROCESSED)
+
+    with pytest.raises(AdobeError) as cv:
+        client.create_return_order_by_adobe_order(
+            authorization_uk,
+            customer_id,
+            order_created,
+        )
+
+    assert repr(cv.value) == str(error)
+
+
 @pytest.mark.parametrize(
     "update_params",
     [
