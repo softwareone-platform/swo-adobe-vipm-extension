@@ -1,5 +1,4 @@
 import logging
-from datetime import date
 
 from django.conf import settings
 from mpt_extension_sdk.mpt_http.mpt import (
@@ -20,12 +19,9 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_COMMITTED,
     STATUS_PROCESSED,
 )
 from adobe_vipm.adobe.utils import (
-    get_3yc_commitment,
     sanitize_company_name,
     sanitize_first_last_name,
 )
@@ -33,8 +29,7 @@ from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
     STATUS_GC_ERROR,
     get_gc_agreement_deployments_to_check,
-    get_prices_for_3yc_skus,
-    get_prices_for_skus,
+    get_sku_price,
 )
 from adobe_vipm.flows.constants import (
     GLOBAL_SUFFIX,
@@ -57,10 +52,8 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_NAME_TRANSFER,
 )
 from adobe_vipm.flows.utils import (
-    get_customer_consumables_discount_level,
-    get_customer_licenses_discount_level,
     get_market_segment,
-    is_consumables_sku,
+    get_sku_with_discount_level,
     split_phone_number,
 )
 from adobe_vipm.shared import mpt_client, mpt_o_client
@@ -443,7 +436,7 @@ def create_gc_agreement_subscription(
     gc_agreement_id,
     buyer_id,
     item,
-    prices=None
+    prices
 ):
     """
     Create a global customer agreement subscription.
@@ -605,6 +598,9 @@ def process_agreement_deployment(
             for item in get_product_items_by_skus(mpt_client, product_id, returned_skus)
         }
 
+        offer_ids = [get_sku_with_discount_level(adobe_subscription["offerId"], adobe_customer)
+                     for adobe_subscription in adobe_subscriptions]
+
         for adobe_subscription in adobe_subscriptions:
             if adobe_subscription["status"] != STATUS_PROCESSED:
                 logger.warning(
@@ -627,12 +623,16 @@ def process_agreement_deployment(
                     adobe_client, authorization_id, adobe_customer, adobe_subscription
                 )
 
-                sku_price = get_sku_price(
+                prices = get_sku_price(
                     adobe_customer,
-                    adobe_subscription,
+                    offer_ids,
                     product_id,
                     agreement_deployment.deployment_currency
                 )
+                sku_discount_level = get_sku_with_discount_level(
+                    adobe_subscription["offerId"],
+                    adobe_customer)
+
                 create_gc_agreement_subscription(
                     mpt_client,
                     agreement_deployment,
@@ -640,7 +640,7 @@ def process_agreement_deployment(
                     gc_agreement_id,
                     licensee["buyer"]["id"],
                     item,
-                    sku_price
+                    prices.get(sku_discount_level)
                 )
                 logger.info(
                     f"GC agreement subscription created for {adobe_subscription['subscriptionId']}"
@@ -661,52 +661,8 @@ def process_agreement_deployment(
         agreement_deployment.save()
 
 
-def get_sku_price(adobe_customer, adobe_subscription, product_id, deployment_currency):
-    """
-    Obtiene el precio del SKU considerando el nivel de descuento y el compromiso 3YC.
-
-    Args:
-        adobe_customer (dict): Información del cliente de Adobe
-        adobe_subscription (dict): Información de la suscripción de Adobe
-        product_id (str): ID del producto
-        deployment_currency (str): Moneda del despliegue
-
-    Returns:
-        float or None: Precio del SKU si está disponible, None en caso contrario
-    """
-    actual_sku = adobe_subscription["offerId"]
-    discount_level = (
-        get_customer_licenses_discount_level(adobe_customer)
-        if not is_consumables_sku(actual_sku)
-        else get_customer_consumables_discount_level(adobe_customer)
-    )
-    actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
-    commitment = get_3yc_commitment(adobe_customer)
-    commitment_start_date = None
-    if (
-        commitment
-        and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
-        and date.fromisoformat(commitment["endDate"]) >= date.today()
-    ):
-        commitment_start_date = date.fromisoformat(commitment["startDate"])
-
-    if commitment_start_date:
-        prices = get_prices_for_3yc_skus(
-            product_id,
-            deployment_currency,
-            commitment_start_date,
-            [actual_sku]
-        )
-    else:
-        prices = get_prices_for_skus(
-            product_id,
-            deployment_currency,
-            [actual_sku]
-        )
-    return prices.get(actual_sku) if prices else None
-
-
 def check_gc_agreement_deployments():
+
     """
     Check and process Global Customer Agreement Deployments for each product ID
     defined in the settings.

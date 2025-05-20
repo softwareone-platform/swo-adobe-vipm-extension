@@ -23,8 +23,7 @@ from adobe_vipm.adobe.errors import CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
-    get_prices_for_3yc_skus,
-    get_prices_for_skus,
+    get_sku_price,
 )
 from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
@@ -37,11 +36,9 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
-    get_customer_consumables_discount_level,
-    get_customer_licenses_discount_level,
     get_deployments,
     get_global_customer,
-    is_consumables_sku,
+    get_sku_with_discount_level,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
@@ -109,23 +106,13 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
 
             actual_sku = adobe_subscription["offerId"]
 
-            discount_level = (
-                get_customer_licenses_discount_level(customer)
-                if not is_consumables_sku(actual_sku)
-                else get_customer_consumables_discount_level(customer)
-            )
-
-            actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
-            to_update.append((subscription, adobe_subscription, actual_sku))
+            to_update.append((subscription,
+                              adobe_subscription,
+                              get_sku_with_discount_level(actual_sku, customer)))
 
         skus = [item[2] for item in to_update]
 
-        if commitment_start_date:
-            prices = get_prices_for_3yc_skus(
-                product_id, currency, commitment_start_date, skus
-            )
-        else:
-            prices = get_prices_for_skus(product_id, currency, skus)
+        prices = get_sku_price(customer, skus, product_id, currency)
 
         for subscription, adobe_subscription, actual_sku in to_update:
             if actual_sku not in prices:
@@ -199,23 +186,11 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
             actual_sku = get_adobe_product_by_marketplace_sku(
                 line["item"]["externalIds"]["vendor"]
             ).sku
-            discount_level = (
-                get_customer_licenses_discount_level(customer)
-                if not is_consumables_sku(actual_sku)
-                else get_customer_consumables_discount_level(customer)
-            )
-            actual_sku = f"{actual_sku[0:10]}{discount_level}{actual_sku[12:]}"
-
-            to_update.append((line, actual_sku))
+            to_update.append((line, get_sku_with_discount_level(actual_sku, customer)))
 
         skus = [item[1] for item in to_update]
 
-        if commitment_start_date:
-            prices = get_prices_for_3yc_skus(
-                product_id, currency, commitment_start_date, skus
-            )
-        else:
-            prices = get_prices_for_skus(product_id, currency, skus)
+        prices = get_sku_price(customer, skus, product_id, currency)
 
         for line, actual_sku in to_update:
             current_price = line["price"]["unitPP"]

@@ -802,6 +802,15 @@ def is_consumables_sku(sku):
     return sku[10] == "T"
 
 
+def get_sku_with_discount_level(sku, customer):
+    discount_level = (
+        get_customer_licenses_discount_level(customer)
+        if not is_consumables_sku(sku)
+        else get_customer_consumables_discount_level(customer)
+    )
+    sku_with_discount = f"{sku[0:10]}{discount_level}{sku[12:]}"
+    return sku_with_discount
+
 def get_market_segment(product_id):
     return get_for_product(settings, "PRODUCT_SEGMENT", product_id)
 
