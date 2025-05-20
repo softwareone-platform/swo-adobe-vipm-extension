@@ -13,6 +13,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    SetupDueDate,
     StartOrderProcessing,
     get_configuration_template_name,
     switch_order_to_failed,
@@ -34,6 +35,7 @@ def fulfill_configuration_order(client, order):
 
     pipeline = Pipeline(
         SetupContext(),
+        SetupDueDate(),
         StartOrderProcessing(template_name),
         SubscriptionUpdateAutoRenewal(),
         CompleteOrder(template_name),
