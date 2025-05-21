@@ -69,6 +69,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
+    get_address,
     get_adobe_customer_id,
     get_coterm_date,
     get_deployment_id,
@@ -137,14 +138,7 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     }
 
     if address:
-        customer_data[PARAM_ADDRESS] = {
-            "country": address.get("country", ""),
-            "state": address.get("region", ""),
-            "city": address.get("city", ""),
-            "addressLine1": address.get("addressLine1", ""),
-            "addressLine2": address.get("addressLine2", ""),
-            "postCode": address.get("postalCode", ""),
-        }
+        customer_data[PARAM_ADDRESS] = get_address(address)
 
     if commitment:
         customer_data[PARAM_3YC] = None

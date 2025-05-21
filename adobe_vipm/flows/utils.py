@@ -1059,3 +1059,20 @@ def is_within_last_two_weeks(coterm_date):
     ).date()
 
     return date.today() >= last_two_weeks
+
+
+def get_address(data):
+    """
+    Set the address fields in the address object.
+    Args:
+        address (dict): The address object to update.
+        data (dict): The data to set.
+    """
+    return {
+        "country": data.get("country", ""),
+        "state": data.get("region", ""),
+        "city": data.get("city", ""),
+        "addressLine1": data.get("addressLine1", ""),
+        "addressLine2": data.get("addressLine2", ""),
+        "postCode": data.get("postalCode", ""),
+    }
