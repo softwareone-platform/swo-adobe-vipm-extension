@@ -25,6 +25,7 @@ from adobe_vipm.flows.constants import (
     PARAM_3YC_RECOMMITMENT,
     PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
     PARAM_3YC_START_DATE,
+    PARAM_DEPLOYMENT_ID,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
 )
@@ -159,7 +160,9 @@ def update_deployment_agreements_3yc(
         return
 
     deployment_agreements = get_agreements_by_customer_deployments(
-        mpt_client, [deployment["deploymentId"] for deployment in customer_deployments]
+        mpt_client,
+        PARAM_DEPLOYMENT_ID,
+        [deployment["deploymentId"] for deployment in customer_deployments]
     )
 
     for deployment_agreement in deployment_agreements:

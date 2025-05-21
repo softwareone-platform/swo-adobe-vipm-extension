@@ -13,7 +13,11 @@ from adobe_vipm.flows.benefits import (
     resubmit_3yc_commitment_request,
     submit_3yc_recommitment_request,
 )
-from adobe_vipm.flows.constants import PARAM_3YC_CONSUMABLES, PARAM_3YC_LICENSES
+from adobe_vipm.flows.constants import (
+    PARAM_3YC_CONSUMABLES,
+    PARAM_3YC_LICENSES,
+    PARAM_DEPLOYMENT_ID,
+)
 from adobe_vipm.flows.utils import get_adobe_customer_id, get_company_name
 from adobe_vipm.notifications import Button
 
@@ -448,6 +452,7 @@ def test_check_3yc_commitment_request_global_customers(
 
     mocked_get_agreements_by_deployments.assert_called_once_with(
         mpt_client,
+        PARAM_DEPLOYMENT_ID,
         ["0", "1"],
     )
     assert mocked_update_agreement.call_args_list == [
