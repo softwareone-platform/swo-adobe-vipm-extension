@@ -455,6 +455,11 @@ def create_gc_agreement_subscription(
     logger.info(
         f"Creating GC agreement subscription for {adobe_subscription['subscriptionId']}"
     )
+
+    price_component = {}
+    if prices is not None:
+        price_component = {"price": {"unitPP": prices}}
+
     subscription = {
         "status": "Active",
         "name": f"Subscription for {item['name']}",
@@ -478,7 +483,7 @@ def create_gc_agreement_subscription(
         },
         "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
         "lines": [{"quantity": adobe_subscription["currentQuantity"], "item": item,
-                   **({"price": {"unitPP": prices}} if prices is not None else {})
+                   **price_component
         }],
         "startDate": adobe_subscription["creationDate"],
         "commitmentDate": adobe_subscription["renewalDate"],
