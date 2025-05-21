@@ -1,5 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date
 from functools import cache
 
 from django.conf import settings
@@ -19,7 +20,12 @@ from pyairtable.formulas import (
 from pyairtable.orm import Model, fields
 from requests import HTTPError
 
+from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
+)
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
+from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.utils import find_first
 
 STATUS_INIT = "init"
@@ -529,6 +535,44 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
         if item.sku not in prices:
             prices[item.sku] = item.unit_pp
     return prices
+
+
+def get_sku_price(adobe_customer, offer_ids, product_id, deployment_currency):
+    """
+    Get the SKU price considering the level dicount and the 3YC commitment.
+
+    Args:
+        adobe_customer (dict): Adobe customer
+        adobe_subscription (dict): Adobe subscription
+        product_id (str): ID of the product
+        deployment_currency (str): deployment currency
+
+    Returns:
+        float or None: Sku price if is available, None in other case
+    """
+    commitment = get_3yc_commitment(adobe_customer)
+    commitment_start_date = None
+    if (
+        commitment
+        and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+        and date.fromisoformat(commitment["endDate"]) >= date.today()
+    ):
+        commitment_start_date = date.fromisoformat(commitment["startDate"])
+
+    if commitment_start_date:
+        prices = get_prices_for_3yc_skus(
+            product_id,
+            deployment_currency,
+            commitment_start_date,
+            offer_ids
+        )
+    else:
+        prices = get_prices_for_skus(
+            product_id,
+            deployment_currency,
+            offer_ids
+        )
+    return prices if prices else {}
 
 
 def create_gc_agreement_deployments(product_id, agreement_deployments):

@@ -102,7 +102,7 @@ def test_sync_agreement_prices(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_prices_for_skus",
+        "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
@@ -263,7 +263,7 @@ def test_sync_agreement_prices_dry_run(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_prices_for_skus",
+        "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[{"65304578CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
     )
 
@@ -494,7 +494,7 @@ def test_sync_agreement_prices_with_3yc(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_prices_for_3yc_skus",
+        "adobe_vipm.airtable.models.get_prices_for_3yc_skus",
         side_effect=[{"65304578CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
     )
 
@@ -678,7 +678,7 @@ def test_sync_global_customer_parameter(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_prices_for_skus",
+        "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
@@ -1002,7 +1002,7 @@ def test_sync_global_customer_update_not_required(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_prices_for_skus",
+        "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
@@ -1314,7 +1314,7 @@ def test_sync_global_customer_update_adobe_error(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_prices_for_skus",
+        "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
@@ -1679,7 +1679,7 @@ def test_sync_agreement_prices_with_missing_prices(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_prices_for_skus",
+        "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[
             {"77777777CA01A12": 20.22},
             {"77777777CA01A12": 20.22},
