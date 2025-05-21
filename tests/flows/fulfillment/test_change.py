@@ -970,6 +970,14 @@ def test_fulfill_change_order(mocker):
     )
 
 
+@pytest.mark.parametrize(
+    ("error_code","error_message"),
+    [
+        ("3120", "Update could not be performed because it would create an invalid renewal state"),
+        ("3123", "Line Item offer id has expired"),
+        ("3119", "Inactive Subscription or Pending Renewal is not Editable"),
+    ],
+)
 def test_validate_update_renewal_quantity_invalid_renewal_state(
     mocker,
     order_factory,
@@ -977,12 +985,18 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
     adobe_api_error_factory,
     subscriptions_factory,
     lines_factory,
+    error_code,
+    error_message,
 ):
     """
     Tests the validate update renewal quantity step when the renewal state is invalid.
+    when the offer has expired or when the subscription is inactive/pending renewal
     """
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
+    )
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions",
     )
     subscriptions = subscriptions_factory()
     order = order_factory(
@@ -1012,8 +1026,8 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
     mocked_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            "3120",
-            "Update could not be performed because it would create an invalid renewal state",
+            error_code,
+            error_message,
         ),
     )
 
@@ -1024,9 +1038,10 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
         mocked_client,
         context.order,
         ERR_INVALID_RENEWAL_STATE.to_dict(
-            error="Update could not be performed because it would create an invalid renewal state",
+            error=error_message,
         ),
     )
+    mocked_notify.assert_called_once()
     mocked_next_step.assert_not_called()
 
 
@@ -1043,6 +1058,9 @@ def test_validate_update_renewal_quantity_error(
     """
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
+    )
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions",
     )
     subscriptions = subscriptions_factory()
     order = order_factory(
@@ -1081,4 +1099,235 @@ def test_validate_update_renewal_quantity_error(
     step(mocked_client, context, mocked_next_step)
 
     mocked_switch_to_failed.assert_not_called()
+    mocked_notify.assert_called_once()
+    mocked_next_step.assert_not_called()
+
+
+def test_rollback_updated_subscriptions_error(
+    mocker,
+    order_factory,
+    lines_factory,
+    subscriptions_factory,
+    adobe_subscription_factory,
+    adobe_order_factory,
+):
+    """
+    Tests the rollback of updated subscriptions when an error occurs during the rollback process.
+    Verifies that both successful updates are rolled back and the Adobe order is returned.
+    """
+    subscriptions = subscriptions_factory()
+    subscriptions2 = subscriptions_factory()
+    subscriptions2[0]["id"] = "sub-2"
+    subscriptions2[0]["externalIds"]["vendor"] = "sub-2-id"
+    subscriptions2[0]["lines"][0]["item"]["id"] = "ITM-1234-1234-1234-0002"
+    subscriptions2[0]["lines"][0]["id"] = "ALI-2119-4550-8674-5962-0002"
+
+    order = order_factory(
+        lines=lines_factory(quantity=5)
+        + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
+        subscriptions=subscriptions + subscriptions2,
+    )
+
+    adobe_sub = adobe_subscription_factory(
+        subscription_id="sub-1-id",
+        renewal_quantity=10,
+    )
+    adobe_sub2 = adobe_subscription_factory(
+        subscription_id="sub-2-id",
+        renewal_quantity=15,
+    )
+
+    adobe_order = adobe_order_factory(
+        order_type="NEW",
+        status="PROCESSED",
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscription.side_effect = [adobe_sub, adobe_sub2]
+
+    mocked_adobe_client.update_subscription.side_effect = [
+        None,
+        AdobeAPIError(400, {"code": "1000", "message": "Error during rollback"}),
+        None,
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions"
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        upsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        product_id="PRD-1111-1111",
+        adobe_new_order=adobe_order,
+    )
+    context.updated = [
+        {
+            'subscription_vendor_id': 'sub-1-id',
+            'old_quantity': 10,
+            'new_quantity': 5
+        }
+    ]
+
+    step = UpdateRenewalQuantities()
+    step(mocked_client, context, mocked_next_step)
+
+    assert mocked_adobe_client.update_subscription.call_count == 3
+
+    mocked_adobe_client.update_subscription.assert_any_call(
+        context.authorization_id,
+        context.adobe_customer_id,
+        "a-sub-id",
+        quantity=5,
+    )
+
+    mocked_adobe_client.update_subscription.assert_any_call(
+        context.authorization_id,
+        context.adobe_customer_id,
+        "a-sub-id",
+        quantity=5,
+    )
+
+    mocked_adobe_client.update_subscription.assert_any_call(
+        context.authorization_id,
+        context.adobe_customer_id,
+        "a-sub-id",
+        quantity=10,
+    )
+
+    mocked_adobe_client.create_return_order_by_adobe_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_order,
+    )
+
+    mocked_notify.assert_called_with(
+        context.order["id"],
+        'Error updating subscription sub-2, 1000 - Error during rollback',
+        [],
+        context.product_id
+    )
+
+    mocked_next_step.assert_not_called()
+
+
+def test_rollback_updated_subscriptions_error_during_rollback(
+    mocker,
+    order_factory,
+    lines_factory,
+    subscriptions_factory,
+    adobe_subscription_factory,
+    adobe_order_factory,
+):
+    """
+    Tests the rollback of updated subscriptions when an error occurs during the rollback process.
+    Verifies that the error is caught and the notification is sent with the correct error message.
+    """
+    subscriptions = subscriptions_factory()
+    subscriptions2 = subscriptions_factory()
+    subscriptions2[0]["id"] = "sub-2"
+    subscriptions2[0]["externalIds"]["vendor"] = "sub-2-id"
+    subscriptions2[0]["lines"][0]["item"]["id"] = "ITM-1234-1234-1234-0002"
+    subscriptions2[0]["lines"][0]["id"] = "ALI-2119-4550-8674-5962-0002"
+
+    order = order_factory(
+        lines=lines_factory(quantity=5)
+        + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
+        subscriptions=subscriptions + subscriptions2,
+    )
+
+    adobe_sub = adobe_subscription_factory(
+        subscription_id="sub-1-id",
+        renewal_quantity=10,
+    )
+    adobe_sub2 = adobe_subscription_factory(
+        subscription_id="sub-2-id",
+        renewal_quantity=15,
+    )
+
+    adobe_order = adobe_order_factory(
+        order_type="NEW",
+        status="PROCESSED",
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscription.side_effect = [adobe_sub, adobe_sub2]
+    mocked_adobe_client.update_subscription.side_effect = [
+        None,
+        AdobeAPIError(400, {"code": "1000", "message": "Error during rollback"}),
+        AdobeAPIError(400, {"code": "1000", "message": "Error during rollback"}),
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions"
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        upsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        product_id="PRD-1111-1111",
+        adobe_new_order=adobe_order,
+    )
+    context.updated = [
+        {
+            'subscription_vendor_id': 'sub-1-id',
+            'old_quantity': 10,
+            'new_quantity': 5
+        },
+        {
+            'subscription_vendor_id': 'sub-2-id',
+            'old_quantity': 15,
+            'new_quantity': 5
+        }
+    ]
+
+    step = UpdateRenewalQuantities()
+    step(mocked_client, context, mocked_next_step)
+
+    assert mocked_adobe_client.update_subscription.call_count == 3
+
+    mocked_adobe_client.update_subscription.assert_any_call(
+        context.authorization_id,
+        context.adobe_customer_id,
+        "a-sub-id",
+        quantity=5,
+    )
+    mocked_adobe_client.update_subscription.assert_any_call(
+        context.authorization_id,
+        context.adobe_customer_id,
+        "a-sub-id",
+        quantity=5,
+    )
+    mocked_adobe_client.update_subscription.assert_any_call(
+        context.authorization_id,
+        context.adobe_customer_id,
+        "a-sub-id",
+        quantity=10,
+    )
+    mocked_notify.assert_called_with(
+        context.order["id"],
+        'Error rolling back updated subscriptions: 1000 - Error during rollback',
+        context.updated,
+        context.product_id
+    )
     mocked_next_step.assert_not_called()
