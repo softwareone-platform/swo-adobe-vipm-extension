@@ -375,16 +375,23 @@ def test_check_gc_agreement_deployments_get_listing_error(
 def test_check_gc_agreement_deployments_create_listing(
     mocker,
     settings,
-    mpt_error_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
-    items_factory,
+    agreement_factory,
+    created_agreement_factory,
     provisioning_agreement,
     gc_agreement_deployment,
     listing,
     licensee,
     template,
 ):
+    agreement = agreement_factory()
+
+    expected_created_agreement_arg = created_agreement_factory(
+        deployments="",
+        is_profile_address_exists=True
+    )
+
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
@@ -421,12 +428,12 @@ def test_check_gc_agreement_deployments_create_listing(
 
     mocked_create_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.create_agreement",
-        return_value=mocker.MagicMock(),
+        return_value=agreement,
     )
 
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=mocker.MagicMock(),
+        return_value=agreement,
     )
 
     mocker.patch(
@@ -434,7 +441,7 @@ def test_check_gc_agreement_deployments_create_listing(
         return_value=mocked_gc_agreement_deployments_model,
     )
 
-    adobe_customer = adobe_customer_factory()
+    adobe_customer = adobe_customer_factory(company_profile_address_exists=True)
     mocked_adobe_client.get_customer.return_value = adobe_customer
     mocked_adobe_client.get_customer_deployments_active_status.return_value = (
         mocker.MagicMock()
@@ -459,60 +466,113 @@ def test_check_gc_agreement_deployments_create_listing(
     mocked_adobe_client.get_customer.assert_called_once()
     mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
-    mocked_create_agreement.assert_called_with(
-        mocker.ANY,
-        {
-            "authorization": {"id": "AUT-1234-1234-1234"},
-            "buyer": {"id": "BUY-3731-7971"},
-            "client": {"id": "ACC-123-123-123"},
-            "externalIds": {"vendor": "a-client-id"},
-            "licensee": {"id": "LC-321-321-321"},
-            "lines": [],
-            "listing": {"id": "LST-9401-9279"},
-            "name": "Adobe for Commercial for Client Account - US",
-            "parameters": {
-                "fulfillment": [
-                    {"externalId": "globalCustomer", "value": ["Yes"]},
-                    {"externalId": "deploymentId", "value": "deployment_id"},
-                    {"externalId": "deployments", "value": ""},
-                    {"externalId": "customerId", "value": "P0112233"},
-                    {"externalId": "cotermDate", "value": "2024-01-23"},
-                ],
-                "ordering": [
-                    {"externalId": "agreementType", "value": "Migrate"},
-                    {"externalId": "companyName", "value": "Migrated Company"},
-                    {
-                        "externalId": "address",
-                        "value": {
-                            "addressLine1": "addressLine1",
-                            "addressLine2": "addressLine2",
-                            "city": "city",
-                            "country": "US",
-                            "postCode": "postalCode",
-                            "state": "region",
-                        },
-                    },
-                    {
-                        "externalId": "contact",
-                        "value": {
-                            "email": "email",
-                            "firstName": "firstName",
-                            "lastName": "lastName",
-                            "phone": {"number": "8004449890", "prefix": "+1"},
-                        },
-                    },
-                    {"externalId": "membershipId", "value": "membership-id"},
-                ],
-            },
-            "product": {"id": "PRD-123-123-123"},
-            "seller": {"id": "SEL-321-321"},
-            "status": "Active",
-            "subscriptions": [],
-            "template": {"id": "TPL-1234-1234-4321", "name": "Default Template"},
-            "termsAndConditions": [],
-            "vendor": {"id": "ACC-1234-vendor-id"},
-        },
+
+    assert mocked_create_agreement.call_args_list[0].args[1] == expected_created_agreement_arg
+
+    mocked_get_agreement.assert_called_once()
+
+    mocked_update_agreement.assert_called_once()
+
+
+def test_check_gc_agreement_deployments_create_listing_with_no_address(
+    mocker,
+    settings,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    agreement_factory,
+    mock_adobe_customer_deployments_external_ids,
+    mock_adobe_customer_deployments_items,
+    created_agreement_factory,
+    provisioning_agreement,
+    gc_agreement_deployment,
+    listing,
+    licensee,
+    template,
+):
+    agreement = agreement_factory()
+
+    expected_created_agreement_arg = created_agreement_factory(
+        deployments=mock_adobe_customer_deployments_external_ids,
+        is_profile_address_exists=False,
     )
+
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
+        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
+    }
+    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.global_customer.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
+
+    mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
+        return_value=[],
+    )
+
+    mocked_create_listing = mocker.patch(
+        "adobe_vipm.flows.global_customer.create_listing",
+        return_value=listing,
+    )
+
+    mocked_get_licensee = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_licensee",
+        return_value=licensee,
+    )
+
+    mocked_get_product_template_or_default = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_product_template_or_default",
+        return_value=template,
+    )
+
+    mocked_create_agreement = mocker.patch(
+        "adobe_vipm.flows.global_customer.create_agreement",
+        return_value=agreement,
+    )
+
+    mocked_update_agreement = mocker.patch(
+        "adobe_vipm.flows.global_customer.update_agreement",
+        return_value=agreement,
+    )
+
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
+    )
+
+    adobe_customer = adobe_customer_factory(company_profile_address_exists=False)
+    mocked_adobe_client.get_customer.return_value = adobe_customer
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+        mock_adobe_customer_deployments_items
+    )
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription_factory()]
+    }
+
+    gc_agreement_deployment.listing_id = None
+    gc_agreement_deployment.agreement_id = None
+    mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
+    mocked_get_agreement = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_agreement",
+        return_value=provisioning_agreement,
+    )
+
+    check_gc_agreement_deployments()
+    mocked_gc_agreement_deployments_model.all.assert_called_once()
+    mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
+    mocked_create_listing.assert_called_once()
+    mocked_get_licensee.assert_called_once()
+    mocked_adobe_client.get_customer.assert_called_once()
+    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
+    mocked_get_product_template_or_default.assert_called_once()
+
+    assert mocked_create_agreement.call_args_list[0].args[1] == expected_created_agreement_arg
+
     mocked_get_agreement.assert_called_once()
 
     mocked_update_agreement.assert_called_once()
