@@ -1224,6 +1224,7 @@ def test_create_return_order_by_adobe_order(
     )
 
     expected_body = {
+        "externalReferenceId": f"{order_created['externalReferenceId']}_{order_created['orderId']}",
         "referenceOrderId": order_created["orderId"],
         "orderType": ORDER_TYPE_RETURN,
         "currencyCode": "USD",

@@ -346,6 +346,36 @@ class AdobeClient:
         return orders
 
     @wrap_http_error
+    def _create_return_order_base(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        payload: dict,
+        correlation_id: str = None,
+    ) -> dict:
+        """
+        Base method to create a return order with the given payload.
+
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str): Identifier of the customer that place the RETURN order.
+            payload (dict): The payload for the return order.
+            correlation_id (str, optional): Correlation ID for the request.
+
+        Returns:
+            dict: The RETURN order.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        response = requests.post(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
     def create_return_order(
         self,
         authorization_id: str,
@@ -364,23 +394,27 @@ class AdobeClient:
             customer_id (str): Identifier of the customer that place the RETURN order.
             returning_order (dict): The order that contains the item to return.
             returning_item (dict): The item that must be returned.
+            external_reference (str): External reference for the return order.
+            deployment_id (str, optional): Deployment ID if the return is for a deployment.
 
         Returns:
             dict: The RETURN order.
         """
-        authorization = self._config.get_authorization(authorization_id)
         line_number = returning_item["extLineItemNumber"]
         quantity = returning_item["quantity"]
         sku = returning_item["offerId"]
         external_id = f"{external_reference}_{returning_order['externalReferenceId']}_{line_number}"
+
         payload = {
             "externalReferenceId": external_id,
             "referenceOrderId": returning_order["orderId"],
             "orderType": ORDER_TYPE_RETURN,
             "lineItems": [],
         }
+
         if not deployment_id:
-            payload["currencyCode"] = authorization.currency
+            payload["currencyCode"] = self._config.get_authorization(authorization_id).currency
+
         line_item = {
             "extLineItemNumber": line_number,
             "offerId": sku,
@@ -388,20 +422,10 @@ class AdobeClient:
         }
         if deployment_id:
             line_item["deploymentId"] = deployment_id
-            line_item["currencyCode"] = authorization.currency
+            line_item["currencyCode"] = self._config.get_authorization(authorization_id).currency
         payload["lineItems"].append(line_item)
-        headers = self._get_headers(
-            authorization,
-            correlation_id=external_id,
-        )
-        response = requests.post(
-            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
-        return response.json()
 
+        return self._create_return_order_base(authorization_id, customer_id, payload, external_id)
 
     @wrap_http_error
     def create_return_order_by_adobe_order(
@@ -412,23 +436,28 @@ class AdobeClient:
     ) -> dict:
         """
         Creates a return order for a given Adobe order.
-        """
-        authorization = self._config.get_authorization(authorization_id)
-        payload = {
-            "referenceOrderId": order_created["orderId"],
-            "orderType": ORDER_TYPE_RETURN,
-            "currencyCode": authorization.currency,
-            "lineItems": order_created["lineItems"],
-        }
-        headers = self._get_headers(authorization)
-        response = requests.post(
-            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
-        return response.json()
 
+        Args:
+            authorization_id (str): Id of the authorization to use.
+            customer_id (str): Identifier of the customer that place the RETURN order.
+            order_created (dict): The Adobe order to return.
+
+        Returns:
+            dict: The RETURN order.
+        """
+        external_reference_id = f"{order_created["externalReferenceId"]}_{order_created["orderId"]}"
+        adobe_order_id = order_created["orderId"]
+        currency_code = self._config.get_authorization(authorization_id).currency
+        adobe_line_items = order_created["lineItems"]
+
+        payload = {
+            "externalReferenceId": external_reference_id,
+            "referenceOrderId": adobe_order_id,
+            "orderType": ORDER_TYPE_RETURN,
+            "currencyCode": currency_code,
+            "lineItems": adobe_line_items,
+        }
+        return self._create_return_order_base(authorization_id, customer_id, payload)
 
     def _get_preview_order_line_item(self, line: dict, quantity: int) -> dict:
         adobe_base_sku = line["item"]["externalIds"]["vendor"]
