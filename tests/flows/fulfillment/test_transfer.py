@@ -421,6 +421,8 @@ def test_transfer_with_no_profile_address(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
     )
+    # TODO: For mocking without checking for calls, this could be refactored into one line through
+    # @pytest.mark.usefixtures().
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,

@@ -52,6 +52,7 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_NAME_TRANSFER,
 )
 from adobe_vipm.flows.utils import (
+    get_address,
     get_market_segment,
     get_sku_with_discount_level,
     split_phone_number,
@@ -330,14 +331,7 @@ def create_gc_agreement_deployment(
     try:
         address = adobe_customer["companyProfile"].get("address", {})
         contact = adobe_customer["companyProfile"]["contacts"][0]
-        param_address = {
-            "country": address.get("country", ""),
-            "state": address.get("region", ""),
-            "city": address.get("city", ""),
-            "addressLine1": address.get("addressLine1", ""),
-            "addressLine2": address.get("addressLine2", ""),
-            "postCode": address.get("postalCode", ""),
-        }
+        param_address = get_address(address)
 
         param_contact = {
             "firstName": sanitize_first_last_name(contact["firstName"]),
