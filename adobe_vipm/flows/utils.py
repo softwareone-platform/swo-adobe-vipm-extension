@@ -1,9 +1,10 @@
 import copy
 import functools
+import re
 from datetime import date, datetime, timedelta
+from operator import attrgetter
 
 import phonenumbers
-import regex as re
 from django.conf import settings
 from markdown_it import MarkdownIt
 from mpt_extension_sdk.mpt_http.mpt import get_product_onetime_items_by_ids
@@ -13,7 +14,9 @@ from adobe_vipm.adobe.constants import (
     OFFER_TYPE_CONSUMABLES,
     OFFER_TYPE_LICENSE,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
+    STATUS_SUBSCRIPTION_ACTIVE,
 )
+from adobe_vipm.adobe.utils import get_item_by_partial_sku
 from adobe_vipm.flows.constants import (
     LAST_TWO_WEEKS_DAYS,
     NEW_CUSTOMER_PARAMETERS,
@@ -1076,3 +1079,67 @@ def get_address(data):
         "addressLine2": data.get("addressLine2", ""),
         "postCode": data.get("postalCode", ""),
     }
+
+def is_line_item_active_subscription(subscriptions, line):
+    adobe_item = get_item_by_partial_sku(
+        subscriptions["items"], line["item"]["externalIds"]["vendor"]
+    )
+    return adobe_item["status"] == STATUS_SUBSCRIPTION_ACTIVE
+
+
+def has_valid_returnable_quantity(line, returnable_orders):
+    delta = line["oldQuantity"] - line["quantity"]
+    total_quantity_returnable = sum(
+        roi.quantity
+        for roi in sorted(returnable_orders, key=attrgetter("quantity"))
+    )
+    if delta != total_quantity_returnable:
+        return False
+    return True
+
+
+def _validate_subscription_and_returnable_orders(
+    adobe_client,
+    context,
+    line,
+    sku,
+    return_orders=None
+):
+    """
+    Validates if the subscription is active and has valid returnable orders.
+
+    Args:
+        adobe_client: The Adobe client instance
+        context: The context object
+        line: The order line to validate
+        sku: The SKU to validate
+        return_orders: Optional return orders to pass to get_returnable_orders_by_sku
+
+    Returns:
+        tuple: (is_valid, returnable_orders)
+        - is_valid: True if validation passed, False otherwise
+        - returnable_orders: List of returnable orders if validation passed, None otherwise
+    """
+    subscriptions = adobe_client.get_subscriptions(
+        context.authorization_id,
+        context.adobe_customer_id,
+    )
+
+    if not is_line_item_active_subscription(subscriptions, line):
+        return True, []
+
+    returnable_orders = adobe_client.get_returnable_orders_by_sku(
+        context.authorization_id,
+        context.adobe_customer_id,
+        sku,
+        context.adobe_customer["cotermDate"],
+        return_orders=return_orders,
+    )
+
+    if not returnable_orders:
+        return False, []
+
+    if not has_valid_returnable_quantity(line, returnable_orders):
+        return False, None
+
+    return True, returnable_orders
