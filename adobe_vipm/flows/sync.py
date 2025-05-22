@@ -28,6 +28,7 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_CURRENT_QUANTITY,
+    PARAM_DEPLOYMENT_ID,
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_RENEWAL_DATE,
@@ -366,6 +367,7 @@ def sync_deployments_prices(
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
+        PARAM_DEPLOYMENT_ID,
         [deployment["deploymentId"] for deployment in customer_deployments],
     )
 
