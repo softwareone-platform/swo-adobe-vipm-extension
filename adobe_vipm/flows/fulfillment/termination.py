@@ -11,6 +11,7 @@ from adobe_vipm.adobe.constants import STATUS_INVALID_RENEWAL_STATE
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
+    ERR_INVALID_TERMINATION_ORDER_QUANTITY,
     TEMPLATE_NAME_TERMINATION,
 )
 from adobe_vipm.flows.context import Context
@@ -27,6 +28,7 @@ from adobe_vipm.flows.fulfillment.shared import (
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
+    _validate_subscription_and_returnable_orders,
     get_adobe_subscription_id,
     get_subscription_by_line_and_item_id,
 )
@@ -43,15 +45,23 @@ class GetReturnableOrders(Step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
-            context.adobe_returnable_orders[sku] = (
-                adobe_client.get_returnable_orders_by_sku(
-                    context.authorization_id,
-                    context.adobe_customer_id,
-                    sku,
-                    context.adobe_customer["cotermDate"],
-                    return_orders=context.adobe_return_orders.get(sku),
-                )
+            is_valid, returnable_orders = _validate_subscription_and_returnable_orders(
+                adobe_client,
+                context,
+                line,
+                sku,
+                return_orders=context.adobe_return_orders.get(sku)
             )
+            if not is_valid:
+                switch_order_to_failed(
+                    client,
+                    context.order,
+                    ERR_INVALID_TERMINATION_ORDER_QUANTITY.to_dict(),
+                )
+                return
+
+            context.adobe_returnable_orders[sku] = returnable_orders
+
         returnable_orders_count = sum(
             len(v) for v in context.adobe_returnable_orders.values()
         )
@@ -129,7 +139,6 @@ def fulfill_termination_order(client, order):
         GetReturnableOrders(),
         ValidateDownsizes3YC(),
         SubmitReturnOrders(),
-        SwitchAutoRenewalOff(),
         CompleteOrder(TEMPLATE_NAME_TERMINATION),
     )
     context = Context(order=order)
