@@ -13,6 +13,7 @@ from .customer import (
 )
 from .date import (
     get_due_date,
+    is_coterm_date_in_last_24_hours,
     is_renewal_window_open,
     is_within_last_two_weeks,
     reset_due_date,

@@ -3,6 +3,10 @@ import logging
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows.constants import ERR_INVALID_TERMINATION_ORDER_QUANTITY
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.shared import (
+    SetOrUpdateCotermNextSyncDates,
+    ValidateRenewalWindow24h,
+)
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
@@ -39,6 +43,8 @@ def validate_termination_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         ValidateDuplicateLines(),
+        SetOrUpdateCotermNextSyncDates(),
+        ValidateRenewalWindow24h(True),
         ValidateDownsizes(),
         ValidateDownsizes3YC(True),
     )

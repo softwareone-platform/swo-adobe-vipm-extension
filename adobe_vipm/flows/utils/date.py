@@ -1,6 +1,7 @@
 import copy
 from datetime import date, datetime, timedelta
 
+import pytz
 from django.conf import settings
 
 from adobe_vipm.flows.constants import (
@@ -93,10 +94,19 @@ def is_renewal_window_open(order):
     today = date.today()
     return coterm_date - timedelta(days=4) <= today <= coterm_date
 
-
 def is_within_last_two_weeks(coterm_date):
     last_two_weeks = (
         datetime.fromisoformat(coterm_date) - timedelta(days=LAST_TWO_WEEKS_DAYS)
     ).date()
 
     return date.today() >= last_two_weeks
+
+def is_coterm_date_in_last_24_hours(order):
+    if not get_coterm_date(order):
+        return False
+    coterm_date = datetime.fromisoformat(get_coterm_date(order)).date()
+    pacific_tz = pytz.timezone('America/Los_Angeles')
+    today = datetime.now(pacific_tz).date()
+    return today >= coterm_date - timedelta(days=1)
+
+
