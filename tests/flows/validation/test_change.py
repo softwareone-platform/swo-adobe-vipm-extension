@@ -11,15 +11,17 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.shared import (
+    SetOrUpdateCotermNextSyncDates,
+    ValidateRenewalWindow24h,
+)
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.validation.change import (
     GetPreviewOrder,
     ValidateDownsizes,
     validate_change_order,
 )
-from adobe_vipm.flows.validation.shared import (
-    ValidateDuplicateLines,
-)
+from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 
 
 @freeze_time("2024-11-09 12:30:00")
@@ -394,19 +396,25 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 6
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(
         mocked_pipeline_ctor.mock_calls[0].args[1], ValidateDuplicateLines
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDownsizes)
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[3],
+        mocked_pipeline_ctor.mock_calls[0].args[2], SetOrUpdateCotermNextSyncDates
+    )
+    assert isinstance(
+        mocked_pipeline_ctor.mock_calls[0].args[3], ValidateRenewalWindow24h
+    )
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDownsizes)
+    assert isinstance(
+        mocked_pipeline_ctor.mock_calls[0].args[5],
         ValidateDownsizes3YC,
     )
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[4],
+        mocked_pipeline_ctor.mock_calls[0].args[6],
         GetPreviewOrder,
     )
 

@@ -34,7 +34,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
-    ValidateRenewalWindow,
+    ValidateRenewalWindow24h,
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
 
@@ -939,7 +939,7 @@ def test_fulfill_change_order(mocker):
     assert (
         mocked_pipeline_ctor.mock_calls[0].args[4].template_name == TEMPLATE_NAME_CHANGE
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], ValidateRenewalWindow)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], ValidateRenewalWindow24h)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnOrders)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetReturnableOrders)
     assert isinstance(

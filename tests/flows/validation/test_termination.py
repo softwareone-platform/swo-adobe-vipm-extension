@@ -4,6 +4,10 @@ from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.constants import ERR_INVALID_TERMINATION_ORDER_QUANTITY
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.shared import (
+    SetOrUpdateCotermNextSyncDates,
+    ValidateRenewalWindow24h,
+)
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 from adobe_vipm.flows.validation.termination import (
@@ -328,12 +332,14 @@ def test_validate_termination_order(mocker):
 
     validate_termination_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 4
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 6
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], ValidateDuplicateLines)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDownsizes)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], ValidateDownsizes3YC)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[2], SetOrUpdateCotermNextSyncDates)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], ValidateRenewalWindow24h)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDownsizes)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], ValidateDownsizes3YC)
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(

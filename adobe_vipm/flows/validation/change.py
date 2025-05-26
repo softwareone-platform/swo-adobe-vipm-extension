@@ -11,6 +11,10 @@ from adobe_vipm.flows.constants import (
     ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.shared import (
+    SetOrUpdateCotermNextSyncDates,
+    ValidateRenewalWindow24h,
+)
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import is_within_last_two_weeks, set_order_error
@@ -109,6 +113,8 @@ def validate_change_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         ValidateDuplicateLines(),
+        SetOrUpdateCotermNextSyncDates(),
+        ValidateRenewalWindow24h(True),
         ValidateDownsizes(),
         ValidateDownsizes3YC(True),
         GetPreviewOrder(),

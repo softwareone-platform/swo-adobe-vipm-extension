@@ -26,7 +26,6 @@ from adobe_vipm.flows.constants import (
     PARAM_DUE_DATE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
-    TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -42,6 +41,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SyncAgreement,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
+    ValidateRenewalWindow24h,
     send_gc_mpt_notification,
     send_mpt_notification,
     set_customer_coterm_date_if_null,
@@ -496,7 +496,7 @@ def test_set_processing_template_to_delayed_in_renewal_win(
         mocked_client,
         context.product_id,
         MPT_ORDER_STATUS_PROCESSING,
-        TEMPLATE_NAME_DELAYED,
+        "my template",
     )
     mocked_update_order.assert_called_once_with(
         mocked_client,
@@ -1628,7 +1628,6 @@ def test_create_or_update_subscriptions_step_sub_expired(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-
 @freeze_time("2024-01-01")
 def test_complete_order_step(mocker, order_factory):
     """
@@ -2061,3 +2060,53 @@ def test_send_gc_mpt_notification(mocker, settings, order_factory, status, subje
             "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         },
     )
+
+
+@freeze_time("2024-05-06")
+@pytest.mark.parametrize(
+    ("is_validation", "coterm_date", "should_fail"),
+    [
+        (True, "2024-05-06", True),
+        (False, "2024-05-06", True),
+        (True, None, False),
+        (False, None, False),
+    ],
+)
+def test_validate_renewal_window_24h_step(
+    mocker, order_factory, fulfillment_parameters_factory, is_validation, coterm_date, should_fail
+):
+    """
+    Tests that ValidateRenewalWindow24h:
+    - Sets the error or fails the order if coterm date is in last 24h (depending on validation mode)
+    - Continues to next step if there is no coterm date
+    """
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_order_error"
+    )
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date=coterm_date)
+    )
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateRenewalWindow24h(is_validation=is_validation)
+    step(mocked_client, context, mocked_next_step)
+
+    if should_fail:
+        if is_validation:
+            mocked_set_order_error.assert_called_once()
+            mocked_switch_order_to_failed.assert_not_called()
+            mocked_next_step.assert_called_once_with(mocked_client, context)
+        else:
+            mocked_set_order_error.assert_not_called()
+            mocked_switch_order_to_failed.assert_called_once()
+            mocked_next_step.assert_not_called()
+    else:
+        mocked_set_order_error.assert_not_called()
+        mocked_switch_order_to_failed.assert_not_called()
+        mocked_next_step.assert_called_once_with(mocked_client, context)
