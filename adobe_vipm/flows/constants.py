@@ -253,6 +253,26 @@ ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION = ValidationError(
     "{error}",
 )
 
+ERR_COMMITMENT_3YC_LICENSES =(
+    "The quantity selected of {selected_licenses} would place the account below the "
+    "minimum commitment of {minimum_licenses} licenses for the three-year commitment."
+)
+
+ERR_COMMITMENT_3YC_CONSUMABLES =(
+    "The quantity selected of {selected_consumables} would place the account below the "
+    "minimum commitment of {minimum_consumables} consumables for the three-year commitment."
+)
+
+ERR_COMMITMENT_3YC_VALIDATION = ValidationError(
+    "VIPM0034",
+    "{error}",
+)
+
+ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT = ValidationError(
+    "VIPM0035",
+    "The 3-year commitment is in status {status}. Please contact support to renew the commitment."
+)
+
 ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
     "VIPM0021",
     "Do not add or remove items, and do not modify the quantities of any items. "
