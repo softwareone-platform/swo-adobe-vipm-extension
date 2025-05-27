@@ -1961,12 +1961,14 @@ def mock_sku_mapping_data():
             "sku": "65304578CA01A12",
             "segment": "segment_1",
             "name": "name_1",
+            "type_3yc": "License"
         },
         {
             "vendor_external_id": "77777777CA",
             "sku": "77777777CA01A12",
             "segment": "segment_2",
             "name": "name_2",
+            "type_3yc": "Consumable"
         },
     ]
 

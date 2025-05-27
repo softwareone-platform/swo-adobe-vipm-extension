@@ -698,3 +698,8 @@ def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     result = get_adobe_product_by_marketplace_sku("65304578CA")
     assert result.vendor_external_id == "65304578CA"
     assert result.sku == "65304578CA01A12"
+    assert not result.is_consumable()
+    assert result.is_license()
+    assert result.is_valid_3yc_type()
+
+

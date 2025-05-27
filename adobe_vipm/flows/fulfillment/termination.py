@@ -25,7 +25,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
-from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_adobe_subscription_id,
@@ -138,7 +138,7 @@ def fulfill_termination_order(client, order):
         ValidateRenewalWindow(),
         GetReturnOrders(),
         GetReturnableOrders(),
-        ValidateDownsizes3YC(),
+        Validate3YCCommitment(),
         SubmitReturnOrders(),
         CompleteOrder(TEMPLATE_NAME_TERMINATION),
     )

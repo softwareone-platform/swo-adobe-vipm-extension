@@ -1,16 +1,9 @@
-from datetime import date, timedelta
-
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.constants import STATUS_3YC_ACCEPTED
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
-    ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
-    ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
-    ERR_DOWNSIZE_MINIMUM_3YC_LICENSES,
-    ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION,
     ERR_INVALID_RENEWAL_STATE,
     ERR_NO_RETURABLE_ERRORS_FOUND,
     TEMPLATE_NAME_CHANGE,
@@ -36,7 +29,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     SyncAgreement,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import (
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+)
 
 
 @pytest.mark.parametrize(
@@ -383,429 +380,6 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
     )
     mocked_next_step.assert_not_called()
 
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsize_3yc_orders_step_error_minimum_license_quantity(
-    mocker,
-    order_factory,
-    adobe_subscription_factory,
-    adobe_commitment_factory,
-    adobe_customer_factory,
-    lines_factory,
-):
-    """
-    Tests the validate returnable orders step when the user has 3YC commitment benefits and
-    the resulting number of licenses after the return is greater or equal to the minimum 3YC
-     quantity.
-    """
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.helpers.switch_order_to_failed",
-    )
-    adobe_3yc_commitment = adobe_commitment_factory(licenses=25, consumables=0)
-
-    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
-    order_lines = lines_factory(
-        line_id=None,
-        item_id=1,
-        quantity=10,
-        old_quantity=20,
-        name="Awesome Expired product 1",
-        external_vendor_id="65304990CA",
-        unit_purchase_price=33.04,
-    )
-    order_lines.extend(
-        lines_factory(
-            line_id=None,
-            item_id=2,
-            quantity=20,
-            old_quantity=25,
-            name="Awesome Expired product 2",
-            external_vendor_id="65304991CA",
-            unit_purchase_price=35.09,
-        )
-    )
-
-    order = order_factory(lines=order_lines)
-    context = Context(
-        order=order,
-        downsize_lines=order["lines"],
-        adobe_returnable_orders={
-            "sku1": (mocker.MagicMock(),),
-            "sku2": (mocker.MagicMock(),),
-        },
-        adobe_customer_id="adobe-customer-id",
-        adobe_customer=adobe_customer,
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    adobe_subscription = adobe_subscription_factory(offer_id="65304990CA01A12")
-    adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CA01A12")
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription, adobe_subscription_2],
-    }
-
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    step = ValidateDownsizes3YC()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
-        context.order,
-        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(
-            error=ERR_DOWNSIZE_MINIMUM_3YC_LICENSES.format(minimum_licenses=25),
-        ),
-    )
-    mocked_next_step.assert_not_called()
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsize_3yc_orders_step_error_minimum_license_consumables(
-    mocker,
-    order_factory,
-    adobe_subscription_factory,
-    adobe_commitment_factory,
-    adobe_customer_factory,
-    lines_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.helpers.switch_order_to_failed",
-    )
-    adobe_3yc_commitment = adobe_commitment_factory(licenses=0, consumables=37)
-
-    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
-    order_lines = lines_factory(
-        line_id=None,
-        item_id=1,
-        quantity=10,
-        old_quantity=20,
-        name="Awesome Expired product 1",
-        external_vendor_id="65304990CA",
-        unit_purchase_price=33.04,
-    )
-    order_lines.extend(
-        lines_factory(
-            line_id=None,
-            item_id=2,
-            quantity=20,
-            old_quantity=25,
-            name="Awesome Expired product 2",
-            external_vendor_id="65304991CA",
-            unit_purchase_price=35.09,
-        )
-    )
-
-    order = order_factory(lines=order_lines)
-
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={},
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    adobe_subscription = adobe_subscription_factory(offer_id="65304990CAT1A12")
-    adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CAT1A12")
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription, adobe_subscription_2],
-    }
-
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    step = ValidateDownsizes3YC()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
-        context.order,
-        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(
-            error=ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(minimum_consumables=37),
-        ),
-    )
-    mocked_next_step.assert_not_called()
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
-    mocker,
-    order_factory,
-    adobe_subscription_factory,
-    adobe_commitment_factory,
-    adobe_customer_factory,
-    lines_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.helpers.switch_order_to_failed",
-    )
-    adobe_3yc_commitment = adobe_commitment_factory(licenses=20, consumables=37)
-
-    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
-    order_lines = lines_factory(
-        line_id=None,
-        item_id=1,
-        quantity=10,
-        old_quantity=20,
-        name="Awesome Expired product 1",
-        external_vendor_id="65304990CA",
-        unit_purchase_price=33.04,
-    )
-    order_lines.extend(
-        lines_factory(
-            line_id=None,
-            item_id=2,
-            quantity=20,
-            old_quantity=37,
-            name="Awesome Expired product 2",
-            external_vendor_id="65304991CA",
-            unit_purchase_price=35.09,
-        )
-    )
-
-    order = order_factory(lines=order_lines)
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={},
-        deployment_id="",
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    adobe_subscription = adobe_subscription_factory(offer_id="65304990CA01A12")
-    adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CAT1A12")
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription, adobe_subscription_2],
-    }
-
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    step = ValidateDownsizes3YC()
-    step(mocked_client, context, mocked_next_step)
-    error_msg = ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
-        minimum_consumables=37, minimum_licenses=20
-    )
-
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
-        context.order,
-        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(error=error_msg),
-    )
-    mocked_next_step.assert_not_called()
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsize_3yc_orders_step_error_item_not_found(
-    mocker,
-    order_factory,
-    adobe_subscription_factory,
-    adobe_commitment_factory,
-    adobe_customer_factory,
-    lines_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.helpers.switch_order_to_failed",
-    )
-    adobe_3yc_commitment = adobe_commitment_factory(licenses=20, consumables=37)
-
-    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
-    order_lines = lines_factory(
-        line_id=None,
-        item_id=1,
-        quantity=10,
-        old_quantity=20,
-        name="Awesome Expired product 1",
-        external_vendor_id="999999999CA",
-        unit_purchase_price=33.04,
-    )
-    order_lines.extend(
-        lines_factory(
-            line_id=None,
-            item_id=2,
-            quantity=20,
-            old_quantity=37,
-            name="Awesome Expired product 2",
-            external_vendor_id="65304991CA",
-            unit_purchase_price=35.09,
-        )
-    )
-
-    order = order_factory(lines=order_lines)
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={},
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    adobe_subscription = adobe_subscription_factory(offer_id="65304990CA01A12")
-    adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CAT1A12")
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription, adobe_subscription_2],
-    }
-
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    step = ValidateDownsizes3YC()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
-        context.order,
-        ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION.to_dict(
-            error="Item 999999999CA not found in Adobe subscriptions",
-        ),
-    )
-    mocked_next_step.assert_not_called()
-
-
-def test_validate_downsize_3yc_orders_step_skip_commitment_expired(
-    mocker,
-    order_factory,
-    adobe_subscription_factory,
-    adobe_commitment_factory,
-    adobe_customer_factory,
-    lines_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    adobe_3yc_commitment = adobe_commitment_factory(
-        licenses=20,
-        consumables=37,
-        end_date=(date.today() - timedelta(days=1)).isoformat(),
-    )
-
-    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
-    order_lines = lines_factory(
-        line_id=None,
-        item_id=1,
-        quantity=10,
-        old_quantity=20,
-        name="Awesome Expired product 1",
-        external_vendor_id="999999999CA",
-        unit_purchase_price=33.04,
-    )
-    order_lines.extend(
-        lines_factory(
-            line_id=None,
-            item_id=2,
-            quantity=20,
-            old_quantity=37,
-            name="Awesome Expired product 2",
-            external_vendor_id="65304991CA",
-            unit_purchase_price=35.09,
-        )
-    )
-
-    order = order_factory(lines=order_lines)
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={},
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    step = ValidateDownsizes3YC()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_validate_downsize_3yc_orders_step_skip_commitment_accepted(
-    mocker,
-    order_factory,
-    adobe_subscription_factory,
-    adobe_commitment_factory,
-    adobe_customer_factory,
-    lines_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    adobe_3yc_commitment = adobe_commitment_factory(
-        licenses=20, consumables=37, status=STATUS_3YC_ACCEPTED
-    )
-
-    adobe_customer = adobe_customer_factory(commitment=adobe_3yc_commitment)
-    order_lines = lines_factory(
-        line_id=None,
-        item_id=1,
-        quantity=10,
-        old_quantity=20,
-        name="Awesome Expired product 1",
-        external_vendor_id="999999999CA",
-        unit_purchase_price=33.04,
-    )
-    order_lines.extend(
-        lines_factory(
-            line_id=None,
-            item_id=2,
-            quantity=20,
-            old_quantity=37,
-            name="Awesome Expired product 2",
-            external_vendor_id="65304991CA",
-            unit_purchase_price=35.09,
-        )
-    )
-
-    order = order_factory(lines=order_lines)
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={},
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    step = ValidateDownsizes3YC()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
 def test_update_renewal_quantities_step(
     mocker,
     order_factory,
@@ -838,6 +412,7 @@ def test_update_renewal_quantities_step(
         order=order,
         order_id=order["id"],
         upsize_lines=order["lines"],
+        downsize_lines=order["lines"],
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
@@ -845,17 +420,34 @@ def test_update_renewal_quantities_step(
     step = UpdateRenewalQuantities()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        adobe_sub["subscriptionId"],
-    )
-    mocked_adobe_client.update_subscription.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        adobe_sub["subscriptionId"],
-        quantity=5,
-    )
+    assert mocked_adobe_client.get_subscription.call_count == 2
+    mocked_adobe_client.get_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+        ),
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+        ),
+    ])
+    assert mocked_adobe_client.update_subscription.call_count == 2
+    mocked_adobe_client.update_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+            quantity=5,
+        ),
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+            quantity=5,
+        ),
+    ])
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -936,10 +528,11 @@ def test_fulfill_change_order(mocker):
         GetReturnOrders,
         GetReturnableOrders,
         ValidateReturnableOrders,
-        ValidateDownsizes3YC,
+        Validate3YCCommitment,
         GetPreviewOrder,
-        SubmitReturnOrders,
         SubmitNewOrder,
+        UpdateRenewalQuantities,
+        SubmitReturnOrders,
         UpdateRenewalQuantities,
         CreateOrUpdateSubscriptions,
         UpdatePrices,
@@ -947,13 +540,14 @@ def test_fulfill_change_order(mocker):
         SyncAgreement,
     ]
 
+
     pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
     assert len(pipeline_args) == len(expected_steps)
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert pipeline_args[4].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[16].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[17].template_name == TEMPLATE_NAME_CHANGE
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(
@@ -1023,7 +617,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
         ),
     )
 
-    step = UpdateRenewalQuantities()
+    step = UpdateRenewalQuantities(process_downsize_lines=True, process_upsize_lines=True)
     step(mocked_client, context, mocked_next_step)
 
     mocked_switch_to_failed.assert_called_once_with(
