@@ -15,7 +15,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermNextSyncDates,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment, ValidateDownsizes3YC
 from adobe_vipm.flows.validation.change import (
     GetPreviewOrder,
     ValidateDownsizes,
@@ -404,7 +404,7 @@ def test_validate_change_order(mocker):
         SetOrUpdateCotermNextSyncDates,
         ValidateRenewalWindow,
         ValidateDownsizes,
-        ValidateDownsizes3YC,
+        Validate3YCCommitment,
         GetPreviewOrder,
     ]
 

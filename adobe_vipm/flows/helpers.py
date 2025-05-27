@@ -15,13 +15,30 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACCEPTED,
     STATUS_3YC_ACTIVE,
     STATUS_3YC_COMMITTED,
+    STATUS_3YC_DECLINED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_NONCOMPLIANT,
+    STATUS_3YC_REQUESTED,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.adobe.utils import get_3yc_commitment, get_item_by_partial_sku
-from adobe_vipm.airtable.models import get_prices_for_3yc_skus, get_prices_for_skus
+from adobe_vipm.adobe.utils import (
+    get_3yc_commitment,
+    get_3yc_commitment_request,
+    get_item_by_partial_sku,
+)
+from adobe_vipm.airtable.models import (
+    get_adobe_product_by_marketplace_sku,
+    get_prices_for_3yc_skus,
+    get_prices_for_skus,
+)
 from adobe_vipm.flows.constants import (
+    ERR_COMMITMENT_3YC_CONSUMABLES,
+    ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT,
+    ERR_COMMITMENT_3YC_LICENSES,
+    ERR_COMMITMENT_3YC_VALIDATION,
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_DOWNSIZE_MINIMUM_3YC_LICENSES,
@@ -186,6 +203,251 @@ class SetupContext(Step):
         next_step(client, context)
 
 
+class Validate3YCCommitment(Step):
+    def __init__(self, is_validation=False):
+        self.is_validation = is_validation
+
+    def __call__(self, client, context, next_step):
+        if not context.adobe_customer:
+            if self.validate_3yc_quantities_parameters(client, context):
+                next_step(client, context)
+            return
+
+        commitment = get_3yc_commitment_request(context.adobe_customer)
+        adobe_client = get_adobe_client()
+
+        if commitment.get("status",'') == STATUS_3YC_REQUESTED and not self.is_validation:
+            logger.info(f"{context}: 3YC commitment request is in status {STATUS_3YC_REQUESTED}")
+            return
+
+        if commitment.get("status",'') in [
+            STATUS_3YC_EXPIRED,
+            STATUS_3YC_NONCOMPLIANT,
+            STATUS_3YC_DECLINED,
+        ]:
+            logger.info(f"{context}: 3YC commitment is expired or noncompliant")
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT.to_dict(
+                    status=commitment.get("status")
+                ),
+            )
+            return
+
+        if commitment or context.customer_data.get("3YC"):
+            subscriptions = adobe_client.get_subscriptions(
+                context.authorization_id,
+                context.adobe_customer_id,
+            )
+            is_valid, error = self.validate_items_in_subscriptions(context, subscriptions)
+            if not is_valid:
+                self.manage_order_error(client, context, error)
+                return
+
+            count_licenses, count_consumables = self.get_quantities(context, subscriptions)
+            error = self.validate_minimum_quantity(
+                context, commitment, count_licenses, count_consumables
+            )
+            if error:
+                self.manage_order_error(client, context, error)
+                return
+
+        next_step(client, context)
+
+
+    def get_quantities(self, context, subscriptions):
+
+        count_licenses, count_consumables = self.get_licenses_and_consumables_count(
+            subscriptions
+        )
+
+        count_licenses, count_consumables = self.process_donwsize_lines_quantities(
+            context,
+            count_licenses=count_licenses,
+            count_consumables=count_consumables)
+        count_licenses, count_consumables = self.process_upsize_lines_quantities(
+            context,
+            count_licenses=count_licenses,
+            count_consumables=count_consumables)
+
+        return count_licenses, count_consumables
+
+    def manage_order_error(self, client, context, error):
+        if self.is_validation:
+            context.order = set_order_error(
+                context.order,
+                ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
+            )
+        else:
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
+            )
+
+    @staticmethod
+    def get_licenses_and_consumables_count(subscriptions):
+        """
+        Get the count of licenses and consumables from the Adobe customer subscriptions.
+        Args:
+            subscriptions (dict): Adobe customer subscriptions.
+        Returns:
+            tuple: The count of licenses and consumables.
+
+        """
+        count_licenses = 0
+        count_consumables = 0
+
+        if subscriptions and "items" in subscriptions:
+            for subscription in subscriptions["items"]:
+                sku = get_adobe_product_by_marketplace_sku(subscription["offerId"][0:10])
+                if (sku.is_valid_3yc_type() and
+                    subscription["autoRenewal"]["enabled"]):
+                    if sku.is_consumable():
+                        count_consumables += subscription["autoRenewal"]["renewalQuantity"]
+                    else:
+                        count_licenses += subscription["autoRenewal"]["renewalQuantity"]
+
+        return count_licenses, count_consumables
+
+    @staticmethod
+    def process_donwsize_lines_quantities(context, count_licenses, count_consumables):
+        for line in context.downsize_lines:
+            delta = line["oldQuantity"] - line["quantity"]
+            sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
+            if sku.is_valid_3yc_type():
+                if sku.is_consumable():
+                    count_consumables -= delta
+                else:
+                    count_licenses -= delta
+        return count_licenses, count_consumables
+
+    @staticmethod
+    def process_upsize_lines_quantities(context, count_licenses=0, count_consumables=0):
+        for line in context.upsize_lines + context.new_lines:
+            delta = line["quantity"] - line["oldQuantity"]
+            sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
+            if sku.is_valid_3yc_type():
+                if sku.is_consumable():
+                    count_consumables += delta
+                else:
+                    count_licenses += delta
+        return count_licenses, count_consumables
+
+    @staticmethod
+    def validate_items_in_subscriptions(context, subscriptions):
+        if subscriptions["items"]:
+            for line in context.downsize_lines + context.upsize_lines:
+                adobe_item = get_item_by_partial_sku(
+                    subscriptions["items"], line["item"]["externalIds"]["vendor"]
+                )
+                if not adobe_item:
+                    vendor_id = line['item']['externalIds']['vendor']
+                    return False, f"Item {vendor_id} not found in Adobe subscriptions"
+        return True, None
+
+    @staticmethod
+    def validate_minimum_quantity(
+        context,
+        commitment,
+        count_licenses,
+        count_consumables,
+    ):
+        is_invalid_license_minimum = False
+        is_invalid_consumable_minimum = False
+        minimum_licenses = 0
+        minimum_consumables = 0
+
+        for mq in commitment["minimumQuantities"]:
+            if mq["offerType"] == "LICENSE" and count_licenses < mq["quantity"]:
+                is_invalid_license_minimum = True
+                minimum_licenses = mq["quantity"]
+            if mq["offerType"] == "CONSUMABLES" and count_consumables < mq["quantity"]:
+                is_invalid_consumable_minimum = True
+                minimum_consumables = mq["quantity"]
+
+        if is_invalid_consumable_minimum and is_invalid_license_minimum:
+            logger.error(
+                f"{context}: failed due to reduction quantity is not allowed below "
+                f"the minimum commitment of licenses and consumables"
+            )
+            return ERR_COMMITMENT_3YC_CONSUMABLES.format(
+                minimum_licenses=minimum_licenses,
+                minimum_consumables=minimum_consumables,
+            )
+
+        if is_invalid_license_minimum:
+            logger.error(
+                f"{context}: failed due to reduction quantity is not allowed below "
+                f"the minimum commitment of licenses"
+            )
+            return ERR_COMMITMENT_3YC_LICENSES.format(
+                selected_licenses=count_licenses,
+                minimum_licenses=minimum_licenses
+            )
+
+        if is_invalid_consumable_minimum:
+            logger.error(
+                f"{context}: failed due to reduction quantity is not allowed below"
+                f" the minimum commitment of consumables"
+            )
+            return ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(
+                selected_consumables=count_consumables,
+                minimum_consumables=minimum_consumables
+            )
+
+    @staticmethod
+    def get_3yc_commitment_enabled(adobe_customer):
+        """
+        Get the 3YC commitment if it is enabled.
+        Args:
+            adobe_customer (dict): Adobe customer object.
+
+        Returns: Commitment object if it is enabled, otherwise None.
+
+        """
+        commitment = get_3yc_commitment(adobe_customer)
+
+        if (
+            commitment
+            and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+            and date.today() <= date.fromisoformat(commitment["endDate"])
+        ):
+            return commitment
+        return None
+
+    def validate_3yc_quantities_parameters(self, client, context):
+        """
+        Validate the 3YC commitment quantities are not allowed below
+        the minimum commitment of licenses and consumables.
+        """
+        count_licenses, count_consumables = self.get_quantities(context, [])
+
+        if count_licenses == 0 and count_consumables == 0:
+            return True
+
+        minimum_licenses_commited = int(context.customer_data.get("3YCLicenses", 0) or 0)
+        minimum_consumables_commited = int(context.customer_data.get("3YCConsumables",0) or 0)
+
+        if count_licenses < minimum_licenses_commited:
+            self.manage_order_error(client, context,
+                ERR_COMMITMENT_3YC_LICENSES.format(
+                selected_licenses=count_licenses,
+                minimum_licenses=minimum_licenses_commited
+            ))
+            return False
+
+        if count_consumables < minimum_consumables_commited:
+            self.manage_order_error(client, context,
+                ERR_COMMITMENT_3YC_CONSUMABLES.format(
+                selected_consumables=count_consumables,
+                minimum_consumables=minimum_consumables_commited
+            ))
+            return False
+
+        return True
+
 class ValidateDownsizes3YC:
     """
     Validates If the Adobe customer has a 3YC commitment and the reduction quantity
@@ -229,6 +491,7 @@ class ValidateDownsizes3YC:
                     count_consumables -= delta
                 else:
                     count_licenses -= delta
+
             error = self.validate_minimum_quantity(
                 context, commitment, count_licenses, count_consumables
             )
@@ -371,8 +634,11 @@ class UpdatePrices(Step):
 
     def _get_prices_for_skus(self, context, actual_skus):
         """Get prices for SKUs considering 3YC commitment if applicable."""
-        commitment = get_3yc_commitment(context.adobe_customer) if context.adobe_customer else None
-
+        commitment = (
+            get_3yc_commitment_request(context.adobe_customer)
+            if context.adobe_customer
+            else None
+        )
         if self._is_valid_3yc_commitment(commitment):
             return get_prices_for_3yc_skus(
                 context.product_id,
@@ -392,7 +658,10 @@ class UpdatePrices(Step):
             return False
 
         return (
-            commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+            commitment["status"] in (
+                STATUS_3YC_COMMITTED,
+                STATUS_3YC_ACTIVE,
+                STATUS_3YC_ACCEPTED)
             and date.fromisoformat(commitment["endDate"]) >= date.today()
         )
 

@@ -32,6 +32,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment,
+    get_3yc_commitment_request,
     sanitize_company_name,
     sanitize_first_last_name,
 )
@@ -75,6 +76,7 @@ from adobe_vipm.flows.utils import (
     map_returnable_to_return_orders,
     md2html,
     reset_due_date,
+    set_adobe_3yc_commitment_request_status,
     set_adobe_3yc_end_date,
     set_adobe_3yc_enroll_status,
     set_adobe_3yc_start_date,
@@ -580,18 +582,33 @@ class SetOrUpdateCotermNextSyncDates(Step):
         ).date()
         next_sync = coterm_date + timedelta(days=1)
 
-        if coterm_date.isoformat() != get_coterm_date(
-            context.order
-        ) or next_sync.isoformat() != get_next_sync(context.order):
+        needs_update = False
+        if coterm_date.isoformat() != get_coterm_date(context.order):
             context.order = set_coterm_date(context.order, coterm_date.isoformat())
+            needs_update = True
+
+        if next_sync.isoformat() != get_next_sync(context.order):
             context.order = set_next_sync(context.order, next_sync.isoformat())
+            needs_update = True
+
+        if context.adobe_customer:
+            commitment = get_3yc_commitment_request(context.adobe_customer)
+            if commitment:
+                context.order = set_adobe_3yc_enroll_status(context.order, commitment["status"])
+                context.order = set_adobe_3yc_commitment_request_status(
+                    context.order, commitment["status"])
+                context.order = set_adobe_3yc_start_date(context.order, commitment["startDate"])
+                context.order = set_adobe_3yc_end_date(context.order, commitment["endDate"])
+                needs_update = True
+
+        if needs_update:
             update_order(
                 client, context.order_id, parameters=context.order["parameters"]
             )
             logger.info(
-                f"{context}: coterm ({coterm_date.isoformat()}) "
-                f"and next sync ({next_sync.isoformat()}) updated successfully"
+                f"{context}: order parameters updated successfully"
             )
+
         next_step(client, context)
 
 
@@ -775,6 +792,7 @@ class SubmitNewOrder(Step):
             return
         adobe_client = get_adobe_client()
         adobe_order = None
+
         if not context.adobe_new_order_id and context.adobe_preview_order:
             deployment_id = get_deployment_id(context.order)
             adobe_order = adobe_client.create_new_order(
@@ -830,7 +848,6 @@ class SubmitNewOrder(Step):
             )
             return
         next_step(client, context)
-
 
 class CreateOrUpdateSubscriptions(Step):
     def __call__(self, client, context, next_step):

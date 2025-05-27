@@ -48,7 +48,12 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, UpdatePrices
+from adobe_vipm.flows.helpers import (
+    PrepareCustomerData,
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+)
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_market_segment_eligibility_status,
@@ -270,6 +275,7 @@ def fulfill_purchase_order(client, order):
         StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         PrepareCustomerData(),
         CreateCustomer(),
+        Validate3YCCommitment(),
         GetPreviewOrder(),
         SubmitNewOrder(),
         CreateOrUpdateSubscriptions(),

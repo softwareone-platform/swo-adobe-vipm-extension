@@ -36,7 +36,12 @@ from adobe_vipm.flows.fulfillment.shared import (
     SyncAgreement,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import (
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+    ValidateDownsizes3YC,
+)
 
 
 @pytest.mark.parametrize(
@@ -936,10 +941,11 @@ def test_fulfill_change_order(mocker):
         GetReturnOrders,
         GetReturnableOrders,
         ValidateReturnableOrders,
-        ValidateDownsizes3YC,
+        Validate3YCCommitment,
         GetPreviewOrder,
-        SubmitReturnOrders,
         SubmitNewOrder,
+        UpdateRenewalQuantities,
+        SubmitReturnOrders,
         UpdateRenewalQuantities,
         CreateOrUpdateSubscriptions,
         UpdatePrices,
@@ -947,13 +953,14 @@ def test_fulfill_change_order(mocker):
         SyncAgreement,
     ]
 
+
     pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
     assert len(pipeline_args) == len(expected_steps)
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert pipeline_args[4].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[16].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[17].template_name == TEMPLATE_NAME_CHANGE
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(
@@ -1023,7 +1030,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
         ),
     )
 
-    step = UpdateRenewalQuantities()
+    step = UpdateRenewalQuantities(process_downsize_lines=True, process_upsize_lines=True)
     step(mocked_client, context, mocked_next_step)
 
     mocked_switch_to_failed.assert_called_once_with(

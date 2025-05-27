@@ -560,7 +560,10 @@ def test_update_prices_step_with_3yc_commitment(
         start_date="2024-01-01",
         end_date="2025-01-01",
     )
-    adobe_customer = adobe_customer_factory(commitment=commitment)
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
     sku = adobe_order["lineItems"][0]["offerId"]
 
@@ -583,7 +586,6 @@ def test_update_prices_step_with_3yc_commitment(
         adobe_customer=adobe_customer,
         adobe_new_order=adobe_order,
     )
-
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
