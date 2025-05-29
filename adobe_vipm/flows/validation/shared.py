@@ -3,7 +3,6 @@ from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.airtable.models import get_prices_for_skus
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
@@ -13,10 +12,8 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.utils import (
     get_deployment_id,
-    get_order_line_by_sku,
     set_order_error,
 )
-from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -100,25 +97,3 @@ class GetPreviewOrder(Step):
             return
         next_step(client, context)
 
-
-class UpdatePrices(Step):
-    def __call__(self, client, context, next_step):
-        if not context.adobe_preview_order:
-            next_step(client, context)
-            return
-        adobe_skus = [
-            item["offerId"] for item in context.adobe_preview_order["lineItems"]
-        ]
-        prices = get_prices_for_skus(context.product_id, context.currency, adobe_skus)
-
-        updated_lines = []
-        for preview_item in context.adobe_preview_order["lineItems"]:
-            order_line = get_order_line_by_sku(
-                context.order, get_partial_sku(preview_item["offerId"])
-            )
-            order_line.setdefault("price", {})
-            order_line["price"]["unitPP"] = prices[preview_item["offerId"]]
-            updated_lines.append(order_line)
-        context.order["lines"] = updated_lines
-
-        next_step(client, context)

@@ -5,7 +5,12 @@ from urllib.parse import urljoin
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.constants import STATUS_INTERNAL_SERVER_ERROR
+from adobe_vipm.adobe.constants import (
+    ORDER_TYPE_NEW,
+    ORDER_TYPE_PREVIEW,
+    STATUS_3YC_COMMITTED,
+    STATUS_INTERNAL_SERVER_ERROR,
+)
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.constants import (
     PARAM_ADDRESS,
@@ -17,6 +22,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import (
     PrepareCustomerData,
     SetupContext,
+    UpdatePrices,
 )
 from adobe_vipm.flows.utils import get_customer_data
 
@@ -275,7 +281,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
 
     assert (
         str(exc_info.value)
-        == f"{adobe_api_error["code"]} - {adobe_api_error["message"]}"
+        == f"{adobe_api_error['code']} - {adobe_api_error['message']}"
     )
     assert context.order["agreement"] == agreement
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
@@ -426,3 +432,294 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
         parameters=context.order["parameters"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_prices_step_no_orders(mocker, order_factory):
+    """Test that if there are no new or preview orders, the step just continues."""
+    order = order_factory()
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_new_order=None,
+        adobe_preview_order=None,
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_prices_step_with_new_order(mocker, order_factory, adobe_order_factory):
+    """Test price updates with a new order."""
+    order = order_factory()
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
+    sku = adobe_order["lineItems"][0]["offerId"]
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={sku: 121.36},
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id=order["agreement"]["product"]["id"],
+        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        adobe_new_order=adobe_order,
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_get_prices.assert_called_once_with(
+        context.product_id,
+        context.currency,
+        [sku],
+    )
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        lines=[
+            {
+                "id": order["lines"][0]["id"],
+                "price": {"unitPP": 121.36},
+            },
+        ],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_prices_step_with_preview_order(mocker, order_factory, adobe_order_factory):
+    """Test price updates with a preview order."""
+    order = order_factory()
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    sku = adobe_order["lineItems"][0]["offerId"]
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={sku: 121.36},
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id=order["agreement"]["product"]["id"],
+        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        adobe_preview_order=adobe_order,
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_get_prices.assert_called_once_with(
+        context.product_id,
+        context.currency,
+        [sku],
+    )
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        lines=[
+            {
+                "id": order["lines"][0]["id"],
+                "price": {"unitPP": 121.36},
+            },
+        ],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+@freeze_time("2024-11-09")
+def test_update_prices_step_with_3yc_commitment(
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    """Test price updates when customer has 3YC commitment."""
+    order = order_factory()
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2025-01-01",
+    )
+    adobe_customer = adobe_customer_factory(commitment=commitment)
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
+    sku = adobe_order["lineItems"][0]["offerId"]
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_3yc_skus",
+        return_value={sku: 121.36},
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id=order["agreement"]["product"]["id"],
+        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        adobe_customer=adobe_customer,
+        adobe_new_order=adobe_order,
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_get_prices.assert_called_once_with(
+        context.product_id,
+        context.currency,
+        date.fromisoformat(commitment["startDate"]),
+        [sku],
+    )
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        lines=[
+            {
+                "id": order["lines"][0]["id"],
+                "price": {"unitPP": 121.36},
+            },
+        ],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_prices_step_with_expired_3yc_commitment(
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    """Test price updates when customer has expired 3YC commitment."""
+    order = order_factory()
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2023-01-01",
+        end_date="2024-01-01",
+    )
+    adobe_customer = adobe_customer_factory(commitment=commitment)
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
+    sku = adobe_order["lineItems"][0]["offerId"]
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={sku: 121.36},
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id=order["agreement"]["product"]["id"],
+        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        adobe_customer=adobe_customer,
+        adobe_new_order=adobe_order,
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_get_prices.assert_called_once_with(
+        context.product_id,
+        context.currency,
+        [sku],
+    )
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        lines=[
+            {
+                "id": order["lines"][0]["id"],
+                "price": {"unitPP": 121.36},
+            },
+        ],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_prices_step_with_multiple_lines(
+    mocker,
+    order_factory,
+    lines_factory,
+    adobe_order_factory,
+):
+    """Test price updates with multiple order lines."""
+    line_1 = lines_factory()[0]
+    line_2 = lines_factory(line_id=2, item_id=2)[0]
+    order = order_factory(lines=[line_1, line_2])
+
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
+    sku = adobe_order["lineItems"][0]["offerId"]
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={sku: 121.36},
+    )
+    mocked_update_order = mocker.patch(
+        "adobe_vipm.flows.helpers.update_order",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id=order["agreement"]["product"]["id"],
+        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        adobe_new_order=adobe_order,
+    )
+
+    step = UpdatePrices()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_get_prices.assert_called_once_with(
+        context.product_id,
+        context.currency,
+        [sku],
+    )
+    mocked_update_order.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        lines=[
+            {
+                "id": line_1["id"],
+                "price": {"unitPP": 121.36},
+            },
+            {
+                "id": line_2["id"],
+                "price": {"unitPP": line_2["price"]["unitPP"]},
+            },
+        ],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+

@@ -14,7 +14,6 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
-    UpdatePrices,
     ValidateDuplicateLines,
 )
 
@@ -245,52 +244,3 @@ def test_get_preview_order_step_api_error(
 
     mocked_next_step.assert_not_called()
 
-
-def test_update_prices_step(mocker, order_factory, adobe_order_factory):
-    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
-    order = order_factory()
-    mocked_get_prices_for_skus = mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_prices_for_skus",
-        return_value={"65304578CA01A12": 7892.11},
-    )
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-        order_id="order-id",
-        authorization_id="auth-id",
-        product_id="PRD-1234",
-        currency="EUR",
-        adobe_preview_order=adobe_preview_order,
-    )
-
-    step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
-
-    assert context.validation_succeeded is True
-    assert context.order["lines"][0]["price"]["unitPP"] == 7892.11
-    mocked_get_prices_for_skus.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [adobe_preview_order["lineItems"][0]["offerId"]],
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_update_prices_step_no_preview_order(mocker, order_factory):
-    order = order_factory()
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-        authorization_id="auth-id",
-    )
-
-    step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
-
-    assert context.validation_succeeded is True
-    mocked_next_step.assert_called_once_with(mocked_client, context)
