@@ -1498,10 +1498,6 @@ types-openpyxl = "==3.1.*"
 typing-extensions = "==4.9.*"
 watchfiles = "==0.21.*"
 
-[package.source]
-type = "file"
-url = "mpt_extension_sdk-4.1.1.tar.gz"
-
 [[package]]
 name = "msal"
 version = "1.32.3"
