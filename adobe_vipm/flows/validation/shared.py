@@ -47,11 +47,7 @@ class ValidateDuplicateLines(Step):
                 items.append(line["item"]["id"])
 
         items.extend(
-            [
-                line["item"]["id"]
-                for line in context.order["lines"]
-                if line["oldQuantity"] == 0
-            ]
+            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
         )
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:
@@ -78,9 +74,7 @@ class GetPreviewOrder(Step):
             next_step(client, context)
             return
 
-        customer_id = (
-            context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
-        )
+        customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
         adobe_client = get_adobe_client()
         try:
             deployment_id = get_deployment_id(context.order)
@@ -94,9 +88,7 @@ class GetPreviewOrder(Step):
             )
         except AdobeAPIError as e:
             context.validation_succeeded = False
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_ERROR.to_dict(details=str(e))
-            )
+            context.order = set_order_error(context.order, ERR_ADOBE_ERROR.to_dict(details=str(e)))
             return
         next_step(client, context)
 
@@ -106,9 +98,7 @@ class UpdatePrices(Step):
         if not context.adobe_preview_order:
             next_step(client, context)
             return
-        adobe_skus = [
-            item["offerId"] for item in context.adobe_preview_order["lineItems"]
-        ]
+        adobe_skus = [item["offerId"] for item in context.adobe_preview_order["lineItems"]]
         prices = get_prices_for_skus(context.product_id, context.currency, adobe_skus)
 
         updated_lines = []
@@ -119,6 +109,6 @@ class UpdatePrices(Step):
             order_line.setdefault("price", {})
             order_line["price"]["unitPP"] = prices[preview_item["offerId"]]
             updated_lines.append(order_line)
-        context.order["lines"] = updated_lines
+        context.order["lines"] = context.downsize_lines + updated_lines
 
         next_step(client, context)
