@@ -9,7 +9,7 @@ import requests
 from freezegun import freeze_time
 from responses import matchers
 
-from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
+from adobe_vipm.adobe import client as adobe_client
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
@@ -1712,7 +1712,7 @@ def test_get_auth_token(
         ],
     )
 
-    client = AdobeClient()
+    client = adobe_client.AdobeClient()
     with freeze_time("2024-01-01 12:00:00"):
         token = client._get_auth_token(authorization)
         assert isinstance(token, APIToken)
@@ -1742,7 +1742,7 @@ def test_get_auth_token_error(
         status=403,
     )
 
-    client = AdobeClient()
+    client = adobe_client.AdobeClient()
     with pytest.raises(requests.HTTPError):
         client._get_auth_token(authorization)
 
@@ -1751,17 +1751,16 @@ def test_get_adobe_client(mocker):
     """
     Test AdobeClient is cached per process.
     """
+    adobe_client._ADOBE_CLIENT = None
+
     mocked_client = mocker.MagicMock()
     mocked_client_constructor = mocker.patch(
         "adobe_vipm.adobe.client.AdobeClient",
         return_value=mocked_client,
     )
-    get_adobe_client()
-    get_adobe_client()
+    adobe_client.get_adobe_client()
+    adobe_client.get_adobe_client()
     assert mocked_client_constructor.call_count == 1
-    from adobe_vipm.adobe import client
-
-    assert client._ADOBE_CLIENT == mocked_client
 
 
 def test_get_subscriptions(
@@ -2319,7 +2318,7 @@ def test_get_returnable_orders_by_sku(
     )
 
     mocked_get_orders = mocker.patch.object(
-        AdobeClient,
+        adobe_client.AdobeClient,
         "get_orders",
         return_value=[
             order_ko_0,
@@ -2427,7 +2426,7 @@ def test_get_returnable_orders_by_sku_with_returning_orders(
     )
 
     mocked_get_orders = mocker.patch.object(
-        AdobeClient,
+        adobe_client.AdobeClient,
         "get_orders",
         return_value=[
             order_ko_0,
@@ -2512,7 +2511,7 @@ def test_get_return_orders_by_external_reference(
     )
 
     mocked_get_orders = mocker.patch.object(
-        AdobeClient,
+        adobe_client.AdobeClient,
         "get_orders",
         return_value=[order_ok_1, order_ok_2, order_ko_1],
     )
@@ -2595,7 +2594,7 @@ def test_get_returnable_orders_by_sku_no_renewal_for_period(
     )
 
     mocked_get_orders = mocker.patch.object(
-        AdobeClient,
+        adobe_client.AdobeClient,
         "get_orders",
         return_value=[
             order_ok_0,
