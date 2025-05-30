@@ -43,10 +43,9 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
-    UpdatePrices,
     ValidateDuplicateLines,
 )
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, UpdatePrices
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_fulfillment_parameter,

@@ -31,12 +31,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
-    UpdatePrices,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
-from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_adobe_subscription_id,

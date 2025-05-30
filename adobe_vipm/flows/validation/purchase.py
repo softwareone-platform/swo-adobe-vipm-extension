@@ -47,7 +47,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, UpdatePrices
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
@@ -58,7 +58,6 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
-    UpdatePrices,
     ValidateDuplicateLines,
 )
 

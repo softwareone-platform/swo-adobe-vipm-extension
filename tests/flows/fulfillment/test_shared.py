@@ -40,7 +40,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
-    UpdatePrices,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     send_gc_mpt_notification,
@@ -1628,129 +1627,6 @@ def test_create_or_update_subscriptions_step_sub_expired(
     mocked_create_subscription.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
-
-def test_update_prices_step(
-    mocker, order_factory, adobe_customer_factory, adobe_order_factory
-):
-    """
-    Tests that prices are updated according to actual sku when the customer has no 3yc benefit.
-    """
-    order = order_factory()
-    adobe_customer = adobe_customer_factory()
-    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
-    sku = adobe_order["lineItems"][0]["offerId"]
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_prices_for_skus",
-        return_value={sku: 121.36},
-    )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-        order_id=order["id"],
-        product_id=order["agreement"]["product"]["id"],
-        currency=order["agreement"]["listing"]["priceList"]["currency"],
-        adobe_customer=adobe_customer,
-        adobe_new_order=adobe_order,
-    )
-
-    step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
-    mocked_update_order.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        lines=[
-            {
-                "id": order["lines"][0]["id"],
-                "price": {
-                    "unitPP": 121.36,
-                },
-            },
-        ],
-    )
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_update_prices_step_3yc(
-    mocker,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_commitment_factory,
-    adobe_order_factory,
-):
-    """
-    Tests that prices are updated according to actual sku when the customer has the 3yc benefit.
-    """
-    line_1 = lines_factory()[0]
-    line_2 = lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA")[0]
-    order = order_factory(
-        lines=[line_1, line_2],
-    )
-    commitment = adobe_commitment_factory()
-    adobe_customer = adobe_customer_factory(
-        commitment=commitment,
-    )
-    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
-    sku = adobe_order["lineItems"][0]["offerId"]
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_prices_for_3yc_skus",
-        return_value={sku: 121.36},
-    )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-        order_id=order["id"],
-        product_id=order["agreement"]["product"]["id"],
-        currency=order["agreement"]["listing"]["priceList"]["currency"],
-        adobe_customer=adobe_customer,
-        adobe_new_order=adobe_order,
-    )
-
-    step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        date.fromisoformat(commitment["startDate"]),
-        [sku],
-    )
-    mocked_update_order.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        lines=[
-            {
-                "id": line_1["id"],
-                "price": {
-                    "unitPP": 121.36,
-                },
-            },
-            {
-                "id": line_2["id"],
-                "price": {
-                    "unitPP": line_2["price"]["unitPP"],
-                },
-            },
-        ],
-    )
 
 
 @freeze_time("2024-01-01")

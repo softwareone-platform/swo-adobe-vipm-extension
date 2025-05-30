@@ -58,7 +58,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     GetPreviewOrder,
     SetOrUpdateCotermNextSyncDates,
     SubmitNewOrder,
-    UpdatePrices,
     add_subscription,
     check_processing_template,
     handle_retries,
@@ -70,7 +69,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import SetupContext, UpdatePrices
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (

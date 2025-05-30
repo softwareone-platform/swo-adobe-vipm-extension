@@ -5,7 +5,6 @@ This module contains shared functions used by the different fulfillment flows.
 import logging
 from collections import Counter
 from datetime import date, datetime, timedelta
-from operator import itemgetter
 
 from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -26,8 +25,6 @@ from mpt_extension_sdk.mpt_http.mpt import (
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
     UNRECOVERABLE_ORDER_STATUSES,
@@ -37,10 +34,6 @@ from adobe_vipm.adobe.utils import (
     get_3yc_commitment,
     sanitize_company_name,
     sanitize_first_last_name,
-)
-from adobe_vipm.airtable.models import (
-    get_prices_for_3yc_skus,
-    get_prices_for_skus,
 )
 from adobe_vipm.flows.constants import (
     ERR_DUE_DATE_REACHED,
@@ -77,7 +70,6 @@ from adobe_vipm.flows.utils import (
     get_next_sync,
     get_one_time_skus,
     get_order_line_by_sku,
-    get_price_item_by_line_sku,
     get_subscription_by_line_and_item_id,
     is_renewal_window_open,
     map_returnable_to_return_orders,
@@ -920,68 +912,6 @@ class CreateOrUpdateSubscriptions(Step):
                         f'({order_subscription["id"]}) updated'
                     )
         next_step(client, context)
-
-
-class UpdatePrices(Step):
-    def __call__(self, client, context, next_step):
-        if context.adobe_new_order:  # pragma: no branch
-            actual_skus = [
-                item["offerId"] for item in context.adobe_new_order["lineItems"]
-            ]
-            commitment = get_3yc_commitment(context.adobe_customer)
-            if (
-                commitment
-                and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
-                and date.fromisoformat(commitment["endDate"]) >= date.today()
-            ):
-                prices = get_prices_for_3yc_skus(
-                    context.product_id,
-                    context.currency,
-                    date.fromisoformat(commitment["startDate"]),
-                    actual_skus,
-                )
-            else:
-                prices = get_prices_for_skus(
-                    context.product_id, context.currency, actual_skus
-                )
-
-            lines = []
-            for line in [
-                get_order_line_by_sku(context.order, sku) for sku in actual_skus
-            ]:
-                new_price_item = get_price_item_by_line_sku(
-                    prices, line["item"]["externalIds"]["vendor"]
-                )
-                lines.append(
-                    {
-                        "id": line["id"],
-                        "price": {
-                            "unitPP": new_price_item[1],
-                        },
-                    }
-                )
-
-            # to have total list of lines, leave other not updated
-            updated_lines_ids = {line["id"] for line in lines}
-            for line in context.order["lines"]:
-                if line["id"] in updated_lines_ids:
-                    continue
-
-                lines.append(
-                    {
-                        "id": line["id"],
-                        "price": {
-                            "unitPP": line["price"]["unitPP"],
-                        },
-                    }
-                )
-
-            lines = sorted(lines, key=itemgetter("id"))
-
-            update_order(client, context.order_id, lines=lines)
-            logger.info(f"{context}: order lines prices updated successfully")
-        next_step(client, context)
-
 
 class CompleteOrder(Step):
     def __init__(self, template_name):

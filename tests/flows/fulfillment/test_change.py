@@ -34,10 +34,9 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
-    UpdatePrices,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
 
 
 @pytest.mark.parametrize(

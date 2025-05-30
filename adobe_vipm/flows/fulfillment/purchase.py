@@ -44,12 +44,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
-    UpdatePrices,
     ValidateDuplicateLines,
     switch_order_to_failed,
     switch_order_to_query,
 )
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, UpdatePrices
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_market_segment_eligibility_status,
