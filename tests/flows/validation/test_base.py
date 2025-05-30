@@ -143,7 +143,7 @@ def test_validate_purchase_order_with_change(
     from adobe_vipm.adobe.client import AdobeClient
     from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 
-    mocker.patch("adobe_vipm.adobe.client.get_adobe_client")
+    # mocker.patch("adobe_vipm.adobe.client.get_adobe_client")
     mocker.patch("adobe_vipm.adobe.client.get_config")
     mocker.patch.object(
         AdobeClient,
