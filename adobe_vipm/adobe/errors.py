@@ -78,6 +78,13 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
             return func(*args, **kwargs)
         except HTTPError as e:
             logger.error(e)
+            # TODO: Maybe here, when HTTP 404 and
+            #  {
+            #     "code": "1116",
+            #     "message": "Invalid Customer",
+            #     "additionalDetails": []
+            # } we will assume the customer is lost, and we must Terminate the Agreement.
+            # The Vendor can Terminate an Agreement by Terminating all its subscriptions.
             try:
                 raise AdobeAPIError(e.response.status_code, e.response.json())
             except JSONDecodeError:

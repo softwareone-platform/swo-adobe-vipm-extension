@@ -254,6 +254,34 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
         sync_agreement(mpt_client, agreement, dry_run)
 
 
+def sync_agreements_by_coterm_date(mpt_client, dry_run):
+    """
+    Get all the agreements with value of the cotermDate Agreement fulfilment parameter is less than
+    or equal to now -1 day.
+    """
+
+
+def sync_agreements_by_3yc_end_date(mpt_client, dry_run):
+    """
+    Get all the agreements with value of the 3YCEndDate Agreement fulfilment parameter is less than
+    or equal to now -1 day.
+    """
+
+
+def sync_agreements_by_3yc_enroll_status(mpt_client, dry_run):
+    """
+    Get all the agreements with value of the 3YCEndDate Agreement fulfilment parameter is less than
+    or equal to now -1 day.
+    """
+
+
+def sync_agreements_by_a_schedule(mpt_client, dry_run):
+    """
+    Get all the agreements to sync by a schedule - for example, monthly, on the day after the renewal day.
+    It seems all the sync conditions can be specified on a schedule.
+    """
+
+
 def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
     """
     Get the agreements given a list of agreement IDs

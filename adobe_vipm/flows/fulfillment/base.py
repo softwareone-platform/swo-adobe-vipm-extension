@@ -46,6 +46,7 @@ def fulfill_order(client, order):
                 fulfill_configuration_order(client, order)
             case constants.ORDER_TYPE_TERMINATION:
                 fulfill_termination_order(client, order)
+        # TODO: after any order completion (regardless of order status) sync the agreement
     except Exception:
         notify_unhandled_exception_in_teams(
             "fulfillment",
