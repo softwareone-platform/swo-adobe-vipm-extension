@@ -28,9 +28,9 @@ from adobe_vipm.flows.fulfillment.shared import (
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
-    _validate_subscription_and_returnable_orders,
     get_adobe_subscription_id,
     get_subscription_by_line_and_item_id,
+    validate_subscription_and_returnable_orders,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class GetReturnableOrders(Step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
-            is_valid, returnable_orders = _validate_subscription_and_returnable_orders(
+            is_valid, returnable_orders = validate_subscription_and_returnable_orders(
                 adobe_client,
                 context,
                 line,

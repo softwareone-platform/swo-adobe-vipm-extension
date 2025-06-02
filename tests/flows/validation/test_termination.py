@@ -1,5 +1,6 @@
 from freezegun import freeze_time
 
+from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.constants import ERR_INVALID_TERMINATION_ORDER_QUANTITY
 from adobe_vipm.flows.context import Context
@@ -61,7 +62,7 @@ def test_validate_downsizes_step_success(
 
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
         ret_info_1,
         ret_info_2,
@@ -126,7 +127,7 @@ def test_validate_downsizes_step_no_returnable_orders(
     )
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
 
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
@@ -210,7 +211,7 @@ def test_validate_downsizes_step_quantity_mismatch(
 
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
         ret_info_1,
         ret_info_2,
@@ -271,7 +272,7 @@ def test_validate_downsizes_step_inactive_subscription(
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             {

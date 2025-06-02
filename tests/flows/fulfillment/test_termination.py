@@ -1,5 +1,6 @@
 import pytest
 
+from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
@@ -86,7 +87,7 @@ def test_get_returnable_orders_step(
 
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_returnable_orders_by_sku.return_value = returnable_orders
 
     mocked_switch_to_failed = mocker.patch(
@@ -155,7 +156,7 @@ def test_switch_autorenewal_off(
         renewal_quantity=10,
     )
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -208,7 +209,7 @@ def test_switch_autorenewal_off_already_off(
         autorenewal_enabled=False,
     )
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -306,7 +307,7 @@ def test_switch_autorenewal_off_invalid_renwal_state(
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
     )
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -374,7 +375,7 @@ def test_switch_autorenewal_off_error_updating_autorenew(
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
     )
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -434,7 +435,7 @@ def test_get_returnable_orders_step_inactive_subscription(
     adobe_customer = adobe_customer_factory()
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             {
@@ -493,7 +494,7 @@ def test_get_returnable_orders_step_no_returnable_orders(
     adobe_customer = adobe_customer_factory()
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             {

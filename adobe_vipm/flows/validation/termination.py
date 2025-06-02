@@ -6,8 +6,8 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
-    _validate_subscription_and_returnable_orders,
     set_order_error,
+    validate_subscription_and_returnable_orders,
 )
 from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 
@@ -20,7 +20,7 @@ class ValidateDownsizes(Step):
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
 
-            is_valid, _ = _validate_subscription_and_returnable_orders(
+            is_valid, _ = validate_subscription_and_returnable_orders(
                 adobe_client, context, line, sku
             )
 

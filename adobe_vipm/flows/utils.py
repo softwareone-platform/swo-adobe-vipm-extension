@@ -2,7 +2,6 @@ import copy
 import functools
 import re
 from datetime import date, datetime, timedelta
-from operator import attrgetter
 
 import phonenumbers
 from django.conf import settings
@@ -1089,16 +1088,13 @@ def is_line_item_active_subscription(subscriptions, line):
 
 def has_valid_returnable_quantity(line, returnable_orders):
     delta = line["oldQuantity"] - line["quantity"]
-    total_quantity_returnable = sum(
-        roi.quantity
-        for roi in sorted(returnable_orders, key=attrgetter("quantity"))
-    )
+    total_quantity_returnable = sum(roi.quantity for roi in returnable_orders)
     if delta != total_quantity_returnable:
         return False
     return True
 
 
-def _validate_subscription_and_returnable_orders(
+def validate_subscription_and_returnable_orders(
     adobe_client,
     context,
     line,
