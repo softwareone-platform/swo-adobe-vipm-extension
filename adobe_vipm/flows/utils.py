@@ -1089,9 +1089,7 @@ def is_line_item_active_subscription(subscriptions, line):
 def has_valid_returnable_quantity(line, returnable_orders):
     delta = line["oldQuantity"] - line["quantity"]
     total_quantity_returnable = sum(roi.quantity for roi in returnable_orders)
-    if delta != total_quantity_returnable:
-        return False
-    return True
+    return delta == total_quantity_returnable
 
 
 def validate_subscription_and_returnable_orders(
@@ -1103,6 +1101,8 @@ def validate_subscription_and_returnable_orders(
 ):
     """
     Validates if the subscription is active and has valid returnable orders.
+    Returnable orders are the orders that has been created in a period
+    of 2 weeks before the current date.
 
     Args:
         adobe_client: The Adobe client instance
@@ -1136,6 +1136,6 @@ def validate_subscription_and_returnable_orders(
         return False, []
 
     if not has_valid_returnable_quantity(line, returnable_orders):
-        return False, None
+        return False, []
 
     return True, returnable_orders

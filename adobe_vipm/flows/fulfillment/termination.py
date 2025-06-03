@@ -52,6 +52,7 @@ class GetReturnableOrders(Step):
                 sku,
                 return_orders=context.adobe_return_orders.get(sku)
             )
+            logger.info(f"{context}: returnable orders: {returnable_orders} for {sku}")
             if not is_valid:
                 switch_order_to_failed(
                     client,
