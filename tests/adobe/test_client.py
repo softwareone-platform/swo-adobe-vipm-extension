@@ -22,7 +22,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_PROCESSED,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
-from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
 
 
@@ -371,6 +371,70 @@ def test_create_preview_order_upsize(
         "orderId": "adobe-order-id",
     }
 
+def test_create_preview_order_upsize_product_not_found(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_config_file,
+    adobe_authorizations_file,
+    adobe_subscription_factory,
+    order_factory,
+    lines_factory,
+    adobe_client_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+):
+    """
+    Test the call to Adobe API to create a preview order for upsizes when the product is not found
+    in Adobe's system.
+    """
+    mocker.patch(
+        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        side_effect=["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0][
+        "authorization_uk"
+    ]
+    customer_id = "a-customer"
+    deployment_id = "a_deployment_id"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    # Create an order with a non-existent product SKU
+    order = order_factory(
+        lines=lines_factory(old_quantity=5, quantity=10)
+    )
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "NONEXISTENT-SKU"}
+
+    # Mock the subscriptions endpoint to return an empty list
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions",
+        ),
+        status=200,
+        json={"items": []},
+    )
+
+    with pytest.raises(AdobeProductNotFoundError) as exc_info:
+        client.create_preview_order(
+            authorization_uk,
+            customer_id,
+            order["id"],
+            order["lines"],
+            [],
+            deployment_id,
+        )
+
+    assert str(exc_info.value) == (
+        "Product NONEXISTENT-SKU not found in Adobe to make the upsize."
+        "This could be because the product is not available for this customer "
+        "or the subscription has been terminated."
+    )
 
 def test_create_preview_order_upsize_after_downsize_lower(
     mocker,

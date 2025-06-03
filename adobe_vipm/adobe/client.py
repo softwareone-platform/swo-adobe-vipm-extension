@@ -29,7 +29,7 @@ from adobe_vipm.adobe.dataclasses import (
     Reseller,
     ReturnableOrderInfo,
 )
-from adobe_vipm.adobe.errors import wrap_http_error
+from adobe_vipm.adobe.errors import AdobeProductNotFoundError, wrap_http_error
 from adobe_vipm.adobe.utils import (
     find_first,
     get_item_by_partial_sku,
@@ -543,6 +543,14 @@ class AdobeClient:
             #      - Update renewal quantity back to 10
             #      - Place order with additional 1 quantity added
             adobe_base_sku = line["item"]["externalIds"]["vendor"]
+
+            if adobe_base_sku not in map_by_base_offer_subscriptions:
+                raise AdobeProductNotFoundError(
+                    f"Product {adobe_base_sku} not found in Adobe to make the upsize."
+                    f"This could be because the product is not available for this customer "
+                    f"or the subscription has been terminated."
+                )
+
             adobe_subscription = map_by_base_offer_subscriptions[adobe_base_sku]
             renewal_quantity = adobe_subscription["autoRenewal"]["renewalQuantity"]
             current_quantity = adobe_subscription["currentQuantity"]
