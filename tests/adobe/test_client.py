@@ -284,7 +284,7 @@ def test_create_preview_order_upsize(
     """
 
     mocker.patch(
-        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
@@ -388,7 +388,7 @@ def test_create_preview_order_upsize_product_not_found(
     in Adobe's system.
     """
     mocker.patch(
-        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
@@ -459,7 +459,7 @@ def test_create_preview_order_upsize_after_downsize_lower(
     """
 
     mocker.patch(
-        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
@@ -518,7 +518,7 @@ def test_create_preview_newlines(
     """
 
     mocker.patch(
-        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
@@ -607,7 +607,7 @@ def test_create_preview_newlines_wo_deployment(
     """
 
     mocker.patch(
-        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
@@ -692,7 +692,7 @@ def test_create_preview_order_bad_request(
     """
 
     mocker.patch(
-        "adobe_vipm.adobe.client.get_adobe_product_by_marketplace_sku",
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
