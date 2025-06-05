@@ -216,6 +216,13 @@ ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
     "when there are no returnable orders to modify your renewal quantity."
 )
 
+ERR_INVALID_TERMINATION_ORDER_QUANTITY = ValidationError(
+    "VIPM0033",
+    "Cannot return the entire quantity of all subscriptions in this order. "
+    "Consider disabling auto-renewal for these subscriptions "
+    "instead using a Configuration Order."
+)
+
 ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
     "Cannot reduce item `{item}` quantity by {delta} and there "
     "is only one returnable order which would reduce the quantity to zero. "
