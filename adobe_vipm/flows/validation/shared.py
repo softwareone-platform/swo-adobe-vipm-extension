@@ -2,7 +2,7 @@ import logging
 from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
@@ -90,6 +90,12 @@ class GetPreviewOrder(Step):
                 deployment_id=deployment_id,
             )
         except AdobeAPIError as e:
+            context.validation_succeeded = False
+            context.order = set_order_error(
+                context.order, ERR_ADOBE_ERROR.to_dict(details=str(e))
+            )
+            return
+        except AdobeProductNotFoundError as e:
             context.validation_succeeded = False
             context.order = set_order_error(
                 context.order, ERR_ADOBE_ERROR.to_dict(details=str(e))

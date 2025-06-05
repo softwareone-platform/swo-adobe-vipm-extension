@@ -1,7 +1,7 @@
 import pytest
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
@@ -244,3 +244,34 @@ def test_get_preview_order_step_api_error(
 
     mocked_next_step.assert_not_called()
 
+
+def test_get_preview_order_step_product_not_found_error(
+    mocker, order_factory
+):
+    error = AdobeProductNotFoundError("Product not found")
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.create_preview_order.side_effect = error
+    mocker.patch(
+        "adobe_vipm.flows.validation.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    order = order_factory()
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        upsize_lines=order["lines"],
+        authorization_id="auth-id",
+        market_segment=MARKET_SEGMENT_COMMERCIAL,
+    )
+
+    step = GetPreviewOrder()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details=str(error))
+    assert context.adobe_preview_order is None
+
+    mocked_next_step.assert_not_called()
