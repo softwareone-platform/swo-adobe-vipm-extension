@@ -14,7 +14,6 @@ from .customer import (
 from .date import (
     get_due_date,
     is_coterm_date_within_order_creation_window,
-    is_renewal_window_open,
     is_within_last_two_weeks,
     reset_due_date,
     set_due_date,

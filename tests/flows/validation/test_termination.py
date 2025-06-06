@@ -334,12 +334,17 @@ def test_validate_termination_order(mocker):
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 6
 
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], ValidateDuplicateLines)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[2], SetOrUpdateCotermNextSyncDates)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], ValidateRenewalWindow)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDownsizes)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], ValidateDownsizes3YC)
+    expected_steps = [
+        SetupContext,
+        ValidateDuplicateLines,
+        SetOrUpdateCotermNextSyncDates,
+        ValidateRenewalWindow,
+        ValidateDownsizes,
+        ValidateDownsizes3YC,
+    ]
+
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
+    assert actual_steps == expected_steps
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(

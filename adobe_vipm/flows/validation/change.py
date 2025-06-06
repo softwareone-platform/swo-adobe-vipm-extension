@@ -114,7 +114,7 @@ def validate_change_order(client, order):
         SetupContext(),
         ValidateDuplicateLines(),
         SetOrUpdateCotermNextSyncDates(),
-        ValidateRenewalWindow(True),
+        ValidateRenewalWindow(is_validation=True),
         ValidateDownsizes(),
         ValidateDownsizes3YC(True),
         GetPreviewOrder(),

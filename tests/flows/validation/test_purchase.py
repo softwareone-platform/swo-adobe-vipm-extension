@@ -864,17 +864,18 @@ def test_validate_purchase_order(mocker):
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
 
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], PrepareCustomerData)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[2], CheckPurchaseValidationEnabled
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], ValidateCustomerData)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDuplicateLines
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetPreviewOrder)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], UpdatePrices)
+    expected_steps = [
+        SetupContext,
+        PrepareCustomerData,
+        CheckPurchaseValidationEnabled,
+        ValidateCustomerData,
+        ValidateDuplicateLines,
+        GetPreviewOrder,
+        UpdatePrices,
+    ]
+
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
+    assert actual_steps == expected_steps
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(

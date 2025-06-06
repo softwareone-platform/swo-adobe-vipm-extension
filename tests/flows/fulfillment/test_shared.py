@@ -2002,21 +2002,12 @@ def test_send_gc_mpt_notification(mocker, settings, order_factory, status, subje
 
 
 @freeze_time("2024-05-06")
-@pytest.mark.parametrize(
-    ("is_validation", "coterm_date", "should_fail"),
-    [
-        (True, "2024-05-06", True),
-        (False, "2024-05-06", True),
-        (True, None, False),
-        (False, None, False),
-    ],
-)
-def test_validate_renewal_window_24h_step(
-    mocker, order_factory, fulfillment_parameters_factory, is_validation, coterm_date, should_fail
+def test_validate_renewal_window_creation_window_validation_mode(
+    mocker, order_factory, fulfillment_parameters_factory
 ):
     """
-    Tests that ValidateRenewalWindow:
-    - Sets the error or fails the order if coterm date is in last 24h (depending on validation mode)
+    Tests that ValidateRenewalWindow in validation mode:
+    - Sets the error if coterm date is in creation window
     - Continues to next step if there is no coterm date
     """
     mocked_client = mocker.MagicMock()
@@ -2028,24 +2019,64 @@ def test_validate_renewal_window_24h_step(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
 
+    # Test with coterm date in creation window
     order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(coterm_date=coterm_date)
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-05-06")
     )
     context = Context(order=order, order_id=order["id"])
 
-    step = ValidateRenewalWindow(is_validation=is_validation)
+    step = ValidateRenewalWindow(is_validation=True)
     step(mocked_client, context, mocked_next_step)
 
-    if should_fail:
-        if is_validation:
-            mocked_set_order_error.assert_called_once()
-            mocked_switch_order_to_failed.assert_not_called()
-            mocked_next_step.assert_called_once_with(mocked_client, context)
-        else:
-            mocked_set_order_error.assert_not_called()
-            mocked_switch_order_to_failed.assert_called_once()
-            mocked_next_step.assert_not_called()
-    else:
-        mocked_set_order_error.assert_not_called()
-        mocked_switch_order_to_failed.assert_not_called()
-        mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_set_order_error.assert_called_once()
+    mocked_switch_order_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+@freeze_time("2024-05-06")
+def test_validate_renewal_window_creation_window_non_validation_mode(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    """
+    Tests that ValidateRenewalWindow in non-validation mode:
+    - Fails the order if coterm date is in creation window
+    - Continues to next step if there is no coterm date
+    """
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_order_error"
+    )
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+
+    # Test with coterm date in creation window
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-05-06")
+    )
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateRenewalWindow(is_validation=False)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_set_order_error.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+    mocked_next_step.assert_not_called()
+
+    # Reset mocks
+    mocked_switch_order_to_failed.reset_mock()
+    mocked_next_step.reset_mock()
+
+    # Test with no coterm date
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date=None)
+    )
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateRenewalWindow(is_validation=False)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_set_order_error.assert_not_called()
+    mocked_switch_order_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
