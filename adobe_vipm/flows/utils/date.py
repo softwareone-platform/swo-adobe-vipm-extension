@@ -2,6 +2,7 @@ import copy
 from datetime import date, datetime, timedelta
 
 from django.conf import settings
+from zoneinfo import ZoneInfo
 
 from adobe_vipm.flows.constants import (
     LAST_TWO_WEEKS_DAYS,
@@ -86,17 +87,22 @@ def reset_due_date(order):
 
     return order
 
-def is_renewal_window_open(order):
-    if not get_coterm_date(order):
-        return False
-    coterm_date = datetime.fromisoformat(get_coterm_date(order)).date()
-    today = date.today()
-    return coterm_date - timedelta(days=4) <= today <= coterm_date
-
-
 def is_within_last_two_weeks(coterm_date):
     last_two_weeks = (
         datetime.fromisoformat(coterm_date) - timedelta(days=LAST_TWO_WEEKS_DAYS)
     ).date()
 
     return date.today() >= last_two_weeks
+
+def is_coterm_date_within_order_creation_window(order):
+    if not get_coterm_date(order):
+        return False
+    hours = settings.EXTENSION_CONFIG.get("ORDER_CREATION_WINDOW_HOURS")
+    coterm_date = datetime.fromisoformat(get_coterm_date(order)).date()
+    #The zone is set to Pacific time to match the Adobe order creation window
+    #this is for the business logic to be consistent with the Adobe order creation window
+    pacific_tz = ZoneInfo('America/Los_Angeles')
+    today = datetime.now(pacific_tz).date()
+    return today >= coterm_date - timedelta(hours=int(hours))
+
+
