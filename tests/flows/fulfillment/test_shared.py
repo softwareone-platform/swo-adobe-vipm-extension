@@ -1,4 +1,3 @@
-import logging
 from datetime import date
 
 import pytest
@@ -41,7 +40,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     SyncAgreement,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
-    ValidateRenewalWindow24h,
     send_gc_mpt_notification,
     send_mpt_notification,
     set_customer_coterm_date_if_null,
@@ -505,65 +503,6 @@ def test_set_processing_template_to_delayed_in_renewal_win(
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
-
-@freeze_time("2024-05-06")
-def test_validate_renewal_window_step(
-    mocker, order_factory, fulfillment_parameters_factory
-):
-    """
-    Tests that if the renewal window is not open
-    the order processing pipeline continue with the next step.
-    """
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(
-                coterm_date="2024-07-08"
-            )
-        )
-    )
-
-    step = ValidateRenewalWindow()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2024-05-06")
-def test_validate_renewal_window_step_win_opened(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    caplog,
-):
-    """
-    Tests that if the renewal window is not open
-    the order processing pipeline continue with the next step.
-    """
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(
-                coterm_date="2024-05-08"
-            )
-        )
-    )
-
-    step = ValidateRenewalWindow()
-    with caplog.at_level(logging.WARNING):
-        step(mocked_client, context, mocked_next_step)
-
-    assert (
-        f"{context}: Renewal window is open, coterm date is '2024-05-08'" in caplog.text
-    )
-
-    mocked_next_step.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -2076,7 +2015,7 @@ def test_validate_renewal_window_24h_step(
     mocker, order_factory, fulfillment_parameters_factory, is_validation, coterm_date, should_fail
 ):
     """
-    Tests that ValidateRenewalWindow24h:
+    Tests that ValidateRenewalWindow:
     - Sets the error or fails the order if coterm date is in last 24h (depending on validation mode)
     - Continues to next step if there is no coterm date
     """
@@ -2094,7 +2033,7 @@ def test_validate_renewal_window_24h_step(
     )
     context = Context(order=order, order_id=order["id"])
 
-    step = ValidateRenewalWindow24h(is_validation=is_validation)
+    step = ValidateRenewalWindow(is_validation=is_validation)
     step(mocked_client, context, mocked_next_step)
 
     if should_fail:
