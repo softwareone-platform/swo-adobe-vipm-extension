@@ -1,8 +1,8 @@
 import copy
 from datetime import date, datetime, timedelta
 
-import pytz
 from django.conf import settings
+from zoneinfo import ZoneInfo
 
 from adobe_vipm.flows.constants import (
     LAST_TWO_WEEKS_DAYS,
@@ -101,12 +101,15 @@ def is_within_last_two_weeks(coterm_date):
 
     return date.today() >= last_two_weeks
 
-def is_coterm_date_in_last_24_hours(order):
+def is_coterm_date_within_order_creation_window(order):
     if not get_coterm_date(order):
         return False
+    hours = settings.EXTENSION_CONFIG.get("ORDER_CREATION_WINDOW_HOURS")
     coterm_date = datetime.fromisoformat(get_coterm_date(order)).date()
-    pacific_tz = pytz.timezone('America/Los_Angeles')
+    #The zone is set to Pacific time to match the Adobe order creation window
+    #this is for the business logic to be consistent with the Adobe order creation window
+    pacific_tz = ZoneInfo('America/Los_Angeles')
     today = datetime.now(pacific_tz).date()
-    return today >= coterm_date - timedelta(days=1)
+    return today >= coterm_date - timedelta(hours=int(hours))
 
 

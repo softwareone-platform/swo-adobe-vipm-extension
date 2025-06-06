@@ -22,7 +22,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
-    ValidateRenewalWindow24h,
+    ValidateRenewalWindow,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
@@ -135,7 +135,7 @@ def fulfill_termination_order(client, order):
         SetupDueDate(),
         SetOrUpdateCotermNextSyncDates(),
         StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
-        ValidateRenewalWindow24h(),
+        ValidateRenewalWindow(),
         GetReturnOrders(),
         GetReturnableOrders(),
         ValidateDownsizes3YC(),

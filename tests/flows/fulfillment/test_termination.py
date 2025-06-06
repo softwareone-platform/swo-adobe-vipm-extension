@@ -16,7 +16,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
-    ValidateRenewalWindow24h,
+    ValidateRenewalWindow,
 )
 from adobe_vipm.flows.fulfillment.termination import (
     GetReturnableOrders,
@@ -270,7 +270,7 @@ def test_fulfill_termination_order(mocker):
         mocked_pipeline_ctor.mock_calls[0].args[3].template_name
         == TEMPLATE_NAME_TERMINATION
     )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow24h)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnOrders)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnableOrders)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], ValidateDownsizes3YC)

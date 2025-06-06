@@ -13,7 +13,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermNextSyncDates,
-    ValidateRenewalWindow24h,
+    ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 from adobe_vipm.flows.validation.change import (
@@ -406,7 +406,7 @@ def test_validate_change_order(mocker):
         mocked_pipeline_ctor.mock_calls[0].args[2], SetOrUpdateCotermNextSyncDates
     )
     assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[3], ValidateRenewalWindow24h
+        mocked_pipeline_ctor.mock_calls[0].args[3], ValidateRenewalWindow
     )
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDownsizes)
     assert isinstance(

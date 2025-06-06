@@ -71,8 +71,7 @@ from adobe_vipm.flows.utils import (
     get_one_time_skus,
     get_order_line_by_sku,
     get_subscription_by_line_and_item_id,
-    is_coterm_date_in_last_24_hours,
-    is_renewal_window_open,
+    is_coterm_date_within_order_creation_window,
     map_returnable_to_return_orders,
     md2html,
     reset_due_date,
@@ -631,28 +630,13 @@ class ValidateRenewalWindow(Step):
     Check if the renewal window is open. In that case stop the order processing.
     """
 
-    def __call__(self, client, context, next_step):
-        if is_renewal_window_open(context.order):
-            coterm_date = get_coterm_date(context.order)
-            logger.warning(
-                f"{context}: Renewal window is open, coterm date is '{coterm_date}'"
-            )
-            return
-        logger.info(f"{context}: not in renewal window, continue")
-        next_step(client, context)
-
-class ValidateRenewalWindow24h(Step):
-    """
-    Check if the renewal window is open. In that case stop the order processing.
-    """
-
     def __init__(self, is_validation=False):
         self.is_validation = is_validation
 
     def __call__(self, client, context, next_step):
-        if is_coterm_date_in_last_24_hours(context.order):
+        if is_coterm_date_within_order_creation_window(context.order):
             coterm_date = get_coterm_date(context.order)
-            logger.warning(
+            logger.info(
                 f"{context}: Order is being created within the last 24 "
                 f"hours of coterm date '{coterm_date}'"
             )

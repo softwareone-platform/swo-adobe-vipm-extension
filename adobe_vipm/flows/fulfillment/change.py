@@ -32,7 +32,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitReturnOrders,
     SyncAgreement,
     ValidateDuplicateLines,
-    ValidateRenewalWindow24h,
+    ValidateRenewalWindow,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
@@ -246,7 +246,7 @@ def fulfill_change_order(client, order):
         ValidateDuplicateLines(),
         SetOrUpdateCotermNextSyncDates(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
-        ValidateRenewalWindow24h(),
+        ValidateRenewalWindow(),
         GetReturnOrders(),
         GetReturnableOrders(),
         ValidateReturnableOrders(),
