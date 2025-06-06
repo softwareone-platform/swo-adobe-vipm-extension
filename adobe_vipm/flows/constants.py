@@ -253,6 +253,26 @@ ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION = ValidationError(
     "{error}",
 )
 
+ERR_COMMITMENT_3YC_LICENSES =(
+    "The quantity selected of {selected_licenses} would place the account below the "
+    "minimum commitment of {minimum_licenses} licenses for the three-year commitment."
+)
+
+ERR_COMMITMENT_3YC_CONSUMABLES =(
+    "The quantity selected of {selected_consumables} would place the account below the "
+    "minimum commitment of {minimum_consumables} consumables for the three-year commitment."
+)
+
+ERR_COMMITMENT_3YC_VALIDATION = ValidationError(
+    "VIPM0034",
+    "{error}",
+)
+
+ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT = ValidationError(
+    "VIPM0035",
+    "The 3-year commitment is in status {status}. Please contact support to renew the commitment."
+)
+
 ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
     "VIPM0021",
     "Do not add or remove items, and do not modify the quantities of any items. "
@@ -276,6 +296,13 @@ ERR_MARKET_SEGMENT_NOT_ELIGIBLE = ValidationError(
 ERR_DUE_DATE_REACHED = ValidationError(
     "VIPM0025",
     "Due date {due_date} for order processing is reached.",
+)
+
+ERR_COTERM_DATE_IN_LAST_24_HOURS = ValidationError(
+    "VIPM0034",
+    "Orders cannot be placed within 24 hours of the renewal date. "
+    "Please wait until after the renewal date and make your required "
+    "changes with Change, Configuration, or Termination Orders.",
 )
 
 ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS = ValidationError(

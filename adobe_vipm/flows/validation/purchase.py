@@ -47,7 +47,12 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, UpdatePrices
+from adobe_vipm.flows.helpers import (
+    PrepareCustomerData,
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+)
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
@@ -273,6 +278,7 @@ def validate_purchase_order(client, order):
         CheckPurchaseValidationEnabled(),
         ValidateCustomerData(),
         ValidateDuplicateLines(),
+        Validate3YCCommitment(True),
         GetPreviewOrder(),
         UpdatePrices(),
     )
