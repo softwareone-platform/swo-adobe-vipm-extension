@@ -37,7 +37,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
-    SyncAgreement,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     send_gc_mpt_notification,
@@ -1671,37 +1670,6 @@ def test_complete_configuration_order_selects_template(
     )
     mocked_send_email.assert_called_once_with(mocked_client, completed_order)
     assert context.order == completed_order
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_sync_agreement_step(mocker, order_factory):
-    """
-    Tests the step call the synchronization of an agreement and then
-    continue with the order processing pipeline.
-    """
-    mocked_sync = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids",
-    )
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    order = order_factory()
-
-    context = Context(
-        order=order,
-        order_id=order["id"],
-        agreement_id=order["agreement"]["id"],
-    )
-
-    step = SyncAgreement()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_sync.assert_called_once_with(
-        mocked_client,
-        [context.agreement_id],
-    )
-
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 

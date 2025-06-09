@@ -33,7 +33,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
-    SyncAgreement,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
@@ -608,9 +607,7 @@ def test_validate_downsize_3yc_orders_step_error_minimum_quantity_generic(
 
     step = ValidateDownsizes3YC()
     step(mocked_client, context, mocked_next_step)
-    error_msg = ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
-        minimum_consumables=37, minimum_licenses=20
-    )
+    error_msg = ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(minimum_consumables=37, minimum_licenses=20)
 
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
@@ -944,7 +941,6 @@ def test_fulfill_change_order(mocker):
         CreateOrUpdateSubscriptions,
         UpdatePrices,
         CompleteOrder,
-        SyncAgreement,
     ]
 
     pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
@@ -963,7 +959,7 @@ def test_fulfill_change_order(mocker):
 
 
 @pytest.mark.parametrize(
-    ("error_code","error_message"),
+    ("error_code", "error_message"),
     [
         ("3120", "Update could not be performed because it would create an invalid renewal state"),
         ("3123", "Line Item offer id has expired"),
@@ -1164,11 +1160,7 @@ def test_rollback_updated_subscriptions_error(
         adobe_new_order=adobe_order,
     )
     context.updated = [
-        {
-            'subscription_vendor_id': 'sub-1-id',
-            'old_quantity': 10,
-            'new_quantity': 5
-        }
+        {"subscription_vendor_id": "sub-1-id", "old_quantity": 10, "new_quantity": 5}
     ]
 
     step = UpdateRenewalQuantities()
@@ -1205,9 +1197,9 @@ def test_rollback_updated_subscriptions_error(
 
     mocked_notify.assert_called_with(
         context.order["id"],
-        'Error updating subscription sub-2, 1000 - Error during rollback',
+        "Error updating subscription sub-2, 1000 - Error during rollback",
         [],
-        context.product_id
+        context.product_id,
     )
 
     mocked_next_step.assert_not_called()
@@ -1281,16 +1273,8 @@ def test_rollback_updated_subscriptions_error_during_rollback(
         adobe_new_order=adobe_order,
     )
     context.updated = [
-        {
-            'subscription_vendor_id': 'sub-1-id',
-            'old_quantity': 10,
-            'new_quantity': 5
-        },
-        {
-            'subscription_vendor_id': 'sub-2-id',
-            'old_quantity': 15,
-            'new_quantity': 5
-        }
+        {"subscription_vendor_id": "sub-1-id", "old_quantity": 10, "new_quantity": 5},
+        {"subscription_vendor_id": "sub-2-id", "old_quantity": 15, "new_quantity": 5},
     ]
 
     step = UpdateRenewalQuantities()
@@ -1318,8 +1302,8 @@ def test_rollback_updated_subscriptions_error_during_rollback(
     )
     mocked_notify.assert_called_with(
         context.order["id"],
-        'Error rolling back updated subscriptions: 1000 - Error during rollback',
+        "Error rolling back updated subscriptions: 1000 - Error during rollback",
         context.updated,
-        context.product_id
+        context.product_id,
     )
     mocked_next_step.assert_not_called()

@@ -30,7 +30,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitReturnOrders,
-    SyncAgreement,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     switch_order_to_failed,
@@ -258,7 +257,6 @@ def fulfill_change_order(client, order):
         CreateOrUpdateSubscriptions(),
         UpdatePrices(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
-        SyncAgreement(),
     )
     context = Context(order=order)
     pipeline.run(client, context)

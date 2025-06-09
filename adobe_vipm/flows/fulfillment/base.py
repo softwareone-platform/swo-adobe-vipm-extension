@@ -1,6 +1,8 @@
 import logging
 import traceback
 
+from mpt_extension_sdk.mpt_http.mpt import get_agreement
+
 import adobe_vipm.flows.constants as constants
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.configuration import fulfill_configuration_order
@@ -9,6 +11,7 @@ from adobe_vipm.flows.fulfillment.shared import start_processing_attempt
 from adobe_vipm.flows.fulfillment.termination import fulfill_termination_order
 from adobe_vipm.flows.fulfillment.transfer import fulfill_transfer_order
 from adobe_vipm.flows.helpers import populate_order_info
+from adobe_vipm.flows.sync import sync_agreement
 from adobe_vipm.flows.utils import (
     is_transfer_order,
     notify_unhandled_exception_in_teams,
@@ -46,6 +49,7 @@ def fulfill_order(client, order):
                 fulfill_configuration_order(client, order)
             case constants.ORDER_TYPE_TERMINATION:
                 fulfill_termination_order(client, order)
+        sync_agreement(client, get_agreement(client, order["agreement"]["id"]), dry_run=False)
     except Exception:
         notify_unhandled_exception_in_teams(
             "fulfillment",
