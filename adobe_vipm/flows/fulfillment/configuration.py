@@ -16,6 +16,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermNextSyncDates,
     SetupDueDate,
     StartOrderProcessing,
+    SyncAgreement,
     ValidateRenewalWindow,
     get_configuration_template_name,
     switch_order_to_failed,
@@ -43,6 +44,7 @@ def fulfill_configuration_order(client, order):
         ValidateRenewalWindow(),
         SubscriptionUpdateAutoRenewal(),
         CompleteOrder(template_name),
+        SyncAgreement(),
     )
 
     context = Context(order=order)
