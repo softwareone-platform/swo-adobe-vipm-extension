@@ -631,26 +631,30 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
         parameters=context.order["parameters"],
     )
 
-    assert get_fulfillment_parameter(
+    parameter_list = []
+    parameter_list.append(get_fulfillment_parameter(
         context.order,
         PARAM_3YC_ENROLL_STATUS
-    )["value"] == commitment["status"]
-
-    assert get_fulfillment_parameter(
+    )["value"])
+    parameter_list.append(get_fulfillment_parameter(
         context.order,
         PARAM_3YC_COMMITMENT_REQUEST_STATUS
-    )["value"] == commitment["status"]
-
-    assert get_fulfillment_parameter(
+    )["value"])
+    parameter_list.append(get_fulfillment_parameter(
         context.order,
         PARAM_3YC_START_DATE
-    )["value"] == commitment["startDate"]
-
-    assert get_fulfillment_parameter(
+    )["value"])
+    parameter_list.append(get_fulfillment_parameter(
         context.order,
         PARAM_3YC_END_DATE
-    )["value"] == commitment["endDate"]
+    )["value"])
 
+    assert parameter_list == [
+        commitment["status"],
+        commitment["status"],
+        commitment["startDate"],
+        commitment["endDate"]
+    ]
     assert get_coterm_date(context.order) == "2025-01-01"
     assert get_next_sync(context.order) == "2025-01-02"
 

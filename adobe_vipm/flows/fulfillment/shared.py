@@ -606,7 +606,8 @@ class SetOrUpdateCotermNextSyncDates(Step):
                 client, context.order_id, parameters=context.order["parameters"]
             )
             logger.info(
-                f"{context}: order parameters updated successfully"
+                f"{context}: coterm ({coterm_date.isoformat()}) "
+                f"and next sync ({next_sync.isoformat()}) updated successfully"
             )
 
         next_step(client, context)
