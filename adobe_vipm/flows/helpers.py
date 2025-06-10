@@ -377,7 +377,7 @@ class UpdatePrices(Step):
             return get_prices_for_3yc_skus(
                 context.product_id,
                 context.currency,
-                date.fromisoformat(commitment["startDate"]),
+                date.fromisoformat(commitment.get("startDate", "")) if commitment else None,
                 actual_skus,
             )
         return get_prices_for_skus(
