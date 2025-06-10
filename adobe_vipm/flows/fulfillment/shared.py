@@ -60,7 +60,6 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
 )
 from adobe_vipm.flows.pipeline import Step
-from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_address,
     get_adobe_customer_id,
@@ -944,12 +943,6 @@ class CompleteOrder(Step):
         context.order["agreement"] = agreement
         send_mpt_notification(client, context.order)
         logger.info(f"{context}: order has been completed successfully")
-        next_step(client, context)
-
-class SyncAgreement(Step):
-    def __call__(self, client, context, next_step):
-        sync_agreements_by_agreement_ids(client, [context.agreement_id])
-        logger.info(f"{context}: agreement synchoronized")
         next_step(client, context)
 
 

@@ -50,7 +50,7 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 
-pytestmark = pytest.mark.usefixtures("mock_adobe_config")
+pytestmark = pytest.mark.usefixtures("mock_adobe_config", "mock_sync_agreement")
 
 
 @pytest.fixture(autouse=True)

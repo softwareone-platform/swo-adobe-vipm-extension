@@ -306,6 +306,7 @@ def sync_global_customer_parameters(
 
 def sync_agreement(mpt_client, agreement, dry_run):
     try:
+        logger.debug(f"Syncing {agreement=}")
         customer_id = get_adobe_customer_id(agreement)
         adobe_client = get_adobe_client()
         logger.info(f"Synchronizing agreement {agreement["id"]}...")
