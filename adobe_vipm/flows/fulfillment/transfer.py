@@ -432,7 +432,7 @@ def _transfer_migrated(
         switch_order_to_failed(
             mpt_client,
             order,
-            ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
+            ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED.to_dict(),
         )
         return
 

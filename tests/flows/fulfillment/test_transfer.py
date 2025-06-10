@@ -2242,7 +2242,7 @@ def test_fulfill_transfer_order_migration_synchronized(
     mocked_fail_order.assert_called_once_with(
         m_client,
         order["id"],
-        ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
+        ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED.to_dict(),
         parameters=order["parameters"],
     )
 
