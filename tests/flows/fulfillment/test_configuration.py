@@ -414,13 +414,21 @@ def test_fulfill_configuration_order(mocker):
 
     fulfill_configuration_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 5
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
 
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], Step)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], Step)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[2], Step)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], SubscriptionUpdateAutoRenewal)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], Step)
+    expected_steps = [
+        Step,
+        Step,
+        Step,
+        Step,
+        Step,
+        SubscriptionUpdateAutoRenewal,
+        Step,
+    ]
+    actual_steps = list(mocked_pipeline_ctor.mock_calls[0].args)
+
+    for actual, expected in zip(actual_steps, expected_steps):
+        assert isinstance(actual, expected)
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(

@@ -258,28 +258,25 @@ def test_fulfill_termination_order(mocker):
     mocked_order = mocker.MagicMock()
 
     fulfill_termination_order(mocked_client, mocked_order)
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 10
 
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], SetupDueDate)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[2], SetOrUpdateCotermNextSyncDates
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], StartOrderProcessing)
-    assert (
-        mocked_pipeline_ctor.mock_calls[0].args[3].template_name
-        == TEMPLATE_NAME_TERMINATION
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], ValidateRenewalWindow)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnableOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], ValidateDownsizes3YC)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SubmitReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], CompleteOrder)
-    assert (
-        mocked_pipeline_ctor.mock_calls[0].args[9].template_name
-        == TEMPLATE_NAME_TERMINATION
-    )
+    expected_steps = [
+        SetupContext,
+        SetupDueDate,
+        SetOrUpdateCotermNextSyncDates,
+        StartOrderProcessing,
+        ValidateRenewalWindow,
+        GetReturnOrders,
+        GetReturnableOrders,
+        ValidateDownsizes3YC,
+        SubmitReturnOrders,
+        CompleteOrder,
+    ]
+
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
+    assert actual_steps == expected_steps
+    assert mocked_pipeline_ctor.mock_calls[0].args[3].template_name == TEMPLATE_NAME_TERMINATION
+    assert mocked_pipeline_ctor.mock_calls[0].args[9].template_name == TEMPLATE_NAME_TERMINATION
+
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(
         mocked_client,

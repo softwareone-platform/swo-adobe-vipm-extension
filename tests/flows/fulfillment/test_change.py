@@ -925,43 +925,36 @@ def test_fulfill_change_order(mocker):
     mocked_order = mocker.MagicMock()
 
     fulfill_change_order(mocked_client, mocked_order)
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 18
 
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], SetupDueDate)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[2], ValidateDuplicateLines
-    )
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[3], SetOrUpdateCotermNextSyncDates
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[4], StartOrderProcessing)
-    assert (
-        mocked_pipeline_ctor.mock_calls[0].args[4].template_name == TEMPLATE_NAME_CHANGE
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], ValidateRenewalWindow)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], GetReturnableOrders)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[8], ValidateReturnableOrders
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], ValidateDownsizes3YC)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], GetPreviewOrder)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[11], SubmitReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[12], SubmitNewOrder)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[13], UpdateRenewalQuantities
-    )
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[14], CreateOrUpdateSubscriptions
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[15], UpdatePrices)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[16], CompleteOrder)
-    assert (
-        mocked_pipeline_ctor.mock_calls[0].args[16].template_name
-        == TEMPLATE_NAME_CHANGE
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[17], SyncAgreement)
+    expected_steps = [
+        SetupContext,
+        SetupDueDate,
+        ValidateDuplicateLines,
+        SetOrUpdateCotermNextSyncDates,
+        StartOrderProcessing,
+        ValidateRenewalWindow,
+        GetReturnOrders,
+        GetReturnableOrders,
+        ValidateReturnableOrders,
+        ValidateDownsizes3YC,
+        GetPreviewOrder,
+        SubmitReturnOrders,
+        SubmitNewOrder,
+        UpdateRenewalQuantities,
+        CreateOrUpdateSubscriptions,
+        UpdatePrices,
+        CompleteOrder,
+        SyncAgreement,
+    ]
+
+    pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
+    assert len(pipeline_args) == len(expected_steps)
+
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
+    assert actual_steps == expected_steps
+    assert pipeline_args[4].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[16].template_name == TEMPLATE_NAME_CHANGE
+
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(
         mocked_client,
