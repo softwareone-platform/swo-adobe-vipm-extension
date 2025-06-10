@@ -205,18 +205,20 @@ class Validate3YCCommitment(Step):
     def __call__(self, client, context, next_step):
 
         if not context.adobe_customer:
+            logger.info(f"{context}: No Adobe customer found, validating 3YC quantities parameters")
             if self.validate_3yc_quantities_parameters(client, context):
                 next_step(client, context)
             return
 
         commitment = get_3yc_commitment_request(context.adobe_customer)
         adobe_client = get_adobe_client()
+        commitment_status = commitment.get("status",'')
 
-        if commitment.get("status",'') == STATUS_3YC_REQUESTED and not self.is_validation:
+        if commitment_status == STATUS_3YC_REQUESTED and not self.is_validation:
             logger.info(f"{context}: 3YC commitment request is in status {STATUS_3YC_REQUESTED}")
             return
 
-        if commitment.get("status",'') in [
+        if commitment_status in [
             STATUS_3YC_EXPIRED,
             STATUS_3YC_NONCOMPLIANT,
             STATUS_3YC_DECLINED,
@@ -260,14 +262,19 @@ class Validate3YCCommitment(Step):
             subscriptions
         )
 
-        count_licenses, count_consumables = self.process_donwsize_lines_quantities(
+        count_licenses, count_consumables = self.process_lines_quantities(
             context,
             count_licenses=count_licenses,
-            count_consumables=count_consumables)
-        count_licenses, count_consumables = self.process_upsize_lines_quantities(
+            count_consumables=count_consumables,
+            is_downsize=True
+        )
+
+        count_licenses, count_consumables = self.process_lines_quantities(
             context,
             count_licenses=count_licenses,
-            count_consumables=count_consumables)
+            count_consumables=count_consumables,
+            is_downsize=False
+        )
 
         return count_licenses, count_consumables
 
@@ -297,41 +304,46 @@ class Validate3YCCommitment(Step):
         count_licenses = 0
         count_consumables = 0
 
-        if subscriptions and "items" in subscriptions:
-            for subscription in subscriptions["items"]:
-                sku = get_adobe_product_by_marketplace_sku(subscription["offerId"][0:10])
-                if (sku.is_valid_3yc_type() and
-                    subscription["autoRenewal"]["enabled"]):
-                    if sku.is_consumable():
-                        count_consumables += subscription["autoRenewal"]["renewalQuantity"]
-                    else:
-                        count_licenses += subscription["autoRenewal"]["renewalQuantity"]
+        if not subscriptions or "items" not in subscriptions:
+            return 0, 0
+
+        active_subscriptions = [
+            sub for sub in subscriptions["items"]
+            if sub["autoRenewal"]["enabled"]
+        ]
+
+        for subscription in active_subscriptions:
+            sku = get_adobe_product_by_marketplace_sku(subscription["offerId"][0:10])
+            if sku.is_valid_3yc_type():
+                if sku.is_consumable():
+                    count_consumables += subscription["autoRenewal"]["renewalQuantity"]
+                else:
+                    count_licenses += subscription["autoRenewal"]["renewalQuantity"]
 
         return count_licenses, count_consumables
 
     @staticmethod
-    def process_donwsize_lines_quantities(context, count_licenses, count_consumables):
-        for line in context.downsize_lines:
-            delta = line["oldQuantity"] - line["quantity"]
+    def process_lines_quantities(context, count_licenses=0, count_consumables=0, is_downsize=False):
+        if is_downsize:
+            lines = context.downsize_lines
+        else:
+            lines = context.upsize_lines + context.new_lines
+
+        for line in lines:
+            if is_downsize:
+                delta = line["oldQuantity"] - line["quantity"]
+            else:
+                delta = line["quantity"] - line["oldQuantity"]
+
             sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
             if sku.is_valid_3yc_type():
                 if sku.is_consumable():
-                    count_consumables -= delta
+                    count_consumables += delta if not is_downsize else -delta
                 else:
-                    count_licenses -= delta
+                    count_licenses += delta if not is_downsize else -delta
+
         return count_licenses, count_consumables
 
-    @staticmethod
-    def process_upsize_lines_quantities(context, count_licenses=0, count_consumables=0):
-        for line in context.upsize_lines + context.new_lines:
-            delta = line["quantity"] - line["oldQuantity"]
-            sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
-            if sku.is_valid_3yc_type():
-                if sku.is_consumable():
-                    count_consumables += delta
-                else:
-                    count_licenses += delta
-        return count_licenses, count_consumables
 
     @staticmethod
     def validate_items_in_subscriptions(context, subscriptions):

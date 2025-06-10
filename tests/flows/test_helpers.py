@@ -1032,7 +1032,7 @@ def test_validate_3yc_commitment_expired_status(
     )
     assert error_expected == error_dict.get("message")
 
-@pytest.mark.parametrize("is_validation", [True, False])
+
 def test_validate_3yc_commitment_item_not_found(
     mocker,
     order_factory,
@@ -1040,7 +1040,6 @@ def test_validate_3yc_commitment_item_not_found(
     adobe_commitment_factory,
     adobe_subscription_factory,
     mock_get_sku_adobe_mapping_model,
-    is_validation
 ):
     """Test validation when item is not found in subscriptions."""
     mocked_switch_order_to_failed = mocker.patch(
@@ -1105,25 +1104,97 @@ def test_validate_3yc_commitment_item_not_found(
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
 
-    if is_validation:
-        step = Validate3YCCommitment(True)
-        step(mocked_client, context, mocked_next_step)
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+    mocked_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+    mocked_set_order_error.assert_not_called()
+    error_call = mocked_switch_order_to_failed.call_args
+    error_dict = error_call[0][2]
+    assert "Item 65304578CA not found in Adobe subscriptions" == error_dict.get("message")
 
-        mocked_next_step.assert_not_called()
-        mocked_set_order_error.assert_called_once()
-        mocked_switch_order_to_failed.assert_not_called()
-        error_call = mocked_set_order_error.call_args
-        error_dict = error_call[0][1]
-        assert "Item 65304578CA not found in Adobe subscriptions" == error_dict.get("message")
-    else:
-        step = Validate3YCCommitment()
-        step(mocked_client, context, mocked_next_step)
-        mocked_next_step.assert_not_called()
-        mocked_switch_order_to_failed.assert_called_once()
-        mocked_set_order_error.assert_not_called()
-        error_call = mocked_switch_order_to_failed.call_args
-        error_dict = error_call[0][2]
-        assert "Item 65304578CA not found in Adobe subscriptions" == error_dict.get("message")
+
+def test_validate_3yc_commitment_item_not_found_validation(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when item is not found in subscriptions."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="77777777CA",
+                renewal_quantity=8,
+                autorenewal_enabled=True,
+            ),
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    lines = [{
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 15,
+                "oldQuantity": 16,
+            }]
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        upsize_lines=lines,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment(True)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+    mocked_set_order_error.assert_called_once()
+    mocked_switch_order_to_failed.assert_not_called()
+    error_call = mocked_set_order_error.call_args
+    error_dict = error_call[0][1]
+    assert "Item 65304578CA not found in Adobe subscriptions" == error_dict.get("message")
+
 
 @pytest.mark.parametrize("is_validation", [True, False])
 def test_validate_3yc_commitment_below_minimum_licenses(

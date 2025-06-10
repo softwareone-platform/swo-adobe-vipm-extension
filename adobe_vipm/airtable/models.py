@@ -765,7 +765,7 @@ def get_sku_adobe_mapping_model(
             """
             Check if the SKU is a valid 3YC type.
             """
-            return self.type_3yc in (TYPE_3YC_CONSUMABLE, TYPE_3YC_LICENSE)
+            return self.is_consumable() or self.is_license()
 
     return AdobeProductMapping
 
