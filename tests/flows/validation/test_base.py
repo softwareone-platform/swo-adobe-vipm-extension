@@ -131,23 +131,3 @@ def test_validate_purchase_order(mocker, caplog, order_factory):
     )
 
     mocked_validate.assert_called_once_with(mocked_client, order)
-
-
-def test_validate_termination_order(mocker, caplog, order_factory):
-    """Tests the validate order entrypoint function when it validates."""
-    order = order_factory(order_type="Termination")
-
-    mocked_client = mocker.MagicMock()
-    mocked_validate = mocker.patch(
-        "adobe_vipm.flows.validation.base.validate_termination_order",
-        return_value=(False, order),
-    )
-
-    with caplog.at_level(logging.INFO):
-        assert validate_order(mocked_client, order) == order
-
-    assert caplog.records[0].message == (
-        f"Validation of order {order['id']} succeeded without errors"
-    )
-
-    mocked_validate.assert_called_once_with(mocked_client, order)

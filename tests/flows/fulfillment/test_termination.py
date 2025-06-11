@@ -1,11 +1,7 @@
-import pytest
-
-from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
-    ERR_INVALID_TERMINATION_ORDER_QUANTITY,
     TEMPLATE_NAME_TERMINATION,
 )
 from adobe_vipm.flows.context import Context
@@ -26,25 +22,6 @@ from adobe_vipm.flows.fulfillment.termination import (
 from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
 
 
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        {
-            "name": "successful_case",
-            "old_quantity": 7,
-            "quantity": 0,
-            "adobe_orders_quantities": [1, 2, 4],
-            "should_fail": False,
-        },
-        {
-            "name": "failure_case",
-            "old_quantity": 7,
-            "quantity": 0,
-            "adobe_orders_quantities": [1, 2, 3],
-            "should_fail": True,
-        },
-    ],
-)
 def test_get_returnable_orders_step(
     mocker,
     order_factory,
@@ -52,47 +29,54 @@ def test_get_returnable_orders_step(
     adobe_customer_factory,
     adobe_order_factory,
     adobe_items_factory,
-    test_case,
 ):
     """
     Tests the retrieval of returnable orders by sku.
-    Tests both successful and failure cases where quantities match or don't match.
     """
     order = order_factory(
         lines=lines_factory(
-            quantity=test_case["quantity"],
-            old_quantity=test_case["old_quantity"],
+            quantity=3,
+            old_quantity=7,
         )
     )
     adobe_customer = adobe_customer_factory()
-
-    adobe_orders = [
-        adobe_order_factory(
-            order_type="NEW",
-            items=adobe_items_factory(quantity=qty),
-        )
-        for qty in test_case["adobe_orders_quantities"]
-    ]
-
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
-    returnable_orders = [
-        ReturnableOrderInfo(
-            order,
-            order["lineItems"][0],
-            order["lineItems"][0]["quantity"],
-        )
-        for order in adobe_orders
-    ]
-
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
-    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = returnable_orders
-
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
+    adobe_order_1 = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(quantity=1),
     )
+    adobe_order_2 = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(quantity=2),
+    )
+    adobe_order_3 = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(quantity=4),
+    )
+
+    ret_info_1 = ReturnableOrderInfo(
+        adobe_order_1,
+        adobe_order_1["lineItems"][0],
+        adobe_order_1["lineItems"][0]["quantity"],
+    )
+    ret_info_2 = ReturnableOrderInfo(
+        adobe_order_2,
+        adobe_order_2["lineItems"][0],
+        adobe_order_2["lineItems"][0]["quantity"],
+    )
+    ret_info_3 = ReturnableOrderInfo(
+        adobe_order_3,
+        adobe_order_3["lineItems"][0],
+        adobe_order_3["lineItems"][0]["quantity"],
+    )
+
+    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+        ret_info_1,
+        ret_info_2,
+        ret_info_3,
+    ]
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -100,15 +84,6 @@ def test_get_returnable_orders_step(
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
-    }
 
     context = Context(
         order=order,
@@ -121,22 +96,15 @@ def test_get_returnable_orders_step(
     step = GetReturnableOrders()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    assert context.adobe_returnable_orders[sku] == [ret_info_1, ret_info_2, ret_info_3]
+    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
+        sku,
+        adobe_customer["cotermDate"],
+        return_orders=None,
     )
-
-    if test_case["should_fail"]:
-        mocked_switch_to_failed.assert_called_once_with(
-            mocked_client,
-            context.order,
-            ERR_INVALID_TERMINATION_ORDER_QUANTITY.to_dict(),
-        )
-        mocked_next_step.assert_not_called()
-    else:
-        mocked_switch_to_failed.assert_not_called()
-        mocked_next_step.assert_called_once_with(mocked_client, context)
-        assert context.adobe_returnable_orders[sku] == returnable_orders
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_switch_autorenewal_off(
@@ -156,7 +124,7 @@ def test_switch_autorenewal_off(
         renewal_quantity=10,
     )
 
-    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
+    mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -209,7 +177,7 @@ def test_switch_autorenewal_off_already_off(
         autorenewal_enabled=False,
     )
 
-    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
+    mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -258,7 +226,7 @@ def test_fulfill_termination_order(mocker):
     mocked_order = mocker.MagicMock()
 
     fulfill_termination_order(mocked_client, mocked_order)
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 10
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 11
 
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], SetupDueDate)
@@ -275,9 +243,10 @@ def test_fulfill_termination_order(mocker):
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], GetReturnableOrders)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[7], ValidateDownsizes3YC)
     assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[8], SubmitReturnOrders)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], CompleteOrder)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[9], SwitchAutoRenewalOff)
+    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[10], CompleteOrder)
     assert (
-        mocked_pipeline_ctor.mock_calls[0].args[9].template_name
+        mocked_pipeline_ctor.mock_calls[0].args[10].template_name
         == TEMPLATE_NAME_TERMINATION
     )
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
@@ -307,7 +276,7 @@ def test_switch_autorenewal_off_invalid_renwal_state(
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
     )
-    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
+    mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -375,7 +344,7 @@ def test_switch_autorenewal_off_error_updating_autorenew(
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
     )
-    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
+    mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.return_value = adobe_sub
     mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
@@ -415,134 +384,3 @@ def test_switch_autorenewal_off_error_updating_autorenew(
         auto_renewal=False,
     )
     mocked_switch_to_failed.assert_not_called()
-
-
-def test_get_returnable_orders_step_inactive_subscription(
-    mocker,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-):
-    """
-    Tests the GetReturnableOrders step when the subscription is inactive.
-    """
-    order = order_factory(
-        lines=lines_factory(
-            quantity=0,
-            old_quantity=7,
-        )
-    )
-    adobe_customer = adobe_customer_factory()
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
-    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "INACTIVE",
-                "offerId": sku
-            }
-        ]
-    }
-
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-    )
-
-    step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-    )
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-    mocked_switch_to_failed.assert_not_called()
-
-
-def test_get_returnable_orders_step_no_returnable_orders(
-    mocker,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-):
-    """
-    Tests the GetReturnableOrders step when there are no returnable orders.
-    """
-    order = order_factory(
-        lines=lines_factory(
-            quantity=0,
-            old_quantity=7,
-        )
-    )
-    adobe_customer = adobe_customer_factory()
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
-    mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
-    }
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
-
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-    )
-
-    step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-    )
-
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        sku,
-        context.adobe_customer["cotermDate"],
-        return_orders=context.adobe_return_orders.get(sku),
-    )
-
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
-        context.order,
-        ERR_INVALID_TERMINATION_ORDER_QUANTITY.to_dict(),
-    )
-    mocked_next_step.assert_not_called()

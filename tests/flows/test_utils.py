@@ -24,7 +24,7 @@ from adobe_vipm.flows.utils import (
 
 
 def test_notify_unhandled_exception_in_teams(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
     notify_unhandled_exception_in_teams(
         "validation",
         "ORD-0000",
@@ -40,7 +40,7 @@ def test_notify_unhandled_exception_in_teams(mocker):
 
 
 def test_notify_agreement_unhandled_exception_in_teams(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
     notify_agreement_unhandled_exception_in_teams(
         "AGR-0000",
         "exception-traceback",
@@ -55,7 +55,7 @@ def test_notify_agreement_unhandled_exception_in_teams(mocker):
 
 
 def test_notify_missing_prices(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
     notify_missing_prices(
         "AGR-0000", ["65504578CA01A12"], "65504575CA01A12", "USD", None
     )
@@ -70,7 +70,7 @@ def test_notify_missing_prices(mocker):
     )
 
 def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
     notify_not_updated_subscriptions(
         order_id="ORD-1234",
         error_message="Some error occurred",
@@ -92,7 +92,7 @@ def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
 
 
 def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
     notify_not_updated_subscriptions(
         order_id="ORD-1234",
         error_message="Some error occurred",
