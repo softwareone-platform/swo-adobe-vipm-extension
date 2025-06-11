@@ -15,7 +15,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermNextSyncDates,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import (
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+)
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import is_within_last_two_weeks, set_order_error
 from adobe_vipm.flows.validation.shared import (
@@ -116,7 +120,7 @@ def validate_change_order(client, order):
         SetOrUpdateCotermNextSyncDates(),
         ValidateRenewalWindow(is_validation=True),
         ValidateDownsizes(),
-        ValidateDownsizes3YC(True),
+        Validate3YCCommitment(True),
         GetPreviewOrder(),
         UpdatePrices(),
     )

@@ -8,7 +8,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermNextSyncDates,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 from adobe_vipm.flows.validation.termination import (
     ValidateDownsizes,
@@ -340,7 +340,7 @@ def test_validate_termination_order(mocker):
         SetOrUpdateCotermNextSyncDates,
         ValidateRenewalWindow,
         ValidateDownsizes,
-        ValidateDownsizes3YC,
+        Validate3YCCommitment,
     ]
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]

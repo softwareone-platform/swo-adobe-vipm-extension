@@ -9,6 +9,8 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
     STATUS_3YC_COMMITTED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_REQUESTED,
     STATUS_INTERNAL_SERVER_ERROR,
 )
 from adobe_vipm.adobe.errors import AdobeError
@@ -23,6 +25,7 @@ from adobe_vipm.flows.helpers import (
     PrepareCustomerData,
     SetupContext,
     UpdatePrices,
+    Validate3YCCommitment,
 )
 from adobe_vipm.flows.utils import get_customer_data
 
@@ -560,7 +563,10 @@ def test_update_prices_step_with_3yc_commitment(
         start_date="2024-01-01",
         end_date="2025-01-01",
     )
-    adobe_customer = adobe_customer_factory(commitment=commitment)
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
     sku = adobe_order["lineItems"][0]["offerId"]
 
@@ -583,7 +589,6 @@ def test_update_prices_step_with_3yc_commitment(
         adobe_customer=adobe_customer,
         adobe_new_order=adobe_order,
     )
-
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
@@ -723,3 +728,881 @@ def test_update_prices_step_with_multiple_lines(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+
+
+def test_validate_3yc_commitment_without_adobe_customer(
+    mocker,
+    order_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when there is no Adobe customer."""
+
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 25,
+                "oldQuantity": 12,
+            },
+            {
+                "id": "line-2",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 25,
+                "oldQuantity": 12,
+            }
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=None,
+        adobe_customer_id=None,
+        customer_data={
+            "3YCLicenses": 10,
+        },
+        upsize_lines=lines
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+def test_validate_3yc_commitment_without_adobe_customer_fail_license_quantity(
+    mocker,
+    order_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when there is no Adobe customer."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 2,
+                "oldQuantity": 0,
+            }
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=None,
+        adobe_customer_id=None,
+        customer_data={
+            "3YCLicenses": 10
+        },
+        upsize_lines=lines
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    error_call = mocked_switch_order_to_failed.call_args
+    error_dict = error_call[0][2]
+    error_expected = ("The quantity selected of 2 would place the account below the "
+                      "minimum commitment of 10 licenses for the three-year commitment.")
+    assert error_expected == error_dict.get("message")
+
+def test_validate_3yc_commitment_without_adobe_customer_fail_consumables_quantity(
+    mocker,
+    order_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when there is no Adobe customer."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "77777777CA"},
+                },
+                "quantity": 2,
+                "oldQuantity": 0,
+            }
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=None,
+        adobe_customer_id=None,
+        customer_data={
+            "3YCConsumables": 10
+        },
+        upsize_lines=lines
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    error_call = mocked_switch_order_to_failed.call_args
+    error_dict = error_call[0][2]
+    error_expected = ("The quantity selected of 2 would place the account below the "
+                      "minimum commitment of 10 consumables for the three-year commitment.")
+    assert error_expected == error_dict.get("message")
+
+
+def test_validate_3yc_commitment_requested_status(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when commitment is in REQUESTED status."""
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_REQUESTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 15,
+                "oldQuantity": 15,
+            }
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        upsize_lines=lines
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocked_adobe_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+
+def test_validate_3yc_commitment_expired_status(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when commitment is in EXPIRED status."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_EXPIRED,
+        start_date="2024-01-01",
+        end_date="2024-01-01",
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="65304578CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            )
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    order = order_factory(
+        lines=[
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 15,
+                "oldQuantity": 15,
+            }
+        ],
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+    mocked_set_order_error.assert_not_called()
+
+    error_call = mocked_switch_order_to_failed.call_args
+    error_dict = error_call[0][2]
+    error_expected = (
+        "The 3-year commitment is in status EXPIRED. "
+        "Please contact support to renew the commitment."
+    )
+    assert error_expected == error_dict.get("message")
+
+
+def test_validate_3yc_commitment_item_not_found(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when item is not found in subscriptions."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="77777777CA",
+                renewal_quantity=8,
+                autorenewal_enabled=True,
+            ),
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    lines = [{
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 15,
+                "oldQuantity": 16,
+            }]
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        upsize_lines=lines,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+    mocked_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+    mocked_set_order_error.assert_not_called()
+    error_call = mocked_switch_order_to_failed.call_args
+    error_dict = error_call[0][2]
+    assert "Item 65304578CA not found in Adobe subscriptions" == error_dict.get("message")
+
+
+def test_validate_3yc_commitment_item_not_found_validation(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when item is not found in subscriptions."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="77777777CA",
+                renewal_quantity=8,
+                autorenewal_enabled=True,
+            ),
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+    lines = [{
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 15,
+                "oldQuantity": 16,
+            }]
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        upsize_lines=lines,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment(True)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+    mocked_set_order_error.assert_called_once()
+    mocked_switch_order_to_failed.assert_not_called()
+    error_call = mocked_set_order_error.call_args
+    error_dict = error_call[0][1]
+    assert "Item 65304578CA not found in Adobe subscriptions" == error_dict.get("message")
+
+
+@pytest.mark.parametrize("is_validation", [True, False])
+def test_validate_3yc_commitment_below_minimum_licenses(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+    is_validation
+):
+    """Test validation when quantities are below minimum commitment."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+        licenses=100
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="65304578CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            )
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 5,
+                "oldQuantity": 15,
+            },
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        downsize_lines=lines
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    if is_validation:
+        step = Validate3YCCommitment(True)
+        step(mocked_client, context, mocked_next_step)
+
+        mocked_next_step.assert_not_called()
+        mocked_set_order_error.assert_called_once()
+        mocked_switch_order_to_failed.assert_not_called()
+        error_call = mocked_set_order_error.call_args
+        error_dict = error_call[0][1]
+        error_expected = (
+            "The quantity selected of 5 would place the account "
+            "below the minimum commitment of 100 licenses "
+            "for the three-year commitment."
+        )
+        assert error_expected == error_dict.get("message")
+    else:
+        step = Validate3YCCommitment()
+        step(mocked_client, context, mocked_next_step)
+        mocked_next_step.assert_not_called()
+        mocked_switch_order_to_failed.assert_called_once()
+        mocked_set_order_error.assert_not_called()
+        error_call = mocked_switch_order_to_failed.call_args
+        error_dict = error_call[0][2]
+        error_expected = (
+            "The quantity selected of 5 would place the account "
+            "below the minimum commitment of 100 licenses "
+            "for the three-year commitment."
+        )
+        assert error_expected == error_dict.get("message")
+
+@pytest.mark.parametrize("is_validation", [True, False])
+def test_validate_3yc_commitment_below_minimum_consumables(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+    is_validation
+):
+    """Test validation when quantities are below minimum commitment."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+        consumables=100
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="77777777CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            )
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "77777777CA"},
+                },
+                "quantity": 5,
+                "oldQuantity": 15,
+            },
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        downsize_lines=lines
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    if is_validation:
+        step = Validate3YCCommitment(True)
+        step(mocked_client, context, mocked_next_step)
+
+        mocked_next_step.assert_not_called()
+        mocked_set_order_error.assert_called_once()
+        mocked_switch_order_to_failed.assert_not_called()
+        error_call = mocked_set_order_error.call_args
+        error_dict = error_call[0][1]
+        error_expected = (
+            "The order has failed. The reduction in quantity would "
+            "place the account below the minimum commitment of "
+            "100 consumables for the three-year commitment."
+        )
+        assert error_expected == error_dict.get("message")
+    else:
+        step = Validate3YCCommitment()
+        step(mocked_client, context, mocked_next_step)
+        mocked_next_step.assert_not_called()
+        mocked_switch_order_to_failed.assert_called_once()
+        mocked_set_order_error.assert_not_called()
+        error_call = mocked_switch_order_to_failed.call_args
+        error_dict = error_call[0][2]
+        error_expected = (
+            "The order has failed. The reduction in quantity would "
+            "place the account below the minimum commitment of "
+            "100 consumables for the three-year commitment."
+        )
+        assert error_expected == error_dict.get("message")
+
+def test_validate_3yc_commitment_below_minimum_consumables_and_licenses(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when quantities are below minimum commitment."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+        licenses=100,
+        consumables=100
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="65304578CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            ),
+            adobe_subscription_factory(
+                offer_id="77777777CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            )
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "77777777CA"},
+                },
+                "quantity": 5,
+                "oldQuantity": 15,
+            },
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        downsize_lines=lines
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+    mocked_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+    mocked_set_order_error.assert_not_called()
+    error_call = mocked_switch_order_to_failed.call_args
+    error_dict = error_call[0][2]
+    error_expected = (
+        "The order has failed. The reduction in quantity would "
+        "place the account below the minimum commitment of "
+        "100 licenses or 100 consumables for the three-year commitment."
+    )
+    assert error_expected == error_dict.get("message")
+
+def test_validate_3yc_commitment_success(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test successful validation with valid quantities."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    commitment = adobe_commitment_factory(
+        status=STATUS_3YC_COMMITTED,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+        licenses=10,
+        consumables=5,
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="65304578CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            ),
+            adobe_subscription_factory(
+                offer_id="77777777CA",
+                renewal_quantity=8,
+                autorenewal_enabled=True,
+            ),
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    lines = [
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 12,
+                "oldQuantity": 15,
+            },
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "77777777CA"},
+                },
+                "quantity": 12,
+                "oldQuantity": 7,
+            }
+        ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        downsize_lines=[order["lines"][0]],
+        upsize_lines=[order["lines"][1]]
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_switch_order_to_failed.assert_not_called()
+    mocked_set_order_error.assert_not_called()
+
+    assert context.order.get("status") != "failed"

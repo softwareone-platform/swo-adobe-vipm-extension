@@ -7,7 +7,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermNextSyncDates,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     set_order_error,
@@ -27,7 +27,6 @@ class ValidateDownsizes(Step):
             is_valid, _ = validate_subscription_and_returnable_orders(
                 adobe_client, context, line, sku
             )
-
             if not is_valid:
                 context.validation_succeeded = False
                 context.order = set_order_error(
@@ -46,7 +45,7 @@ def validate_termination_order(client, order):
         SetOrUpdateCotermNextSyncDates(),
         ValidateRenewalWindow(is_validation=True),
         ValidateDownsizes(),
-        ValidateDownsizes3YC(True),
+        Validate3YCCommitment(is_validation=True),
     )
     context = Context(order=order)
     pipeline.run(client, context)

@@ -23,7 +23,7 @@ from adobe_vipm.flows.fulfillment.termination import (
     SwitchAutoRenewalOff,
     fulfill_termination_order,
 )
-from adobe_vipm.flows.helpers import SetupContext, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
 
 
 @pytest.mark.parametrize(
@@ -267,7 +267,7 @@ def test_fulfill_termination_order(mocker):
         ValidateRenewalWindow,
         GetReturnOrders,
         GetReturnableOrders,
-        ValidateDownsizes3YC,
+        Validate3YCCommitment,
         SubmitReturnOrders,
         CompleteOrder,
     ]
