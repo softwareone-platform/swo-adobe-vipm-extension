@@ -61,6 +61,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,9 @@ class Validate3YCCommitment(Step):
 
     def __call__(self, client, context, next_step):
 
-        if not context.adobe_customer:
+        is_new_purchase_order_validation = not context.adobe_customer
+
+        if is_new_purchase_order_validation:
             logger.info(f"{context}: No Adobe customer found, validating 3YC quantities parameters")
             if self.validate_3yc_quantities_parameters(client, context):
                 next_step(client, context)
@@ -304,21 +307,22 @@ class Validate3YCCommitment(Step):
         count_licenses = 0
         count_consumables = 0
 
-        if not subscriptions or "items" not in subscriptions:
-            return 0, 0
-
         active_subscriptions = [
-            sub for sub in subscriptions["items"]
+            sub for sub in subscriptions.get("items",[])
             if sub["autoRenewal"]["enabled"]
         ]
 
         for subscription in active_subscriptions:
-            sku = get_adobe_product_by_marketplace_sku(subscription["offerId"][0:10])
-            if sku.is_valid_3yc_type():
-                if sku.is_consumable():
-                    count_consumables += subscription["autoRenewal"]["renewalQuantity"]
-                else:
-                    count_licenses += subscription["autoRenewal"]["renewalQuantity"]
+            sku = get_adobe_product_by_marketplace_sku(
+                get_partial_sku(subscription["offerId"]))
+
+            if not sku.is_valid_3yc_type():
+                continue
+
+            if sku.is_consumable():
+                count_consumables += subscription["autoRenewal"]["renewalQuantity"]
+            else:
+                count_licenses += subscription["autoRenewal"]["renewalQuantity"]
 
         return count_licenses, count_consumables
 
@@ -336,18 +340,20 @@ class Validate3YCCommitment(Step):
                 delta = line["quantity"] - line["oldQuantity"]
 
             sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
-            if sku.is_valid_3yc_type():
-                if sku.is_consumable():
-                    count_consumables += delta if not is_downsize else -delta
-                else:
-                    count_licenses += delta if not is_downsize else -delta
+            if not sku.is_valid_3yc_type():
+                continue
+
+            if sku.is_consumable():
+                count_consumables += delta if not is_downsize else -delta
+            else:
+                count_licenses += delta if not is_downsize else -delta
 
         return count_licenses, count_consumables
 
 
     @staticmethod
     def validate_items_in_subscriptions(context, subscriptions):
-        if subscriptions["items"]:
+        if subscriptions.get("items",[]):
             for line in context.downsize_lines + context.upsize_lines:
                 adobe_item = get_item_by_partial_sku(
                     subscriptions["items"], line["item"]["externalIds"]["vendor"]
@@ -412,7 +418,7 @@ class Validate3YCCommitment(Step):
         Validate the 3YC commitment quantities are not allowed below
         the minimum commitment of licenses and consumables.
         """
-        count_licenses, count_consumables = self.get_quantities(context, [])
+        count_licenses, count_consumables = self.get_quantities(context, {})
 
         if count_licenses == 0 and count_consumables == 0:
             return True

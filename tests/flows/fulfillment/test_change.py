@@ -12,6 +12,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.change import (
     GetReturnableOrders,
     UpdateRenewalQuantities,
+    UpdateRenewalQuantitiesDownsizes,
     ValidateDuplicateLines,
     ValidateReturnableOrders,
     fulfill_change_order,
@@ -380,6 +381,7 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
     )
     mocked_next_step.assert_not_called()
 
+
 def test_update_renewal_quantities_step(
     mocker,
     order_factory,
@@ -420,35 +422,85 @@ def test_update_renewal_quantities_step(
     step = UpdateRenewalQuantities()
     step(mocked_client, context, mocked_next_step)
 
-    assert mocked_adobe_client.get_subscription.call_count == 2
+    assert mocked_adobe_client.get_subscription.call_count == 1
     mocked_adobe_client.get_subscription.assert_has_calls([
         mocker.call(
             context.authorization_id,
             context.adobe_customer_id,
             adobe_sub["subscriptionId"],
-        ),
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-        ),
+        )
     ])
-    assert mocked_adobe_client.update_subscription.call_count == 2
+    assert mocked_adobe_client.update_subscription.call_count == 1
     mocked_adobe_client.update_subscription.assert_has_calls([
         mocker.call(
             context.authorization_id,
             context.adobe_customer_id,
             adobe_sub["subscriptionId"],
             quantity=5,
-        ),
+        )
+    ])
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_update_renewal_quantities_downsize_step(
+    mocker,
+    order_factory,
+    lines_factory,
+    subscriptions_factory,
+    adobe_subscription_factory,
+):
+    subscriptions = subscriptions_factory()
+    order = order_factory(
+        lines=lines_factory(quantity=5)
+        + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
+        subscriptions=subscriptions,
+    )
+
+    adobe_sub = adobe_subscription_factory(
+        renewal_quantity=10,
+    )
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscription.return_value = adobe_sub
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        upsize_lines=order["lines"],
+        downsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = UpdateRenewalQuantitiesDownsizes()
+    step(mocked_client, context, mocked_next_step)
+
+    assert mocked_adobe_client.get_subscription.call_count == 1
+    mocked_adobe_client.get_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+        )
+    ])
+    assert mocked_adobe_client.update_subscription.call_count == 1
+    mocked_adobe_client.update_subscription.assert_has_calls([
         mocker.call(
             context.authorization_id,
             context.adobe_customer_id,
             adobe_sub["subscriptionId"],
             quantity=5,
-        ),
+        )
     ])
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
 
 
 def test_update_renewal_quantities_step_quantity_match(
@@ -533,7 +585,7 @@ def test_fulfill_change_order(mocker):
         SubmitNewOrder,
         UpdateRenewalQuantities,
         SubmitReturnOrders,
-        UpdateRenewalQuantities,
+        UpdateRenewalQuantitiesDownsizes,
         CreateOrUpdateSubscriptions,
         UpdatePrices,
         CompleteOrder,
@@ -617,7 +669,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
         ),
     )
 
-    step = UpdateRenewalQuantities(process_downsize_lines=True, process_upsize_lines=True)
+    step = UpdateRenewalQuantities()
     step(mocked_client, context, mocked_next_step)
 
     mocked_switch_to_failed.assert_called_once_with(

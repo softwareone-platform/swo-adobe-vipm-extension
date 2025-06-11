@@ -605,10 +605,20 @@ class SetOrUpdateCotermNextSyncDates(Step):
             update_order(
                 client, context.order_id, parameters=context.order["parameters"]
             )
-            logger.info(
-                f"{context}: coterm ({coterm_date.isoformat()}) "
-                f"and next sync ({next_sync.isoformat()}) updated successfully"
-            )
+            updated_params = {
+                "coterm_date": coterm_date.isoformat(),
+                "next_sync": next_sync.isoformat(),
+            }
+            if context.adobe_customer and get_3yc_commitment_request(context.adobe_customer):
+                commitment = get_3yc_commitment_request(context.adobe_customer)
+                updated_params.update({
+                    "3yc_enroll_status": commitment["status"],
+                    "3yc_commitment_request_status": commitment["status"],
+                    "3yc_start_date": commitment["startDate"],
+                    "3yc_end_date": commitment["endDate"]
+                })
+            params_str = ', '.join(f'{k}={v}' for k, v in updated_params.items())
+            logger.info(f"{context}: Updated parameters: {params_str}")
 
         next_step(client, context)
 
