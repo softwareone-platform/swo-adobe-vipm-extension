@@ -326,30 +326,40 @@ class Validate3YCCommitment(Step):
 
         return count_licenses, count_consumables
 
-    @staticmethod
-    def process_lines_quantities(context, count_licenses=0, count_consumables=0, is_downsize=False):
-        if is_downsize:
-            lines = context.downsize_lines
-        else:
-            lines = context.upsize_lines + context.new_lines
+    def process_lines_quantities(self,context,
+                                 count_licenses=0,
+                                 count_consumables=0,
+                                 is_downsize=False):
+        lines = context.downsize_lines if is_downsize else context.upsize_lines + context.new_lines
 
         for line in lines:
-            if is_downsize:
-                delta = line["oldQuantity"] - line["quantity"]
-            else:
-                delta = line["quantity"] - line["oldQuantity"]
-
+            delta = self._calculate_delta(line, is_downsize)
             sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
+
             if not sku.is_valid_3yc_type():
                 continue
 
-            if sku.is_consumable():
-                count_consumables += delta if not is_downsize else -delta
-            else:
-                count_licenses += delta if not is_downsize else -delta
+            count_licenses, count_consumables = self._update_counts(
+                sku, delta, count_licenses, count_consumables, is_downsize
+            )
 
         return count_licenses, count_consumables
 
+    def _calculate_delta(self, line, is_downsize):
+        """Calculate the quantity delta for a line."""
+        if is_downsize:
+            return line["oldQuantity"] - line["quantity"]
+        return line["quantity"] - line["oldQuantity"]
+
+    def _update_counts(self, sku, delta, count_licenses,
+                       count_consumables, is_downsize):
+        """Update license and consumable counts based on SKU type and delta."""
+        if sku.is_consumable():
+            count_consumables += delta if not is_downsize else -delta
+        else:
+            count_licenses += delta if not is_downsize else -delta
+
+        return count_licenses, count_consumables
 
     @staticmethod
     def validate_items_in_subscriptions(context, subscriptions):
