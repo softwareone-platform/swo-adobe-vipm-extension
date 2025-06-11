@@ -278,13 +278,6 @@ ERR_DUE_DATE_REACHED = ValidationError(
     "Due date {due_date} for order processing is reached.",
 )
 
-ERR_COTERM_DATE_IN_LAST_24_HOURS = ValidationError(
-    "VIPM0034",
-    "Orders cannot be placed within 24 hours of the renewal date. "
-    "Please wait until after the renewal date and make your required "
-    "changes with Change, Configuration, or Termination Orders.",
-)
-
 ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS = ValidationError(
     "VIPM0026",
     "Unrecoverable Adobe Order status: {description}",
