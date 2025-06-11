@@ -147,31 +147,24 @@ class UpdateRenewalQuantities(Step):
     The upsizes and new lines are processed first, to process correctly the 3yc
     to maintain the compliant with the 3yc minimum quantities.
     """
-    def __init__(self, process_downsize_lines=True, process_upsize_lines=True):
-        self.process_downsize_lines = process_downsize_lines
-        self.process_upsize_lines = process_upsize_lines
-        self.error = {}
+    def __init__(self):
+        self.error = None
 
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         context.updated = []
-        if self.process_downsize_lines:
-            self._update_downsize_lines(adobe_client, context)
-        if self.process_upsize_lines:
-            self._update_upsize_and_new_lines(adobe_client, context)
-
+        self._update_lines(adobe_client, context)
         if self.error:
             self._handle_subscription_update_error(adobe_client, client, context, self.error)
             return
 
         next_step(client, context)
 
-    def _update_downsize_lines(self, adobe_client, context):
-        for line in context.downsize_lines:
-            self._update_line(adobe_client, context, line)
+    def _get_lines(self, context):
+        return context.upsize_lines + context.new_lines
 
-    def _update_upsize_and_new_lines(self, adobe_client, context):
-        for line in context.upsize_lines + context.new_lines:
+    def _update_lines(self, adobe_client, context):
+        for line in self._get_lines(context):
             self._update_line(adobe_client, context, line)
 
     def _update_line(self, adobe_client, context, line):
@@ -257,6 +250,10 @@ class UpdateRenewalQuantities(Step):
             logger.error(f"Error rolling back updated subscriptions: {e}")
 
 
+class UpdateRenewalQuantitiesDownsizes(UpdateRenewalQuantities):
+    def _get_lines(self, context):
+        return context.downsize_lines
+
 def fulfill_change_order(client, order):
     """
     Fulfills a change order by processing the necessary actions based on the provided parameters.
@@ -281,13 +278,9 @@ def fulfill_change_order(client, order):
         Validate3YCCommitment(),
         GetPreviewOrder(),
         SubmitNewOrder(),
-        UpdateRenewalQuantities(
-            process_downsize_lines=False,
-            process_upsize_lines=True),
+        UpdateRenewalQuantities(),
         SubmitReturnOrders(),
-        UpdateRenewalQuantities(
-            process_downsize_lines=True,
-            process_upsize_lines=False),
+        UpdateRenewalQuantitiesDownsizes(),
         CreateOrUpdateSubscriptions(),
         UpdatePrices(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
