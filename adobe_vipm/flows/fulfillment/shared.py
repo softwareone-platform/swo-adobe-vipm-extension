@@ -577,10 +577,11 @@ class SetOrUpdateCotermNextSyncDates(Step):
     """
 
     def __call__(self, client, context, next_step):
-        coterm_date = datetime.fromisoformat(
-            context.adobe_customer["cotermDate"]
-        ).date()
-        next_sync = coterm_date + timedelta(days=1)
+        if context.has_coterm_date():
+            coterm_date = datetime.fromisoformat(
+                context.adobe_customer["cotermDate"]
+            ).date()
+            next_sync = coterm_date + timedelta(days=1)
 
         needs_update = False
         if coterm_date.isoformat() != get_coterm_date(context.order):

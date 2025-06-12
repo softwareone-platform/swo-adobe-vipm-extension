@@ -44,7 +44,6 @@ from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_adobe_subscription_id,
     get_subscription_by_line_and_item_id,
-    is_within_last_two_weeks,
     notify_not_updated_subscriptions,
 )
 
@@ -65,7 +64,7 @@ class GetReturnableOrders(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         returnable_orders_count = 0
-        if is_within_last_two_weeks(context.adobe_customer["cotermDate"]):
+        if (context.is_within_coterm_window()):
             logger.info(
                 "Downsize occurs in the last two weeks before the anniversary date. "
                 "Returnable orders are not going to be submitted, the renewal quantity "
