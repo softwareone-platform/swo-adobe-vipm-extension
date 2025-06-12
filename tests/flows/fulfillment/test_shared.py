@@ -557,6 +557,38 @@ def test_set_or_update_coterm_next_sync_dates_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_set_or_update_withouCotermDate(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+):
+    """
+    Tests that the order is updated when either the `cotermDate`
+    either the `nextSync` fulfillment parameter are not in sync with
+    the adobe customer coterm date.
+    """
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    customer = adobe_customer_factory(coterm_date=None)
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id=customer["customerId"],
+        adobe_customer=customer,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    step = SetOrUpdateCotermNextSyncDates()
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_update.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
 def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
     mocker,
     order_factory,
