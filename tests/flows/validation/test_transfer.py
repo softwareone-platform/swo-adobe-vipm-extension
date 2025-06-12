@@ -723,7 +723,7 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
         return_value=mocked_transfer,
     )
     mocker.patch(
-        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
@@ -828,7 +828,7 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
         return_value=mocked_transfer,
     )
     mocker.patch(
-        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
@@ -956,7 +956,7 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
         return_value=mocked_transfer,
     )
     mocker.patch(
-        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
@@ -1174,7 +1174,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
         return_value=mocked_transfer,
     )
     mocker.patch(
-        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
@@ -1253,7 +1253,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
         return_value=mocked_transfer,
     )
     mocker.patch(
-        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
@@ -1459,7 +1459,7 @@ def test_validate_transfer_already_migrated_no_items_add_line(
         return_value=mocked_transfer,
     )
     mocker.patch(
-        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        "adobe_vipm.flows.utils.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(

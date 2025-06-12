@@ -216,13 +216,6 @@ ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
     "when there are no returnable orders to modify your renewal quantity."
 )
 
-ERR_INVALID_TERMINATION_ORDER_QUANTITY = ValidationError(
-    "VIPM0033",
-    "Cannot return the entire quantity of all subscriptions in this order. "
-    "Consider disabling auto-renewal for these subscriptions "
-    "instead using a Configuration Order."
-)
-
 ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
     "Cannot reduce item `{item}` quantity by {delta} and there "
     "is only one returnable order which would reduce the quantity to zero. "
@@ -276,13 +269,6 @@ ERR_MARKET_SEGMENT_NOT_ELIGIBLE = ValidationError(
 ERR_DUE_DATE_REACHED = ValidationError(
     "VIPM0025",
     "Due date {due_date} for order processing is reached.",
-)
-
-ERR_COTERM_DATE_IN_LAST_24_HOURS = ValidationError(
-    "VIPM0034",
-    "Orders cannot be placed within 24 hours of the renewal date. "
-    "Please wait until after the renewal date and make your required "
-    "changes with Change, Configuration, or Termination Orders.",
 )
 
 ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS = ValidationError(
