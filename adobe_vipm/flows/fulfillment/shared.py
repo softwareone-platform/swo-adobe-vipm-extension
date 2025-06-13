@@ -575,23 +575,24 @@ class SetOrUpdateCotermNextSyncDates(Step):
     """
 
     def __call__(self, client, context, next_step):
-        coterm_date = datetime.fromisoformat(
-            context.adobe_customer["cotermDate"]
-        ).date()
-        next_sync = coterm_date + timedelta(days=1)
+        if context.has_coterm_date():
+            coterm_date = datetime.fromisoformat(
+                context.adobe_customer["cotermDate"]
+            ).date()
+            next_sync = coterm_date + timedelta(days=1)
 
-        if coterm_date.isoformat() != get_coterm_date(
-            context.order
-        ) or next_sync.isoformat() != get_next_sync(context.order):
-            context.order = set_coterm_date(context.order, coterm_date.isoformat())
-            context.order = set_next_sync(context.order, next_sync.isoformat())
-            update_order(
-                client, context.order_id, parameters=context.order["parameters"]
-            )
-            logger.info(
-                f"{context}: coterm ({coterm_date.isoformat()}) "
-                f"and next sync ({next_sync.isoformat()}) updated successfully"
-            )
+            if coterm_date.isoformat() != get_coterm_date(
+                context.order
+            ) or next_sync.isoformat() != get_next_sync(context.order):
+                context.order = set_coterm_date(context.order, coterm_date.isoformat())
+                context.order = set_next_sync(context.order, next_sync.isoformat())
+                update_order(
+                    client, context.order_id, parameters=context.order["parameters"]
+                )
+                logger.info(
+                    f"{context}: coterm ({coterm_date.isoformat()}) "
+                    f"and next sync ({next_sync.isoformat()}) updated successfully"
+                )
         next_step(client, context)
 
 

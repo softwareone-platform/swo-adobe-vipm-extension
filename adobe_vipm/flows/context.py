@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from datetime import date
 
+from adobe_vipm.flows.utils.date import is_within_last_two_weeks
+
 
 @dataclass
 class Context:
@@ -35,3 +37,24 @@ class Context:
             f"{self.authorization_id} {due_date} "
             f"{self.adobe_customer_id or '-'} {self.adobe_new_order_id or '-'}"
         )
+
+    def is_within_coterm_window(self):
+        """
+        Checks if the current date is within the last two weeks before the cotermination date.
+
+        Returns:
+            bool: True if within the window, False otherwise
+        """
+        return (
+            self.adobe_customer.get("cotermDate") and
+            is_within_last_two_weeks(self.adobe_customer["cotermDate"])
+        )
+
+    def has_coterm_date(self):
+        """
+        Checks if the customer has a cotermination date.
+
+        Returns:
+            bool: True if cotermination date exists, False otherwise
+        """
+        return bool(self.adobe_customer.get("cotermDate"))
