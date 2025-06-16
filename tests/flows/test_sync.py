@@ -6,6 +6,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.sync import (
     sync_agreement,
+    sync_agreements_by_3yc_end_date,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_next_sync,
     sync_all_agreements,
@@ -443,6 +444,39 @@ def test_sync_agreements_by_next_sync(mocker, agreement_factory, dry_run):
         mocked_mpt_client,
         agreement,
         dry_run,
+    )
+
+
+@freeze_time("2024-11-09")
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_sync_agreements_by_3yc_end_date(mocker, agreement_factory, dry_run):
+    agreement = agreement_factory()
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_get_agreements_by_query = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_query",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mocked_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.sync_agreement",
+        autospec=True,
+    )
+
+    sync_agreements_by_3yc_end_date(mocked_mpt_client, dry_run)
+
+    mocked_sync_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        agreement,
+        dry_run,
+    )
+    mocked_get_agreements_by_query.assert_called_once_with(
+        mocked_mpt_client,
+        "eq(status,Active)&"
+        "any(parameters.fulfillment,and(eq(externalId,3YCEndDate),eq(displayValue,2024-11-08)))&"
+        "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2024-11-09)))&"
+        "select=subscriptions,authorization,parameters,listing,lines,"
+        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
+        "-externalIds",
     )
 
 
