@@ -4,6 +4,7 @@ from mpt_extension_sdk.core.utils import setup_client
 from adobe_vipm.flows.sync import (
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_agreement_ids,
+    sync_agreements_by_coterm_date,
     sync_agreements_by_next_sync,
     sync_all_agreements,
 )
@@ -50,4 +51,5 @@ class Command(BaseCommand):
         else:
             sync_agreements_by_next_sync(client, options["dry_run"])
             sync_agreements_by_3yc_end_date(client, options["dry_run"])
+            sync_agreements_by_coterm_date(client, options["dry_run"])
         self.success("Processing agreements completed.")
