@@ -6,6 +6,7 @@ from adobe_vipm.flows.sync import (
     sync_agreements_by_agreement_ids,
     sync_agreements_by_coterm_date,
     sync_agreements_by_next_sync,
+    sync_agreements_by_renewal_date,
     sync_all_agreements,
 )
 
@@ -52,4 +53,5 @@ class Command(BaseCommand):
             sync_agreements_by_next_sync(client, options["dry_run"])
             sync_agreements_by_3yc_end_date(client, options["dry_run"])
             sync_agreements_by_coterm_date(client, options["dry_run"])
+            sync_agreements_by_renewal_date(client, options["dry_run"])
         self.success("Processing agreements completed.")

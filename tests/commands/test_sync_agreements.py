@@ -16,6 +16,7 @@ def test_process_sync_agreements(mocker, dry_run, mock_mpt_client):
         sync_agreements_by_next_sync=DEFAULT,
         sync_agreements_by_3yc_end_date=DEFAULT,
         sync_agreements_by_coterm_date=DEFAULT,
+        sync_agreements_by_renewal_date=DEFAULT,
         spec=True,
     )
 
