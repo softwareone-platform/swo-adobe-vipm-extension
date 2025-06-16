@@ -9,6 +9,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_agreements_by_customer_deployments,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
+    get_agreements_by_query,
     get_all_agreements,
     update_agreement,
     update_agreement_subscription,
@@ -27,9 +28,11 @@ from adobe_vipm.airtable.models import (
     get_sku_price,
 )
 from adobe_vipm.flows.constants import (
+    PARAM_3YC_END_DATE,
     PARAM_ADOBE_SKU,
     PARAM_CURRENT_QUANTITY,
     PARAM_DEPLOYMENT_ID,
+    PARAM_LAST_SYNC_DATE,
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_RENEWAL_DATE,
@@ -231,6 +234,27 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
     """
     agreements = get_agreements_by_next_sync(mpt_client, PARAM_NEXT_SYNC_DATE)
     for agreement in agreements:
+        sync_agreement(mpt_client, agreement, dry_run)
+
+
+def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):
+    """
+    Synchronizes agreements by their active subscriptions renewed yesterday.
+    """
+    logger.info("Syncing agreements by 3yc End Date...")
+    today = datetime.now().date().isoformat()
+    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
+    rql_query = (
+        "eq(status,Active)&"
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_3YC_END_DATE}),eq(displayValue,{yesterday})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        # Let's get only what we need
+        "select=subscriptions,authorization,parameters,listing,lines,"
+        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
+        "-externalIds"
+    )
+    for agreement in get_agreements_by_query(mpt_client, rql_query):
+        logger.debug(f"Syncing {agreement=}")
         sync_agreement(mpt_client, agreement, dry_run)
 
 
