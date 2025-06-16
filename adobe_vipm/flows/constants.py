@@ -43,6 +43,7 @@ PARAM_RETRY_COUNT = "retryCount"
 PARAM_GLOBAL_CUSTOMER = "globalCustomer"
 PARAM_DEPLOYMENTS = "deployments"
 PARAM_DEPLOYMENT_ID = "deploymentId"
+PARAM_LAST_SYNC_DATE = "lastSyncDate"
 
 STATUS_MARKET_SEGMENT_ELIGIBLE = "eligible"
 STATUS_MARKET_SEGMENT_NOT_ELIGIBLE = "not-eligible"
