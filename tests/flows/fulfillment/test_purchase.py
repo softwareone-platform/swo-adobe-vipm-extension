@@ -45,7 +45,12 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     ValidateDuplicateLines,
 )
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, UpdatePrices
+from adobe_vipm.flows.helpers import (
+    PrepareCustomerData,
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+)
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_fulfillment_parameter,
@@ -748,7 +753,7 @@ def test_fulfill_purchase_order(mocker):
 
     fulfill_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 14
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 15
 
     expected_steps = [
         SetupContext,
@@ -758,6 +763,7 @@ def test_fulfill_purchase_order(mocker):
         StartOrderProcessing,
         PrepareCustomerData,
         CreateCustomer,
+        Validate3YCCommitment,
         GetPreviewOrder,
         SubmitNewOrder,
         CreateOrUpdateSubscriptions,
@@ -771,7 +777,7 @@ def test_fulfill_purchase_order(mocker):
     assert actual_steps == expected_steps
 
     assert mocked_pipeline_ctor.mock_calls[0].args[4].template_name == TEMPLATE_NAME_PURCHASE
-    assert mocked_pipeline_ctor.mock_calls[0].args[13].template_name == TEMPLATE_NAME_PURCHASE
+    assert mocked_pipeline_ctor.mock_calls[0].args[14].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(
         mocked_client,

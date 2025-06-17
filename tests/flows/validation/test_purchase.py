@@ -26,7 +26,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
 from adobe_vipm.flows.validation.purchase import (
     CheckPurchaseValidationEnabled,
@@ -862,7 +862,7 @@ def test_validate_purchase_order(mocker):
 
     validate_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
 
     expected_steps = [
         SetupContext,
@@ -870,6 +870,7 @@ def test_validate_purchase_order(mocker):
         CheckPurchaseValidationEnabled,
         ValidateCustomerData,
         ValidateDuplicateLines,
+        Validate3YCCommitment,
         GetPreviewOrder,
         UpdatePrices,
     ]

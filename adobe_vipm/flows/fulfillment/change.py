@@ -35,7 +35,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
-from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
+from adobe_vipm.flows.helpers import (
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+)
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_adobe_subscription_id,
@@ -138,59 +142,77 @@ class UpdateRenewalQuantities(Step):
     """
     Updates the Adobe subscriptions renewal quantity if it doesn't match
     the agreement current quantity.
+    If process_downsize_lines is False, the downsize lines will not be processed.
+    If process_upsize_lines is False, the upsize and new lines will not be processed.
+    The upsizes and new lines are processed first, to process correctly the 3yc
+    to maintain the compliant with the 3yc minimum quantities.
     """
+    def __init__(self):
+        self.error = None
 
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         context.updated = []
-        for line in context.downsize_lines + context.upsize_lines + context.new_lines:
-            subscription = get_subscription_by_line_and_item_id(
-                context.order["subscriptions"],
-                line["item"]["id"],
-                line["id"],
-            )
-            if not subscription:
-                continue
-            adobe_sub_id = get_adobe_subscription_id(subscription)
-            adobe_subscription = adobe_client.get_subscription(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub_id,
-            )
-            qty = line["quantity"]
-            old_qty = adobe_subscription["autoRenewal"]["renewalQuantity"]
-            if old_qty != qty:
-                try:
-                    adobe_client.update_subscription(
-                        context.authorization_id,
-                        context.adobe_customer_id,
-                        adobe_sub_id,
-                        quantity=qty,
-                    )
-                    logger.info(
-                        f"{context}: update renewal quantity for sub "
-                        f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
-                    )
-                    context.updated.append({
-                        "subscription_vendor_id": adobe_sub_id,
-                        "old_quantity": old_qty,
-                        "new_quantity": qty
-                    })
-                except AdobeAPIError as e:
-                    logger.error(
-                        f"{context}: failed to update renewal quantity for "
-                        f"{subscription['id']} ({adobe_sub_id}) due to {e}"
-                    )
-                    notify_not_updated_subscriptions(
-                        context.order["id"],
-                        f"Error updating subscription {subscription['id']}, {str(e)}",
-                        [],
-                        context.product_id
-                    )
-                    self._handle_subscription_update_error(adobe_client, client, context, e)
-                    return
+        self._update_lines(adobe_client, context)
+        if self.error:
+            self._handle_subscription_update_error(adobe_client, client, context, self.error)
+            return
+
         next_step(client, context)
 
+    def _get_lines(self, context):
+        return context.upsize_lines + context.new_lines
+
+    def _update_lines(self, adobe_client, context):
+        for line in self._get_lines(context):
+            self._update_line(adobe_client, context, line)
+
+    def _update_line(self, adobe_client, context, line):
+        subscription = get_subscription_by_line_and_item_id(
+            context.order["subscriptions"],
+            line["item"]["id"],
+            line["id"],
+        )
+        if not subscription:
+            return
+        adobe_sub_id = get_adobe_subscription_id(subscription)
+        adobe_subscription = adobe_client.get_subscription(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub_id,
+        )
+        qty = line["quantity"]
+        old_qty = adobe_subscription["autoRenewal"]["renewalQuantity"]
+        if old_qty != qty:
+            try:
+                adobe_client.update_subscription(
+                    context.authorization_id,
+                    context.adobe_customer_id,
+                    adobe_sub_id,
+                    quantity=qty,
+                )
+                logger.info(
+                    f"{context}: update renewal quantity for sub "
+                    f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
+                )
+                context.updated.append({
+                    "subscription_vendor_id": adobe_sub_id,
+                    "old_quantity": old_qty,
+                    "new_quantity": qty
+                })
+            except AdobeAPIError as e:
+                logger.error(
+                    f"{context}: failed to update renewal quantity for "
+                    f"{subscription['id']} ({adobe_sub_id}) due to {e}"
+                )
+                notify_not_updated_subscriptions(
+                    context.order["id"],
+                    f"Error updating subscription {subscription['id']}, {str(e)}",
+                    [],
+                    context.product_id
+                )
+                self.error = e
+                return
 
     def _handle_subscription_update_error(self, adobe_client, client, context, e):
         self._rollback_updated_subscriptions(adobe_client, context)
@@ -202,7 +224,6 @@ class UpdateRenewalQuantities(Step):
                 context.order,
                 ERR_INVALID_RENEWAL_STATE.to_dict(error=e.message),
             )
-
 
     def _rollback_updated_subscriptions(self, adobe_client, context):
         try:
@@ -229,6 +250,10 @@ class UpdateRenewalQuantities(Step):
             logger.error(f"Error rolling back updated subscriptions: {e}")
 
 
+class UpdateRenewalQuantitiesDownsizes(UpdateRenewalQuantities):
+    def _get_lines(self, context):
+        return context.downsize_lines
+
 def fulfill_change_order(client, order):
     """
     Fulfills a change order by processing the necessary actions based on the provided parameters.
@@ -250,11 +275,12 @@ def fulfill_change_order(client, order):
         GetReturnOrders(),
         GetReturnableOrders(),
         ValidateReturnableOrders(),
-        ValidateDownsizes3YC(),
+        Validate3YCCommitment(),
         GetPreviewOrder(),
-        SubmitReturnOrders(),
         SubmitNewOrder(),
         UpdateRenewalQuantities(),
+        SubmitReturnOrders(),
+        UpdateRenewalQuantitiesDownsizes(),
         CreateOrUpdateSubscriptions(),
         UpdatePrices(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
