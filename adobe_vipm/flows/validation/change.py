@@ -22,6 +22,7 @@ from adobe_vipm.flows.helpers import (
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import set_order_error
+from adobe_vipm.flows.utils.customer import is_within_coterm_window
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
@@ -43,7 +44,7 @@ class ValidateDownsizes(Step):
         adobe_client = get_adobe_client()
         errors = []
 
-        if (context.is_within_coterm_window()):
+        if (is_within_coterm_window(context.adobe_customer)):
             logger.info(
                 "Downsize occurs in the last two weeks before the anniversary date. "
                 "Returnable orders are not going to be submitted, the renewal quantity "
