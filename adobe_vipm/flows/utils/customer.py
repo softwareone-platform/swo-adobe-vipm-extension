@@ -15,6 +15,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CUSTOMER_ID,
     PARAM_GLOBAL_CUSTOMER,
 )
+from adobe_vipm.flows.utils.date import is_within_last_two_weeks
 from adobe_vipm.flows.utils.parameter import (
     get_fulfillment_parameter,
     get_ordering_parameter,
@@ -165,3 +166,24 @@ def set_global_customer(order, global_sales_enabled):
     )
     global_customer_param["value"] = [global_sales_enabled]
     return updated_order
+
+def is_within_coterm_window(customer):
+    """
+    Checks if the current date is within the last two weeks before the cotermination date.
+
+    Returns:
+        bool: True if within the window, False otherwise
+    """
+    return (
+        customer.get("cotermDate") and
+        is_within_last_two_weeks(customer["cotermDate"])
+    )
+
+def has_coterm_date(customer):
+    """
+    Checks if the customer has a cotermination date.
+
+    Returns:
+        bool: True if cotermination date exists, False otherwise
+    """
+    return bool(customer.get("cotermDate"))
