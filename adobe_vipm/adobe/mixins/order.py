@@ -1,5 +1,7 @@
+import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from hashlib import sha256
 from urllib.parse import urljoin
 
 import requests
@@ -78,17 +80,34 @@ class OrderClientMixin:
         deployment_id: str = None,
     ) -> dict:
         authorization = self._config.get_authorization(authorization_id)
+
+        def build_line_item(item):
+            line_item = {
+                "extLineItemNumber": item["extLineItemNumber"],
+                "offerId": item["offerId"],
+                "quantity": item["quantity"],
+            }
+            if "deploymentId" in item:
+                line_item["deploymentId"] = item["deploymentId"]
+                line_item["currencyCode"] = item["currencyCode"]
+            return line_item
+
+        lineItems = [
+            build_line_item(item) for item in adobe_preview_order["lineItems"]
+        ]
+
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
             "orderType": ORDER_TYPE_NEW,
-            "lineItems": adobe_preview_order["lineItems"],
+            "lineItems": lineItems,
         }
         if not deployment_id:
             payload["currencyCode"] = authorization.currency
 
+        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
         headers = self._get_headers(
             authorization,
-            correlation_id=adobe_preview_order["externalReferenceId"],
+            correlation_id=correlation_id,
         )
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
