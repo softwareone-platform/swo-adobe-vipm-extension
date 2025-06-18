@@ -3,6 +3,7 @@ import sys
 import traceback
 from datetime import date, datetime, timedelta
 
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement_subscription,
     get_agreements_by_customer_deployments,
@@ -357,6 +358,22 @@ def sync_agreement(mpt_client, agreement, dry_run):
         logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
         notify_agreement_unhandled_exception_in_teams(
             agreement["id"], traceback.format_exc()
+        )
+    else:
+        _update_last_sync_date(mpt_client, agreement, dry_run)
+
+
+def _update_last_sync_date(mpt_client: MPTClient, agreement: dict, dry_run: bool) -> None:
+    if not dry_run:
+        logger.info(f"Updating Last Sync Date for agreement {agreement['id']}")
+        update_agreement(
+            mpt_client,
+            agreement["id"],
+            parameters={
+                "fulfillment": [
+                    {"externalId": "lastSyncDate", "value": datetime.now().date().isoformat()}
+                ]
+            },
         )
 
 
