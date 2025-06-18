@@ -774,7 +774,9 @@ def test_create_new_order(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": adobe_order["externalReferenceId"],
+                    "x-correlation-id": (
+                        "dc133932f3e590ba2f958174213a688e50ac782e1650f8fcb6884a941622d1f2"
+                    ),
                 },
             ),
             matchers.json_params_matcher(adobe_order),
@@ -837,7 +839,9 @@ def test_create_new_order_no_deployment(
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
-                    "x-correlation-id": adobe_order["externalReferenceId"],
+                    "x-correlation-id": (
+                        "ac4eb5538ad0d84c816b61cfd73d39e82cc81085ace1a397c19318c4be1726a4"
+                    ),
                 },
             ),
             matchers.json_params_matcher(adobe_order),
