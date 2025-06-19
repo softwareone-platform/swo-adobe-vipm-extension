@@ -344,7 +344,7 @@ def test_sync_agreement_prices_exception(
     with caplog.at_level(logging.ERROR):
         sync_agreement(mocked_mpt_client, agreement, False)
 
-    assert f"Cannot sync agreement {agreement['id']}" in caplog.text
+    assert f"Error synchronizing agreement {agreement['id']}" in caplog.text
 
     mocked_get_agreement_subscription.assert_called_once_with(
         mocked_mpt_client,
