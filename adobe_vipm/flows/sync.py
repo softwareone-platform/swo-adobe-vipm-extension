@@ -100,16 +100,14 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
         )
 
         if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
-            logger.info(
-                f"Skipping subscription {subscription['id']}. It is terminated"
-            )
+            logger.info(f"Skipping subscription {subscription['id']}. It is terminated")
             continue
 
         actual_sku = adobe_subscription["offerId"]
 
-        to_update.append((subscription,
-                          adobe_subscription,
-                          get_sku_with_discount_level(actual_sku, customer)))
+        to_update.append(
+            (subscription, adobe_subscription, get_sku_with_discount_level(actual_sku, customer))
+        )
 
     skus = [item[2] for item in to_update]
 
@@ -144,9 +142,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                 },
                 {
                     "externalId": PARAM_RENEWAL_QUANTITY,
-                    "value": str(
-                        adobe_subscription["autoRenewal"]["renewalQuantity"]
-                    ),
+                    "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                 },
                 {
                     "externalId": PARAM_RENEWAL_DATE,
@@ -164,10 +160,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                 commitmentDate=coterm_date,
                 autoRenew=adobe_subscription["autoRenewal"]["enabled"],
             )
-            logger.info(
-                f"Subscription: {subscription['id']} ({line_id}): "
-                f"sku={actual_sku}"
-            )
+            logger.info(f"Subscription: {subscription['id']} ({line_id}): " f"sku={actual_sku}")
         else:
             current_price = subscription["lines"][0]["price"]["unitPP"]
             sys.stdout.write(
@@ -184,9 +177,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
 
     to_update = []
     for line in agreement["lines"]:
-        actual_sku = get_adobe_product_by_marketplace_sku(
-            line["item"]["externalIds"]["vendor"]
-        ).sku
+        actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
         to_update.append((line, get_sku_with_discount_level(actual_sku, customer)))
 
     skus = [item[1] for item in to_update]
@@ -207,17 +198,13 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
         else:
             logger.info(f"OneTime item: {line['id']}: sku={actual_sku}\n")
 
-    next_sync = (
-        (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
-    )
+    next_sync = (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
     if not dry_run:
         update_agreement(
             mpt_client,
             agreement["id"],
             lines=agreement["lines"],
-            parameters={
-                "fulfillment": [{"externalId": "nextSync", "value": next_sync}]
-            },
+            parameters={"fulfillment": [{"externalId": "nextSync", "value": next_sync}]},
         )
 
     if missing_prices_skus:
@@ -231,7 +218,6 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
 
     logger.info(f"agreement updated {agreement['id']}")
     return coterm_date
-
 
 
 def sync_agreements_by_next_sync(mpt_client, dry_run):
@@ -265,9 +251,7 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
         sync_agreement(mpt_client, agreement, dry_run)
 
 
-def sync_global_customer_parameters(
-    mpt_client, adobe_client, customer_deployments, agreement
-):
+def sync_global_customer_parameters(mpt_client, adobe_client, customer_deployments, agreement):
     try:
         parameters = {PARAM_PHASE_FULFILLMENT: []}
         global_customer_enabled = get_global_customer(agreement)
@@ -291,12 +275,9 @@ def sync_global_customer_parameters(
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception as e:
         logger.exception(
-            f"Error setting global customer parameters for agreement "
-            f"{agreement["id"]}: {e}"
+            f"Error setting global customer parameters for agreement " f"{agreement["id"]}: {e}"
         )
-        notify_agreement_unhandled_exception_in_teams(
-            agreement["id"], traceback.format_exc()
-        )
+        notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
 
 
 def sync_agreement(mpt_client, agreement, dry_run):
@@ -314,14 +295,10 @@ def sync_agreement(mpt_client, agreement, dry_run):
         )
 
         if len(processing_subscriptions) > 0:
-            logger.info(
-                f"Agreement {agreement["id"]} has processing subscriptions, skip it"
-            )
+            logger.info(f"Agreement {agreement["id"]} has processing subscriptions, skip it")
             return
 
-        customer = adobe_client.get_customer(
-            agreement["authorization"]["id"], customer_id
-        )
+        customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
 
         if not customer.get("discounts", []):
             raise CustomerDiscountsNotFoundError(
@@ -350,9 +327,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
 
     except Exception as e:
         logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
-        notify_agreement_unhandled_exception_in_teams(
-            agreement["id"], traceback.format_exc()
-        )
+        notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
     else:
         _update_last_sync_date(mpt_client, agreement, dry_run)
 
@@ -384,9 +359,7 @@ def sync_deployments_prices(
     )
 
     for deployment_agreement in deployment_agreements:
-        sync_agreement_prices(
-            mpt_client, deployment_agreement, dry_run, adobe_client, customer
-        )
+        sync_agreement_prices(mpt_client, deployment_agreement, dry_run, adobe_client, customer)
         sync_gc_3yc_agreements(
             mpt_client,
             main_agreement,
