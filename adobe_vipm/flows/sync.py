@@ -3,11 +3,13 @@ import sys
 import traceback
 from datetime import date, datetime, timedelta
 
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement_subscription,
     get_agreements_by_customer_deployments,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
+    get_agreements_by_query,
     get_all_agreements,
     update_agreement,
     update_agreement_subscription,
@@ -29,6 +31,7 @@ from adobe_vipm.flows.constants import (
     PARAM_ADOBE_SKU,
     PARAM_CURRENT_QUANTITY,
     PARAM_DEPLOYMENT_ID,
+    PARAM_LAST_SYNC_DATE,
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_RENEWAL_DATE,
@@ -251,6 +254,30 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
     """
     agreements = get_agreements_by_next_sync(mpt_client, PARAM_NEXT_SYNC_DATE)
     for agreement in agreements:
+        sync_agreement(mpt_client, agreement, dry_run)
+
+
+def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
+    """
+    Synchronizes agreements by their active subscriptions renewed yesterday.
+    """
+    today = datetime.now().today().strftime("%Y-%m-%d")
+    yesterday = (datetime.now().today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    rql_query = (
+        "eq(status,Active)&"
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_RENEWAL_DATE}),eq(displayValue,{yesterday})))&"
+        # TODO: verify if above and below RQL will catch whole day.
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        # Let's get only what we need
+        "select=-template,-name,-listing,-status,-authorization,-vendor,-client,-price,"
+        "-licensee,-buyer,-seller,-product,-externalIds,-subscriptions.price,"
+        "-subscriptions.agreement,-subscriptions.buyer,-subscriptions.licensee,-subscriptions.buyer,"
+        "-subscriptions.seller,-subscriptions.terms,-subscriptions.product,-subscriptions.template,"
+        "-subscriptions.name,-subscriptions.startDate,-subscriptions.externalIds,"
+        "-subscriptions.splitStatus,-subscriptions.autoRenew,-subscriptions.split,"
+        "-subscriptions.status,-subscriptions.terminationDate"
+    )
+    for agreement in get_agreements_by_query(mpt_client, rql_query, limit=1000):
         sync_agreement(mpt_client, agreement, dry_run)
 
 
