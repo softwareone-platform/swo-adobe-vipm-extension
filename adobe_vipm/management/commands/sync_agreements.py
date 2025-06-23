@@ -44,9 +44,7 @@ class Command(BaseCommand):
         self.info("Start processing agreements...")
         client = setup_client()
         if options["agreements"]:
-            sync_agreements_by_agreement_ids(
-                client, options["agreements"], options["dry_run"]
-            )
+            sync_agreements_by_agreement_ids(client, options["agreements"], options["dry_run"])
         elif options["all"]:
             sync_all_agreements(client, options["dry_run"])
         else:
