@@ -159,7 +159,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                 commitmentDate=coterm_date,
                 autoRenew=adobe_subscription["autoRenewal"]["enabled"],
             )
-            logger.info(f"Subscription: {subscription['id']} ({line_id}): " f"sku={actual_sku}")
+            logger.info(f"Subscription: {subscription['id']} ({line_id}): sku={actual_sku}")
         else:
             current_price = subscription["lines"][0]["price"]["unitPP"]
             sys.stdout.write(
@@ -250,7 +250,7 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
         sync_agreement(mpt_client, agreement, dry_run)
 
 
-def sync_global_customer_parameters(mpt_client, adobe_client, customer_deployments, agreement):
+def sync_global_customer_parameters(mpt_client, customer_deployments, agreement):
     try:
         parameters = {PARAM_PHASE_FULFILLMENT: []}
         global_customer_enabled = get_global_customer(agreement)
@@ -274,7 +274,7 @@ def sync_global_customer_parameters(mpt_client, adobe_client, customer_deploymen
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception as e:
         logger.exception(
-            f"Error setting global customer parameters for agreement " f"{agreement["id"]}: {e}"
+            f"Error setting global customer parameters for agreement {agreement["id"]}: {e}"
         )
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
 
@@ -312,9 +312,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
             customer_deployments = adobe_client.get_customer_deployments_active_status(
                 authorization_id, customer_id
             )
-            sync_global_customer_parameters(
-                mpt_client, adobe_client, customer_deployments, agreement
-            )
+            sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
             sync_deployments_prices(
                 mpt_client,
                 adobe_client,
