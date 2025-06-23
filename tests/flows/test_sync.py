@@ -483,9 +483,8 @@ def test_sync_agreements_by_3yc_end_date(mocker, agreement_factory, dry_run):
 
 @freeze_time("2025-06-16")
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run):
+def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock_mpt_client):
     agreement = agreement_factory()
-    mocked_mpt_client = mocker.MagicMock()
     mocked_get_agreements_by_query = mocker.patch(
         "adobe_vipm.flows.sync.get_agreements_by_query",
         return_value=[agreement],
@@ -496,15 +495,15 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run):
         autospec=True,
     )
 
-    sync_agreements_by_coterm_date(mocked_mpt_client, dry_run)
+    sync_agreements_by_coterm_date(mock_mpt_client, dry_run)
 
     mocked_sync_agreement.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         agreement,
         dry_run,
     )
     mocked_get_agreements_by_query.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,cotermDate),eq(displayValue,2025-06-15)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-06-16)))&"
