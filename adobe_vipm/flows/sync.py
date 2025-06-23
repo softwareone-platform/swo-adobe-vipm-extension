@@ -100,8 +100,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
         )
 
         if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
-            logger.info(f"Skipping subscription {subscription['id']}. It is terminated")
-            continue
+            logger.info(f"Skipping subscription {subscription['id']}. It is terminated by Adobe.")
 
         actual_sku = adobe_subscription["offerId"]
 
