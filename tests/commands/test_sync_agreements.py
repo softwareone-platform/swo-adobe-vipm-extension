@@ -53,9 +53,7 @@ def test_process_all(mocker, dry_run):
         "adobe_vipm.management.commands.sync_agreements.setup_client",
         return_value=mocked_client,
     )
-    mocked = mocker.patch(
-        "adobe_vipm.management.commands.sync_agreements.sync_all_agreements"
-    )
+    mocked = mocker.patch("adobe_vipm.management.commands.sync_agreements.sync_all_agreements")
 
     call_command(
         "sync_agreements",
