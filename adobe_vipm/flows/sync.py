@@ -328,21 +328,21 @@ def sync_agreement(mpt_client, agreement, dry_run):
         logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
     else:
-        _update_last_sync_date(mpt_client, agreement, dry_run)
+        if not dry_run:
+            _update_last_sync_date(mpt_client, agreement)
 
 
-def _update_last_sync_date(mpt_client: MPTClient, agreement: dict, dry_run: bool) -> None:
-    if not dry_run:
-        logger.info(f"Updating Last Sync Date for agreement {agreement['id']}")
-        update_agreement(
-            mpt_client,
-            agreement["id"],
-            parameters={
-                "fulfillment": [
-                    {"externalId": "lastSyncDate", "value": datetime.now().date().isoformat()}
-                ]
-            },
-        )
+def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
+    logger.info(f"Updating Last Sync Date for agreement {agreement['id']}")
+    update_agreement(
+        mpt_client,
+        agreement["id"],
+        parameters={
+            "fulfillment": [
+                {"externalId": "lastSyncDate", "value": datetime.now().date().isoformat()}
+            ]
+        },
+    )
 
 
 def sync_deployments_prices(
