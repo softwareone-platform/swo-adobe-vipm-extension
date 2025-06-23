@@ -1,7 +1,6 @@
 from datetime import date, timedelta
 
 import pytest
-from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
@@ -11,7 +10,6 @@ from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
     get_transfer_item_sku_by_subscription,
-    is_renewal_window_open,
     is_transferring_item_expired,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
@@ -24,7 +22,7 @@ from adobe_vipm.flows.utils import (
 
 
 def test_notify_unhandled_exception_in_teams(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
     notify_unhandled_exception_in_teams(
         "validation",
         "ORD-0000",
@@ -40,7 +38,7 @@ def test_notify_unhandled_exception_in_teams(mocker):
 
 
 def test_notify_agreement_unhandled_exception_in_teams(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
     notify_agreement_unhandled_exception_in_teams(
         "AGR-0000",
         "exception-traceback",
@@ -55,7 +53,7 @@ def test_notify_agreement_unhandled_exception_in_teams(mocker):
 
 
 def test_notify_missing_prices(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
     notify_missing_prices(
         "AGR-0000", ["65504578CA01A12"], "65504575CA01A12", "USD", None
     )
@@ -70,7 +68,7 @@ def test_notify_missing_prices(mocker):
     )
 
 def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
     notify_not_updated_subscriptions(
         order_id="ORD-1234",
         error_message="Some error occurred",
@@ -92,7 +90,7 @@ def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
 
 
 def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
-    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.send_exception")
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
     notify_not_updated_subscriptions(
         order_id="ORD-1234",
         error_message="Some error occurred",
@@ -280,27 +278,3 @@ def test_get_customer_consumables_discount_level(adobe_customer_factory):
         )
         == "T2"
     )
-
-
-@pytest.mark.parametrize(
-    ("today", "expected_result"),
-    [
-        ("2024-03-06", False),
-        ("2024-03-07", True),
-        ("2024-03-08", True),
-        ("2024-03-09", True),
-        ("2024-03-10", True),
-        ("2024-03-11", True),
-        ("2024-03-12", False),
-    ],
-)
-def test_is_renewal_window_open(
-    order_factory, fulfillment_parameters_factory, today, expected_result
-):
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            coterm_date="2024-03-11",
-        )
-    )
-    with freeze_time(today):
-        assert is_renewal_window_open(order) is expected_result

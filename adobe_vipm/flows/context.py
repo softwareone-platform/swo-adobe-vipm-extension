@@ -35,3 +35,4 @@ class Context:
             f"{self.authorization_id} {due_date} "
             f"{self.adobe_customer_id or '-'} {self.adobe_new_order_id or '-'}"
         )
+

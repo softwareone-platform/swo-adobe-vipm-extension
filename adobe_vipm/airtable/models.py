@@ -37,6 +37,8 @@ STATUS_GC_CREATED = "created"
 STATUS_GC_ERROR = "error"
 STATUS_GC_PENDING = "pending"
 STATUS_GC_TRANSFERRED = "transferred"
+TYPE_3YC_CONSUMABLE = "Consumable"
+TYPE_3YC_LICENSE = "License"
 
 PRICELIST_CACHE = defaultdict(list)
 
@@ -726,6 +728,7 @@ def get_sku_adobe_mapping_model(
         sku = fields.TextField("sku")
         segment = fields.SelectField("segment")
         name = fields.TextField("name")
+        type_3yc = fields.SelectField("type_3yc")
 
         class Meta:
             table_name = "SKU Mapping"
@@ -745,6 +748,24 @@ def get_sku_adobe_mapping_model(
                 )
 
             return entity
+
+        def is_consumable(self):
+            """
+            Check if the SKU is a consumable.
+            """
+            return self.type_3yc == TYPE_3YC_CONSUMABLE
+
+        def is_license(self):
+            """
+            Check if the SKU is a license.
+            """
+            return self.type_3yc == TYPE_3YC_LICENSE
+
+        def is_valid_3yc_type(self):
+            """
+            Check if the SKU is a valid 3YC type.
+            """
+            return self.is_consumable() or self.is_license()
 
     return AdobeProductMapping
 

@@ -1,4 +1,3 @@
-import logging
 from datetime import date
 
 import pytest
@@ -23,10 +22,13 @@ from adobe_vipm.flows.constants import (
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
+    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+    PARAM_3YC_END_DATE,
+    PARAM_3YC_ENROLL_STATUS,
+    PARAM_3YC_START_DATE,
     PARAM_DUE_DATE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
-    TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -55,6 +57,7 @@ from adobe_vipm.flows.utils import (
     set_coterm_date,
     set_next_sync,
 )
+from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 
 
 @pytest.fixture(autouse=True)
@@ -380,7 +383,6 @@ def test_start_order_processing_step(mocker, order_factory):
 def test_configuration_start_order_processing_selects_template(
     mocker, order_factory, auto_renew, expected_template
 ):
-    # Arrange
     order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
     context = Context(order=order, order_id=order["id"])
     mocked_client = mocker.MagicMock()
@@ -394,11 +396,9 @@ def test_configuration_start_order_processing_selects_template(
         "adobe_vipm.flows.fulfillment.shared.update_order"
     )
 
-    # Act
     step = StartOrderProcessing(expected_template)
     step(mocked_client, context, mocked_next_step)
 
-    # Assert
     mocked_get_template.assert_called_once_with(
         mocked_client,
         context.order["agreement"]["product"]["id"],
@@ -496,7 +496,7 @@ def test_set_processing_template_to_delayed_in_renewal_win(
         mocked_client,
         context.product_id,
         MPT_ORDER_STATUS_PROCESSING,
-        TEMPLATE_NAME_DELAYED,
+        "my template",
     )
     mocked_update_order.assert_called_once_with(
         mocked_client,
@@ -505,65 +505,6 @@ def test_set_processing_template_to_delayed_in_renewal_win(
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
-
-@freeze_time("2024-05-06")
-def test_validate_renewal_window_step(
-    mocker, order_factory, fulfillment_parameters_factory
-):
-    """
-    Tests that if the renewal window is not open
-    the order processing pipeline continue with the next step.
-    """
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(
-                coterm_date="2024-07-08"
-            )
-        )
-    )
-
-    step = ValidateRenewalWindow()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2024-05-06")
-def test_validate_renewal_window_step_win_opened(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    caplog,
-):
-    """
-    Tests that if the renewal window is not open
-    the order processing pipeline continue with the next step.
-    """
-
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(
-                coterm_date="2024-05-08"
-            )
-        )
-    )
-
-    step = ValidateRenewalWindow()
-    with caplog.at_level(logging.WARNING):
-        step(mocked_client, context, mocked_next_step)
-
-    assert (
-        f"{context}: Renewal window is open, coterm date is '2024-05-08'" in caplog.text
-    )
-
-    mocked_next_step.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -616,6 +557,38 @@ def test_set_or_update_coterm_next_sync_dates_step(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_set_or_update_withouCotermDate(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+):
+    """
+    Tests that the order is updated when either the `cotermDate`
+    either the `nextSync` fulfillment parameter are not in sync with
+    the adobe customer coterm date.
+    """
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    customer = adobe_customer_factory(coterm_date=None)
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id=customer["customerId"],
+        adobe_customer=customer,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    step = SetOrUpdateCotermNextSyncDates()
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_update.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
 def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
     mocker,
     order_factory,
@@ -647,6 +620,78 @@ def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
 
     mocked_update.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    """
+    Tests that the order is updated with 3YC parameters when the Adobe customer
+    has a 3YC commitment request.
+    """
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    commitment = adobe_commitment_factory(
+        status="REQUESTED",
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+    )
+    customer = adobe_customer_factory(
+        coterm_date="2025-01-01",
+        commitment_request=commitment
+    )
+
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id=customer["customerId"],
+        adobe_customer=customer,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    step = SetOrUpdateCotermNextSyncDates()
+    step(mocked_client, context, mocked_next_step)
+    mocked_update.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        parameters=context.order["parameters"],
+    )
+
+    parameter_list = []
+    parameter_list.append(get_fulfillment_parameter(
+        context.order,
+        PARAM_3YC_ENROLL_STATUS
+    )["value"])
+    parameter_list.append(get_fulfillment_parameter(
+        context.order,
+        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+    )["value"])
+    parameter_list.append(get_fulfillment_parameter(
+        context.order,
+        PARAM_3YC_START_DATE
+    )["value"])
+    parameter_list.append(get_fulfillment_parameter(
+        context.order,
+        PARAM_3YC_END_DATE
+    )["value"])
+
+    assert parameter_list == [
+        commitment["status"],
+        commitment["status"],
+        commitment["startDate"],
+        commitment["endDate"]
+    ]
+    assert get_coterm_date(context.order) == "2025-01-01"
+    assert get_next_sync(context.order) == "2025-01-02"
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
 
 
 def test_submit_return_orders_step(
@@ -1628,6 +1673,62 @@ def test_create_or_update_subscriptions_step_sub_expired(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_create_or_update_subscriptions_step_update_existing_subscription(
+    mocker,
+    order_factory,
+    subscriptions_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+    """
+    Tests that when a subscription already exists, it updates the subscription's SKU
+    with the new Adobe SKU from the order line.
+    """
+    adobe_order = adobe_order_factory(
+        order_type=ORDER_TYPE_NEW,
+        items=adobe_items_factory(subscription_id="adobe-sub-id"),
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocker.MagicMock(),
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
+        return_value=[],
+    )
+
+    mocked_set_sku = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_subscription_actual_sku",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    order = order_factory(
+        subscriptions=subscriptions_factory(),
+    )
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        adobe_new_order=adobe_order,
+    )
+    step = CreateOrUpdateSubscriptions()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_set_sku.assert_called_once_with(
+        mocked_client,
+        context.order,
+        order["subscriptions"][0],
+        adobe_order["lineItems"][0]["offerId"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
 
 @freeze_time("2024-01-01")
 def test_complete_order_step(mocker, order_factory):
@@ -1690,7 +1791,6 @@ def test_complete_order_step(mocker, order_factory):
 def test_complete_configuration_order_selects_template(
     mocker, order_factory, auto_renew, expected_template
 ):
-    # Arrange
     order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
     completed_order = order_factory(status="Completed")
     context = Context(
@@ -1714,11 +1814,9 @@ def test_complete_configuration_order_selects_template(
         "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
     )
 
-    # Act
     step = CompleteOrder(expected_template)
     step(mocked_client, context, mocked_next_step)
 
-    # Assert
     mocked_get_template.assert_called_once_with(
         mocked_client,
         context.product_id,
@@ -2061,3 +2159,84 @@ def test_send_gc_mpt_notification(mocker, settings, order_factory, status, subje
             "portal_base_url": settings.MPT_PORTAL_BASE_URL,
         },
     )
+
+
+@freeze_time("2024-05-06")
+def test_validate_renewal_window_creation_window_validation_mode(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    """
+    Tests that ValidateRenewalWindow in validation mode:
+    - Sets the error if coterm date is in creation window
+    - Continues to next step if there is no coterm date
+    """
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_order_error"
+    )
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+
+    # Test with coterm date in creation window
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-05-06")
+    )
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateRenewalWindow(is_validation=True)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_set_order_error.assert_called_once()
+    mocked_switch_order_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+@freeze_time("2024-05-06")
+def test_validate_renewal_window_creation_window_non_validation_mode(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    """
+    Tests that ValidateRenewalWindow in non-validation mode:
+    - Fails the order if coterm date is in creation window
+    - Continues to next step if there is no coterm date
+    """
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_order_error"
+    )
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+
+    # Test with coterm date in creation window
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-05-06")
+    )
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateRenewalWindow(is_validation=False)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_set_order_error.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+    mocked_next_step.assert_not_called()
+
+    # Reset mocks
+    mocked_switch_order_to_failed.reset_mock()
+    mocked_next_step.reset_mock()
+
+    # Test with no coterm date
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date=None)
+    )
+    context = Context(order=order, order_id=order["id"])
+
+    step = ValidateRenewalWindow(is_validation=False)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_set_order_error.assert_not_called()
+    mocked_switch_order_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)

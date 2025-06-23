@@ -26,7 +26,7 @@ from adobe_vipm.flows.constants import (
     PARAM_CONTACT,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext
+from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
 from adobe_vipm.flows.validation.purchase import (
     CheckPurchaseValidationEnabled,
@@ -862,19 +862,21 @@ def test_validate_purchase_order(mocker):
 
     validate_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
 
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[0], SetupContext)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[1], PrepareCustomerData)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[2], CheckPurchaseValidationEnabled
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[3], ValidateCustomerData)
-    assert isinstance(
-        mocked_pipeline_ctor.mock_calls[0].args[4], ValidateDuplicateLines
-    )
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[5], GetPreviewOrder)
-    assert isinstance(mocked_pipeline_ctor.mock_calls[0].args[6], UpdatePrices)
+    expected_steps = [
+        SetupContext,
+        PrepareCustomerData,
+        CheckPurchaseValidationEnabled,
+        ValidateCustomerData,
+        ValidateDuplicateLines,
+        Validate3YCCommitment,
+        GetPreviewOrder,
+        UpdatePrices,
+    ]
+
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
+    assert actual_steps == expected_steps
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(

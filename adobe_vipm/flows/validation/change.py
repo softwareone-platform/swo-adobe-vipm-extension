@@ -11,9 +11,18 @@ from adobe_vipm.flows.constants import (
     ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateDownsizes3YC
+from adobe_vipm.flows.fulfillment.shared import (
+    SetOrUpdateCotermNextSyncDates,
+    ValidateRenewalWindow,
+)
+from adobe_vipm.flows.helpers import (
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+)
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.utils import is_within_last_two_weeks, set_order_error
+from adobe_vipm.flows.utils import set_order_error
+from adobe_vipm.flows.utils.customer import is_within_coterm_window
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
@@ -35,7 +44,7 @@ class ValidateDownsizes(Step):
         adobe_client = get_adobe_client()
         errors = []
 
-        if is_within_last_two_weeks(context.adobe_customer["cotermDate"]):
+        if (is_within_coterm_window(context.adobe_customer)):
             logger.info(
                 "Downsize occurs in the last two weeks before the anniversary date. "
                 "Returnable orders are not going to be submitted, the renewal quantity "
@@ -109,8 +118,10 @@ def validate_change_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         ValidateDuplicateLines(),
+        SetOrUpdateCotermNextSyncDates(),
+        ValidateRenewalWindow(is_validation=True),
         ValidateDownsizes(),
-        ValidateDownsizes3YC(True),
+        Validate3YCCommitment(True),
         GetPreviewOrder(),
         UpdatePrices(),
     )

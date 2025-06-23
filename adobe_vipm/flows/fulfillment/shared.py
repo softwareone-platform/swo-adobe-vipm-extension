@@ -32,10 +32,12 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment,
+    get_3yc_commitment_request,
     sanitize_company_name,
     sanitize_first_last_name,
 )
 from adobe_vipm.flows.constants import (
+    ERR_COTERM_DATE_IN_LAST_24_HOURS,
     ERR_DUE_DATE_REACHED,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
@@ -57,7 +59,6 @@ from adobe_vipm.flows.constants import (
     PARAM_RENEWAL_QUANTITY,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
-    TEMPLATE_NAME_DELAYED,
 )
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
@@ -71,10 +72,11 @@ from adobe_vipm.flows.utils import (
     get_one_time_skus,
     get_order_line_by_sku,
     get_subscription_by_line_and_item_id,
-    is_renewal_window_open,
+    is_coterm_date_within_order_creation_window,
     map_returnable_to_return_orders,
     md2html,
     reset_due_date,
+    set_adobe_3yc_commitment_request_status,
     set_adobe_3yc_end_date,
     set_adobe_3yc_enroll_status,
     set_adobe_3yc_start_date,
@@ -84,9 +86,11 @@ from adobe_vipm.flows.utils import (
     set_customer_data,
     set_due_date,
     set_next_sync,
+    set_order_error,
     set_template,
     split_phone_number,
 )
+from adobe_vipm.flows.utils.customer import has_coterm_date
 from adobe_vipm.notifications import mpt_notify
 from adobe_vipm.utils import get_partial_sku
 
@@ -574,23 +578,50 @@ class SetOrUpdateCotermNextSyncDates(Step):
     """
 
     def __call__(self, client, context, next_step):
-        coterm_date = datetime.fromisoformat(
-            context.adobe_customer["cotermDate"]
-        ).date()
-        next_sync = coterm_date + timedelta(days=1)
+        if has_coterm_date(context.adobe_customer):
+            coterm_date = datetime.fromisoformat(
+                context.adobe_customer["cotermDate"]
+            ).date()
+            next_sync = coterm_date + timedelta(days=1)
 
-        if coterm_date.isoformat() != get_coterm_date(
-            context.order
-        ) or next_sync.isoformat() != get_next_sync(context.order):
-            context.order = set_coterm_date(context.order, coterm_date.isoformat())
-            context.order = set_next_sync(context.order, next_sync.isoformat())
-            update_order(
-                client, context.order_id, parameters=context.order["parameters"]
-            )
-            logger.info(
-                f"{context}: coterm ({coterm_date.isoformat()}) "
-                f"and next sync ({next_sync.isoformat()}) updated successfully"
-            )
+            needs_update = False
+            if coterm_date.isoformat() != get_coterm_date(context.order):
+                context.order = set_coterm_date(context.order, coterm_date.isoformat())
+                needs_update = True
+
+            if next_sync.isoformat() != get_next_sync(context.order):
+                context.order = set_next_sync(context.order, next_sync.isoformat())
+                needs_update = True
+
+            if context.adobe_customer:
+                commitment = get_3yc_commitment_request(context.adobe_customer)
+                if commitment:
+                    context.order = set_adobe_3yc_enroll_status(context.order, commitment["status"])
+                    context.order = set_adobe_3yc_commitment_request_status(
+                        context.order, commitment["status"])
+                    context.order = set_adobe_3yc_start_date(context.order, commitment["startDate"])
+                    context.order = set_adobe_3yc_end_date(context.order, commitment["endDate"])
+                    needs_update = True
+
+            if needs_update:
+                update_order(
+                    client, context.order_id, parameters=context.order["parameters"]
+                )
+                updated_params = {
+                    "coterm_date": coterm_date.isoformat(),
+                    "next_sync": next_sync.isoformat(),
+                }
+                if context.adobe_customer and get_3yc_commitment_request(context.adobe_customer):
+                    commitment = get_3yc_commitment_request(context.adobe_customer)
+                    updated_params.update({
+                        "3yc_enroll_status": commitment["status"],
+                        "3yc_commitment_request_status": commitment["status"],
+                        "3yc_start_date": commitment["startDate"],
+                        "3yc_end_date": commitment["endDate"]
+                    })
+                params_str = ', '.join(f'{k}={v}' for k, v in updated_params.items())
+                logger.info(f"{context}: Updated parameters: {params_str}")
+
         next_step(client, context)
 
 
@@ -605,16 +636,11 @@ class StartOrderProcessing(Step):
         self.template_name = template_name
 
     def __call__(self, client, context, next_step):
-        template_name = (
-            self.template_name
-            if not is_renewal_window_open(context.order)
-            else TEMPLATE_NAME_DELAYED
-        )
         template = get_product_template_or_default(
             client,
             context.order["agreement"]["product"]["id"],
             MPT_ORDER_STATUS_PROCESSING,
-            template_name,
+            self.template_name,
         )
         current_template_id = context.order.get("template", {}).get("id")
         if template["id"] != current_template_id:
@@ -634,16 +660,29 @@ class ValidateRenewalWindow(Step):
     Check if the renewal window is open. In that case stop the order processing.
     """
 
-    def __call__(self, client, context, next_step):
-        if is_renewal_window_open(context.order):
-            coterm_date = get_coterm_date(context.order)
-            logger.warning(
-                f"{context}: Renewal window is open, coterm date is '{coterm_date}'"
-            )
-            return
-        logger.info(f"{context}: not in renewal window, continue")
-        next_step(client, context)
+    def __init__(self, is_validation=False):
+        self.is_validation = is_validation
 
+    def __call__(self, client, context, next_step):
+        if is_coterm_date_within_order_creation_window(context.order):
+            coterm_date = get_coterm_date(context.order)
+            logger.info(
+                f"{context}: Order is being created within the last 24 "
+                f"hours of coterm date '{coterm_date}'"
+            )
+            if self.is_validation:
+                context.order = set_order_error(
+                    context.order,
+                    ERR_COTERM_DATE_IN_LAST_24_HOURS.to_dict(),
+                )
+            else:
+                switch_order_to_failed(
+                    client,
+                    context.order,
+                    ERR_COTERM_DATE_IN_LAST_24_HOURS.to_dict(),
+                )
+                return
+        next_step(client, context)
 
 class GetReturnOrders(Step):
     def __call__(self, client, context, next_step):
@@ -766,6 +805,7 @@ class SubmitNewOrder(Step):
             return
         adobe_client = get_adobe_client()
         adobe_order = None
+
         if not context.adobe_new_order_id and context.adobe_preview_order:
             deployment_id = get_deployment_id(context.order)
             adobe_order = adobe_client.create_new_order(
@@ -821,7 +861,6 @@ class SubmitNewOrder(Step):
             )
             return
         next_step(client, context)
-
 
 class CreateOrUpdateSubscriptions(Step):
     def __call__(self, client, context, next_step):
