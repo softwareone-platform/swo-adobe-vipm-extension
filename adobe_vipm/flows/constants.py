@@ -55,9 +55,7 @@ REQUIRED_CUSTOMER_ORDER_PARAMS = (
     PARAM_CONTACT,
 )
 OPTIONAL_CUSTOMER_ORDER_PARAMS = (PARAM_3YC, PARAM_3YC_CONSUMABLES, PARAM_3YC_LICENSES)
-NEW_CUSTOMER_PARAMETERS = (
-    REQUIRED_CUSTOMER_ORDER_PARAMS + OPTIONAL_CUSTOMER_ORDER_PARAMS
-)
+NEW_CUSTOMER_PARAMETERS = REQUIRED_CUSTOMER_ORDER_PARAMS + OPTIONAL_CUSTOMER_ORDER_PARAMS
 
 PARAM_PHASE_ORDERING = "ordering"
 PARAM_PHASE_FULFILLMENT = "fulfillment"
@@ -114,9 +112,7 @@ ERR_ADDRESS_LINE_2_LENGTH = (
     "The provided `Address line 2` is too long, the maximum "
     f"length is {MAXLEN_ADDRESS_LINE_2} characters"
 )
-ERR_CITY_LENGTH = (
-    f"The provided `City` is too long, the maximum length is {MAXLEN_CITY} characters"
-)
+ERR_CITY_LENGTH = f"The provided `City` is too long, the maximum length is {MAXLEN_CITY} characters"
 ERR_CONTACT = ValidationError(
     "VIPM0011",
     "The `{title}` contains invalid components: {errors}.",
@@ -144,14 +140,12 @@ ERR_VIPM_UNHANDLED_EXCEPTION = ValidationError(
 
 ERR_3YC_QUANTITY_LICENSES = ValidationError(
     "VIPM0013",
-    "The `{title}` must be an integer "
-    f"number equal to {MINQTY_LICENSES} or greater.",
+    "The `{title}` must be an integer " f"number equal to {MINQTY_LICENSES} or greater.",
 )
 
 ERR_3YC_QUANTITY_CONSUMABLES = ValidationError(
     "VIPM0014",
-    "The `{title}` must be an integer "
-    f"number equal to {MINQTY_CONSUMABLES} or greater.",
+    "The `{title}` must be an integer " f"number equal to {MINQTY_CONSUMABLES} or greater.",
 )
 
 ERR_3YC_NO_MINIMUMS = ValidationError(
@@ -190,8 +184,8 @@ TEMPLATE_NAME_PURCHASE = "Purchase"
 TEMPLATE_NAME_CHANGE = "Change"
 TEMPLATE_NAME_DELAYED = "Delayed"
 TEMPLATE_NAME_TERMINATION = "Termination"
-TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE="EnableAutoRenewal"
-TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE="DisableAutoRenewal"
+TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE = "EnableAutoRenewal"
+TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE = "DisableAutoRenewal"
 
 MARKET_SEGMENT_COMMERCIAL = "COM"
 MARKET_SEGMENT_EDUCATION = "EDU"
@@ -207,9 +201,7 @@ ERR_INVALID_DOWNSIZE_QUANTITY = ValidationError(
     "VIPM0019", "Could not find suitable returnable orders for all items.\n{messages}"
 )
 
-ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = (
-    " or any combination of these values,"
-)
+ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = " or any combination of these values,"
 
 ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
     "Cannot reduce item `{item}` quantity by {delta}. "
@@ -221,7 +213,7 @@ ERR_INVALID_TERMINATION_ORDER_QUANTITY = ValidationError(
     "VIPM0033",
     "Cannot return the entire quantity of all subscriptions in this order. "
     "Consider disabling auto-renewal for these subscriptions "
-    "instead using a Configuration Order."
+    "instead using a Configuration Order.",
 )
 
 ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
@@ -254,12 +246,12 @@ ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION = ValidationError(
     "{error}",
 )
 
-ERR_COMMITMENT_3YC_LICENSES =(
+ERR_COMMITMENT_3YC_LICENSES = (
     "The quantity selected of {selected_licenses} would place the account below the "
     "minimum commitment of {minimum_licenses} licenses for the three-year commitment."
 )
 
-ERR_COMMITMENT_3YC_CONSUMABLES =(
+ERR_COMMITMENT_3YC_CONSUMABLES = (
     "The quantity selected of {selected_consumables} would place the account below the "
     "minimum commitment of {minimum_consumables} consumables for the three-year commitment."
 )
@@ -271,7 +263,7 @@ ERR_COMMITMENT_3YC_VALIDATION = ValidationError(
 
 ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT = ValidationError(
     "VIPM0035",
-    "The 3-year commitment is in status {status}. Please contact support to renew the commitment."
+    "The 3-year commitment is in status {status}. Please contact support to renew the commitment.",
 )
 
 ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
@@ -331,9 +323,7 @@ ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED = ValidationError(
     "Membership has already been migrated.",
 )
 
-ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR = ValidationError(
-    "VIPM0031", "{error}"
-)
+ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR = ValidationError("VIPM0031", "{error}")
 
 ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
     "No subscriptions found without deployment ID to be added to the main agreement",
