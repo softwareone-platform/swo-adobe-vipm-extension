@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import threading
 import time
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 HANDLED_SIGNALS = (signal.SIGINT, signal.SIGTERM)
-PROCESS_CHECK_INTERVAL_SECS = 5
+PROCESS_CHECK_INTERVAL_SECS = int(os.environ.get("PROCESS_CHECK_INTERVAL_SECS", 5))
 
 
 def _display_path(path):
