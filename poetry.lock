@@ -1463,14 +1463,14 @@ files = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "4.2.0"
+version = "5.1.1"
 description = "Extensions SDK for SoftwareONE Marketplace Platform"
 optional = false
 python-versions = "<4,>=3.12"
 groups = ["main"]
 files = [
-    {file = "mpt_extension_sdk-4.2.0-py3-none-any.whl", hash = "sha256:9b2a665a5beb35eda7dd5916de7510569876fb306cfdbb1ca908c8e95bb6da07"},
-    {file = "mpt_extension_sdk-4.2.0.tar.gz", hash = "sha256:93a1c0200e731dc4a0e85594073bb9db73dd720dd2ebf4eb2821be15f92ab6d5"},
+    {file = "mpt_extension_sdk-5.1.1-py3-none-any.whl", hash = "sha256:304a11a2f1b5e88294095aa5d98b12f08a8689e61d30e542ea4fe78dc6970748"},
+    {file = "mpt_extension_sdk-5.1.1.tar.gz", hash = "sha256:8cce7682ffcf2e29ceae4da7976604db4ac7018465b1409d10f8add3fa62d92e"},
 ]
 
 [package.dependencies]
@@ -3716,4 +3716,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4"
-content-hash = "40c5a3fa58f2d19fa0362bd825875f4f6d1ff54a21f1458a45178fa9f446f489"
+content-hash = "0e2a88c44298ea1b1fc4e5517134ee7178e51e1a91fd359f4d1aca62ce9684fa"
