@@ -2,15 +2,13 @@ from unittest.mock import DEFAULT
 
 import pytest
 from django.core.management import call_command
-from mpt_extension_sdk.mpt_http.base import MPTClient
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_process_sync_agreements(mocker, dry_run):
-    mocked_client = mocker.MagicMock(spec=MPTClient)
+def test_process_sync_agreements(mocker, dry_run, mock_mpt_client):
     mocker.patch(
         "adobe_vipm.management.commands.sync_agreements.setup_client",
-        return_value=mocked_client,
+        return_value=mock_mpt_client,
         spec=True,
     )
     mocked = mocker.patch.multiple(
@@ -24,7 +22,7 @@ def test_process_sync_agreements(mocker, dry_run):
     call_command("sync_agreements", dry_run=dry_run)
 
     for v in mocked.values():
-        v.assert_called_once_with(mocked_client, dry_run)
+        v.assert_called_once_with(mock_mpt_client, dry_run)
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
