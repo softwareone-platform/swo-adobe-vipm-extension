@@ -16,7 +16,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
-    SyncAgreement,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.fulfillment.termination import (
@@ -271,7 +270,6 @@ def test_fulfill_termination_order(mocker):
         Validate3YCCommitment,
         SubmitReturnOrders,
         CompleteOrder,
-        SyncAgreement,
     ]
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]

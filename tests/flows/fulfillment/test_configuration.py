@@ -5,7 +5,6 @@ from adobe_vipm.flows.fulfillment.configuration import (
     SubscriptionUpdateAutoRenewal,
     fulfill_configuration_order,
 )
-from adobe_vipm.flows.fulfillment.shared import SyncAgreement
 from adobe_vipm.flows.pipeline import Step
 
 
@@ -415,7 +414,7 @@ def test_fulfill_configuration_order(mocker):
 
     fulfill_configuration_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
 
     expected_steps = [
         Step,
@@ -425,7 +424,6 @@ def test_fulfill_configuration_order(mocker):
         Step,
         SubscriptionUpdateAutoRenewal,
         Step,
-        SyncAgreement,
     ]
     actual_steps = list(mocked_pipeline_ctor.mock_calls[0].args)
 

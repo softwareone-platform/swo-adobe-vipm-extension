@@ -9,7 +9,6 @@ import pytest
 import responses
 from django.conf import settings
 from mpt_extension_sdk.core.events.dataclasses import Event
-from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from rich.highlighter import ReprHighlighter as _ReprHighlighter
 
@@ -1365,14 +1364,6 @@ def mpt_client(settings):
     from mpt_extension_sdk.core.utils import setup_client
 
     return setup_client()
-
-@pytest.fixture()
-def mock_mpt_client(mocker):
-    """
-    Create an instance of the MPT client used by the extension.
-    """
-    return mocker.MagicMock(spec=MPTClient)
-
 
 @pytest.fixture()
 def created_agreement_factory():

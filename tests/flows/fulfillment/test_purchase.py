@@ -43,7 +43,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
-    SyncAgreement,
     ValidateDuplicateLines,
 )
 from adobe_vipm.flows.helpers import (
@@ -754,7 +753,7 @@ def test_fulfill_purchase_order(mocker):
 
     fulfill_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 16
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 15
 
     expected_steps = [
         SetupContext,
@@ -772,7 +771,6 @@ def test_fulfill_purchase_order(mocker):
         SetOrUpdateCotermNextSyncDates,
         UpdatePrices,
         CompleteOrder,
-        SyncAgreement,
     ]
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]

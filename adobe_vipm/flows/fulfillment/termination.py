@@ -22,7 +22,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
-    SyncAgreement,
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
@@ -142,7 +141,6 @@ def fulfill_termination_order(client, order):
         Validate3YCCommitment(),
         SubmitReturnOrders(),
         CompleteOrder(TEMPLATE_NAME_TERMINATION),
-        SyncAgreement(),
     )
     context = Context(order=order)
     pipeline.run(client, context)

@@ -44,7 +44,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
-    SyncAgreement,
     ValidateDuplicateLines,
     switch_order_to_failed,
     switch_order_to_query,
@@ -284,7 +283,6 @@ def fulfill_purchase_order(client, order):
         SetOrUpdateCotermNextSyncDates(),
         UpdatePrices(),
         CompleteOrder(TEMPLATE_NAME_PURCHASE),
-        SyncAgreement(),
     )
 
     context = Context(order=order)
