@@ -38,6 +38,8 @@ services:
     command: bash -c "ruff check . && pytest"
     volumes:
       - .:/extension
+    environment:
+      - PROCESS_CHECK_INTERVAL_SECS=0
     env_file:
       - .env
 
