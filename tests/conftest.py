@@ -1735,7 +1735,8 @@ def mock_gunicorn_logging_config():
         "disable_existing_loggers": False,
         "formatters": {
             "verbose": {
-                "format": "{asctime} {name} {levelname} (pid: {process}) {message}",
+                "format": "{asctime} {name} {levelname} (pid: {process}, thread: {thread})"
+                " {message}",
                 "style": "{",
             },
             "rich": {
