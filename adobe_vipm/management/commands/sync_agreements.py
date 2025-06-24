@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from mpt_extension_sdk.core.utils import setup_client
 
 from adobe_vipm.flows.sync import (
+    sync_agreements_by_3yc_end_date,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_next_sync,
     sync_all_agreements,
@@ -43,11 +44,10 @@ class Command(BaseCommand):
         self.info("Start processing agreements...")
         client = setup_client()
         if options["agreements"]:
-            sync_agreements_by_agreement_ids(
-                client, options["agreements"], options["dry_run"]
-            )
+            sync_agreements_by_agreement_ids(client, options["agreements"], options["dry_run"])
         elif options["all"]:
             sync_all_agreements(client, options["dry_run"])
         else:
             sync_agreements_by_next_sync(client, options["dry_run"])
+            sync_agreements_by_3yc_end_date(client, options["dry_run"])
         self.success("Processing agreements completed.")
