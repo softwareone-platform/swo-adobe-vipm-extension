@@ -1366,12 +1366,25 @@ def mpt_client(settings):
 
     return setup_client()
 
+
 @pytest.fixture()
 def mock_mpt_client(mocker):
     """
     Create an instance of the MPT client used by the extension.
     """
     return mocker.MagicMock(spec=MPTClient)
+
+
+@pytest.fixture()
+def mock_setup_client(mocker, mock_mpt_client):
+    """
+    Create an instance of the MPT client used by the extension.
+    """
+    mocker.patch(
+        "adobe_vipm.management.commands.sync_3yc_enrollments.setup_client",
+        return_value=mock_mpt_client,
+    )
+    return mock_mpt_client
 
 
 @pytest.fixture()
@@ -1940,6 +1953,14 @@ def mock_invalid_env_values(
 @pytest.fixture()
 def mock_worker_initialize(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.initialize")
+
+
+@pytest.fixture()
+def mock_adobe_client(mocker):
+    m = mocker.MagicMock(spec=AdobeClient)
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=m)
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=m)
+    return m
 
 
 @pytest.fixture()
