@@ -54,7 +54,7 @@ MIDDLEWARE = [
     "mpt_extension_sdk.runtime.djapp.middleware.MPTClientMiddleware",
 ]
 
-ROOT_URLCONF = "swo.mpt.extensions.runtime.djapp.conf.urls"
+ROOT_URLCONF = "mpt_extension_sdk.runtime.djapp.conf.urls"
 
 TEMPLATES = [
     {
@@ -163,9 +163,7 @@ USE_APPLICATIONINSIGHTS = os.getenv("USE_APPLICATIONINSIGHTS", "False").lower() 
     "1",
     "t",
 )
-APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv(
-    "APPLICATIONINSIGHTS_CONNECTION_STRING", ""
-)
+APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
 
 MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
 MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
@@ -174,9 +172,6 @@ MPT_API_TOKEN_OPERATIONS = os.getenv("MPT_API_TOKEN_OPERATIONS", "change-me!")
 MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
 MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30
 MPT_PORTAL_BASE_URL = "https://portal.s1.local"
-MPT_NOTIFY_CATEGORIES = json.loads(
-    os.getenv("MPT_NOTIFY_CATEGORIES", '{"ORDERS": "NTC-0000-0006"}')
-)
 
 EXTENSION_CONFIG = {
     "ADOBE_API_BASE_URL": "https://api.adobe",

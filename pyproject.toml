@@ -10,7 +10,7 @@ dependencies = [
     "django==4.2.*",
     "jinja2==3.1.*",
     "markdown-it-py==3.0.*",
-    "mpt-extension-sdk==5.1.*",
+    "mpt-extension-sdk==5.2.*",
     "openpyxl==3.1.*",
     "phonenumbers==8.13.*",
     "pyairtable==2.3.*",
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-swoext = "swo.mpt.extensions.runtime.swoext:main"
+swoext = "mpt_extension_sdk.runtime.swoext:main"
 
 [project.entry-points."swo.mpt.ext"]
 app_config = "adobe_vipm.apps:ExtensionConfig"

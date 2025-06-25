@@ -2,8 +2,8 @@ import logging
 
 import pymsteams
 import pytest
-from mpt_extension_sdk.mpt_http.mpt import NotifyCategories
 
+from adobe_vipm.flows.constants import NOTIFY_CATEGORIES
 from adobe_vipm.notifications import (
     Button,
     FactsSection,
@@ -180,10 +180,9 @@ def test_mpt_notify_exception(mocker, caplog):
             "template_name",
             {"test": "context"},
         )
-
     assert (
         f"Cannot send MPT API notification:"
-        f" Category: '{NotifyCategories.ORDERS.value}',"
+        f" Category: '{NOTIFY_CATEGORIES["ORDERS"]}',"
         f" Account ID: 'account_id',"
         f" Buyer ID: 'buyer_id',"
         f" Subject: 'email-subject',"

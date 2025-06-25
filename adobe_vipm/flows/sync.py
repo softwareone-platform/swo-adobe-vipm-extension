@@ -280,6 +280,27 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
         sync_agreement(mpt_client, agreement, dry_run)
 
 
+def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
+    """
+    Synchronizes agreements by their active subscriptions renewed yesterday.
+    """
+    logger.info("Synchronizing agreements by renewal date...")
+    today = datetime.now().date().isoformat()
+    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
+    rql_query = (
+        "eq(status,Active)&"
+        f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),eq(displayValue,{yesterday})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        # Let's get only what we need
+        "select=subscriptions,authorization,parameters,listing,lines,"
+        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
+        "-externalIds"
+    )
+    for agreement in get_agreements_by_query(mpt_client, rql_query):
+        logger.debug(f"Syncing {agreement=}")
+        sync_agreement(mpt_client, agreement, dry_run)
+
+
 def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
     """
     Get the agreements given a list of agreement IDs
