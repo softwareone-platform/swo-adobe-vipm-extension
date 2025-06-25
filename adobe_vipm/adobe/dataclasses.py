@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
 
 
 @dataclass(frozen=True)
 class Authorization:
     authorization_uk: str
-    authorization_id: Optional[str]
+    authorization_id: str | None
     name: str
     client_id: str
     client_secret: str
@@ -30,7 +29,7 @@ class Reseller:
     id: str
     seller_uk: str
     authorization: Authorization
-    seller_id: Optional[str]
+    seller_id: str | None
 
 
 @dataclass(frozen=True)
@@ -46,11 +45,11 @@ class APIToken:
 class Country:
     code: str
     name: str
-    states_or_provinces: List[str]
-    currencies: List[str]
+    states_or_provinces: list[str]
+    currencies: list[str]
     pricelist_region: str
     postal_code_format_regex: str
-    provinces_to_code: Optional[dict] = None
+    provinces_to_code: dict | None = None
 
 
 @dataclass(frozen=True)

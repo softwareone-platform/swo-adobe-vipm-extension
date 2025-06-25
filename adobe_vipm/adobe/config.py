@@ -1,6 +1,6 @@
 import json
+from collections.abc import MutableMapping
 from importlib.resources import files
-from typing import List, MutableMapping, Tuple
 
 from django.conf import settings
 
@@ -21,8 +21,8 @@ class Config:
     REQUIRED_API_SCOPES = ["openid", "AdobeID", "read_organizations"]
 
     def __init__(self) -> None:
-        self.language_codes: List[str] = []
-        self.resellers: MutableMapping[Tuple[Authorization, str], Reseller] = {}
+        self.language_codes: list[str] = []
+        self.resellers: MutableMapping[tuple[Authorization, str], Reseller] = {}
         self.authorizations: MutableMapping[str, Authorization] = {}
         self.countries: MutableMapping[str, Country] = {}
         self._setup()
@@ -40,7 +40,7 @@ class Config:
         return ",".join(self.REQUIRED_API_SCOPES)
 
     @property
-    def country_codes(self) -> List[str]:
+    def country_codes(self) -> list[str]:
         return list(self.countries.keys())
 
     def get_authorization(self, id: str) -> Authorization:

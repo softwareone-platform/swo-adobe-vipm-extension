@@ -1,12 +1,13 @@
-FROM python:3.12.2-slim-bookworm
-ENV PYTHONUNBUFFERED=1 POETRY_VERSION=1.7.0
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-RUN pip3 install poetry==$POETRY_VERSION
-
+COPY . /extension
 WORKDIR /extension
 
-ADD . /extension
+RUN uv venv /opt/venv
 
-RUN poetry update && poetry install --with dev,runtime,sdk
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+RUN uv sync --frozen --no-cache --all-groups --active
 
 CMD ["swoext", "run", "--no-color"]

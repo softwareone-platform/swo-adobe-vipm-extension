@@ -1,78 +1,87 @@
-[tool.poetry]
+[project]
 name = "swo-adobe-vimp-extension"
 version = "0.1.0"
 description = "Adobe VIP Marketplace extension for SWO Marketplace Platform"
-authors = ["SoftwareOne AG"]
-license = "Apache-2.0 license"
-packages = [
-    { include = "adobe_vipm" }
-]
+authors = [{ name = "SoftwareOne AG" }]
+requires-python = ">=3.12,<4"
 readme = "README.md"
+license = {text = "Apache-2.0 license"}
+dependencies = [
+    "django==4.2.*",
+    "jinja2==3.1.*",
+    "markdown-it-py==3.0.*",
+    "mpt-extension-sdk==5.1.*",
+    "openpyxl==3.1.*",
+    "phonenumbers==8.13.*",
+    "pyairtable==2.3.*",
+    "pymsteams==0.2.*",
+    "regex>=2024.7.24,<2025",
+    "requests==2.32.*",
+    "types-openpyxl==3.1.*",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.12,<4"
-django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
-jinja2 = "3.1.*"
-markdown-it-py = "3.0.*"
-mpt-extension-sdk = "5.1.*"
-openpyxl = "3.1.*"
-phonenumbers = "8.13.*"
-pyairtable = "2.3.*"
-pymsteams = "0.2.*"
-regex = "^2024.7.24"
-requests = "2.32.*"
-types-openpyxl = "3.1.*"
+[project.scripts]
+swoext = "swo.mpt.extensions.runtime.swoext:main"
 
-[tool.poetry.group.dev.dependencies]
-freezegun = "1.4.*"
-ipdb = "0.13.*"
-ipython = "8.*"
-mypy = "1.8.*"
-poetry-plugin-sort = "0.2.*"
-pre-commit = "3.6.*"
-pytest = "7.4.*"
-pytest-cov = "4.1.*"
-pytest-deadfixtures = "2.2.*"
-pytest-django = "4.7.*"
-pytest-mock = "3.12.*"
-pytest-randomly = "3.15.*"
-pytest-xdist = "3.5.*"
-responses = "0.24.*"
-ruff = "0.3.*"
-types-openpyxl = "3.1.*"
-types-requests = "2.31.*"
+[project.entry-points."swo.mpt.ext"]
+app_config = "adobe_vipm.apps:ExtensionConfig"
 
-[tool.poetry.group.sdk.dependencies] # Move to the SDK when splitting
-django-ninja = "1.1.*"
-pyjwt = "2.8.*"
-typing-extensions = "4.9.*"
+[dependency-groups]
+dev = [
+    "freezegun==1.4.*",
+    "ipdb==0.13.*",
+    "ipython==8.*",
+    "mypy==1.8.*",
+    "poetry-plugin-sort==0.2.*",
+    "pre-commit==3.6.*",
+    "pytest==7.4.*",
+    "pytest-cov==4.1.*",
+    "pytest-deadfixtures==2.2.*",
+    "pytest-django==4.7.*",
+    "pytest-mock==3.12.*",
+    "pytest-randomly==3.15.*",
+    "pytest-xdist==3.5.*",
+    "responses==0.24.*",
+    "ruff==0.3.*",
+    "types-openpyxl==3.1.*",
+    "types-requests==2.31.*",
+]
+sdk = [
+    "django-ninja==1.1.*",
+    "pyjwt==2.8.*",
+    "typing-extensions==4.9.*",
+]
+runtime = [
+    "azure-monitor-opentelemetry-exporter==1.0.0b25",
+    "click==8.1.*",
+    "debugpy==1.8.*",
+    "gunicorn==23.0.*",
+    "opentelemetry-api==1.30.*",
+    "opentelemetry-instrumentation-django==0.51b0",
+    "opentelemetry-instrumentation-logging==0.51b0",
+    "opentelemetry-instrumentation-requests==0.51b0",
+    "opentelemetry-sdk==1.30.*",
+    "pyfiglet==1.0.*",
+    "rich==13.7.*",
+    "watchfiles==0.21.*",
+]
 
+[tool.uv]
+default-groups = [
+    "dev",
+    "sdk",
+    "runtime",
+]
 
-[tool.poetry.group.runtime.dependencies] # Move to runtime when splitting
-azure-monitor-opentelemetry-exporter = "1.0.0b25"
-click = "8.1.*"
-debugpy = "1.8.*"
-gunicorn = "23.0.*"
-opentelemetry-api = "1.30.*"
-opentelemetry-instrumentation-django = "0.51b0"
-opentelemetry-instrumentation-logging = "0.51b0"
-opentelemetry-instrumentation-requests = "0.51b0"
-opentelemetry-sdk = "1.30.*"
-pyfiglet = "1.0.*"
-rich = "13.7.*"
-watchfiles = "0.21.*"
+[tool.hatch.build.targets.sdist]
+include = ["adobe_vipm"]
 
-[tool.poetry.scripts]
-swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
-
-
-[tool.poetry.plugins."swo.mpt.ext"]
-"app_config" = "adobe_vipm.apps:ExtensionConfig"
-
+[tool.hatch.build.targets.wheel]
+include = ["adobe_vipm"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = "tests"

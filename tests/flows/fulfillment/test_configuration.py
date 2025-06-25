@@ -429,7 +429,7 @@ def test_fulfill_configuration_order(mocker):
     ]
     actual_steps = list(mocked_pipeline_ctor.mock_calls[0].args)
 
-    for actual, expected in zip(actual_steps, expected_steps):
+    for actual, expected in zip(actual_steps, expected_steps, strict=False):
         assert isinstance(actual, expected)
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
