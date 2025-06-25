@@ -10,6 +10,7 @@ from adobe_vipm.flows.sync import (
     sync_agreements_by_agreement_ids,
     sync_agreements_by_coterm_date,
     sync_agreements_by_next_sync,
+    sync_agreements_by_renewal_date,
     sync_all_agreements,
 )
 from adobe_vipm.flows.utils import get_adobe_customer_id
@@ -507,6 +508,39 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,cotermDate),eq(displayValue,2025-06-15)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-06-16)))&"
+        "select=subscriptions,authorization,parameters,listing,lines,"
+        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
+        "-externalIds",
+    )
+
+
+@freeze_time("2024-11-09")
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
+    agreement = agreement_factory()
+    mocked_mpt_client = mocker.MagicMock()
+    mocked_get_agreements_by_query = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_query",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mocked_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.sync_agreement",
+        autospec=True,
+    )
+
+    sync_agreements_by_renewal_date(mocked_mpt_client, dry_run)
+
+    mocked_sync_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        agreement,
+        dry_run,
+    )
+    mocked_get_agreements_by_query.assert_called_once_with(
+        mocked_mpt_client,
+        "eq(status,Active)&"
+        "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),eq(displayValue,2024-11-08)))&"
+        "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2024-11-09)))&"
         "select=subscriptions,authorization,parameters,listing,lines,"
         "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
         "-externalIds",
