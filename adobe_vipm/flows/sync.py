@@ -30,6 +30,7 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import (
     PARAM_3YC_END_DATE,
     PARAM_ADOBE_SKU,
+    PARAM_COTERM_DATE,
     PARAM_CURRENT_QUANTITY,
     PARAM_DEPLOYMENT_ID,
     PARAM_LAST_SYNC_DATE,
@@ -247,6 +248,27 @@ def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):
     rql_query = (
         "eq(status,Active)&"
         f"any(parameters.fulfillment,and(eq(externalId,{PARAM_3YC_END_DATE}),eq(displayValue,{yesterday})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        # Let's get only what we need
+        "select=subscriptions,authorization,parameters,listing,lines,"
+        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
+        "-externalIds"
+    )
+    for agreement in get_agreements_by_query(mpt_client, rql_query):
+        logger.debug(f"Syncing {agreement=}")
+        sync_agreement(mpt_client, agreement, dry_run)
+
+
+def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
+    """
+    Synchronizes agreements by their active subscriptions renewed yesterday.
+    """
+    logger.info("Synchronizing agreements by cotermDate...")
+    today = datetime.now().date().isoformat()
+    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
+    rql_query = (
+        "eq(status,Active)&"
+        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_COTERM_DATE}),eq(displayValue,{yesterday})))&"
         f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
         "select=subscriptions,authorization,parameters,listing,lines,"
