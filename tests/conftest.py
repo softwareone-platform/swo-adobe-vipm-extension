@@ -1943,6 +1943,14 @@ def mock_worker_initialize(mocker):
 
 
 @pytest.fixture()
+def mock_adobe_client(mocker):
+    m = mocker.MagicMock(spec=AdobeClient)
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=m)
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=m)
+    return m
+
+
+@pytest.fixture()
 def mock_worker_call_command(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.call_command")
 
