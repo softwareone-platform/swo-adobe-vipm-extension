@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement_subscription,
+    get_agreements_by_3yc_enroll_status,
     get_agreements_by_customer_deployments,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
@@ -17,8 +18,10 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACCEPTED,
     STATUS_3YC_ACTIVE,
     STATUS_3YC_COMMITTED,
+    STATUS_3YC_REQUESTED,
     STATUS_SUBSCRIPTION_TERMINATED,
 )
 from adobe_vipm.adobe.errors import CustomerDiscountsNotFoundError
@@ -29,6 +32,7 @@ from adobe_vipm.airtable.models import (
 )
 from adobe_vipm.flows.constants import (
     PARAM_3YC_END_DATE,
+    PARAM_3YC_ENROLL_STATUS,
     PARAM_ADOBE_SKU,
     PARAM_COTERM_DATE,
     PARAM_CURRENT_QUANTITY,
@@ -48,6 +52,8 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+
+TEMP_3YC_STATUSES = (STATUS_3YC_REQUESTED, STATUS_3YC_ACCEPTED)
 
 logger = logging.getLogger(__name__)
 
@@ -314,6 +320,50 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
     """
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
+        sync_agreement(mpt_client, agreement, dry_run)
+
+
+def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = True) -> None:
+    """
+    This function retrieves agreements filtered by their 3YC enrollment status and synchronizes
+    their corresponding statuses.
+    """
+    agreements = get_agreements_by_3yc_enroll_status(mpt_client, TEMP_3YC_STATUSES)
+    for agreement in agreements:
+        try:
+            logger.info(f"Checking 3YC enroll status for agreement {agreement['id']}")
+            _sync_3yc_enroll_status(mpt_client, agreement, dry_run)
+        except Exception as e:
+            logger.error(
+                f"Error synchronizing 3YC enroll status for agreement {agreement['id']}: {e}"
+            )
+
+
+def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: bool) -> None:
+    adobe_client = get_adobe_client()
+    customer = adobe_client.get_customer(
+        authorization_id=agreement["authorization"]["id"],
+        customer_id=get_adobe_customer_id(agreement),
+    )
+    commitment = get_3yc_commitment(customer)
+    enroll_status = commitment["status"]
+    logger.debug(
+        f"Commitment Status for Adobe customer {customer['customerId']} is {enroll_status}"
+    )
+
+    if enroll_status in TEMP_3YC_STATUSES:
+        logger.info(f"Updating 3YC enroll status for agreement {agreement['id']}")
+        if not dry_run:
+            update_agreement(
+                mpt_client,
+                agreement["id"],
+                parameters={
+                    PARAM_PHASE_FULFILLMENT: [
+                        {"externalId": PARAM_3YC_ENROLL_STATUS, "value": enroll_status}
+                    ]
+                },
+            )
+    else:
         sync_agreement(mpt_client, agreement, dry_run)
 
 
