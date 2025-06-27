@@ -484,6 +484,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0002",
@@ -495,6 +496,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0003",
@@ -506,6 +508,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0004",
@@ -517,6 +520,7 @@ def transfer_order_parameters_factory():
                     "hidden": False,
                     "required": True,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0005",
@@ -528,6 +532,7 @@ def transfer_order_parameters_factory():
                     "hidden": False,
                     "required": True,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0006",
@@ -539,6 +544,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0007",
@@ -550,6 +556,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0008",
@@ -561,6 +568,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
         ]
 

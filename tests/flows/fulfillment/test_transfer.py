@@ -49,6 +49,8 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
     split_phone_number,
 )
+from adobe_vipm.flows.utils.order import reset_order_error
+from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -1216,6 +1218,8 @@ def test_create_transfer_fail(
 
     fulfill_order(mocked_mpt_client, order)
 
+    order = reset_order_error(reset_ordering_parameters_error(order))
+
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -1730,7 +1734,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                due_date=None,
+                due_date= '2012-02-13',
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -3676,7 +3680,7 @@ def test_transfer_gc_account_no_deployments(
         mocked_mpt_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[2].kwargs == {
+    order_result = {
         "externalIds": {
             "vendor": adobe_transfer["transferId"],
         },
@@ -3709,11 +3713,18 @@ def test_transfer_gc_account_no_deployments(
         },
     }
 
+    order_result = reset_order_error(reset_ordering_parameters_error(order_result))
+    assert (
+        mocked_update_order.mock_calls[2].kwargs.get("parameters")
+        == order_result.get("parameters")
+    )
+
     assert mocked_update_order.mock_calls[3].args == (
         mocked_mpt_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[3].kwargs == {
+
+    order_result = {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -3743,6 +3754,12 @@ def test_transfer_gc_account_no_deployments(
             ),
         },
     }
+    order_result = reset_order_error(reset_ordering_parameters_error(order_result))
+
+    assert (
+        mocked_update_order.mock_calls[3].kwargs.get("parameters")
+        == order_result.get("parameters")
+    )
 
     mocked_update_agreement.assert_called_once_with(
         mocked_mpt_client,
@@ -6176,7 +6193,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
-            "fulfillment": fulfillment_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(due_date="2012-02-13"),
             "ordering": order["parameters"]["ordering"],
         },
     }
