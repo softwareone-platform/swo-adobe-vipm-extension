@@ -336,7 +336,6 @@ class SetupTransferContext(Step):
         context.transfer = transfer
         context.authorization = authorization
         context.membership_id = membership_id
-        context.transfer_found = True if transfer else False
 
         next_step(mpt_client, context)
 
@@ -351,8 +350,7 @@ class ValidateTransferStatus(Step):
         if transfer.status == STATUS_RUNNING:
             self._set_transfer_error(context, order, "Migration in progress, retry later")
             return
-
-        if transfer.status == STATUS_SYNCHRONIZED:
+        elif transfer.status == STATUS_SYNCHRONIZED:
             self._set_transfer_error(context, order, "Membership has already been migrated")
             return
 
@@ -372,8 +370,7 @@ class ValidateTransferStatus(Step):
 
 class FetchTransferData(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer_found:
-            # No transfer, saltar a validación de no migrado
+        if not context.transfer:
             next_step(mpt_client, context)
             return
 
@@ -407,7 +404,7 @@ class FetchTransferData(Step):
 
 class ValidateInactiveAccount(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer_found:
+        if not context.transfer:
             next_step(mpt_client, context)
             return
 
@@ -426,7 +423,7 @@ class ValidateInactiveAccount(Step):
 
 class UpdateSubscriptionSkus(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer_found:
+        if not context.transfer:
             next_step(mpt_client, context)
             return
 
@@ -440,7 +437,7 @@ class UpdateSubscriptionSkus(Step):
 
 class FetchCustomerAndValidateEmptySubscriptions(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer_found:
+        if not context.transfer:
             next_step(mpt_client, context)
             return
 
@@ -465,7 +462,6 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
                 )
                 context.validation_succeeded = False
                 return
-            # No error, just skip
             context.validation_succeeded = True
             return
 
@@ -473,7 +469,7 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
 
 class AddLinesToOrder(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer_found:
+        if not context.transfer:
             has_error, order = validate_transfer_not_migrated(
                 mpt_client, context.order
             )
