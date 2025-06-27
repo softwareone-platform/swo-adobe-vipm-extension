@@ -46,8 +46,8 @@ def validate_order(client, order):
 
         if order["type"] in validators:
             has_errors, order = validators[order["type"]](client, order)
+            order = update_parameters_visibility(order)
 
-        order = update_parameters_visibility(order)
 
         if not order["lines"]:  # pragma: no cover
             del order["lines"]
