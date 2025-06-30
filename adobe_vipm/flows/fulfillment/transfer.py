@@ -463,7 +463,7 @@ def _transfer_migrated(
     )
     if items_with_deployment_id:
         _manage_order_with_deployment_id(
-            order, adobe_transfer, gc_main_agreement, items_with_deployment_id
+            mpt_client, order, adobe_transfer, gc_main_agreement, items_with_deployment_id
         )
         return
 
@@ -983,7 +983,7 @@ def _get_order_line_items_with_deployment_id(adobe_transfer_order, order):
 
 
 def _manage_order_with_deployment_id(
-    order, adobe_transfer_order, gc_main_agreement, items_with_deployment
+    mpt_client, order, adobe_transfer_order, gc_main_agreement, items_with_deployment
 ):
     """
     Manages the order with items that contain deployment ID. A new notification is
@@ -997,10 +997,8 @@ def _manage_order_with_deployment_id(
     Returns:
         None
     """
-    logger.warning(
-        "Order contains items with deployment ID, keep in pending to be reviewed"
-    )
-    send_gc_mpt_notification(order, items_with_deployment)
+    logger.warning("Order contains items with deployment ID, keep in pending to be reviewed")
+    send_gc_mpt_notification(mpt_client, order, items_with_deployment)
     if gc_main_agreement:
         gc_main_agreement.status = STATUS_GC_ERROR
         gc_main_agreement.error_description = "Order contains items with deployment ID"
@@ -1131,7 +1129,7 @@ def fulfill_transfer_order(mpt_client, order):
     )
     if items_with_deployment_id:
         _manage_order_with_deployment_id(
-            order, adobe_transfer_order, gc_main_agreement, items_with_deployment_id
+            mpt_client, order, adobe_transfer_order, gc_main_agreement, items_with_deployment_id
         )
         return
 

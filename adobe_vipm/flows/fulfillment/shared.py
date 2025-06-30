@@ -470,19 +470,19 @@ def save_next_sync_and_coterm_dates(client, order, coterm_date):
     return order
 
 
-def send_mpt_notification(client: MPTClient, order: dict) -> None:
+def send_mpt_notification(mpt_client: MPTClient, order: dict) -> None:
     """
     Send an MPT notification to the customer according to the
     current order status.
     It embeds the current order template into the body.
 
     Args:
-        client (MPTClient): The client used to consume the MPT API.
+        mpt_client (MPTClient): The client used to consume the MPT API.
         order (dict): The order for which the notification should be sent.
     """
     context = {
         "order": order,
-        "activation_template": md2html(get_rendered_template(client, order["id"])),
+        "activation_template": md2html(get_rendered_template(mpt_client, order["id"])),
         "api_base_url": settings.MPT_API_BASE_URL,
         "portal_base_url": settings.MPT_PORTAL_BASE_URL,
     }
@@ -496,6 +496,7 @@ def send_mpt_notification(client: MPTClient, order: dict) -> None:
             f"for {order['agreement']['buyer']['name']}"
         )
     mpt_notify(
+        mpt_client,
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
@@ -529,6 +530,7 @@ def set_customer_coterm_date_if_null(client, adobe_client, order):
     order = set_coterm_date(order, coterm_date)
     update_order(client, order["id"], parameters=order["parameters"])
     return order
+
 
 def get_configuration_template_name(order):
     """
@@ -1053,7 +1055,7 @@ class ValidateDuplicateLines(Step):
         next_step(client, context)
 
 
-def send_gc_mpt_notification(order: dict, items_with_deployment: list) -> None:
+def send_gc_mpt_notification(mpt_client, order: dict, items_with_deployment: list) -> None:
     """Send MPT API notification to the subscribers according to the
     current order status.
     It embeds the current order template.
@@ -1084,6 +1086,7 @@ def send_gc_mpt_notification(order: dict, items_with_deployment: list) -> None:
     )
 
     mpt_notify(
+        mpt_client,
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
