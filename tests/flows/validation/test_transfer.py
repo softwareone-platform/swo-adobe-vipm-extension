@@ -26,8 +26,6 @@ from adobe_vipm.flows.constants import (
     PARAM_MEMBERSHIP_ID,
 )
 from adobe_vipm.flows.utils import get_ordering_parameter
-from adobe_vipm.flows.utils.order import reset_order_error
-from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 from adobe_vipm.flows.validation.transfer import get_prices, validate_transfer
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
@@ -623,11 +621,10 @@ def test_validate_transfer_already_migrated_all_items_expired(
 
     assert has_errors is False
 
-    order = reset_order_error(reset_ordering_parameters_error(order))
-    assert validated_order["parameters"] == order["parameters"]
+    assert validated_order == order
 
     mocked_get_transfer.assert_called_once_with(
-        ANY,
+        order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
@@ -706,12 +703,9 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
 
     assert has_errors is False
 
-
-    order = reset_order_error(reset_ordering_parameters_error(order))
-
-    assert validated_order["parameters"] == order["parameters"]
+    assert validated_order == order
     mocked_get_transfer.assert_called_once_with(
-        ANY,
+        order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
@@ -810,11 +804,10 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
 
     assert has_errors is False
 
-    order = reset_order_error(reset_ordering_parameters_error(order))
-    assert validated_order["parameters"] == order["parameters"]
+    assert validated_order == order
 
     mocked_get_transfer.assert_called_once_with(
-        ANY,
+        order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
@@ -922,11 +915,9 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
 
     assert has_errors is False
 
-    order = reset_order_error(reset_ordering_parameters_error(order))
-
-    assert validated_order['parameters'] == order['parameters']
+    assert validated_order == order
     mocked_get_transfer.assert_called_once_with(
-        ANY,
+        order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
@@ -1060,11 +1051,10 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
 
     assert has_errors is False
 
-    order = reset_order_error(reset_ordering_parameters_error(order))
-    assert validated_order["parameters"] == order["parameters"]
+    assert validated_order == order
 
     mocked_get_transfer.assert_called_once_with(
-        ANY,
+        order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
@@ -1177,12 +1167,9 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
 
     assert has_errors is False
-
-    order = reset_order_error(reset_ordering_parameters_error(order))
-    assert validated_order["parameters"] == order["parameters"]
-    #assert validated_order == order
+    assert validated_order == order
     mocked_get_transfer.assert_called_once_with(
-        ANY,
+        order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
