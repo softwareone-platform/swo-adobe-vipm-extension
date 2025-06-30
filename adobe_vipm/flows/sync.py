@@ -116,6 +116,8 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
 
     prices = get_sku_price(customer, skus, product_id, currency)
 
+    last_sync_date = datetime.now().date().isoformat()
+
     for subscription, adobe_subscription, actual_sku in to_update:
         if actual_sku not in prices:
             logger.error(
@@ -151,6 +153,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                     "externalId": PARAM_RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
+                {"externalId": "lastSyncDate", "value": last_sync_date},
             ],
         }
 

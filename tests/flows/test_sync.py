@@ -167,6 +167,7 @@ def test_sync_agreement_prices(
                         "externalId": "renewalDate",
                         "value": adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-23"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -194,6 +195,7 @@ def test_sync_agreement_prices(
                         "externalId": "renewalDate",
                         "value": another_adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-23"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -638,6 +640,7 @@ def test_sync_agreement_prices_with_3yc(
                     "externalId": "renewalDate",
                     "value": adobe_subscription["renewalDate"],
                 },
+                {"externalId": "lastSyncDate", "value": "2024-11-09"},
             ]
         },
         commitmentDate="2025-04-04",
@@ -864,6 +867,7 @@ def test_sync_global_customer_parameter(
                             "externalId": "renewalDate",
                             "value": adobe_subscription["renewalDate"],
                         },
+                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
                     ]
                 },
                 commitmentDate="2025-04-04",
@@ -893,6 +897,7 @@ def test_sync_global_customer_parameter(
                             "externalId": "renewalDate",
                             "value": another_adobe_subscription["renewalDate"],
                         },
+                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
                     ]
                 },
                 commitmentDate="2025-04-04",
@@ -922,6 +927,7 @@ def test_sync_global_customer_parameter(
                             "externalId": "renewalDate",
                             "value": adobe_deployment_subscription["renewalDate"],
                         },
+                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
                     ]
                 },
                 commitmentDate="2025-04-04",
@@ -1205,6 +1211,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1232,6 +1239,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": another_adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1261,6 +1269,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": adobe_deployment_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1290,6 +1299,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": another_adobe_deployment_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1473,6 +1483,7 @@ def test_sync_global_customer_update_adobe_error(
                         "externalId": "renewalDate",
                         "value": adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1500,6 +1511,7 @@ def test_sync_global_customer_update_adobe_error(
                         "externalId": "renewalDate",
                         "value": another_adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
