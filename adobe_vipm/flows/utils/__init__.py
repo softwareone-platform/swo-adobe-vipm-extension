@@ -98,7 +98,7 @@ from .three_yc import (
 )
 from .validation import (
     has_valid_returnable_quantity,
+    is_migrate_customer,
     is_purchase_validation_enabled,
-    is_transfer_validation_enabled,
     validate_subscription_and_returnable_orders,
 )

@@ -3,12 +3,13 @@ import traceback
 
 from adobe_vipm.flows import constants
 from adobe_vipm.flows.utils import (
-    get_ordering_parameter,
-    is_transfer_validation_enabled,
     notify_unhandled_exception_in_teams,
     strip_trace_id,
     update_parameters_visibility,
 )
+from adobe_vipm.flows.utils.order import reset_order_error
+from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
+from adobe_vipm.flows.utils.validation import is_migrate_customer
 from adobe_vipm.flows.validation.change import validate_change_order
 from adobe_vipm.flows.validation.purchase import validate_purchase_order
 from adobe_vipm.flows.validation.termination import validate_termination_order
@@ -30,16 +31,18 @@ def validate_order(client, order):
     """
     try:
         has_errors = False
-        agreement_type = get_ordering_parameter(order, constants.PARAM_AGREEMENT_TYPE).get("value")
 
-        def validate_purchase_or_transfer(client, order):
-            if agreement_type == "Migrate" and is_transfer_validation_enabled(order):
+        order = reset_ordering_parameters_error(order)
+        order = reset_order_error(order)
+
+        def validate_purchase(client, order):
+            if is_migrate_customer(order):
                 return validate_transfer(client, order)
             else:
                 return validate_purchase_order(client, order)
 
         validators = {
-            constants.ORDER_TYPE_PURCHASE: validate_purchase_or_transfer,
+            constants.ORDER_TYPE_PURCHASE: validate_purchase,
             constants.ORDER_TYPE_CHANGE: validate_change_order,
             constants.ORDER_TYPE_TERMINATION: validate_termination_order,
         }
@@ -49,8 +52,7 @@ def validate_order(client, order):
             order = update_parameters_visibility(order)
 
 
-        if not order["lines"]:  # pragma: no cover
-            del order["lines"]
+
 
         logger.info(
             f"Validation of order {order['id']} succeeded "
