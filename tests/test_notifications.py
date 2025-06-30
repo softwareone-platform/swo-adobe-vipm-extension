@@ -14,7 +14,6 @@ from adobe_vipm.notifications import (
     send_notification,
     send_warning,
 )
-from adobe_vipm.shared import mpt_client
 
 
 def test_send_notification_full(mocker, settings):
@@ -136,7 +135,7 @@ def test_send_others(mocker, function, color, icon):
     )
 
 
-def test_mpt_notify(mocker):
+def test_mpt_notify(mocker, mock_mpt_client):
     mocked_template = mocker.MagicMock()
     mocked_template.render.return_value = "rendered-template"
     mocked_jinja_env = mocker.MagicMock()
@@ -145,13 +144,18 @@ def test_mpt_notify(mocker):
 
     mocked_notify = mocker.patch("adobe_vipm.notifications.notify", autospec=True)
     mpt_notify(
-        "account_id", "buyer_id", "email-subject", "template_name", {"test": "context"}
+        mock_mpt_client,
+        "account_id",
+        "buyer_id",
+        "email-subject",
+        "template_name",
+        {"test": "context"},
     )
 
     mocked_jinja_env.get_template.assert_called_once_with("template_name.html")
     mocked_template.render.assert_called_once_with({"test": "context"})
     mocked_notify.assert_called_once_with(
-        mpt_client,
+        mock_mpt_client,
         "NTC-0000-0006",
         "account_id",
         "buyer_id",
@@ -160,7 +164,7 @@ def test_mpt_notify(mocker):
     )
 
 
-def test_mpt_notify_exception(mocker, caplog):
+def test_mpt_notify_exception(mocker, mock_mpt_client, caplog):
     mocked_template = mocker.MagicMock()
     mocked_template.render.return_value = "rendered-template"
     mocked_jinja_env = mocker.MagicMock()
@@ -174,6 +178,7 @@ def test_mpt_notify_exception(mocker, caplog):
     )
     with caplog.at_level(logging.ERROR):
         mpt_notify(
+            mock_mpt_client,
             "account_id",
             "buyer_id",
             "email-subject",
