@@ -3,12 +3,10 @@ from datetime import date
 
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement,
-    get_licensee,
     get_product_items_by_skus,
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import (
     STATUS_3YC_COMMITTED,
     STATUS_TRANSFER_INACTIVE_ACCOUNT,
@@ -49,8 +47,6 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_ordering_parameter_error,
 )
-from adobe_vipm.flows.utils.order import reset_order_error
-from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -317,41 +313,39 @@ def validate_transfer_not_migrated(mpt_client, order):
 class SetupTransferContext(Step):
     def __call__(self, mpt_client, context, next_step):
         context.validation_succeeded = True
-        config = get_config()
-        context.order = reset_ordering_parameters_error(context.order)
-        context.order = reset_order_error(context.order)
         context.order["agreement"] = get_agreement(mpt_client, context.order["agreement"]["id"])
-        context.order["agreement"]["licensee"] = get_licensee(
-            mpt_client, context.order["agreement"]["licensee"]["id"]
-        )
+
         product_id = context.order["agreement"]["product"]["id"]
         authorization_id = context.order["authorization"]["id"]
-        authorization = config.get_authorization(authorization_id)
-        membership_id = get_adobe_membership_id(context.order)
-        transfer = get_transfer_by_authorization_membership_or_customer(
+        context.membership_id = get_adobe_membership_id(context.order)
+        context.transfer = get_transfer_by_authorization_membership_or_customer(
             product_id,
-            authorization.authorization_id,
-            membership_id,
+            authorization_id,
+            context.membership_id,
         )
-        context.transfer = transfer
-        context.authorization = authorization
-        context.membership_id = membership_id
-
         next_step(mpt_client, context)
 
 class ValidateTransferStatus(Step):
     def __call__(self, mpt_client, context, next_step):
         transfer = context.transfer
         order = context.order
-        if not transfer:
-            next_step(mpt_client, context)
-            return
 
         if transfer.status == STATUS_RUNNING:
             self._set_transfer_error(context, order, "Migration in progress, retry later")
             return
         elif transfer.status == STATUS_SYNCHRONIZED:
             self._set_transfer_error(context, order, "Membership has already been migrated")
+            return
+
+        if context.adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
+            context.order = set_ordering_parameter_error(
+                context.order,
+                PARAM_MEMBERSHIP_ID,
+                ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
+                    status=context.adobe_transfer["status"],
+                )
+            )
+            context.validation_succeeded = False
             return
 
         next_step(mpt_client, context)
@@ -371,18 +365,22 @@ class ValidateTransferStatus(Step):
 class FetchTransferData(Step):
     def __call__(self, mpt_client, context, next_step):
         if not context.transfer:
-            next_step(mpt_client, context)
+            has_error, order = validate_transfer_not_migrated(
+                mpt_client, context.order
+            )
+            context.order = order
+            context.validation_succeeded = not has_error
             return
 
         try:
             adobe_client = get_adobe_client()
             subscriptions = adobe_client.get_subscriptions(
-                context.authorization.authorization_id,
+                context.order["authorization"]["id"],
                 context.transfer.customer_id,
             )
             subscriptions = exclude_subscriptions_with_deployment_id(subscriptions)
             adobe_transfer = adobe_client.get_transfer(
-                context.authorization.authorization_id,
+                context.order["authorization"]["id"],
                 context.transfer.membership_id,
                 context.transfer.transfer_id,
             )
@@ -400,33 +398,11 @@ class FetchTransferData(Step):
 
         context.subscriptions = subscriptions
         context.adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
-        next_step(mpt_client, context)
 
-class ValidateInactiveAccount(Step):
-    def __call__(self, mpt_client, context, next_step):
-        if not context.transfer:
-            next_step(mpt_client, context)
-            return
-
-        adobe_transfer = context.adobe_transfer
-        if adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
-            context.order = set_ordering_parameter_error(
-                context.order,
-                PARAM_MEMBERSHIP_ID,
-                ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
-                    status=adobe_transfer["status"],
-                )
-            )
-            context.validation_succeeded = False
-            return
         next_step(mpt_client, context)
 
 class UpdateSubscriptionSkus(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer:
-            next_step(mpt_client, context)
-            return
-
         for subscription in context.subscriptions["items"]:
             correct_sku = get_transfer_item_sku_by_subscription(
                 context.adobe_transfer,
@@ -437,13 +413,9 @@ class UpdateSubscriptionSkus(Step):
 
 class FetchCustomerAndValidateEmptySubscriptions(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer:
-            next_step(mpt_client, context)
-            return
-
         adobe_client = get_adobe_client()
         customer = adobe_client.get_customer(
-            context.authorization.authorization_id,
+            context.order["authorization"]["id"],
             context.transfer.customer_id
         )
         context.customer = customer
@@ -469,14 +441,6 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
 
 class AddLinesToOrder(Step):
     def __call__(self, mpt_client, context, next_step):
-        if not context.transfer:
-            has_error, order = validate_transfer_not_migrated(
-                mpt_client, context.order
-            )
-            context.order = order
-            context.validation_succeeded = not has_error
-            return
-
         commitment = get_3yc_commitment(context.customer)
         has_error, order = add_lines_to_order(
             mpt_client,
@@ -491,14 +455,10 @@ class AddLinesToOrder(Step):
         next_step(mpt_client, context)
 
 def validate_transfer(mpt_client, order):
-    """
-    Valida una orden de transferencia usando un pipeline de pasos.
-    """
     pipeline = Pipeline(
         SetupTransferContext(),
-        ValidateTransferStatus(),
         FetchTransferData(),
-        ValidateInactiveAccount(),
+        ValidateTransferStatus(),
         UpdateSubscriptionSkus(),
         FetchCustomerAndValidateEmptySubscriptions(),
         AddLinesToOrder(),
