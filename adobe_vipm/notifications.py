@@ -6,17 +6,14 @@ from datetime import datetime
 import pymsteams
 from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import NotifyCategories, notify
-
-from adobe_vipm.shared import mpt_client
 
 logger = logging.getLogger(__name__)
 
 
 def dateformat(date_string):
-    return (
-        datetime.fromisoformat(date_string).strftime("%-d %B %Y") if date_string else ""
-    )
+    return datetime.fromisoformat(date_string).strftime("%-d %B %Y") if date_string else ""
 
 
 env = Environment(
@@ -116,7 +113,12 @@ def send_exception(
 
 
 def mpt_notify(
-    account_id: str, buyer_id: str, subject: str, template_name: str, context: dict
+    mpt_client: MPTClient,
+    account_id: str,
+    buyer_id: str,
+    subject: str,
+    template_name: str,
+    context: dict,
 ) -> None:
     """
     Sends a notification through the MPT API using a specified template and context.
