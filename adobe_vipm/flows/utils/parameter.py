@@ -4,12 +4,14 @@ import functools
 from adobe_vipm.flows.constants import (
     NEW_CUSTOMER_PARAMETERS,
     OPTIONAL_CUSTOMER_ORDER_PARAMS,
+    PARAM_AGREEMENT_TYPE,
     PARAM_COTERM_DATE,
     PARAM_MEMBERSHIP_ID,
     PARAM_NEXT_SYNC_DATE,
     PARAM_PHASE_FULFILLMENT,
     PARAM_PHASE_ORDERING,
     PARAM_RETRY_COUNT,
+    TRANSFER_CUSTOMER_PARAMETERS,
 )
 from adobe_vipm.utils import find_first
 
@@ -79,17 +81,35 @@ def reset_ordering_parameters_error(order):
     return updated_order
 
 def update_parameters_visibility(order):
-    from adobe_vipm.flows.utils.customer import is_new_customer
+    """
+    Update the visibility of parameters based on the agreement type.
+    """
+    agreement_type = get_ordering_parameter(order, PARAM_AGREEMENT_TYPE)
+    agreement_value = agreement_type.get("value")
+    updated_order = copy.deepcopy(order)
 
-    if is_new_customer(order):
-        for param in NEW_CUSTOMER_PARAMETERS:
-            order = set_parameter_visible(order, param)
-        order = set_parameter_hidden(order, PARAM_MEMBERSHIP_ID)
-    else:
-        for param in NEW_CUSTOMER_PARAMETERS:
-            order = set_parameter_hidden(order, param)
-        order = set_parameter_visible(order, PARAM_MEMBERSHIP_ID)
-    return order
+    def set_params_visibility(params, hidden):
+        for param in params:
+            if hidden:
+                updated = set_parameter_hidden
+            else:
+                updated = set_parameter_visible
+            nonlocal updated_order
+            updated_order = updated(updated_order, param)
+
+    if agreement_value == "New":
+        set_params_visibility(NEW_CUSTOMER_PARAMETERS, hidden=False)
+        set_params_visibility(TRANSFER_CUSTOMER_PARAMETERS + (PARAM_MEMBERSHIP_ID,), hidden=True)
+    elif agreement_value == "Migrate":
+        set_params_visibility(NEW_CUSTOMER_PARAMETERS + TRANSFER_CUSTOMER_PARAMETERS, hidden=True)
+        set_params_visibility([PARAM_MEMBERSHIP_ID], hidden=False)
+    elif agreement_value == "Transfer":
+        set_params_visibility(NEW_CUSTOMER_PARAMETERS, hidden=True)
+        set_params_visibility([PARAM_MEMBERSHIP_ID], hidden=True)
+        set_params_visibility(TRANSFER_CUSTOMER_PARAMETERS, hidden=False)
+
+    return updated_order
+
 
 def is_ordering_param_required(source, param_external_id):
     param = get_ordering_parameter(source, param_external_id)
