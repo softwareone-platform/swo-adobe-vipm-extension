@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sys
 import traceback
@@ -263,7 +264,7 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
     _sync_agreements_by_param(mpt_client, PARAM_COTERM_DATE, dry_run)
 
 
-def _sync_agreements_by_param(mpt_client: MPTClient, param, dry_run: bool):
+def _sync_agreements_by_param(mpt_client: MPTClient, param: str, dry_run: bool) -> None:
     today = datetime.now().date().isoformat()
     yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
     rql_query = (
@@ -317,19 +318,29 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
         sync_agreement(mpt_client, agreement, dry_run)
 
 
-def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = True) -> None:
+async def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = True) -> None:
     """
     This function retrieves agreements filtered by their 3YC enrollment status and synchronizes
     their corresponding statuses.
     """
-    try:
-        agreements = get_agreements_by_3yc_enroll_status(mpt_client, TEMP_3YC_STATUSES)
-    except Exception as e:
-        logger.exception(f"Unknown exception getting agreements by 3YC enroll status: {e}")
-        raise
-    for agreement in agreements:
+    enroll_status_queue = asyncio.Queue()
+
+    for agreement in get_agreements_by_3yc_enroll_status(mpt_client, TEMP_3YC_STATUSES):
+        logger.info(f"Queuing 3YC enroll status for agreement {agreement['id']}")
+        await enroll_status_queue.put((mpt_client, agreement, dry_run))
+
+    await enroll_status_queue.put(None)
+
+    await asyncio.gather(_worker_3yc_enroll_status(enroll_status_queue))
+
+
+async def _worker_3yc_enroll_status(queue):
+    while True:
+        item = await queue.get()
+        if not item:
+            break
         try:
-            logger.info(f"Checking 3YC enroll status for agreement {agreement['id']}")
+            mpt_client, agreement, dry_run = item
             _sync_3yc_enroll_status(mpt_client, agreement, dry_run)
         except AuthorizationNotFoundError as e:
             logger.error(

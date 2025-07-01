@@ -73,11 +73,17 @@ default-groups = [
     "runtime",
 ]
 
+[tool.uv.sources]
+mpt-extension-sdk = { path = "../mpt-extension-sdk" }
+
 [tool.hatch.build.targets.sdist]
 include = ["adobe_vipm"]
 
 [tool.hatch.build.targets.wheel]
 include = ["adobe_vipm"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]

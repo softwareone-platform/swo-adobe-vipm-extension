@@ -1,5 +1,7 @@
+import asyncio
+
 from django.core.management.base import BaseCommand
-from mpt_extension_sdk.core.utils import setup_client
+from mpt_extension_sdk.core.utils import mpt_httpx_client
 
 from adobe_vipm.flows.sync import sync_agreements_by_3yc_enroll_status
 
@@ -23,6 +25,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.info("Start processing 3YC enrollment statuses...")
-        mpt_client = setup_client()
-        sync_agreements_by_3yc_enroll_status(mpt_client, options["dry_run"])
+
+        with mpt_httpx_client() as mpt_client, asyncio.Runner() as runner:
+            runner.run(sync_agreements_by_3yc_enroll_status(mpt_client, options["dry_run"]))
+
         self.success("Processing 3YC enrollment statuses completed.")

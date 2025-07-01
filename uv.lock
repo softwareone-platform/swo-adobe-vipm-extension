@@ -873,8 +873,8 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "5.2.0"
-source = { registry = "https://pypi.org/simple" }
+version = "4.1.1"
+source = { directory = "../mpt-extension-sdk" }
 dependencies = [
     { name = "azure-identity" },
     { name = "azure-keyvault-secrets" },
@@ -885,6 +885,7 @@ dependencies = [
     { name = "django" },
     { name = "django-ninja" },
     { name = "gunicorn" },
+    { name = "httpx" },
     { name = "jinja2" },
     { name = "markdown-it-py" },
     { name = "openpyxl" },
@@ -905,9 +906,61 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/60/cb/727586d34de4f71f115aec640e33227494c9cdbc11094caa42ecd6925a0e/mpt_extension_sdk-5.2.0.tar.gz", hash = "sha256:17a4e9df54d3fa1711357f52b9fee6d7f1d1af4603b7b0812d109b669a929c9d", size = 116320 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/8d/18731ca6f44f99940ab70f915eace98f20c4ab8cdf76a4a188a246f30ab1/mpt_extension_sdk-5.2.0-py3-none-any.whl", hash = "sha256:3b0d9925009a7ef6d7780988814a0e6cfb12eaa11458e82b895ab27c465793f1", size = 34200 },
+
+[package.metadata]
+requires-dist = [
+    { name = "azure-identity", specifier = ">=1.21.0,<2" },
+    { name = "azure-keyvault-secrets", specifier = ">=4.9.0,<5" },
+    { name = "azure-monitor-opentelemetry-exporter", specifier = "==1.0.0b25" },
+    { name = "boto3", specifier = "==1.34.*" },
+    { name = "click", specifier = "==8.1.*" },
+    { name = "debugpy", specifier = "==1.8.*" },
+    { name = "django", specifier = "==4.2.*" },
+    { name = "django-ninja", specifier = "==1.1.*" },
+    { name = "gunicorn", specifier = "==23.0.*" },
+    { name = "httpx", specifier = "==0.28.*" },
+    { name = "jinja2", specifier = "==3.1.*" },
+    { name = "markdown-it-py", specifier = "==3.0.*" },
+    { name = "openpyxl", specifier = "==3.1.*" },
+    { name = "opentelemetry-api", specifier = "==1.30.*" },
+    { name = "opentelemetry-instrumentation-django", specifier = "==0.51b0" },
+    { name = "opentelemetry-instrumentation-logging", specifier = "==0.51b0" },
+    { name = "opentelemetry-instrumentation-requests", specifier = "==0.51b0" },
+    { name = "opentelemetry-sdk", specifier = "==1.30.*" },
+    { name = "phonenumbers", specifier = "==8.13.*" },
+    { name = "pyairtable", specifier = "==2.3.*" },
+    { name = "pyfiglet", specifier = "==1.0.*" },
+    { name = "pyjwt", specifier = "==2.8.*" },
+    { name = "pymsteams", specifier = "==0.2.*" },
+    { name = "regex", specifier = ">=2024.7.24,<2025" },
+    { name = "requests", specifier = "==2.32.*" },
+    { name = "rich", specifier = "==13.7.*" },
+    { name = "types-openpyxl", specifier = "==3.1.*" },
+    { name = "typing-extensions", specifier = "==4.9.*" },
+    { name = "watchfiles", specifier = "==0.21.*" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "freezegun", specifier = "==1.4.*" },
+    { name = "ipdb", specifier = "==0.13.*" },
+    { name = "ipython", specifier = "==8.*" },
+    { name = "mypy", specifier = "==1.8.*" },
+    { name = "poetry-plugin-sort", specifier = "==0.2.*" },
+    { name = "pre-commit", specifier = "==3.6.*" },
+    { name = "pytest", specifier = "==8.4.*" },
+    { name = "pytest-asyncio", specifier = "==1.0.*" },
+    { name = "pytest-cov", specifier = "==6.2.*" },
+    { name = "pytest-deadfixtures", specifier = "==2.2.*" },
+    { name = "pytest-django", specifier = "==4.11.*" },
+    { name = "pytest-httpx", specifier = "==0.35.*" },
+    { name = "pytest-mock", specifier = "==3.14.*" },
+    { name = "pytest-randomly", specifier = "==3.16.*" },
+    { name = "pytest-xdist", specifier = "==3.7.*" },
+    { name = "responses", specifier = "==0.24.*" },
+    { name = "ruff", specifier = "==0.3.*" },
+    { name = "types-openpyxl", specifier = "==3.1.*" },
+    { name = "types-requests", specifier = "==2.31.*" },
 ]
 
 [[package]]
@@ -1976,7 +2029,7 @@ requires-dist = [
     { name = "django", specifier = "==4.2.*" },
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "markdown-it-py", specifier = "==3.0.*" },
-    { name = "mpt-extension-sdk", specifier = "==5.2.*" },
+    { name = "mpt-extension-sdk", directory = "../mpt-extension-sdk" },
     { name = "openpyxl", specifier = "==3.1.*" },
     { name = "phonenumbers", specifier = "==8.13.*" },
     { name = "pyairtable", specifier = "==2.3.*" },
