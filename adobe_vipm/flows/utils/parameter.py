@@ -78,7 +78,34 @@ def reset_ordering_parameters_error(order):
 
 
 def update_parameters_visibility(order):
-    from adobe_vipm.flows.utils.customer import is_new_customer
+    """
+    Update the visibility of parameters based on the agreement type.
+    """
+    agreement_type = get_ordering_parameter(order, PARAM_AGREEMENT_TYPE)
+    agreement_value = agreement_type.get("value")
+    updated_order = copy.deepcopy(order)
+
+    def set_params_visibility(params, hidden):
+        for param in params:
+            if hidden:
+                updated = set_parameter_hidden
+            else:
+                updated = set_parameter_visible
+            nonlocal updated_order
+            updated_order = updated(updated_order, param)
+
+    if agreement_value == "New":
+        set_params_visibility(NEW_CUSTOMER_PARAMETERS, hidden=False)
+        set_params_visibility(TRANSFER_CUSTOMER_PARAMETERS + (PARAM_MEMBERSHIP_ID,), hidden=True)
+    elif agreement_value == "Migrate":
+        set_params_visibility(NEW_CUSTOMER_PARAMETERS + TRANSFER_CUSTOMER_PARAMETERS, hidden=True)
+        set_params_visibility([PARAM_MEMBERSHIP_ID], hidden=False)
+    elif agreement_value == "Transfer":
+        set_params_visibility(NEW_CUSTOMER_PARAMETERS, hidden=True)
+        set_params_visibility([PARAM_MEMBERSHIP_ID], hidden=True)
+        set_params_visibility(TRANSFER_CUSTOMER_PARAMETERS, hidden=False)
+
+    return updated_order
 
     if is_new_customer(order):
         for param in PARAM_NEW_CUSTOMER_PARAMETERS:

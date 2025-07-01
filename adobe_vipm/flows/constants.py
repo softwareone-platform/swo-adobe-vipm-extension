@@ -182,6 +182,10 @@ ERR_ADOBE_MEMBERSHIP_PROCESSING = ValidationError(
     "VIPM0032", "Error processing the membership {membership_id}: {error}"
 )
 
+ERR_ADOBE_RESSELLER_CHANGE_PREVIEW = ValidationError(
+    "VIPM0036", "Error processing the reseller change code {reseller_change_code}: {error}"
+)
+
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
 ERR_ADOBE_UNEXPECTED_ERROR = "Adobe returned an unexpected error"
 
