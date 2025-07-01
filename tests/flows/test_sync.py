@@ -1000,6 +1000,7 @@ def test_sync_global_customer_parameter(
         ]
 
 
+@freeze_time("2025-06-30")
 def test_sync_global_customer_update_not_required(
     mocker,
     agreement_factory,
@@ -1320,6 +1321,7 @@ def test_sync_global_customer_update_not_required(
     mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
 
 
+@freeze_time("2025-06-30")
 def test_sync_global_customer_update_adobe_error(
     mocker,
     agreement_factory,
