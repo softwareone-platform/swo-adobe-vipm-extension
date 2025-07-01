@@ -3,10 +3,14 @@ import logging
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe import constants
+from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
+from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
+    TEMP_3YC_STATUSES,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
+    sync_agreements_by_3yc_enroll_status,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_coterm_date,
     sync_agreements_by_next_sync,
@@ -547,6 +551,195 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
         "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
         "-externalIds",
     )
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        constants.STATUS_3YC_ACCEPTED,
+        constants.STATUS_3YC_REQUESTED,
+    ],
+)
+def test_sync_agreements_by_3yc_enroll_status_status(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    status,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_query = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=status)
+    )
+    mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_query.assert_called_once_with(mock_mpt_client, TEMP_3YC_STATUSES)
+    mock_update_agreement.assert_called_once_with(
+        mock_mpt_client,
+        agreement["id"],
+        parameters={"fulfillment": [{"externalId": "3YCEnrollStatus", "value": status}]},
+    )
+    mock_sync_agreement.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        constants.STATUS_3YC_COMMITTED,
+        constants.STATUS_3YC_ACTIVE,
+        constants.STATUS_3YC_DECLINED,
+        constants.STATUS_3YC_NONCOMPLIANT,
+        constants.STATUS_3YC_EXPIRED,
+    ],
+)
+def test_sync_agreements_by_3yc_enroll_status_full(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    status,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=status)
+    )
+    mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client, TEMP_3YC_STATUSES
+    )
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
+
+
+def test_sync_agreements_by_3yc_enroll_status_status_error(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    caplog,
+):
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        side_effect=MPTAPIError(400, {"rql_validation": ["Value has to be a non empty array."]}),
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=constants.STATUS_3YC_EXPIRED)
+    )
+    mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    with pytest.raises(MPTAPIError):
+        sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    assert "Unknown exception getting agreements by 3YC enroll status" in caplog.text
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_not_called()
+
+
+def test_sync_agreements_by_3yc_enroll_status_error_sync(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    caplog,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=constants.STATUS_3YC_COMMITTED)
+    )
+    mock_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.sync_agreement",
+        autospec=True,
+        side_effect=AuthorizationNotFoundError("Authorization with uk/id ID not found."),
+    )
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client, TEMP_3YC_STATUSES
+    )
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
+    assert "Authorization with uk/id ID not found." in caplog.text
+
+
+def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    caplog,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement, agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=constants.STATUS_3YC_COMMITTED)
+    )
+    mock_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.sync_agreement",
+        autospec=True,
+        side_effect=Exception("Unknown exception getting agreements by 3YC enroll status"),
+    )
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client, TEMP_3YC_STATUSES
+    )
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_has_calls(
+        [
+            mocker.call(mock_mpt_client, agreement, False),
+            mocker.call(mock_mpt_client, agreement, False),
+        ]
+    )
+    assert caplog.messages == [
+        "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
+        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962:"
+        " Unknown exception getting agreements by 3YC enroll status",
+        "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
+        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962:"
+        " Unknown exception getting agreements by 3YC enroll status",
+    ]
 
 
 @freeze_time("2024-11-09 12:30:00")
