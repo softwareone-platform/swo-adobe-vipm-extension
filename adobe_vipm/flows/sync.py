@@ -51,8 +51,8 @@ from adobe_vipm.flows.utils import (
 )
 
 TEMP_3YC_STATUSES = (
-    ThreeYearCommitmentStatus.REQUESTED.value,
-    ThreeYearCommitmentStatus.ACCEPTED.value,
+    ThreeYearCommitmentStatus.REQUESTED,
+    ThreeYearCommitmentStatus.ACCEPTED,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,8 +88,8 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
     if (
         commitment
         and commitment["status"] in (
-            ThreeYearCommitmentStatus.COMMITTED.value,
-            ThreeYearCommitmentStatus.ACTIVE.value,
+            ThreeYearCommitmentStatus.COMMITTED,
+            ThreeYearCommitmentStatus.ACTIVE,
         )
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):

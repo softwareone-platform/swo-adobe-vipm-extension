@@ -377,7 +377,7 @@ def check_running_transfers_for_product(product_id):
                             f"{str(e)}",
                         ),
                     )
-        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED.value:
+        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
             subscriptions = client.get_subscriptions(
                 transfer.authorization_uk,
                 transfer.customer_id,

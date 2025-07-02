@@ -36,7 +36,7 @@ def test_get_agreements_by_3yc_commitment_request_status(
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
-        f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED.value},{ThreeYearCommitmentStatus.ACCEPTED.value}))"
+        f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED},{ThreeYearCommitmentStatus.ACCEPTED}))"
         ")"
         ")"
     )
@@ -73,7 +73,7 @@ def test_get_agreements_for_3yc_recommitment(mocker, settings):
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{PARAM_3YC_ENROLL_STATUS}),"
-        f"eq(displayValue,{ThreeYearCommitmentStatus.COMMITTED.value})"
+        f"eq(displayValue,{ThreeYearCommitmentStatus.COMMITTED})"
         ")"
         ")"
     )
@@ -136,11 +136,7 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
     )
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
-    error_statuses = [
-        ThreeYearCommitmentStatus.DECLINED.value,
-        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
-        ThreeYearCommitmentStatus.EXPIRED.value,
-    ]
+    error_statuses = [status.name for status in ThreeYearCommitmentStatus.ERROR_STATUSES]
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("

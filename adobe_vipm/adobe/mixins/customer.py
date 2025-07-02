@@ -65,14 +65,14 @@ class CustomerClientMixin:
             if customer_data["3YCLicenses"]:
                 quantities.append(
                     {
-                        "offerType": OfferType.LICENSE.value,
+                        "offerType": str(OfferType.LICENSE),
                         "quantity": int(customer_data["3YCLicenses"]),
                     },
                 )
             if customer_data["3YCConsumables"]:
                 quantities.append(
                     {
-                        "offerType": OfferType.CONSUMABLES.value,
+                        "offerType": str(OfferType.CONSUMABLES),
                         "quantity": int(customer_data["3YCConsumables"]),
                     },
                 )

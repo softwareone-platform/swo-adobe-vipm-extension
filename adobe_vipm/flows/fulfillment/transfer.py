@@ -295,7 +295,7 @@ def _fulfill_transfer_migrated(
             )
             continue
 
-        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED.value:
+        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
             adobe_subscription = adobe_client.update_subscription(
                 authorization_id,
                 transfer.customer_id,
@@ -858,7 +858,7 @@ def create_agreement_subscriptions(
             continue
 
         commitment = get_3yc_commitment(customer)
-        if commitment.get("status", "") != ThreeYearCommitmentStatus.COMMITTED.value:
+        if commitment.get("status", "") != ThreeYearCommitmentStatus.COMMITTED:
             adobe_subscription = adobe_client.update_subscription(
                 authorization_id,
                 customer_id,
