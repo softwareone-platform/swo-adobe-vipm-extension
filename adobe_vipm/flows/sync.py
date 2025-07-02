@@ -6,7 +6,6 @@ from datetime import date, datetime, timedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement_subscription,
-    get_agreements_by_3yc_enroll_status,
     get_agreements_by_customer_deployments,
     get_agreements_by_ids,
     get_agreements_by_next_sync,
@@ -40,6 +39,7 @@ from adobe_vipm.flows.constants import (
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
 )
+from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
@@ -87,7 +87,8 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
     commitment_start_date = None
     if (
         commitment
-        and commitment["status"] in (
+        and commitment["status"]
+        in (
             ThreeYearCommitmentStatus.COMMITTED,
             ThreeYearCommitmentStatus.ACTIVE,
         )
