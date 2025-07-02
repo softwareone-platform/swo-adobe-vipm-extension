@@ -14,11 +14,11 @@ from mpt_extension_sdk.mpt_http.mpt import get_product_items_by_skus, update_ord
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
@@ -295,7 +295,7 @@ def _fulfill_transfer_migrated(
             )
             continue
 
-        if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
+        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED.value:
             adobe_subscription = adobe_client.update_subscription(
                 authorization_id,
                 transfer.customer_id,
@@ -858,7 +858,7 @@ def create_agreement_subscriptions(
             continue
 
         commitment = get_3yc_commitment(customer)
-        if commitment.get("status", "") != STATUS_3YC_COMMITTED:
+        if commitment.get("status", "") != ThreeYearCommitmentStatus.COMMITTED.value:
             adobe_subscription = adobe_client.update_subscription(
                 authorization_id,
                 customer_id,

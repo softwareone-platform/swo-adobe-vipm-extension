@@ -2,12 +2,7 @@ import pytest
 from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACCEPTED,
-    STATUS_3YC_COMMITTED,
-    STATUS_3YC_DECLINED,
-    STATUS_3YC_EXPIRED,
-    STATUS_3YC_NONCOMPLIANT,
-    STATUS_3YC_REQUESTED,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
@@ -41,7 +36,7 @@ def test_get_agreements_by_3yc_commitment_request_status(
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
-        f"in(displayValue,({STATUS_3YC_REQUESTED},{STATUS_3YC_ACCEPTED}))"
+        f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED.value},{ThreeYearCommitmentStatus.ACCEPTED.value}))"
         ")"
         ")"
     )
@@ -78,7 +73,7 @@ def test_get_agreements_for_3yc_recommitment(mocker, settings):
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{PARAM_3YC_ENROLL_STATUS}),"
-        f"eq(displayValue,{STATUS_3YC_COMMITTED})"
+        f"eq(displayValue,{ThreeYearCommitmentStatus.COMMITTED.value})"
         ")"
         ")"
     )
@@ -141,7 +136,11 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
     )
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
-    error_statuses = [STATUS_3YC_DECLINED, STATUS_3YC_NONCOMPLIANT, STATUS_3YC_EXPIRED]
+    error_statuses = [
+        ThreeYearCommitmentStatus.DECLINED.value,
+        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
+        ThreeYearCommitmentStatus.EXPIRED.value,
+    ]
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("

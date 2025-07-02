@@ -3,9 +3,7 @@ from urllib.parse import urljoin
 import pytest
 
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_DECLINED,
-    STATUS_3YC_EXPIRED,
-    STATUS_3YC_NONCOMPLIANT,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.benefits import (
@@ -153,7 +151,11 @@ def test_check_3yc_commitment_request_not_committed(
 
 @pytest.mark.parametrize("is_recommitment", [False, True])
 @pytest.mark.parametrize(
-    "request_status", [STATUS_3YC_DECLINED, STATUS_3YC_EXPIRED, STATUS_3YC_NONCOMPLIANT]
+    "request_status", [
+        ThreeYearCommitmentStatus.DECLINED.value,
+        ThreeYearCommitmentStatus.EXPIRED.value,
+        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
+    ]
 )
 def test_check_3yc_commitment_request_declined(
     mocker,

@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 
 import requests
 
-from adobe_vipm.adobe.constants import OFFER_TYPE_CONSUMABLES, OFFER_TYPE_LICENSE
+from adobe_vipm.adobe.constants import OfferType
 from adobe_vipm.adobe.dataclasses import Reseller
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.adobe.utils import join_phone_number
@@ -65,14 +65,14 @@ class CustomerClientMixin:
             if customer_data["3YCLicenses"]:
                 quantities.append(
                     {
-                        "offerType": OFFER_TYPE_LICENSE,
+                        "offerType": OfferType.LICENSE.value,
                         "quantity": int(customer_data["3YCLicenses"]),
                     },
                 )
             if customer_data["3YCConsumables"]:
                 quantities.append(
                     {
-                        "offerType": OFFER_TYPE_CONSUMABLES,
+                        "offerType": OfferType.CONSUMABLES.value,
                         "quantity": int(customer_data["3YCConsumables"]),
                     },
                 )

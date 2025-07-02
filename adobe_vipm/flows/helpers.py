@@ -15,13 +15,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACCEPTED,
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_COMMITTED,
-    STATUS_3YC_DECLINED,
-    STATUS_3YC_EXPIRED,
-    STATUS_3YC_NONCOMPLIANT,
-    STATUS_3YC_REQUESTED,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import (
@@ -226,11 +220,18 @@ class Validate3YCCommitment(Step):
         adobe_client = get_adobe_client()
         commitment_status = commitment.get("status",'')
 
-        if commitment_status == STATUS_3YC_REQUESTED and not self.is_validation:
-            logger.info(f"{context}: 3YC commitment request is in status {STATUS_3YC_REQUESTED}")
+        if (commitment_status == ThreeYearCommitmentStatus.REQUESTED.value
+            and not self.is_validation):
+            logger.info(f"{context}: 3YC commitment request is in status "
+                        f"{ThreeYearCommitmentStatus.REQUESTED.value}")
             return
 
-        if self._is_commitment_expired_or_rejected(commitment_status, commitment, context):
+        if commitment_status in [
+            ThreeYearCommitmentStatus.EXPIRED.value,
+            ThreeYearCommitmentStatus.NONCOMPLIANT.value,
+            ThreeYearCommitmentStatus.DECLINED.value,
+        ]:
+            logger.info(f"{context}: 3YC commitment is expired or noncompliant")
             switch_order_to_failed(
                 client,
                 context.order,
@@ -533,9 +534,10 @@ class UpdatePrices(Step):
 
         return (
             commitment["status"] in (
-                STATUS_3YC_COMMITTED,
-                STATUS_3YC_ACTIVE,
-                STATUS_3YC_ACCEPTED)
+                ThreeYearCommitmentStatus.COMMITTED.value,
+                ThreeYearCommitmentStatus.ACTIVE.value,
+                ThreeYearCommitmentStatus.ACCEPTED.value,
+            )
             and date.fromisoformat(commitment["endDate"]) >= date.today()
         )
 

@@ -10,9 +10,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_DECLINED,
-    STATUS_3YC_EXPIRED,
-    STATUS_3YC_NONCOMPLIANT,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment, get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
@@ -146,9 +144,9 @@ def _send_3yc_denied_warning_if_needed(
         request_type_param_phase,
 ):
     if status in (
-        STATUS_3YC_DECLINED,
-        STATUS_3YC_EXPIRED,
-        STATUS_3YC_NONCOMPLIANT,
+        ThreeYearCommitmentStatus.DECLINED.value,
+        ThreeYearCommitmentStatus.EXPIRED.value,
+        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
     ):
         agreement_link = urljoin(
             settings.MPT_PORTAL_BASE_URL,

@@ -1,3 +1,5 @@
+from enum import Enum
+
 import regex as re
 
 STATUS_PROCESSED = "1000"
@@ -77,15 +79,18 @@ REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")
 REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")
 
-# TODO: group make statuses in an enum - will be much clearer and easier to use
-STATUS_3YC_ACCEPTED = "ACCEPTED"
-STATUS_3YC_DECLINED = "DECLINED"
-STATUS_3YC_COMMITTED = "COMMITTED"
-STATUS_3YC_ACTIVE = "ACTIVE"
-STATUS_3YC_REQUESTED = "REQUESTED"
-STATUS_3YC_NONCOMPLIANT = "NONCOMPLIANT"
-STATUS_3YC_EXPIRED = "EXPIRED"
-OFFER_TYPE_LICENSE = "LICENSE"
-OFFER_TYPE_CONSUMABLES = "CONSUMABLES"
+
+class ThreeYearCommitmentStatus(Enum):
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    COMMITTED = "COMMITTED"
+    ACTIVE = "ACTIVE"
+    REQUESTED = "REQUESTED"
+    NONCOMPLIANT = "NONCOMPLIANT"
+    EXPIRED = "EXPIRED"
+
+class OfferType(Enum):
+    LICENSE = "LICENSE"
+    CONSUMABLES = "CONSUMABLES"
 
 CANCELLATION_WINDOW_DAYS = 14

@@ -6,12 +6,7 @@ from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 from mpt_extension_sdk.mpt_http.wrap_http_error import wrap_mpt_http_error
 
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACCEPTED,
-    STATUS_3YC_COMMITTED,
-    STATUS_3YC_DECLINED,
-    STATUS_3YC_EXPIRED,
-    STATUS_3YC_NONCOMPLIANT,
-    STATUS_3YC_REQUESTED,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
@@ -43,7 +38,7 @@ def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
-        f"in(displayValue,({STATUS_3YC_REQUESTED},{STATUS_3YC_ACCEPTED}))"
+        f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED.value},{ThreeYearCommitmentStatus.ACCEPTED.value}))"
         ")"
         ")"
     )
@@ -79,7 +74,11 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
         PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
     )
 
-    error_statuses = [STATUS_3YC_DECLINED, STATUS_3YC_NONCOMPLIANT, STATUS_3YC_EXPIRED]
+    error_statuses = [
+        ThreeYearCommitmentStatus.DECLINED.value,
+        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
+        ThreeYearCommitmentStatus.EXPIRED.value,
+    ]
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
@@ -114,7 +113,7 @@ def get_agreements_for_3yc_recommitment(mpt_client):
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{PARAM_3YC_ENROLL_STATUS}),"
-        f"eq(displayValue,{STATUS_3YC_COMMITTED})"
+        f"eq(displayValue,{ThreeYearCommitmentStatus.COMMITTED.value})"
         ")"
         ")"
     )
