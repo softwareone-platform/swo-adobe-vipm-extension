@@ -14,23 +14,20 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import (
     get_agreements_by_3yc_commitment_request_status,
+    get_agreements_by_3yc_enroll_status,
     get_agreements_for_3yc_recommitment,
     get_agreements_for_3yc_resubmit,
 )
 
 
 @pytest.mark.parametrize("is_recommitment", [True, False])
-def test_get_agreements_by_3yc_commitment_request_status(
-    mocker, settings, is_recommitment
-):
+def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_recommitment):
     param_external_id = (
         PARAM_3YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
-    request_type_param_ext_id = (
-        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
-    )
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
     enroll_status_condition = (
@@ -131,9 +128,7 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
 
-    request_type_param_ext_id = (
-        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
-    )
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
     error_statuses = [status.name for status in ThreeYearCommitmentStatus.ERROR_STATUSES]
@@ -187,3 +182,16 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
         is_recommitment=is_recommitment,
     ) == [get_agreement_by_query]
     mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
+
+
+@pytest.mark.parametrize("status", ["Active", "processing"])
+def test_get_agreements_by_3yc_enroll_status(mock_mpt_client, mock_get_agreements_by_query, status):
+    rql_query = (
+        f"and(eq(status,{status}),any(parameters.fulfillment,and(eq(externalId,3YCEnrollStatus),"
+        "in(displayValue,(REQUESTED,ACCEPTED)))))"
+        "&select=lines,parameters,subscriptions,product,listing"
+    )
+
+    get_agreements_by_3yc_enroll_status(mock_mpt_client, ("REQUESTED", "ACCEPTED"), status=status)
+
+    mock_get_agreements_by_query.assert_called_once_with(mock_mpt_client, rql_query)

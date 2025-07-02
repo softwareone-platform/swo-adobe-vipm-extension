@@ -1,7 +1,9 @@
 import logging
 from datetime import date, timedelta
+from enum import Enum
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 from mpt_extension_sdk.mpt_http.wrap_http_error import wrap_mpt_http_error
 
@@ -28,9 +30,7 @@ def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=
         if not is_recommitment
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
-    request_type_param_ext_id = (
-        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
-    )
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
     request_type_param_phase = (
         PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
     )
@@ -67,9 +67,7 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
 
-    request_type_param_ext_id = (
-        PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
-    )
+    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
     request_type_param_phase = (
         PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
     )
@@ -147,4 +145,20 @@ def get_agreements_for_3yc_recommitment(mpt_client):
     )
 
     rql_query = f"and({','.join(all_conditions)})&select=parameters"
+    return get_agreements_by_query(mpt_client, rql_query)
+
+
+def get_agreements_by_3yc_enroll_status(
+    mpt_client: MPTClient, enroll_statuses: Enum, status: str = "Active"
+):
+    param_condition = (
+        f"any(parameters.fulfillment,"
+        f"and(eq(externalId,3YCEnrollStatus),in(displayValue,({",".join(enroll_statuses)}))))"
+    )
+    status_condition = f"eq(status,{status})"
+
+    rql_query = (
+        f"and({status_condition},{param_condition})"
+        "&select=lines,parameters,subscriptions,product,listing"
+    )
     return get_agreements_by_query(mpt_client, rql_query)
