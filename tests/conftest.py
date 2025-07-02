@@ -16,10 +16,9 @@ from rich.highlighter import ReprHighlighter as _ReprHighlighter
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import (
-    OFFER_TYPE_CONSUMABLES,
-    OFFER_TYPE_LICENSE,
     STATUS_PENDING,
     STATUS_PROCESSED,
+    OfferType,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
@@ -1592,11 +1591,11 @@ def adobe_customer_factory():
             },
             "discounts": [
                 {
-                    "offerType": OFFER_TYPE_LICENSE,
+                    "offerType": OfferType.LICENSE,
                     "level": licenses_discount_level,
                 },
                 {
-                    "offerType": OFFER_TYPE_CONSUMABLES,
+                    "offerType": OfferType.CONSUMABLES,
                     "level": consumables_discount_level,
                 },
             ],
@@ -1780,7 +1779,7 @@ def mock_gunicorn_logging_config():
 
 @pytest.fixture()
 def mock_wrap_event():
-    return Event("evt-id", "orders", {"id": "ORD-1111-1111-1111"})
+    return Event("evt-id", "orders", {"id": "ORD-1111-1111"})
 
 
 @pytest.fixture()

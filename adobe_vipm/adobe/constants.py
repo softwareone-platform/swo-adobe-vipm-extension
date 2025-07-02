@@ -1,3 +1,5 @@
+from enum import Flag, auto
+
 import regex as re
 
 STATUS_PROCESSED = "1000"
@@ -77,15 +79,45 @@ REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")
 REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")
 
-# TODO: group make statuses in an enum - will be much clearer and easier to use
-STATUS_3YC_ACCEPTED = "ACCEPTED"
-STATUS_3YC_DECLINED = "DECLINED"
-STATUS_3YC_COMMITTED = "COMMITTED"
-STATUS_3YC_ACTIVE = "ACTIVE"
-STATUS_3YC_REQUESTED = "REQUESTED"
-STATUS_3YC_NONCOMPLIANT = "NONCOMPLIANT"
-STATUS_3YC_EXPIRED = "EXPIRED"
-OFFER_TYPE_LICENSE = "LICENSE"
-OFFER_TYPE_CONSUMABLES = "CONSUMABLES"
+
+class ThreeYearCommitmentStatus(Flag):
+    ACCEPTED = auto()
+    DECLINED = auto()
+    COMMITTED = auto()
+    ACTIVE = auto()
+    REQUESTED = auto()
+    NONCOMPLIANT = auto()
+    EXPIRED = auto()
+
+    TEMPORARY = REQUESTED | ACCEPTED
+
+    ERROR_STATUSES = DECLINED | NONCOMPLIANT | EXPIRED
+
+    FINISHED_STATUSES = COMMITTED | ACTIVE | ACCEPTED
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.name == other
+        return super().__eq__(other)
+
+    def __str__(self):
+        return self.name
+
+    def __contains__(self, item):
+        if isinstance(item, ThreeYearCommitmentStatus):
+            return bool(self & item)
+        return False
+
+class OfferType(Flag):
+    LICENSE = auto()
+    CONSUMABLES = auto()
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.name == other
+        return super().__eq__(other)
+
+    def __str__(self):
+        return self.name
 
 CANCELLATION_WINDOW_DAYS = 14
