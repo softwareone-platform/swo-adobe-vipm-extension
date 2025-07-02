@@ -104,9 +104,20 @@ class ThreeYearCommitmentStatus(Flag):
         return self.name
 
     def __contains__(self, item):
-        if isinstance(item, ThreeYearCommitmentStatus):
-            return bool(self & item)
-        return False
+        if isinstance(item, str):
+            try:
+                member = getattr(self, item)
+            except AttributeError:
+                return False
+            return self.__contains__(member)
+        return super().__contains__(item)
+
+    def __getattribute__(self, name):
+        if name == "value":
+            return self.name
+
+        return super().__getattribute__(name)
+
 
 class OfferType(Flag):
     LICENSE = auto()
@@ -119,5 +130,6 @@ class OfferType(Flag):
 
     def __str__(self):
         return self.name
+
 
 CANCELLATION_WINDOW_DAYS = 14
