@@ -1591,11 +1591,11 @@ def adobe_customer_factory():
             },
             "discounts": [
                 {
-                    "offerType": OfferType.LICENSE.value,
+                    "offerType": OfferType.LICENSE,
                     "level": licenses_discount_level,
                 },
                 {
-                    "offerType": OfferType.CONSUMABLES.value,
+                    "offerType": OfferType.CONSUMABLES,
                     "level": consumables_discount_level,
                 },
             ],

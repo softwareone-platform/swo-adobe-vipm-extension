@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Flag, auto
 
 import regex as re
 
@@ -80,17 +80,44 @@ REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")
 REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")
 
 
-class ThreeYearCommitmentStatus(Enum):
-    ACCEPTED = "ACCEPTED"
-    DECLINED = "DECLINED"
-    COMMITTED = "COMMITTED"
-    ACTIVE = "ACTIVE"
-    REQUESTED = "REQUESTED"
-    NONCOMPLIANT = "NONCOMPLIANT"
-    EXPIRED = "EXPIRED"
+class ThreeYearCommitmentStatus(Flag):
+    ACCEPTED = auto()
+    DECLINED = auto()
+    COMMITTED = auto()
+    ACTIVE = auto()
+    REQUESTED = auto()
+    NONCOMPLIANT = auto()
+    EXPIRED = auto()
 
-class OfferType(Enum):
-    LICENSE = "LICENSE"
-    CONSUMABLES = "CONSUMABLES"
+    TEMPORARY = REQUESTED | ACCEPTED
+
+    ERROR_STATUSES = DECLINED | NONCOMPLIANT | EXPIRED
+
+    FINISHED_STATUSES = COMMITTED | ACTIVE | ACCEPTED
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.name == other
+        return super().__eq__(other)
+
+    def __str__(self):
+        return self.name
+
+    def __contains__(self, item):
+        if isinstance(item, ThreeYearCommitmentStatus):
+            return bool(self & item)
+        return False
+
+class OfferType(Flag):
+    LICENSE = auto()
+    CONSUMABLES = auto()
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.name == other
+        return super().__eq__(other)
+
+    def __str__(self):
+        return self.name
 
 CANCELLATION_WINDOW_DAYS = 14

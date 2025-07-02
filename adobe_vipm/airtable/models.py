@@ -556,8 +556,8 @@ def get_sku_price(adobe_customer, offer_ids, product_id, deployment_currency):
     if (
         commitment
         and commitment["status"] in (
-            ThreeYearCommitmentStatus.COMMITTED.value,
-            ThreeYearCommitmentStatus.ACTIVE.value,
+            ThreeYearCommitmentStatus.COMMITTED,
+            ThreeYearCommitmentStatus.ACTIVE,
         )
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):

@@ -113,14 +113,14 @@ def set_adobe_customer_id(order, customer_id):
 
 def get_customer_licenses_discount_level(customer):
     licenses_discount = find_first(
-        lambda x: x["offerType"] == OfferType.LICENSE.value, customer["discounts"]
+        lambda x: x["offerType"] == OfferType.LICENSE, customer["discounts"]
     )
     return licenses_discount["level"]
 
 
 def get_customer_consumables_discount_level(customer):
     licenses_discount = find_first(
-        lambda x: x["offerType"] == OfferType.CONSUMABLES.value, customer["discounts"]
+        lambda x: x["offerType"] == OfferType.CONSUMABLES, customer["discounts"]
     )
     return licenses_discount["level"]
 

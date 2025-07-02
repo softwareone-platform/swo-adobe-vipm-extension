@@ -1776,7 +1776,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.COMMITTED.value
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.COMMITTED
 
     adobe_customer = adobe_customer_factory()
 
@@ -1989,7 +1989,7 @@ def test_fulfill_transfer_order_already_migrated_(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED.value
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED
 
     adobe_customer = adobe_customer_factory()
 
@@ -4821,7 +4821,7 @@ def test_fulfill_transfer_gc_order_already_migrated_(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED.value
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED
 
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
 
@@ -5010,7 +5010,7 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED.value
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED
 
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
 

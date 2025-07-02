@@ -556,8 +556,8 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
 @pytest.mark.parametrize(
     "status",
     [
-        constants.ThreeYearCommitmentStatus.ACCEPTED.value,
-        constants.ThreeYearCommitmentStatus.REQUESTED.value,
+        constants.ThreeYearCommitmentStatus.ACCEPTED,
+        constants.ThreeYearCommitmentStatus.REQUESTED,
     ],
 )
 def test_sync_agreements_by_3yc_enroll_status_status(
@@ -595,11 +595,11 @@ def test_sync_agreements_by_3yc_enroll_status_status(
 @pytest.mark.parametrize(
     "status",
     [
-        constants.ThreeYearCommitmentStatus.COMMITTED.value,
-        constants.ThreeYearCommitmentStatus.ACTIVE.value,
-        constants.ThreeYearCommitmentStatus.DECLINED.value,
-        constants.ThreeYearCommitmentStatus.NONCOMPLIANT.value,
-        constants.ThreeYearCommitmentStatus.EXPIRED.value,
+        constants.ThreeYearCommitmentStatus.COMMITTED,
+        constants.ThreeYearCommitmentStatus.ACTIVE,
+        constants.ThreeYearCommitmentStatus.DECLINED,
+        constants.ThreeYearCommitmentStatus.NONCOMPLIANT,
+        constants.ThreeYearCommitmentStatus.EXPIRED,
     ],
 )
 def test_sync_agreements_by_3yc_enroll_status_full(
@@ -647,7 +647,7 @@ def test_sync_agreements_by_3yc_enroll_status_status_error(
         autospec=True,
     )
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
-        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.EXPIRED.value)
+        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.EXPIRED)
     )
     mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
     mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
@@ -676,7 +676,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
         autospec=True,
     )
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
-        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED.value)
+        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED)
     )
     mock_sync_agreement = mocker.patch(
         "adobe_vipm.flows.sync.sync_agreement",

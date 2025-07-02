@@ -1266,7 +1266,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         (
             False,
             "A",
-            ThreeYearCommitmentStatus.ACTIVE.value,
+            ThreeYearCommitmentStatus.ACTIVE,
             {
                 "start": date.today() - timedelta(days=-1),
                 "end": date.today() + timedelta(days=365*3)
@@ -1278,7 +1278,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         (
             False,
             "A",
-            ThreeYearCommitmentStatus.EXPIRED.value,
+            ThreeYearCommitmentStatus.EXPIRED,
             {
                 "start": date.today() - timedelta(days=365*3),
                 "end": date.today() - timedelta(days=1)
