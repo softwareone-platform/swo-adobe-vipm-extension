@@ -137,14 +137,14 @@ def test_sync_agreement_prices(
     ]
     assert mocked_adobe_client.get_subscription.call_args_list == [
         mocker.call(
-            authorization_id,
-            customer_id,
-            mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=mpt_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
-            authorization_id,
-            customer_id,
-            another_mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=another_mpt_subscription["externalIds"]["vendor"],
         ),
     ]
 
@@ -289,9 +289,9 @@ def test_sync_agreement_prices_dry_run(
         mpt_subscription["id"],
     )
     mocked_adobe_client.get_subscription.assert_called_once_with(
-        authorization_id,
-        customer_id,
-        mpt_subscription["externalIds"]["vendor"],
+        authorization_id=authorization_id,
+        customer_id=customer_id,
+        subscription_id=mpt_subscription["externalIds"]["vendor"],
     )
 
     mocked_update_agreement_subscription.assert_not_called()
@@ -809,9 +809,9 @@ def test_sync_agreement_prices_with_3yc(
         mpt_subscription["id"],
     )
     mocked_adobe_client.get_subscription.assert_called_once_with(
-        authorization_id,
-        customer_id,
-        mpt_subscription["externalIds"]["vendor"],
+        authorization_id=authorization_id,
+        customer_id=customer_id,
+        subscription_id=mpt_subscription["externalIds"]["vendor"],
     )
 
     mocked_update_agreement_subscription.assert_called_once_with(
@@ -1020,19 +1020,19 @@ def test_sync_global_customer_parameter(
     ]
     assert mocked_adobe_client.get_subscription.call_args_list == [
         mocker.call(
-            authorization_id,
-            customer_id,
-            mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=mpt_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
-            authorization_id,
-            customer_id,
-            another_mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=another_mpt_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
-            authorization_id,
-            customer_id,
-            deployment_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=deployment_subscription["externalIds"]["vendor"],
         ),
     ]
 
@@ -1361,24 +1361,24 @@ def test_sync_global_customer_update_not_required(
     ]
     assert mocked_adobe_client.get_subscription.call_args_list == [
         mocker.call(
-            authorization_id,
-            customer_id,
-            mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=mpt_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
-            authorization_id,
-            customer_id,
-            another_mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=another_mpt_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
-            authorization_id,
-            "",
-            deployment_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id="",
+            subscription_id=deployment_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
-            authorization_id,
-            "",
-            another_deployment_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id="",
+            subscription_id=another_deployment_subscription["externalIds"]["vendor"],
         ),
     ]
 
@@ -1644,14 +1644,14 @@ def test_sync_global_customer_update_adobe_error(
     ]
     assert mocked_adobe_client.get_subscription.call_args_list == [
         mocker.call(
-            authorization_id,
-            customer_id,
-            mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=mpt_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
-            authorization_id,
-            customer_id,
-            another_mpt_subscription["externalIds"]["vendor"],
+            authorization_id=authorization_id,
+            customer_id=customer_id,
+            subscription_id=another_mpt_subscription["externalIds"]["vendor"],
         ),
     ]
 
