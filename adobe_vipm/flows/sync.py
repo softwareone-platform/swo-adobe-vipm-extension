@@ -15,7 +15,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     update_agreement_subscription,
 )
 
-from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
 from adobe_vipm.adobe.constants import (
     STATUS_SUBSCRIPTION_TERMINATED,
     ThreeYearCommitmentStatus,
@@ -55,76 +55,102 @@ TEMP_3YC_STATUSES = (ThreeYearCommitmentStatus.REQUESTED, ThreeYearCommitmentSta
 logger = logging.getLogger(__name__)
 
 
-def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer):
+def sync_agreement_prices(
+    mpt_client: MPTClient,
+    agreement: dict,
+    dry_run: bool,
+    adobe_client: AdobeClient,
+    customer: dict,
+) -> str:
     """
     Updates the purchase prices of an Agreement (subscriptions and One-Time items)
     based on the customer discount level and customer benefits (3yc).
-
-    Args:
-        mpt_client (MPTClient): The client used to consume the MPT API.
-        agreement (dict): The agreement to update.
-        dry_run (bool): if True, it just simulate the prices update but doesn't
-        perform it.
-        adobe_client (AdobeClient): The client used to consume the Adobe API.
-        customer (dict): The Adobe customer information.
-
-    Returns:
-        str: Returns the customer coterm date.
     """
-    agreement_id = agreement["id"]
-    missing_prices_skus = []
-
-    authorization_id = agreement["authorization"]["id"]
-    customer_id = get_adobe_customer_id(agreement)
-    currency = agreement["listing"]["priceList"]["currency"]
-    product_id = agreement["product"]["id"]
-    subscriptions = agreement["subscriptions"]
-
     commitment = get_3yc_commitment(customer)
     commitment_start_date = None
     if (
         commitment
-        and commitment["status"] in (
-            ThreeYearCommitmentStatus.COMMITTED,
-            ThreeYearCommitmentStatus.ACTIVE
-        )
+        and commitment["status"]
+        in (ThreeYearCommitmentStatus.COMMITTED, ThreeYearCommitmentStatus.ACTIVE)
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):
         commitment_start_date = date.fromisoformat(commitment["startDate"])
 
     coterm_date = customer["cotermDate"]
 
-    to_update = []
+    subscriptions_for_update = _get_subscriptions_for_update(
+        adobe_client, agreement, customer, mpt_client
+    )
 
-    for subscription in subscriptions:
-        if subscription["status"] in ("Terminated", "Expired"):
-            continue
+    product_id = agreement["product"]["id"]
+    currency = agreement["listing"]["priceList"]["currency"]
 
-        subscription = get_agreement_subscription(mpt_client, subscription["id"])
-        adobe_subscription_id = subscription["externalIds"]["vendor"]
+    _update_subscriptions(
+        coterm_date,
+        currency,
+        customer,
+        dry_run,
+        mpt_client,
+        product_id,
+        subscriptions_for_update,
+        agreement_id=agreement["id"],
+        commitment_start_date=commitment_start_date,
+    )
 
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id,
-            customer_id,
-            adobe_subscription_id,
+    _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
+
+    next_sync = (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
+    if not dry_run:
+        update_agreement(
+            mpt_client,
+            agreement["id"],
+            lines=agreement["lines"],
+            parameters={"fulfillment": [{"externalId": "nextSync", "value": next_sync}]},
         )
 
-        if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
-            logger.info(f"Skipping subscription {subscription['id']}. It is terminated by Adobe.")
+    logger.info(f"agreement updated {agreement['id']}")
+    return coterm_date
 
-        actual_sku = adobe_subscription["offerId"]
 
-        to_update.append(
-            (subscription, adobe_subscription, get_sku_with_discount_level(actual_sku, customer))
-        )
-
-    skus = [item[2] for item in to_update]
-
+def _log_agreement_lines(
+    agreement: dict, currency: str, customer: dict, dry_run: bool, product_id: str
+) -> None:
+    agreement_lines = []
+    for line in agreement["lines"]:
+        actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
+        agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
+    skus = [item[1] for item in agreement_lines]
     prices = get_sku_price(customer, skus, product_id, currency)
+    for line, actual_sku in agreement_lines:
+        current_price = line["price"]["unitPP"]
+        line["price"]["unitPP"] = prices[actual_sku]
 
+        if dry_run:
+            sys.stdout.write(
+                f"OneTime item: {line['id']}: sku={actual_sku}, current_price={current_price}, "
+                f"new_price={prices[actual_sku]}\n",
+            )
+        else:
+            logger.info(f"OneTime item: {line['id']}: sku={actual_sku}\n")
+
+
+def _update_subscriptions(
+    coterm_date: str,
+    currency: str,
+    customer: str,
+    dry_run: bool,
+    mpt_client: MPTClient,
+    product_id: str,
+    subscriptions_for_update: list[tuple[dict, dict, str]],
+    agreement_id: str,
+    commitment_start_date: date,
+) -> None:
+    skus = [item[2] for item in subscriptions_for_update]
+    prices = get_sku_price(customer, skus, product_id, currency)
     last_sync_date = datetime.now().date().isoformat()
+    missing_prices_skus = []
 
-    for subscription, adobe_subscription, actual_sku in to_update:
+    for subscription, adobe_subscription, actual_sku in subscriptions_for_update:
         if actual_sku not in prices:
             logger.error(
                 f"Skipping subscription {subscription['id']} "
@@ -134,19 +160,11 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
             continue
 
         line_id = subscription["lines"][0]["id"]
-        lines = [
-            {
-                "price": {"unitPP": prices[actual_sku]},
-                "id": line_id,
-            }
-        ]
+        lines = [{"price": {"unitPP": prices[actual_sku]}, "id": line_id}]
 
         parameters = {
             "fulfillment": [
-                {
-                    "externalId": PARAM_ADOBE_SKU,
-                    "value": actual_sku,
-                },
+                {"externalId": PARAM_ADOBE_SKU, "value": actual_sku},
                 {
                     "externalId": PARAM_CURRENT_QUANTITY,
                     "value": str(adobe_subscription["currentQuantity"]),
@@ -187,38 +205,6 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                 f"commitment_date={coterm_date}\n"
             )
 
-    to_update = []
-    for line in agreement["lines"]:
-        actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
-        to_update.append((line, get_sku_with_discount_level(actual_sku, customer)))
-
-    skus = [item[1] for item in to_update]
-
-    prices = get_sku_price(customer, skus, product_id, currency)
-
-    for line, actual_sku in to_update:
-        current_price = line["price"]["unitPP"]
-        line["price"]["unitPP"] = prices[actual_sku]
-
-        if dry_run:
-            sys.stdout.write(
-                f"OneTime item: {line['id']}: "
-                f"sku={actual_sku}, "
-                f"current_price={current_price}, "
-                f"new_price={prices[actual_sku]}\n",
-            )
-        else:
-            logger.info(f"OneTime item: {line['id']}: sku={actual_sku}\n")
-
-    next_sync = (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
-    if not dry_run:
-        update_agreement(
-            mpt_client,
-            agreement["id"],
-            lines=agreement["lines"],
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": next_sync}]},
-        )
-
     if missing_prices_skus:
         notify_missing_prices(
             agreement_id,
@@ -228,8 +214,35 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
             commitment_start_date,
         )
 
-    logger.info(f"agreement updated {agreement['id']}")
-    return coterm_date
+
+def _get_subscriptions_for_update(
+    adobe_client: AdobeClient, agreement: dict, customer: dict, mpt_client: MPTClient
+) -> list[tuple[dict, dict, str]]:
+    for_update = []
+
+    for subscription in agreement["subscriptions"]:
+        if subscription["status"] == "Terminated":
+            continue
+
+        subscription = get_agreement_subscription(mpt_client, subscription["id"])
+        adobe_subscription_id = subscription["externalIds"]["vendor"]
+
+        adobe_subscription = adobe_client.get_subscription(
+            authorization_id=agreement["authorization"]["id"],
+            customer_id=get_adobe_customer_id(agreement),
+            subscription_id=adobe_subscription_id,
+        )
+
+        if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
+            logger.info(f"Skipping subscription {subscription['id']}. It is terminated by Adobe.")
+
+        actual_sku = adobe_subscription["offerId"]
+
+        for_update.append(
+            (subscription, adobe_subscription, get_sku_with_discount_level(actual_sku, customer))
+        )
+
+    return for_update
 
 
 def sync_agreements_by_next_sync(mpt_client, dry_run):
