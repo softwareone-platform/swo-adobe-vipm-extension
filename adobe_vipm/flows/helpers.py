@@ -19,7 +19,6 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import (
-    get_3yc_commitment,
     get_3yc_commitment_request,
     get_item_by_partial_sku,
 )
@@ -56,7 +55,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +73,7 @@ def populate_order_info(client, order):
         dict: The enriched order.
     """
     order["agreement"] = get_agreement(client, order["agreement"]["id"])
-    order["agreement"]["licensee"] = get_licensee(
-        client, order["agreement"]["licensee"]["id"]
-    )
+    order["agreement"]["licensee"] = get_licensee(client, order["agreement"]["licensee"]["id"])
 
     return order
 
@@ -137,9 +134,7 @@ class SetupContext(Step):
         adobe_client = get_adobe_client()
         context.order = reset_order_error(context.order)
         context.order = reset_ordering_parameters_error(context.order)
-        context.order["agreement"] = get_agreement(
-            client, context.order["agreement"]["id"]
-        )
+        context.order["agreement"] = get_agreement(client, context.order["agreement"]["id"])
         context.order["agreement"]["licensee"] = get_licensee(
             client, context.order["agreement"]["licensee"]["id"]
         )
@@ -174,9 +169,7 @@ class SetupContext(Step):
         context.authorization_id = context.order["authorization"]["id"]
         context.product_id = context.order["agreement"]["product"]["id"]
         context.seller_id = context.order["agreement"]["seller"]["id"]
-        context.currency = context.order["agreement"]["listing"]["priceList"][
-            "currency"
-        ]
+        context.currency = context.order["agreement"]["listing"]["priceList"]["currency"]
         context.customer_data = get_customer_data(context.order)
         context.market_segment = get_market_segment(context.product_id)
         context.adobe_customer_id = get_adobe_customer_id(context.order)
@@ -199,7 +192,6 @@ class Validate3YCCommitment(Step):
         self.is_validation = is_validation
 
     def __call__(self, client, context, next_step):
-
         is_new_purchase_order_validation = not context.adobe_customer
 
         if context.adobe_return_orders:
@@ -212,17 +204,18 @@ class Validate3YCCommitment(Step):
                 next_step(client, context)
             return
 
-        commitment = (
-            get_3yc_commitment_request(context.adobe_customer)
-            or get_3yc_commitment(context.adobe_customer)
+        commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
+            context.adobe_customer
         )
 
         adobe_client = get_adobe_client()
-        commitment_status = commitment.get("status",'')
+        commitment_status = commitment.get("status", "")
 
         if commitment_status == ThreeYearCommitmentStatus.REQUESTED and not self.is_validation:
-            logger.info(f"{context}: 3YC commitment request is "
-                        f"in status {ThreeYearCommitmentStatus.REQUESTED}")
+            logger.info(
+                f"{context}: 3YC commitment request is "
+                f"in status {ThreeYearCommitmentStatus.REQUESTED}"
+            )
             return
 
         if commitment_status in [
@@ -273,49 +266,21 @@ class Validate3YCCommitment(Step):
 
         next_step(client, context)
 
-    def _is_commitment_expired_or_rejected(self, commitment_status, commitment, context):
-        """Check if commitment is expired, noncompliant, or rejected."""
-        if commitment_status in [
-            STATUS_3YC_EXPIRED,
-            STATUS_3YC_NONCOMPLIANT,
-            STATUS_3YC_DECLINED,
-        ]:
-            logger.info(f"{context}: 3YC commitment is expired or noncompliant")
-            return True
-
-        if not commitment and context.customer_data.get("3YC") == ["Yes"]:
-            logger.info(f"{context}: 3YC commitment has been rejected")
-            return True
-
-        return False
-
-    def _validate_3yc_commitment_date_before_coterm_date(self, context, commitment):
-        if not context.adobe_customer['cotermDate']:
-            return False
-
-        threeyc_end_date = datetime.strptime(commitment['endDate'], "%Y-%m-%d")
-        coterm_date = datetime.strptime(context.adobe_customer['cotermDate'], "%Y-%m-%d")
-        return threeyc_end_date < coterm_date
-
-
     def get_quantities(self, context, subscriptions):
+        count_licenses, count_consumables = self.get_licenses_and_consumables_count(subscriptions)
 
-        count_licenses, count_consumables = self.get_licenses_and_consumables_count(
-            subscriptions
+        count_licenses, count_consumables = self.process_lines_quantities(
+            context,
+            count_licenses=count_licenses,
+            count_consumables=count_consumables,
+            is_downsize=True,
         )
 
         count_licenses, count_consumables = self.process_lines_quantities(
             context,
             count_licenses=count_licenses,
             count_consumables=count_consumables,
-            is_downsize=True
-        )
-
-        count_licenses, count_consumables = self.process_lines_quantities(
-            context,
-            count_licenses=count_licenses,
-            count_consumables=count_consumables,
-            is_downsize=False
+            is_downsize=False,
         )
 
         return count_licenses, count_consumables
@@ -347,13 +312,11 @@ class Validate3YCCommitment(Step):
         count_consumables = 0
 
         active_subscriptions = [
-            sub for sub in subscriptions.get("items",[])
-            if sub["autoRenewal"]["enabled"]
+            sub for sub in subscriptions.get("items", []) if sub["autoRenewal"]["enabled"]
         ]
 
         for subscription in active_subscriptions:
-            sku = get_adobe_product_by_marketplace_sku(
-                get_partial_sku(subscription["offerId"]))
+            sku = get_adobe_product_by_marketplace_sku(get_partial_sku(subscription["offerId"]))
 
             if not sku.is_valid_3yc_type():
                 continue
@@ -365,10 +328,9 @@ class Validate3YCCommitment(Step):
 
         return count_licenses, count_consumables
 
-    def process_lines_quantities(self,context,
-                                 count_licenses=0,
-                                 count_consumables=0,
-                                 is_downsize=False):
+    def process_lines_quantities(
+        self, context, count_licenses=0, count_consumables=0, is_downsize=False
+    ):
         lines = context.downsize_lines if is_downsize else context.upsize_lines + context.new_lines
 
         for line in lines:
@@ -390,8 +352,7 @@ class Validate3YCCommitment(Step):
             return line["oldQuantity"] - line["quantity"]
         return line["quantity"] - line["oldQuantity"]
 
-    def _update_counts(self, sku, delta, count_licenses,
-                       count_consumables, is_downsize):
+    def _update_counts(self, sku, delta, count_licenses, count_consumables, is_downsize):
         """Update license and consumable counts based on SKU type and delta."""
         if sku.is_consumable():
             count_consumables += delta if not is_downsize else -delta
@@ -402,13 +363,13 @@ class Validate3YCCommitment(Step):
 
     @staticmethod
     def validate_items_in_subscriptions(context, subscriptions):
-        if subscriptions.get("items",[]):
+        if subscriptions.get("items", []):
             for line in context.downsize_lines + context.upsize_lines:
                 adobe_item = get_item_by_partial_sku(
                     subscriptions["items"], line["item"]["externalIds"]["vendor"]
                 )
                 if not adobe_item:
-                    vendor_id = line['item']['externalIds']['vendor']
+                    vendor_id = line["item"]["externalIds"]["vendor"]
                     return False, f"Item {vendor_id} not found in Adobe subscriptions"
         return True, None
 
@@ -448,8 +409,7 @@ class Validate3YCCommitment(Step):
                 f"the minimum commitment of licenses"
             )
             return ERR_COMMITMENT_3YC_LICENSES.format(
-                selected_licenses=count_licenses,
-                minimum_licenses=minimum_licenses
+                selected_licenses=count_licenses, minimum_licenses=minimum_licenses
             )
 
         if is_invalid_consumable_minimum:
@@ -458,8 +418,7 @@ class Validate3YCCommitment(Step):
                 f" the minimum commitment of consumables"
             )
             return ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(
-                selected_consumables=count_consumables,
-                minimum_consumables=minimum_consumables
+                selected_consumables=count_consumables, minimum_consumables=minimum_consumables
             )
 
     def validate_3yc_quantities_parameters(self, client, context):
@@ -473,25 +432,31 @@ class Validate3YCCommitment(Step):
             return True
 
         minimum_licenses_commited = int(context.customer_data.get("3YCLicenses", 0) or 0)
-        minimum_consumables_commited = int(context.customer_data.get("3YCConsumables",0) or 0)
+        minimum_consumables_commited = int(context.customer_data.get("3YCConsumables", 0) or 0)
 
         if count_licenses < minimum_licenses_commited:
-            self.manage_order_error(client, context,
+            self.manage_order_error(
+                client,
+                context,
                 ERR_COMMITMENT_3YC_LICENSES.format(
-                selected_licenses=count_licenses,
-                minimum_licenses=minimum_licenses_commited
-            ))
+                    selected_licenses=count_licenses, minimum_licenses=minimum_licenses_commited
+                ),
+            )
             return False
 
         if count_consumables < minimum_consumables_commited:
-            self.manage_order_error(client, context,
+            self.manage_order_error(
+                client,
+                context,
                 ERR_COMMITMENT_3YC_CONSUMABLES.format(
-                selected_consumables=count_consumables,
-                minimum_consumables=minimum_consumables_commited
-            ))
+                    selected_consumables=count_consumables,
+                    minimum_consumables=minimum_consumables_commited,
+                ),
+            )
             return False
 
         return True
+
 
 class UpdatePrices(Step):
     def __call__(self, client, context, next_step):
@@ -514,8 +479,10 @@ class UpdatePrices(Step):
     def _get_prices_for_skus(self, context, actual_skus):
         """Get prices for SKUs considering 3YC commitment if applicable."""
         commitment = (
-            (get_3yc_commitment_request(context.adobe_customer)
-            or get_3yc_commitment(context.adobe_customer))
+            (
+                get_3yc_commitment_request(context.adobe_customer)
+                or get_3yc_commitment(context.adobe_customer)
+            )
             if context.adobe_customer
             else None
         )
@@ -526,11 +493,7 @@ class UpdatePrices(Step):
                 date.fromisoformat(commitment.get("startDate", "")) if commitment else None,
                 actual_skus,
             )
-        return get_prices_for_skus(
-            context.product_id,
-            context.currency,
-            actual_skus
-        )
+        return get_prices_for_skus(context.product_id, context.currency, actual_skus)
 
     def _is_valid_3yc_commitment(self, commitment):
         """Check if 3YC commitment is valid and active."""
@@ -538,10 +501,12 @@ class UpdatePrices(Step):
             return False
 
         return (
-            commitment["status"] in (
+            commitment["status"]
+            in (
                 ThreeYearCommitmentStatus.COMMITTED,
                 ThreeYearCommitmentStatus.ACTIVE,
-                ThreeYearCommitmentStatus.ACCEPTED)
+                ThreeYearCommitmentStatus.ACCEPTED,
+            )
             and date.fromisoformat(commitment["endDate"]) >= date.today()
         )
 
@@ -553,22 +518,25 @@ class UpdatePrices(Step):
         for sku in actual_skus:
             line = get_order_line_by_sku(context.order, sku)
             new_price_item = get_price_item_by_line_sku(
-                prices,
-                line["item"]["externalIds"]["vendor"]
+                prices, line["item"]["externalIds"]["vendor"]
             )
-            updated_lines.append({
-                "id": line["id"],
-                "price": {"unitPP": new_price_item[1]},
-            })
+            updated_lines.append(
+                {
+                    "id": line["id"],
+                    "price": {"unitPP": new_price_item[1]},
+                }
+            )
 
         # Add remaining lines with unchanged prices
         updated_lines_ids = {line["id"] for line in updated_lines}
         for line in context.order["lines"]:
             if line["id"] not in updated_lines_ids:
-                updated_lines.append({
-                    "id": line["id"],
-                    "price": {"unitPP": line["price"]["unitPP"]},
-                })
+                updated_lines.append(
+                    {
+                        "id": line["id"],
+                        "price": {"unitPP": line["price"]["unitPP"]},
+                    }
+                )
 
         return sorted(updated_lines, key=itemgetter("id"))
 

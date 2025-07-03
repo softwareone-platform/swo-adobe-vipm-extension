@@ -1,6 +1,5 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
 from functools import cache
 
 from django.conf import settings
@@ -20,12 +19,8 @@ from pyairtable.formulas import (
 from pyairtable.orm import Model, fields
 from requests import HTTPError
 
-from adobe_vipm.adobe.constants import (
-    ThreeYearCommitmentStatus,
-)
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
-from adobe_vipm.adobe.utils import get_3yc_commitment
-from adobe_vipm.utils import find_first
+from adobe_vipm.utils import find_first, get_commitment_start_date
 
 STATUS_INIT = "init"
 STATUS_RUNNING = "running"
@@ -112,31 +107,19 @@ def get_transfer_model(base_info):
         customer_id = fields.TextField("customer_id")
         customer_company_name = fields.TextField("customer_company_name")
         customer_preferred_language = fields.TextField("customer_preferred_language")
-        customer_address_address_line_1 = fields.TextField(
-            "customer_address_address_line_1"
-        )
-        customer_address_address_line_2 = fields.TextField(
-            "customer_address_address_line_2"
-        )
+        customer_address_address_line_1 = fields.TextField("customer_address_address_line_1")
+        customer_address_address_line_2 = fields.TextField("customer_address_address_line_2")
         customer_address_city = fields.TextField("customer_address_city")
         customer_address_region = fields.TextField("customer_address_region")
         customer_address_postal_code = fields.TextField("customer_address_postal_code")
         customer_address_country = fields.TextField("customer_address_country")
-        customer_address_phone_number = fields.TextField(
-            "customer_address_phone_number"
-        )
+        customer_address_phone_number = fields.TextField("customer_address_phone_number")
         customer_contact_first_name = fields.TextField("customer_contact_first_name")
         customer_contact_last_name = fields.TextField("customer_contact_last_name")
         customer_contact_email = fields.TextField("customer_contact_email")
-        customer_contact_phone_number = fields.TextField(
-            "customer_contact_phone_number"
-        )
-        customer_benefits_3yc_start_date = fields.DateField(
-            "customer_benefits_3yc_start_date"
-        )
-        customer_benefits_3yc_end_date = fields.DateField(
-            "customer_benefits_3yc_end_date"
-        )
+        customer_contact_phone_number = fields.TextField("customer_contact_phone_number")
+        customer_benefits_3yc_start_date = fields.DateField("customer_benefits_3yc_start_date")
+        customer_benefits_3yc_end_date = fields.DateField("customer_benefits_3yc_end_date")
         customer_benefits_3yc_status = fields.TextField("customer_benefits_3yc_status")
         customer_benefits_3yc_minimum_quantity_license = fields.NumberField(
             "customer_benefits_3yc_minimum_quantity_license",
@@ -295,9 +278,7 @@ def get_offer_ids_by_membership_id(product_id, membership_id):
     Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
     return [
         offer.offer_id
-        for offer in Offer.all(
-            formula=EQUAL(FIELD("membership_id"), STR_VALUE(membership_id))
-        )
+        for offer in Offer.all(formula=EQUAL(FIELD("membership_id"), STR_VALUE(membership_id)))
     ]
 
 
@@ -506,19 +487,12 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
             OR(
                 EQUAL(FIELD("valid_until"), "BLANK()"),
                 AND(
-                    LESS_EQUAL(
-                        FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))
-                    ),
-                    GREATER(
-                        FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))
-                    ),
+                    LESS_EQUAL(FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))),
+                    GREATER(FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))),
                 ),
             ),
             OR(
-                *[
-                    EQUAL(FIELD("sku"), to_airtable_value(sku))
-                    for sku in skus_to_lookup
-                ],
+                *[EQUAL(FIELD("sku"), to_airtable_value(sku)) for sku in skus_to_lookup],
             ),
         ),
         sort=["-valid_until"],
@@ -551,31 +525,14 @@ def get_sku_price(adobe_customer, offer_ids, product_id, deployment_currency):
     Returns:
         float or None: Sku price if is available, None in other case
     """
-    commitment = get_3yc_commitment(adobe_customer)
-    commitment_start_date = None
-    if (
-        commitment
-        and commitment["status"] in (
-            ThreeYearCommitmentStatus.COMMITTED,
-            ThreeYearCommitmentStatus.ACTIVE
-        )
-        and date.fromisoformat(commitment["endDate"]) >= date.today()
-    ):
-        commitment_start_date = date.fromisoformat(commitment["startDate"])
+    commitment_start_date = get_commitment_start_date(adobe_customer)
 
     if commitment_start_date:
         prices = get_prices_for_3yc_skus(
-            product_id,
-            deployment_currency,
-            commitment_start_date,
-            offer_ids
+            product_id, deployment_currency, commitment_start_date, offer_ids
         )
     else:
-        prices = get_prices_for_skus(
-            product_id,
-            deployment_currency,
-            offer_ids
-        )
+        prices = get_prices_for_skus(product_id, deployment_currency, offer_ids)
     return prices if prices else {}
 
 
@@ -608,9 +565,7 @@ def create_gc_main_agreement(product_id, main_agreement):
         product_id (str): The ID of the product used to determine the AirTable base.
         main_agreement (dict): The main agreement object to create.
     """
-    GCMainAgreement = get_gc_main_agreement_model(
-        AirTableBaseInfo.for_migrations(product_id)
-    )
+    GCMainAgreement = get_gc_main_agreement_model(AirTableBaseInfo.for_migrations(product_id))
     GCMainAgreement(**main_agreement).save()
 
 
@@ -630,9 +585,7 @@ def get_gc_main_agreement(product_id, authorization_uk, membership_or_customer_i
         GCMainAgreement: The GCMainOrder if it has been found,
         None otherwise.
     """
-    GCMainAgreement = get_gc_main_agreement_model(
-        AirTableBaseInfo.for_migrations(product_id)
-    )
+    GCMainAgreement = get_gc_main_agreement_model(AirTableBaseInfo.for_migrations(product_id))
     gc_main_agreements = GCMainAgreement.all(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
@@ -709,12 +662,7 @@ def get_agreement_deployment_view_link(product_id):
         )
         base_id = GCAgreementDeployment.Meta.base_id
         table_id = GCAgreementDeployment.get_table().id
-        view_id = (
-            GCAgreementDeployment.get_table()
-            .schema()
-            .view("Agreement Deployments View")
-            .id
-        )
+        view_id = GCAgreementDeployment.get_table().schema().view("Agreement Deployments View").id
         record_id = GCAgreementDeployment.id
         return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
     except HTTPError:
@@ -740,9 +688,7 @@ def get_sku_adobe_mapping_model(
         @classmethod
         def from_short_id(cls, vendor_external_id: str):
             entity = cls.first(
-                formula=EQUAL(
-                    FIELD("vendor_external_id"), STR_VALUE(vendor_external_id)
-                )
+                formula=EQUAL(FIELD("vendor_external_id"), STR_VALUE(vendor_external_id))
             )
             if entity is None:
                 raise AdobeProductNotFoundError(
