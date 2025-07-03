@@ -21,7 +21,6 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
-from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
     STATUS_GC_ERROR,
@@ -90,7 +89,7 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
 )
 from adobe_vipm.notifications import Button, FactsSection, send_warning
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -107,9 +106,7 @@ def _handle_transfer_preview_error(client, order, error):
         and error.status_code == 404
     ):
         error_msg = (
-            str(error)
-            if isinstance(error, AdobeAPIError)
-            else ERR_ADOBE_MEMBERSHIP_NOT_FOUND
+            str(error) if isinstance(error, AdobeAPIError) else ERR_ADOBE_MEMBERSHIP_NOT_FOUND
         )
         param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
@@ -144,9 +141,7 @@ def _check_transfer(mpt_client, order, membership_id):
     authorization_id = order["authorization"]["id"]
     transfer_preview = None
     try:
-        transfer_preview = adobe_client.preview_transfer(
-            authorization_id, membership_id
-        )
+        transfer_preview = adobe_client.preview_transfer(authorization_id, membership_id)
     except AdobeError as e:
         _handle_transfer_preview_error(mpt_client, order, e)
         logger.warning(f"Transfer order {order['id']} has been failed: {str(e)}.")
@@ -161,10 +156,7 @@ def _check_transfer(mpt_client, order, membership_id):
     )
 
     order_lines = sorted(
-        [
-            (line["item"]["externalIds"]["vendor"], line["quantity"])
-            for line in order["lines"]
-        ],
+        [(line["item"]["externalIds"]["vendor"], line["quantity"]) for line in order["lines"]],
         key=lambda i: i[0],
     )
     if adobe_lines != order_lines:
@@ -172,9 +164,7 @@ def _check_transfer(mpt_client, order, membership_id):
             lines=",".join([line[0] for line in adobe_lines]),
         )
         switch_order_to_failed(mpt_client, order, error)
-        logger.warning(
-            f"Transfer Order {order['id']} has been failed: {error['message']}."
-        )
+        logger.warning(f"Transfer Order {order['id']} has been failed: {error['message']}.")
         return False
     return True
 
@@ -203,18 +193,14 @@ def _submit_transfer_order(mpt_client, order, membership_id):
     except AdobeError as e:
         error = ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(e))
         switch_order_to_failed(mpt_client, order, error)
-        logger.warning(
-            f"Transfer order {order['id']} has been failed: {error['message']}."
-        )
+        logger.warning(f"Transfer order {order['id']} has been failed: {error['message']}.")
         return None
 
     adobe_transfer_order_id = adobe_transfer_order["transferId"]
     return save_adobe_order_id(mpt_client, order, adobe_transfer_order_id)
 
 
-def _check_adobe_transfer_order_fulfilled(
-    mpt_client, order, membership_id, adobe_transfer_id
-):
+def _check_adobe_transfer_order_fulfilled(mpt_client, order, membership_id, adobe_transfer_id):
     """
     Checks the fulfillment status of an Adobe transfer order.
 
@@ -456,9 +442,7 @@ def _transfer_migrated(
         transfer.membership_id,
         transfer.transfer_id,
     )
-    items_with_deployment_id = _get_order_line_items_with_deployment_id(
-        adobe_transfer, order
-    )
+    items_with_deployment_id = _get_order_line_items_with_deployment_id(adobe_transfer, order)
     if items_with_deployment_id:
         _manage_order_with_deployment_id(
             mpt_client, order, adobe_transfer, gc_main_agreement, items_with_deployment_id
@@ -478,9 +462,7 @@ def _transfer_migrated(
     ):
         return
     adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
-    returned_skus = [
-        get_partial_sku(item["offerId"]) for item in adobe_subscriptions["items"]
-    ]
+    returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_subscriptions["items"]]
 
     items = []
     if returned_skus:
@@ -489,9 +471,7 @@ def _transfer_migrated(
         )
 
     one_time_skus = [
-        item["externalIds"]["vendor"]
-        for item in items
-        if item["terms"]["period"] == "one-time"
+        item["externalIds"]["vendor"] for item in items if item["terms"]["period"] == "one-time"
     ]
     adobe_items_without_one_time_offers = [
         item
@@ -580,9 +560,7 @@ def get_new_agreement_deployments(
         list: The new agreement deployments to be added to Airtable.
     """
     new_agreement_deployments = []
-    deployment_currency_map = generate_deployments_currency_map(
-        adobe_transfer_order["lineItems"]
-    )
+    deployment_currency_map = generate_deployments_currency_map(adobe_transfer_order["lineItems"])
 
     for deployment in customer_deployments:
         created_deployment = next(
@@ -646,9 +624,7 @@ def send_gc_agreement_deployments_notification(
         f"Adobe Global Customer Deployments created for {agreement_id}",
         f"Following deployments have been created for the customer {customer_id}:",
         facts=FactsSection("Deployments", facts),
-        button=Button(
-            "Open Agreement Deployments View", agreement_deployment_view_link
-        ),
+        button=Button("Open Agreement Deployments View", agreement_deployment_view_link),
     )
 
 
@@ -668,15 +644,12 @@ def are_all_deployments_synchronized(existing_deployments, customer_deployments)
             (
                 gc_deployment
                 for gc_deployment in existing_deployments
-                if gc_deployment.deployment_id
-                == customer_deployment.get("deploymentId")
+                if gc_deployment.deployment_id == customer_deployment.get("deploymentId")
             ),
             None,
         )
         if not created_deployment:
-            logger.info(
-                f"Deployment {customer_deployment.get('deploymentId')} is not created"
-            )
+            logger.info(f"Deployment {customer_deployment.get('deploymentId')} is not created")
             return True
         if created_deployment.status != STATUS_GC_CREATED:
             logger.info(
@@ -688,9 +661,7 @@ def are_all_deployments_synchronized(existing_deployments, customer_deployments)
     return True
 
 
-def add_gc_main_agreement(
-    order, adobe_transfer_order, status=STATUS_GC_PENDING, error=""
-):
+def add_gc_main_agreement(order, adobe_transfer_order, status=STATUS_GC_PENDING, error=""):
     """
     Adds a main agreement to Airtable.
 
@@ -745,8 +716,7 @@ def _check_agreement_deployments(
     product_id = order["agreement"]["product"]["id"]
     if customer.get("globalSalesEnabled", False):
         logger.info(
-            "Adobe customer has global sales enabled, proceed to get the customer"
-            " deployments"
+            "Adobe customer has global sales enabled, proceed to get the customer" " deployments"
         )
         if not gc_main_agreement:
             add_gc_main_agreement(order, adobe_transfer_order)
@@ -802,9 +772,7 @@ def _check_gc_main_agreement(gc_main_agreement, order):
                 f"Main agreement {gc_main_agreement.main_agreement_id} already exists in Airtable"
             )
             if gc_main_agreement.status == STATUS_GC_ERROR:
-                logger.info(
-                    "Main agreement is in error state, wait for manual intervention"
-                )
+                logger.info("Main agreement is in error state, wait for manual intervention")
                 return False
 
         else:
@@ -812,16 +780,12 @@ def _check_gc_main_agreement(gc_main_agreement, order):
                 "Main agreement exists in Airtable, proceed to save the current agreement ID."
                 " Continue with deployment synchronization"
             )
-            gc_main_agreement.main_agreement_id = order.get("agreement", {}).get(
-                "id", ""
-            )
+            gc_main_agreement.main_agreement_id = order.get("agreement", {}).get("id", "")
             gc_main_agreement.save()
     return True
 
 
-def create_agreement_subscriptions(
-    adobe_transfer_order, mpt_client, order, adobe_client, customer
-):
+def create_agreement_subscriptions(adobe_transfer_order, mpt_client, order, adobe_client, customer):
     """
     Creates subscriptions for the transfer order.
 
@@ -866,16 +830,12 @@ def create_agreement_subscriptions(
                 auto_renewal=True,
             )
 
-        subscriptions.append(
-            add_subscription(mpt_client, adobe_subscription, order, item)
-        )
+        subscriptions.append(add_subscription(mpt_client, adobe_subscription, order, item))
 
     return subscriptions
 
 
-def sync_main_agreement(
-    gc_main_agreement, product_id, authorization_id, customer_id, error=""
-):
+def sync_main_agreement(gc_main_agreement, product_id, authorization_id, customer_id, error=""):
     """
     Synchronizes the main agreement status in Airtable.
 
@@ -890,9 +850,7 @@ def sync_main_agreement(
         None
     """
     if not gc_main_agreement:
-        gc_main_agreement = get_main_agreement(
-            product_id, authorization_id, customer_id
-        )
+        gc_main_agreement = get_main_agreement(product_id, authorization_id, customer_id)
 
     if gc_main_agreement:
         gc_main_agreement.status = STATUS_GC_ERROR if error else STATUS_GC_TRANSFERRED
@@ -900,9 +858,7 @@ def sync_main_agreement(
         gc_main_agreement.save()
 
 
-def _check_pending_deployments(
-    gc_main_agreement, existing_deployments, customer_deployments
-):
+def _check_pending_deployments(gc_main_agreement, existing_deployments, customer_deployments):
     """
     Checks if all deployments are synchronized and the main agreement is in a valid state.
 
@@ -971,9 +927,7 @@ def _get_order_line_items_with_deployment_id(adobe_transfer_order, order):
         ]
         if adobe_items_with_same_offer_id:
             items_without_deployment = [
-                item
-                for item in adobe_items_with_same_offer_id
-                if not item.get("deploymentId", "")
+                item for item in adobe_items_with_same_offer_id if not item.get("deploymentId", "")
             ]
             if not items_without_deployment:
                 items_with_deployment.append(line["item"]["name"])
@@ -1179,7 +1133,7 @@ class ValidateDeploymentItems(Step):
                 context.order,
                 context.adobe_transfer_order,
                 context.gc_main_agreement,
-                context.items_with_deployment_id
+                context.items_with_deployment_id,
             )
             return
 
@@ -1195,8 +1149,7 @@ class GetAdobeCustomer(Step):
         adobe_client = get_adobe_client()
         context.customer_id = context.adobe_transfer_order["customerId"]
         context.adobe_customer = adobe_client.get_customer(
-            context.authorization_id,
-            context.customer_id
+            context.authorization_id, context.customer_id
         )
         next_step(client, context)
 
@@ -1253,7 +1206,7 @@ class CreateTransferSubscriptions(Step):
             client,
             context.order,
             adobe_client,
-            context.adobe_customer
+            context.adobe_customer,
         )
 
         if not context.subscriptions:
@@ -1264,7 +1217,7 @@ class CreateTransferSubscriptions(Step):
                 context.product_id,
                 context.authorization_id,
                 context.customer_id,
-                error
+                error,
             )
             return
 
@@ -1284,9 +1237,7 @@ class SetCommitmentDates(Step):
 
         if context.commitment_date:  # pragma: no branch
             context.order = save_next_sync_and_coterm_dates(
-                client,
-                context.order,
-                context.commitment_date
+                client, context.order, context.commitment_date
             )
 
         next_step(client, context)
@@ -1304,7 +1255,7 @@ class CompleteTransferOrder(Step):
             context.gc_main_agreement,
             context.product_id,
             context.authorization_id,
-            context.customer_id
+            context.customer_id,
         )
         next_step(client, context)
 

@@ -21,7 +21,6 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
-from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
@@ -49,6 +48,7 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date
 
 TEMP_3YC_STATUSES = (ThreeYearCommitmentStatus.REQUESTED, ThreeYearCommitmentStatus.ACCEPTED)
 
@@ -66,15 +66,7 @@ def sync_agreement_prices(
     Updates the purchase prices of an Agreement (subscriptions and One-Time items)
     based on the customer discount level and customer benefits (3yc).
     """
-    commitment = get_3yc_commitment(customer)
-    commitment_start_date = None
-    if (
-        commitment
-        and commitment["status"]
-        in (ThreeYearCommitmentStatus.COMMITTED, ThreeYearCommitmentStatus.ACTIVE)
-        and date.fromisoformat(commitment["endDate"]) >= date.today()
-    ):
-        commitment_start_date = date.fromisoformat(commitment["startDate"])
+    commitment_start_date = get_commitment_start_date(customer)
 
     coterm_date = customer["cotermDate"]
 
