@@ -594,7 +594,10 @@ class SetOrUpdateCotermNextSyncDates(Step):
                 needs_update = True
 
             if context.adobe_customer:
-                commitment = get_3yc_commitment_request(context.adobe_customer)
+                commitment = (
+                    get_3yc_commitment_request(context.adobe_customer)
+                    or get_3yc_commitment(context.adobe_customer)
+                )
                 if commitment:
                     context.order = set_adobe_3yc_enroll_status(context.order, commitment["status"])
                     context.order = set_adobe_3yc_commitment_request_status(
@@ -611,8 +614,11 @@ class SetOrUpdateCotermNextSyncDates(Step):
                     "coterm_date": coterm_date.isoformat(),
                     "next_sync": next_sync.isoformat(),
                 }
-                if context.adobe_customer and get_3yc_commitment_request(context.adobe_customer):
-                    commitment = get_3yc_commitment_request(context.adobe_customer)
+                commitment = (
+                    get_3yc_commitment_request(context.adobe_customer)
+                    or get_3yc_commitment(context.adobe_customer)
+                )
+                if context.adobe_customer and commitment:
                     updated_params.update({
                         "3yc_enroll_status": commitment["status"],
                         "3yc_commitment_request_status": commitment["status"],

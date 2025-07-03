@@ -480,7 +480,8 @@ class UpdatePrices(Step):
     def _get_prices_for_skus(self, context, actual_skus):
         """Get prices for SKUs considering 3YC commitment if applicable."""
         commitment = (
-            get_3yc_commitment_request(context.adobe_customer)
+            (get_3yc_commitment_request(context.adobe_customer)
+            or get_3yc_commitment(context.adobe_customer))
             if context.adobe_customer
             else None
         )
