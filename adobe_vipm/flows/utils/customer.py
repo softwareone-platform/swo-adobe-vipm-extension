@@ -1,7 +1,8 @@
 import copy
 
 from adobe_vipm.adobe.constants import (
-    OfferType,
+    OFFER_TYPE_CONSUMABLES,
+    OFFER_TYPE_LICENSE,
 )
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
@@ -113,14 +114,14 @@ def set_adobe_customer_id(order, customer_id):
 
 def get_customer_licenses_discount_level(customer):
     licenses_discount = find_first(
-        lambda x: x["offerType"] == OfferType.LICENSE, customer["discounts"]
+        lambda x: x["offerType"] == OFFER_TYPE_LICENSE, customer["discounts"]
     )
     return licenses_discount["level"]
 
 
 def get_customer_consumables_discount_level(customer):
     licenses_discount = find_first(
-        lambda x: x["offerType"] == OfferType.CONSUMABLES, customer["discounts"]
+        lambda x: x["offerType"] == OFFER_TYPE_CONSUMABLES, customer["discounts"]
     )
     return licenses_discount["level"]
 

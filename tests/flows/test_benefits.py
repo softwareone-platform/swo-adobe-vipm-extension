@@ -3,7 +3,9 @@ from urllib.parse import urljoin
 import pytest
 
 from adobe_vipm.adobe.constants import (
-    ThreeYearCommitmentStatus,
+    STATUS_3YC_DECLINED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_NONCOMPLIANT,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.benefits import (
@@ -151,9 +153,7 @@ def test_check_3yc_commitment_request_not_committed(
 
 @pytest.mark.parametrize("is_recommitment", [False, True])
 @pytest.mark.parametrize(
-    "request_status", [
-        ThreeYearCommitmentStatus.ERROR_STATUSES
-    ]
+    "request_status", [STATUS_3YC_DECLINED, STATUS_3YC_EXPIRED, STATUS_3YC_NONCOMPLIANT]
 )
 def test_check_3yc_commitment_request_declined(
     mocker,
@@ -214,7 +214,7 @@ def test_check_3yc_commitment_request_declined(
     request_type_title = "commitment" if not is_recommitment else "recommitment"
 
     mocked_send_warning.assert_called_once_with(
-        f"3YC {request_type_title.capitalize()} Request {str(request_status).capitalize()}",
+        f"3YC {request_type_title.capitalize()} Request {request_status.capitalize()}",
         f"The 3-year {request_type_title} request for agreement {agreement['id']} "
         f"**{agreement['name']}** of the customer **{get_company_name(agreement)}** "
         f"has been denied: {request_status}.\n\n"

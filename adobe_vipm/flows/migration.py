@@ -5,10 +5,10 @@ from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_COMMITTED,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_ALREADY_TRANSFERRED,
-    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
@@ -377,7 +377,7 @@ def check_running_transfers_for_product(product_id):
                             f"{str(e)}",
                         ),
                     )
-        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
+        if transfer.customer_benefits_3yc_status != STATUS_3YC_COMMITTED:
             subscriptions = client.get_subscriptions(
                 transfer.authorization_uk,
                 transfer.customer_id,

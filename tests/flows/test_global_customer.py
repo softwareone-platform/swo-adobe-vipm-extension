@@ -3,8 +3,9 @@ from datetime import date, timedelta
 import pytest
 
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_EXPIRED,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
-    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_sku_price
@@ -1266,7 +1267,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         (
             False,
             "A",
-            ThreeYearCommitmentStatus.ACTIVE,
+            STATUS_3YC_ACTIVE,
             {
                 "start": date.today() - timedelta(days=-1),
                 "end": date.today() + timedelta(days=365*3)
@@ -1278,7 +1279,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         (
             False,
             "A",
-            ThreeYearCommitmentStatus.EXPIRED,
+            STATUS_3YC_EXPIRED,
             {
                 "start": date.today() - timedelta(days=365*3),
                 "end": date.today() - timedelta(days=1)

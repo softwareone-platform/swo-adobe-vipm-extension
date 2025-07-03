@@ -8,8 +8,8 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_COMMITTED,
     STATUS_TRANSFER_INACTIVE_ACCOUNT,
-    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.adobe.utils import get_3yc_commitment
@@ -70,10 +70,7 @@ def get_prices(order, commitment, adobe_skus):
     product_id = order["agreement"]["product"]["id"]
     if (
         commitment
-        and commitment["status"] in (
-            ThreeYearCommitmentStatus.COMMITTED,
-            ThreeYearCommitmentStatus.ACTIVE,
-        )
+        and commitment["status"] in (STATUS_3YC_COMMITTED, "ACTIVE")
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):
         return get_prices_for_3yc_skus(

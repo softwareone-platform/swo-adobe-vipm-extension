@@ -15,7 +15,13 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    ThreeYearCommitmentStatus,
+    STATUS_3YC_ACCEPTED,
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
+    STATUS_3YC_DECLINED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_NONCOMPLIANT,
+    STATUS_3YC_REQUESTED,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import (
@@ -216,13 +222,15 @@ class Validate3YCCommitment(Step):
         adobe_client = get_adobe_client()
         commitment_status = commitment.get("status",'')
 
-        if (commitment_status == ThreeYearCommitmentStatus.REQUESTED
-            and not self.is_validation):
-            logger.info(f"{context}: 3YC commitment request is in status "
-                        f"{ThreeYearCommitmentStatus.REQUESTED}")
+        if commitment_status == STATUS_3YC_REQUESTED and not self.is_validation:
+            logger.info(f"{context}: 3YC commitment request is in status {STATUS_3YC_REQUESTED}")
             return
 
-        if commitment_status in ThreeYearCommitmentStatus.ERROR_STATUSES:
+        if commitment_status in [
+            STATUS_3YC_EXPIRED,
+            STATUS_3YC_NONCOMPLIANT,
+            STATUS_3YC_DECLINED,
+        ]:
             logger.info(f"{context}: 3YC commitment is expired or noncompliant")
             switch_order_to_failed(
                 client,
@@ -495,7 +503,10 @@ class UpdatePrices(Step):
             return False
 
         return (
-            commitment["status"] in ThreeYearCommitmentStatus.FINISHED_STATUSES
+            commitment["status"] in (
+                STATUS_3YC_COMMITTED,
+                STATUS_3YC_ACTIVE,
+                STATUS_3YC_ACCEPTED)
             and date.fromisoformat(commitment["endDate"]) >= date.today()
         )
 

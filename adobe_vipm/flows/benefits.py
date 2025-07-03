@@ -10,7 +10,9 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    ThreeYearCommitmentStatus,
+    STATUS_3YC_DECLINED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_NONCOMPLIANT,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment, get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
@@ -120,14 +122,16 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
 
             status = request_info["status"]
             if status in (
-                ThreeYearCommitmentStatus.ERROR_STATUSES
+                STATUS_3YC_DECLINED,
+                STATUS_3YC_EXPIRED,
+                STATUS_3YC_NONCOMPLIANT,
             ):
                 agreement_link = urljoin(
                     settings.MPT_PORTAL_BASE_URL,
                     f"/commerce/agreements/{agreement['id']}",
                 )
                 send_warning(
-                    f"3YC {request_type_title.capitalize()} Request {str(status).capitalize()}",
+                    f"3YC {request_type_title.capitalize()} Request {status.capitalize()}",
                     f"The 3-year {request_type_title} request for agreement {agreement['id']} "
                     f"**{agreement['name']}** of the customer **{get_company_name(agreement)}** "
                     f"has been denied: {status}.\n\n"

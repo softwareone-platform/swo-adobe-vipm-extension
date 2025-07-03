@@ -17,8 +17,11 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    STATUS_3YC_ACCEPTED,
+    STATUS_3YC_ACTIVE,
+    STATUS_3YC_COMMITTED,
+    STATUS_3YC_REQUESTED,
     STATUS_SUBSCRIPTION_TERMINATED,
-    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment
@@ -50,10 +53,7 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 
-TEMP_3YC_STATUSES = (
-    ThreeYearCommitmentStatus.REQUESTED,
-    ThreeYearCommitmentStatus.ACCEPTED,
-)
+TEMP_3YC_STATUSES = (STATUS_3YC_REQUESTED, STATUS_3YC_ACCEPTED)
 
 logger = logging.getLogger(__name__)
 
@@ -87,11 +87,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
     commitment_start_date = None
     if (
         commitment
-        and commitment["status"]
-        in (
-            ThreeYearCommitmentStatus.COMMITTED,
-            ThreeYearCommitmentStatus.ACTIVE,
-        )
+        and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):
         commitment_start_date = date.fromisoformat(commitment["startDate"])
