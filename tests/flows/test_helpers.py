@@ -8,8 +8,10 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
+    STATUS_3YC_COMMITTED,
+    STATUS_3YC_EXPIRED,
+    STATUS_3YC_REQUESTED,
     STATUS_INTERNAL_SERVER_ERROR,
-    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.flows.constants import (
@@ -557,7 +559,7 @@ def test_update_prices_step_with_3yc_commitment(
     """Test price updates when customer has 3YC commitment."""
     order = order_factory()
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2024-01-01",
         end_date="2025-01-01",
     )
@@ -619,7 +621,7 @@ def test_update_prices_step_with_expired_3yc_commitment(
     """Test price updates when customer has expired 3YC commitment."""
     order = order_factory()
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2023-01-01",
         end_date="2024-01-01",
     )
@@ -893,7 +895,7 @@ def test_validate_3yc_commitment_requested_status(
 ):
     """Test validation when commitment is in REQUESTED status."""
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.REQUESTED,
+        status=STATUS_3YC_REQUESTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
@@ -961,7 +963,7 @@ def test_validate_3yc_commitment_expired_status(
         "adobe_vipm.flows.helpers.set_order_error"
     )
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.EXPIRED,
+        status=STATUS_3YC_EXPIRED,
         start_date="2024-01-01",
         end_date="2024-01-01",
     )
@@ -1048,7 +1050,7 @@ def test_validate_3yc_commitment_item_not_found(
     )
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
@@ -1129,7 +1131,7 @@ def test_validate_3yc_commitment_item_not_found_validation(
     )
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
@@ -1213,7 +1215,7 @@ def test_validate_3yc_commitment_below_minimum_licenses(
     )
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
         licenses=100
@@ -1321,7 +1323,7 @@ def test_validate_3yc_commitment_below_minimum_consumables(
     )
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
         consumables=100
@@ -1427,7 +1429,7 @@ def test_validate_3yc_commitment_below_minimum_consumables_and_licenses(
     )
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
         licenses=100,
@@ -1523,7 +1525,7 @@ def test_validate_3yc_commitment_success(
     )
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=STATUS_3YC_COMMITTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
         licenses=10,
