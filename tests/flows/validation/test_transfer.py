@@ -5,13 +5,12 @@ import pytest
 from mpt_extension_sdk.mpt_http.wrap_http_error import MPTAPIError
 
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_COMMITTED,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
     STATUS_TRANSFER_INACTIVE_ACCOUNT,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_TRANSFER_STATUSES,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.constants import (
@@ -520,7 +519,10 @@ def test_validate_transfer_account_inactive(
 
 @pytest.mark.parametrize(
     "commitment_status",
-    [STATUS_3YC_ACTIVE, STATUS_3YC_COMMITTED],
+    [
+        ThreeYearCommitmentStatus.ACTIVE,
+        ThreeYearCommitmentStatus.COMMITTED
+    ],
 )
 def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitment_status):
     commitment = adobe_commitment_factory(

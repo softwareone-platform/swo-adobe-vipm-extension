@@ -6,14 +6,13 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
-    STATUS_3YC_COMMITTED,
-    STATUS_3YC_EXPIRED,
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
     STATUS_PENDING,
     STATUS_PROCESSED,
     STATUS_TRANSFER_INVALID_MEMBERSHIP,
     STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_TRANSFER_STATUSES,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
@@ -1777,7 +1776,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = STATUS_3YC_COMMITTED
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.COMMITTED
 
     adobe_customer = adobe_customer_factory()
 
@@ -1990,7 +1989,7 @@ def test_fulfill_transfer_order_already_migrated_(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = STATUS_3YC_EXPIRED
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED
 
     adobe_customer = adobe_customer_factory()
 
@@ -4822,7 +4821,7 @@ def test_fulfill_transfer_gc_order_already_migrated_(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = STATUS_3YC_EXPIRED
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED
 
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
 
@@ -5011,7 +5010,7 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     mocked_transfer.transfer_id = "transfer-id"
-    mocked_transfer.customer_benefits_3yc_status = STATUS_3YC_EXPIRED
+    mocked_transfer.customer_benefits_3yc_status = ThreeYearCommitmentStatus.EXPIRED
 
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
 

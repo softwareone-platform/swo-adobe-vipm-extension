@@ -586,45 +586,56 @@ class SetOrUpdateCotermNextSyncDates(Step):
             ).date()
             next_sync = coterm_date + timedelta(days=1)
 
-            needs_update = False
-            if coterm_date.isoformat() != get_coterm_date(context.order):
-                context.order = set_coterm_date(context.order, coterm_date.isoformat())
-                needs_update = True
-
-            if next_sync.isoformat() != get_next_sync(context.order):
-                context.order = set_next_sync(context.order, next_sync.isoformat())
-                needs_update = True
-
-            if context.adobe_customer:
-                commitment = get_3yc_commitment_request(context.adobe_customer)
-                if commitment:
-                    context.order = set_adobe_3yc_enroll_status(context.order, commitment["status"])
-                    context.order = set_adobe_3yc_commitment_request_status(
-                        context.order, commitment["status"])
-                    context.order = set_adobe_3yc_start_date(context.order, commitment["startDate"])
-                    context.order = set_adobe_3yc_end_date(context.order, commitment["endDate"])
-                    needs_update = True
+            needs_update = self.coterm_and_next_sync_update_if_needed(
+                context,
+                coterm_date,
+                next_sync
+            )
+            needs_update |= self.commitment_update_if_needed(context)
 
             if needs_update:
-                update_order(
-                    client, context.order_id, parameters=context.order["parameters"]
-                )
-                updated_params = {
-                    "coterm_date": coterm_date.isoformat(),
-                    "next_sync": next_sync.isoformat(),
-                }
-                if context.adobe_customer and get_3yc_commitment_request(context.adobe_customer):
-                    commitment = get_3yc_commitment_request(context.adobe_customer)
-                    updated_params.update({
-                        "3yc_enroll_status": commitment["status"],
-                        "3yc_commitment_request_status": commitment["status"],
-                        "3yc_start_date": commitment["startDate"],
-                        "3yc_end_date": commitment["endDate"]
-                    })
-                params_str = ', '.join(f'{k}={v}' for k, v in updated_params.items())
-                logger.info(f"{context}: Updated parameters: {params_str}")
+                self.update_order_parameters(client, context, coterm_date, next_sync)
 
         next_step(client, context)
+
+    def coterm_and_next_sync_update_if_needed(self, context, coterm_date, next_sync):
+        needs_update = False
+        if coterm_date.isoformat() != get_coterm_date(context.order):
+            context.order = set_coterm_date(context.order, coterm_date.isoformat())
+            needs_update = True
+        if next_sync.isoformat() != get_next_sync(context.order):
+            context.order = set_next_sync(context.order, next_sync.isoformat())
+            needs_update = True
+        return needs_update
+
+    def commitment_update_if_needed(self, context):
+        if not context.adobe_customer:
+            return False
+        commitment = get_3yc_commitment_request(context.adobe_customer)
+        if not commitment:
+            return False
+        context.order = set_adobe_3yc_enroll_status(context.order, commitment["status"])
+        context.order = set_adobe_3yc_commitment_request_status(context.order, commitment["status"])
+        context.order = set_adobe_3yc_start_date(context.order, commitment["startDate"])
+        context.order = set_adobe_3yc_end_date(context.order, commitment["endDate"])
+        return True
+
+    def update_order_parameters(self, client, context, coterm_date, next_sync):
+        update_order(client, context.order_id, parameters=context.order["parameters"])
+        updated_params = {
+            "coterm_date": coterm_date.isoformat(),
+            "next_sync": next_sync.isoformat(),
+        }
+        commitment = get_3yc_commitment_request(context.adobe_customer)
+        if commitment:
+            updated_params.update({
+                "3yc_enroll_status": commitment["status"],
+                "3yc_commitment_request_status": commitment["status"],
+                "3yc_start_date": commitment["startDate"],
+                "3yc_end_date": commitment["endDate"]
+            })
+        params_str = ', '.join(f'{k}={v}' for k, v in updated_params.items())
+        logger.info(f"{context}: Updated parameters: {params_str}")
 
 
 class StartOrderProcessing(Step):
