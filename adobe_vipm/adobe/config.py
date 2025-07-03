@@ -1,6 +1,7 @@
 import json
+from collections.abc import MutableMapping
 from importlib.resources import files
-from typing import List, MutableMapping, Tuple
+from typing import List, Tuple
 
 from django.conf import settings
 
