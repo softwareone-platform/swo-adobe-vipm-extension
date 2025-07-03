@@ -19,6 +19,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import (
+    get_3yc_commitment,
     get_3yc_commitment_request,
     get_item_by_partial_sku,
 )
@@ -207,7 +208,11 @@ class Validate3YCCommitment(Step):
                 next_step(client, context)
             return
 
-        commitment = get_3yc_commitment_request(context.adobe_customer)
+        commitment = (
+            get_3yc_commitment_request(context.adobe_customer)
+            or get_3yc_commitment(context.adobe_customer)
+        )
+
         adobe_client = get_adobe_client()
         commitment_status = commitment.get("status",'')
 
