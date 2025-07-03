@@ -131,7 +131,11 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
     request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
-    error_statuses = [status.name for status in ThreeYearCommitmentStatus.ERROR_STATUSES]
+    error_statuses = [
+        ThreeYearCommitmentStatus.DECLINED,
+        ThreeYearCommitmentStatus.NONCOMPLIANT,
+        ThreeYearCommitmentStatus.EXPIRED
+    ]
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("

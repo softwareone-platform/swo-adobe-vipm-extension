@@ -519,7 +519,10 @@ def test_validate_transfer_account_inactive(
 
 @pytest.mark.parametrize(
     "commitment_status",
-    [ThreeYearCommitmentStatus.ACTIVE, ThreeYearCommitmentStatus.COMMITTED],
+    [
+        ThreeYearCommitmentStatus.ACTIVE,
+        ThreeYearCommitmentStatus.COMMITTED
+    ],
 )
 def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitment_status):
     commitment = adobe_commitment_factory(

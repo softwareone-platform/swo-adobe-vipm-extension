@@ -72,7 +72,7 @@ def get_prices(order, commitment, adobe_skus):
         commitment
         and commitment["status"] in (
             ThreeYearCommitmentStatus.COMMITTED,
-            ThreeYearCommitmentStatus.ACTIVE,
+            ThreeYearCommitmentStatus.ACTIVE
         )
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):

@@ -72,7 +72,11 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
         PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
     )
 
-    error_statuses = [status.name for status in ThreeYearCommitmentStatus.ERROR_STATUSES]
+    error_statuses = [
+        ThreeYearCommitmentStatus.DECLINED,
+        ThreeYearCommitmentStatus.NONCOMPLIANT,
+        ThreeYearCommitmentStatus.EXPIRED
+    ]
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("

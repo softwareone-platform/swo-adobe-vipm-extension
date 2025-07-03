@@ -120,14 +120,16 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
 
             status = request_info["status"]
             if status in (
-                ThreeYearCommitmentStatus.ERROR_STATUSES
+                ThreeYearCommitmentStatus.DECLINED,
+                ThreeYearCommitmentStatus.EXPIRED,
+                ThreeYearCommitmentStatus.NONCOMPLIANT,
             ):
                 agreement_link = urljoin(
                     settings.MPT_PORTAL_BASE_URL,
                     f"/commerce/agreements/{agreement['id']}",
                 )
                 send_warning(
-                    f"3YC {request_type_title.capitalize()} Request {str(status).capitalize()}",
+                    f"3YC {request_type_title.capitalize()} Request {status}",
                     f"The 3-year {request_type_title} request for agreement {agreement['id']} "
                     f"**{agreement['name']}** of the customer **{get_company_name(agreement)}** "
                     f"has been denied: {status}.\n\n"

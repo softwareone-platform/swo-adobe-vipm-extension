@@ -637,6 +637,7 @@ class SetOrUpdateCotermNextSyncDates(Step):
         params_str = ', '.join(f'{k}={v}' for k, v in updated_params.items())
         logger.info(f"{context}: Updated parameters: {params_str}")
 
+
 class StartOrderProcessing(Step):
     """
     Set the template for the processing status or the

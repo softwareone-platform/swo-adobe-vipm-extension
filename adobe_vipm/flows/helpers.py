@@ -216,13 +216,16 @@ class Validate3YCCommitment(Step):
         adobe_client = get_adobe_client()
         commitment_status = commitment.get("status",'')
 
-        if (commitment_status == ThreeYearCommitmentStatus.REQUESTED
-            and not self.is_validation):
-            logger.info(f"{context}: 3YC commitment request is in status "
-                        f"{ThreeYearCommitmentStatus.REQUESTED}")
+        if commitment_status == ThreeYearCommitmentStatus.REQUESTED and not self.is_validation:
+            logger.info(f"{context}: 3YC commitment request is "
+                        f"in status {ThreeYearCommitmentStatus.REQUESTED}")
             return
 
-        if commitment_status in ThreeYearCommitmentStatus.ERROR_STATUSES:
+        if commitment_status in [
+            ThreeYearCommitmentStatus.EXPIRED,
+            ThreeYearCommitmentStatus.NONCOMPLIANT,
+            ThreeYearCommitmentStatus.DECLINED,
+        ]:
             logger.info(f"{context}: 3YC commitment is expired or noncompliant")
             switch_order_to_failed(
                 client,
@@ -495,7 +498,10 @@ class UpdatePrices(Step):
             return False
 
         return (
-            commitment["status"] in ThreeYearCommitmentStatus.FINISHED_STATUSES
+            commitment["status"] in (
+                ThreeYearCommitmentStatus.COMMITTED,
+                ThreeYearCommitmentStatus.ACTIVE,
+                ThreeYearCommitmentStatus.ACCEPTED)
             and date.fromisoformat(commitment["endDate"]) >= date.today()
         )
 
