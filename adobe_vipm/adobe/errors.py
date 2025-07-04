@@ -35,11 +35,14 @@ class CountryNotFoundError(AdobeError):
 class CustomerDiscountsNotFoundError(AdobeError):
     pass
 
+
 class SubscriptionNotFoundError(AdobeError):
     pass
 
+
 class SubscriptionUpdateError(AdobeError):
     pass
+
 
 class AdobeHttpError(AdobeError):
     def __init__(self, status_code: int, content: str):
@@ -54,9 +57,7 @@ class AdobeAPIError(AdobeHttpError):
         self.payload: dict = payload
         # 504 error response doesn't follow the expected format -
         # it uses "error_code" field instead of "code"
-        self.code: str = (
-            payload.get("code") or payload.get("error_code") or payload.get("error")
-        )
+        self.code: str = payload.get("code") or payload.get("error_code") or payload.get("error")
         self.message: str = (
             payload.get("message") or payload.get("error_description") or str(payload)
         )
@@ -82,8 +83,6 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
             try:
                 raise AdobeAPIError(e.response.status_code, e.response.json())
             except JSONDecodeError:
-                raise AdobeHttpError(
-                    e.response.status_code, e.response.content.decode()
-                )
+                raise AdobeHttpError(e.response.status_code, e.response.content.decode())
 
     return _wrapper

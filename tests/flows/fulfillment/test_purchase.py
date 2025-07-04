@@ -231,9 +231,7 @@ def test_validate_market_segment_eligibility_step_status_eligible(
     mocked_next_step.assert_not_called()
 
 
-def test_create_customer_step(
-    mocker, order_factory, customer_data, adobe_customer_factory
-):
+def test_create_customer_step(mocker, order_factory, customer_data, adobe_customer_factory):
     adobe_customer = adobe_customer_factory()
 
     mocked_adobe_client = mocker.MagicMock()
@@ -542,9 +540,7 @@ def test_create_customer_step_handle_error_unexpected_error(
     )
 
 
-def test_create_customer_step_handle_error_address(
-    mocker, order_factory, adobe_api_error_factory
-):
+def test_create_customer_step_handle_error_address(mocker, order_factory, adobe_api_error_factory):
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(

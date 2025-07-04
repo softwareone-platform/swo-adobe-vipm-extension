@@ -2,9 +2,7 @@ from django.test import override_settings
 from swo.mpt.extensions.runtime.master import Master
 
 
-@override_settings(
-    MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt.ext": {}}}
-)
+@override_settings(MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt.ext": {}}})
 def test_master_start_signals_handler(mock_runtime_master_options):
     mock_runtime_master = Master(mock_runtime_master_options)
     mock_runtime_master.setup_signals_handler()
@@ -14,9 +12,7 @@ def test_master_start_signals_handler(mock_runtime_master_options):
     assert is_started
 
 
-@override_settings(
-    MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt": {}}}
-)
+@override_settings(MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt": {}}})
 def test_master_restart_signals_handler(mock_runtime_master_options):
     mock_runtime_master = Master(mock_runtime_master_options)
     mock_runtime_master.setup_signals_handler()
@@ -27,9 +23,7 @@ def test_master_restart_signals_handler(mock_runtime_master_options):
     assert is_restarted
 
 
-@override_settings(
-    MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt": {}}}
-)
+@override_settings(MPT_PRODUCTS_IDS="PRD-1111-1111", LOGGING={"loggers": {"swo.mpt": {}}})
 def test_master_stop_signals_handler(mock_runtime_master_options):
     mock_runtime_master = Master(mock_runtime_master_options)
     mock_runtime_master.setup_signals_handler()

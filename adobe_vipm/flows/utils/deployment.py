@@ -17,11 +17,8 @@ def get_deployments(order):
         order,
         PARAM_DEPLOYMENTS,
     )
-    return (
-        deployments_param.get("value").split(",")
-        if deployments_param.get("value")
-        else []
-    )
+    return deployments_param.get("value").split(",") if deployments_param.get("value") else []
+
 
 def set_deployments(order, deployments):
     """
@@ -52,11 +49,10 @@ def exclude_items_with_deployment_id(adobe_transfer):
     Returns:
         dict: The Adobe transfer order with items without deployment ID.
     """
-    line_items = [
-        item for item in adobe_transfer["lineItems"] if not item.get("deploymentId", "")
-    ]
+    line_items = [item for item in adobe_transfer["lineItems"] if not item.get("deploymentId", "")]
     adobe_transfer["lineItems"] = line_items
     return adobe_transfer
+
 
 def exclude_subscriptions_with_deployment_id(adobe_subscriptions):
     """
@@ -68,13 +64,10 @@ def exclude_subscriptions_with_deployment_id(adobe_subscriptions):
     Returns:
         dict: The Adobe customer subscriptions with subscriptions without deployment ID.
     """
-    items = [
-        item
-        for item in adobe_subscriptions["items"]
-        if not item.get("deploymentId", "")
-    ]
+    items = [item for item in adobe_subscriptions["items"] if not item.get("deploymentId", "")]
     adobe_subscriptions["items"] = items
     return adobe_subscriptions
+
 
 def get_deployment_id(source):
     """
@@ -90,5 +83,3 @@ def get_deployment_id(source):
         "deploymentId",
     )
     return param.get("value")
-
-

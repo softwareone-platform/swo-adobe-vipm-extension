@@ -44,7 +44,7 @@ class ValidateDownsizes(Step):
         adobe_client = get_adobe_client()
         errors = []
 
-        if (is_within_coterm_window(context.adobe_customer)):
+        if is_within_coterm_window(context.adobe_customer):
             logger.info(
                 "Downsize occurs in the last two weeks before the anniversary date. "
                 "Returnable orders are not going to be submitted, the renewal quantity "
@@ -64,9 +64,7 @@ class ValidateDownsizes(Step):
             if not returnable_orders:
                 continue
 
-            returnable_by_quantity = self.get_returnable_by_quantity_map(
-                returnable_orders
-            )
+            returnable_by_quantity = self.get_returnable_by_quantity_map(returnable_orders)
 
             delta = line["oldQuantity"] - line["quantity"]
 

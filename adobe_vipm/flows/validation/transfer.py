@@ -12,7 +12,6 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
-from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     STATUS_RUNNING,
     STATUS_SYNCHRONIZED,
@@ -47,7 +46,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_ordering_parameter_error,
 )
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +69,8 @@ def get_prices(order, commitment, adobe_skus):
     product_id = order["agreement"]["product"]["id"]
     if (
         commitment
-        and commitment["status"] in (
-            ThreeYearCommitmentStatus.COMMITTED,
-            ThreeYearCommitmentStatus.ACTIVE
-        )
+        and commitment["status"]
+        in (ThreeYearCommitmentStatus.COMMITTED, ThreeYearCommitmentStatus.ACTIVE)
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):
         return get_prices_for_3yc_skus(
@@ -105,9 +102,7 @@ def _update_order_lines(
 
             return order_error, order
 
-        current_line = get_order_line_by_sku(
-            order, get_partial_sku(adobe_line["offerId"])
-        )
+        current_line = get_order_line_by_sku(order, get_partial_sku(adobe_line["offerId"]))
         if current_line:
             current_line["quantity"] = adobe_line[quantity_field]
         else:
@@ -121,9 +116,7 @@ def _update_order_lines(
             order["lines"].append(new_line)
 
     lines = [
-        line
-        for line in order["lines"]
-        if line["item"]["externalIds"]["vendor"] in returned_skus
+        line for line in order["lines"] if line["item"]["externalIds"]["vendor"] in returned_skus
     ]
     order["lines"] = lines
 
@@ -156,9 +149,7 @@ def add_lines_to_order(
 
     if adobe_items:
         items = _get_items(adobe_items, mpt_client, order)
-        adobe_items_without_one_time_offers = _get_items_without_one_time_offers(
-            adobe_items, items
-        )
+        adobe_items_without_one_time_offers = _get_items_without_one_time_offers(adobe_items, items)
 
         if is_transferred:
             if are_all_transferring_items_expired(adobe_items_without_one_time_offers):
@@ -199,9 +190,7 @@ def add_lines_to_order(
     return order_error, order
 
 
-def _get_updated_order_lines(
-    adobe_items, commitment, items, order, order_error, quantity_field
-):
+def _get_updated_order_lines(adobe_items, commitment, items, order, order_error, quantity_field):
     valid_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
     returned_full_skus = [item["offerId"] for item in adobe_items]
     prices = get_prices(order, commitment, returned_full_skus)
@@ -244,21 +233,15 @@ def _fail_validation_if_items_updated(
 def _get_items(adobe_items, mpt_client, order):
     returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
 
-    return get_product_items_by_skus(
-        mpt_client, order["agreement"]["product"]["id"], returned_skus
-    )
+    return get_product_items_by_skus(mpt_client, order["agreement"]["product"]["id"], returned_skus)
 
 
 def _get_items_without_one_time_offers(adobe_items, items):
     one_time_skus = [
-        item["externalIds"]["vendor"]
-        for item in items
-        if item["terms"]["period"] == "one-time"
+        item["externalIds"]["vendor"] for item in items if item["terms"]["period"] == "one-time"
     ]
     adobe_items_without_one_time_offers = [
-        item
-        for item in adobe_items
-        if get_partial_sku(item["offerId"]) not in one_time_skus
+        item for item in adobe_items if get_partial_sku(item["offerId"]) not in one_time_skus
     ]
 
     return adobe_items_without_one_time_offers
@@ -296,9 +279,7 @@ def validate_transfer_not_migrated(mpt_client, order):
         return True, order
     except AdobeHttpError as he:
         err_msg = (
-            ERR_ADOBE_MEMBERSHIP_NOT_FOUND
-            if he.status_code == 404
-            else ERR_ADOBE_UNEXPECTED_ERROR
+            ERR_ADOBE_MEMBERSHIP_NOT_FOUND if he.status_code == 404 else ERR_ADOBE_UNEXPECTED_ERROR
         )
         param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
@@ -308,9 +289,7 @@ def validate_transfer_not_migrated(mpt_client, order):
         )
         return True, order
     commitment = get_3yc_commitment(transfer_preview)
-    return add_lines_to_order(
-        mpt_client, order, transfer_preview["items"], commitment, "quantity"
-    )
+    return add_lines_to_order(mpt_client, order, transfer_preview["items"], commitment, "quantity")
 
 
 class SetupTransferContext(Step):
@@ -327,6 +306,7 @@ class SetupTransferContext(Step):
             context.membership_id,
         )
         next_step(mpt_client, context)
+
 
 class ValidateTransferStatus(Step):
     def __call__(self, mpt_client, context, next_step):
@@ -346,7 +326,7 @@ class ValidateTransferStatus(Step):
                 PARAM_MEMBERSHIP_ID,
                 ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
                     status=context.adobe_transfer["status"],
-                )
+                ),
             )
             context.validation_succeeded = False
             return
@@ -358,19 +338,15 @@ class ValidateTransferStatus(Step):
         context.order = set_ordering_parameter_error(
             order,
             PARAM_MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                title=param["name"],
-                details=details
-            ),
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=details),
         )
         context.validation_succeeded = False
+
 
 class FetchTransferData(Step):
     def __call__(self, mpt_client, context, next_step):
         if not context.transfer:
-            has_error, order = validate_transfer_not_migrated(
-                mpt_client, context.order
-            )
+            has_error, order = validate_transfer_not_migrated(mpt_client, context.order)
             context.order = order
             context.validation_succeeded = not has_error
             return
@@ -404,22 +380,22 @@ class FetchTransferData(Step):
 
         next_step(mpt_client, context)
 
+
 class UpdateSubscriptionSkus(Step):
     def __call__(self, mpt_client, context, next_step):
         for subscription in context.subscriptions["items"]:
             correct_sku = get_transfer_item_sku_by_subscription(
-                context.adobe_transfer,
-                subscription["subscriptionId"]
+                context.adobe_transfer, subscription["subscriptionId"]
             )
             subscription["offerId"] = correct_sku or subscription["offerId"]
         next_step(mpt_client, context)
+
 
 class FetchCustomerAndValidateEmptySubscriptions(Step):
     def __call__(self, mpt_client, context, next_step):
         adobe_client = get_adobe_client()
         customer = adobe_client.get_customer(
-            context.order["authorization"]["id"],
-            context.transfer.customer_id
+            context.order["authorization"]["id"], context.transfer.customer_id
         )
         context.customer = customer
 
@@ -431,8 +407,7 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
                     context.order,
                     PARAM_MEMBERSHIP_ID,
                     ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                        title=param["name"],
-                        details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
+                        title=param["name"], details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
                     ),
                 )
                 context.validation_succeeded = False
@@ -441,6 +416,7 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
             return
 
         next_step(mpt_client, context)
+
 
 class AddLinesToOrder(Step):
     def __call__(self, mpt_client, context, next_step):
@@ -451,11 +427,12 @@ class AddLinesToOrder(Step):
             context.subscriptions["items"],
             commitment,
             "currentQuantity",
-            True
+            True,
         )
         context.order = order
         context.validation_succeeded = not has_error
         next_step(mpt_client, context)
+
 
 def validate_transfer(mpt_client, order):
     pipeline = Pipeline(

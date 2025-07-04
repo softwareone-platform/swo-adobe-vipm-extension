@@ -26,21 +26,13 @@ def test_properties(mock_adobe_config, adobe_config_file, settings):
     assert c.language_codes == ["en-US"]
 
 
-def test_get_reseller(
-    mock_adobe_config, adobe_credentials_file, adobe_authorizations_file
-):
+def test_get_reseller(mock_adobe_config, adobe_credentials_file, adobe_authorizations_file):
     """
     Test the lookup the Reseller object by Authorization and id.
     """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
-    seller_uk = adobe_authorizations_file["authorizations"][0]["resellers"][0][
-        "seller_uk"
-    ]
-    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
-        "seller_id"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_uk = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_uk"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
     reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
 
     c = Config()
@@ -59,9 +51,7 @@ def test_get_reseller_not_found(mock_adobe_config, adobe_authorizations_file):
     if there is no reseller for a given an authorization and reseller uk/id.
     """
     c = Config()
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     auth = c.get_authorization(authorization_uk)
     with pytest.raises(ResellerNotFoundError) as cv:
         assert c.get_reseller(auth, "SEL-unknown")
@@ -71,18 +61,12 @@ def test_get_reseller_not_found(mock_adobe_config, adobe_authorizations_file):
     )
 
 
-def test_get_authorization(
-    mock_adobe_config, adobe_credentials_file, adobe_authorizations_file
-):
+def test_get_authorization(mock_adobe_config, adobe_credentials_file, adobe_authorizations_file):
     """
     Test the lookup the Authorization object by uk/id.
     """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
-    authorization_id = adobe_authorizations_file["authorizations"][0][
-        "authorization_id"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    authorization_id = adobe_authorizations_file["authorizations"][0]["authorization_id"]
     client_id = adobe_credentials_file[0]["client_id"]
     client_secret = adobe_credentials_file[0]["client_secret"]
     distributor_id = adobe_authorizations_file["authorizations"][0]["distributor_id"]
@@ -149,10 +133,7 @@ def test_load_data(
     settings,
 ):
     def multi_mock_open(*file_contents):
-        mock_files = [
-            mocker.mock_open(read_data=content).return_value
-            for content in file_contents
-        ]
+        mock_files = [mocker.mock_open(read_data=content).return_value for content in file_contents]
         mock_opener = mocker.mock_open()
         mock_opener.side_effect = mock_files
         return mock_opener

@@ -519,10 +519,7 @@ def test_validate_transfer_account_inactive(
 
 @pytest.mark.parametrize(
     "commitment_status",
-    [
-        ThreeYearCommitmentStatus.ACTIVE,
-        ThreeYearCommitmentStatus.COMMITTED
-    ],
+    [ThreeYearCommitmentStatus.ACTIVE, ThreeYearCommitmentStatus.COMMITTED],
 )
 def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitment_status):
     commitment = adobe_commitment_factory(
@@ -1268,7 +1265,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     }
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1439,7 +1435,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
         "items": [adobe_subscription, adobe_subscription_2, adobe_subscription_3],
     }
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
-
 
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_adobe_client",

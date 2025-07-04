@@ -39,9 +39,7 @@ class ResellerClientMixin:
                         "firstName": reseller_data["contact"]["firstName"],
                         "lastName": reseller_data["contact"]["lastName"],
                         "email": reseller_data["contact"]["email"],
-                        "phoneNumber": join_phone_number(
-                            reseller_data["contact"]["phone"]
-                        ),
+                        "phoneNumber": join_phone_number(reseller_data["contact"]["phone"]),
                     }
                 ],
             },

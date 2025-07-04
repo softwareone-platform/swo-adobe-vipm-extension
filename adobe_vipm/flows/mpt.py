@@ -75,7 +75,7 @@ def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
     error_statuses = [
         ThreeYearCommitmentStatus.DECLINED,
         ThreeYearCommitmentStatus.NONCOMPLIANT,
-        ThreeYearCommitmentStatus.EXPIRED
+        ThreeYearCommitmentStatus.EXPIRED,
     ]
 
     enroll_status_condition = (

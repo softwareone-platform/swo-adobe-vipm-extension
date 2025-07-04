@@ -39,10 +39,9 @@ def set_adobe_order_id(order, adobe_order_id):
         dict: The updated order with the vendor external id attribute set.
     """
     updated_order = copy.deepcopy(order)
-    updated_order["externalIds"] = updated_order.get("externalIds", {}) | {
-        "vendor": adobe_order_id
-    }
+    updated_order["externalIds"] = updated_order.get("externalIds", {}) | {"vendor": adobe_order_id}
     return updated_order
+
 
 def is_purchase_order(order):
     """
@@ -75,8 +74,10 @@ def is_change_order(order):
 def is_termination_order(order):
     return order["type"] == ORDER_TYPE_TERMINATION
 
+
 def is_configuration_order(order):
     return order["type"] == ORDER_TYPE_CONFIGURATION
+
 
 def split_downsizes_upsizes_new(order):
     """
@@ -102,6 +103,7 @@ def split_downsizes_upsizes_new(order):
 
     return downsize_lines, upsize_lines, new_lines
 
+
 def get_order_line_by_sku(order, sku):
     """
     Returns an order line object by sku or None if not found.
@@ -120,6 +122,7 @@ def get_order_line_by_sku(order, sku):
         lambda line: line["item"]["externalIds"]["vendor"] in sku,
         order["lines"],
     )
+
 
 def has_order_line_updated(order_lines, adobe_items, quantity_field):
     """
@@ -145,6 +148,7 @@ def has_order_line_updated(order_lines, adobe_items, quantity_field):
     }
     return order_line_map != adobe_items_map
 
+
 def set_order_error(order, error):
     updated_order = copy.deepcopy(order)
     updated_order["error"] = error
@@ -156,10 +160,12 @@ def reset_order_error(order):
     updated_order["error"] = None
     return updated_order
 
+
 def set_template(order, template):
     updated_order = copy.deepcopy(order)
     updated_order["template"] = template
     return updated_order
+
 
 def get_one_time_skus(client, order):
     """
@@ -190,9 +196,7 @@ def map_returnable_to_return_orders(returnable_orders, return_orders):
 
     for returnable_order in returnable_orders:
         return_order = find_first(
-            functools.partial(
-                filter_by_reference_order, returnable_order.order["orderId"]
-            ),
+            functools.partial(filter_by_reference_order, returnable_order.order["orderId"]),
             return_orders,
         )
         mapped.append((returnable_order, return_order))

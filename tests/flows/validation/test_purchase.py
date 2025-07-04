@@ -55,9 +55,7 @@ def test_validate_company_name(order_factory, order_parameters_factory, company_
     """
     Tests the validation of the Company name when it is valid.
     """
-    order = order_factory(
-        order_parameters=order_parameters_factory(company_name=company_name)
-    )
+    order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
 
     context = Context(
@@ -87,9 +85,7 @@ def test_validate_company_name_invalid_length(
     """
     Tests the validation of the Company name when it is invalid due to length.
     """
-    order = order_factory(
-        order_parameters=order_parameters_factory(company_name=company_name)
-    )
+    order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
 
     context = Context(
@@ -117,15 +113,11 @@ def test_validate_company_name_invalid_length(
         "Star * of the Sky",
     ],
 )
-def test_validate_company_name_invalid_chars(
-    order_factory, order_parameters_factory, company_name
-):
+def test_validate_company_name_invalid_chars(order_factory, order_parameters_factory, company_name):
     """
     Tests the validation of the Company name when it is invalid due to chars.
     """
-    order = order_factory(
-        order_parameters=order_parameters_factory(company_name=company_name)
-    )
+    order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
     context = Context(
         order=order,
@@ -250,9 +242,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
     assert param["constraints"]["required"] is True
 
 
-def test_validate_address_invalid_state_did_u_mean(
-    order_factory, order_parameters_factory
-):
+def test_validate_address_invalid_state_did_u_mean(order_factory, order_parameters_factory):
     order = order_factory(
         order_parameters=order_parameters_factory(
             address={
@@ -331,9 +321,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
     assert param["constraints"]["required"] is True
 
 
-def test_validate_address_invalid_postal_code_length(
-    order_factory, order_parameters_factory
-):
+def test_validate_address_invalid_postal_code_length(order_factory, order_parameters_factory):
     """
     Tests the validation of an address when the postal code doesn't match
     the expected length.
@@ -809,7 +797,6 @@ def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
         title_min_consumables="3YCConsumables",
     )
     assert context.order["error"] == error
-
 
 
 def test_check_purchase_validation_enabled_step(mocker, order_factory):

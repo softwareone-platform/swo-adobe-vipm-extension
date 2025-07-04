@@ -38,9 +38,7 @@ def test_validate_duplicate_lines_step_duplicates(mocker, order_factory, lines_f
     mocked_next_step.assert_not_called()
 
 
-def test_validate_duplicate_lines_step_existing_lines(
-    mocker, order_factory, lines_factory
-):
+def test_validate_duplicate_lines_step_existing_lines(mocker, order_factory, lines_factory):
     order = order_factory(lines=lines_factory(line_id=2, item_id=10))
 
     mocked_client = mocker.MagicMock()
@@ -91,9 +89,7 @@ def test_validate_duplicate_lines_step_no_lines(mocker, order_factory):
 )
 def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segment):
     deployment_id = "deployment-id"
-    adobe_preview_order = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=deployment_id
-    )
+    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocker.patch(
@@ -138,13 +134,9 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segm
     "segment",
     [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
 )
-def test_get_preview_order_step_no_deployment(
-    mocker, order_factory, adobe_order_factory, segment
-):
+def test_get_preview_order_step_no_deployment(mocker, order_factory, adobe_order_factory, segment):
     deployment_id = None
-    adobe_preview_order = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=deployment_id
-    )
+    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
     mocker.patch(
@@ -213,9 +205,7 @@ def test_get_preview_order_step_no_lines(mocker, order_factory):
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_get_preview_order_step_api_error(
-    mocker, order_factory, adobe_api_error_factory
-):
+def test_get_preview_order_step_api_error(mocker, order_factory, adobe_api_error_factory):
     error = AdobeAPIError(400, adobe_api_error_factory("9999", "unexpected"))
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.side_effect = error
@@ -245,9 +235,7 @@ def test_get_preview_order_step_api_error(
     mocked_next_step.assert_not_called()
 
 
-def test_get_preview_order_step_product_not_found_error(
-    mocker, order_factory
-):
+def test_get_preview_order_step_product_not_found_error(mocker, order_factory):
     error = AdobeProductNotFoundError("Product not found")
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.side_effect = error

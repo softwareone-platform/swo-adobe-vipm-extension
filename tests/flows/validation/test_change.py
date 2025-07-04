@@ -33,9 +33,7 @@ def test_validate_downsizes_step(
         )
     )
     coterm_date = datetime.today() + timedelta(days=20)
-    adobe_customer = adobe_customer_factory(
-        coterm_date=coterm_date.strftime("%Y-%m-%d")
-    )
+    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -118,9 +116,7 @@ def test_validate_downsizes_step_no_returnable_orders(
         )
     )
     coterm_date = datetime.today() + timedelta(days=20)
-    adobe_customer = adobe_customer_factory(
-        coterm_date=coterm_date.strftime("%Y-%m-%d")
-    )
+    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock()
@@ -170,9 +166,7 @@ def test_validate_downsizes_step_invalid_quantity(
         )
     )
     coterm_date = datetime.today() + timedelta(days=20)
-    adobe_customer = adobe_customer_factory(
-        coterm_date=coterm_date.strftime("%Y-%m-%d")
-    )
+    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
@@ -268,9 +262,7 @@ def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
         )
     )
     coterm_date = datetime.today() + timedelta(days=10)
-    adobe_customer = adobe_customer_factory(
-        coterm_date=coterm_date.strftime("%Y-%m-%d")
-    )
+    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
 
     mocked_adobe_client = mocker.MagicMock()
 
@@ -312,9 +304,7 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
         )
     )
     coterm_date = datetime.today() + timedelta(days=20)
-    adobe_customer = adobe_customer_factory(
-        coterm_date=coterm_date.strftime("%Y-%m-%d")
-    )
+    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=16),
@@ -409,8 +399,3 @@ def test_validate_change_order(mocker):
         mocked_client,
         mocked_context,
     )
-
-
-
-
-

@@ -30,7 +30,6 @@ class AdobeClient(
         self._token_cache: MutableMapping[Authorization, APIToken] = {}
         self._logger = logger
 
-
     def _get_headers(self, authorization: Authorization, correlation_id=None):
         return {
             "X-Api-Key": authorization.client_id,
@@ -62,9 +61,7 @@ class AdobeClient(
             token_info = response.json()
             self._token_cache[authorization] = APIToken(
                 token=token_info["access_token"],
-                expires=(
-                    datetime.now() + timedelta(seconds=token_info["expires_in"] - 180)
-                ),
+                expires=(datetime.now() + timedelta(seconds=token_info["expires_in"] - 180)),
             )
         response.raise_for_status()
 

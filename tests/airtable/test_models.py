@@ -77,9 +77,7 @@ def test_get_offer_ids_by_membership_id(mocker, settings):
     offer_ids = get_offer_ids_by_membership_id("product_id", "member_id")
 
     assert offer_ids == ["offer-id"]
-    mocked_offer_model.all.assert_called_once_with(
-        formula="{membership_id}='member_id'"
-    )
+    mocked_offer_model.all.assert_called_once_with(formula="{membership_id}='member_id'")
 
 
 def test_create_offers(mocker, settings):
@@ -203,10 +201,7 @@ def test_get_transfer_link(mocker):
     table_mock.schema.return_value = schema_mock
     transfer.get_table.return_value = table_mock
 
-    assert (
-        get_transfer_link(transfer)
-        == "https://airtable.com/base-id/table-id/view-id/record-id"
-    )
+    assert get_transfer_link(transfer) == "https://airtable.com/base-id/table-id/view-id/record-id"
 
 
 def test_get_transfer_link_exception(mocker):
@@ -332,9 +327,7 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
     }
 
 
-def test_get_prices_for_3yc_skus_hit_cache(
-    mocker, settings, mock_pricelist_cache_factory
-):
+def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cache_factory):
     cache = defaultdict(list)
     cache["sku-1"].append(
         {
@@ -384,9 +377,7 @@ def test_get_prices_for_3yc_skus_hit_cache(
     )
 
 
-def test_get_prices_for_3yc_skus_just_cache(
-    mocker, settings, mock_pricelist_cache_factory
-):
+def test_get_prices_for_3yc_skus_just_cache(mocker, settings, mock_pricelist_cache_factory):
     cache = defaultdict(list)
     cache["sku-1"].append(
         {
@@ -504,9 +495,7 @@ def test_create_gc_main_agreement(mocker, settings):
         "AIRTABLE_BASES": {"product_id": "base_id"},
     }
     mocked_gc_main_agreement = mocker.MagicMock()
-    mocked_get_gc_main_agreement_model = mocker.MagicMock(
-        return_value=mocked_gc_main_agreement
-    )
+    mocked_get_gc_main_agreement_model = mocker.MagicMock(return_value=mocked_gc_main_agreement)
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_main_agreement_model",
         return_value=mocked_get_gc_main_agreement_model,
@@ -550,9 +539,7 @@ def test_get_gc_main_agreement(mocker, settings):
     mocked_gc_main_agreement = mocker.MagicMock()
     mocked_gc_main_agreement_model.all.return_value = [mocked_gc_main_agreement]
 
-    gc_main_agreement = get_gc_main_agreement(
-        "product_id", "authorization_uk", "main_agreement_id"
-    )
+    gc_main_agreement = get_gc_main_agreement("product_id", "authorization_uk", "main_agreement_id")
 
     assert gc_main_agreement == mocked_gc_main_agreement
     mocked_gc_main_agreement_model.all.assert_called_once_with(
@@ -574,9 +561,7 @@ def test_get_gc_main_agreement_empty_response(mocker, settings):
 
     mocked_gc_main_agreement_model.all.return_value = []
 
-    gc_main_agreement = get_gc_main_agreement(
-        "product_id", "authorization_uk", "main_agreement_id"
-    )
+    gc_main_agreement = get_gc_main_agreement("product_id", "authorization_uk", "main_agreement_id")
 
     assert gc_main_agreement is None
     mocked_gc_main_agreement_model.all.assert_called_once_with(
@@ -701,5 +686,3 @@ def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     assert not result.is_consumable()
     assert result.is_license()
     assert result.is_valid_3yc_type()
-
-
