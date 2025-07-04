@@ -56,9 +56,7 @@ def test_notify_agreement_unhandled_exception_in_teams(mocker):
 
 def test_notify_missing_prices(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
-    notify_missing_prices(
-        "AGR-0000", ["65504578CA01A12"], "65504575CA01A12", "USD", None
-    )
+    notify_missing_prices("AGR-0000", ["65504578CA01A12"], "65504575CA01A12", "USD", None)
 
     mocked_send_exc.assert_called_once_with(
         "Missing prices detected",
@@ -69,13 +67,14 @@ def test_notify_missing_prices(mocker):
         "- SKUs:\n  - 65504578CA01A12\n",
     )
 
+
 def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
     notify_not_updated_subscriptions(
         order_id="ORD-1234",
         error_message="Some error occurred",
         updated_subscriptions=[],
-        product_id="PROD-5678"
+        product_id="PROD-5678",
     )
 
     expected_message = (
@@ -86,8 +85,7 @@ def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
     )
 
     mocked_send_exc.assert_called_once_with(
-        "Error updating the subscriptions in configuration order: ORD-1234",
-        expected_message
+        "Error updating the subscriptions in configuration order: ORD-1234", expected_message
     )
 
 
@@ -100,7 +98,7 @@ def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
             {"subscription_vendor_id": "SUB-1"},
             {"subscription_vendor_id": "SUB-2"},
         ],
-        product_id="PROD-5678"
+        product_id="PROD-5678",
     )
 
     expected_message = (
@@ -114,8 +112,7 @@ def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
     )
 
     mocked_send_exc.assert_called_once_with(
-        "Error updating the subscriptions in configuration order: ORD-1234",
-        expected_message
+        "Error updating the subscriptions in configuration order: ORD-1234", expected_message
     )
 
 
@@ -228,25 +225,19 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
     )
 
     assert (
-        is_transferring_item_expired(
-            adobe_items_factory(renewal_date=date.today().isoformat())[0]
-        )
+        is_transferring_item_expired(adobe_items_factory(renewal_date=date.today().isoformat())[0])
         is False
     )
     assert (
         is_transferring_item_expired(
-            adobe_items_factory(
-                renewal_date=(date.today() + timedelta(days=5)).isoformat()
-            )[0]
+            adobe_items_factory(renewal_date=(date.today() + timedelta(days=5)).isoformat())[0]
         )
         is False
     )
 
     assert (
         is_transferring_item_expired(
-            adobe_items_factory(
-                renewal_date=(date.today() - timedelta(days=5)).isoformat()
-            )[0]
+            adobe_items_factory(renewal_date=(date.today() - timedelta(days=5)).isoformat())[0]
         )
         is True
     )
@@ -258,17 +249,12 @@ def test_get_transfer_item_sku_by_subscription(
 ):
     items = adobe_items_factory(subscription_id="my-awesome-sub")
     transfer = adobe_transfer_factory(items=items)
-    assert (
-        get_transfer_item_sku_by_subscription(transfer, "my-awesome-sub")
-        == items[0]["offerId"]
-    )
+    assert get_transfer_item_sku_by_subscription(transfer, "my-awesome-sub") == items[0]["offerId"]
 
 
 def test_get_customer_licenses_discount_level(adobe_customer_factory):
     assert (
-        get_customer_licenses_discount_level(
-            adobe_customer_factory(licenses_discount_level="05")
-        )
+        get_customer_licenses_discount_level(adobe_customer_factory(licenses_discount_level="05"))
         == "05"
     )
 

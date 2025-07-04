@@ -158,9 +158,7 @@ class Config:
 
     @classmethod
     def _load_config(cls):
-        with files("adobe_vipm").joinpath("adobe_config.json").open(
-            "r", encoding="utf-8"
-        ) as f:
+        with files("adobe_vipm").joinpath("adobe_config.json").open("r", encoding="utf-8") as f:
             return json.load(f)
 
     def _setup(self):

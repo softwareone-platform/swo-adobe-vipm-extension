@@ -38,6 +38,4 @@ def test_webhook_secret_not_defined(settings):
     with pytest.raises(ImproperlyConfigured) as e:
         app.ready()
 
-    assert "Please, specify it in EXT_WEBHOOKS_SECRETS environment variable." in str(
-        e.value
-    )
+    assert "Please, specify it in EXT_WEBHOOKS_SECRETS environment variable." in str(e.value)

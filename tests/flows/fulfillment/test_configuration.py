@@ -39,8 +39,7 @@ def test_subscription_update_auto_renewal_step(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(order=order, adobe_customer_id="adobe-customer-id")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -91,9 +90,9 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      product_id='PRD-1111-1111',
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(
+        order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
+    )
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -151,8 +150,7 @@ def test_subscription_update_auto_renewal_step_already_updated(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(order=order, adobe_customer_id="adobe-customer-id")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -205,9 +203,9 @@ def test_subscription_update_auto_renewal_step_error(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      product_id='PRD-1111-1111',
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(
+        order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
+    )
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -268,9 +266,9 @@ def test_subscription_update_auto_renewal_step_all_failed(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      product_id='PRD-1111-1111',
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(
+        order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
+    )
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -356,7 +354,7 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order, product_id='PRD-1111-1111')
+    context = Context(order=order, product_id="PRD-1111-1111")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)

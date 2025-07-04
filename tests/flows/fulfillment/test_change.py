@@ -441,22 +441,26 @@ def test_update_renewal_quantities_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-        )
-    ])
+    mocked_adobe_client.get_subscription.assert_has_calls(
+        [
+            mocker.call(
+                context.authorization_id,
+                context.adobe_customer_id,
+                adobe_sub["subscriptionId"],
+            )
+        ]
+    )
     assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-            quantity=5,
-        )
-    ])
+    mocked_adobe_client.update_subscription.assert_has_calls(
+        [
+            mocker.call(
+                context.authorization_id,
+                context.adobe_customer_id,
+                adobe_sub["subscriptionId"],
+                quantity=5,
+            )
+        ]
+    )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -501,24 +505,27 @@ def test_update_renewal_quantities_downsize_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-        )
-    ])
+    mocked_adobe_client.get_subscription.assert_has_calls(
+        [
+            mocker.call(
+                context.authorization_id,
+                context.adobe_customer_id,
+                adobe_sub["subscriptionId"],
+            )
+        ]
+    )
     assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-            quantity=5,
-        )
-    ])
+    mocked_adobe_client.update_subscription.assert_has_calls(
+        [
+            mocker.call(
+                context.authorization_id,
+                context.adobe_customer_id,
+                adobe_sub["subscriptionId"],
+                quantity=5,
+            )
+        ]
+    )
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
 
 
 def test_update_renewal_quantities_step_quantity_match(
@@ -610,7 +617,6 @@ def test_fulfill_change_order(mocker):
         SyncAgreement,
     ]
 
-
     pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
     assert len(pipeline_args) == len(expected_steps)
 
@@ -627,7 +633,7 @@ def test_fulfill_change_order(mocker):
 
 
 @pytest.mark.parametrize(
-    ("error_code","error_message"),
+    ("error_code", "error_message"),
     [
         ("3120", "Update could not be performed because it would create an invalid renewal state"),
         ("3119", "Inactive Subscription or Pending Renewal is not Editable"),
@@ -827,11 +833,7 @@ def test_rollback_updated_subscriptions_error(
         adobe_new_order=adobe_order,
     )
     context.updated = [
-        {
-            'subscription_vendor_id': 'sub-1-id',
-            'old_quantity': 10,
-            'new_quantity': 5
-        }
+        {"subscription_vendor_id": "sub-1-id", "old_quantity": 10, "new_quantity": 5}
     ]
 
     step = UpdateRenewalQuantities()
@@ -868,9 +870,9 @@ def test_rollback_updated_subscriptions_error(
 
     mocked_notify.assert_called_with(
         context.order["id"],
-        'Error updating subscription sub-2, 1000 - Error during rollback',
+        "Error updating subscription sub-2, 1000 - Error during rollback",
         [],
-        context.product_id
+        context.product_id,
     )
 
     mocked_next_step.assert_not_called()
@@ -944,16 +946,8 @@ def test_rollback_updated_subscriptions_error_during_rollback(
         adobe_new_order=adobe_order,
     )
     context.updated = [
-        {
-            'subscription_vendor_id': 'sub-1-id',
-            'old_quantity': 10,
-            'new_quantity': 5
-        },
-        {
-            'subscription_vendor_id': 'sub-2-id',
-            'old_quantity': 15,
-            'new_quantity': 5
-        }
+        {"subscription_vendor_id": "sub-1-id", "old_quantity": 10, "new_quantity": 5},
+        {"subscription_vendor_id": "sub-2-id", "old_quantity": 15, "new_quantity": 5},
     ]
 
     step = UpdateRenewalQuantities()
@@ -981,8 +975,8 @@ def test_rollback_updated_subscriptions_error_during_rollback(
     )
     mocked_notify.assert_called_with(
         context.order["id"],
-        'Error rolling back updated subscriptions: 1000 - Error during rollback',
+        "Error rolling back updated subscriptions: 1000 - Error during rollback",
         context.updated,
-        context.product_id
+        context.product_id,
     )
     mocked_next_step.assert_not_called()

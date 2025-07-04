@@ -51,9 +51,6 @@ def validate_order(client, order):
             has_errors, order = validators[order["type"]](client, order)
             order = update_parameters_visibility(order)
 
-
-
-
         logger.info(
             f"Validation of order {order['id']} succeeded "
             f"with{'out' if not has_errors else ''} errors"

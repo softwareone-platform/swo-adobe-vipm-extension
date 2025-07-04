@@ -134,7 +134,7 @@ def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
     error_statuses = [
         ThreeYearCommitmentStatus.DECLINED,
         ThreeYearCommitmentStatus.NONCOMPLIANT,
-        ThreeYearCommitmentStatus.EXPIRED
+        ThreeYearCommitmentStatus.EXPIRED,
     ]
 
     enroll_status_condition = (

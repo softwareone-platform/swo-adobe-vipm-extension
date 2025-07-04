@@ -52,11 +52,7 @@ class GetReturnableOrders(Step):
                 line
             )
             is_valid, returnable_orders = validate_subscription_and_returnable_orders(
-                adobe_client,
-                context,
-                line,
-                subscription_id,
-                return_orders=context.adobe_return_orders.get(sku)
+                adobe_client, context, line, subscription_id, return_orders=context.adobe_return_orders.get(sku)
             )
             logger.info(f"{context}: returnable orders: {returnable_orders} for {sku}")
             if not is_valid:
@@ -69,9 +65,7 @@ class GetReturnableOrders(Step):
 
             context.adobe_returnable_orders[sku] = returnable_orders
 
-        returnable_orders_count = sum(
-            len(v) for v in context.adobe_returnable_orders.values()
-        )
+        returnable_orders_count = sum(len(v) for v in context.adobe_returnable_orders.values())
         logger.info(f"{context}: found {returnable_orders_count} returnable orders.")
         next_step(client, context)
 

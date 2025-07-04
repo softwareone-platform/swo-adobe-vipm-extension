@@ -66,7 +66,7 @@ class GetReturnableOrders(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
         returnable_orders_count = 0
-        if (is_within_coterm_window(context.adobe_customer)):
+        if is_within_coterm_window(context.adobe_customer):
             logger.info(
                 "Downsize occurs in the last two weeks before the anniversary date. "
                 "Returnable orders are not going to be submitted, the renewal quantity "
@@ -152,6 +152,7 @@ class UpdateRenewalQuantities(Step):
     The upsizes and new lines are processed first, to process correctly the 3yc
     to maintain the compliant with the 3yc minimum quantities.
     """
+
     def __init__(self):
         self.error = None
 
@@ -197,6 +198,17 @@ class UpdateRenewalQuantities(Step):
                     adobe_sub_id,
                     quantity=qty,
                 )
+                logger.info(
+                    f"{context}: update renewal quantity for sub "
+                    f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
+                )
+                context.updated.append(
+                    {
+                        "subscription_vendor_id": adobe_sub_id,
+                        "old_quantity": old_qty,
+                        "new_quantity": qty,
+                    }
+                )
             except AdobeAPIError as e:
                 if not (e.code == STATUS_LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order):
                     logger.error(
@@ -207,7 +219,7 @@ class UpdateRenewalQuantities(Step):
                         context.order["id"],
                         f"Error updating subscription {subscription['id']}, {str(e)}",
                         [],
-                        context.product_id
+                        context.product_id,
                     )
                     self.error = e
                     return
@@ -224,8 +236,10 @@ class UpdateRenewalQuantities(Step):
 
     def _handle_subscription_update_error(self, adobe_client, client, context, e):
         self._rollback_updated_subscriptions(adobe_client, context)
-        if e.code in [STATUS_INVALID_RENEWAL_STATE,
-            STATUS_SUBSCRIPTION_INACTIVE]:
+        if e.code in [
+            STATUS_INVALID_RENEWAL_STATE,
+            STATUS_SUBSCRIPTION_INACTIVE,
+        ]:
             switch_order_to_failed(
                 client,
                 context.order,
@@ -252,7 +266,7 @@ class UpdateRenewalQuantities(Step):
                 context.order["id"],
                 f"Error rolling back updated subscriptions: {e}",
                 context.updated,
-                context.product_id
+                context.product_id,
             )
             logger.error(f"Error rolling back updated subscriptions: {e}")
 
@@ -260,6 +274,7 @@ class UpdateRenewalQuantities(Step):
 class UpdateRenewalQuantitiesDownsizes(UpdateRenewalQuantities):
     def _get_lines(self, context):
         return context.downsize_lines
+
 
 def fulfill_change_order(client, order):
     """

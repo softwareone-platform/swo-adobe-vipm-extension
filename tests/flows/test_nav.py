@@ -222,9 +222,7 @@ def test_terminate_contract_non_terminated(mocker, requests_mocker, settings):
     settings.EXTENSION_CONFIG = {
         "NAV_API_BASE_URL": "https://api.nav",
     }
-    resp_json = (
-        """{"contractInsert": {"contractNumber": "whatever", "isPreferred": true}}"""
-    )
+    resp_json = """{"contractInsert": {"contractNumber": "whatever", "isPreferred": true}}"""
     mocker.patch("adobe_vipm.flows.nav.get_token", return_value=(True, "a-token"))
     requests_mocker.post(
         "https://api.nav/v1.0/contracts/terminateNow/my-cco",

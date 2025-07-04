@@ -106,12 +106,7 @@ def test_get_returnable_orders_step(
     mocked_next_step = mocker.MagicMock()
 
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     context = Context(
@@ -439,12 +434,7 @@ def test_get_returnable_orders_step_inactive_subscription(
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "INACTIVE",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "INACTIVE", "offerId": sku}]
     }
 
     mocked_switch_to_failed = mocker.patch(
@@ -498,12 +488,7 @@ def test_get_returnable_orders_step_no_returnable_orders(
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
     mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
 

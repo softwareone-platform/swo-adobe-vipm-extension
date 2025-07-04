@@ -47,6 +47,7 @@ def set_due_date(order):
 
     return updated_order
 
+
 def get_due_date(order):
     """
     Gets DUE_DATE parameter
@@ -62,11 +63,8 @@ def get_due_date(order):
         PARAM_DUE_DATE,
     )
 
-    return (
-        datetime.strptime(param["value"], "%Y-%m-%d").date()
-        if param.get("value")
-        else None
-    )
+    return datetime.strptime(param["value"], "%Y-%m-%d").date() if param.get("value") else None
+
 
 def reset_due_date(order):
     """
@@ -87,12 +85,14 @@ def reset_due_date(order):
 
     return order
 
+
 def is_within_last_two_weeks(coterm_date):
     last_two_weeks = (
         datetime.fromisoformat(coterm_date) - timedelta(days=LAST_TWO_WEEKS_DAYS)
     ).date()
 
     return date.today() >= last_two_weeks
+
 
 def is_coterm_date_within_order_creation_window(order):
     if not get_coterm_date(order):

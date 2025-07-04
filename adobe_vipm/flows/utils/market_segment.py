@@ -20,6 +20,7 @@ def get_market_segment_eligibility_status(order):
         PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
     ).get("value")
 
+
 def set_market_segment_eligibility_status_pending(order):
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(

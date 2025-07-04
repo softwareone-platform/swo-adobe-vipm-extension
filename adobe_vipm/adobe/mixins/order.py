@@ -29,7 +29,6 @@ from adobe_vipm.utils import get_partial_sku, map_by
 
 
 class OrderClientMixin:
-
     @staticmethod
     def _is_processed(order_item):
         order, item = order_item
@@ -94,9 +93,7 @@ class OrderClientMixin:
                 line_item["currencyCode"] = item["currencyCode"]
             return line_item
 
-        line_items = [
-            build_line_item(item) for item in adobe_preview_order["lineItems"]
-        ]
+        line_items = [build_line_item(item) for item in adobe_preview_order["lineItems"]]
 
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
@@ -332,7 +329,6 @@ class OrderClientMixin:
             for item in order["lineItems"]:
                 results[get_partial_sku(item["offerId"])].append(order)
         return results
-
 
     @wrap_http_error
     def _create_return_order_base(

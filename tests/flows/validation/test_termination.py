@@ -82,12 +82,7 @@ def test_validate_downsizes_step_success(
         ret_info_3,
     ]
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     mocker.patch(
@@ -153,12 +148,7 @@ def test_validate_downsizes_step_no_returnable_orders(
     mocked_next_step = mocker.MagicMock()
 
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     context = Context(
@@ -171,7 +161,6 @@ def test_validate_downsizes_step_no_returnable_orders(
 
     step = ValidateDownsizes()
     step(mocked_client, context, mocked_next_step)
-
 
     mocked_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id,
@@ -237,12 +226,7 @@ def test_validate_downsizes_step_quantity_mismatch(
     ]
 
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     mocker.patch(
@@ -293,12 +277,7 @@ def test_validate_downsizes_step_inactive_subscription(
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1004",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1004", "offerId": sku}]
     }
 
     mocker.patch(

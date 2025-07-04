@@ -29,9 +29,7 @@ def test_check_3yc_commitment_request(
     is_recommitment,
 ):
     status_param_ext_id = (
-        "3YCCommitmentRequestStatus"
-        if not is_recommitment
-        else "3YCRecommitmentRequestStatus"
+        "3YCCommitmentRequestStatus" if not is_recommitment else "3YCRecommitmentRequestStatus"
     )
     request_type_param_ext_id = "3YC" if not is_recommitment else "3YCRecommitment"
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
@@ -39,9 +37,7 @@ def test_check_3yc_commitment_request(
     customer_kwargs = {
         "commitment": adobe_commitment_factory(status="COMMITTED"),
     }
-    request_type = (
-        "commitment_request" if not is_recommitment else "recommitment_request"
-    )
+    request_type = "commitment_request" if not is_recommitment else "recommitment_request"
 
     customer_kwargs[request_type] = adobe_commitment_factory(status="COMMITTED")
     agreement = agreement_factory()
@@ -52,9 +48,7 @@ def test_check_3yc_commitment_request(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -105,14 +99,10 @@ def test_check_3yc_commitment_request_not_committed(
     is_recommitment,
 ):
     status_param_ext_id = (
-        "3YCCommitmentRequestStatus"
-        if not is_recommitment
-        else "3YCRecommitmentRequestStatus"
+        "3YCCommitmentRequestStatus" if not is_recommitment else "3YCRecommitmentRequestStatus"
     )
 
-    request_type = (
-        "commitment_request" if not is_recommitment else "recommitment_request"
-    )
+    request_type = "commitment_request" if not is_recommitment else "recommitment_request"
 
     customer_kwargs = {request_type: adobe_commitment_factory(status="ACCEPTED")}
     agreement = agreement_factory()
@@ -123,9 +113,7 @@ def test_check_3yc_commitment_request_not_committed(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -151,11 +139,12 @@ def test_check_3yc_commitment_request_not_committed(
 
 @pytest.mark.parametrize("is_recommitment", [False, True])
 @pytest.mark.parametrize(
-    "request_status", [
+    "request_status",
+    [
         ThreeYearCommitmentStatus.DECLINED,
         ThreeYearCommitmentStatus.EXPIRED,
-        ThreeYearCommitmentStatus.NONCOMPLIANT
-    ]
+        ThreeYearCommitmentStatus.NONCOMPLIANT,
+    ],
 )
 def test_check_3yc_commitment_request_declined(
     mocker,
@@ -167,13 +156,9 @@ def test_check_3yc_commitment_request_declined(
     request_status,
 ):
     status_param_ext_id = (
-        "3YCCommitmentRequestStatus"
-        if not is_recommitment
-        else "3YCRecommitmentRequestStatus"
+        "3YCCommitmentRequestStatus" if not is_recommitment else "3YCRecommitmentRequestStatus"
     )
-    request_type = (
-        "commitment_request" if not is_recommitment else "recommitment_request"
-    )
+    request_type = "commitment_request" if not is_recommitment else "recommitment_request"
 
     customer_kwargs = {request_type: adobe_commitment_factory(status=request_status)}
     agreement = agreement_factory()
@@ -184,9 +169,7 @@ def test_check_3yc_commitment_request_declined(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -237,13 +220,9 @@ def test_resubmit_3yc_commitment_request(
     is_recommitment,
 ):
     status_param_ext_id = (
-        "3YCCommitmentRequestStatus"
-        if not is_recommitment
-        else "3YCRecommitmentRequestStatus"
+        "3YCCommitmentRequestStatus" if not is_recommitment else "3YCRecommitmentRequestStatus"
     )
-    request_type = (
-        "commitment_request" if not is_recommitment else "recommitment_request"
-    )
+    request_type = "commitment_request" if not is_recommitment else "recommitment_request"
 
     customer_kwargs = {request_type: adobe_commitment_factory(status="ACCEPTED")}
     agreement = agreement_factory(
@@ -259,9 +238,7 @@ def test_resubmit_3yc_commitment_request(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_for_3yc_resubmit",
         return_value=[agreement],
@@ -317,9 +294,7 @@ def test_submit_3yc_recommitment_request(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_for_3yc_recommitment",
         return_value=[agreement],
@@ -369,9 +344,7 @@ def test_check_3yc_commitment_request_exception(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -439,9 +412,7 @@ def test_check_3yc_commitment_request_global_customers(
         {"deploymentId": str(i)} for i in range(2)
     ]
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
 
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.benefits.update_agreement")
 
@@ -523,9 +494,7 @@ def test_resubmit_3yc_commitment_request_exception(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_for_3yc_resubmit",
         return_value=[agreement],
@@ -576,9 +545,7 @@ def test_submit_3yc_recommitment_request_exception(
 
     mocked_mpt_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_for_3yc_recommitment",
         return_value=[agreement],
