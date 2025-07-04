@@ -21,6 +21,7 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
+from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
@@ -32,6 +33,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_deployments,
     get_global_customer,
+    get_parameter,
     get_sku_with_discount_level,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
@@ -81,11 +83,51 @@ def sync_agreement_prices(
 
     next_sync = (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
     if not dry_run:
+        parameters = {Param.PHASE_FULFILLMENT: [{"externalId": "nextSync", "value": next_sync}]}
+        commitment_info = get_3yc_commitment(customer)
+        if commitment_info:
+            three_yc_recommitment_par = get_parameter(
+                Param.PHASE_FULFILLMENT, agreement, Param.THREE_YC_RECOMMITMENT
+            )
+            is_recommitment = True if three_yc_recommitment_par else False
+            status_param_ext_id = (
+                Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+                if not is_recommitment
+                else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+            )
+            request_type_param_ext_id = (
+                Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+            )
+            request_type_param_phase = (
+                Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+            )
+            request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
+            parameters[Param.PHASE_FULFILLMENT].append(
+                {"externalId": status_param_ext_id, "value": request_info["status"]}
+            )
+            parameters.setdefault(request_type_param_phase, [])
+            parameters[request_type_param_phase].append(
+                {"externalId": request_type_param_ext_id, "value": None},
+            )
+            parameters[Param.PHASE_FULFILLMENT] += [
+                {
+                    "externalId": Param.THREE_YC_ENROLL_STATUS,
+                    "value": commitment_info["status"],
+                },
+                {
+                    "externalId": Param.THREE_YC_START_DATE,
+                    "value": commitment_info["startDate"],
+                },
+                {
+                    "externalId": Param.THREE_YC_END_DATE,
+                    "value": commitment_info["endDate"],
+                },
+            ]
         update_agreement(
             mpt_client,
             agreement["id"],
             lines=agreement["lines"],
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": next_sync}]},
+            parameters=parameters,
         )
 
     logger.info(f"agreement updated {agreement['id']}")
