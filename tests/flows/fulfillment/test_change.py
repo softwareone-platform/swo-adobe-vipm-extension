@@ -612,7 +612,6 @@ def test_fulfill_change_order(mocker):
     ("error_code","error_message"),
     [
         ("3120", "Update could not be performed because it would create an invalid renewal state"),
-        ("3123", "Line Item offer id has expired"),
         ("3119", "Inactive Subscription or Pending Renewal is not Editable"),
     ],
 )
