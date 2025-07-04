@@ -11,11 +11,7 @@ from adobe_vipm.flows.benefits import (
     resubmit_3yc_commitment_request,
     submit_3yc_recommitment_request,
 )
-from adobe_vipm.flows.constants import (
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_LICENSES,
-    PARAM_DEPLOYMENT_ID,
-)
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils import get_adobe_customer_id, get_company_name
 from adobe_vipm.notifications import Button
 
@@ -255,8 +251,8 @@ def test_resubmit_3yc_commitment_request(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            PARAM_3YC_CONSUMABLES: "1021",
-            PARAM_3YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES: "1021",
+            Param.THREE_YC_LICENSES: "13",
         },
         is_recommitment=is_recommitment,
     )
@@ -309,8 +305,8 @@ def test_submit_3yc_recommitment_request(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            PARAM_3YC_CONSUMABLES: "1021",
-            PARAM_3YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES: "1021",
+            Param.THREE_YC_LICENSES: "13",
         },
         is_recommitment=True,
     )
@@ -425,7 +421,7 @@ def test_check_3yc_commitment_request_global_customers(
 
     mocked_get_agreements_by_deployments.assert_called_once_with(
         mpt_client,
-        PARAM_DEPLOYMENT_ID,
+        Param.DEPLOYMENT_ID,
         ["0", "1"],
     )
     assert mocked_update_agreement.call_args_list == [
@@ -511,8 +507,8 @@ def test_resubmit_3yc_commitment_request_exception(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            PARAM_3YC_CONSUMABLES: "1021",
-            PARAM_3YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES: "1021",
+            Param.THREE_YC_LICENSES: "13",
         },
         is_recommitment=is_recommitment,
     )
@@ -560,8 +556,8 @@ def test_submit_3yc_recommitment_request_exception(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            PARAM_3YC_CONSUMABLES: "1021",
-            PARAM_3YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES: "1021",
+            Param.THREE_YC_LICENSES: "13",
         },
         is_recommitment=True,
     )
