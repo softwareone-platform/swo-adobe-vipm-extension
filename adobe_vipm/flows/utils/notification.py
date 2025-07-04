@@ -1,12 +1,12 @@
 import functools
 
-from adobe_vipm.flows.constants import PARAM_CONTACT
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import get_ordering_parameter
 from adobe_vipm.notifications import send_exception
 
 
 def get_notifications_recipient(order):
-    return (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get("email") or (
+    return (get_ordering_parameter(order, Param.CONTACT).get("value", {}) or {}).get("email") or (
         order["agreement"]["buyer"].get("contact", {}) or {}
     ).get("email")
 

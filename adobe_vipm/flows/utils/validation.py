@@ -1,8 +1,4 @@
-from adobe_vipm.flows.constants import (
-    PARAM_AGREEMENT_TYPE,
-    PARAM_MEMBERSHIP_ID,
-    REQUIRED_CUSTOMER_ORDER_PARAMS,
-)
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import (
     get_ordering_parameter,
     is_ordering_param_required,
@@ -66,10 +62,10 @@ def has_valid_returnable_quantity(line, returnable_orders):
 def is_purchase_validation_enabled(order):
     return all(
         is_ordering_param_required(order, param_external_id)
-        for param_external_id in REQUIRED_CUSTOMER_ORDER_PARAMS
+        for param_external_id in Param.REQUIRED_CUSTOMER_ORDER
     )
 
 
 def is_migrate_customer(order):
-    agreement_type = get_ordering_parameter(order, PARAM_AGREEMENT_TYPE).get("value")
-    return agreement_type == "Migrate" and is_ordering_param_required(order, PARAM_MEMBERSHIP_ID)
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
+    return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)

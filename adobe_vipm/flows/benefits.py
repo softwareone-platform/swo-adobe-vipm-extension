@@ -13,20 +13,7 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
-from adobe_vipm.flows.constants import (
-    PARAM_3YC,
-    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_END_DATE,
-    PARAM_3YC_ENROLL_STATUS,
-    PARAM_3YC_LICENSES,
-    PARAM_3YC_RECOMMITMENT,
-    PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_START_DATE,
-    PARAM_DEPLOYMENT_ID,
-    PARAM_PHASE_FULFILLMENT,
-    PARAM_PHASE_ORDERING,
-)
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.mpt import (
     get_agreements_by_3yc_commitment_request_status,
     get_agreements_for_3yc_recommitment,
@@ -62,17 +49,19 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
             request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
 
             status_param_ext_id = (
-                PARAM_3YC_COMMITMENT_REQUEST_STATUS
+                Param.THREE_YC_COMMITMENT_REQUEST_STATUS
                 if not is_recommitment
-                else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+                else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
             )
-            request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+            request_type_param_ext_id = (
+                Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+            )
             request_type_param_phase = (
-                PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
+                Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
             )
 
             parameters = {
-                PARAM_PHASE_FULFILLMENT: [
+                Param.PHASE_FULFILLMENT: [
                     {
                         "externalId": status_param_ext_id,
                         "value": request_info["status"],
@@ -86,18 +75,18 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 parameters[request_type_param_phase].append(
                     {"externalId": request_type_param_ext_id, "value": None},
                 )
-                parameters[PARAM_PHASE_FULFILLMENT].extend(
+                parameters[Param.PHASE_FULFILLMENT].extend(
                     [
                         {
-                            "externalId": PARAM_3YC_ENROLL_STATUS,
+                            "externalId": Param.THREE_YC_ENROLL_STATUS,
                             "value": commitment_info["status"],
                         },
                         {
-                            "externalId": PARAM_3YC_START_DATE,
+                            "externalId": Param.THREE_YC_START_DATE,
                             "value": commitment_info["startDate"],
                         },
                         {
-                            "externalId": PARAM_3YC_END_DATE,
+                            "externalId": Param.THREE_YC_END_DATE,
                             "value": commitment_info["endDate"],
                         },
                     ],
@@ -154,7 +143,7 @@ def update_deployment_agreements_3yc(
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
-        PARAM_DEPLOYMENT_ID,
+        Param.DEPLOYMENT_ID,
         [deployment["deploymentId"] for deployment in customer_deployments],
     )
 
@@ -169,9 +158,9 @@ def update_deployment_agreements_3yc(
 def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
     request_type_title = "Commitment" if not is_recommitment else "Recommitment"
     status_param_ext_id = (
-        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment
-        else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
     )
     adobe_client = get_adobe_client()
     agreements = get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=is_recommitment)
@@ -181,12 +170,12 @@ def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
             customer_id = get_adobe_customer_id(agreement)
 
             commitment_request = {
-                PARAM_3YC_CONSUMABLES: get_ordering_parameter(agreement, PARAM_3YC_CONSUMABLES).get(
-                    "value"
-                ),
-                PARAM_3YC_LICENSES: get_ordering_parameter(agreement, PARAM_3YC_LICENSES).get(
-                    "value"
-                ),
+                Param.THREE_YC_CONSUMABLES: get_ordering_parameter(
+                    agreement, Param.THREE_YC_CONSUMABLES
+                ).get("value"),
+                Param.THREE_YC_LICENSES: get_ordering_parameter(
+                    agreement, Param.THREE_YC_LICENSES
+                ).get("value"),
             }
             customer = adobe_client.create_3yc_request(
                 authorization_id,
@@ -198,7 +187,7 @@ def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
             commitment_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
             status = commitment_info["status"]
             parameters = {
-                PARAM_PHASE_FULFILLMENT: [
+                Param.PHASE_FULFILLMENT: [
                     {"externalId": status_param_ext_id, "value": status},
                 ]
             }
@@ -227,12 +216,12 @@ def submit_3yc_recommitment_request(mpt_client):
             customer_id = get_adobe_customer_id(agreement)
 
             commitment_request = {
-                PARAM_3YC_CONSUMABLES: get_ordering_parameter(agreement, PARAM_3YC_CONSUMABLES).get(
-                    "value"
-                ),
-                PARAM_3YC_LICENSES: get_ordering_parameter(agreement, PARAM_3YC_LICENSES).get(
-                    "value"
-                ),
+                Param.THREE_YC_CONSUMABLES: get_ordering_parameter(
+                    agreement, Param.THREE_YC_CONSUMABLES
+                ).get("value"),
+                Param.THREE_YC_LICENSES: get_ordering_parameter(
+                    agreement, Param.THREE_YC_LICENSES
+                ).get("value"),
             }
 
             customer = adobe_client.create_3yc_request(
@@ -245,7 +234,7 @@ def submit_3yc_recommitment_request(mpt_client):
             commitment_info = get_3yc_commitment_request(customer, is_recommitment=True)
             status = commitment_info["status"]
             parameters = {
-                PARAM_PHASE_FULFILLMENT: [
+                Param.PHASE_FULFILLMENT: [
                     {"externalId": "3YCRecommitmentRequestStatus", "value": status},
                 ]
             }

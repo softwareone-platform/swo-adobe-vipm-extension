@@ -45,9 +45,9 @@ from adobe_vipm.flows.constants import (
     ERR_UPDATING_TRANSFER_ITEMS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
-    PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -108,10 +108,10 @@ def _handle_transfer_preview_error(client, order, error):
         error_msg = (
             str(error) if isinstance(error, AdobeAPIError) else ERR_ADOBE_MEMBERSHIP_NOT_FOUND
         )
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
-            PARAM_MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=error_msg),
         )
         switch_order_to_query(client, order)
@@ -400,10 +400,10 @@ def _transfer_migrated(
         transfer (Transfer): The AirTable transfer object.
     """
     if transfer.status == STATUS_RUNNING:
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
-            PARAM_MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(
                 title=param["name"], details="Migration in progress, retry later"
             ),
