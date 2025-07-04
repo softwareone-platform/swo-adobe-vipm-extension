@@ -6,9 +6,10 @@ from adobe_vipm.notifications import send_exception
 
 
 def get_notifications_recipient(order):
-    return (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get(
-        "email"
-    ) or (order["agreement"]["buyer"].get("contact", {}) or {}).get("email")
+    return (get_ordering_parameter(order, PARAM_CONTACT).get("value", {}) or {}).get("email") or (
+        order["agreement"]["buyer"].get("contact", {}) or {}
+    ).get("email")
+
 
 @functools.cache
 def notify_unhandled_exception_in_teams(process, order_id, traceback):
@@ -18,6 +19,7 @@ def notify_unhandled_exception_in_teams(process, order_id, traceback):
         f"of the order **{order_id}**:\n\n"
         f"```{traceback}```",
     )
+
 
 @functools.cache
 def notify_agreement_unhandled_exception_in_teams(agreement_id, traceback):
@@ -31,9 +33,7 @@ def notify_agreement_unhandled_exception_in_teams(agreement_id, traceback):
     )
 
 
-def notify_missing_prices(
-    agreement_id, missing_skus, product_id, currency, commitment_date=None
-):
+def notify_missing_prices(agreement_id, missing_skus, product_id, currency, commitment_date=None):
     """
     Notifies about SKUs with missing prices in the agreement.
     Args:
@@ -44,9 +44,7 @@ def notify_missing_prices(
         commitment_date (str, optional): The 3YC commitment date if applicable
     """
     context = (
-        f"3YC prices (commitment date: {commitment_date})"
-        if commitment_date
-        else "regular prices"
+        f"3YC prices (commitment date: {commitment_date})" if commitment_date else "regular prices"
     )
 
     message = (
@@ -82,10 +80,8 @@ def notify_not_updated_subscriptions(order_id, error_message, updated_subscripti
 
     if updated_subscriptions:
         message += "The following subscriptions has been updated and rolled back:\n"
-        message += "".join(f"  - {sub['subscription_vendor_id']}\n"
-                           for sub in updated_subscriptions)
+        message += "".join(
+            f"  - {sub['subscription_vendor_id']}\n" for sub in updated_subscriptions
+        )
 
-    send_exception(
-        f"Error updating the subscriptions in configuration order: {order_id}",
-        message
-    )
+    send_exception(f"Error updating the subscriptions in configuration order: {order_id}", message)

@@ -716,7 +716,7 @@ def _check_agreement_deployments(
     product_id = order["agreement"]["product"]["id"]
     if customer.get("globalSalesEnabled", False):
         logger.info(
-            "Adobe customer has global sales enabled, proceed to get the customer" " deployments"
+            "Adobe customer has global sales enabled, proceed to get the customer deployments"
         )
         if not gc_main_agreement:
             add_gc_main_agreement(order, adobe_transfer_order)

@@ -13,11 +13,7 @@ from adobe_vipm.flows.utils.subscription import (
 
 
 def validate_subscription_and_returnable_orders(
-    adobe_client,
-    context,
-    line,
-    sku,
-    return_orders=None
+    adobe_client, context, line, sku, return_orders=None
 ):
     """
     Validates if the subscription is active and has valid returnable orders.
@@ -60,6 +56,7 @@ def validate_subscription_and_returnable_orders(
 
     return True, returnable_orders
 
+
 def has_valid_returnable_quantity(line, returnable_orders):
     delta = line["oldQuantity"] - line["quantity"]
     total_quantity_returnable = sum(roi.quantity for roi in returnable_orders)
@@ -71,6 +68,7 @@ def is_purchase_validation_enabled(order):
         is_ordering_param_required(order, param_external_id)
         for param_external_id in REQUIRED_CUSTOMER_ORDER_PARAMS
     )
+
 
 def is_migrate_customer(order):
     agreement_type = get_ordering_parameter(order, PARAM_AGREEMENT_TYPE).get("value")

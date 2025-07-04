@@ -23,7 +23,6 @@ from adobe_vipm.utils import find_first
 
 
 def get_customer_data(order):
-
     """
     Returns a dictionary with the customer data extracted from the
     corresponding ordering parameters.
@@ -72,11 +71,13 @@ def set_customer_data(order, customer_data):
         )["value"] = value
     return updated_order
 
+
 def get_company_name(source):
     return get_ordering_parameter(
         source,
         PARAM_COMPANY_NAME,
     ).get("value")
+
 
 def get_adobe_customer_id(source):
     """
@@ -96,6 +97,7 @@ def get_adobe_customer_id(source):
     )
     return param.get("value")
 
+
 def set_adobe_customer_id(order, customer_id):
     """
     Create a copy of the order. Set the CustomerId
@@ -110,6 +112,7 @@ def set_adobe_customer_id(order, customer_id):
     )
     customer_ff_param["value"] = customer_id
     return updated_order
+
 
 def get_customer_licenses_discount_level(customer):
     licenses_discount = find_first(
@@ -148,6 +151,7 @@ def get_global_customer(order):
     )
     return global_customer_param.get("value")
 
+
 def set_global_customer(order, global_sales_enabled):
     """
     Set the globalCustomer parameter on the order.
@@ -166,6 +170,7 @@ def set_global_customer(order, global_sales_enabled):
     global_customer_param["value"] = [global_sales_enabled]
     return updated_order
 
+
 def is_within_coterm_window(customer):
     """
     Checks if the current date is within the last two weeks before the cotermination date.
@@ -173,10 +178,8 @@ def is_within_coterm_window(customer):
     Returns:
         bool: True if within the window, False otherwise
     """
-    return (
-        customer.get("cotermDate") and
-        is_within_last_two_weeks(customer["cotermDate"])
-    )
+    return customer.get("cotermDate") and is_within_last_two_weeks(customer["cotermDate"])
+
 
 def has_coterm_date(customer):
     """

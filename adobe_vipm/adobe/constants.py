@@ -79,6 +79,7 @@ REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")
 REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")
 
+
 class ThreeYearCommitmentStatus(StrEnum):
     ACCEPTED = "ACCEPTED"
     DECLINED = "DECLINED"
@@ -88,10 +89,10 @@ class ThreeYearCommitmentStatus(StrEnum):
     NONCOMPLIANT = "NONCOMPLIANT"
     EXPIRED = "EXPIRED"
 
+
 class OfferType(StrEnum):
     LICENSE = "LICENSE"
     CONSUMABLES = "CONSUMABLES"
-
 
 
 CANCELLATION_WINDOW_DAYS = 14

@@ -18,6 +18,7 @@ def set_adobe_3yc_enroll_status(order, enroll_status):
     ff_param["value"] = enroll_status
     return updated_order
 
+
 def set_adobe_3yc_commitment_request_status(order, status):
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
@@ -26,6 +27,7 @@ def set_adobe_3yc_commitment_request_status(order, status):
     )
     ff_param["value"] = status
     return updated_order
+
 
 def set_adobe_3yc_start_date(order, start_date):
     updated_order = copy.deepcopy(order)
@@ -36,6 +38,7 @@ def set_adobe_3yc_start_date(order, start_date):
     ff_param["value"] = start_date
     return updated_order
 
+
 def set_adobe_3yc_end_date(order, end_date):
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
@@ -44,6 +47,7 @@ def set_adobe_3yc_end_date(order, end_date):
     )
     ff_param["value"] = end_date
     return updated_order
+
 
 def get_3yc_fulfillment_parameters(order_or_agreement):
     three_yc_fulfillment_parameters = [

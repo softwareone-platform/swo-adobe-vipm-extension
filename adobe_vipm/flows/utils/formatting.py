@@ -27,6 +27,7 @@ def split_phone_number(phone_number, country):
         "number": number,
     }
 
+
 def md2html(template):
     return MarkdownIt("commonmark", {"breaks": True, "html": True}).render(template)
 

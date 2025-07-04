@@ -51,7 +51,6 @@ class SubscriptionClientMixin:
         response.raise_for_status()
         return response.json()
 
-
     @wrap_http_error
     def get_subscriptions_for_offers(
         self,
@@ -72,9 +71,7 @@ class SubscriptionClientMixin:
             dict: The retrieved subscriptions.
         """
         subscriptions = self.get_subscriptions(authorization_id, customer_id)["items"]
-        active_subscriptions = filter(
-            lambda s: s["status"] == STATUS_PROCESSED, subscriptions
-        )
+        active_subscriptions = filter(lambda s: s["status"] == STATUS_PROCESSED, subscriptions)
 
         return list(
             filter(

@@ -28,7 +28,6 @@ from adobe_vipm.utils import get_partial_sku, map_by
 
 
 class OrderClientMixin:
-
     @staticmethod
     def _is_processed(order_item):
         order, item = order_item
@@ -93,9 +92,7 @@ class OrderClientMixin:
                 line_item["currencyCode"] = item["currencyCode"]
             return line_item
 
-        line_items = [
-            build_line_item(item) for item in adobe_preview_order["lineItems"]
-        ]
+        line_items = [build_line_item(item) for item in adobe_preview_order["lineItems"]]
 
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
@@ -247,14 +244,10 @@ class OrderClientMixin:
         filters = {
             "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
             "start-date": start_date.isoformat(),
-            "end-date": (
-                date.fromisoformat(customer_coterm_date) - timedelta(days=15)
-            ).isoformat(),
+            "end-date": (date.fromisoformat(customer_coterm_date) - timedelta(days=15)).isoformat(),
         }
 
-        returning_order_ids = [
-            order["referenceOrderId"] for order in (return_orders or [])
-        ]
+        returning_order_ids = [order["referenceOrderId"] for order in (return_orders or [])]
 
         orders = self.get_orders(
             authorization_id,
@@ -285,9 +278,7 @@ class OrderClientMixin:
             order_items,
         )
         if renewal_order_item:
-            renewal_order_date = datetime.fromisoformat(
-                renewal_order_item[0]["creationDate"]
-            )
+            renewal_order_date = datetime.fromisoformat(renewal_order_item[0]["creationDate"])
             order_items = filter(
                 lambda order_item: datetime.fromisoformat(order_item[0]["creationDate"])
                 >= renewal_order_date,
@@ -326,7 +317,6 @@ class OrderClientMixin:
             for item in order["lineItems"]:
                 results[get_partial_sku(item["offerId"])].append(order)
         return results
-
 
     @wrap_http_error
     def _create_return_order_base(
