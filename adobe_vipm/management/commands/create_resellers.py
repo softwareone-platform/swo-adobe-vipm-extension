@@ -101,8 +101,7 @@ class Command(BaseCommand):
 
     def load_row(self, row):
         return {
-            COLUMNS[cel.column_letter]: str(cel.value) if cel.value else cel.value
-            for cel in row
+            COLUMNS[cel.column_letter]: str(cel.value) if cel.value else cel.value for cel in row
         }
 
     def prepare_reseller_data(self, row_data):

@@ -152,20 +152,10 @@ def _is_valid_minimum_quantity(minimum, quantity):
 
 
 is_valid_postal_code_length = functools.partial(_is_valid_maxlength, MAXLEN_POSTAL_CODE)
-is_valid_address_line_1_length = functools.partial(
-    _is_valid_maxlength, MAXLEN_ADDRESS_LINE_1
-)
-is_valid_address_line_2_length = functools.partial(
-    _is_valid_maxlength, MAXLEN_ADDRESS_LINE_2
-)
+is_valid_address_line_1_length = functools.partial(_is_valid_maxlength, MAXLEN_ADDRESS_LINE_1)
+is_valid_address_line_2_length = functools.partial(_is_valid_maxlength, MAXLEN_ADDRESS_LINE_2)
 is_valid_city_length = functools.partial(_is_valid_maxlength, MAXLEN_CITY)
-is_valid_phone_number_length = functools.partial(
-    _is_valid_maxlength, MAXLEN_PHONE_NUMBER
-)
+is_valid_phone_number_length = functools.partial(_is_valid_maxlength, MAXLEN_PHONE_NUMBER)
 
-is_valid_minimum_licenses = functools.partial(
-    _is_valid_minimum_quantity, MINQTY_LICENSES
-)
-is_valid_minimum_consumables = functools.partial(
-    _is_valid_minimum_quantity, MINQTY_CONSUMABLES
-)
+is_valid_minimum_licenses = functools.partial(_is_valid_minimum_quantity, MINQTY_LICENSES)
+is_valid_minimum_consumables = functools.partial(_is_valid_minimum_quantity, MINQTY_CONSUMABLES)

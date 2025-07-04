@@ -33,6 +33,7 @@ def get_subscription_by_line_and_item_id(subscriptions, item_id, line_id):
         if item:
             return subscription
 
+
 def get_adobe_subscription_id(subscription):
     """
     Return the value of the subscription id from the subscription.
@@ -45,12 +46,14 @@ def get_adobe_subscription_id(subscription):
     """
     return subscription.get("externalIds", {}).get("vendor")
 
+
 def is_transferring_item_expired(item):
     if "status" in item and item["status"] == STATUS_INACTIVE_OR_GENERIC_FAILURE:
         return True
 
     renewal_date = date.fromisoformat(item["renewalDate"])
     return date.today() > renewal_date
+
 
 def are_all_transferring_items_expired(adobe_items):
     """
@@ -83,6 +86,7 @@ def get_transfer_item_sku_by_subscription(trf, sub_id):
 def is_consumables_sku(sku):
     return sku[10] == "T"
 
+
 def get_sku_with_discount_level(sku, customer):
     discount_level = (
         get_customer_licenses_discount_level(customer)
@@ -92,9 +96,9 @@ def get_sku_with_discount_level(sku, customer):
     sku_with_discount = f"{sku[0:10]}{discount_level}{sku[12:]}"
     return sku_with_discount
 
+
 def get_price_item_by_line_sku(prices, line_sku):
     return find_first(
         lambda price_item: price_item[0].startswith(line_sku),
         list(prices.items()),
     )
-

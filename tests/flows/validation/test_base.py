@@ -55,9 +55,7 @@ def test_validate_transfer_order_no_validate(
     with caplog.at_level(logging.INFO):
         validate_order(m_client, order)
 
-    assert caplog.records[0].message == (
-        f"Validation of order {order['id']} succeeded with errors"
-    )
+    assert caplog.records[0].message == (f"Validation of order {order['id']} succeeded with errors")
 
 
 def test_validate_order_exception(mocker, mpt_error_factory, order_factory):
@@ -97,10 +95,7 @@ def test_validate_change_order(mocker, caplog, order_factory):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    mocked_validate.assert_called_once_with(
-        mocked_client,
-        reset_ordering_parameters_error(order)
-    )
+    mocked_validate.assert_called_once_with(mocked_client, reset_ordering_parameters_error(order))
 
 
 def test_validate_purchase_order(mocker, caplog, order_factory):
@@ -120,10 +115,7 @@ def test_validate_purchase_order(mocker, caplog, order_factory):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    mocked_validate.assert_called_once_with(
-        mocked_client,
-        reset_ordering_parameters_error(order)
-    )
+    mocked_validate.assert_called_once_with(mocked_client, reset_ordering_parameters_error(order))
 
 
 def test_validate_termination_order(mocker, caplog, order_factory):
@@ -143,7 +135,4 @@ def test_validate_termination_order(mocker, caplog, order_factory):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    mocked_validate.assert_called_once_with(
-        mocked_client,
-        reset_ordering_parameters_error(order)
-    )
+    mocked_validate.assert_called_once_with(mocked_client, reset_ordering_parameters_error(order))

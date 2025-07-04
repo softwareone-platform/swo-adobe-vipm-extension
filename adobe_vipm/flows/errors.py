@@ -96,8 +96,6 @@ def wrap_airtable_http_error(func):
             try:
                 raise AirTableAPIError(e.response.status_code, e.response.json())
             except JSONDecodeError:
-                raise AirTableHttpError(
-                    e.response.status_code, e.response.content.decode()
-                )
+                raise AirTableHttpError(e.response.status_code, e.response.content.decode())
 
     return _wrapper

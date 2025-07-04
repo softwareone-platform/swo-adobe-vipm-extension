@@ -63,9 +63,7 @@ from adobe_vipm.utils import get_partial_sku
 logger = logging.getLogger(__name__)
 
 
-def get_adobe_subscriptions_by_deployment(
-    adobe_client, authorization_id, agreement_deployment
-):
+def get_adobe_subscriptions_by_deployment(adobe_client, authorization_id, agreement_deployment):
     try:
         adobe_subscriptions = adobe_client.get_subscriptions(
             authorization_id, agreement_deployment.customer_id
@@ -73,9 +71,7 @@ def get_adobe_subscriptions_by_deployment(
     except Exception as e:
         logger.exception(f"Error getting Adobe transfer order: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = (
-            f"Error getting Adobe transfer order: {e}"
-        )
+        agreement_deployment.error_description = f"Error getting Adobe transfer order: {e}"
         agreement_deployment.save()
         return None
 
@@ -351,9 +347,7 @@ def create_gc_agreement_deployment(
             {"externalId": PARAM_AGREEMENT_TYPE, "value": "Migrate"},
             {
                 "externalId": PARAM_COMPANY_NAME,
-                "value": sanitize_company_name(
-                    adobe_customer["companyProfile"]["companyName"]
-                ),
+                "value": sanitize_company_name(adobe_customer["companyProfile"]["companyName"]),
             },
             {"externalId": PARAM_CONTACT, "value": param_contact},
             {
@@ -416,21 +410,13 @@ def create_gc_agreement_deployment(
     except Exception as e:
         logger.exception(f"Error creating agreement deployment: {e}")
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = (
-            f"Error creating agreement deployment: {e}"
-        )
+        agreement_deployment.error_description = f"Error creating agreement deployment: {e}"
         agreement_deployment.save()
         return None
 
 
 def create_gc_agreement_subscription(
-    mpt_client,
-    agreement_deployment,
-    adobe_subscription,
-    gc_agreement_id,
-    buyer_id,
-    item,
-    prices
+    mpt_client, agreement_deployment, adobe_subscription, gc_agreement_id, buyer_id, item, prices
 ):
     """
     Create a global customer agreement subscription.
@@ -446,9 +432,7 @@ def create_gc_agreement_subscription(
     Returns:
         None
     """
-    logger.info(
-        f"Creating GC agreement subscription for {adobe_subscription['subscriptionId']}"
-    )
+    logger.info(f"Creating GC agreement subscription for {adobe_subscription['subscriptionId']}")
 
     price_component = {}
     if prices is not None:
@@ -476,9 +460,9 @@ def create_gc_agreement_subscription(
             ]
         },
         "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
-        "lines": [{"quantity": adobe_subscription["currentQuantity"], "item": item,
-                   **price_component
-        }],
+        "lines": [
+            {"quantity": adobe_subscription["currentQuantity"], "item": item, **price_component}
+        ],
         "startDate": adobe_subscription["creationDate"],
         "commitmentDate": adobe_subscription["renewalDate"],
         "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
@@ -542,18 +526,14 @@ def process_agreement_deployment(
             return
         agreement_deployment.price_list_id = price_list_id
 
-        listing = get_listing(
-            mpt_o_client, authorization_id, price_list_id, agreement_deployment
-        )
+        listing = get_listing(mpt_o_client, authorization_id, price_list_id, agreement_deployment)
         if not listing:
             return
         agreement_deployment.listing_id = listing["id"]
 
         licensee = get_licensee(mpt_o_client, agreement_deployment.licensee_id)
 
-        main_agreement = get_agreement(
-            mpt_client, agreement_deployment.main_agreement_id
-        )
+        main_agreement = get_agreement(mpt_client, agreement_deployment.main_agreement_id)
 
         adobe_customer = adobe_client.get_customer(
             authorization_id, agreement_deployment.customer_id
@@ -588,17 +568,17 @@ def process_agreement_deployment(
         )
         if not adobe_subscriptions:
             return
-        returned_skus = [
-            get_partial_sku(item["offerId"]) for item in adobe_subscriptions
-        ]
+        returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_subscriptions]
 
         items_map = {
             item["externalIds"]["vendor"]: item
             for item in get_product_items_by_skus(mpt_client, product_id, returned_skus)
         }
 
-        offer_ids = [get_sku_with_discount_level(adobe_subscription["offerId"], adobe_customer)
-                     for adobe_subscription in adobe_subscriptions]
+        offer_ids = [
+            get_sku_with_discount_level(adobe_subscription["offerId"], adobe_customer)
+            for adobe_subscription in adobe_subscriptions
+        ]
 
         for adobe_subscription in adobe_subscriptions:
             if adobe_subscription["status"] != STATUS_PROCESSED:
@@ -623,14 +603,11 @@ def process_agreement_deployment(
                 )
 
                 prices = get_sku_price(
-                    adobe_customer,
-                    offer_ids,
-                    product_id,
-                    agreement_deployment.deployment_currency
+                    adobe_customer, offer_ids, product_id, agreement_deployment.deployment_currency
                 )
                 sku_discount_level = get_sku_with_discount_level(
-                    adobe_subscription["offerId"],
-                    adobe_customer)
+                    adobe_subscription["offerId"], adobe_customer
+                )
 
                 create_gc_agreement_subscription(
                     mpt_client,
@@ -639,7 +616,7 @@ def process_agreement_deployment(
                     gc_agreement_id,
                     licensee["buyer"]["id"],
                     item,
-                    prices.get(sku_discount_level)
+                    prices.get(sku_discount_level),
                 )
                 logger.info(
                     f"GC agreement subscription created for {adobe_subscription['subscriptionId']}"
@@ -654,14 +631,11 @@ def process_agreement_deployment(
             f"Error processing agreement deployment {agreement_deployment.deployment_id}: {e}"
         )
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = (
-            f"Error processing agreement deployment: {e}"
-        )
+        agreement_deployment.error_description = f"Error processing agreement deployment: {e}"
         agreement_deployment.save()
 
 
 def check_gc_agreement_deployments():
-
     """
     Check and process Global Customer Agreement Deployments for each product ID
     defined in the settings.
