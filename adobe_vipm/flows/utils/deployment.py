@@ -1,6 +1,6 @@
 import copy
 
-from adobe_vipm.flows.constants import PARAM_DEPLOYMENTS
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 
 
@@ -15,7 +15,7 @@ def get_deployments(order):
     """
     deployments_param = get_fulfillment_parameter(
         order,
-        PARAM_DEPLOYMENTS,
+        Param.DEPLOYMENTS,
     )
     return deployments_param.get("value").split(",") if deployments_param.get("value") else []
 
@@ -33,7 +33,7 @@ def set_deployments(order, deployments):
     updated_order = copy.deepcopy(order)
     deployments_param = get_fulfillment_parameter(
         updated_order,
-        PARAM_DEPLOYMENTS,
+        Param.DEPLOYMENTS,
     )
     deployments_param["value"] = ",".join(deployments)
     return updated_order

@@ -12,12 +12,7 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeError
-from adobe_vipm.flows.constants import (
-    PARAM_ADDRESS,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
-    PARAM_RETRY_COUNT,
-)
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import (
     PrepareCustomerData,
@@ -185,7 +180,7 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     )
     fulfillment_parameters.append(
         {
-            "externalId": PARAM_RETRY_COUNT,
+            "externalId": Param.RETRY_COUNT,
             "value": "1",
         }
     )
@@ -320,7 +315,7 @@ def test_prepare_customer_data_step_no_company_name(mocker, order_factory, custo
     order = order_factory()
 
     no_company_customer_data = copy.copy(customer_data)
-    del no_company_customer_data[PARAM_COMPANY_NAME]
+    del no_company_customer_data[Param.COMPANY_NAME]
 
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.helpers.update_order",
@@ -338,7 +333,7 @@ def test_prepare_customer_data_step_no_company_name(mocker, order_factory, custo
 
     assert get_customer_data(context.order) == context.customer_data
     assert (
-        context.customer_data[PARAM_COMPANY_NAME] == context.order["agreement"]["licensee"]["name"]
+        context.customer_data[Param.COMPANY_NAME] == context.order["agreement"]["licensee"]["name"]
     )
 
     mocked_update_order.assert_called_once_with(
@@ -353,7 +348,7 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
     order = order_factory()
 
     no_address_customer_data = copy.copy(customer_data)
-    del no_address_customer_data[PARAM_ADDRESS]
+    del no_address_customer_data[Param.ADDRESS]
 
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.helpers.update_order",
@@ -370,7 +365,7 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
     step(mocked_client, context, mocked_next_step)
 
     assert get_customer_data(context.order) == context.customer_data
-    assert context.customer_data[PARAM_ADDRESS] == {
+    assert context.customer_data[Param.ADDRESS] == {
         "country": context.order["agreement"]["licensee"]["address"]["country"],
         "state": context.order["agreement"]["licensee"]["address"]["state"],
         "city": context.order["agreement"]["licensee"]["address"]["city"],
@@ -391,7 +386,7 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
     order = order_factory()
 
     no_contact_customer_data = copy.copy(customer_data)
-    del no_contact_customer_data[PARAM_CONTACT]
+    del no_contact_customer_data[Param.CONTACT]
 
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.helpers.update_order",
@@ -408,7 +403,7 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
     step(mocked_client, context, mocked_next_step)
 
     assert get_customer_data(context.order) == context.customer_data
-    assert context.customer_data[PARAM_CONTACT] == {
+    assert context.customer_data[Param.CONTACT] == {
         "firstName": context.order["agreement"]["licensee"]["contact"]["firstName"],
         "lastName": context.order["agreement"]["licensee"]["contact"]["lastName"],
         "email": context.order["agreement"]["licensee"]["contact"]["email"],

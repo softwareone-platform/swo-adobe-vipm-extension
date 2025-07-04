@@ -19,11 +19,7 @@ from adobe_vipm.flows.constants import (
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
     ERR_STATE_OR_PROVINCE,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_LICENSES,
-    PARAM_ADDRESS,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, Validate3YCCommitment
@@ -68,7 +64,7 @@ def test_validate_company_name(order_factory, order_parameters_factory, company_
 
     assert context.validation_succeeded is True
 
-    param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
+    param = get_ordering_parameter(context.order, Param.COMPANY_NAME)
     assert "error" not in param
 
 
@@ -98,7 +94,7 @@ def test_validate_company_name_invalid_length(
 
     assert context.validation_succeeded is False
 
-    param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
+    param = get_ordering_parameter(context.order, Param.COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -129,7 +125,7 @@ def test_validate_company_name_invalid_chars(order_factory, order_parameters_fac
 
     assert context.validation_succeeded is False
 
-    param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
+    param = get_ordering_parameter(context.order, Param.COMPANY_NAME)
     assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -143,8 +139,8 @@ def test_validate_address(order_factory, address_line_2, state_or_province):
     """
     order = order_factory()
     customer_data = get_customer_data(order)
-    customer_data[PARAM_ADDRESS]["addressLine2"] = address_line_2
-    customer_data[PARAM_ADDRESS]["state"] = state_or_province
+    customer_data[Param.ADDRESS]["addressLine2"] = address_line_2
+    customer_data[Param.ADDRESS]["state"] = state_or_province
     context = Context(
         order=order,
         customer_data=customer_data,
@@ -157,7 +153,7 @@ def test_validate_address(order_factory, address_line_2, state_or_province):
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_ADDRESS,
+        Param.ADDRESS,
     )
     assert "error" not in param
 
@@ -192,7 +188,7 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_ADDRESS,
+        Param.ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
         title=param["name"],
@@ -232,7 +228,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_ADDRESS,
+        Param.ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
         title=param["name"],
@@ -269,7 +265,7 @@ def test_validate_address_invalid_state_did_u_mean(order_factory, order_paramete
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_ADDRESS,
+        Param.ADDRESS,
     )
     error = f"{ERR_STATE_OR_PROVINCE} (Did you mean California, Colorado ?)"
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -311,7 +307,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_ADDRESS,
+        Param.ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
         title=param["name"],
@@ -352,7 +348,7 @@ def test_validate_address_invalid_postal_code_length(order_factory, order_parame
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_ADDRESS,
+        Param.ADDRESS,
     )
     assert param["error"] == ERR_ADDRESS.to_dict(
         title=param["name"],
@@ -393,7 +389,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_ADDRESS,
+        Param.ADDRESS,
     )
 
     assert param["error"] == ERR_ADDRESS.to_dict(
@@ -429,7 +425,7 @@ def test_validate_contact(order_factory):
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_CONTACT,
+        Param.CONTACT,
     )
     assert "error" not in param
 
@@ -454,7 +450,7 @@ def test_validate_contact_mandatory(order_factory, order_parameters_factory):
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_CONTACT,
+        Param.CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
         title=param["name"],
@@ -491,7 +487,7 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_CONTACT,
+        Param.CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
         title=param["name"],
@@ -528,7 +524,7 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_CONTACT,
+        Param.CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
         title=param["name"],
@@ -565,7 +561,7 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_CONTACT,
+        Param.CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
         title=param["name"],
@@ -606,7 +602,7 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
 
     param = get_ordering_parameter(
         context.order,
-        PARAM_CONTACT,
+        Param.CONTACT,
     )
     assert param["error"] == ERR_CONTACT.to_dict(
         title=param["name"],
@@ -719,7 +715,7 @@ def test_validate_3yc(order_factory, order_parameters_factory, quantities):
 
     assert context.validation_succeeded is True
 
-    for param_name in (PARAM_3YC_LICENSES, PARAM_3YC_CONSUMABLES):
+    for param_name in (Param.THREE_YC_LICENSES, Param.THREE_YC_CONSUMABLES):
         param = get_ordering_parameter(context.order, param_name)
         assert "error" not in param
 
@@ -727,8 +723,8 @@ def test_validate_3yc(order_factory, order_parameters_factory, quantities):
 @pytest.mark.parametrize(
     ("param_name", "factory_field", "error"),
     [
-        (PARAM_3YC_LICENSES, "p3yc_licenses", ERR_3YC_QUANTITY_LICENSES),
-        (PARAM_3YC_CONSUMABLES, "p3yc_consumables", ERR_3YC_QUANTITY_CONSUMABLES),
+        (Param.THREE_YC_LICENSES, "p3yc_licenses", ERR_3YC_QUANTITY_LICENSES),
+        (Param.THREE_YC_CONSUMABLES, "p3yc_consumables", ERR_3YC_QUANTITY_CONSUMABLES),
     ],
 )
 @pytest.mark.parametrize("quantity", ["a", "-3"])

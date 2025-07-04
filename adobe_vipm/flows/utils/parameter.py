@@ -2,14 +2,7 @@ import copy
 import functools
 
 from adobe_vipm.flows.constants import (
-    NEW_CUSTOMER_PARAMETERS,
-    OPTIONAL_CUSTOMER_ORDER_PARAMS,
-    PARAM_COTERM_DATE,
-    PARAM_MEMBERSHIP_ID,
-    PARAM_NEXT_SYNC_DATE,
-    PARAM_PHASE_FULFILLMENT,
-    PARAM_PHASE_ORDERING,
-    PARAM_RETRY_COUNT,
+    Param,
 )
 from adobe_vipm.utils import find_first
 
@@ -34,9 +27,9 @@ def get_parameter(parameter_phase, source, param_external_id):
     )
 
 
-get_ordering_parameter = functools.partial(get_parameter, PARAM_PHASE_ORDERING)
+get_ordering_parameter = functools.partial(get_parameter, Param.PHASE_ORDERING)
 
-get_fulfillment_parameter = functools.partial(get_parameter, PARAM_PHASE_FULFILLMENT)
+get_fulfillment_parameter = functools.partial(get_parameter, Param.PHASE_FULFILLMENT)
 
 
 def set_ordering_parameter_error(order, param_external_id, error, required=True):
@@ -76,7 +69,7 @@ def reset_ordering_parameters_error(order):
     """
     updated_order = copy.deepcopy(order)
 
-    for param in updated_order["parameters"][PARAM_PHASE_ORDERING]:
+    for param in updated_order["parameters"][Param.PHASE_ORDERING]:
         param["error"] = None
 
     return updated_order
@@ -86,13 +79,13 @@ def update_parameters_visibility(order):
     from adobe_vipm.flows.utils.customer import is_new_customer
 
     if is_new_customer(order):
-        for param in NEW_CUSTOMER_PARAMETERS:
+        for param in Param.NEW_CUSTOMER_PARAMETERS:
             order = set_parameter_visible(order, param)
-        order = set_parameter_hidden(order, PARAM_MEMBERSHIP_ID)
+        order = set_parameter_hidden(order, Param.MEMBERSHIP_ID)
     else:
-        for param in NEW_CUSTOMER_PARAMETERS:
+        for param in Param.NEW_CUSTOMER_PARAMETERS:
             order = set_parameter_hidden(order, param)
-        order = set_parameter_visible(order, PARAM_MEMBERSHIP_ID)
+        order = set_parameter_visible(order, Param.MEMBERSHIP_ID)
     return order
 
 
@@ -105,7 +98,7 @@ def set_coterm_date(order, coterm_date):
     updated_order = copy.deepcopy(order)
     customer_ff_param = get_fulfillment_parameter(
         updated_order,
-        PARAM_COTERM_DATE,
+        Param.COTERM_DATE,
     )
     customer_ff_param["value"] = coterm_date
     return updated_order
@@ -114,7 +107,7 @@ def set_coterm_date(order, coterm_date):
 def get_coterm_date(order):
     return get_fulfillment_parameter(
         order,
-        PARAM_COTERM_DATE,
+        Param.COTERM_DATE,
     ).get("value")
 
 
@@ -143,7 +136,7 @@ def get_adobe_membership_id(source):
     """
     param = get_ordering_parameter(
         source,
-        PARAM_MEMBERSHIP_ID,
+        Param.MEMBERSHIP_ID,
     )
     return param.get("value")
 
@@ -152,7 +145,7 @@ def set_next_sync(order, next_sync):
     updated_order = copy.deepcopy(order)
     customer_ff_param = get_fulfillment_parameter(
         updated_order,
-        PARAM_NEXT_SYNC_DATE,
+        Param.NEXT_SYNC_DATE,
     )
     customer_ff_param["value"] = next_sync
     return updated_order
@@ -161,7 +154,7 @@ def set_next_sync(order, next_sync):
 def get_next_sync(order):
     return get_fulfillment_parameter(
         order,
-        PARAM_NEXT_SYNC_DATE,
+        Param.NEXT_SYNC_DATE,
     ).get("value")
 
 
@@ -173,7 +166,7 @@ def set_parameter_visible(order, param_external_id):
     )
     param["constraints"] = {
         "hidden": False,
-        "required": param_external_id not in OPTIONAL_CUSTOMER_ORDER_PARAMS,
+        "required": param_external_id not in Param.OPTIONAL_CUSTOMER_ORDER,
     }
     return updated_order
 
@@ -202,7 +195,7 @@ def get_retry_count(order):
         str: retry count. None if parameter doesn't exist
     """
     param = find_first(
-        lambda x: x["externalId"] == PARAM_RETRY_COUNT,
+        lambda x: x["externalId"] == Param.RETRY_COUNT,
         order["parameters"]["fulfillment"],
     )
 

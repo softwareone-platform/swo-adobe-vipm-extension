@@ -29,7 +29,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
     ERR_UPDATING_TRANSFER_ITEMS,
-    PARAM_MEMBERSHIP_ID,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.pipeline import Pipeline, Step
@@ -89,10 +89,10 @@ def _update_order_lines(
     for adobe_line in adobe_items:
         item = items_map.get(get_partial_sku(adobe_line["offerId"]))
         if not item:
-            param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+            param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
             order = set_ordering_parameter_error(
                 order,
-                PARAM_MEMBERSHIP_ID,
+                Param.MEMBERSHIP_ID,
                 ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
                     title=param["name"],
                     item_sku=get_partial_sku(adobe_line["offerId"]),
@@ -178,7 +178,7 @@ def add_lines_to_order(
     if not adobe_items:
         order = set_ordering_parameter_error(
             order,
-            PARAM_MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
         )
         return True, order
@@ -270,10 +270,10 @@ def validate_transfer_not_migrated(mpt_client, order):
             membership_id,
         )
     except AdobeAPIError as e:
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
-            PARAM_MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
         )
         return True, order
@@ -281,10 +281,10 @@ def validate_transfer_not_migrated(mpt_client, order):
         err_msg = (
             ERR_ADOBE_MEMBERSHIP_NOT_FOUND if he.status_code == 404 else ERR_ADOBE_UNEXPECTED_ERROR
         )
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
         order = set_ordering_parameter_error(
             order,
-            PARAM_MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=err_msg),
         )
         return True, order
@@ -323,7 +323,7 @@ class ValidateTransferStatus(Step):
         if context.adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_MEMBERSHIP_ID,
+                Param.MEMBERSHIP_ID,
                 ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
                     status=context.adobe_transfer["status"],
                 ),
@@ -334,10 +334,10 @@ class ValidateTransferStatus(Step):
         next_step(mpt_client, context)
 
     def _set_transfer_error(self, context, order, details):
-        param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
         context.order = set_ordering_parameter_error(
             order,
-            PARAM_MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=details),
         )
         context.validation_succeeded = False
@@ -366,7 +366,7 @@ class FetchTransferData(Step):
         except AdobeError as e:
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_MEMBERSHIP_ID,
+                Param.MEMBERSHIP_ID,
                 ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
                     membership_id=context.transfer.membership_id,
                     error=str(e),
@@ -402,10 +402,10 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
         if len(context.subscriptions["items"]) == 0:
             if customer.get("globalSalesEnabled", False):
                 logger.error(ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT)
-                param = get_ordering_parameter(context.order, PARAM_MEMBERSHIP_ID)
+                param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_MEMBERSHIP_ID,
+                    Param.MEMBERSHIP_ID,
                     ERR_ADOBE_MEMBERSHIP_ID.to_dict(
                         title=param["name"], details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
                     ),

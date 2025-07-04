@@ -3,17 +3,7 @@ import copy
 from adobe_vipm.adobe.constants import (
     OfferType,
 )
-from adobe_vipm.flows.constants import (
-    PARAM_3YC,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_LICENSES,
-    PARAM_ADDRESS,
-    PARAM_AGREEMENT_TYPE,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
-    PARAM_CUSTOMER_ID,
-    PARAM_GLOBAL_CUSTOMER,
-)
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.date import is_within_last_two_weeks
 from adobe_vipm.flows.utils.parameter import (
     get_fulfillment_parameter,
@@ -36,12 +26,12 @@ def get_customer_data(order):
     """
     customer_data = {}
     for param_external_id in (
-        PARAM_COMPANY_NAME,
-        PARAM_ADDRESS,
-        PARAM_CONTACT,
-        PARAM_3YC,
-        PARAM_3YC_CONSUMABLES,
-        PARAM_3YC_LICENSES,
+        Param.COMPANY_NAME,
+        Param.ADDRESS,
+        Param.CONTACT,
+        Param.THREE_YC,
+        Param.THREE_YC_CONSUMABLES,
+        Param.THREE_YC_LICENSES,
     ):
         param = get_ordering_parameter(
             order,
@@ -75,7 +65,7 @@ def set_customer_data(order, customer_data):
 def get_company_name(source):
     return get_ordering_parameter(
         source,
-        PARAM_COMPANY_NAME,
+        Param.COMPANY_NAME,
     ).get("value")
 
 
@@ -93,7 +83,7 @@ def get_adobe_customer_id(source):
     """
     param = get_fulfillment_parameter(
         source,
-        PARAM_CUSTOMER_ID,
+        Param.CUSTOMER_ID,
     )
     return param.get("value")
 
@@ -108,7 +98,7 @@ def set_adobe_customer_id(order, customer_id):
     updated_order = copy.deepcopy(order)
     customer_ff_param = get_fulfillment_parameter(
         updated_order,
-        PARAM_CUSTOMER_ID,
+        Param.CUSTOMER_ID,
     )
     customer_ff_param["value"] = customer_id
     return updated_order
@@ -131,7 +121,7 @@ def get_customer_consumables_discount_level(customer):
 def is_new_customer(source):
     param = get_ordering_parameter(
         source,
-        PARAM_AGREEMENT_TYPE,
+        Param.AGREEMENT_TYPE,
     )
     return param.get("value") == "New"
 
@@ -147,7 +137,7 @@ def get_global_customer(order):
     """
     global_customer_param = get_fulfillment_parameter(
         order,
-        PARAM_GLOBAL_CUSTOMER,
+        Param.GLOBAL_CUSTOMER,
     )
     return global_customer_param.get("value")
 
@@ -165,7 +155,7 @@ def set_global_customer(order, global_sales_enabled):
     updated_order = copy.deepcopy(order)
     global_customer_param = get_fulfillment_parameter(
         updated_order,
-        PARAM_GLOBAL_CUSTOMER,
+        Param.GLOBAL_CUSTOMER,
     )
     global_customer_param["value"] = [global_sales_enabled]
     return updated_order
