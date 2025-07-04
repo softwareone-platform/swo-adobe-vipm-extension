@@ -140,12 +140,14 @@ ERR_VIPM_UNHANDLED_EXCEPTION = ValidationError(
 
 ERR_3YC_QUANTITY_LICENSES = ValidationError(
     "VIPM0013",
-    "The `{title}` must be an integer " f"number equal to {MINQTY_LICENSES} or greater.",
+    f"The minimum number of licenses must be numeric "
+    f"and greater than or equal to ten ({MINQTY_LICENSES}).",
 )
 
 ERR_3YC_QUANTITY_CONSUMABLES = ValidationError(
     "VIPM0014",
-    "The `{title}` must be an integer " f"number equal to {MINQTY_CONSUMABLES} or greater.",
+    f"The minimum number of consumables must be numeric "
+    f"and greater than or equal to one thousand ({MINQTY_CONSUMABLES}).",
 )
 
 ERR_3YC_NO_MINIMUMS = ValidationError(
