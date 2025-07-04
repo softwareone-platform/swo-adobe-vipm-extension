@@ -1,3 +1,4 @@
+import copy
 import logging
 import sys
 import traceback
@@ -21,6 +22,7 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
+from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
@@ -32,6 +34,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_deployments,
     get_global_customer,
+    get_parameter,
     get_sku_with_discount_level,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
@@ -80,16 +83,75 @@ def sync_agreement_prices(
     _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
 
     next_sync = (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
+    parameters = {Param.PHASE_FULFILLMENT: [{"externalId": "nextSync", "value": next_sync}]}
+    commitment_info = get_3yc_commitment(customer)
+    if commitment_info:
+        parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
+        for mq in commitment_info.get("minimumQuantities", ()):
+            if mq["offerType"] == "LICENSE":
+                parameters.setdefault(Param.PHASE_ORDERING, [])
+                parameters[Param.PHASE_ORDERING].append(
+                    {"externalId": Param.THREE_YC_LICENSES, "value": str(mq.get("quantity"))}
+                )
+            if mq["offerType"] == "CONSUMABLES":
+                parameters.setdefault(Param.PHASE_ORDERING, [])
+                parameters[Param.PHASE_ORDERING].append(
+                    {"externalId": Param.THREE_YC_CONSUMABLES, "value": str(mq.get("quantity"))}
+                )
+
     if not dry_run:
         update_agreement(
             mpt_client,
             agreement["id"],
             lines=agreement["lines"],
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": next_sync}]},
+            parameters=parameters,
         )
 
     logger.info(f"agreement updated {agreement['id']}")
     return coterm_date
+
+
+def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters):
+    new_parameters = copy.deepcopy(parameters)
+    three_yc_recommitment_par = get_parameter(
+        Param.PHASE_FULFILLMENT, agreement, Param.THREE_YC_RECOMMITMENT
+    )
+    is_recommitment = True if three_yc_recommitment_par else False
+    status_param_ext_id = (
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        if not is_recommitment
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+    )
+    request_type_param_ext_id = (
+        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+    )
+    request_type_param_phase = (
+        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+    )
+    request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
+    new_parameters[Param.PHASE_FULFILLMENT].append(
+        {"externalId": status_param_ext_id, "value": request_info.get("status")}
+    )
+    new_parameters.setdefault(request_type_param_phase, [])
+    new_parameters[request_type_param_phase].append(
+        {"externalId": request_type_param_ext_id, "value": None},
+    )
+    new_parameters[Param.PHASE_FULFILLMENT] += [
+        {
+            "externalId": Param.THREE_YC_ENROLL_STATUS,
+            "value": commitment_info.get("status"),
+        },
+        {
+            "externalId": Param.THREE_YC_START_DATE,
+            "value": commitment_info.get("startDate"),
+        },
+        {
+            "externalId": Param.THREE_YC_END_DATE,
+            "value": commitment_info.get("endDate"),
+        },
+    ]
+
+    return new_parameters
 
 
 def _log_agreement_lines(
@@ -436,6 +498,8 @@ def sync_agreement(mpt_client, agreement, dry_run):
                 dry_run,
             )
 
+    except AuthorizationNotFoundError as e:
+        logger.error(f"AuthorizationNotFoundError synchronizing agreement {agreement['id']}: {e}")
     except Exception as e:
         logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
