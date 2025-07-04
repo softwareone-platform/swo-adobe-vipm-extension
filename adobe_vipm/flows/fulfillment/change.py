@@ -184,6 +184,7 @@ class UpdateRenewalQuantities(Step):
         )
         qty = line["quantity"]
         old_qty = adobe_subscription["autoRenewal"]["renewalQuantity"]
+
         if old_qty != qty:
             try:
                 adobe_client.update_subscription(
@@ -192,38 +193,35 @@ class UpdateRenewalQuantities(Step):
                     adobe_sub_id,
                     quantity=qty,
                 )
-                logger.info(
-                    f"{context}: update renewal quantity for sub "
-                    f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
-                )
-                context.updated.append(
-                    {
-                        "subscription_vendor_id": adobe_sub_id,
-                        "old_quantity": old_qty,
-                        "new_quantity": qty,
-                    }
-                )
             except AdobeAPIError as e:
-                logger.error(
-                    f"{context}: failed to update renewal quantity for "
-                    f"{subscription['id']} ({adobe_sub_id}) due to {e}"
-                )
-                notify_not_updated_subscriptions(
-                    context.order["id"],
-                    f"Error updating subscription {subscription['id']}, {str(e)}",
-                    [],
-                    context.product_id,
-                )
-                self.error = e
-                return
+                if not (e.code == STATUS_LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order):
+                    logger.error(
+                        f"{context}: failed to update renewal quantity for "
+                        f"{subscription['id']} ({adobe_sub_id}) due to {e}"
+                    )
+                    notify_not_updated_subscriptions(
+                        context.order["id"],
+                        f"Error updating subscription {subscription['id']}, {str(e)}",
+                        [],
+                        context.product_id
+                    )
+                    self.error = e
+                    return
+
+            logger.info(
+                f"{context}: update renewal quantity for sub "
+                f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
+            )
+            context.updated.append({
+                "subscription_vendor_id": adobe_sub_id,
+                "old_quantity": old_qty,
+                "new_quantity": qty
+            })
 
     def _handle_subscription_update_error(self, adobe_client, client, context, e):
         self._rollback_updated_subscriptions(adobe_client, context)
-        if e.code in [
-            STATUS_INVALID_RENEWAL_STATE,
-            STATUS_LINE_ITEM_OFFER_ID_EXPIRED,
-            STATUS_SUBSCRIPTION_INACTIVE,
-        ]:
+        if e.code in [STATUS_INVALID_RENEWAL_STATE,
+            STATUS_SUBSCRIPTION_INACTIVE]:
             switch_order_to_failed(
                 client,
                 context.order,
