@@ -26,31 +26,7 @@ from adobe_vipm.airtable.models import (
     AirTableBaseInfo,
     get_sku_adobe_mapping_model,
 )
-from adobe_vipm.flows.constants import (
-    PARAM_3YC,
-    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_END_DATE,
-    PARAM_3YC_ENROLL_STATUS,
-    PARAM_3YC_LICENSES,
-    PARAM_3YC_RECOMMITMENT,
-    PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_START_DATE,
-    PARAM_ADDRESS,
-    PARAM_ADOBE_SKU,
-    PARAM_AGREEMENT_TYPE,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
-    PARAM_COTERM_DATE,
-    PARAM_CUSTOMER_ID,
-    PARAM_DEPLOYMENT_ID,
-    PARAM_DEPLOYMENTS,
-    PARAM_DUE_DATE,
-    PARAM_GLOBAL_CUSTOMER,
-    PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
-    PARAM_MEMBERSHIP_ID,
-    PARAM_NEXT_SYNC_DATE,
-)
+from adobe_vipm.flows.constants import Param
 
 
 @pytest.fixture()
@@ -371,7 +347,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": PARAM_COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME,
                 "type": "SingleLineText",
                 "value": company_name,
                 "constraints": {
@@ -382,7 +358,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": PARAM_ADDRESS,
+                "externalId": Param.ADDRESS,
                 "type": "Address",
                 "value": address,
                 "constraints": {
@@ -393,7 +369,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": PARAM_CONTACT,
+                "externalId": Param.CONTACT,
                 "type": "Contact",
                 "value": contact,
                 "constraints": {
@@ -404,7 +380,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": PARAM_AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE,
                 "type": "SingleLineText",
                 "value": "New",
                 "constraints": {
@@ -415,7 +391,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0005",
                 "name": "Membership Id",
-                "externalId": PARAM_MEMBERSHIP_ID,
+                "externalId": Param.MEMBERSHIP_ID,
                 "type": "SingleLineText",
                 "value": "",
                 "constraints": {
@@ -426,7 +402,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0006",
                 "name": "3YC",
-                "externalId": PARAM_3YC,
+                "externalId": Param.THREE_YC,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
@@ -437,7 +413,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0007",
                 "name": "3YCLicenses",
-                "externalId": PARAM_3YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES,
                 "type": "SingleLineText",
                 "value": p3yc_licenses,
                 "constraints": {
@@ -448,7 +424,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCConsumables",
-                "externalId": PARAM_3YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES,
                 "type": "SingleLineText",
                 "value": p3yc_consumables,
                 "constraints": {
@@ -476,7 +452,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": PARAM_COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME,
                 "type": "SingleLineText",
                 "value": company_name or "",
                 "constraints": {
@@ -488,7 +464,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": PARAM_ADDRESS,
+                "externalId": Param.ADDRESS,
                 "type": "Address",
                 "value": address or {},
                 "constraints": {
@@ -500,7 +476,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": PARAM_CONTACT,
+                "externalId": Param.CONTACT,
                 "type": "Contact",
                 "value": contact or {},
                 "constraints": {
@@ -512,7 +488,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": PARAM_AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE,
                 "type": "SingleLineText",
                 "value": "Migrate",
                 "constraints": {
@@ -524,7 +500,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0005",
                 "name": "Membership Id",
-                "externalId": PARAM_MEMBERSHIP_ID,
+                "externalId": Param.MEMBERSHIP_ID,
                 "type": "SingleLineText",
                 "value": membership_id,
                 "constraints": {
@@ -536,7 +512,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0006",
                 "name": "3YC",
-                "externalId": PARAM_3YC,
+                "externalId": Param.THREE_YC,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
@@ -548,7 +524,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0007",
                 "name": "3YCLicenses",
-                "externalId": PARAM_3YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES,
                 "type": "SingleLineText",
                 "value": p3yc_licenses or "",
                 "constraints": {
@@ -560,7 +536,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCConsumables",
-                "externalId": PARAM_3YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES,
                 "type": "SingleLineText",
                 "value": p3yc_consumables or "",
                 "constraints": {
@@ -597,83 +573,83 @@ def fulfillment_parameters_factory():
             {
                 "id": "PAR-1234-5678",
                 "name": "Customer Id",
-                "externalId": PARAM_CUSTOMER_ID,
+                "externalId": Param.CUSTOMER_ID,
                 "type": "SingleLineText",
                 "value": customer_id,
             },
             {
                 "id": "PAR-7771-1777",
                 "name": "Due Date",
-                "externalId": PARAM_DUE_DATE,
+                "externalId": Param.DUE_DATE,
                 "type": "Date",
                 "value": due_date,
             },
             {
                 "id": "PAR-9876-5432",
                 "name": "3YC Enroll Status",
-                "externalId": PARAM_3YC_ENROLL_STATUS,
+                "externalId": Param.THREE_YC_ENROLL_STATUS,
                 "type": "SingleLineText",
                 "value": p3yc_enroll_status,
             },
             {
                 "id": "PAR-2266-4848",
                 "name": "3YC Start Date",
-                "externalId": PARAM_3YC_START_DATE,
+                "externalId": Param.THREE_YC_START_DATE,
                 "type": "Date",
                 "value": p3yc_start_date,
             },
             {
                 "id": "PAR-3528-2927",
                 "name": "3YC End Date",
-                "externalId": PARAM_3YC_END_DATE,
+                "externalId": Param.THREE_YC_END_DATE,
                 "type": "Date",
                 "value": p3yc_end_date,
             },
             {
                 "id": "PAR-4141-1414",
                 "name": "Next Sync",
-                "externalId": PARAM_NEXT_SYNC_DATE,
+                "externalId": Param.NEXT_SYNC_DATE,
                 "type": "Date",
                 "value": next_sync_date,
             },
             {
                 "id": "PAR-0022-2200",
                 "name": "3YC Commitment Request Status",
-                "externalId": PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+                "externalId": Param.THREE_YC_COMMITMENT_REQUEST_STATUS,
                 "type": "SingleLineText",
                 "value": p3yc_commitment_request_status,
             },
             {
                 "id": "PAR-0077-7700",
                 "name": "3YC Recommitment Request Status",
-                "externalId": PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
+                "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS,
                 "type": "SingleLineText",
                 "value": p3yc_recommitment_request_status,
             },
             {
                 "id": "PAR-0000-6666",
                 "name": "3YCRecommitment",
-                "externalId": PARAM_3YC_RECOMMITMENT,
+                "externalId": Param.THREE_YC_RECOMMITMENT,
                 "type": "Checkbox",
                 "value": p3yc_recommitment or [],
             },
             {
                 "id": "PAR-0000-6666",
                 "name": "Eligibility Status",
-                "externalId": PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
+                "externalId": Param.MARKET_SEGMENT_ELIGIBILITY_STATUS,
                 "type": "Dropdown",
                 "value": market_segment_eligibility_status,
             },
             {
                 "id": "PAR-7373-1919",
                 "name": "Customer Coterm date",
-                "externalId": PARAM_COTERM_DATE,
+                "externalId": Param.COTERM_DATE,
                 "type": "Date",
                 "value": coterm_date,
             },
             {
                 "id": "PAR-6179-6384-0024",
-                "externalId": PARAM_GLOBAL_CUSTOMER,
+                "externalId": Param.GLOBAL_CUSTOMER,
                 "name": "Global Customer",
                 "type": "Checkbox",
                 "displayValue": "Yes",
@@ -681,14 +657,14 @@ def fulfillment_parameters_factory():
             },
             {
                 "id": "PAR-6179-6384-0025",
-                "externalId": PARAM_DEPLOYMENT_ID,
+                "externalId": Param.DEPLOYMENT_ID,
                 "name": "Deployment ID",
                 "type": "SingleLineText",
                 "value": deployment_id,
             },
             {
                 "id": "PAR-6179-6384-0026",
-                "externalId": PARAM_DEPLOYMENTS,
+                "externalId": Param.DEPLOYMENTS,
                 "name": "Deployments",
                 "type": "MultiLineText",
                 "value": ",".join(deployments),
@@ -807,7 +783,7 @@ def subscriptions_factory(lines_factory):
                     "fulfillment": [
                         {
                             "name": "Adobe SKU",
-                            "externalId": PARAM_ADOBE_SKU,
+                            "externalId": Param.ADOBE_SKU,
                             "type": "SingleLineText",
                             "value": adobe_sku,
                         }

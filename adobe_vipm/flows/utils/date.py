@@ -4,11 +4,7 @@ from datetime import date, datetime, timedelta
 from django.conf import settings
 from zoneinfo import ZoneInfo
 
-from adobe_vipm.flows.constants import (
-    LAST_TWO_WEEKS_DAYS,
-    PARAM_DUE_DATE,
-    PARAM_PHASE_FULFILLMENT,
-)
+from adobe_vipm.flows.constants import LAST_TWO_WEEKS_DAYS, Param
 from adobe_vipm.flows.utils.parameter import (
     get_coterm_date,
     get_fulfillment_parameter,
@@ -28,16 +24,16 @@ def set_due_date(order):
     updated_order = copy.deepcopy(order)
     param = get_fulfillment_parameter(
         updated_order,
-        PARAM_DUE_DATE,
+        Param.DUE_DATE,
     )
     if not param:
         # in case of there is no any due date parameter
         # when order was in processing status
         # and due date was created and rolled out to the environment
         param = {
-            "externalId": PARAM_DUE_DATE,
+            "externalId": Param.DUE_DATE,
         }
-        updated_order["parameters"][PARAM_PHASE_FULFILLMENT].append(param)
+        updated_order["parameters"][Param.PHASE_FULFILLMENT].append(param)
 
     if not param.get("value"):
         due_date = date.today() + timedelta(
@@ -60,7 +56,7 @@ def get_due_date(order):
     """
     param = get_fulfillment_parameter(
         order,
-        PARAM_DUE_DATE,
+        Param.DUE_DATE,
     )
 
     return datetime.strptime(param["value"], "%Y-%m-%d").date() if param.get("value") else None
@@ -79,7 +75,7 @@ def reset_due_date(order):
     """
     param = get_fulfillment_parameter(
         order,
-        PARAM_DUE_DATE,
+        Param.DUE_DATE,
     )
     param["value"] = None
 

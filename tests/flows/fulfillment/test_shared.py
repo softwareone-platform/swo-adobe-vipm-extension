@@ -22,14 +22,9 @@ from adobe_vipm.flows.constants import (
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
-    PARAM_3YC,
-    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_END_DATE,
-    PARAM_3YC_ENROLL_STATUS,
-    PARAM_3YC_START_DATE,
-    PARAM_DUE_DATE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -285,7 +280,7 @@ def test_setup_due_date_when_parameter_is_missed(
     fulfillment_parameters = fulfillment_parameters_factory()
     fulfillment_parameters = list(
         filter(
-            lambda p: p["externalId"] != PARAM_DUE_DATE,
+            lambda p: p["externalId"] != Param.DUE_DATE,
             fulfillment_parameters,
         )
     )
@@ -630,13 +625,17 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
 
     parameter_list = []
     parameter_list.append(
-        get_fulfillment_parameter(context.order, PARAM_3YC_ENROLL_STATUS)["value"]
+        get_fulfillment_parameter(context.order, Param.THREE_YC_ENROLL_STATUS)["value"]
     )
     parameter_list.append(
-        get_fulfillment_parameter(context.order, PARAM_3YC_COMMITMENT_REQUEST_STATUS)["value"]
+        get_fulfillment_parameter(context.order, Param.THREE_YC_COMMITMENT_REQUEST_STATUS)["value"]
     )
-    parameter_list.append(get_fulfillment_parameter(context.order, PARAM_3YC_START_DATE)["value"])
-    parameter_list.append(get_fulfillment_parameter(context.order, PARAM_3YC_END_DATE)["value"])
+    parameter_list.append(
+        get_fulfillment_parameter(context.order, Param.THREE_YC_START_DATE)["value"]
+    )
+    parameter_list.append(
+        get_fulfillment_parameter(context.order, Param.THREE_YC_END_DATE)["value"]
+    )
     parameter_list.append(get_fulfillment_parameter(
         context.order,
         PARAM_3YC

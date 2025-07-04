@@ -34,9 +34,7 @@ from adobe_vipm.flows.constants import (
     ERR_COMMITMENT_3YC_VALIDATION,
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
-    PARAM_ADDRESS,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
+    Param,
 )
 from adobe_vipm.flows.fulfillment.shared import switch_order_to_failed
 from adobe_vipm.flows.pipeline import Step
@@ -86,12 +84,12 @@ class PrepareCustomerData(Step):
 
         customer_data_updated = False
 
-        if not context.customer_data.get(PARAM_COMPANY_NAME):
-            context.customer_data[PARAM_COMPANY_NAME] = licensee["name"]
+        if not context.customer_data.get(Param.COMPANY_NAME):
+            context.customer_data[Param.COMPANY_NAME] = licensee["name"]
             customer_data_updated = True
 
-        if not context.customer_data.get(PARAM_ADDRESS):
-            context.customer_data[PARAM_ADDRESS] = {
+        if not context.customer_data.get(Param.ADDRESS):
+            context.customer_data[Param.ADDRESS] = {
                 "country": address["country"],
                 "state": address["state"],
                 "city": address["city"],
@@ -101,8 +99,8 @@ class PrepareCustomerData(Step):
             }
             customer_data_updated = True
 
-        if not context.customer_data.get(PARAM_CONTACT) and contact:
-            context.customer_data[PARAM_CONTACT] = {
+        if not context.customer_data.get(Param.CONTACT) and contact:
+            context.customer_data[Param.CONTACT] = {
                 "firstName": contact["firstName"],
                 "lastName": contact["lastName"],
                 "email": contact["email"],

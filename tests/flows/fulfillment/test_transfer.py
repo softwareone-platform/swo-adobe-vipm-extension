@@ -33,9 +33,9 @@ from adobe_vipm.flows.constants import (
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
-    PARAM_MEMBERSHIP_ID,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import fulfill_order
@@ -1009,10 +1009,10 @@ def test_transfer_invalid_membership(
         authorization_id,
         "a-membership-id",
     )
-    param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
     order = set_ordering_parameter_error(
         order,
-        PARAM_MEMBERSHIP_ID,
+        Param.MEMBERSHIP_ID,
         ERR_ADOBE_MEMBERSHIP_ID.to_dict(
             title=param["name"],
             details=str(adobe_error),
@@ -1075,10 +1075,10 @@ def test_transfer_membership_not_found(
         authorization_id,
         "a-membership-id",
     )
-    param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
     order = set_ordering_parameter_error(
         order,
-        PARAM_MEMBERSHIP_ID,
+        Param.MEMBERSHIP_ID,
         ERR_ADOBE_MEMBERSHIP_ID.to_dict(
             title=param["name"],
             details=ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
@@ -1337,7 +1337,7 @@ def test_fulfill_transfer_order_already_migrated(
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -1526,7 +1526,7 @@ def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -1843,7 +1843,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -2049,7 +2049,7 @@ def test_fulfill_transfer_order_already_migrated_(
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -2135,7 +2135,7 @@ def test_fulfill_transfer_order_migration_running(
 
     fulfill_order(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -2143,10 +2143,10 @@ def test_fulfill_transfer_order_migration_running(
         membership_param["value"],
     )
 
-    param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
     order = set_ordering_parameter_error(
         order,
-        PARAM_MEMBERSHIP_ID,
+        Param.MEMBERSHIP_ID,
         ERR_ADOBE_MEMBERSHIP_ID.to_dict(
             title=param["name"],
             details="Migration in progress, retry later",
@@ -2206,7 +2206,7 @@ def test_fulfill_transfer_order_migration_synchronized(
 
     fulfill_order(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -2899,7 +2899,7 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -3058,7 +3058,7 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
 
     mock_get_product_items_by_skus.assert_not_called()
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -4857,7 +4857,7 @@ def test_fulfill_transfer_gc_order_already_migrated_(
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -5046,7 +5046,7 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
@@ -6093,7 +6093,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
 
     fulfill_order(m_client, order)
 
-    membership_id_param = get_ordering_parameter(updated_order, PARAM_MEMBERSHIP_ID)
+    membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID)
 
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],

@@ -36,21 +36,8 @@ from adobe_vipm.flows.constants import (
     GLOBAL_SUFFIX,
     MARKET_SEGMENT_COMMERCIAL,
     MPT_ORDER_STATUS_COMPLETED,
-    PARAM_ADDRESS,
-    PARAM_ADOBE_SKU,
-    PARAM_AGREEMENT_TYPE,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
-    PARAM_COTERM_DATE,
-    PARAM_CURRENT_QUANTITY,
-    PARAM_CUSTOMER_ID,
-    PARAM_DEPLOYMENT_ID,
-    PARAM_DEPLOYMENTS,
-    PARAM_GLOBAL_CUSTOMER,
-    PARAM_MEMBERSHIP_ID,
-    PARAM_RENEWAL_DATE,
-    PARAM_RENEWAL_QUANTITY,
     TEMPLATE_NAME_TRANSFER,
+    Param,
 )
 from adobe_vipm.flows.utils import (
     get_address,
@@ -344,36 +331,36 @@ def create_gc_agreement_deployment(
         )
 
         ordering_parameters = [
-            {"externalId": PARAM_AGREEMENT_TYPE, "value": "Migrate"},
+            {"externalId": Param.AGREEMENT_TYPE, "value": "Migrate"},
             {
-                "externalId": PARAM_COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME,
                 "value": sanitize_company_name(adobe_customer["companyProfile"]["companyName"]),
             },
-            {"externalId": PARAM_CONTACT, "value": param_contact},
+            {"externalId": Param.CONTACT, "value": param_contact},
             {
-                "externalId": PARAM_MEMBERSHIP_ID,
+                "externalId": Param.MEMBERSHIP_ID,
                 "value": agreement_deployment.membership_id,
             },
         ]
         if address:
-            ordering_parameters.append({"externalId": PARAM_ADDRESS, "value": param_address})
+            ordering_parameters.append({"externalId": Param.ADDRESS, "value": param_address})
 
         fulfillment_parameters = [
-            {"externalId": PARAM_GLOBAL_CUSTOMER, "value": ["Yes"]},
+            {"externalId": Param.GLOBAL_CUSTOMER, "value": ["Yes"]},
             {
-                "externalId": PARAM_DEPLOYMENT_ID,
+                "externalId": Param.DEPLOYMENT_ID,
                 "value": agreement_deployment.deployment_id,
             },
             {
-                "externalId": PARAM_DEPLOYMENTS,
+                "externalId": Param.DEPLOYMENTS,
                 "value": ",".join(customer_deployment_ids),
             },
             {
-                "externalId": PARAM_CUSTOMER_ID,
+                "externalId": Param.CUSTOMER_ID,
                 "value": agreement_deployment.customer_id,
             },
             {
-                "externalId": PARAM_COTERM_DATE,
+                "externalId": Param.COTERM_DATE,
                 "value": adobe_customer["cotermDate"],
             },
         ]
@@ -444,17 +431,17 @@ def create_gc_agreement_subscription(
         "agreement": {"id": gc_agreement_id},
         "parameters": {
             "fulfillment": [
-                {"externalId": PARAM_ADOBE_SKU, "value": adobe_subscription["offerId"]},
+                {"externalId": Param.ADOBE_SKU, "value": adobe_subscription["offerId"]},
                 {
-                    "externalId": PARAM_CURRENT_QUANTITY,
+                    "externalId": Param.CURRENT_QUANTITY,
                     "value": str(adobe_subscription["currentQuantity"]),
                 },
                 {
-                    "externalId": PARAM_RENEWAL_QUANTITY,
+                    "externalId": Param.RENEWAL_QUANTITY,
                     "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                 },
                 {
-                    "externalId": PARAM_RENEWAL_DATE,
+                    "externalId": Param.RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
             ]
