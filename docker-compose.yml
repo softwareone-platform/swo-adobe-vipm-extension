@@ -10,10 +10,6 @@ services:
       - .:/extension
     env_file:
       - .env
-    ports:
-      - "8080:8080"
-    expose:
-      - "8080"
 
   bash:
     container_name: adobe_vipm_bash
@@ -28,6 +24,10 @@ services:
       - .:/extension
     env_file:
       - .env
+    ports:
+      - "8080:8080"
+    expose:
+      - "8080"
 
   app_test:
     container_name: adobe_vipm_test
