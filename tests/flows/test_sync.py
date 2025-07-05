@@ -3,10 +3,14 @@ import logging
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe import constants
+from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
+from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
+    TEMP_3YC_STATUSES,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
+    sync_agreements_by_3yc_enroll_status,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_coterm_date,
     sync_agreements_by_next_sync,
@@ -167,6 +171,7 @@ def test_sync_agreement_prices(
                         "externalId": "renewalDate",
                         "value": adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-23"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -194,6 +199,7 @@ def test_sync_agreement_prices(
                         "externalId": "renewalDate",
                         "value": another_adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-23"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -547,6 +553,195 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
     )
 
 
+@pytest.mark.parametrize(
+    "status",
+    [
+        constants.ThreeYearCommitmentStatus.ACCEPTED,
+        constants.ThreeYearCommitmentStatus.REQUESTED,
+    ],
+)
+def test_sync_agreements_by_3yc_enroll_status_status(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    status,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_query = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=status)
+    )
+    mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_query.assert_called_once_with(mock_mpt_client, TEMP_3YC_STATUSES)
+    mock_update_agreement.assert_called_once_with(
+        mock_mpt_client,
+        agreement["id"],
+        parameters={"fulfillment": [{"externalId": "3YCEnrollStatus", "value": status}]},
+    )
+    mock_sync_agreement.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        constants.ThreeYearCommitmentStatus.COMMITTED,
+        constants.ThreeYearCommitmentStatus.ACTIVE,
+        constants.ThreeYearCommitmentStatus.DECLINED,
+        constants.ThreeYearCommitmentStatus.NONCOMPLIANT,
+        constants.ThreeYearCommitmentStatus.EXPIRED,
+    ],
+)
+def test_sync_agreements_by_3yc_enroll_status_full(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    status,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=status)
+    )
+    mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client, TEMP_3YC_STATUSES
+    )
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
+
+
+def test_sync_agreements_by_3yc_enroll_status_status_error(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    caplog,
+):
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        side_effect=MPTAPIError(400, {"rql_validation": ["Value has to be a non empty array."]}),
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.EXPIRED)
+    )
+    mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    with pytest.raises(MPTAPIError):
+        sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    assert "Unknown exception getting agreements by 3YC enroll status" in caplog.text
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_not_called()
+
+
+def test_sync_agreements_by_3yc_enroll_status_error_sync(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    caplog,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED)
+    )
+    mock_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.sync_agreement",
+        autospec=True,
+        side_effect=AuthorizationNotFoundError("Authorization with uk/id ID not found."),
+    )
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client, TEMP_3YC_STATUSES
+    )
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
+    assert "Authorization with uk/id ID not found." in caplog.text
+
+
+def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    agreement_factory,
+    caplog,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement, agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED)
+    )
+    mock_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.sync.sync_agreement",
+        autospec=True,
+        side_effect=Exception("Unknown exception getting agreements by 3YC enroll status"),
+    )
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+
+    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client, TEMP_3YC_STATUSES
+    )
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_has_calls(
+        [
+            mocker.call(mock_mpt_client, agreement, False),
+            mocker.call(mock_mpt_client, agreement, False),
+        ]
+    )
+    assert caplog.messages == [
+        "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
+        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962:"
+        " Unknown exception getting agreements by 3YC enroll status",
+        "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
+        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962:"
+        " Unknown exception getting agreements by 3YC enroll status",
+    ]
+
+
 @freeze_time("2024-11-09 12:30:00")
 def test_sync_agreement_prices_with_3yc(
     mocker,
@@ -638,6 +833,7 @@ def test_sync_agreement_prices_with_3yc(
                     "externalId": "renewalDate",
                     "value": adobe_subscription["renewalDate"],
                 },
+                {"externalId": "lastSyncDate", "value": "2024-11-09"},
             ]
         },
         commitmentDate="2025-04-04",
@@ -864,6 +1060,7 @@ def test_sync_global_customer_parameter(
                             "externalId": "renewalDate",
                             "value": adobe_subscription["renewalDate"],
                         },
+                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
                     ]
                 },
                 commitmentDate="2025-04-04",
@@ -893,6 +1090,7 @@ def test_sync_global_customer_parameter(
                             "externalId": "renewalDate",
                             "value": another_adobe_subscription["renewalDate"],
                         },
+                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
                     ]
                 },
                 commitmentDate="2025-04-04",
@@ -922,6 +1120,7 @@ def test_sync_global_customer_parameter(
                             "externalId": "renewalDate",
                             "value": adobe_deployment_subscription["renewalDate"],
                         },
+                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
                     ]
                 },
                 commitmentDate="2025-04-04",
@@ -994,6 +1193,7 @@ def test_sync_global_customer_parameter(
         ]
 
 
+@freeze_time("2025-06-30")
 def test_sync_global_customer_update_not_required(
     mocker,
     agreement_factory,
@@ -1205,6 +1405,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1232,6 +1433,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": another_adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1261,6 +1463,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": adobe_deployment_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1290,6 +1493,7 @@ def test_sync_global_customer_update_not_required(
                         "externalId": "renewalDate",
                         "value": another_adobe_deployment_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1310,6 +1514,7 @@ def test_sync_global_customer_update_not_required(
     mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
 
 
+@freeze_time("2025-06-30")
 def test_sync_global_customer_update_adobe_error(
     mocker,
     agreement_factory,
@@ -1473,6 +1678,7 @@ def test_sync_global_customer_update_adobe_error(
                         "externalId": "renewalDate",
                         "value": adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -1500,6 +1706,7 @@ def test_sync_global_customer_update_adobe_error(
                         "externalId": "renewalDate",
                         "value": another_adobe_subscription["renewalDate"],
                     },
+                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
                 ]
             },
             commitmentDate="2025-04-04",

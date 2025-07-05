@@ -62,7 +62,7 @@ from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 
 @pytest.fixture(autouse=True)
 def mocked_send_mpt_notification(mocker):
-    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification")
+    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification", spec=True)
 
 
 @pytest.mark.parametrize(
@@ -86,9 +86,7 @@ def mocked_send_mpt_notification(mocker):
         ),
     ],
 )
-def test_send_mpt_notification(mocker, settings, order_factory, status, subject):
-    mocked_mpt_client = mocker.MagicMock()
-
+def test_send_mpt_notification(mocker, settings, order_factory, mock_mpt_client, status, subject):
     mocked_get_rendered_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
         return_value="rendered-template",
@@ -98,10 +96,11 @@ def test_send_mpt_notification(mocker, settings, order_factory, status, subject)
 
     order = order_factory(order_id="ORD-1234", status=status)
 
-    send_mpt_notification(mocked_mpt_client, order)
-    mocked_get_rendered_template.assert_called_once_with(mocked_mpt_client, order["id"])
+    send_mpt_notification(mock_mpt_client, order)
+    mocked_get_rendered_template.assert_called_once_with(mock_mpt_client, order["id"])
 
     mocked_mpt_notify.assert_called_once_with(
+        mock_mpt_client,
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
@@ -117,16 +116,13 @@ def test_send_mpt_notification(mocker, settings, order_factory, status, subject)
 
 @freeze_time("2025-01-01")
 def test_start_processing_attempt_first_attempt(
-    mocker, settings, order_factory, fulfillment_parameters_factory
+    mocker, settings, order_factory, fulfillment_parameters_factory, mocked_send_mpt_notification
 ):
     order = order_factory()
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             due_date="2025-01-31",
         ),
-    )
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
     )
     mocked_update = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
@@ -137,7 +133,7 @@ def test_start_processing_attempt_first_attempt(
 
     start_processing_attempt(mocked_client, order)
 
-    mocked_send_notification.assert_called_once_with(mocked_client, updated_order)
+    mocked_send_mpt_notification.assert_called_once_with(mocked_client, updated_order)
     mocked_update.assert_called_once_with(
         mocked_client,
         updated_order["id"],
@@ -147,12 +143,8 @@ def test_start_processing_attempt_first_attempt(
 
 @freeze_time("2025-01-01")
 def test_start_processing_attempt_other_attempts(
-    mocker, order_factory, fulfillment_parameters_factory
+    mocker, order_factory, fulfillment_parameters_factory, mocked_send_mpt_notification
 ):
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
-    )
-
     mocked_client = mocker.MagicMock()
 
     order = order_factory(
@@ -163,7 +155,7 @@ def test_start_processing_attempt_other_attempts(
 
     start_processing_attempt(mocked_client, order)
 
-    mocked_send_notification.assert_not_called()
+    mocked_send_mpt_notification.assert_not_called()
 
 
 def test_set_customer_coterm_date_if_null(
@@ -331,7 +323,7 @@ def test_setup_due_date_when_parameter_is_missed(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_start_order_processing_step(mocker, order_factory):
+def test_start_order_processing_step(mocker, order_factory, mocked_send_mpt_notification):
     """
     Tests that the template for the `Processing` status
     with the name provided during the instantiation of the step class
@@ -341,12 +333,7 @@ def test_start_order_processing_step(mocker, order_factory):
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1234"},
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     order = order_factory()
@@ -369,7 +356,7 @@ def test_start_order_processing_step(mocker, order_factory):
         context.order["id"],
         template={"id": "TPL-1234"},
     )
-    mocked_send_notification.assert_called_once_with(mocked_client, context.order)
+    mocked_send_mpt_notification.assert_called_once_with(mocked_client, context.order)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -415,7 +402,7 @@ def test_configuration_start_order_processing_selects_template(
 
 
 def test_set_processing_template_step_already_set_not_first_attempt(
-    mocker, order_factory
+    mocker, order_factory, mocked_send_mpt_notification
 ):
     """
     Tests that the template for the `Processing` status
@@ -427,12 +414,7 @@ def test_set_processing_template_step_already_set_not_first_attempt(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1234"},
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -451,7 +433,7 @@ def test_set_processing_template_step_already_set_not_first_attempt(
         "my template",
     )
     mocked_update_order.assert_not_called()
-    mocked_send_notification.assert_not_called()
+    mocked_send_mpt_notification.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -1789,7 +1771,7 @@ def test_complete_order_step(mocker, order_factory):
     ],
 )
 def test_complete_configuration_order_selects_template(
-    mocker, order_factory, auto_renew, expected_template
+    mocker, order_factory, auto_renew, expected_template, mocked_send_mpt_notification
 ):
     order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
     completed_order = order_factory(status="Completed")
@@ -1810,9 +1792,6 @@ def test_complete_configuration_order_selects_template(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
         return_value=completed_order,
     )
-    mocked_send_email = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
-    )
 
     step = CompleteOrder(expected_template)
     step(mocked_client, context, mocked_next_step)
@@ -1829,7 +1808,7 @@ def test_complete_configuration_order_selects_template(
         {"id": "TPL-0000"},
         parameters=order["parameters"],
     )
-    mocked_send_email.assert_called_once_with(mocked_client, completed_order)
+    mocked_send_mpt_notification.assert_called_once_with(mocked_client, completed_order)
     assert context.order == completed_order
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -2136,14 +2115,17 @@ def test_get_preview_order_step_adobe_error(
         )
     ],
 )
-def test_send_gc_mpt_notification(mocker, settings, order_factory, status, subject):
+def test_send_gc_mpt_notification(
+    mocker, settings, order_factory, mock_mpt_client, status, subject
+):
     mock_mpt_notify = mocker.patch("adobe_vipm.flows.fulfillment.shared.mpt_notify")
 
     order = order_factory(order_id="ORD-1234", status=status)
 
-    send_gc_mpt_notification(order, ["deployment 1"])
+    send_gc_mpt_notification(mock_mpt_client, order, ["deployment 1"])
 
     mock_mpt_notify.assert_called_once_with(
+        mock_mpt_client,
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,

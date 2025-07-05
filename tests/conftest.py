@@ -16,10 +16,9 @@ from rich.highlighter import ReprHighlighter as _ReprHighlighter
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import (
-    OFFER_TYPE_CONSUMABLES,
-    OFFER_TYPE_LICENSE,
     STATUS_PENDING,
     STATUS_PROCESSED,
+    OfferType,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
@@ -287,19 +286,13 @@ def adobe_authorizations_file():
 
 
 @pytest.fixture()
-def mock_adobe_config(
-    mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file
-):
+def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file):
     """
     Mock the Adobe Config object to load test data from the adobe_credentials and
     adobe_config_file fixtures.
     """
-    mocker.patch.object(
-        Config, "_load_credentials", return_value=adobe_credentials_file
-    )
-    mocker.patch.object(
-        Config, "_load_authorizations", return_value=adobe_authorizations_file
-    )
+    mocker.patch.object(Config, "_load_credentials", return_value=adobe_credentials_file)
+    mocker.patch.object(Config, "_load_authorizations", return_value=adobe_authorizations_file)
     mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
 
 
@@ -490,6 +483,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0002",
@@ -501,6 +495,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0003",
@@ -512,6 +507,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0004",
@@ -523,6 +519,7 @@ def transfer_order_parameters_factory():
                     "hidden": False,
                     "required": True,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0005",
@@ -534,6 +531,7 @@ def transfer_order_parameters_factory():
                     "hidden": False,
                     "required": True,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0006",
@@ -545,6 +543,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0007",
@@ -556,6 +555,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
             {
                 "id": "PAR-0000-0008",
@@ -567,6 +567,7 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                'error': None
             },
         ]
 
@@ -791,9 +792,7 @@ def subscriptions_factory(lines_factory):
         lines=None,
         auto_renew=True,
     ):
-        start_date = (
-            start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
-        )
+        start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
         lines = lines_factory() if lines is None else lines
         return [
             {
@@ -906,8 +905,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             "subscriptions": subscriptions,
             "parameters": {
                 "ordering": ordering_parameters or order_parameters_factory(),
-                "fulfillment": fulfillment_parameters
-                or fulfillment_parameters_factory(),
+                "fulfillment": fulfillment_parameters or fulfillment_parameters_factory(),
             },
         }
 
@@ -1270,8 +1268,7 @@ def adobe_subscription_factory():
                 "renewalQuantity": renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
-            "renewalDate": renewal_date
-            or (date.today() + timedelta(days=366)).isoformat(),
+            "renewalDate": renewal_date or (date.today() + timedelta(days=366)).isoformat(),
             "status": status,
             "deploymentId": deployment_id,
         }
@@ -1330,19 +1327,13 @@ def adobe_client_factory(
 
     def _factory():
         authorization = Authorization(
-            authorization_uk=adobe_authorizations_file["authorizations"][0][
-                "authorization_uk"
-            ],
-            authorization_id=adobe_authorizations_file["authorizations"][0][
-                "authorization_id"
-            ],
+            authorization_uk=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+            authorization_id=adobe_authorizations_file["authorizations"][0]["authorization_id"],
             name=adobe_credentials_file[0]["name"],
             client_id=adobe_credentials_file[0]["client_id"],
             client_secret=adobe_credentials_file[0]["client_secret"],
             currency=adobe_authorizations_file["authorizations"][0]["currency"],
-            distributor_id=adobe_authorizations_file["authorizations"][0][
-                "distributor_id"
-            ],
+            distributor_id=adobe_authorizations_file["authorizations"][0]["distributor_id"],
         )
         api_token = APIToken(
             "a-token",
@@ -1366,12 +1357,25 @@ def mpt_client(settings):
 
     return setup_client()
 
+
 @pytest.fixture()
 def mock_mpt_client(mocker):
     """
     Create an instance of the MPT client used by the extension.
     """
     return mocker.MagicMock(spec=MPTClient)
+
+
+@pytest.fixture()
+def mock_setup_client(mocker, mock_mpt_client):
+    """
+    Create an instance of the MPT client used by the extension.
+    """
+    mocker.patch(
+        "adobe_vipm.management.commands.sync_3yc_enrollments.setup_client",
+        return_value=mock_mpt_client,
+    )
+    return mock_mpt_client
 
 
 @pytest.fixture()
@@ -1405,10 +1409,7 @@ def created_agreement_factory():
                 "fulfillment": [
                     {"externalId": "globalCustomer", "value": ["Yes"]},
                     {"externalId": "deploymentId", "value": "deployment_id"},
-                    {
-                        "externalId": "deployments",
-                        "value": deployments
-                    },
+                    {"externalId": "deployments", "value": deployments},
                     {"externalId": "customerId", "value": "P0112233"},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                 ],
@@ -1435,6 +1436,7 @@ def created_agreement_factory():
                 }
             )
         return created_agreement
+
     return _created_agreement
 
 
@@ -1589,11 +1591,11 @@ def adobe_customer_factory():
             },
             "discounts": [
                 {
-                    "offerType": OFFER_TYPE_LICENSE,
+                    "offerType": OfferType.LICENSE,
                     "level": licenses_discount_level,
                 },
                 {
-                    "offerType": OFFER_TYPE_CONSUMABLES,
+                    "offerType": OfferType.CONSUMABLES,
                     "level": consumables_discount_level,
                 },
             ],
@@ -1627,22 +1629,22 @@ def adobe_customer_factory():
 @pytest.fixture()
 def mock_adobe_customer_deployments_items():
     return [
-            {
-                "deploymentId": "deployment-1",
-                "status": "1000",
-                "companyProfile": {"address": {"country": "DE"}},
-            },
-            {
-                "deploymentId": "deployment-2",
-                "status": "1004",
-                "companyProfile": {"address": {"country": "US"}},
-            },
-            {
-                "deploymentId": "deployment-3",
-                "status": "1000",
-                "companyProfile": {"address": {"country": "ES"}},
-            },
-        ]
+        {
+            "deploymentId": "deployment-1",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        },
+        {
+            "deploymentId": "deployment-2",
+            "status": "1004",
+            "companyProfile": {"address": {"country": "US"}},
+        },
+        {
+            "deploymentId": "deployment-3",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "ES"}},
+        },
+    ]
 
 
 @pytest.fixture()
@@ -1777,7 +1779,7 @@ def mock_gunicorn_logging_config():
 
 @pytest.fixture()
 def mock_wrap_event():
-    return Event("evt-id", "orders", {"id": "ORD-1111-1111-1111"})
+    return Event("evt-id", "orders", {"id": "ORD-1111-1111"})
 
 
 @pytest.fixture()
@@ -1943,6 +1945,14 @@ def mock_worker_initialize(mocker):
 
 
 @pytest.fixture()
+def mock_adobe_client(mocker):
+    m = mocker.MagicMock(spec=AdobeClient)
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=m)
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=m)
+    return m
+
+
+@pytest.fixture()
 def mock_worker_call_command(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.call_command")
 
@@ -1971,14 +1981,14 @@ def mock_sku_mapping_data():
             "sku": "65304578CA01A12",
             "segment": "segment_1",
             "name": "name_1",
-            "type_3yc": "License"
+            "type_3yc": "License",
         },
         {
             "vendor_external_id": "77777777CA",
             "sku": "77777777CA01A12",
             "segment": "segment_2",
             "name": "name_2",
-            "type_3yc": "Consumable"
+            "type_3yc": "Consumable",
         },
     ]
 
@@ -1992,9 +2002,7 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
 
     AdobeProductMapping = get_sku_adobe_mapping_model(base_info)
 
-    all_sku = {
-        i["vendor_external_id"]: AdobeProductMapping(**i) for i in mock_sku_mapping_data
-    }
+    all_sku = {i["vendor_external_id"]: AdobeProductMapping(**i) for i in mock_sku_mapping_data}
     mocker.patch.object(AdobeProductMapping, "all", return_value=all_sku)
 
     def from_id(external_id):

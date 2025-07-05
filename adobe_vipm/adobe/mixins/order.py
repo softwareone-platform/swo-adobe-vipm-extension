@@ -29,7 +29,8 @@ from adobe_vipm.utils import get_partial_sku, map_by
 
 class OrderClientMixin:
 
-    def _is_processed(self, order_item):
+    @staticmethod
+    def _is_processed(order_item):
         order, item = order_item
         return order["status"] == STATUS_PROCESSED and item["status"] == STATUS_PROCESSED
 
@@ -92,14 +93,14 @@ class OrderClientMixin:
                 line_item["currencyCode"] = item["currencyCode"]
             return line_item
 
-        lineItems = [
+        line_items = [
             build_line_item(item) for item in adobe_preview_order["lineItems"]
         ]
 
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
             "orderType": ORDER_TYPE_NEW,
-            "lineItems": lineItems,
+            "lineItems": line_items,
         }
         if not deployment_id:
             payload["currencyCode"] = authorization.currency
@@ -222,7 +223,8 @@ class OrderClientMixin:
         response.raise_for_status()
         return response.json()
 
-    def _get_preview_order_line_item(self, line: dict, quantity: int) -> dict:
+    @staticmethod
+    def _get_preview_order_line_item(line: dict, quantity: int) -> dict:
         adobe_base_sku = line["item"]["externalIds"]["vendor"]
         product_sku = get_adobe_product_by_marketplace_sku(adobe_base_sku).sku
 

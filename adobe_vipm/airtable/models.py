@@ -21,8 +21,7 @@ from pyairtable.orm import Model, fields
 from requests import HTTPError
 
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_COMMITTED,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment
@@ -556,7 +555,10 @@ def get_sku_price(adobe_customer, offer_ids, product_id, deployment_currency):
     commitment_start_date = None
     if (
         commitment
-        and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+        and commitment["status"] in (
+            ThreeYearCommitmentStatus.COMMITTED,
+            ThreeYearCommitmentStatus.ACTIVE
+        )
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):
         commitment_start_date = date.fromisoformat(commitment["startDate"])

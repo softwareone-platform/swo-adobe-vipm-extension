@@ -17,11 +17,10 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_COMMITTED,
     STATUS_SUBSCRIPTION_TERMINATED,
+    ThreeYearCommitmentStatus,
 )
-from adobe_vipm.adobe.errors import CustomerDiscountsNotFoundError
+from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
@@ -29,6 +28,7 @@ from adobe_vipm.airtable.models import (
 )
 from adobe_vipm.flows.constants import (
     PARAM_3YC_END_DATE,
+    PARAM_3YC_ENROLL_STATUS,
     PARAM_ADOBE_SKU,
     PARAM_COTERM_DATE,
     PARAM_CURRENT_QUANTITY,
@@ -39,6 +39,7 @@ from adobe_vipm.flows.constants import (
     PARAM_RENEWAL_DATE,
     PARAM_RENEWAL_QUANTITY,
 )
+from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
@@ -48,6 +49,8 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+
+TEMP_3YC_STATUSES = (ThreeYearCommitmentStatus.REQUESTED, ThreeYearCommitmentStatus.ACCEPTED)
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +84,10 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
     commitment_start_date = None
     if (
         commitment
-        and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
+        and commitment["status"] in (
+            ThreeYearCommitmentStatus.COMMITTED,
+            ThreeYearCommitmentStatus.ACTIVE
+        )
         and date.fromisoformat(commitment["endDate"]) >= date.today()
     ):
         commitment_start_date = date.fromisoformat(commitment["startDate"])
@@ -115,6 +121,8 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
     skus = [item[2] for item in to_update]
 
     prices = get_sku_price(customer, skus, product_id, currency)
+
+    last_sync_date = datetime.now().date().isoformat()
 
     for subscription, adobe_subscription, actual_sku in to_update:
         if actual_sku not in prices:
@@ -151,6 +159,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
                     "externalId": PARAM_RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
+                {"externalId": "lastSyncDate", "value": last_sync_date},
             ],
         }
 
@@ -243,20 +252,7 @@ def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):
     Synchronizes agreements by their active subscriptions renewed yesterday.
     """
     logger.info("Syncing agreements by 3yc End Date...")
-    today = datetime.now().date().isoformat()
-    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
-    rql_query = (
-        "eq(status,Active)&"
-        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_3YC_END_DATE}),eq(displayValue,{yesterday})))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
-        # Let's get only what we need
-        "select=subscriptions,authorization,parameters,listing,lines,"
-        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
-        "-externalIds"
-    )
-    for agreement in get_agreements_by_query(mpt_client, rql_query):
-        logger.debug(f"Syncing {agreement=}")
-        sync_agreement(mpt_client, agreement, dry_run)
+    _sync_agreements_by_param(mpt_client, PARAM_3YC_END_DATE, dry_run)
 
 
 def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
@@ -264,11 +260,15 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
     Synchronizes agreements by their active subscriptions renewed yesterday.
     """
     logger.info("Synchronizing agreements by cotermDate...")
+    _sync_agreements_by_param(mpt_client, PARAM_COTERM_DATE, dry_run)
+
+
+def _sync_agreements_by_param(mpt_client: MPTClient, param, dry_run: bool):
     today = datetime.now().date().isoformat()
     yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
     rql_query = (
         "eq(status,Active)&"
-        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_COTERM_DATE}),eq(displayValue,{yesterday})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
         f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
         "select=subscriptions,authorization,parameters,listing,lines,"
@@ -314,6 +314,60 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
     """
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
+        sync_agreement(mpt_client, agreement, dry_run)
+
+
+def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = True) -> None:
+    """
+    This function retrieves agreements filtered by their 3YC enrollment status and synchronizes
+    their corresponding statuses.
+    """
+    try:
+        agreements = get_agreements_by_3yc_enroll_status(mpt_client, TEMP_3YC_STATUSES)
+    except Exception as e:
+        logger.exception(f"Unknown exception getting agreements by 3YC enroll status: {e}")
+        raise
+    for agreement in agreements:
+        try:
+            logger.info(f"Checking 3YC enroll status for agreement {agreement['id']}")
+            _sync_3yc_enroll_status(mpt_client, agreement, dry_run)
+        except AuthorizationNotFoundError as e:
+            logger.error(
+                f"AuthorizationNotFoundError synchronizing 3YC enroll status for agreement"
+                f" {agreement['id']}: {e}"
+            )
+        except Exception as e:
+            logger.exception(
+                f"Unknown exception synchronizing 3YC enroll status for agreement"
+                f" {agreement['id']}: {e}"
+            )
+
+
+def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: bool) -> None:
+    adobe_client = get_adobe_client()
+    customer = adobe_client.get_customer(
+        authorization_id=agreement["authorization"]["id"],
+        customer_id=get_adobe_customer_id(agreement),
+    )
+    commitment = get_3yc_commitment(customer)
+    enroll_status = commitment["status"]
+    logger.debug(
+        f"Commitment Status for Adobe customer {customer['customerId']} is {enroll_status}"
+    )
+
+    if enroll_status in TEMP_3YC_STATUSES:
+        logger.info(f"Updating 3YC enroll status for agreement {agreement['id']}")
+        if not dry_run:
+            update_agreement(
+                mpt_client,
+                agreement["id"],
+                parameters={
+                    PARAM_PHASE_FULFILLMENT: [
+                        {"externalId": PARAM_3YC_ENROLL_STATUS, "value": enroll_status}
+                    ]
+                },
+            )
+    else:
         sync_agreement(mpt_client, agreement, dry_run)
 
 

@@ -3,7 +3,8 @@ import logging
 import pytest
 
 from adobe_vipm.flows.errors import MPTAPIError
-from adobe_vipm.flows.utils import reset_ordering_parameters_error, strip_trace_id
+from adobe_vipm.flows.utils import strip_trace_id
+from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 from adobe_vipm.flows.validation.base import validate_order
 
 
@@ -17,17 +18,9 @@ def test_validate_transfer_order(
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     m_client = mocker.MagicMock()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.base.populate_order_info", return_value=order
-    )
     m_validate_transfer = mocker.patch(
         "adobe_vipm.flows.validation.base.validate_transfer",
         return_value=(False, order),
-    )
-
-    m_adobe_cli = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.validation.base.get_adobe_client", return_value=m_adobe_cli
     )
 
     with caplog.at_level(logging.INFO):
@@ -39,7 +32,6 @@ def test_validate_transfer_order(
 
     m_validate_transfer.assert_called_once_with(
         m_client,
-        m_adobe_cli,
         reset_ordering_parameters_error(order),
     )
 
@@ -51,14 +43,9 @@ def test_validate_transfer_order_no_validate(
     transfer_order_parameters_factory,
 ):
     """Tests the validate order entrypoint function for transfers when doesn't validate."""
-    mocker.patch("adobe_vipm.flows.validation.base.get_adobe_client")
+
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     m_client = mocker.MagicMock()
-
-    mocker.patch(
-        "adobe_vipm.flows.validation.base.populate_order_info",
-        return_value=reset_ordering_parameters_error(order),
-    )
 
     mocker.patch(
         "adobe_vipm.flows.validation.base.validate_transfer",
@@ -110,7 +97,10 @@ def test_validate_change_order(mocker, caplog, order_factory):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    mocked_validate.assert_called_once_with(mocked_client, order)
+    mocked_validate.assert_called_once_with(
+        mocked_client,
+        reset_ordering_parameters_error(order)
+    )
 
 
 def test_validate_purchase_order(mocker, caplog, order_factory):
@@ -130,7 +120,10 @@ def test_validate_purchase_order(mocker, caplog, order_factory):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    mocked_validate.assert_called_once_with(mocked_client, order)
+    mocked_validate.assert_called_once_with(
+        mocked_client,
+        reset_ordering_parameters_error(order)
+    )
 
 
 def test_validate_termination_order(mocker, caplog, order_factory):
@@ -150,4 +143,7 @@ def test_validate_termination_order(mocker, caplog, order_factory):
         f"Validation of order {order['id']} succeeded without errors"
     )
 
-    mocked_validate.assert_called_once_with(mocked_client, order)
+    mocked_validate.assert_called_once_with(
+        mocked_client,
+        reset_ordering_parameters_error(order)
+    )
