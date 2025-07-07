@@ -12,7 +12,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     GetReturnOrders,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
@@ -258,7 +258,7 @@ def test_fulfill_termination_order(mocker):
     expected_steps = [
         SetupContext,
         SetupDueDate,
-        SetOrUpdateCotermNextSyncDates,
+        SetOrUpdateCotermDate,
         StartOrderProcessing,
         ValidateRenewalWindow,
         GetReturnOrders,

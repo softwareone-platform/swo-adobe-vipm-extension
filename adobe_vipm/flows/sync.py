@@ -9,7 +9,6 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement_subscription,
     get_agreements_by_customer_deployments,
     get_agreements_by_ids,
-    get_agreements_by_next_sync,
     get_agreements_by_query,
     get_all_agreements,
     update_agreement,
@@ -82,8 +81,7 @@ def sync_agreement_prices(
 
     _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
 
-    next_sync = (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
-    parameters = {Param.PHASE_FULFILLMENT: [{"externalId": "nextSync", "value": next_sync}]}
+    parameters = {}
     commitment_info = get_3yc_commitment(customer)
     if commitment_info:
         parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
@@ -113,6 +111,7 @@ def sync_agreement_prices(
 
 def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters):
     new_parameters = copy.deepcopy(parameters)
+    new_parameters.setdefault(Param.PHASE_FULFILLMENT, [])
     three_yc_recommitment_par = get_parameter(
         Param.PHASE_FULFILLMENT, agreement, Param.THREE_YC_RECOMMITMENT
     )
@@ -285,21 +284,6 @@ def _get_subscriptions_for_update(
         )
 
     return for_update
-
-
-def sync_agreements_by_next_sync(mpt_client, dry_run):
-    """
-    Get all the agreements which nextSync date fullfilment parameter
-    has passed to update the prices for them.
-
-    Args:
-        mpt_client (MPTClient): The client used to consume the MPT API.
-        dry_run (bool): if True, it just simulate the prices update but doesn't
-        perform it.
-    """
-    agreements = get_agreements_by_next_sync(mpt_client, Param.NEXT_SYNC_DATE)
-    for agreement in agreements:
-        sync_agreement(mpt_client, agreement, dry_run)
 
 
 def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):

@@ -12,7 +12,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import (
@@ -116,7 +116,7 @@ def validate_change_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         ValidateDuplicateLines(),
-        SetOrUpdateCotermNextSyncDates(),
+        SetOrUpdateCotermDate(),
         ValidateRenewalWindow(is_validation=True),
         ValidateDownsizes(),
         Validate3YCCommitment(True),
