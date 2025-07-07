@@ -1606,3 +1606,151 @@ def test_validate_3yc_commitment_success(
     mocked_set_order_error.assert_not_called()
 
     assert context.order.get("status") != "failed"
+
+def test_validate_3yc_commitment_rejected(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """Test validation when commitment is in EXPIRED status."""
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+    mocked_set_order_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_order_error"
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=None,
+        commitment_request=None,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="65304578CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            )
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    order = order_factory(
+        lines=[
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 15,
+                "oldQuantity": 15,
+            }
+        ],
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        customer_data={
+            "3YC": ["Yes"],
+        }
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+    mocked_set_order_error.assert_not_called()
+
+    error_call = mocked_switch_order_to_failed.call_args
+    error_dict = error_call[0][2]
+    error_expected = (
+        "The 3-year commitment is in status None. Please contact support to renew the commitment."
+    )
+    assert error_expected == error_dict.get("message")
+
+
+def test_validate_3yc_commitment_no_commitment(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    adobe_customer = adobe_customer_factory(
+        commitment=None,
+        commitment_request=None,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="65304578CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            )
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    order = order_factory(
+        lines=[
+            {
+                "id": "line-1",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                },
+                "quantity": 15,
+                "oldQuantity": 15,
+            }
+        ],
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        customer_data={
+        }
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
