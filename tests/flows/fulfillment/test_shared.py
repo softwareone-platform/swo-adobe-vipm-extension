@@ -32,7 +32,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
@@ -49,9 +49,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_order_id,
     get_coterm_date,
     get_due_date,
-    get_next_sync,
     set_coterm_date,
-    set_next_sync,
 )
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 
@@ -470,30 +468,27 @@ def test_set_processing_template_to_delayed_in_renewal_win(
 
 
 @pytest.mark.parametrize(
-    ("coterm_date", "next_sync"),
+    "coterm_date",
     [
-        ("2025-01-01", None),
-        ("2024-12-31", "2026-01-02"),
-        (None, "2026-01-02"),
+        "2026-01-01",
+        "2024-12-31",
+        None,
     ],
 )
-def test_set_or_update_coterm_next_sync_dates_step(
+def test_set_or_update_coterm_date_step(
     mocker,
     order_factory,
     adobe_customer_factory,
     coterm_date,
-    next_sync,
 ):
     """
-    Tests that the order is updated when either the `cotermDate`
-    either the `nextSync` fulfillment parameter are not in sync with
-    the adobe customer coterm date.
+    Tests that the order is updated when the ` cotermDate `
+    fulfillment parameter is not in sync with the adobe customer coterm date.
     """
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     customer = adobe_customer_factory(coterm_date="2025-01-01")
     order = order_factory()
     order = set_coterm_date(order, coterm_date)
-    order = set_next_sync(order, next_sync)
 
     context = Context(
         order=order,
@@ -505,7 +500,7 @@ def test_set_or_update_coterm_next_sync_dates_step(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
 
     step(mocked_client, context, mocked_next_step)
 
@@ -515,7 +510,6 @@ def test_set_or_update_coterm_next_sync_dates_step(
         parameters=context.order["parameters"],
     )
     assert get_coterm_date(context.order) == "2025-01-01"
-    assert get_next_sync(context.order) == "2025-01-02"
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -525,8 +519,7 @@ def test_set_or_update_withouCotermDate(
     adobe_customer_factory,
 ):
     """
-    Tests that the order is updated when either the `cotermDate`
-    either the `nextSync` fulfillment parameter are not in sync with
+    Tests that the order is updated when the `cotermDate` fulfillment parameter is not in sync with
     the adobe customer coterm date.
     """
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
@@ -543,7 +536,7 @@ def test_set_or_update_withouCotermDate(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
 
     step(mocked_client, context, mocked_next_step)
 
@@ -551,21 +544,19 @@ def test_set_or_update_withouCotermDate(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
+def test_set_or_update_coterm_date_step_are_in_sync(
     mocker,
     order_factory,
     adobe_customer_factory,
 ):
     """
-    Tests that the order is not updated when both the `cotermDate`
-    and the `nextSync` fulfillment parameter are in sync with
-    the adobe customer coterm date.
+    Tests that the order is not updated when the `cotermDate`
+    fulfillment parameter is in sync with the adobe customer coterm date.
     """
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     customer = adobe_customer_factory(coterm_date="2025-01-01")
     order = order_factory()
     order = set_coterm_date(order, "2025-01-01")
-    order = set_next_sync(order, "2025-01-02")
 
     context = Context(
         order=order,
@@ -576,7 +567,7 @@ def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
 
     step(mocked_client, context, mocked_next_step)
 
@@ -584,7 +575,7 @@ def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
+def test_set_or_update_coterm_date_step_with_3yc(
     mocker,
     order_factory,
     adobe_customer_factory,
@@ -614,7 +605,7 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
     step(mocked_client, context, mocked_next_step)
     mocked_update.assert_called_once_with(
         mocked_client,
@@ -648,7 +639,6 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
         commitment["endDate"],
     ]
     assert get_coterm_date(context.order) == "2025-01-01"
-    assert get_next_sync(context.order) == "2025-01-02"
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 

@@ -246,7 +246,6 @@ def test_transfer(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -327,7 +326,6 @@ def test_transfer(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -566,7 +564,6 @@ def test_transfer_with_no_profile_address(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -639,7 +636,6 @@ def test_transfer_with_no_profile_address(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -1360,7 +1356,6 @@ def test_fulfill_transfer_order_already_migrated(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-04-19",
                 coterm_date="2024-04-18",
             ),
         },
@@ -1549,7 +1544,6 @@ def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-04-19",
                 coterm_date="2024-04-18",
             ),
         },
@@ -1765,7 +1759,6 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
             due_date="2012-02-14",
-            next_sync_date="2024-08-05",
             coterm_date="2024-08-04",
         ),
         order_parameters=transfer_order_parameters_factory(
@@ -1866,7 +1859,6 @@ def test_fulfill_transfer_order_already_migrated_3yc(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-08-05",
                 coterm_date="2024-08-04",
             ),
         },
@@ -1896,7 +1888,6 @@ def test_fulfill_transfer_order_already_migrated_3yc(
                 customer_id="a-client-id",
                 due_date=None,
                 coterm_date="2024-08-04",
-                next_sync_date="2024-08-05",
             ),
             "ordering": updated_order["parameters"]["ordering"],
         },
@@ -1976,7 +1967,6 @@ def test_fulfill_transfer_order_already_migrated_(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
             due_date="2025-01-01",
-            next_sync_date="2024-08-05",
             coterm_date="2024-08-04",
         ),
         order_parameters=transfer_order_parameters_factory(
@@ -2389,7 +2379,6 @@ def test_transfer_3yc_customer(
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -2465,7 +2454,6 @@ def test_transfer_3yc_customer(
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -2668,7 +2656,6 @@ def test_transfer_3yc_customer_with_no_profile_address(
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -2736,7 +2723,6 @@ def test_transfer_3yc_customer_with_no_profile_address(
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
                 p3yc_end_date=adobe_3yc_commitment["endDate"],
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
             ),
             "ordering": transfer_order_parameters_factory(
@@ -3333,7 +3319,6 @@ def test_transfer_gc_account_all_deployments_created(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
                 deployments=["deployment-id - DE"],
                 global_customer="Yes",
@@ -3416,7 +3401,6 @@ def test_transfer_gc_account_all_deployments_created(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
                 deployments=["deployment-id - DE"],
                 global_customer="Yes",
@@ -3681,7 +3665,6 @@ def test_transfer_gc_account_no_deployments(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
                 global_customer="Yes",
             ),
@@ -3768,7 +3751,6 @@ def test_transfer_gc_account_no_deployments(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
                 deployments=[],
                 global_customer="Yes",
@@ -4777,7 +4759,6 @@ def test_fulfill_transfer_gc_order_already_migrated_(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
             due_date="2025-01-01",
-            next_sync_date="2024-08-05",
             coterm_date="2024-08-04",
         ),
         order_parameters=transfer_order_parameters_factory(
@@ -4964,7 +4945,6 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
         fulfillment_parameters=fulfillment_parameters_factory(
             customer_id="a-client-id",
             due_date="2025-01-01",
-            next_sync_date="2024-08-05",
             coterm_date="2024-08-04",
         ),
         order_parameters=transfer_order_parameters_factory(
@@ -5638,7 +5618,6 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
                 global_customer="Yes",
             ),
@@ -5720,7 +5699,6 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
                 due_date=None,
-                next_sync_date="2024-01-02",
                 coterm_date="2024-01-01",
                 deployments=[],
                 global_customer="Yes",

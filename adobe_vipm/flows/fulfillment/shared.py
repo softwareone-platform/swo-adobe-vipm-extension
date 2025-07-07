@@ -4,7 +4,7 @@ This module contains shared functions used by the different fulfillment flows.
 
 import logging
 from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -58,7 +58,6 @@ from adobe_vipm.flows.utils import (
     get_coterm_date,
     get_deployment_id,
     get_due_date,
-    get_next_sync,
     get_one_time_skus,
     get_order_line_by_sku,
     get_subscription_by_line_and_item_id,
@@ -75,7 +74,6 @@ from adobe_vipm.flows.utils import (
     set_coterm_date,
     set_customer_data,
     set_due_date,
-    set_next_sync,
     set_order_error,
     set_template,
     split_phone_number,
@@ -430,13 +428,9 @@ def start_processing_attempt(client, order):
     return order
 
 
-def save_next_sync_and_coterm_dates(client, order, coterm_date):
+def save_coterm_dates(client, order, coterm_date):
     """
     Save the customer coterm date as a fulfillment parameter.
-    It also calculates the next sync fulfillment parameter as
-    the coterm date plus 1 day. The next sync date is used by
-    the agreement synchronization process to know when the
-    agreement has to be synchronized.
 
     Args:
         client (MPTClient): The client used to consume the MPT API.
@@ -448,8 +442,6 @@ def save_next_sync_and_coterm_dates(client, order, coterm_date):
     """
     coterm_date = datetime.fromisoformat(coterm_date).date()
     order = set_coterm_date(order, coterm_date.isoformat())
-    next_sync = coterm_date + timedelta(days=1)
-    order = set_next_sync(order, next_sync.isoformat())
     update_order(client, order["id"], parameters=order["parameters"])
     return order
 
@@ -557,34 +549,28 @@ class SetupDueDate(Step):
         next_step(client, context)
 
 
-class SetOrUpdateCotermNextSyncDates(Step):
+class SetOrUpdateCotermDate(Step):
     """
-    Set or update the fulfillment parameters `cotermDate` and
-    `nextSync` according to the Adobe customer coterm date.
+    Set or update the fulfillment parameters `cotermDate` according to the Adobe customer coterm
+     date.
     """
 
     def __call__(self, client, context, next_step):
         if has_coterm_date(context.adobe_customer):
             coterm_date = datetime.fromisoformat(context.adobe_customer["cotermDate"]).date()
-            next_sync = coterm_date + timedelta(days=1)
 
-            needs_update = self.coterm_and_next_sync_update_if_needed(
-                context, coterm_date, next_sync
-            )
+            needs_update = self.update_coterm_if_needed(context, coterm_date)
             needs_update |= self.commitment_update_if_needed(context)
 
             if needs_update:
-                self.update_order_parameters(client, context, coterm_date, next_sync)
+                self.update_order_parameters(client, context, coterm_date)
 
         next_step(client, context)
 
-    def coterm_and_next_sync_update_if_needed(self, context, coterm_date, next_sync):
+    def update_coterm_if_needed(self, context, coterm_date):
         needs_update = False
         if coterm_date.isoformat() != get_coterm_date(context.order):
             context.order = set_coterm_date(context.order, coterm_date.isoformat())
-            needs_update = True
-        if next_sync.isoformat() != get_next_sync(context.order):
-            context.order = set_next_sync(context.order, next_sync.isoformat())
             needs_update = True
         return needs_update
 
@@ -603,12 +589,9 @@ class SetOrUpdateCotermNextSyncDates(Step):
         context.order = set_adobe_3yc_end_date(context.order, commitment["endDate"])
         return True
 
-    def update_order_parameters(self, client, context, coterm_date, next_sync):
+    def update_order_parameters(self, client, context, coterm_date):
         update_order(client, context.order_id, parameters=context.order["parameters"])
-        updated_params = {
-            "coterm_date": coterm_date.isoformat(),
-            "next_sync": next_sync.isoformat(),
-        }
+        updated_params = {"coterm_date": coterm_date.isoformat()}
         commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
             context.adobe_customer
         )

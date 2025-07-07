@@ -18,7 +18,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     GetReturnOrders,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
@@ -133,7 +133,7 @@ def fulfill_termination_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         SetupDueDate(),
-        SetOrUpdateCotermNextSyncDates(),
+        SetOrUpdateCotermDate(),
         StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
         ValidateRenewalWindow(),
         GetReturnOrders(),
