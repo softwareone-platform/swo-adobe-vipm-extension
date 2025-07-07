@@ -1799,7 +1799,7 @@ def test_validate_3yc_commitment_date_before_coterm_date(
 ):
     """Test validation when commitment is in REQUESTED status."""
     commitment = adobe_commitment_factory(
-        status=STATUS_3YC_COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED,
         start_date="2021-01-01",
         end_date="2023-01-01",
     )
@@ -1865,7 +1865,7 @@ def test_validate_3yc_commitment_date_without_coterm_date(
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     commitment = adobe_commitment_factory(
-        status=STATUS_3YC_COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED,
         start_date="2024-01-01",
         end_date="2027-01-01",
         licenses=10,

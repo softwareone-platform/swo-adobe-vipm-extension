@@ -240,12 +240,18 @@ class Validate3YCCommitment(Step):
             )
             return
 
-        if commitment:
-            if self._validate_3yc_commitment_date_before_coterm_date(context, commitment):
-                logger.info(f"{context}: 3YC commitment end date is before coterm date")
-                next_step(client, context)
-                return
+        if not commitment and context.customer_data.get("3YC") == ["Yes"]:
+            logger.info(f"{context}: 3YC commitment has been rejected")
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT.to_dict(
+                    status=commitment.get("status")
+                ),
+            )
+            return
 
+        if commitment:
             subscriptions = adobe_client.get_subscriptions(
                 context.authorization_id,
                 context.adobe_customer_id,
