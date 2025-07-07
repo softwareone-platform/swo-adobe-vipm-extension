@@ -208,6 +208,10 @@ class Validate3YCCommitment(Step):
 
         is_new_purchase_order_validation = not context.adobe_customer
 
+        if context.adobe_return_orders:
+            next_step(client, context)
+            return
+
         if is_new_purchase_order_validation:
             logger.info(f"{context}: No Adobe customer found, validating 3YC quantities parameters")
             if self.validate_3yc_quantities_parameters(client, context):

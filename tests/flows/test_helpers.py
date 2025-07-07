@@ -1690,6 +1690,44 @@ def test_validate_3yc_commitment_rejected(
     assert error_expected == error_dict.get("message")
 
 
+def test_validate_3yc_commitment_return_order_create(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    context = Context(
+        order=None,
+        adobe_customer=None,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        customer_data={
+            "3YC": ["Yes"],
+        },
+        adobe_return_orders={
+            "items": [
+                {
+                    "id": "return-order-1",
+                    "status": "PENDING",
+                }
+            ]
+        },
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
 def test_validate_3yc_commitment_no_commitment(
     mocker,
     order_factory,
