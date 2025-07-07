@@ -2,7 +2,6 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
 
 import pymsteams
 from django.conf import settings
@@ -10,9 +9,9 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import notify
 
-logger = logging.getLogger(__name__)
+from adobe_vipm.adobe.constants import MPT_NOTIFY_CATEGORIES
 
-NotifyCategories = StrEnum("NotifyCategories", settings.MPT_NOTIFY_CATEGORIES)
+logger = logging.getLogger(__name__)
 
 
 def dateformat(date_string):
@@ -137,7 +136,7 @@ def mpt_notify(
     try:
         notify(
             mpt_client,
-            NotifyCategories.ORDERS.value,
+            MPT_NOTIFY_CATEGORIES["ORDERS"],
             account_id,
             buyer_id,
             subject,
@@ -146,7 +145,7 @@ def mpt_notify(
     except Exception:
         logger.exception(
             f"Cannot send MPT API notification:"
-            f" Category: '{NotifyCategories.ORDERS.value}',"
+            f" Category: '{MPT_NOTIFY_CATEGORIES['ORDERS']}',"
             f" Account ID: '{account_id}',"
             f" Buyer ID: '{buyer_id}',"
             f" Subject: '{subject}',"
