@@ -1,3 +1,5 @@
+import json
+import os
 from enum import StrEnum
 
 import regex as re
@@ -106,3 +108,7 @@ class OfferType(StrEnum):
 
 
 CANCELLATION_WINDOW_DAYS = 14
+
+MPT_NOTIFY_CATEGORIES = json.loads(
+    os.getenv("MPT_NOTIFY_CATEGORIES", '{"ORDERS": "NTC-0000-0006"}')
+)
