@@ -7,7 +7,9 @@ import pymsteams
 from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mpt_extension_sdk.mpt_http.base import MPTClient
-from mpt_extension_sdk.mpt_http.mpt import NotifyCategories, notify
+from mpt_extension_sdk.mpt_http.mpt import notify
+
+from adobe_vipm.flows.constants import MPT_NOTIFY_CATEGORIES
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +136,7 @@ def mpt_notify(
     try:
         notify(
             mpt_client,
-            NotifyCategories.ORDERS.value,
+            MPT_NOTIFY_CATEGORIES["ORDERS"],
             account_id,
             buyer_id,
             subject,
@@ -143,7 +145,7 @@ def mpt_notify(
     except Exception:
         logger.exception(
             f"Cannot send MPT API notification:"
-            f" Category: '{NotifyCategories.ORDERS.value}',"
+            f" Category: '{MPT_NOTIFY_CATEGORIES['ORDERS']}',"
             f" Account ID: '{account_id}',"
             f" Buyer ID: '{buyer_id}',"
             f" Subject: '{subject}',"

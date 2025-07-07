@@ -1,3 +1,6 @@
+import json
+import os
+
 from adobe_vipm.adobe.constants import (
     MAXLEN_ADDRESS_LINE_1,
     MAXLEN_ADDRESS_LINE_2,
@@ -65,6 +68,10 @@ GLOBAL_SUFFIX = "_global"
 LAST_TWO_WEEKS_DAYS = 13
 
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
+
+MPT_NOTIFY_CATEGORIES = json.loads(
+    os.getenv("MPT_NOTIFY_CATEGORIES", '{"ORDERS": "NTC-0000-0006"}')
+)
 
 ERR_ADOBE_COMPANY_NAME = ValidationError("VIPM0001", ADOBE_ERR_MSG)
 ERR_ADOBE_ADDRESS = ValidationError("VIPM0003", ADOBE_ERR_MSG)
