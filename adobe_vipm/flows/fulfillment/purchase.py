@@ -95,12 +95,8 @@ class ValidateMarketSegmentEligibility(Step):
         if context.market_segment != MARKET_SEGMENT_COMMERCIAL:
             status = get_market_segment_eligibility_status(context.order)
             if not status:
-                context.order = set_market_segment_eligibility_status_pending(
-                    context.order
-                )
-                switch_order_to_query(
-                    client, context.order, template_name=TEMPLATE_NAME_PURCHASE
-                )
+                context.order = set_market_segment_eligibility_status_pending(context.order)
+                switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
                 logger.info(
                     f"{context}: customer is pending eligibility "
                     f"approval for segment {context.market_segment}"
@@ -113,16 +109,12 @@ class ValidateMarketSegmentEligibility(Step):
                 switch_order_to_failed(
                     client,
                     context.order,
-                    ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(
-                        segment=context.market_segment
-                    ),
+                    ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(segment=context.market_segment),
                 )
                 return
             if status == STATUS_MARKET_SEGMENT_PENDING:
                 return
-            logger.info(
-                f"{context}: customer is eligible for segment {context.market_segment}"
-            )
+            logger.info(f"{context}: customer is eligible for segment {context.market_segment}")
         next_step(client, context)
 
 
@@ -133,9 +125,7 @@ class CreateCustomer(Step):
     """
 
     def save_data(self, client, context):
-        request_3yc_status = get_3yc_commitment_request(context.adobe_customer).get(
-            "status"
-        )
+        request_3yc_status = get_3yc_commitment_request(context.adobe_customer).get("status")
         context.order = set_adobe_customer_id(context.order, context.adobe_customer_id)
         if request_3yc_status:
             context.order = set_adobe_3yc_commitment_request_status(
@@ -187,12 +177,8 @@ class CreateCustomer(Step):
                 )
 
             if not error.details:
-                param_licenses = get_ordering_parameter(
-                    context.order, PARAM_3YC_LICENSES
-                )
-                param_consumables = get_ordering_parameter(
-                    context.order, PARAM_3YC_CONSUMABLES
-                )
+                param_licenses = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
+                param_consumables = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
                 context.order = set_order_error(
                     context.order,
                     ERR_3YC_NO_MINIMUMS.to_dict(
@@ -206,9 +192,7 @@ class CreateCustomer(Step):
                 context.order = set_ordering_parameter_error(
                     context.order,
                     PARAM_COMPANY_NAME,
-                    ERR_ADOBE_COMPANY_NAME.to_dict(
-                        title=param["name"], details=str(error)
-                    ),
+                    ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(error)),
                 )
             if len(
                 list(
@@ -239,9 +223,7 @@ class CreateCustomer(Step):
                 context.order = set_ordering_parameter_error(
                     context.order,
                     PARAM_CONTACT,
-                    ERR_ADOBE_CONTACT.to_dict(
-                        title=param["name"], details="it is mandatory."
-                    ),
+                    ERR_ADOBE_CONTACT.to_dict(title=param["name"], details="it is mandatory."),
                 )
 
                 switch_order_to_query(client, context.order)

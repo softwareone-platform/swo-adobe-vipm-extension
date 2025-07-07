@@ -110,9 +110,7 @@ class ValidateCustomerData(Step):
         ):
             errors = True
             param_licenses = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
-            param_consumables = get_ordering_parameter(
-                context.order, PARAM_3YC_CONSUMABLES
-            )
+            param_consumables = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
             context.validation_succeeded = False
             context.order = set_order_error(
                 context.order,
@@ -195,9 +193,7 @@ class ValidateCustomerData(Step):
             if not validator_func(address[field]):
                 errors.append(err_msg)
 
-        if address["addressLine2"] and not is_valid_address_line_2_length(
-            address["addressLine2"]
-        ):
+        if address["addressLine2"] and not is_valid_address_line_2_length(address["addressLine2"]):
             errors.append(ERR_ADDRESS_LINE_2_LENGTH)
 
         if errors:

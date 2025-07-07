@@ -44,11 +44,7 @@ class ValidateDuplicateLines(Step):
                 items.append(line["item"]["id"])
 
         items.extend(
-            [
-                line["item"]["id"]
-                for line in context.order["lines"]
-                if line["oldQuantity"] == 0
-            ]
+            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
         )
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:
@@ -75,9 +71,7 @@ class GetPreviewOrder(Step):
             next_step(client, context)
             return
 
-        customer_id = (
-            context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
-        )
+        customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
         adobe_client = get_adobe_client()
         try:
             deployment_id = get_deployment_id(context.order)
@@ -91,15 +85,10 @@ class GetPreviewOrder(Step):
             )
         except AdobeAPIError as e:
             context.validation_succeeded = False
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_ERROR.to_dict(details=str(e))
-            )
+            context.order = set_order_error(context.order, ERR_ADOBE_ERROR.to_dict(details=str(e)))
             return
         except AdobeProductNotFoundError as e:
             context.validation_succeeded = False
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_ERROR.to_dict(details=str(e))
-            )
+            context.order = set_order_error(context.order, ERR_ADOBE_ERROR.to_dict(details=str(e)))
             return
         next_step(client, context)
-

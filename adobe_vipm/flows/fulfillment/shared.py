@@ -31,7 +31,6 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import (
-    get_3yc_commitment,
     get_3yc_commitment_request,
     sanitize_company_name,
     sanitize_first_last_name,
@@ -92,7 +91,7 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date
 from adobe_vipm.notifications import mpt_notify
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +121,7 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     commitment = get_3yc_commitment(customer)
 
     customer_data = {
-        PARAM_COMPANY_NAME: sanitize_company_name(
-            customer["companyProfile"]["companyName"]
-        ),
+        PARAM_COMPANY_NAME: sanitize_company_name(customer["companyProfile"]["companyName"]),
         PARAM_CONTACT: {
             "firstName": sanitize_first_last_name(contact["firstName"]),
             "lastName": sanitize_first_last_name(contact["lastName"]),
@@ -269,9 +266,7 @@ def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
         f"has reached the due date ({due_date_str}).",
     )
     reason = f"Due date is reached ({due_date_str})."
-    fail_order(
-        client, order["id"], reason, ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason)
-    )
+    fail_order(client, order["id"], reason, ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason))
     logger.warning(f"Order {order['id']} has been failed: {reason}.")
 
 
@@ -338,9 +333,7 @@ def add_subscription(client, adobe_subscription, order, line):
                     },
                     {
                         "externalId": PARAM_RENEWAL_QUANTITY,
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": PARAM_RENEWAL_DATE,
@@ -485,10 +478,7 @@ def send_mpt_notification(mpt_client: MPTClient, order: dict) -> None:
         "api_base_url": settings.MPT_API_BASE_URL,
         "portal_base_url": settings.MPT_PORTAL_BASE_URL,
     }
-    subject = (
-        f"Order status update {order['id']} "
-        f"for {order['agreement']['buyer']['name']}"
-    )
+    subject = f"Order status update {order['id']} for {order['agreement']['buyer']['name']}"
     if order["status"] == "Querying":
         subject = (
             f"This order need your attention {order['id']} "
@@ -542,9 +532,11 @@ def get_configuration_template_name(order):
         str: The appropriate template name based on auto renewal status.
     """
     auto_renewal = order["subscriptions"][0]["autoRenew"]
-    return (TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE
-            if auto_renewal
-            else TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE)
+    return (
+        TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE
+        if auto_renewal
+        else TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE
+    )
 
 
 class SetupDueDate(Step):
@@ -581,15 +573,11 @@ class SetOrUpdateCotermNextSyncDates(Step):
 
     def __call__(self, client, context, next_step):
         if has_coterm_date(context.adobe_customer):
-            coterm_date = datetime.fromisoformat(
-                context.adobe_customer["cotermDate"]
-            ).date()
+            coterm_date = datetime.fromisoformat(context.adobe_customer["cotermDate"]).date()
             next_sync = coterm_date + timedelta(days=1)
 
             needs_update = self.coterm_and_next_sync_update_if_needed(
-                context,
-                coterm_date,
-                next_sync
+                context, coterm_date, next_sync
             )
             needs_update |= self.commitment_update_if_needed(context)
 
@@ -611,9 +599,8 @@ class SetOrUpdateCotermNextSyncDates(Step):
     def commitment_update_if_needed(self, context):
         if not context.adobe_customer:
             return False
-        commitment = (
-            get_3yc_commitment_request(context.adobe_customer)
-            or get_3yc_commitment(context.adobe_customer)
+        commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
+            context.adobe_customer
         )
 
         if not commitment:
@@ -630,18 +617,19 @@ class SetOrUpdateCotermNextSyncDates(Step):
             "coterm_date": coterm_date.isoformat(),
             "next_sync": next_sync.isoformat(),
         }
-        commitment = (
-            get_3yc_commitment_request(context.adobe_customer)
-            or get_3yc_commitment(context.adobe_customer)
+        commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
+            context.adobe_customer
         )
         if commitment:
-            updated_params.update({
-                "3yc_enroll_status": commitment["status"],
-                "3yc_commitment_request_status": commitment["status"],
-                "3yc_start_date": commitment["startDate"],
-                "3yc_end_date": commitment["endDate"]
-            })
-        params_str = ', '.join(f'{k}={v}' for k, v in updated_params.items())
+            updated_params.update(
+                {
+                    "3yc_enroll_status": commitment["status"],
+                    "3yc_commitment_request_status": commitment["status"],
+                    "3yc_start_date": commitment["startDate"],
+                    "3yc_end_date": commitment["endDate"],
+                }
+            )
+        params_str = ", ".join(f"{k}={v}" for k, v in updated_params.items())
         logger.info(f"{context}: Updated parameters: {params_str}")
 
 
@@ -667,13 +655,13 @@ class StartOrderProcessing(Step):
             context.order = set_template(context.order, template)
             update_order(client, context.order_id, template=context.order["template"])
             logger.info(
-                f"{context}: processing template set to {self.template_name} "
-                f"({template['id']})"
+                f"{context}: processing template set to {self.template_name} ({template['id']})"
             )
         logger.info(f"{context}: processing template is ok, continue")
         if not context.due_date:
             send_mpt_notification(client, context.order)
         next_step(client, context)
+
 
 class ValidateRenewalWindow(Step):
     """
@@ -704,15 +692,14 @@ class ValidateRenewalWindow(Step):
                 return
         next_step(client, context)
 
+
 class GetReturnOrders(Step):
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
-        context.adobe_return_orders = (
-            adobe_client.get_return_orders_by_external_reference(
-                context.authorization_id,
-                context.adobe_customer_id,
-                context.order_id,
-            )
+        context.adobe_return_orders = adobe_client.get_return_orders_by_external_reference(
+            context.authorization_id,
+            context.adobe_customer_id,
+            context.order_id,
         )
         return_orders_count = sum(len(x) for x in context.adobe_return_orders.values())
         logger.info(f"{context}: found {return_orders_count} return order")
@@ -737,13 +724,9 @@ class SubmitReturnOrders(Step):
             for returnable_order, return_order in map_returnable_to_return_orders(
                 returnable_orders or [], return_orders
             ):
-                returnable_order_deployment_id = returnable_order.line.get(
-                    "deploymentId", None
-                )
+                returnable_order_deployment_id = returnable_order.line.get("deploymentId", None)
                 is_returnable = (
-                    (deployment_id == returnable_order_deployment_id)
-                    if deployment_id
-                    else True
+                    (deployment_id == returnable_order_deployment_id) if deployment_id else True
                 )
                 if is_returnable:
                     if return_order:
@@ -766,9 +749,7 @@ class SubmitReturnOrders(Step):
         ]
 
         if pending_orders:
-            logger.info(
-                f"{context}: There are pending return orders {', '.join(pending_orders)}"
-            )
+            logger.info(f"{context}: There are pending return orders {', '.join(pending_orders)}")
             return
 
         next_step(client, context)
@@ -785,9 +766,7 @@ class GetPreviewOrder(Step):
 
     def __call__(self, client, context, next_step):
         adobe_client = get_adobe_client()
-        if (
-            context.upsize_lines or context.new_lines
-        ) and not context.adobe_new_order_id:
+        if (context.upsize_lines or context.new_lines) and not context.adobe_new_order_id:
             try:
                 deployment_id = get_deployment_id(context.order)
                 context.adobe_preview_order = adobe_client.create_preview_order(
@@ -836,13 +815,9 @@ class SubmitNewOrder(Step):
             )
             logger.info(f'{context}: new adobe order created: {adobe_order["orderId"]}')
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
-            update_order(
-                client, context.order_id, externalIds=context.order["externalIds"]
-            )
+            update_order(client, context.order_id, externalIds=context.order["externalIds"])
         elif not context.adobe_new_order_id and not context.adobe_preview_order:
-            logger.info(
-                f"{context}: skip creating Adobe Order, preview order creation was skipped"
-            )
+            logger.info(f"{context}: skip creating Adobe Order, preview order creation was skipped")
             next_step(client, context)
             return
         else:
@@ -854,9 +829,7 @@ class SubmitNewOrder(Step):
         context.adobe_new_order = adobe_order
         context.adobe_new_order_id = adobe_order["orderId"]
         if adobe_order["status"] == STATUS_PENDING:
-            logger.info(
-                f"{context}: adobe order {context.adobe_new_order_id} is still pending."
-            )
+            logger.info(f"{context}: adobe order {context.adobe_new_order_id} is still pending.")
             return
         elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
             error = ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS.to_dict(
@@ -867,20 +840,15 @@ class SubmitNewOrder(Step):
                 context.order,
                 error,
             )
-            logger.warning(
-                f"{context}: The adobe order has been failed {error['message']}."
-            )
+            logger.warning(f"{context}: The adobe order has been failed {error['message']}.")
             return
         elif adobe_order["status"] != STATUS_PROCESSED:
-            error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(
-                status=adobe_order["status"]
-            )
+            error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status=adobe_order["status"])
             switch_order_to_failed(client, context.order, error)
-            logger.warning(
-                f"{context}: the order has been failed due to {error['message']}."
-            )
+            logger.warning(f"{context}: the order has been failed due to {error['message']}.")
             return
         next_step(client, context)
+
 
 class CreateOrUpdateSubscriptions(Step):
     def __call__(self, client, context, next_step):
@@ -928,9 +896,7 @@ class CreateOrUpdateSubscriptions(Step):
                                 {
                                     "externalId": PARAM_RENEWAL_QUANTITY,
                                     "value": str(
-                                        adobe_subscription["autoRenewal"][
-                                            "renewalQuantity"
-                                        ]
+                                        adobe_subscription["autoRenewal"]["renewalQuantity"]
                                     ),
                                 },
                                 {
@@ -951,9 +917,7 @@ class CreateOrUpdateSubscriptions(Step):
                         "commitmentDate": adobe_subscription["renewalDate"],
                         "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
                     }
-                    subscription = create_subscription(
-                        client, context.order_id, subscription
-                    )
+                    subscription = create_subscription(client, context.order_id, subscription)
                     logger.info(
                         f'{context}: subscription {line["subscriptionId"]} '
                         f'({subscription["id"]}) created'
@@ -971,6 +935,7 @@ class CreateOrUpdateSubscriptions(Step):
                         f'({order_subscription["id"]}) updated'
                     )
         next_step(client, context)
+
 
 class CompleteOrder(Step):
     def __init__(self, template_name):
@@ -995,6 +960,7 @@ class CompleteOrder(Step):
         send_mpt_notification(client, context.order)
         logger.info(f"{context}: order has been completed successfully")
         next_step(client, context)
+
 
 class SyncAgreement(Step):
     def __call__(self, client, context, next_step):
@@ -1021,11 +987,7 @@ class ValidateDuplicateLines(Step):
                 items.append(line["item"]["id"])
 
         items.extend(
-            [
-                line["item"]["id"]
-                for line in context.order["lines"]
-                if line["oldQuantity"] == 0
-            ]
+            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
         )
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:
@@ -1048,11 +1010,7 @@ def send_gc_mpt_notification(mpt_client, order: dict, items_with_deployment: lis
         items_with_deployment (list): The list of items with deployment ID.
         order (dict): The order for which the notification should be sent.
     """
-    items = (
-        "<ul>\n"
-        + "\n".join(f"\t<li>{item}</li>" for item in items_with_deployment)
-        + "\n</ul>"
-    )
+    items = "<ul>\n" + "\n".join(f"\t<li>{item}</li>" for item in items_with_deployment) + "\n</ul>"
 
     context = {
         "order": order,

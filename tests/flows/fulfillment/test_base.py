@@ -34,9 +34,7 @@ def test_fulfill_order_exception(
 
 
 @pytest.mark.parametrize("order_type", ["purchase", "change", "configuration", "termination"])
-def test_fulfill_order_by_order_type(
-    mocker, order_factory, order_type, mock_mpt_client
-):
+def test_fulfill_order_by_order_type(mocker, order_factory, order_type, mock_mpt_client):
     mocked_fulfill = mocker.patch(f"adobe_vipm.flows.fulfillment.base.fulfill_{order_type}_order")
     order = order_factory(order_type=order_type.capitalize())
 

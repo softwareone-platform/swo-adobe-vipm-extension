@@ -45,28 +45,6 @@ def join_phone_number(phone: dict) -> str:
     return f"{phone['prefix']}{phone['number']}" if phone else ""
 
 
-def get_3yc_commitment(customer_or_transfer_preview):
-    """
-    Extract the commitment object from the customer object
-    or from the transfer preview object.
-
-    Args:
-        customer_or_transfer_preview (dict): A customer object
-        or a transfer preview object from which extract the commitment
-        object.
-
-    Returns:
-        dict: The commitment object if it exists or an empty object.
-    """
-    benefit_3yc = find_first(
-        lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
-        customer_or_transfer_preview.get("benefits", []),
-        {},
-    )
-
-    return benefit_3yc.get("commitment", {}) or {}
-
-
 def get_3yc_commitment_request(customer, is_recommitment=False):
     """
     Extract the commitment or recommitment request object
@@ -89,9 +67,7 @@ def get_3yc_commitment_request(customer, is_recommitment=False):
     )
 
     return (
-        benefit_3yc.get(
-            "commitmentRequest" if not is_recommitment else "recommitmentRequest", {}
-        )
+        benefit_3yc.get("commitmentRequest" if not is_recommitment else "recommitmentRequest", {})
         or {}
     )
 

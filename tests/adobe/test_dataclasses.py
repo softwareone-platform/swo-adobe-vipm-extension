@@ -83,8 +83,6 @@ def test_api_token_is_expired():
     Test the is_expired method checks the token expires
     against the current date.
     """
-    assert (
-        APIToken("token", datetime.now() + timedelta(seconds=1)).is_expired() is False
-    )
+    assert APIToken("token", datetime.now() + timedelta(seconds=1)).is_expired() is False
 
     assert APIToken("token", datetime.now() - timedelta(seconds=1)).is_expired() is True

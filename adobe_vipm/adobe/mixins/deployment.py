@@ -36,9 +36,7 @@ class DeploymentClientMixin:
         """
         Retrieve the active deployments for a given customer.
         """
-        customer_deployments = self.get_customer_deployments(
-            authorization_id, customer_id
-        )
+        customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
 
         active_deployments = []
 

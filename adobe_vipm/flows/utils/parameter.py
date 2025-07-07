@@ -33,9 +33,11 @@ def get_parameter(parameter_phase, source, param_external_id):
         default={},
     )
 
+
 get_ordering_parameter = functools.partial(get_parameter, PARAM_PHASE_ORDERING)
 
 get_fulfillment_parameter = functools.partial(get_parameter, PARAM_PHASE_FULFILLMENT)
+
 
 def set_ordering_parameter_error(order, param_external_id, error, required=True):
     """
@@ -61,6 +63,7 @@ def set_ordering_parameter_error(order, param_external_id, error, required=True)
     }
     return updated_order
 
+
 def reset_ordering_parameters_error(order):
     """
     Reset errors for all ordering parameters
@@ -78,6 +81,7 @@ def reset_ordering_parameters_error(order):
 
     return updated_order
 
+
 def update_parameters_visibility(order):
     from adobe_vipm.flows.utils.customer import is_new_customer
 
@@ -91,9 +95,11 @@ def update_parameters_visibility(order):
         order = set_parameter_visible(order, PARAM_MEMBERSHIP_ID)
     return order
 
+
 def is_ordering_param_required(source, param_external_id):
     param = get_ordering_parameter(source, param_external_id)
     return (param.get("constraints", {}) or {}).get("required", False)
+
 
 def set_coterm_date(order, coterm_date):
     updated_order = copy.deepcopy(order)
@@ -121,6 +127,7 @@ def update_ordering_parameter_value(order, param_external_id, value):
     param["value"] = value
 
     return updated_order
+
 
 def get_adobe_membership_id(source):
     """
@@ -156,6 +163,7 @@ def get_next_sync(order):
         order,
         PARAM_NEXT_SYNC_DATE,
     ).get("value")
+
 
 def set_parameter_visible(order, param_external_id):
     updated_order = copy.deepcopy(order)
@@ -202,4 +210,3 @@ def get_retry_count(order):
         return
 
     return param["value"] if param.get("value") else ""
-
