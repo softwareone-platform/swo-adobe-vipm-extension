@@ -14,7 +14,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SyncAgreement,
@@ -40,7 +40,7 @@ def fulfill_configuration_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         SetupDueDate(),
-        SetOrUpdateCotermNextSyncDates(),
+        SetOrUpdateCotermDate(),
         StartOrderProcessing(template_name),
         ValidateRenewalWindow(),
         SubscriptionUpdateAutoRenewal(),

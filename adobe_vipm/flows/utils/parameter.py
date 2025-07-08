@@ -141,23 +141,6 @@ def get_adobe_membership_id(source):
     return param.get("value")
 
 
-def set_next_sync(order, next_sync):
-    updated_order = copy.deepcopy(order)
-    customer_ff_param = get_fulfillment_parameter(
-        updated_order,
-        Param.NEXT_SYNC_DATE,
-    )
-    customer_ff_param["value"] = next_sync
-    return updated_order
-
-
-def get_next_sync(order):
-    return get_fulfillment_parameter(
-        order,
-        Param.NEXT_SYNC_DATE,
-    ).get("value")
-
-
 def set_parameter_visible(order, param_external_id):
     updated_order = copy.deepcopy(order)
     param = get_ordering_parameter(

@@ -54,14 +54,14 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SubmitNewOrder,
     add_subscription,
     check_processing_template,
     handle_retries,
     save_adobe_order_id,
     save_adobe_order_id_and_customer_data,
-    save_next_sync_and_coterm_dates,
+    save_coterm_dates,
     send_gc_mpt_notification,
     switch_order_to_completed,
     switch_order_to_failed,
@@ -294,7 +294,7 @@ def _fulfill_transfer_migrated(
             commitment_date = subscription["commitmentDate"]
 
     if commitment_date:  # pragma: no branch
-        order = save_next_sync_and_coterm_dates(mpt_client, order, commitment_date)
+        order = save_coterm_dates(mpt_client, order, commitment_date)
 
     # Fulfills order with active items
     customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
@@ -371,7 +371,7 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
         GetPreviewOrder(),
         SubmitNewOrder(),
         CreateOrUpdateSubscriptions(),
-        SetOrUpdateCotermNextSyncDates(),
+        SetOrUpdateCotermDate(),
         UpdatePrices(),
         SyncGCMainAgreement(transfer, gc_main_agreement, STATUS_GC_CREATED),
         CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
@@ -1236,9 +1236,7 @@ class SetCommitmentDates(Step):
             context.commitment_date = get_commitment_date(subscription, context.commitment_date)
 
         if context.commitment_date:  # pragma: no branch
-            context.order = save_next_sync_and_coterm_dates(
-                client, context.order, context.commitment_date
-            )
+            context.order = save_coterm_dates(client, context.order, context.commitment_date)
 
         next_step(client, context)
 

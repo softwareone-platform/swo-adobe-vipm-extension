@@ -5,7 +5,7 @@ from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.constants import ERR_INVALID_TERMINATION_ORDER_QUANTITY
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
@@ -316,7 +316,7 @@ def test_validate_termination_order(mocker):
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
-        SetOrUpdateCotermNextSyncDates,
+        SetOrUpdateCotermDate,
         ValidateRenewalWindow,
         ValidateDownsizes,
         Validate3YCCommitment,

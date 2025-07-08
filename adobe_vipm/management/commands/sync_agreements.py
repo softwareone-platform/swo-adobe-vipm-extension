@@ -5,7 +5,6 @@ from adobe_vipm.flows.sync import (
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_coterm_date,
-    sync_agreements_by_next_sync,
     sync_agreements_by_renewal_date,
     sync_all_agreements,
 )
@@ -50,7 +49,6 @@ class Command(BaseCommand):
         elif options["all"]:
             sync_all_agreements(client, options["dry_run"])
         else:
-            sync_agreements_by_next_sync(client, options["dry_run"])
             sync_agreements_by_3yc_end_date(client, options["dry_run"])
             sync_agreements_by_coterm_date(client, options["dry_run"])
             sync_agreements_by_renewal_date(client, options["dry_run"])

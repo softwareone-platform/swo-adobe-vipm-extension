@@ -561,7 +561,6 @@ def fulfillment_parameters_factory():
         p3yc_recommitment_request_status="",
         p3yc_start_date="",
         p3yc_end_date="",
-        next_sync_date="",
         market_segment_eligibility_status=None,
         coterm_date="",
         global_customer=None,
@@ -604,13 +603,6 @@ def fulfillment_parameters_factory():
                 "externalId": Param.THREE_YC_END_DATE,
                 "type": "Date",
                 "value": p3yc_end_date,
-            },
-            {
-                "id": "PAR-4141-1414",
-                "name": "Next Sync",
-                "externalId": Param.NEXT_SYNC_DATE,
-                "type": "Date",
-                "value": next_sync_date,
             },
             {
                 "id": "PAR-0022-2200",

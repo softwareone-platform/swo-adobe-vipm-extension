@@ -24,7 +24,6 @@ class Param:
     CONTACT = "contact"
     CUSTOMER_ID = "customerId"
     MEMBERSHIP_ID = "membershipId"
-    NEXT_SYNC_DATE = "nextSync"
     COTERM_DATE = "cotermDate"
     AGREEMENT_TYPE = "agreementType"
     THREE_YC = "3YC"

@@ -5,7 +5,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
@@ -384,7 +384,7 @@ def test_validate_change_order(mocker):
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
-        SetOrUpdateCotermNextSyncDates,
+        SetOrUpdateCotermDate,
         ValidateRenewalWindow,
         ValidateDownsizes,
         Validate3YCCommitment,

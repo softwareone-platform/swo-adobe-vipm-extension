@@ -13,7 +13,6 @@ from adobe_vipm.flows.sync import (
     sync_agreements_by_3yc_enroll_status,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_coterm_date,
-    sync_agreements_by_next_sync,
     sync_agreements_by_renewal_date,
     sync_all_agreements,
 )
@@ -213,12 +212,7 @@ def test_sync_agreement_prices(
     )
 
     assert mocked_update_agreement.call_args_list == [
-        mocker.call(
-            mocked_mpt_client,
-            agreement["id"],
-            lines=expected_lines,
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
-        ),
+        mocker.call(mocked_mpt_client, agreement["id"], lines=expected_lines, parameters={}),
         mocker.call(
             mocked_mpt_client,
             agreement["id"],
@@ -428,26 +422,6 @@ def test_sync_all_agreements(mocker, agreement_factory, dry_run):
     )
 
     sync_all_agreements(mocked_mpt_client, dry_run)
-    mocked_sync_agreement.assert_called_once_with(
-        mocked_mpt_client,
-        agreement,
-        dry_run,
-    )
-
-
-@pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_next_sync(mocker, agreement_factory, dry_run):
-    agreement = agreement_factory()
-    mocked_mpt_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_next_sync",
-        return_value=[agreement],
-    )
-    mocked_sync_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.sync_agreement",
-    )
-
-    sync_agreements_by_next_sync(mocked_mpt_client, dry_run)
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         agreement,
@@ -856,7 +830,6 @@ def test_sync_agreement_prices_with_3yc(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "nextSync", "value": "2025-04-05"},
                     {"externalId": "3YCRecommitmentRequestStatus", "value": "ACCEPTED"},
                     {"externalId": "3YCRecommitment", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
@@ -1151,12 +1124,7 @@ def test_sync_global_customer_parameter(
     )
     if not dry_run:
         assert mocked_update_agreement.call_args_list == [
-            mocker.call(
-                mocked_mpt_client,
-                agreement["id"],
-                lines=expected_lines,
-                parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
-            ),
+            mocker.call(mocked_mpt_client, agreement["id"], lines=expected_lines, parameters={}),
             mocker.call(
                 mocked_mpt_client,
                 agreement["id"],
@@ -1171,7 +1139,7 @@ def test_sync_global_customer_parameter(
                 mocked_mpt_client,
                 deployment_agreements[0]["id"],
                 lines=expected_lines,
-                parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
+                parameters={},
             ),
             mocker.call(
                 mocked_mpt_client,
@@ -1518,15 +1486,9 @@ def test_sync_global_customer_update_not_required(
         ),
     ]
 
-    expected_lines = lines_factory(
-        external_vendor_id="77777777CA",
-        unit_purchase_price=20.22,
-    )
+    expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     assert mocked_update_agreement.mock_calls[0] == mocker.call(
-        mocked_mpt_client,
-        agreement["id"],
-        lines=expected_lines,
-        parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
+        mocked_mpt_client, agreement["id"], lines=expected_lines, parameters={}
     )
     mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
 
@@ -1552,27 +1514,9 @@ def test_sync_global_customer_update_adobe_error(
             {"externalId": "deployments", "value": "deployment-id - DE"},
         ],
         subscriptions=[
-            {
-                "id": "SUB-1000-2000-3000",
-                "status": "Active",
-                "item": {
-                    "id": "ITM-0000-0001-0001",
-                },
-            },
-            {
-                "id": "SUB-1234-5678",
-                "status": "Terminated",
-                "item": {
-                    "id": "ITM-0000-0001-0002",
-                },
-            },
-            {
-                "id": "SUB-1000-2000-5000",
-                "status": "Active",
-                "item": {
-                    "id": "ITM-0000-0001-0003",
-                },
-            },
+            {"id": "SUB-1000-2000-3000", "status": "Active", "item": {"id": "ITM-0000-0001-0001"}},
+            {"id": "SUB-1234-5678", "status": "Terminated", "item": {"id": "ITM-0000-0001-0002"}},
+            {"id": "SUB-1000-2000-5000", "status": "Active", "item": {"id": "ITM-0000-0001-0003"}},
         ],
     )
     mpt_subscription = subscriptions_factory()[0]
@@ -1736,10 +1680,7 @@ def test_sync_global_customer_update_adobe_error(
         unit_purchase_price=20.22,
     )
     mocked_update_agreement.assert_called_once_with(
-        mocked_mpt_client,
-        agreement["id"],
-        lines=expected_lines,
-        parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
+        mocked_mpt_client, agreement["id"], lines=expected_lines, parameters={}
     )
     mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_notifier.assert_called_once()
@@ -2147,7 +2088,6 @@ def test_sync_agreement_prices_with_missing_prices(
             mocked_mpt_client,
             agreement["id"],
             lines=agreement["lines"],
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
         ),
         mocker.call(
             mocked_mpt_client,
