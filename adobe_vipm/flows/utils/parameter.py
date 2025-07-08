@@ -2,6 +2,8 @@ import copy
 import functools
 
 from adobe_vipm.flows.constants import (
+    PARAM_NEW_CUSTOMER_PARAMETERS,
+    PARAM_OPTIONAL_CUSTOMER_ORDER,
     Param,
 )
 from adobe_vipm.utils import find_first
@@ -79,11 +81,11 @@ def update_parameters_visibility(order):
     from adobe_vipm.flows.utils.customer import is_new_customer
 
     if is_new_customer(order):
-        for param in Param.NEW_CUSTOMER_PARAMETERS:
+        for param in PARAM_NEW_CUSTOMER_PARAMETERS:
             order = set_parameter_visible(order, param)
         order = set_parameter_hidden(order, Param.MEMBERSHIP_ID)
     else:
-        for param in Param.NEW_CUSTOMER_PARAMETERS:
+        for param in PARAM_NEW_CUSTOMER_PARAMETERS:
             order = set_parameter_hidden(order, param)
         order = set_parameter_visible(order, Param.MEMBERSHIP_ID)
     return order
@@ -149,7 +151,7 @@ def set_parameter_visible(order, param_external_id):
     )
     param["constraints"] = {
         "hidden": False,
-        "required": param_external_id not in Param.OPTIONAL_CUSTOMER_ORDER,
+        "required": param_external_id not in PARAM_OPTIONAL_CUSTOMER_ORDER,
     }
     return updated_order
 
