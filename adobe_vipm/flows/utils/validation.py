@@ -1,11 +1,6 @@
-from adobe_vipm.flows.constants import Param
-from adobe_vipm.flows.utils.parameter import (
-    get_ordering_parameter,
-    is_ordering_param_required,
-)
-from adobe_vipm.flows.utils.subscription import (
-    is_line_item_active_subscription,
-)
+from adobe_vipm.flows.constants import PARAM_REQUIRED_CUSTOMER_ORDER, Param
+from adobe_vipm.flows.utils.parameter import get_ordering_parameter, is_ordering_param_required
+from adobe_vipm.flows.utils.subscription import is_line_item_active_subscription
 
 
 def validate_subscription_and_returnable_orders(
@@ -63,7 +58,7 @@ def has_valid_returnable_quantity(line, returnable_orders):
 def is_purchase_validation_enabled(order):
     return all(
         is_ordering_param_required(order, param_external_id)
-        for param_external_id in Param.REQUIRED_CUSTOMER_ORDER
+        for param_external_id in PARAM_REQUIRED_CUSTOMER_ORDER
     )
 
 
