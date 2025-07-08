@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from adobe_vipm.adobe.constants import (
     MAXLEN_ADDRESS_LINE_1,
     MAXLEN_ADDRESS_LINE_2,
@@ -17,7 +19,7 @@ ORDER_TYPE_TERMINATION = "Termination"
 ORDER_TYPE_CONFIGURATION = "Configuration"
 
 
-class Param:
+class Param(StrEnum):
     ADDRESS = "address"
     ADOBE_SKU = "adobeSKU"
     COMPANY_NAME = "companyName"
@@ -46,18 +48,23 @@ class Param:
     DEPLOYMENT_ID = "deploymentId"
     LAST_SYNC_DATE = "lastSyncDate"
 
-    REQUIRED_CUSTOMER_ORDER = (
-        COMPANY_NAME,
-        ADDRESS,
-        CONTACT,
-    )
-
-    OPTIONAL_CUSTOMER_ORDER = (THREE_YC, THREE_YC_CONSUMABLES, THREE_YC_LICENSES)
-
-    NEW_CUSTOMER_PARAMETERS = REQUIRED_CUSTOMER_ORDER + OPTIONAL_CUSTOMER_ORDER
-
     PHASE_ORDERING = "ordering"
     PHASE_FULFILLMENT = "fulfillment"
+
+
+PARAM_REQUIRED_CUSTOMER_ORDER = (
+    Param.COMPANY_NAME,
+    Param.ADDRESS,
+    Param.CONTACT,
+)
+
+PARAM_OPTIONAL_CUSTOMER_ORDER = (
+    Param.THREE_YC,
+    Param.THREE_YC_CONSUMABLES,
+    Param.THREE_YC_LICENSES,
+)
+
+PARAM_NEW_CUSTOMER_PARAMETERS = PARAM_REQUIRED_CUSTOMER_ORDER + PARAM_OPTIONAL_CUSTOMER_ORDER
 
 
 STATUS_MARKET_SEGMENT_ELIGIBLE = "eligible"
