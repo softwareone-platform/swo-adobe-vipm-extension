@@ -22,7 +22,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_PROCESSING,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_UPDATING_TRANSFER_ITEMS,
-    PARAM_MEMBERSHIP_ID,
+    Param,
 )
 from adobe_vipm.flows.utils import get_ordering_parameter
 from adobe_vipm.flows.validation.transfer import get_prices, validate_transfer
@@ -190,7 +190,7 @@ def test_validate_transfer_membership_error(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details=str(api_error),
@@ -234,7 +234,7 @@ def test_validate_transfer_http_error(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details=expected_message,
@@ -274,7 +274,7 @@ def test_validate_transfer_unknown_item(
     has_errors, validated_order = validate_transfer(m_client, order)
 
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
         title=param["name"],
         item_sku=adobe_preview_transfer["items"][0]["offerId"][:10],
@@ -324,7 +324,7 @@ def test_validate_transfer_already_migrated(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     assert has_errors is False
     assert validated_order == order
@@ -372,7 +372,7 @@ def test_validate_transfer_migration_running(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details="Migration in progress, retry later",
@@ -410,7 +410,7 @@ def test_validate_transfer_migration_synchronized(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details="Membership has already been migrated",
@@ -449,7 +449,7 @@ def test_validate_transfer_no_items(
     has_errors, validated_order = validate_transfer(m_client, order)
 
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict()
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -509,7 +509,7 @@ def test_validate_transfer_account_inactive(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
         status=STATUS_TRANSFER_INACTIVE_ACCOUNT,
     )
@@ -616,7 +616,7 @@ def test_validate_transfer_already_migrated_all_items_expired(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     assert has_errors is False
 
@@ -698,7 +698,7 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     assert has_errors is False
 
@@ -799,7 +799,7 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     assert has_errors is False
 
@@ -910,7 +910,7 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     assert has_errors is False
 
@@ -1046,7 +1046,7 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     assert has_errors is False
 
@@ -1163,7 +1163,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
 
     assert has_errors is False
     assert validated_order == order
@@ -1632,7 +1632,7 @@ def test_validate_transfer_already_migrated_items_with_deployment(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
 
     assert has_errors is True
     assert membership_param["error"] == {
@@ -1793,7 +1793,7 @@ def test_validate_transfer_adobe_errors(
     has_errors, validated_order = validate_transfer(m_client, order)
 
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, PARAM_MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
 
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
         membership_id=mocked_transfer.membership_id,

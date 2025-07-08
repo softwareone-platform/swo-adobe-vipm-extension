@@ -4,7 +4,7 @@ from mpt_extension_sdk.core.events.dataclasses import Event
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.extension import ext, jwt_secret_callback, process_order_fulfillment
-from adobe_vipm.flows.constants import PARAM_COMPANY_NAME
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils import set_ordering_parameter_error
 
 
@@ -43,7 +43,7 @@ def test_process_order_validation(client, mocker, order_factory, jwt_token, webh
     )
     validated_order = set_ordering_parameter_error(
         order_factory(),
-        PARAM_COMPANY_NAME,
+        Param.COMPANY_NAME,
         {"id": "my_err_id", "message": "my_msg"},
     )
     order = order_factory()

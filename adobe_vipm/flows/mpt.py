@@ -10,29 +10,22 @@ from mpt_extension_sdk.mpt_http.wrap_http_error import wrap_mpt_http_error
 from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
-from adobe_vipm.flows.constants import (
-    PARAM_3YC,
-    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_END_DATE,
-    PARAM_3YC_ENROLL_STATUS,
-    PARAM_3YC_RECOMMITMENT,
-    PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
-    PARAM_PHASE_FULFILLMENT,
-    PARAM_PHASE_ORDERING,
-)
+from adobe_vipm.flows.constants import Param
 
 logger = logging.getLogger(__name__)
 
 
 def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=False):
     param_external_id = (
-        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment
-        else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
     )
-    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_ext_id = (
+        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+    )
     request_type_param_phase = (
-        PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
+        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
     )
 
     enroll_status_condition = (
@@ -62,14 +55,16 @@ def get_agreements_by_3yc_commitment_request_status(mpt_client, is_recommitment=
 @wrap_mpt_http_error
 def get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=False):
     param_external_id = (
-        PARAM_3YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment
-        else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
     )
 
-    request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
+    request_type_param_ext_id = (
+        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+    )
     request_type_param_phase = (
-        PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
+        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
     )
 
     error_statuses = [
@@ -110,28 +105,28 @@ def get_agreements_for_3yc_recommitment(mpt_client):
     limit_date = today + timedelta(days=30)
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
-        f"eq(externalId,{PARAM_3YC_ENROLL_STATUS}),"
+        f"eq(externalId,{Param.THREE_YC_ENROLL_STATUS}),"
         f"eq(displayValue,{ThreeYearCommitmentStatus.COMMITTED})"
         ")"
         ")"
     )
     recommitment_condition = (
         "any(parameters.fulfillment,and("
-        f"eq(externalId,{PARAM_3YC_RECOMMITMENT}),"
+        f"eq(externalId,{Param.THREE_YC_RECOMMITMENT}),"
         "like(displayValue,*Yes*)"
         ")"
         ")"
     )
     enddate_gt_condition = (
         "any(parameters.ordering,and("
-        f"eq(externalId,{PARAM_3YC_END_DATE}),"
+        f"eq(externalId,{Param.THREE_YC_END_DATE}),"
         f"gt(displayValue,{limit_date.isoformat()})"
         ")"
         ")"
     )
     enddate_le_condition = (
         "any(parameters.ordering,and("
-        f"eq(externalId,{PARAM_3YC_END_DATE}),"
+        f"eq(externalId,{Param.THREE_YC_END_DATE}),"
         f"le(displayValue,{today.isoformat()})"
         ")"
         ")"

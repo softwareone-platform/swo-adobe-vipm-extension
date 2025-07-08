@@ -771,7 +771,11 @@ def test_sync_agreement_prices_with_3yc(
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
         coterm_date="2025-04-04",
-        commitment=adobe_commitment_factory(),
+        commitment=adobe_commitment_factory(
+            licenses=9,
+            consumables=1220,
+        ),
+        recommitment_request=adobe_commitment_factory(status="ACCEPTED"),
     )
 
     mocker.patch(
@@ -850,7 +854,20 @@ def test_sync_agreement_prices_with_3yc(
             mocked_mpt_client,
             agreement["id"],
             lines=expected_lines,
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": "2025-04-05"}]},
+            parameters={
+                "fulfillment": [
+                    {"externalId": "nextSync", "value": "2025-04-05"},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": "ACCEPTED"},
+                    {"externalId": "3YCRecommitment", "value": None},
+                    {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+                    {"externalId": "3YCStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                ],
+                "ordering": [
+                    {"externalId": "3YCLicenses", "value": "9"},
+                    {"externalId": "3YCConsumables", "value": "1220"},
+                ],
+            },
         ),
         mocker.call(
             mocked_mpt_client,

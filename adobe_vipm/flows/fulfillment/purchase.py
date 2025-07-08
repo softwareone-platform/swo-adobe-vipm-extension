@@ -26,14 +26,10 @@ from adobe_vipm.flows.constants import (
     ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_LICENSES,
-    PARAM_ADDRESS,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
     STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
     STATUS_MARKET_SEGMENT_PENDING,
     TEMPLATE_NAME_PURCHASE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -151,34 +147,36 @@ class CreateCustomer(Step):
             )
             return
         if error.code == STATUS_INVALID_ADDRESS:
-            param = get_ordering_parameter(context.order, PARAM_ADDRESS)
+            param = get_ordering_parameter(context.order, Param.ADDRESS)
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_ADDRESS,
+                Param.ADDRESS,
                 ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
             )
         elif error.code == STATUS_INVALID_MINIMUM_QUANTITY:
             if "LICENSE" in str(error):
-                param = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
+                param = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_3YC_LICENSES,
+                    Param.THREE_YC_LICENSES,
                     ERR_3YC_QUANTITY_LICENSES.to_dict(title=param["name"]),
                     required=False,
                 )
 
             if "CONSUMABLES" in str(error):
-                param = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
+                param = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_3YC_CONSUMABLES,
+                    Param.THREE_YC_CONSUMABLES,
                     ERR_3YC_QUANTITY_CONSUMABLES.to_dict(title=param["name"]),
                     required=False,
                 )
 
             if not error.details:
-                param_licenses = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
-                param_consumables = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
+                param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
+                param_consumables = get_ordering_parameter(
+                    context.order, Param.THREE_YC_CONSUMABLES
+                )
                 context.order = set_order_error(
                     context.order,
                     ERR_3YC_NO_MINIMUMS.to_dict(
@@ -188,10 +186,10 @@ class CreateCustomer(Step):
                 )
         else:
             if "companyProfile.companyName" in error.details:
-                param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
+                param = get_ordering_parameter(context.order, Param.COMPANY_NAME)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_COMPANY_NAME,
+                    Param.COMPANY_NAME,
                     ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(error)),
                 )
             if len(
@@ -202,10 +200,10 @@ class CreateCustomer(Step):
                     )
                 )
             ):
-                param = get_ordering_parameter(context.order, PARAM_CONTACT)
+                param = get_ordering_parameter(context.order, Param.CONTACT)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_CONTACT,
+                    Param.CONTACT,
                     ERR_ADOBE_CONTACT.to_dict(title=param["name"], details=str(error)),
                 )
 
@@ -219,10 +217,10 @@ class CreateCustomer(Step):
         adobe_client = get_adobe_client()
         try:
             if not context.customer_data.get("contact"):
-                param = get_ordering_parameter(context.order, PARAM_CONTACT)
+                param = get_ordering_parameter(context.order, Param.CONTACT)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_CONTACT,
+                    Param.CONTACT,
                     ERR_ADOBE_CONTACT.to_dict(title=param["name"], details="it is mandatory."),
                 )
 

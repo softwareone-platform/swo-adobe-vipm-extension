@@ -1,3 +1,4 @@
+import copy
 import logging
 import sys
 import traceback
@@ -21,29 +22,19 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
+from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
 )
-from adobe_vipm.flows.constants import (
-    PARAM_3YC_END_DATE,
-    PARAM_3YC_ENROLL_STATUS,
-    PARAM_ADOBE_SKU,
-    PARAM_COTERM_DATE,
-    PARAM_CURRENT_QUANTITY,
-    PARAM_DEPLOYMENT_ID,
-    PARAM_LAST_SYNC_DATE,
-    PARAM_NEXT_SYNC_DATE,
-    PARAM_PHASE_FULFILLMENT,
-    PARAM_RENEWAL_DATE,
-    PARAM_RENEWAL_QUANTITY,
-)
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
     get_deployments,
     get_global_customer,
+    get_parameter,
     get_sku_with_discount_level,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
@@ -92,16 +83,75 @@ def sync_agreement_prices(
     _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
 
     next_sync = (datetime.fromisoformat(coterm_date) + timedelta(days=1)).date().isoformat()
+    parameters = {Param.PHASE_FULFILLMENT: [{"externalId": "nextSync", "value": next_sync}]}
+    commitment_info = get_3yc_commitment(customer)
+    if commitment_info:
+        parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
+        for mq in commitment_info.get("minimumQuantities", ()):
+            if mq["offerType"] == "LICENSE":
+                parameters.setdefault(Param.PHASE_ORDERING, [])
+                parameters[Param.PHASE_ORDERING].append(
+                    {"externalId": Param.THREE_YC_LICENSES, "value": str(mq.get("quantity"))}
+                )
+            if mq["offerType"] == "CONSUMABLES":
+                parameters.setdefault(Param.PHASE_ORDERING, [])
+                parameters[Param.PHASE_ORDERING].append(
+                    {"externalId": Param.THREE_YC_CONSUMABLES, "value": str(mq.get("quantity"))}
+                )
+
     if not dry_run:
         update_agreement(
             mpt_client,
             agreement["id"],
             lines=agreement["lines"],
-            parameters={"fulfillment": [{"externalId": "nextSync", "value": next_sync}]},
+            parameters=parameters,
         )
 
     logger.info(f"agreement updated {agreement['id']}")
     return coterm_date
+
+
+def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters):
+    new_parameters = copy.deepcopy(parameters)
+    three_yc_recommitment_par = get_parameter(
+        Param.PHASE_FULFILLMENT, agreement, Param.THREE_YC_RECOMMITMENT
+    )
+    is_recommitment = True if three_yc_recommitment_par else False
+    status_param_ext_id = (
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        if not is_recommitment
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+    )
+    request_type_param_ext_id = (
+        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+    )
+    request_type_param_phase = (
+        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+    )
+    request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
+    new_parameters[Param.PHASE_FULFILLMENT].append(
+        {"externalId": status_param_ext_id, "value": request_info.get("status")}
+    )
+    new_parameters.setdefault(request_type_param_phase, [])
+    new_parameters[request_type_param_phase].append(
+        {"externalId": request_type_param_ext_id, "value": None},
+    )
+    new_parameters[Param.PHASE_FULFILLMENT] += [
+        {
+            "externalId": Param.THREE_YC_ENROLL_STATUS,
+            "value": commitment_info.get("status"),
+        },
+        {
+            "externalId": Param.THREE_YC_START_DATE,
+            "value": commitment_info.get("startDate"),
+        },
+        {
+            "externalId": Param.THREE_YC_END_DATE,
+            "value": commitment_info.get("endDate"),
+        },
+    ]
+
+    return new_parameters
 
 
 def _log_agreement_lines(
@@ -156,17 +206,17 @@ def _update_subscriptions(
 
         parameters = {
             "fulfillment": [
-                {"externalId": PARAM_ADOBE_SKU, "value": actual_sku},
+                {"externalId": Param.ADOBE_SKU, "value": actual_sku},
                 {
-                    "externalId": PARAM_CURRENT_QUANTITY,
+                    "externalId": Param.CURRENT_QUANTITY,
                     "value": str(adobe_subscription["currentQuantity"]),
                 },
                 {
-                    "externalId": PARAM_RENEWAL_QUANTITY,
+                    "externalId": Param.RENEWAL_QUANTITY,
                     "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                 },
                 {
-                    "externalId": PARAM_RENEWAL_DATE,
+                    "externalId": Param.RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
                 {"externalId": "lastSyncDate", "value": last_sync_date},
@@ -247,7 +297,7 @@ def sync_agreements_by_next_sync(mpt_client, dry_run):
         dry_run (bool): if True, it just simulate the prices update but doesn't
         perform it.
     """
-    agreements = get_agreements_by_next_sync(mpt_client, PARAM_NEXT_SYNC_DATE)
+    agreements = get_agreements_by_next_sync(mpt_client, Param.NEXT_SYNC_DATE)
     for agreement in agreements:
         sync_agreement(mpt_client, agreement, dry_run)
 
@@ -257,7 +307,7 @@ def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):
     Synchronizes agreements by their active subscriptions renewed yesterday.
     """
     logger.info("Syncing agreements by 3yc End Date...")
-    _sync_agreements_by_param(mpt_client, PARAM_3YC_END_DATE, dry_run)
+    _sync_agreements_by_param(mpt_client, Param.THREE_YC_END_DATE, dry_run)
 
 
 def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
@@ -265,7 +315,7 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
     Synchronizes agreements by their active subscriptions renewed yesterday.
     """
     logger.info("Synchronizing agreements by cotermDate...")
-    _sync_agreements_by_param(mpt_client, PARAM_COTERM_DATE, dry_run)
+    _sync_agreements_by_param(mpt_client, Param.COTERM_DATE, dry_run)
 
 
 def _sync_agreements_by_param(mpt_client: MPTClient, param, dry_run: bool):
@@ -274,7 +324,7 @@ def _sync_agreements_by_param(mpt_client: MPTClient, param, dry_run: bool):
     rql_query = (
         "eq(status,Active)&"
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
         "select=subscriptions,authorization,parameters,listing,lines,"
         "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
@@ -295,7 +345,7 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
     rql_query = (
         "eq(status,Active)&"
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),eq(displayValue,{yesterday})))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{PARAM_LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
         "select=subscriptions,authorization,parameters,listing,lines,"
         "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
@@ -367,8 +417,8 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: boo
                 mpt_client,
                 agreement["id"],
                 parameters={
-                    PARAM_PHASE_FULFILLMENT: [
-                        {"externalId": PARAM_3YC_ENROLL_STATUS, "value": enroll_status}
+                    Param.PHASE_FULFILLMENT: [
+                        {"externalId": Param.THREE_YC_ENROLL_STATUS, "value": enroll_status}
                     ]
                 },
             )
@@ -378,11 +428,11 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: boo
 
 def sync_global_customer_parameters(mpt_client, customer_deployments, agreement):
     try:
-        parameters = {PARAM_PHASE_FULFILLMENT: []}
+        parameters = {Param.PHASE_FULFILLMENT: []}
         global_customer_enabled = get_global_customer(agreement)
         if global_customer_enabled != ["Yes"]:
             logger.info(f"Setting global customer for agreement {agreement["id"]}")
-            parameters[PARAM_PHASE_FULFILLMENT].append(
+            parameters[Param.PHASE_FULFILLMENT].append(
                 {"externalId": "globalCustomer", "value": ["Yes"]}
             )
 
@@ -392,11 +442,11 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
-            parameters[PARAM_PHASE_FULFILLMENT].append(
+            parameters[Param.PHASE_FULFILLMENT].append(
                 {"externalId": "deployments", "value": ",".join(deployments)}
             )
             logger.info(f"Setting deployments for agreement {agreement["id"]}")
-        if parameters[PARAM_PHASE_FULFILLMENT]:
+        if parameters[Param.PHASE_FULFILLMENT]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception as e:
         logger.exception(
@@ -448,6 +498,8 @@ def sync_agreement(mpt_client, agreement, dry_run):
                 dry_run,
             )
 
+    except AuthorizationNotFoundError as e:
+        logger.error(f"AuthorizationNotFoundError synchronizing agreement {agreement['id']}: {e}")
     except Exception as e:
         logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
@@ -477,7 +529,7 @@ def sync_deployments_prices(
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
-        PARAM_DEPLOYMENT_ID,
+        Param.DEPLOYMENT_ID,
         [deployment["deploymentId"] for deployment in customer_deployments],
     )
 
