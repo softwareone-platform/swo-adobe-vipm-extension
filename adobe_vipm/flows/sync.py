@@ -218,7 +218,7 @@ def _update_subscriptions(
                     "externalId": Param.RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
-                {"externalId": "lastSyncDate", "value": last_sync_date},
+                {"externalId": Param.LAST_SYNC_DATE, "value": last_sync_date},
             ],
         }
 
@@ -499,7 +499,7 @@ def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
         agreement["id"],
         parameters={
             "fulfillment": [
-                {"externalId": "lastSyncDate", "value": datetime.now().date().isoformat()}
+                {"externalId": Param.LAST_SYNC_DATE, "value": datetime.now().date().isoformat()}
             ]
         },
     )
