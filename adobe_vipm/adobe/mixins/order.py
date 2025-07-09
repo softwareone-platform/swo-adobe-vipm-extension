@@ -14,8 +14,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
+    AdobeStatus,
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError, wrap_http_error
@@ -32,7 +31,10 @@ class OrderClientMixin:
     @staticmethod
     def _is_processed(order_item):
         order, item = order_item
-        return order["status"] == STATUS_PROCESSED and item["status"] == STATUS_PROCESSED
+        return (
+            order["status"] == AdobeStatus.STATUS_PROCESSED
+            and item["status"] == AdobeStatus.STATUS_PROCESSED
+        )
 
     @wrap_http_error
     def get_orders(self, authorization_id, customer_id, filters=None):
@@ -325,7 +327,7 @@ class OrderClientMixin:
             customer_id,
             filters={
                 "order-type": ORDER_TYPE_RETURN,
-                "status": [STATUS_PROCESSED, STATUS_PENDING],
+                "status": [AdobeStatus.STATUS_PROCESSED, AdobeStatus.STATUS_PENDING],
             },
         )
         results = defaultdict(list)

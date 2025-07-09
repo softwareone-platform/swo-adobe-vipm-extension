@@ -15,11 +15,7 @@ from rich.highlighter import ReprHighlighter as _ReprHighlighter
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
-from adobe_vipm.adobe.constants import (
-    STATUS_PENDING,
-    STATUS_PROCESSED,
-    OfferType,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, OfferType
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
     AdobeProductNotFoundError,
@@ -1217,7 +1213,7 @@ def adobe_order_factory(adobe_items_factory):
             order["referenceOrderId"] = reference_order_id
         if status:
             order["status"] = status
-        if status in [STATUS_PENDING, STATUS_PROCESSED] or order_id:
+        if status in [AdobeStatus.STATUS_PENDING, AdobeStatus.STATUS_PROCESSED] or order_id:
             order["orderId"] = order_id or "P0123456789"
         if creation_date:
             order["creationDate"] = creation_date
@@ -1235,7 +1231,7 @@ def adobe_subscription_factory():
         renewal_quantity=10,
         autorenewal_enabled=True,
         deployment_id="",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         renewal_date=None,
     ):
         return {
@@ -1276,7 +1272,7 @@ def adobe_transfer_factory(adobe_items_factory):
     def _transfer(
         transfer_id="a-transfer-id",
         customer_id="",
-        status=STATUS_PENDING,
+        status=AdobeStatus.STATUS_PENDING,
         items=None,
         membership_id="membership-id",
     ):
