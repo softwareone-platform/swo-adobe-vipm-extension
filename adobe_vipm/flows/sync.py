@@ -16,10 +16,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_SUBSCRIPTION_TERMINATED,
-    THREE_YC_TEMP_3YC_STATUSES,
-)
+from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
@@ -270,7 +267,7 @@ def _get_subscriptions_for_update(
             subscription_id=adobe_subscription_id,
         )
 
-        if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
+        if adobe_subscription["status"] == AdobeStatus.STATUS_SUBSCRIPTION_TERMINATED:
             logger.info(f"Skipping subscription {subscription['id']}. It is terminated by Adobe.")
 
         actual_sku = adobe_subscription["offerId"]

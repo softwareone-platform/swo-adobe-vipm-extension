@@ -1,9 +1,6 @@
 from datetime import date
 
-from adobe_vipm.adobe.constants import (
-    STATUS_INACTIVE_OR_GENERIC_FAILURE,
-    STATUS_SUBSCRIPTION_ACTIVE,
-)
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.utils import get_item_by_partial_sku
 from adobe_vipm.flows.utils.customer import (
     get_customer_consumables_discount_level,
@@ -48,7 +45,7 @@ def get_adobe_subscription_id(subscription):
 
 
 def is_transferring_item_expired(item):
-    if "status" in item and item["status"] == STATUS_INACTIVE_OR_GENERIC_FAILURE:
+    if "status" in item and item["status"] == AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE:
         return True
 
     renewal_date = date.fromisoformat(item["renewalDate"])
@@ -72,7 +69,7 @@ def is_line_item_active_subscription(subscriptions, line):
     adobe_item = get_item_by_partial_sku(
         subscriptions["items"], line["item"]["externalIds"]["vendor"]
     )
-    return adobe_item["status"] == STATUS_SUBSCRIPTION_ACTIVE
+    return adobe_item["status"] == AdobeStatus.STATUS_SUBSCRIPTION_ACTIVE
 
 
 def get_transfer_item_sku_by_subscription(trf, sub_id):

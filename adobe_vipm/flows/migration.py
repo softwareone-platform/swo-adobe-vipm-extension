@@ -4,12 +4,7 @@ from datetime import date, datetime
 from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_PENDING,
-    STATUS_PROCESSED,
-    STATUS_TRANSFER_ALREADY_TRANSFERRED,
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AuthorizationNotFoundError,
@@ -161,7 +156,7 @@ def populate_offers_for_transfer(product_id, transfer, transfer_preview):
 
 def handle_preview_error(transfer, api_err):
     """Handle Adobe API errors during transfer preview"""
-    if api_err.code == STATUS_TRANSFER_ALREADY_TRANSFERRED:
+    if api_err.code == AdobeStatus.STATUS_TRANSFER_ALREADY_TRANSFERRED:
         return True
 
     transfer.adobe_error_code = api_err.code
@@ -170,7 +165,8 @@ def handle_preview_error(transfer, api_err):
     if any(x in str(api_err) for x in RECOVERABLE_TRANSFER_ERRORS):
         transfer.status = "rescheduled"
         transfer.migration_error_description = (
-            "Adobe transient error received during transfer preview.")
+            "Adobe transient error received during transfer preview."
+        )
         check_reschedules(transfer)
     else:
         handle_transfer_error(
@@ -182,7 +178,6 @@ def handle_preview_error(transfer, api_err):
                 "Last error from Adobe",
                 {transfer.adobe_error_code: transfer.adobe_error_description},
             ),
-
         )
     return False
 
@@ -204,6 +199,7 @@ def handle_transfer_error(transfer, title, description, facts, adobe_api_error=N
         button=get_transfer_link_button(transfer),
     )
 
+
 def handle_preview_authorization_error(transfer, e):
     """Handle authorization errors during transfer preview"""
     handle_transfer_error(
@@ -215,6 +211,7 @@ def handle_preview_authorization_error(transfer, e):
             {"AuthorizationNotFoundError": str(e)},
         ),
     )
+
 
 def handle_transfer_creation_error(transfer, e):
     """Handle Adobe API errors during transfer creation"""
@@ -230,6 +227,7 @@ def handle_transfer_creation_error(transfer, e):
         adobe_api_error=e,
     )
 
+
 def handle_transfer_reseller_error(transfer, e):
     """Handle reseller errors during transfer creation"""
     handle_transfer_error(
@@ -241,6 +239,7 @@ def handle_transfer_reseller_error(transfer, e):
             {"ResellerNotFoundError": str(e)},
         ),
     )
+
 
 def process_transfer_preview(client, transfer):
     """Process transfer preview and handle errors"""
@@ -256,6 +255,7 @@ def process_transfer_preview(client, transfer):
     except AuthorizationNotFoundError as e:
         handle_preview_authorization_error(transfer, e)
         return None
+
 
 def process_transfer_creation(client, transfer):
     """Process transfer creation and handle errors"""
@@ -323,11 +323,11 @@ def check_running_transfers_for_product(product_id):
             transfer.save()
             continue
 
-        if adobe_transfer["status"] == STATUS_PENDING:
+        if adobe_transfer["status"] == AdobeStatus.STATUS_PENDING:
             check_retries(transfer)
             continue
 
-        elif adobe_transfer["status"] != STATUS_PROCESSED:
+        elif adobe_transfer["status"] != AdobeStatus.STATUS_PROCESSED:
             transfer.migration_error_description = (
                 f"Unexpected status ({adobe_transfer['status']}) "
                 "received from Adobe while retrieving transfer."
@@ -392,7 +392,7 @@ def check_running_transfers_for_product(product_id):
             )
             try:
                 for subscription in subscriptions["items"]:
-                    if subscription["status"] != STATUS_PROCESSED:
+                    if subscription["status"] != AdobeStatus.STATUS_PROCESSED:
                         continue
                     client.update_subscription(
                         transfer.authorization_uk,
