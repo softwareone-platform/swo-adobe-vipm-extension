@@ -90,6 +90,12 @@ class ThreeYearCommitmentStatus(StrEnum):
     EXPIRED = "EXPIRED"
 
 
+THREE_YC_TEMP_3YC_STATUSES = (
+    ThreeYearCommitmentStatus.REQUESTED,
+    ThreeYearCommitmentStatus.ACCEPTED,
+)
+
+
 class OfferType(StrEnum):
     LICENSE = "LICENSE"
     CONSUMABLES = "CONSUMABLES"

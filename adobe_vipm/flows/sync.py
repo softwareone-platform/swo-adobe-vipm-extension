@@ -18,7 +18,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
 from adobe_vipm.adobe.constants import (
     STATUS_SUBSCRIPTION_TERMINATED,
-    ThreeYearCommitmentStatus,
+    THREE_YC_TEMP_3YC_STATUSES,
 )
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
@@ -39,8 +39,6 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date
-
-TEMP_3YC_STATUSES = (ThreeYearCommitmentStatus.REQUESTED, ThreeYearCommitmentStatus.ACCEPTED)
 
 logger = logging.getLogger(__name__)
 
@@ -364,7 +362,7 @@ def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = 
     their corresponding statuses.
     """
     try:
-        agreements = get_agreements_by_3yc_enroll_status(mpt_client, TEMP_3YC_STATUSES)
+        agreements = get_agreements_by_3yc_enroll_status(mpt_client, THREE_YC_TEMP_3YC_STATUSES)
     except Exception as e:
         logger.exception(f"Unknown exception getting agreements by 3YC enroll status: {e}")
         raise
@@ -396,7 +394,7 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: boo
         f"Commitment Status for Adobe customer {customer['customerId']} is {enroll_status}"
     )
 
-    if enroll_status in TEMP_3YC_STATUSES:
+    if enroll_status in THREE_YC_TEMP_3YC_STATUSES:
         logger.info(f"Updating 3YC enroll status for agreement {agreement['id']}")
         if not dry_run:
             update_agreement(
