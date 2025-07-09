@@ -693,6 +693,12 @@ class SubmitReturnOrders(Step):
         all_return_orders = []
         deployment_id = get_deployment_id(context.order)
         is_returnable = False
+
+        logger.info(
+            f"{context}: Initializing SubmitReturnOrders. deployment_id={deployment_id}, "
+            f"skus_returnables={list(context.adobe_returnable_orders.keys())}"
+        )
+
         for sku, returnable_orders in context.adobe_returnable_orders.items():
             return_orders = context.adobe_return_orders.get(sku, [])
             for returnable_order, return_order in map_returnable_to_return_orders(
@@ -701,6 +707,13 @@ class SubmitReturnOrders(Step):
                 returnable_order_deployment_id = returnable_order.line.get("deploymentId", None)
                 is_returnable = (
                     (deployment_id == returnable_order_deployment_id) if deployment_id else True
+                )
+                logger.info(
+                    f"{context}: SKU={sku}, returnable_order_id="
+                    f"{returnable_order.order.get('orderId', None)}, "
+                    f"deployment_id={returnable_order_deployment_id}, "
+                    f"is_returnable={is_returnable}, "
+                    f"return_order_exists={bool(return_order)}"
                 )
                 if is_returnable:
                     if return_order:
