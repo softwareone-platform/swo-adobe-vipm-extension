@@ -105,7 +105,7 @@ def sync_agreement_prices(
             parameters=parameters,
         )
 
-    logger.info(f"agreement updated {agreement['id']}")
+    logger.info(f"Agreement updated {agreement['id']}")
     return coterm_date
 
 
@@ -223,6 +223,9 @@ def _update_subscriptions(
         }
 
         if not dry_run:
+            logger.info(
+                f"Updating subscription: {subscription['id']} ({line_id}): sku={actual_sku}"
+            )
             update_agreement_subscription(
                 mpt_client,
                 subscription["id"],
@@ -231,7 +234,6 @@ def _update_subscriptions(
                 commitmentDate=coterm_date,
                 autoRenew=adobe_subscription["autoRenewal"]["enabled"],
             )
-            logger.info(f"Subscription: {subscription['id']} ({line_id}): sku={actual_sku}")
         else:
             current_price = subscription["lines"][0]["price"]["unitPP"]
             sys.stdout.write(
