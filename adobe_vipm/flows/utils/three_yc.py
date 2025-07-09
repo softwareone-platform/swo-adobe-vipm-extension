@@ -1,12 +1,13 @@
 import copy
 
 from adobe_vipm.flows.constants import (
+    PARAM_3YC,
     PARAM_3YC_COMMITMENT_REQUEST_STATUS,
     PARAM_3YC_END_DATE,
     PARAM_3YC_ENROLL_STATUS,
     PARAM_3YC_START_DATE,
 )
-from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
+from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
 
 
 def set_adobe_3yc_enroll_status(order, enroll_status):
@@ -44,6 +45,17 @@ def set_adobe_3yc_end_date(order, end_date):
     )
     ff_param["value"] = end_date
     return updated_order
+
+
+def set_adobe_3yc(order, value):
+    updated_order = copy.deepcopy(order)
+    ff_param = get_ordering_parameter(
+        updated_order,
+        PARAM_3YC,
+    )
+    ff_param["value"] = value
+    return updated_order
+
 
 def get_3yc_fulfillment_parameters(order_or_agreement):
     three_yc_fulfillment_parameters = [

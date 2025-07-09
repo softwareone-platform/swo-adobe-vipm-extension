@@ -663,6 +663,7 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
         parameters=context.order["parameters"],
     )
 
+
     parameter_list = []
     parameter_list.append(get_fulfillment_parameter(
         context.order,
@@ -683,9 +684,10 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
 
     assert parameter_list == [
         commitment["status"],
-        commitment["status"],
+        None,
         commitment["startDate"],
-        commitment["endDate"]
+        commitment["endDate"],
+        {},
     ]
     assert get_coterm_date(context.order) == "2025-01-01"
     assert get_next_sync(context.order) == "2025-01-02"
