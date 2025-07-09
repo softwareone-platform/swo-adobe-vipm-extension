@@ -49,14 +49,12 @@ def sync_agreement_prices(
     dry_run: bool,
     adobe_client: AdobeClient,
     customer: dict,
-) -> str:
+) -> None:
     """
     Updates the purchase prices of an Agreement (subscriptions and One-Time items)
     based on the customer discount level and customer benefits (3yc).
     """
     commitment_start_date = get_commitment_start_date(customer)
-
-    coterm_date = customer["cotermDate"]
 
     subscriptions_for_update = _get_subscriptions_for_update(
         adobe_client, agreement, customer, mpt_client
@@ -66,15 +64,14 @@ def sync_agreement_prices(
     currency = agreement["listing"]["priceList"]["currency"]
 
     _update_subscriptions(
-        coterm_date,
-        currency,
-        customer,
-        dry_run,
         mpt_client,
+        customer,
+        currency,
         product_id,
-        subscriptions_for_update,
         agreement_id=agreement["id"],
         commitment_start_date=commitment_start_date,
+        subscriptions_for_update=subscriptions_for_update,
+        dry_run=dry_run,
     )
 
     _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
@@ -104,7 +101,6 @@ def sync_agreement_prices(
         )
 
     logger.info(f"Agreement updated {agreement['id']}")
-    return coterm_date
 
 
 def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters):
@@ -158,6 +154,7 @@ def _log_agreement_lines(
     for line in agreement["lines"]:
         actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
         agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
+
     skus = [item[1] for item in agreement_lines]
     prices = get_sku_price(customer, skus, product_id, currency)
     for line, actual_sku in agreement_lines:
@@ -174,20 +171,19 @@ def _log_agreement_lines(
 
 
 def _update_subscriptions(
-    coterm_date: str,
-    currency: str,
-    customer: str,
-    dry_run: bool,
     mpt_client: MPTClient,
+    customer: dict,
+    currency: str,
     product_id: str,
-    subscriptions_for_update: list[tuple[dict, dict, str]],
     agreement_id: str,
     commitment_start_date: date,
+    subscriptions_for_update: list[tuple[dict, dict, str]],
+    dry_run: bool,
 ) -> None:
     skus = [item[2] for item in subscriptions_for_update]
     prices = get_sku_price(customer, skus, product_id, currency)
-    last_sync_date = datetime.now().date().isoformat()
     missing_prices_skus = []
+    coterm_date = customer["cotermDate"]
 
     for subscription, adobe_subscription, actual_sku in subscriptions_for_update:
         if actual_sku not in prices:
@@ -216,7 +212,7 @@ def _update_subscriptions(
                     "externalId": Param.RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
-                {"externalId": Param.LAST_SYNC_DATE, "value": last_sync_date},
+                {"externalId": Param.LAST_SYNC_DATE, "value": datetime.now().date().isoformat()},
             ],
         }
 
