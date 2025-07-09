@@ -159,110 +159,138 @@ def populate_offers_for_transfer(product_id, transfer, transfer_preview):
     create_offers(product_id, offers)
 
 
+def handle_preview_error(transfer, api_err):
+    """Handle Adobe API errors during transfer preview"""
+    if api_err.code == STATUS_TRANSFER_ALREADY_TRANSFERRED:
+        return True
+
+    transfer.adobe_error_code = api_err.code
+    transfer.adobe_error_description = str(api_err)
+
+    if any(x in str(api_err) for x in RECOVERABLE_TRANSFER_ERRORS):
+        transfer.status = "rescheduled"
+        transfer.migration_error_description = (
+            "Adobe transient error received during transfer preview.")
+        check_reschedules(transfer)
+    else:
+        handle_transfer_error(
+            transfer=transfer,
+            title="Adobe error received during transfer preview.",
+            description="An unexpected error has been received from Adobe asking for preview "
+            f"of transfer for Membership **{transfer.membership_id}**.",
+            facts=FactsSection(
+                "Last error from Adobe",
+                {transfer.adobe_error_code: transfer.adobe_error_description},
+            ),
+
+        )
+    return False
+
+
+def handle_transfer_error(transfer, title, description, facts, adobe_api_error=None):
+    transfer.status = "failed"
+    transfer.migration_error_description = description
+    transfer.updated_at = datetime.now()
+    if adobe_api_error:
+        transfer.adobe_error_code = adobe_api_error.code
+        transfer.adobe_error_description = str(adobe_api_error)
+
+    transfer.save()
+
+    send_exception(
+        title,
+        description,
+        facts=facts,
+        button=get_transfer_link_button(transfer),
+    )
+
+def handle_preview_authorization_error(transfer, e):
+    """Handle authorization errors during transfer preview"""
+    handle_transfer_error(
+        transfer=transfer,
+        title="Marketplace Platform configuration error during transfer.",
+        description=str(e),
+        facts=FactsSection(
+            "Transfer error",
+            {"AuthorizationNotFoundError": str(e)},
+        ),
+    )
+
+def handle_transfer_creation_error(transfer, e):
+    """Handle Adobe API errors during transfer creation"""
+    handle_transfer_error(
+        transfer=transfer,
+        title="Adobe error received during transfer creation.",
+        description="An unexpected error has been received from Adobe creating the "
+        f"transfer for Membership **{transfer.membership_id}**.",
+        facts=FactsSection(
+            "Last error from Adobe",
+            {e.code: str(e)},
+        ),
+        adobe_api_error=e,
+    )
+
+def handle_transfer_reseller_error(transfer, e):
+    """Handle reseller errors during transfer creation"""
+    handle_transfer_error(
+        transfer=transfer,
+        title="Marketplace Platform configuration error during transfer.",
+        description=str(e),
+        facts=FactsSection(
+            "Transfer error",
+            {"ResellerNotFoundError": str(e)},
+        ),
+    )
+
+def process_transfer_preview(client, transfer):
+    """Process transfer preview and handle errors"""
+    try:
+        transfer_preview = client.preview_transfer(
+            transfer.authorization_uk,
+            transfer.membership_id,
+        )
+        return transfer_preview
+    except AdobeAPIError as api_err:
+        handle_preview_error(transfer, api_err)
+        return None
+    except AuthorizationNotFoundError as e:
+        handle_preview_authorization_error(transfer, e)
+        return None
+
+def process_transfer_creation(client, transfer):
+    """Process transfer creation and handle errors"""
+    try:
+        adobe_transfer = client.create_transfer(
+            transfer.authorization_uk,
+            transfer.seller_uk,
+            transfer.record_id,
+            transfer.membership_id,
+        )
+        return adobe_transfer
+    except AdobeAPIError as api_err:
+        handle_transfer_creation_error(transfer, api_err)
+        return None
+    except ResellerNotFoundError as e:
+        handle_transfer_reseller_error(transfer, e)
+        return None
+
+
 def start_transfers_for_product(product_id):
     client = get_adobe_client()
 
     transfers_to_process = get_transfers_to_process(product_id)
     logger.info(f"Found {len(transfers_to_process)} transfers for product {product_id}")
+
     for transfer in transfers_to_process:
-        transfer_preview = None
-        try:
-            transfer_preview = client.preview_transfer(
-                transfer.authorization_uk,
-                transfer.membership_id,
-            )
-        except AdobeAPIError as api_err:
-            if api_err.code != STATUS_TRANSFER_ALREADY_TRANSFERRED:
-                transfer.adobe_error_code = api_err.code
-                transfer.adobe_error_description = str(api_err)
-                if any(x in str(api_err) for x in RECOVERABLE_TRANSFER_ERRORS):
-                    transfer.status = "rescheduled"
-                    transfer.migration_error_description = (
-                        "Adobe transient error received during transfer preview."
-                    )
-                    check_reschedules(transfer)
-                else:
-                    transfer.status = "failed"
-                    transfer.migration_error_description = (
-                        "Adobe error received during transfer preview."
-                    )
-                    transfer.updated_at = datetime.now()
-                    transfer.save()
-                    send_exception(
-                        "Adobe error received during transfer preview.",
-                        "An unexpected error has been received from Adobe asking for preview "
-                        f"of transfer for Membership **{transfer.membership_id}**.",
-                        facts=FactsSection(
-                            "Last error from Adobe",
-                            {transfer.adobe_error_code: transfer.adobe_error_description},
-                        ),
-                        button=get_transfer_link_button(transfer),
-                    )
-                continue
-        except AuthorizationNotFoundError as e:
-            transfer.status = "failed"
-            transfer.migration_error_description = str(e)
-            transfer.updated_at = datetime.now()
-            transfer.save()
-            send_exception(
-                "Marketplace Platform configuration error during transfer.",
-                str(e),
-                facts=FactsSection(
-                    "Transfer error",
-                    {"AuthorizationNotFoundError": transfer.migration_error_description},
-                ),
-                button=get_transfer_link_button(transfer),
-            )
+        transfer_preview = process_transfer_preview(client, transfer)
+
+        if not transfer_preview:
             continue
 
-        if transfer_preview:
-            populate_offers_for_transfer(
-                product_id,
-                transfer,
-                transfer_preview,
-            )
+        populate_offers_for_transfer(product_id, transfer, transfer_preview)
 
-        adobe_transfer = None
-
-        try:
-            adobe_transfer = client.create_transfer(
-                transfer.authorization_uk,
-                transfer.seller_uk,
-                transfer.record_id,
-                transfer.membership_id,
-            )
-        except AdobeAPIError as api_err:
-            transfer.adobe_error_code = api_err.code
-            transfer.adobe_error_description = str(api_err)
-            transfer.migration_error_description = "Adobe error received during transfer creation."
-            transfer.status = "failed"
-            transfer.updated_at = datetime.now()
-            transfer.save()
-            send_exception(
-                "Adobe error received during transfer creation.",
-                "An unexpected error has been received from Adobe creating the "
-                f"transfer for Membership **{transfer.membership_id}**.",
-                facts=FactsSection(
-                    "Last error from Adobe",
-                    {transfer.adobe_error_code: transfer.adobe_error_description},
-                ),
-                button=get_transfer_link_button(transfer),
-            )
-            continue
-        except ResellerNotFoundError as e:
-            transfer.status = "failed"
-            transfer.migration_error_description = str(e)
-            transfer.updated_at = datetime.now()
-            transfer.save()
-            send_exception(
-                "Marketplace Platform configuration error during transfer.",
-                str(e),
-                facts=FactsSection(
-                    "Transfer error",
-                    {"ResellerNotFoundError": transfer.migration_error_description},
-                ),
-                button=get_transfer_link_button(transfer),
-            )
+        adobe_transfer = process_transfer_creation(client, transfer)
+        if not adobe_transfer:
             continue
 
         transfer.transfer_id = adobe_transfer["transferId"]
