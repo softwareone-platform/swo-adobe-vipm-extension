@@ -627,16 +627,16 @@ def test_set_or_update_coterm_date_step_with_3yc(
     parameter_list.append(
         get_fulfillment_parameter(context.order, Param.THREE_YC_END_DATE)["value"]
     )
-    parameter_list.append(get_fulfillment_parameter(
-        context.order,
-        PARAM_3YC
-    ))
+    parameter_list.append(
+        get_fulfillment_parameter(context.order, Param.THREE_YC)
+    )
 
     assert parameter_list == [
         commitment["status"],
         None,
         commitment["startDate"],
         commitment["endDate"],
+        {},
     ]
     assert get_coterm_date(context.order) == "2025-01-01"
 
