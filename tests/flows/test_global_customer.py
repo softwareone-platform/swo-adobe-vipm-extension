@@ -2,10 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from adobe_vipm.adobe.constants import (
-    STATUS_INACTIVE_OR_GENERIC_FAILURE,
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_sku_price
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
@@ -904,7 +901,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
             adobe_subscription_factory(
-                deployment_id="deployment_id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+                deployment_id="deployment_id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
             ),
         ]
     }

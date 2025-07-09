@@ -7,10 +7,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_TRANSFER_INACTIVE_ACCOUNT,
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_RUNNING,
@@ -320,7 +317,7 @@ class ValidateTransferStatus(Step):
             self._set_transfer_error(context, order, "Membership has already been migrated")
             return
 
-        if context.adobe_transfer["status"] == STATUS_TRANSFER_INACTIVE_ACCOUNT:
+        if context.adobe_transfer["status"] == AdobeStatus.STATUS_TRANSFER_INACTIVE_ACCOUNT:
             context.order = set_ordering_parameter_error(
                 context.order,
                 Param.MEMBERSHIP_ID,
