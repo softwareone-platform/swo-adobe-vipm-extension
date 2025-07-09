@@ -4,10 +4,10 @@ import pytest
 from freezegun import freeze_time
 
 from adobe_vipm.adobe import constants
+from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
-    TEMP_3YC_STATUSES,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_3yc_enroll_status,
@@ -557,7 +557,9 @@ def test_sync_agreements_by_3yc_enroll_status_status(
 
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
-    mock_get_agreements_by_query.assert_called_once_with(mock_mpt_client, TEMP_3YC_STATUSES)
+    mock_get_agreements_by_query.assert_called_once_with(
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
+    )
     mock_update_agreement.assert_called_once_with(
         mock_mpt_client,
         agreement["id"],
@@ -600,7 +602,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
-        mock_mpt_client, TEMP_3YC_STATUSES
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
@@ -662,7 +664,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
-        mock_mpt_client, TEMP_3YC_STATUSES
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
@@ -697,7 +699,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
-        mock_mpt_client, TEMP_3YC_STATUSES
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_has_calls(
