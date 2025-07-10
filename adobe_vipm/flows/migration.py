@@ -391,15 +391,7 @@ def check_running_transfers_for_product(product_id):
                 transfer.customer_id,
             )
             try:
-                for subscription in subscriptions["items"]:
-                    if subscription["status"] != AdobeStatus.STATUS_PROCESSED:
-                        continue
-                    client.update_subscription(
-                        transfer.authorization_uk,
-                        transfer.customer_id,
-                        subscription["subscriptionId"],
-                        auto_renewal=False,
-                    )
+                _update_subscriptions(client, subscriptions, transfer)
             except AdobeAPIError as api_err:
                 transfer.adobe_error_code = api_err.code
                 transfer.adobe_error_description = str(api_err)
@@ -416,6 +408,18 @@ def check_running_transfers_for_product(product_id):
         transfer.updated_at = datetime.now()
         transfer.completed_at = datetime.now()
         transfer.save()
+
+
+def _update_subscriptions(client, subscriptions, transfer):
+    for subscription in subscriptions["items"]:
+        if subscription["status"] != AdobeStatus.STATUS_PROCESSED:
+            continue
+        client.update_subscription(
+            transfer.authorization_uk,
+            transfer.customer_id,
+            subscription["subscriptionId"],
+            auto_renewal=False,
+        )
 
 
 def process_transfers():
