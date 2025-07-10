@@ -79,6 +79,7 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date
+from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
 from adobe_vipm.notifications import mpt_notify
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
@@ -583,9 +584,10 @@ class SetOrUpdateCotermDate(Step):
         if not commitment:
             return False
         context.order = set_adobe_3yc_enroll_status(context.order, commitment["status"])
-        context.order = set_adobe_3yc_commitment_request_status(context.order, commitment["status"])
+        context.order = set_adobe_3yc_commitment_request_status(context.order, None)
         context.order = set_adobe_3yc_start_date(context.order, commitment["startDate"])
         context.order = set_adobe_3yc_end_date(context.order, commitment["endDate"])
+        context.order = set_adobe_3yc(context.order, None)
         return True
 
     def update_order_parameters(self, client, context, coterm_date):
@@ -598,9 +600,10 @@ class SetOrUpdateCotermDate(Step):
             updated_params.update(
                 {
                     "3yc_enroll_status": commitment["status"],
-                    "3yc_commitment_request_status": commitment["status"],
+                    "3yc_commitment_request_status": None,
                     "3yc_start_date": commitment["startDate"],
                     "3yc_end_date": commitment["endDate"],
+                    "3yc": None,
                 }
             )
         params_str = ", ".join(f"{k}={v}" for k, v in updated_params.items())
