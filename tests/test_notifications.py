@@ -2,11 +2,11 @@ import logging
 
 import pymsteams
 import pytest
-from mpt_extension_sdk.mpt_http.mpt import NotifyCategories
 
 from adobe_vipm.notifications import (
     Button,
     FactsSection,
+    NotifyCategories,
     dateformat,
     mpt_notify,
     send_error,
