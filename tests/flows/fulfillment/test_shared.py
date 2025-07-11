@@ -22,6 +22,7 @@ from adobe_vipm.flows.constants import (
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
+    PARAM_3YC,
     PARAM_3YC_COMMITMENT_REQUEST_STATUS,
     PARAM_3YC_END_DATE,
     PARAM_3YC_ENROLL_STATUS,
@@ -663,6 +664,7 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
         parameters=context.order["parameters"],
     )
 
+
     parameter_list = []
     parameter_list.append(get_fulfillment_parameter(
         context.order,
@@ -680,12 +682,18 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
         context.order,
         PARAM_3YC_END_DATE
     )["value"])
+    parameter_list.append(get_fulfillment_parameter(
+        context.order,
+        PARAM_3YC
+    ))
+
 
     assert parameter_list == [
         commitment["status"],
-        commitment["status"],
+        None,
         commitment["startDate"],
-        commitment["endDate"]
+        commitment["endDate"],
+        {},
     ]
     assert get_coterm_date(context.order) == "2025-01-01"
     assert get_next_sync(context.order) == "2025-01-02"
