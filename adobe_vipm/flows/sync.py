@@ -11,19 +11,24 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_agreements_by_ids,
     get_agreements_by_query,
     get_all_agreements,
+    terminate_subscription,
     update_agreement,
     update_agreement_subscription,
 )
 
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
-from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
+from adobe_vipm.adobe.errors import (
+    AdobeAPIError,
+    AuthorizationNotFoundError,
+    CustomerDiscountsNotFoundError,
+)
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
 )
-from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.constants import Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
@@ -35,6 +40,7 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date
 
 logger = logging.getLogger(__name__)
@@ -255,7 +261,7 @@ def _get_subscriptions_for_update(
     for_update = []
 
     for subscription in agreement["subscriptions"]:
-        if subscription["status"] == "Terminated":
+        if subscription["status"] == SubscriptionStatus.TERMINATED:
             continue
 
         subscription = get_agreement_subscription(mpt_client, subscription["id"])
@@ -432,6 +438,54 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
 
 
+def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, customer_id):
+    for subscription_id in [
+        s["id"]
+        for s in agreement["subscriptions"]
+        if s["status"] is not SubscriptionStatus.TERMINATED
+    ]:
+        logger.info(f">>> Suspected Lost Customer: Terminating subscription {subscription_id}")
+        try:
+            terminate_subscription(
+                mpt_client,
+                subscription_id,
+                "Suspected Lost Customer",
+            )
+        except Exception as e:
+            msg = (
+                f">>> Suspected Lost Customer: Error terminating subscription"
+                f" {subscription_id}: {e}"
+            )
+            logger.exception(msg)
+            notify_processing_lost_customer(msg)
+
+    customer_deployments = adobe_client.get_customer_deployments_active_status(
+        agreement["authorization"]["id"], customer_id
+    )
+    if customer_deployments:
+        deployment_agreements = get_agreements_by_customer_deployments(
+            mpt_client,
+            Param.DEPLOYMENT_ID,
+            [deployment["deploymentId"] for deployment in customer_deployments],
+        )
+
+        for deployment_agreement in deployment_agreements:
+            for subscription_id in [
+                s["id"]
+                for s in deployment_agreement["subscriptions"]
+                if s["status"] is not SubscriptionStatus.TERMINATED
+            ]:
+                try:
+                    terminate_subscription(mpt_client, subscription_id, "Suspected Lost Customer")
+                except Exception as e:
+                    msg = (
+                        f">>> Suspected Lost Customer: Error terminating subscription"
+                        f" {subscription_id}: {e}"
+                    )
+                    logger.exception(msg)
+                    notify_processing_lost_customer(msg)
+
+
 def sync_agreement(mpt_client, agreement, dry_run):
     try:
         logger.debug(f"Syncing {agreement=}")
@@ -450,7 +504,19 @@ def sync_agreement(mpt_client, agreement, dry_run):
             logger.info(f"Agreement {agreement["id"]} has processing subscriptions, skip it")
             return
 
-        customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
+        try:
+            customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
+        except AdobeAPIError as e:
+            if e.code == AdobeStatus.STATUS_INVALID_CUSTOMER:
+                msg = (
+                    f"Received Adobe error {e.code} - {e.message},"
+                    " assuming lost customer and proceeding with lost customer procedure."
+                )
+                logger.info(msg)
+                notify_processing_lost_customer(msg)
+                process_lost_customer(mpt_client, adobe_client, agreement, customer_id)
+                return
+            raise
 
         if not customer.get("discounts", []):
             raise CustomerDiscountsNotFoundError(
