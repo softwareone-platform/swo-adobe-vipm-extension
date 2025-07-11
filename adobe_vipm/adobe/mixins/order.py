@@ -256,6 +256,12 @@ class OrderClientMixin:
         """
         start_date = date.today() - timedelta(days=CANCELLATION_WINDOW_DAYS)
 
+        filters = {
+            "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
+            "start-date": start_date.isoformat(),
+            "end-date": customer_coterm_date,
+        }
+
         returning_order_ids = [order["referenceOrderId"] for order in (return_orders or [])]
 
         orders = self.get_orders(
