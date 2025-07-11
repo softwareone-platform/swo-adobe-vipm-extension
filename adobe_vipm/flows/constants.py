@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import StrEnum, auto
 
 from adobe_vipm.adobe.constants import (
     MAXLEN_ADDRESS_LINE_1,
@@ -340,3 +340,7 @@ ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR = ValidationError("VIPM0031", "{error}")
 ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
     "No subscriptions found without deployment ID to be added to the main agreement",
 )
+
+
+class SubscriptionStatus(StrEnum):
+    TERMINATED = auto()

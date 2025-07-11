@@ -2,6 +2,7 @@ import logging
 
 import pytest
 from freezegun import freeze_time
+from requests import HTTPError, Response
 
 from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES
@@ -2103,4 +2104,105 @@ def test_sync_agreement_prices_with_missing_prices(
     assert "77777777CA01A13" not in [
         call[1]["lines"][0]["price"]["unitPP"]
         for call in mocked_update_agreement_subscription.call_args_list
+    ]
+
+
+@pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
+def test_sync_agreement_lost_customer(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    agreement_factory,
+    mock_terminate_subscription,
+    caplog,
+):
+    mock_response = mocker.MagicMock(spec=Response)
+    mock_response.status_code = 404
+    mock_response.json.return_value = {
+        "code": "1116",
+        "message": "Invalid Customer",
+        "additionalDetails": [],
+    }
+    mock_adobe_client.get_customer.side_effect = HTTPError(response=mock_response)
+
+    sync_agreement(mock_mpt_client, agreement_factory(), False)
+
+    assert mock_terminate_subscription.mock_calls == [
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+    ]
+    assert [rec.message for rec in caplog.records] == [
+        "Synchronizing agreement AGR-2119-4550-8674-5962...",
+        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
+        " proceeding with lost customer procedure.",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1234-5678",
+    ]
+
+
+@pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
+def test_sync_agreement_lost_customer_error(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mpt_error_factory,
+    agreement_factory,
+    mock_terminate_subscription,
+    caplog,
+):
+    mock_response = mocker.MagicMock(spec=Response)
+    mock_response.status_code = 404
+    mock_response.json.return_value = {
+        "code": "1116",
+        "message": "Invalid Customer",
+        "additionalDetails": [],
+    }
+    mock_adobe_client.get_customer.side_effect = HTTPError(response=mock_response)
+    mock_terminate_subscription.side_effect = [
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+    ]
+
+    sync_agreement(mock_mpt_client, agreement_factory(), False)
+
+    assert mock_terminate_subscription.mock_calls == [
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+    ]
+    assert [rec.message for rec in caplog.records] == [
+        "Synchronizing agreement AGR-2119-4550-8674-5962...",
+        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
+        " proceeding with lost customer procedure.",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000",
+        ">>> Suspected Lost Customer: Error terminating subscription "
+        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1234-5678",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
+        "500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription "
+        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
+        "500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription "
+        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
+        "500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
     ]
