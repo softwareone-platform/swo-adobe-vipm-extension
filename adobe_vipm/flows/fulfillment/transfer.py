@@ -13,13 +13,7 @@ from datetime import datetime
 from mpt_extension_sdk.mpt_http.mpt import get_product_items_by_skus, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_PENDING,
-    STATUS_PROCESSED,
-    STATUS_TRANSFER_INVALID_MEMBERSHIP,
-    STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
@@ -99,8 +93,8 @@ def _handle_transfer_preview_error(client, order, error):
         isinstance(error, AdobeAPIError)
         and error.code
         in (
-            STATUS_TRANSFER_INVALID_MEMBERSHIP,
-            STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+            AdobeStatus.STATUS_TRANSFER_INVALID_MEMBERSHIP,
+            AdobeStatus.STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
         )
         or isinstance(error, AdobeHttpError)
         and error.status_code == 404
@@ -220,10 +214,10 @@ def _check_adobe_transfer_order_fulfilled(mpt_client, order, membership_id, adob
         membership_id,
         adobe_transfer_id,
     )
-    if adobe_order["status"] == STATUS_PENDING:
+    if adobe_order["status"] == AdobeStatus.STATUS_PENDING:
         handle_retries(mpt_client, order, adobe_transfer_id)
         return
-    elif adobe_order["status"] != STATUS_PROCESSED:
+    elif adobe_order["status"] != AdobeStatus.STATUS_PROCESSED:
         error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status=adobe_order["status"])
         switch_order_to_failed(mpt_client, order, error)
         logger.warning(f"Transfer {order['id']} has been failed: {error['message']}.")
@@ -273,7 +267,7 @@ def _fulfill_transfer_migrated(
             transfer.customer_id,
             line["subscriptionId"],
         )
-        if adobe_subscription["status"] != STATUS_PROCESSED:
+        if adobe_subscription["status"] != AdobeStatus.STATUS_PROCESSED:
             logger.warning(
                 f"Subscription {adobe_subscription['subscriptionId']} "
                 f"for customer {transfer.customer_id} is in status "
@@ -813,7 +807,7 @@ def create_agreement_subscriptions(adobe_transfer_order, mpt_client, order, adob
             customer_id,
             item["subscriptionId"],
         )
-        if adobe_subscription["status"] != STATUS_PROCESSED:
+        if adobe_subscription["status"] != AdobeStatus.STATUS_PROCESSED:
             logger.warning(
                 f"Subscription {adobe_subscription['subscriptionId']} "
                 f"for customer {customer_id} is in status "

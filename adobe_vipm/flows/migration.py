@@ -4,12 +4,7 @@ from datetime import date, datetime
 from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_PENDING,
-    STATUS_PROCESSED,
-    STATUS_TRANSFER_ALREADY_TRANSFERRED,
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AuthorizationNotFoundError,
@@ -172,7 +167,7 @@ def start_transfers_for_product(product_id):
                 transfer.membership_id,
             )
         except AdobeAPIError as api_err:
-            if api_err.code != STATUS_TRANSFER_ALREADY_TRANSFERRED:
+            if api_err.code != AdobeStatus.STATUS_TRANSFER_ALREADY_TRANSFERRED:
                 transfer.adobe_error_code = api_err.code
                 transfer.adobe_error_description = str(api_err)
                 if any(x in str(api_err) for x in RECOVERABLE_TRANSFER_ERRORS):
@@ -295,11 +290,11 @@ def check_running_transfers_for_product(product_id):
             transfer.save()
             continue
 
-        if adobe_transfer["status"] == STATUS_PENDING:
+        if adobe_transfer["status"] == AdobeStatus.STATUS_PENDING:
             check_retries(transfer)
             continue
 
-        elif adobe_transfer["status"] != STATUS_PROCESSED:
+        elif adobe_transfer["status"] != AdobeStatus.STATUS_PROCESSED:
             transfer.migration_error_description = (
                 f"Unexpected status ({adobe_transfer['status']}) "
                 "received from Adobe while retrieving transfer."
@@ -363,15 +358,7 @@ def check_running_transfers_for_product(product_id):
                 transfer.customer_id,
             )
             try:
-                for subscription in subscriptions["items"]:
-                    if subscription["status"] != STATUS_PROCESSED:
-                        continue
-                    client.update_subscription(
-                        transfer.authorization_uk,
-                        transfer.customer_id,
-                        subscription["subscriptionId"],
-                        auto_renewal=False,
-                    )
+                _update_subscriptions(client, subscriptions, transfer)
             except AdobeAPIError as api_err:
                 transfer.adobe_error_code = api_err.code
                 transfer.adobe_error_description = str(api_err)
@@ -388,6 +375,18 @@ def check_running_transfers_for_product(product_id):
         transfer.updated_at = datetime.now()
         transfer.completed_at = datetime.now()
         transfer.save()
+
+
+def _update_subscriptions(client, subscriptions, transfer):
+    for subscription in subscriptions["items"]:
+        if subscription["status"] != AdobeStatus.STATUS_PROCESSED:
+            continue
+        client.update_subscription(
+            transfer.authorization_uk,
+            transfer.customer_id,
+            subscription["subscriptionId"],
+            auto_renewal=False,
+        )
 
 
 def process_transfers():

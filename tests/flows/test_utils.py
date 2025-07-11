@@ -2,10 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from adobe_vipm.adobe.constants import (
-    STATUS_INACTIVE_OR_GENERIC_FAILURE,
-    STATUS_PROCESSED,
-)
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
@@ -210,14 +207,14 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
     assert (
         is_transferring_item_expired(
             adobe_subscription_factory(
-                status=STATUS_PROCESSED, renewal_date=date.today().isoformat()
+                status=AdobeStatus.STATUS_PROCESSED, renewal_date=date.today().isoformat()
             )
         )
         is False
     )
     assert (
         is_transferring_item_expired(
-            adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+            adobe_subscription_factory(status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE)
         )
         is True
     )

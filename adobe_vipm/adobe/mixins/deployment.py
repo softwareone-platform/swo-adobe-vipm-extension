@@ -2,7 +2,7 @@ from urllib.parse import urljoin
 
 import requests
 
-from adobe_vipm.adobe.constants import STATUS_GC_DEPLOYMENT_ACTIVE
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import wrap_http_error
 
 
@@ -41,7 +41,7 @@ class DeploymentClientMixin:
         active_deployments = []
 
         for customer_deployment in customer_deployments.get("items", []):
-            if customer_deployment.get("status") == STATUS_GC_DEPLOYMENT_ACTIVE:
+            if customer_deployment.get("status") == AdobeStatus.STATUS_GC_DEPLOYMENT_ACTIVE:
                 active_deployments.append(customer_deployment)
 
         return active_deployments

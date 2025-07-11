@@ -7,9 +7,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
-    STATUS_ORDER_CANCELLED,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
+    AdobeStatus,
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
@@ -665,7 +663,7 @@ def test_submit_return_orders_step(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -676,7 +674,7 @@ def test_submit_return_orders_step(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PENDING,
+        status=AdobeStatus.STATUS_PENDING,
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
@@ -736,7 +734,7 @@ def test_submit_return_orders_step_with_deployment_id(
             deployment_id=deployment_id,
             deployment_currency_code="USD",
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         deployment_id=deployment_id,
     )
     ret_info_1 = ReturnableOrderInfo(
@@ -749,7 +747,7 @@ def test_submit_return_orders_step_with_deployment_id(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PENDING,
+        status=AdobeStatus.STATUS_PENDING,
         deployment_id=deployment_id,
     )
 
@@ -808,7 +806,7 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         deployment_id=deployment_id,
     )
     ret_info_1 = ReturnableOrderInfo(
@@ -821,7 +819,7 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PENDING,
+        status=AdobeStatus.STATUS_PENDING,
     )
 
     mocker.patch(
@@ -866,7 +864,7 @@ def test_submit_return_orders_step_order_processed(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -877,7 +875,7 @@ def test_submit_return_orders_step_order_processed(
 
     return_order = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         reference_order_id=adobe_order_1["orderId"],
     )
 
@@ -915,7 +913,7 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
     """
     order = order_factory(deployment_id=None)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
-    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_new_order.return_value = new_order
@@ -974,7 +972,7 @@ def test_submit_new_order_step_with_deployment_id(
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
     new_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
-        status=STATUS_PENDING,
+        status=AdobeStatus.STATUS_PENDING,
         deployment_id=deployment_id,
     )
 
@@ -1034,7 +1032,7 @@ def test_submit_new_order_step_order_created_and_processed(
 
     new_order = adobe_order_factory(
         order_type="NEW",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
     )
     order = order_factory(external_ids={"vendor": new_order["orderId"]})
 
@@ -1091,7 +1089,7 @@ def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
 
     new_order = adobe_order_factory(
         order_type="NEW",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
     )
     order = order_factory(external_ids={"vendor": new_order["orderId"]})
 
@@ -1314,7 +1312,7 @@ def test_get_return_orders_step(mocker, order_factory, adobe_order_factory):
     """
     return_order = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         reference_order_id="new-order-id",
     )
 
@@ -1572,7 +1570,7 @@ def test_create_or_update_subscriptions_step_sub_expired(
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
     )
     adobe_subscription = adobe_subscription_factory(
-        status=STATUS_ORDER_CANCELLED,
+        status=AdobeStatus.STATUS_ORDER_CANCELLED,
     )
 
     mocked_adobe_client = mocker.MagicMock()

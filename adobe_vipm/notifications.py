@@ -2,14 +2,17 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 import pymsteams
 from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mpt_extension_sdk.mpt_http.base import MPTClient
-from mpt_extension_sdk.mpt_http.mpt import NotifyCategories, notify
+from mpt_extension_sdk.mpt_http.mpt import notify
 
 logger = logging.getLogger(__name__)
+
+NotifyCategories = StrEnum("NotifyCategories", settings.MPT_NOTIFY_CATEGORIES)
 
 
 def dateformat(date_string):

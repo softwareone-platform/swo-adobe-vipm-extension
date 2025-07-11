@@ -2,11 +2,7 @@ import copy
 
 import pytest
 
-from adobe_vipm.adobe.constants import (
-    STATUS_INVALID_ADDRESS,
-    STATUS_INVALID_FIELDS,
-    STATUS_INVALID_MINIMUM_QUANTITY,
-)
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
@@ -540,7 +536,7 @@ def test_create_customer_step_handle_error_address(mocker, order_factory, adobe_
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_ADDRESS,
+            code=AdobeStatus.STATUS_INVALID_ADDRESS,
             message="Invalid address",
             details=["detail1", "detail2"],
         ),
@@ -576,7 +572,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_licenses(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.STATUS_INVALID_MINIMUM_QUANTITY,
             message="Minimum quantity out of range",
             details=["LICENSE"],
         ),
@@ -611,7 +607,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_consumables(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.STATUS_INVALID_MINIMUM_QUANTITY,
             message="Minimum quantity out of range",
             details=["CONSUMABLES"],
         ),
@@ -646,7 +642,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_no_minimums(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.STATUS_INVALID_MINIMUM_QUANTITY,
             message="Minimum quantity out of range",
             details=[],
         ),
@@ -696,7 +692,7 @@ def test_create_customer_step_handle_error_invalid_fields(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_FIELDS,
+            code=AdobeStatus.STATUS_INVALID_FIELDS,
             message="Invalid fields",
             details=[error_details],
         ),

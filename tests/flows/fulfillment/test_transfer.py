@@ -6,12 +6,8 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
-    STATUS_INACTIVE_OR_GENERIC_FAILURE,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
-    STATUS_TRANSFER_INVALID_MEMBERSHIP,
-    STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     UNRECOVERABLE_TRANSFER_STATUSES,
+    AdobeStatus,
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
@@ -104,7 +100,7 @@ def test_transfer(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -117,7 +113,7 @@ def test_transfer(
     adobe_customer = adobe_customer_factory()
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -431,7 +427,7 @@ def test_transfer_with_no_profile_address(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -444,7 +440,7 @@ def test_transfer_with_no_profile_address(
     adobe_customer = adobe_customer_factory(company_profile_address_exists=False)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -720,7 +716,7 @@ def test_transfer_not_ready(
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
-    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING)
+    adobe_transfer = adobe_transfer_factory(status=AdobeStatus.STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_transfer.return_value = adobe_transfer
@@ -788,7 +784,7 @@ def test_transfer_reached_due_date(
     )
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
-    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING)
+    adobe_transfer = adobe_transfer_factory(status=AdobeStatus.STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_transfer.return_value = adobe_transfer
@@ -944,8 +940,8 @@ def test_transfer_items_mismatch(
 @pytest.mark.parametrize(
     "transfer_status",
     [
-        STATUS_TRANSFER_INVALID_MEMBERSHIP,
-        STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+        AdobeStatus.STATUS_TRANSFER_INVALID_MEMBERSHIP,
+        AdobeStatus.STATUS_TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
     ],
 )
 def test_transfer_invalid_membership(
@@ -2021,8 +2017,10 @@ def test_fulfill_transfer_order_already_migrated_(
 
     transfer_items = adobe_items_factory(subscription_id="sub-id")
 
-    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING, current_quantity=170)
+    adobe_transfer = adobe_transfer_factory(status=AdobeStatus.STATUS_PENDING, items=transfer_items)
+    adobe_subscription = adobe_subscription_factory(
+        status=AdobeStatus.STATUS_PENDING, current_quantity=170
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -2253,7 +2251,7 @@ def test_transfer_3yc_customer(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id"),
     )
@@ -2537,7 +2535,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id"),
     )
@@ -2855,12 +2853,12 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
 
     transfer_items = adobe_items_factory(
         subscription_id="sub-id",
-        status=STATUS_INACTIVE_OR_GENERIC_FAILURE,
+        status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE,
         offer_id="65304990CA",
     )
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -3017,7 +3015,7 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
 
     adobe_transfer = adobe_transfer_factory()
     adobe_transfer["lineItems"] = []
-    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -3169,7 +3167,7 @@ def test_transfer_gc_account_all_deployments_created(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -3182,7 +3180,7 @@ def test_transfer_gc_account_all_deployments_created(
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -3516,7 +3514,7 @@ def test_transfer_gc_account_no_deployments(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -3529,7 +3527,7 @@ def test_transfer_gc_account_no_deployments(
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -3877,7 +3875,7 @@ def test_transfer_gc_account_create_deployments(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -3890,7 +3888,7 @@ def test_transfer_gc_account_create_deployments(
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -4040,7 +4038,7 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -4053,7 +4051,7 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -4183,7 +4181,7 @@ def test_transfer_gc_account_pending_deployments(
     mocked_gc_main_agreement.status = STATUS_GC_PENDING
 
     mocked_gc_agreement_deployments_by_main_agreement = mocker.MagicMock()
-    mocked_gc_agreement_deployments_by_main_agreement.status = STATUS_PENDING
+    mocked_gc_agreement_deployments_by_main_agreement.status = AdobeStatus.STATUS_PENDING
     mocked_gc_agreement_deployments_by_main_agreement.deployment_id = "deployment-id"
 
     mocker.patch(
@@ -4196,7 +4194,7 @@ def test_transfer_gc_account_pending_deployments(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -4275,7 +4273,7 @@ def test_transfer_gc_account_main_agreement_error_status(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -4364,7 +4362,7 @@ def test_transfer_gc_account_no_items_error_main_agreement(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(
             subscription_id="a-sub-id",
@@ -4564,7 +4562,7 @@ def test_transfer_gc_account_some_deployments_not_created(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(
             subscription_id="a-sub-id",
@@ -4596,7 +4594,7 @@ def test_transfer_gc_account_some_deployments_not_created(
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -4813,8 +4811,10 @@ def test_fulfill_transfer_gc_order_already_migrated_(
 
     transfer_items = adobe_items_factory(subscription_id="sub-id")
 
-    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING, current_quantity=170)
+    adobe_transfer = adobe_transfer_factory(status=AdobeStatus.STATUS_PENDING, items=transfer_items)
+    adobe_subscription = adobe_subscription_factory(
+        status=AdobeStatus.STATUS_PENDING, current_quantity=170
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -4999,9 +4999,9 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
 
     transfer_items = adobe_items_factory(subscription_id="sub-id", deployment_id="deployment-id")
 
-    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
+    adobe_transfer = adobe_transfer_factory(status=AdobeStatus.STATUS_PENDING, items=transfer_items)
     adobe_subscription = adobe_subscription_factory(
-        status=STATUS_PENDING, current_quantity=170, deployment_id="deployment-id"
+        status=AdobeStatus.STATUS_PENDING, current_quantity=170, deployment_id="deployment-id"
     )
 
     mocked_adobe_client = mocker.MagicMock()
@@ -5131,7 +5131,7 @@ def test_transfer_gc_account_items_with_deployment_main_agreement(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id", deployment_id="deployment-id"),
     )
@@ -5275,7 +5275,7 @@ def test_transfer_gc_account_items_with_deployment_main_agreement_bulk_migrated(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id", deployment_id="deployment-id"),
     )
@@ -5381,7 +5381,7 @@ def test_transfer_not_ready_not_commercial(
     agreement["product"]["id"] = "PRD-2222-2222"
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
 
-    adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING)
+    adobe_transfer = adobe_transfer_factory(status=AdobeStatus.STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_transfer.return_value = adobe_transfer
@@ -5471,7 +5471,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(subscription_id="a-sub-id")
         + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
@@ -5484,7 +5484,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
-        subscription_id="inactive-sub-id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+        subscription_id="inactive-sub-id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id",
@@ -5826,7 +5826,7 @@ def test_transfer_gc_account_items_with_and_without_deployment_main_agreement_bu
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.STATUS_PROCESSED,
         customer_id="a-client-id",
         items=adobe_items_factory(
             offer_id="65304578CACA01A12",
@@ -6022,7 +6022,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
 
     transfer_items = adobe_items_factory(
         subscription_id="inactive-sub-id",
-        status=STATUS_INACTIVE_OR_GENERIC_FAILURE,
+        status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE,
         offer_id="65304999CA",
     ) + adobe_items_factory(
         subscription_id="one-time-sub-id",
@@ -6031,14 +6031,14 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     adobe_subscription = adobe_subscription_factory(offer_id="65304578CA2", current_quantity=170)
     adobe_inactive_subscription = adobe_subscription_factory(
         subscription_id="inactive-sub-id",
-        status=STATUS_INACTIVE_OR_GENERIC_FAILURE,
+        status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE,
         offer_id="65304999CA",
     )
     adobe_one_time_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id", offer_id="99999999CA01A12"
     )
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.STATUS_PENDING)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer

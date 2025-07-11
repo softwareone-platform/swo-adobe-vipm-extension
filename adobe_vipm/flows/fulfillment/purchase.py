@@ -9,11 +9,7 @@ import logging
 from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_INVALID_ADDRESS,
-    STATUS_INVALID_FIELDS,
-    STATUS_INVALID_MINIMUM_QUANTITY,
-)
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
@@ -136,9 +132,9 @@ class CreateCustomer(Step):
 
     def handle_error(self, client, context, error):
         if error.code not in (
-            STATUS_INVALID_ADDRESS,
-            STATUS_INVALID_FIELDS,
-            STATUS_INVALID_MINIMUM_QUANTITY,
+            AdobeStatus.STATUS_INVALID_ADDRESS,
+            AdobeStatus.STATUS_INVALID_FIELDS,
+            AdobeStatus.STATUS_INVALID_MINIMUM_QUANTITY,
         ):
             switch_order_to_failed(
                 client,
@@ -146,14 +142,14 @@ class CreateCustomer(Step):
                 ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
             )
             return
-        if error.code == STATUS_INVALID_ADDRESS:
+        if error.code == AdobeStatus.STATUS_INVALID_ADDRESS:
             param = get_ordering_parameter(context.order, Param.ADDRESS)
             context.order = set_ordering_parameter_error(
                 context.order,
                 Param.ADDRESS,
                 ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
             )
-        elif error.code == STATUS_INVALID_MINIMUM_QUANTITY:
+        elif error.code == AdobeStatus.STATUS_INVALID_MINIMUM_QUANTITY:
             if "LICENSE" in str(error):
                 param = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
                 context.order = set_ordering_parameter_error(

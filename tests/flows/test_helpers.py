@@ -8,7 +8,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
-    STATUS_INTERNAL_SERVER_ERROR,
+    AdobeStatus,
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeError
@@ -228,7 +228,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     adobe_client, _, _ = adobe_client_factory()
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_api_error = adobe_api_error_factory(
-        code=STATUS_INTERNAL_SERVER_ERROR,
+        code=AdobeStatus.STATUS_INTERNAL_SERVER_ERROR,
         message="Internal Server Error",
     )
 
@@ -1564,6 +1564,7 @@ def test_validate_3yc_commitment_success(
 
     assert context.order.get("status") != "failed"
 
+
 def test_validate_3yc_commitment_rejected(
     mocker,
     order_factory,
@@ -1573,12 +1574,8 @@ def test_validate_3yc_commitment_rejected(
     mock_get_sku_adobe_mapping_model,
 ):
     """Test validation when commitment is in EXPIRED status."""
-    mocked_switch_order_to_failed = mocker.patch(
-        "adobe_vipm.flows.helpers.switch_order_to_failed"
-    )
-    mocked_set_order_error = mocker.patch(
-        "adobe_vipm.flows.helpers.set_order_error"
-    )
+    mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
+    mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     adobe_customer = adobe_customer_factory(
         commitment=None,
@@ -1622,7 +1619,7 @@ def test_validate_3yc_commitment_rejected(
         authorization_id="test-auth-id",
         customer_data={
             "3YC": ["Yes"],
-        }
+        },
     )
 
     mocked_next_step = mocker.MagicMock()
@@ -1685,6 +1682,7 @@ def test_validate_3yc_commitment_return_order_create(
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
+
 def test_validate_3yc_commitment_no_commitment(
     mocker,
     order_factory,
@@ -1732,8 +1730,7 @@ def test_validate_3yc_commitment_no_commitment(
         adobe_customer=adobe_customer,
         adobe_customer_id="test-customer-id",
         authorization_id="test-auth-id",
-        customer_data={
-        }
+        customer_data={},
     )
 
     mocked_next_step = mocker.MagicMock()
@@ -1747,5 +1744,3 @@ def test_validate_3yc_commitment_no_commitment(
     step(mocked_client, context, mocked_next_step)
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
