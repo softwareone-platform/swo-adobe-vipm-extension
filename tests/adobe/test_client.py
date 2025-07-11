@@ -2305,7 +2305,7 @@ def test_get_returnable_orders_by_sku(
         filters={
             "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
             "start-date": "2023-12-18",
-            "end-date": "2024-02-17",
+            "end-date": "2024-03-03",
         },
     )
 
@@ -2422,7 +2422,7 @@ def test_get_returnable_orders_by_sku_with_returning_orders(
         filters={
             "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
             "start-date": "2023-12-18",
-            "end-date": "2024-02-17",
+            "end-date": "2024-03-03",
         },
     )
 
@@ -2580,7 +2580,7 @@ def test_get_returnable_orders_by_sku_no_renewal_for_period(
         filters={
             "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
             "start-date": "2023-12-18",
-            "end-date": "2024-02-17",
+            "end-date": "2024-03-03",
         },
     )
 
