@@ -117,8 +117,6 @@ def test_start_transfers_for_product_preview_already_transferred(
         "adobe_vipm.flows.migration.populate_offers_for_transfer",
     )
 
-    adobe_transfer = adobe_transfer_factory()
-
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.side_effect = AdobeAPIError(
         400,
@@ -127,7 +125,6 @@ def test_start_transfers_for_product_preview_already_transferred(
             message="Already transferred",
         ),
     )
-    mocked_adobe_client.create_transfer.return_value = adobe_transfer
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -140,9 +137,7 @@ def test_start_transfers_for_product_preview_already_transferred(
         mock_transfer.membership_id,
     )
 
-    mock_transfer.save.assert_called_once()
-    assert mock_transfer.transfer_id == adobe_transfer["transferId"]
-    assert mock_transfer.status == "running"
+    mock_transfer.save.assert_not_called()
     mocked_populate_offers_for_transfer.assert_not_called()
 
 
@@ -245,7 +240,8 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "failed"
     assert mock_transfer.migration_error_description == (
-        "Adobe error received during transfer preview."
+        "An unexpected error has been received from Adobe asking for preview "
+            f"of transfer for Membership **{mock_transfer.membership_id}**."
     )
     mocked_send_exception.assert_called_once_with(
         "Adobe error received during transfer preview.",
@@ -337,7 +333,8 @@ def test_start_transfers_for_product_error(
     assert mock_transfer.adobe_error_description == str(error)
     assert (
         mock_transfer.migration_error_description
-        == "Adobe error received during transfer creation."
+        == "An unexpected error has been received from Adobe creating the "
+        f"transfer for Membership **{mock_transfer.membership_id}**."
     )
 
     mocked_send_exception.assert_called_once_with(
