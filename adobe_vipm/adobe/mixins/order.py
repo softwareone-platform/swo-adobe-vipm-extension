@@ -244,7 +244,7 @@ class OrderClientMixin:
         filters = {
             "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
             "start-date": start_date.isoformat(),
-            "end-date": (date.fromisoformat(customer_coterm_date) - timedelta(days=15)).isoformat(),
+            "end-date": customer_coterm_date,
         }
 
         returning_order_ids = [order["referenceOrderId"] for order in (return_orders or [])]
