@@ -340,3 +340,7 @@ ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR = ValidationError("VIPM0031", "{error}")
 ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
     "No subscriptions found without deployment ID to be added to the main agreement",
 )
+
+
+class SubscriptionStatus(StrEnum):
+    TERMINATED = "Terminated"
