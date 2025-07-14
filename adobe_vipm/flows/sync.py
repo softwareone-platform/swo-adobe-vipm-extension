@@ -11,22 +11,24 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_agreements_by_ids,
     get_agreements_by_query,
     get_all_agreements,
+    terminate_subscription,
     update_agreement,
     update_agreement_subscription,
 )
 
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_SUBSCRIPTION_TERMINATED,
-    ThreeYearCommitmentStatus,
+from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
+from adobe_vipm.adobe.errors import (
+    AdobeAPIError,
+    AuthorizationNotFoundError,
+    CustomerDiscountsNotFoundError,
 )
-from adobe_vipm.adobe.errors import AuthorizationNotFoundError, CustomerDiscountsNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
 )
-from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.constants import Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
@@ -38,9 +40,8 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date
-
-TEMP_3YC_STATUSES = (ThreeYearCommitmentStatus.REQUESTED, ThreeYearCommitmentStatus.ACCEPTED)
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +52,12 @@ def sync_agreement_prices(
     dry_run: bool,
     adobe_client: AdobeClient,
     customer: dict,
-) -> str:
+) -> None:
     """
     Updates the purchase prices of an Agreement (subscriptions and One-Time items)
     based on the customer discount level and customer benefits (3yc).
     """
     commitment_start_date = get_commitment_start_date(customer)
-
-    coterm_date = customer["cotermDate"]
 
     subscriptions_for_update = _get_subscriptions_for_update(
         adobe_client, agreement, customer, mpt_client
@@ -68,15 +67,14 @@ def sync_agreement_prices(
     currency = agreement["listing"]["priceList"]["currency"]
 
     _update_subscriptions(
-        coterm_date,
-        currency,
-        customer,
-        dry_run,
         mpt_client,
+        customer,
+        currency,
         product_id,
-        subscriptions_for_update,
         agreement_id=agreement["id"],
         commitment_start_date=commitment_start_date,
+        subscriptions_for_update=subscriptions_for_update,
+        dry_run=dry_run,
     )
 
     _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
@@ -105,8 +103,7 @@ def sync_agreement_prices(
             parameters=parameters,
         )
 
-    logger.info(f"agreement updated {agreement['id']}")
-    return coterm_date
+    logger.info(f"Agreement updated {agreement['id']}")
 
 
 def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters):
@@ -160,6 +157,7 @@ def _log_agreement_lines(
     for line in agreement["lines"]:
         actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
         agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
+
     skus = [item[1] for item in agreement_lines]
     prices = get_sku_price(customer, skus, product_id, currency)
     for line, actual_sku in agreement_lines:
@@ -176,20 +174,19 @@ def _log_agreement_lines(
 
 
 def _update_subscriptions(
-    coterm_date: str,
-    currency: str,
-    customer: str,
-    dry_run: bool,
     mpt_client: MPTClient,
+    customer: dict,
+    currency: str,
     product_id: str,
-    subscriptions_for_update: list[tuple[dict, dict, str]],
     agreement_id: str,
     commitment_start_date: date,
+    subscriptions_for_update: list[tuple[dict, dict, str]],
+    dry_run: bool,
 ) -> None:
     skus = [item[2] for item in subscriptions_for_update]
     prices = get_sku_price(customer, skus, product_id, currency)
-    last_sync_date = datetime.now().date().isoformat()
     missing_prices_skus = []
+    coterm_date = customer["cotermDate"]
 
     for subscription, adobe_subscription, actual_sku in subscriptions_for_update:
         if actual_sku not in prices:
@@ -218,11 +215,14 @@ def _update_subscriptions(
                     "externalId": Param.RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
-                {"externalId": "lastSyncDate", "value": last_sync_date},
+                {"externalId": Param.LAST_SYNC_DATE, "value": datetime.now().date().isoformat()},
             ],
         }
 
         if not dry_run:
+            logger.info(
+                f"Updating subscription: {subscription['id']} ({line_id}): sku={actual_sku}"
+            )
             update_agreement_subscription(
                 mpt_client,
                 subscription["id"],
@@ -231,7 +231,6 @@ def _update_subscriptions(
                 commitmentDate=coterm_date,
                 autoRenew=adobe_subscription["autoRenewal"]["enabled"],
             )
-            logger.info(f"Subscription: {subscription['id']} ({line_id}): sku={actual_sku}")
         else:
             current_price = subscription["lines"][0]["price"]["unitPP"]
             sys.stdout.write(
@@ -262,7 +261,7 @@ def _get_subscriptions_for_update(
     for_update = []
 
     for subscription in agreement["subscriptions"]:
-        if subscription["status"] == "Terminated":
+        if subscription["status"] == SubscriptionStatus.TERMINATED:
             continue
 
         subscription = get_agreement_subscription(mpt_client, subscription["id"])
@@ -274,7 +273,7 @@ def _get_subscriptions_for_update(
             subscription_id=adobe_subscription_id,
         )
 
-        if adobe_subscription["status"] == STATUS_SUBSCRIPTION_TERMINATED:
+        if adobe_subscription["status"] == AdobeStatus.STATUS_SUBSCRIPTION_TERMINATED:
             logger.info(f"Skipping subscription {subscription['id']}. It is terminated by Adobe.")
 
         actual_sku = adobe_subscription["offerId"]
@@ -362,7 +361,7 @@ def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = 
     their corresponding statuses.
     """
     try:
-        agreements = get_agreements_by_3yc_enroll_status(mpt_client, TEMP_3YC_STATUSES)
+        agreements = get_agreements_by_3yc_enroll_status(mpt_client, THREE_YC_TEMP_3YC_STATUSES)
     except Exception as e:
         logger.exception(f"Unknown exception getting agreements by 3YC enroll status: {e}")
         raise
@@ -394,7 +393,7 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: boo
         f"Commitment Status for Adobe customer {customer['customerId']} is {enroll_status}"
     )
 
-    if enroll_status in TEMP_3YC_STATUSES:
+    if enroll_status in THREE_YC_TEMP_3YC_STATUSES:
         logger.info(f"Updating 3YC enroll status for agreement {agreement['id']}")
         if not dry_run:
             update_agreement(
@@ -439,6 +438,54 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
 
 
+def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, customer_id):
+    for subscription_id in [
+        s["id"]
+        for s in agreement["subscriptions"]
+        if s["status"] is not SubscriptionStatus.TERMINATED
+    ]:
+        logger.info(f">>> Suspected Lost Customer: Terminating subscription {subscription_id}")
+        try:
+            terminate_subscription(
+                mpt_client,
+                subscription_id,
+                "Suspected Lost Customer",
+            )
+        except Exception as e:
+            msg = (
+                f">>> Suspected Lost Customer: Error terminating subscription"
+                f" {subscription_id}: {e}"
+            )
+            logger.exception(msg)
+            notify_processing_lost_customer(msg)
+
+    customer_deployments = adobe_client.get_customer_deployments_active_status(
+        agreement["authorization"]["id"], customer_id
+    )
+    if customer_deployments:
+        deployment_agreements = get_agreements_by_customer_deployments(
+            mpt_client,
+            Param.DEPLOYMENT_ID,
+            [deployment["deploymentId"] for deployment in customer_deployments],
+        )
+
+        for deployment_agreement in deployment_agreements:
+            for subscription_id in [
+                s["id"]
+                for s in deployment_agreement["subscriptions"]
+                if s["status"] is not SubscriptionStatus.TERMINATED
+            ]:
+                try:
+                    terminate_subscription(mpt_client, subscription_id, "Suspected Lost Customer")
+                except Exception as e:
+                    msg = (
+                        f">>> Suspected Lost Customer: Error terminating subscription"
+                        f" {subscription_id}: {e}"
+                    )
+                    logger.exception(msg)
+                    notify_processing_lost_customer(msg)
+
+
 def sync_agreement(mpt_client, agreement, dry_run):
     try:
         logger.debug(f"Syncing {agreement=}")
@@ -457,7 +504,19 @@ def sync_agreement(mpt_client, agreement, dry_run):
             logger.info(f"Agreement {agreement["id"]} has processing subscriptions, skip it")
             return
 
-        customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
+        try:
+            customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
+        except AdobeAPIError as e:
+            if e.code == AdobeStatus.STATUS_INVALID_CUSTOMER:
+                msg = (
+                    f"Received Adobe error {e.code} - {e.message},"
+                    " assuming lost customer and proceeding with lost customer procedure."
+                )
+                logger.info(msg)
+                notify_processing_lost_customer(msg)
+                process_lost_customer(mpt_client, adobe_client, agreement, customer_id)
+                return
+            raise
 
         if not customer.get("discounts", []):
             raise CustomerDiscountsNotFoundError(
@@ -499,7 +558,7 @@ def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
         agreement["id"],
         parameters={
             "fulfillment": [
-                {"externalId": "lastSyncDate", "value": datetime.now().date().isoformat()}
+                {"externalId": Param.LAST_SYNC_DATE, "value": datetime.now().date().isoformat()}
             ]
         },
     )

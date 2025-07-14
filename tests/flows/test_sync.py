@@ -4,10 +4,10 @@ import pytest
 from freezegun import freeze_time
 
 from adobe_vipm.adobe import constants
+from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
-    TEMP_3YC_STATUSES,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_3yc_enroll_status,
@@ -557,7 +557,9 @@ def test_sync_agreements_by_3yc_enroll_status_status(
 
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
-    mock_get_agreements_by_query.assert_called_once_with(mock_mpt_client, TEMP_3YC_STATUSES)
+    mock_get_agreements_by_query.assert_called_once_with(
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
+    )
     mock_update_agreement.assert_called_once_with(
         mock_mpt_client,
         agreement["id"],
@@ -600,7 +602,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
-        mock_mpt_client, TEMP_3YC_STATUSES
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
@@ -662,7 +664,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
-        mock_mpt_client, TEMP_3YC_STATUSES
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
@@ -697,7 +699,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
-        mock_mpt_client, TEMP_3YC_STATUSES
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_has_calls(
@@ -2101,4 +2103,174 @@ def test_sync_agreement_prices_with_missing_prices(
     assert "77777777CA01A13" not in [
         call[1]["lines"][0]["price"]["unitPP"]
         for call in mocked_update_agreement_subscription.call_args_list
+    ]
+
+
+@pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
+def test_sync_agreement_lost_customer(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    agreement_factory,
+    mock_terminate_subscription,
+    mock_notify_processing_lost_customer,
+    caplog,
+):
+    mock_adobe_client.get_customer.side_effect = AdobeAPIError(
+        status_code=int(AdobeStatus.STATUS_INVALID_CUSTOMER),
+        payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
+    )
+
+    sync_agreement(mock_mpt_client, agreement_factory(), False)
+
+    assert mock_terminate_subscription.mock_calls == [
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+    ]
+    assert mock_notify_processing_lost_customer.mock_calls == [
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
+            " with lost customer procedure.",
+            "#541c2e",
+            button=None,
+            facts=None,
+        )
+    ]
+    assert [rec.message for rec in caplog.records] == [
+        "Synchronizing agreement AGR-2119-4550-8674-5962...",
+        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
+        " proceeding with lost customer procedure.",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1234-5678",
+    ]
+
+
+@pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
+def test_sync_agreement_lost_customer_error(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mpt_error_factory,
+    agreement_factory,
+    mock_terminate_subscription,
+    mock_notify_processing_lost_customer,
+    caplog,
+):
+    mock_adobe_client.get_customer.side_effect = AdobeAPIError(
+        status_code=int(AdobeStatus.STATUS_INVALID_CUSTOMER),
+        payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
+    )
+    mock_terminate_subscription.side_effect = [
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+        MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
+    ]
+
+    sync_agreement(mock_mpt_client, agreement_factory(), False)
+
+    assert mock_terminate_subscription.mock_calls == [
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
+    ]
+    assert mock_notify_processing_lost_customer.mock_calls == [
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
+            " with lost customer procedure.",
+            "#541c2e",
+            button=None,
+            facts=None,
+        ),
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
+            " Internal Server Error - Oops!"
+            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+            "#541c2e",
+            button=None,
+            facts=None,
+        ),
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: 500"
+            " Internal Server Error - Oops!"
+            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+            "#541c2e",
+            button=None,
+            facts=None,
+        ),
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
+            " Internal Server Error - Oops!"
+            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+            "#541c2e",
+            button=None,
+            facts=None,
+        ),
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: 500"
+            " Internal Server Error - Oops!"
+            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+            "#541c2e",
+            button=None,
+            facts=None,
+        ),
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
+            " Internal Server Error - Oops!"
+            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+            "#541c2e",
+            button=None,
+            facts=None,
+        ),
+        mocker.call(
+            "🔥 Executing Lost Customer Procedure.",
+            ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: 500"
+            " Internal Server Error - Oops!"
+            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+            "#541c2e",
+            button=None,
+            facts=None,
+        ),
+    ]
+
+    assert [rec.message for rec in caplog.records] == [
+        "Synchronizing agreement AGR-2119-4550-8674-5962...",
+        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
+        " proceeding with lost customer procedure.",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000",
+        ">>> Suspected Lost Customer: Error terminating subscription "
+        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1234-5678",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
+        "500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription "
+        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
+        "500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription "
+        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
+        "500 Internal Server Error - Oops! "
+        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
     ]

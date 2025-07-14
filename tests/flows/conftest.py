@@ -14,3 +14,41 @@ def mock_get_agreements_by_query(mocker):
         new=mock,
     )
     return mock
+
+
+@pytest.fixture()
+def mock_get_agreements_by_customer_deployments(
+    agreement_factory, fulfillment_parameters_factory, mocker
+):
+    deployment_agreements = [
+        agreement_factory(
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="",
+                deployment_id=f"deployment-{i}",
+                deployments="",
+            ),
+        )
+        for i in range(2)
+    ]
+
+    return mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_customer_deployments",
+        spec=True,
+        return_value=deployment_agreements,
+    )
+
+
+@pytest.fixture()
+def mock_terminate_subscription(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.terminate_subscription",
+        spec=True,
+    )
+
+
+@pytest.fixture()
+def mock_notify_processing_lost_customer(mocker):
+    return mocker.patch(
+        "adobe_vipm.notifications.send_notification",
+        spec=True,
+    )
