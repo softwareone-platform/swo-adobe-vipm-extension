@@ -31,6 +31,54 @@ from adobe_vipm.utils import get_3yc_commitment
 logger = logging.getLogger(__name__)
 
 
+def _build_3yc_parameters(request_info, commitment_info, is_recommitment):
+    """Build parameters for 3YC commitment request."""
+    status_param_ext_id = (
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        if not is_recommitment
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+    )
+    request_type_param_ext_id = (
+        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+    )
+    request_type_param_phase = (
+        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+    )
+
+    parameters = {
+        Param.PHASE_FULFILLMENT: [
+            {
+                "externalId": status_param_ext_id,
+                "value": request_info["status"],
+            },
+        ]
+    }
+
+    if commitment_info:
+        parameters.setdefault(request_type_param_phase, [])
+        parameters[request_type_param_phase].append(
+            {"externalId": request_type_param_ext_id, "value": None},
+        )
+        parameters[Param.PHASE_FULFILLMENT].extend(
+            [
+                {
+                    "externalId": Param.THREE_YC_ENROLL_STATUS,
+                    "value": commitment_info["status"],
+                },
+                {
+                    "externalId": Param.THREE_YC_START_DATE,
+                    "value": commitment_info["startDate"],
+                },
+                {
+                    "externalId": Param.THREE_YC_END_DATE,
+                    "value": commitment_info["endDate"],
+                },
+            ],
+        )
+
+    return parameters
+
+
 def check_3yc_commitment_request(mpt_client, is_recommitment=False):
     adobe_client = get_adobe_client()
     agreements = get_agreements_by_3yc_commitment_request_status(
@@ -47,50 +95,11 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
             )
 
             request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
-
-            status_param_ext_id = (
-                Param.THREE_YC_COMMITMENT_REQUEST_STATUS
-                if not is_recommitment
-                else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
-            )
-            request_type_param_ext_id = (
-                Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
-            )
-            request_type_param_phase = (
-                Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
-            )
-
-            parameters = {
-                Param.PHASE_FULFILLMENT: [
-                    {
-                        "externalId": status_param_ext_id,
-                        "value": request_info["status"],
-                    },
-                ]
-            }
-            logger.info(f"3YC request for agreement {agreement['id']} is {request_info['status']}")
             commitment_info = get_3yc_commitment(customer)
-            if commitment_info:
-                parameters.setdefault(request_type_param_phase, [])
-                parameters[request_type_param_phase].append(
-                    {"externalId": request_type_param_ext_id, "value": None},
-                )
-                parameters[Param.PHASE_FULFILLMENT].extend(
-                    [
-                        {
-                            "externalId": Param.THREE_YC_ENROLL_STATUS,
-                            "value": commitment_info["status"],
-                        },
-                        {
-                            "externalId": Param.THREE_YC_START_DATE,
-                            "value": commitment_info["startDate"],
-                        },
-                        {
-                            "externalId": Param.THREE_YC_END_DATE,
-                            "value": commitment_info["endDate"],
-                        },
-                    ],
-                )
+
+            parameters = _build_3yc_parameters(request_info, commitment_info, is_recommitment)
+
+            logger.info(f"3YC request for agreement {agreement['id']} is {request_info['status']}")
 
             update_agreement(
                 mpt_client,
@@ -108,6 +117,9 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 ThreeYearCommitmentStatus.EXPIRED,
                 ThreeYearCommitmentStatus.NONCOMPLIANT,
             ):
+                request_type_param_phase = (
+                    Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+                )
                 agreement_link = urljoin(
                     settings.MPT_PORTAL_BASE_URL,
                     f"/commerce/agreements/{agreement['id']}",
