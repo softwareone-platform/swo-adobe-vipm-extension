@@ -745,7 +745,25 @@ def lines_factory(agreement, deployment_id: str = None):
 
 
 @pytest.fixture
-def subscriptions_factory(lines_factory):
+def subscription_price_factory():
+    def _subscription_price(currency="USD"):
+        return {
+            "SPxY": 4590.00000,
+            "SPxM": 382.50000,
+            "PPxY": 4500.00000,
+            "PPxM": 375.00000,
+            "defaultMarkup": 12.0000000000,
+            "defaultMargin": 10.7142857143,
+            "currency": currency,
+            "markup": 2.0000000000,
+            "margin": 1.9607843137,
+        }
+
+    return _subscription_price
+
+
+@pytest.fixture
+def subscriptions_factory(lines_factory, subscription_price_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
         product_name="Awesome product",
@@ -755,13 +773,16 @@ def subscriptions_factory(lines_factory):
         commitment_date=None,
         lines=None,
         auto_renew=True,
+        price=None,
     ):
         start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
         lines = lines_factory() if lines is None else lines
+        price = price or subscription_price_factory()
         return [
             {
                 "id": subscription_id,
                 "name": f"Subscription for {product_name}",
+                "price": price,
                 "parameters": {
                     "fulfillment": [
                         {
@@ -1221,6 +1242,7 @@ def adobe_subscription_factory():
         offer_id=None,
         current_quantity=10,
         renewal_quantity=10,
+        currency_code="USD",
         autorenewal_enabled=True,
         deployment_id="",
         status=AdobeStatus.PROCESSED.value,
@@ -1230,6 +1252,7 @@ def adobe_subscription_factory():
             "subscriptionId": subscription_id or "a-sub-id",
             "offerId": offer_id or "65304578CA01A12",
             "currentQuantity": current_quantity,
+            "currencyCode": currency_code,
             "autoRenewal": {
                 "enabled": autorenewal_enabled,
                 "renewalQuantity": renewal_quantity,
@@ -1990,3 +2013,17 @@ def mock_get_adobe_product_by_marketplace_sku(mock_get_sku_adobe_mapping_model):
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
 
     return get_adobe_product_by_marketplace_sku
+
+
+@pytest.fixture
+def mock_notify_processing_lost_customer(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.notify_processing_lost_customer", autospec=True)
+
+
+@pytest.fixture
+def mock_get_product_items_by_skus(mocker, items_factory):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.get_product_items_by_skus",
+        return_value=items_factory(),
+        autospec=True,
+    )

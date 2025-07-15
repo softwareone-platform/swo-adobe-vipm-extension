@@ -45,6 +45,7 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,21 @@ def _add_missing_subscriptions(
 
     for adobe_subscription in missing_subscriptions:
         logger.info(f">> Adding missing subscription {adobe_subscription['subscriptionId']}")
+
+        if adobe_subscription["currencyCode"] != agreement["listing"]["priceList"]["currency"]:
+            logger.warning(
+                f"Skipping {adobe_subscription['subscriptionId']=} due to  currency mismatch."
+            )
+            adobe_client.update_subscription(
+                agreement["authorization"]["id"],
+                customer["customerId"],
+                adobe_subscription["subscriptionId"],
+                auto_renewal=False,
+            )
+
+            send_exception(title="Price currency mismatch detected!", text=f"{adobe_subscription}")
+            continue
+
         item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
         prices = get_sku_price(
             customer,
@@ -357,6 +373,7 @@ def _update_subscriptions(
 def _get_subscriptions_for_update(
     mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
 ) -> list[tuple[dict, dict, str]]:
+    logger.info(f"Getting subscriptions for update for {agreement['id']=}")
     today_date = datetime.now().date().isoformat()
     for_update = []
 
