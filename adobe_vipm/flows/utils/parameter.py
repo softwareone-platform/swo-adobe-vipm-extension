@@ -5,6 +5,7 @@ from adobe_vipm.flows.constants import (
     PARAM_NEW_CUSTOMER_PARAMETERS,
     PARAM_OPTIONAL_CUSTOMER_ORDER,
     Param,
+    TRANSFER_CUSTOMER_PARAMETERS,
 )
 from adobe_vipm.utils import find_first
 
@@ -81,7 +82,7 @@ def update_parameters_visibility(order):
     """
     Update the visibility of parameters based on the agreement type.
     """
-    agreement_type = get_ordering_parameter(order, PARAM_AGREEMENT_TYPE)
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE)
     agreement_value = agreement_type.get("value")
     updated_order = copy.deepcopy(order)
 
@@ -95,14 +96,14 @@ def update_parameters_visibility(order):
             updated_order = updated(updated_order, param)
 
     if agreement_value == "New":
-        set_params_visibility(NEW_CUSTOMER_PARAMETERS, hidden=False)
-        set_params_visibility(TRANSFER_CUSTOMER_PARAMETERS + (PARAM_MEMBERSHIP_ID,), hidden=True)
+        set_params_visibility(PARAM_NEW_CUSTOMER_PARAMETERS, hidden=False)
+        set_params_visibility(TRANSFER_CUSTOMER_PARAMETERS + (Param.MEMBERSHIP_ID,), hidden=True)
     elif agreement_value == "Migrate":
-        set_params_visibility(NEW_CUSTOMER_PARAMETERS + TRANSFER_CUSTOMER_PARAMETERS, hidden=True)
-        set_params_visibility([PARAM_MEMBERSHIP_ID], hidden=False)
+        set_params_visibility(PARAM_NEW_CUSTOMER_PARAMETERS + TRANSFER_CUSTOMER_PARAMETERS, hidden=True)
+        set_params_visibility([Param.MEMBERSHIP_ID], hidden=False)
     elif agreement_value == "Transfer":
-        set_params_visibility(NEW_CUSTOMER_PARAMETERS, hidden=True)
-        set_params_visibility([PARAM_MEMBERSHIP_ID], hidden=True)
+        set_params_visibility(PARAM_NEW_CUSTOMER_PARAMETERS, hidden=True)
+        set_params_visibility([Param.MEMBERSHIP_ID], hidden=True)
         set_params_visibility(TRANSFER_CUSTOMER_PARAMETERS, hidden=False)
 
     return updated_order

@@ -65,12 +65,15 @@ def is_purchase_validation_enabled(order):
         for param_external_id in PARAM_REQUIRED_CUSTOMER_ORDER
     )
 
+def is_migrate_customer(order):
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
+    return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)
 
 def is_migrate_customer(order):
-    agreement_type = get_ordering_parameter(order, PARAM_AGREEMENT_TYPE).get("value")
-    return agreement_type == "Migrate" and is_ordering_param_required(order, PARAM_MEMBERSHIP_ID)
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
+    return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)
 
 
 def is_reseller_change(order):
-    agreement_type = get_ordering_parameter(order, PARAM_AGREEMENT_TYPE).get("value")
-    return agreement_type == "Transfer" and is_ordering_param_required(order, PARAM_CHANGE_RESELLER_CODE)
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
+    return agreement_type == "Transfer" and is_ordering_param_required(order, Param.CHANGE_RESELLER_CODE)

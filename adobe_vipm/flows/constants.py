@@ -47,7 +47,8 @@ class Param(StrEnum):
     DEPLOYMENTS = "deployments"
     DEPLOYMENT_ID = "deploymentId"
     LAST_SYNC_DATE = "lastSyncDate"
-
+    CHANGE_RESELLER_CODE = "changeResellerCode"
+    ADOBE_CUSTOMER_ADMIN_EMAIL = "adobeCustomerAdminEmail"
     PHASE_ORDERING = "ordering"
     PHASE_FULFILLMENT = "fulfillment"
 
@@ -71,6 +72,19 @@ STATUS_MARKET_SEGMENT_ELIGIBLE = "eligible"
 STATUS_MARKET_SEGMENT_NOT_ELIGIBLE = "not-eligible"
 STATUS_MARKET_SEGMENT_PENDING = "pending"
 
+OPTIONAL_CUSTOMER_ORDER_PARAMS = (
+    Param.THREE_YC, 
+    Param.THREE_YC_CONSUMABLES, 
+    Param.THREE_YC_LICENSES
+)
+TRANSFER_CUSTOMER_PARAMETERS = (
+    Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
+    Param.CHANGE_RESELLER_CODE,
+)
+
+
+PARAM_PHASE_ORDERING = "ordering"
+PARAM_PHASE_FULFILLMENT = "fulfillment"
 
 CANCELLATION_WINDOW_DAYS = 14
 GLOBAL_SUFFIX = "_global"

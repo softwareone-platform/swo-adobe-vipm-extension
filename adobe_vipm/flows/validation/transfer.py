@@ -51,6 +51,7 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
 )
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
+from adobe_vipm.flows.utils.validation import is_migrate_customer, is_reseller_change
 
 logger = logging.getLogger(__name__)
 
@@ -323,7 +324,6 @@ class SetupTransferContext(Step):
             )
         next_step(mpt_client, context)
 
-
 class ValidateTransferStatus(Step):
     def __call__(self, mpt_client, context, next_step):
         transfer = context.transfer
@@ -342,7 +342,7 @@ class ValidateTransferStatus(Step):
                 Param.MEMBERSHIP_ID,
                 ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
                     status=context.adobe_transfer["status"],
-                ),
+                )
             )
             context.validation_succeeded = False
             return
@@ -354,15 +354,19 @@ class ValidateTransferStatus(Step):
         context.order = set_ordering_parameter_error(
             order,
             Param.MEMBERSHIP_ID,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=details),
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(
+                title=param["name"],
+                details=details
+            ),
         )
         context.validation_succeeded = False
-
 
 class FetchTransferData(Step):
     def __call__(self, mpt_client, context, next_step):
         if not context.transfer:
-            has_error, order = validate_transfer_not_migrated(mpt_client, context.order)
+            has_error, order = validate_transfer_not_migrated(
+                mpt_client, context.order
+            )
             context.order = order
             context.validation_succeeded = not has_error
             return
@@ -396,34 +400,35 @@ class FetchTransferData(Step):
 
         next_step(mpt_client, context)
 
-
 class UpdateSubscriptionSkus(Step):
     def __call__(self, mpt_client, context, next_step):
         for subscription in context.subscriptions["items"]:
             correct_sku = get_transfer_item_sku_by_subscription(
-                context.adobe_transfer, subscription["subscriptionId"]
+                context.adobe_transfer,
+                subscription["subscriptionId"]
             )
             subscription["offerId"] = correct_sku or subscription["offerId"]
         next_step(mpt_client, context)
-
 
 class FetchCustomerAndValidateEmptySubscriptions(Step):
     def __call__(self, mpt_client, context, next_step):
         adobe_client = get_adobe_client()
         customer = adobe_client.get_customer(
-            context.order["authorization"]["id"], context.transfer.customer_id
+            context.order["authorization"]["id"],
+            context.transfer.customer_id
         )
         context.customer = customer
 
         if len(context.subscriptions["items"]) == 0:
             if customer.get("globalSalesEnabled", False):
                 logger.error(ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT)
-                param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID)
+                param = get_ordering_parameter(context.order, PARAM_MEMBERSHIP_ID)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    Param.MEMBERSHIP_ID,
+                    PARAM_MEMBERSHIP_ID,
                     ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                        title=param["name"], details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
+                        title=param["name"],
+                        details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
                     ),
                 )
                 context.validation_succeeded = False
@@ -432,7 +437,6 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
             return
 
         next_step(mpt_client, context)
-
 
 class AddLinesToOrder(Step):
     def __call__(self, mpt_client, context, next_step):
@@ -447,14 +451,16 @@ class AddLinesToOrder(Step):
             context.subscriptions["items"],
             commitment,
             "currentQuantity",
-            True,
+            True
         )
         context.order = order
         context.validation_succeeded = not has_error
         next_step(mpt_client, context)
 
-
 def validate_transfer(mpt_client, order):
+    """
+    Valida una orden de transferencia usando un pipeline de pasos.
+    """
     pipeline = Pipeline(
         SetupTransferContext(),
         FetchTransferData(),
