@@ -1,6 +1,0 @@
-[flake8]
-exclude = .idea,.vscode,.git,venv,env,swo
-show-source = True
-max-line-length = 100
-max-cognitive-complexity = 15
-extend-ignore = PT004, E203, B008

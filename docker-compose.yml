@@ -35,7 +35,7 @@ services:
       context: .
       dockerfile: dev.Dockerfile
     working_dir: /extension
-    command: bash -c "ruff check . && pytest"
+    command: bash -c "ruff check . && uv lock --check && pytest"
     volumes:
       - .:/extension
     environment:

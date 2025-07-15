@@ -32,7 +32,6 @@ dev = [
     "ipdb==0.13.*",
     "ipython==8.*",
     "mypy==1.8.*",
-    "poetry-plugin-sort==0.2.*",
     "pre-commit==3.6.*",
     "pytest==7.4.*",
     "pytest-cov==4.1.*",
@@ -45,11 +44,6 @@ dev = [
     "ruff==0.3.*",
     "types-openpyxl==3.1.*",
     "types-requests==2.31.*",
-]
-sdk = [
-    "django-ninja==1.1.*",
-    "pyjwt==2.8.*",
-    "typing-extensions==4.9.*",
 ]
 runtime = [
     "azure-monitor-opentelemetry-exporter==1.0.0b25",
@@ -69,7 +63,6 @@ runtime = [
 [tool.uv]
 default-groups = [
     "dev",
-    "sdk",
     "runtime",
 ]
 
