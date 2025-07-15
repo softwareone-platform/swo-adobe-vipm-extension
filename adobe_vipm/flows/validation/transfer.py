@@ -493,8 +493,8 @@ class FetchResellerChangeData(Step):
     def __call__(self, mpt_client, context, next_step):
         authorization_id = context.order["authorization"]["id"]
         seller_id = context.order["agreement"]["seller"]["id"]
-        reseller_change_code = get_ordering_parameter(context.order, PARAM_CHANGE_RESELLER_CODE)
-        admin_email = get_ordering_parameter(context.order, PARAM_ADOBE_CUSTOMER_ADMIN_EMAIL)
+        reseller_change_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)
+        admin_email = get_ordering_parameter(context.order, Param.ADOBE_CUSTOMER_ADMIN_EMAIL)
 
         adobe_client = get_adobe_client()
 
@@ -518,7 +518,7 @@ class FetchResellerChangeData(Step):
         except AdobeAPIError as e:
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_CHANGE_RESELLER_CODE,
+                Param.CHANGE_RESELLER_CODE,
                 ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                     reseller_change_code=reseller_change_code["value"],
                     error=str(e),
@@ -535,14 +535,14 @@ class ValidateResellerChange(Step):
         expiry_date = context.adobe_transfer["approval"]["expiry"]
         reseller_change_code = get_ordering_parameter(
             context.order, 
-            PARAM_CHANGE_RESELLER_CODE)["value"]
+            Param.CHANGE_RESELLER_CODE)["value"]
         
         parsed_expiry_date = parser.parse(expiry_date)
        
         if parsed_expiry_date.date() < date.today():
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_CHANGE_RESELLER_CODE,
+                Param.CHANGE_RESELLER_CODE,
                 ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                     reseller_change_code=reseller_change_code,
                     error="Reseller change code has expired",

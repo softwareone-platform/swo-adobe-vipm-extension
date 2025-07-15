@@ -1,8 +1,5 @@
 from adobe_vipm.flows.constants import (
     PARAM_REQUIRED_CUSTOMER_ORDER,
-    PARAM_AGREEMENT_TYPE,
-    PARAM_CHANGE_RESELLER_CODE,
-    PARAM_MEMBERSHIP_ID, 
     Param)
 from adobe_vipm.flows.utils.parameter import get_ordering_parameter, is_ordering_param_required
 from adobe_vipm.flows.utils.subscription import is_line_item_active_subscription
