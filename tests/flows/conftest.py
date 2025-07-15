@@ -52,3 +52,8 @@ def mock_notify_processing_lost_customer(mocker):
         "adobe_vipm.notifications.send_notification",
         spec=True,
     )
+
+
+@pytest.fixture
+def mock_get_adobe_client(mocker, mock_adobe_client):
+    return mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mock_adobe_client)

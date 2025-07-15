@@ -6,6 +6,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
+from adobe_vipm.flows.constants import AgreementStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     sync_agreement,
@@ -2274,3 +2275,15 @@ def test_sync_agreement_lost_customer_error(
         "500 Internal Server Error - Oops! "
         "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
     ]
+
+
+@pytest.mark.parametrize(
+    "status",
+    (s.value for s in AgreementStatus if s is not AgreementStatus.ACTIVE),
+)
+def test_sync_agreement_skips_inactive_agreement(mock_mpt_client, mock_get_adobe_client, status):
+    agreement = {"id": "1", "status": status, "subscriptions": []}
+
+    sync_agreement(mock_mpt_client, agreement, False)
+
+    mock_get_adobe_client.update_last_sync_date.assert_not_called()
