@@ -46,6 +46,7 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ def _add_missing_subscriptions(
     adobe_client: AdobeClient,
     customer: dict,
     agreement: dict,
-    subscriptions_for_update: tuple[str],
+    subscriptions_for_update: set[str],
 ) -> None:
     logger.info(f"Checking missing subscriptions for {agreement["id"]=}")
     adobe_subscriptions = exclude_subscriptions_with_deployment_id(
@@ -88,6 +89,21 @@ def _add_missing_subscriptions(
 
     for adobe_subscription in missing_subscriptions:
         logger.info(f">> Adding missing subscription {adobe_subscription['subscriptionId']}")
+
+        if adobe_subscription["currencyCode"] != agreement["listing"]["priceList"]["currency"]:
+            logger.warning(
+                f"Skipping {adobe_subscription['subscriptionId']=} due to  currency mismatch."
+            )
+            adobe_client.update_subscription(
+                agreement["authorization"]["id"],
+                customer["customerId"],
+                adobe_subscription["subscriptionId"],
+                auto_renewal=False,
+            )
+
+            send_exception(title="Price currency mismatch detected!", text=f"{adobe_subscription}")
+            continue
+
         item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
         prices = get_sku_price(
             customer,
@@ -160,7 +176,7 @@ def sync_agreement_prices(
         adobe_client,
         customer,
         agreement,
-        subscriptions_for_update=tuple(s[1]["subscriptionId"] for s in subscriptions_for_update),
+        subscriptions_for_update={s[1]["subscriptionId"] for s in subscriptions_for_update},
     )
 
     product_id = agreement["product"]["id"]
@@ -358,6 +374,7 @@ def _update_subscriptions(
 def _get_subscriptions_for_update(
     mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
 ) -> list[tuple[dict, dict, str]]:
+    logger.info(f"Getting subscriptions for update for {agreement['id']=}")
     today_date = datetime.now().date().isoformat()
     for_update = []
 
