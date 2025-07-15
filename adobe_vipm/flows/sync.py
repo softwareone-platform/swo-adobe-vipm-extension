@@ -29,7 +29,7 @@ from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
 )
-from adobe_vipm.flows.constants import Param, SubscriptionStatus
+from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
@@ -491,8 +491,11 @@ def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, 
 
 
 def sync_agreement(mpt_client, agreement, dry_run):
+    logger.debug(f"Syncing {agreement=}")
+    if agreement["status"] is not AgreementStatus.ACTIVE:
+        logger.info(f"Skipping agreement {agreement['id']} because it is not in Active status")
+        return
     try:
-        logger.debug(f"Syncing {agreement=}")
         customer_id = get_adobe_customer_id(agreement)
         adobe_client = get_adobe_client()
         logger.info(f"Synchronizing agreement {agreement["id"]}...")

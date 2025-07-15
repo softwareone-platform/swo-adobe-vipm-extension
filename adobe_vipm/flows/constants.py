@@ -344,3 +344,14 @@ ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
 
 class SubscriptionStatus(StrEnum):
     TERMINATED = "Terminated"
+
+
+class AgreementStatus(StrEnum):
+    NEW = "New"
+    DRAFT = "Draft"
+    PROVISIONING = "Provisioning"
+    UPDATING = "Updating"
+    ACTIVE = "Active"
+    TERMINATED = "Terminated"
+    FAILED = "Failed"
+    DELETED = "Deleted"

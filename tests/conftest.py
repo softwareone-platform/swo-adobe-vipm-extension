@@ -22,7 +22,7 @@ from adobe_vipm.airtable.models import (
     AirTableBaseInfo,
     get_sku_adobe_mapping_model,
 )
-from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.constants import AgreementStatus, Param
 
 
 @pytest.fixture
@@ -801,6 +801,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
         fulfillment_parameters=None,
         ordering_parameters=None,
         lines=None,
+        status=AgreementStatus.ACTIVE,
     ):
         if not subscriptions:
             subscriptions = [
@@ -830,6 +831,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
 
         return {
             "id": "AGR-2119-4550-8674-5962",
+            "status": status,
             "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
             "icon": None,
             "name": "Product Name 1",
