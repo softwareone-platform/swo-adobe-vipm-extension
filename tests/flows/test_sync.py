@@ -9,6 +9,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.flows.constants import AgreementStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
+    _get_subscriptions_for_update,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_3yc_enroll_status,
@@ -2287,3 +2288,54 @@ def test_sync_agreement_skips_inactive_agreement(mock_mpt_client, mock_get_adobe
     sync_agreement(mock_mpt_client, agreement, False)
 
     mock_get_adobe_client.update_last_sync_date.assert_not_called()
+
+
+@freeze_time("2025-07-15")
+def test_get_subscriptions_for_update_wrong_currency(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    subscriptions_factory,
+    subscription_price_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_agreement_subscription",
+        return_value=subscriptions_factory(price=subscription_price_factory(currency="GBP"))[0],
+        spec=True,
+    )
+    mock_send_exception = mocker.patch(
+        "adobe_vipm.flows.sync.send_exception",
+        spec=True,
+    )
+
+    _get_subscriptions_for_update(
+        mock_mpt_client,
+        mock_adobe_client,
+        agreement_factory(),
+        adobe_customer_factory(),
+        currency="USD",
+    )
+
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        "AUT-1234-5678", "a-client-id", "SUB-1000-2000-3000", auto_renewal=False
+    )
+    mock_send_exception.assert_called_once_with(
+        title="Price currency mismatch detected!",
+        text="{'id': 'SUB-1000-2000-3000', 'name': 'Subscription for Awesome "
+        "product', 'price': {'SPxY': 4590.0, 'SPxM': 382.5, 'PPxY': 4500.0, "
+        "'PPxM': 375.0, 'defaultMarkup': 12.0, 'defaultMargin': "
+        "10.7142857143, 'currency': 'GBP', 'markup': 2.0, 'margin': "
+        "1.9607843137}, 'parameters': {'fulfillment': [{'name': 'Adobe SKU', "
+        "'externalId': <Param.ADOBE_SKU: 'adobeSKU'>, 'type': "
+        "'SingleLineText', 'value': '65304578CA01A12'}]}, 'externalIds': "
+        "{'vendor': 'a-sub-id'}, 'lines': [{'item': {'id': "
+        "'ITM-1234-1234-1234-0001', 'name': 'Awesome product', 'externalIds': "
+        "{'vendor': '65304578CA'}}, 'oldQuantity': 0, 'quantity': 170, "
+        "'price': {'unitPP': 1234.55}, 'id': "
+        "'ALI-2119-4550-8674-5962-0001'}], 'startDate': "
+        "'2025-07-15T00:00:00+00:00', 'commitmentDate': None, "
+        "'autoRenew': True}",
+    )
+    mock_adobe_client.get_subscription.assert_not_called()

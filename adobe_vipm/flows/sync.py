@@ -42,6 +42,7 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date
 
 logger = logging.getLogger(__name__)
@@ -60,12 +61,13 @@ def sync_agreement_prices(
     """
     commitment_start_date = get_commitment_start_date(customer)
 
+    currency = agreement["listing"]["priceList"]["currency"]
+
     subscriptions_for_update = _get_subscriptions_for_update(
-        adobe_client, agreement, customer, mpt_client
+        mpt_client, adobe_client, agreement, customer, currency
     )
 
     product_id = agreement["product"]["id"]
-    currency = agreement["listing"]["priceList"]["currency"]
 
     _update_subscriptions(
         mpt_client,
@@ -257,8 +259,9 @@ def _update_subscriptions(
 
 
 def _get_subscriptions_for_update(
-    adobe_client: AdobeClient, agreement: dict, customer: dict, mpt_client: MPTClient
+    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict, currency: str
 ) -> list[tuple[dict, dict, str]]:
+    logger.info(f"Getting subscriptions for update for {agreement['id']}")
     for_update = []
 
     for subscription in agreement["subscriptions"]:
@@ -266,6 +269,21 @@ def _get_subscriptions_for_update(
             continue
 
         subscription = get_agreement_subscription(mpt_client, subscription["id"])
+
+        if subscription["price"]["currency"] != currency:
+            logger.warning(
+                f"Skipping subscription {subscription["id"]} because the subscription price"
+                " currency mismatch."
+            )
+            adobe_client.update_subscription(
+                agreement["authorization"]["id"],
+                customer["customerId"],
+                subscription["id"],
+                auto_renewal=False,
+            )
+            send_exception(title="Price currency mismatch detected!", text=f"{subscription}")
+            continue
+
         adobe_subscription_id = subscription["externalIds"]["vendor"]
 
         adobe_subscription = adobe_client.get_subscription(

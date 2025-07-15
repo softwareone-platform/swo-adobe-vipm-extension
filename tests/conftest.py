@@ -745,7 +745,25 @@ def lines_factory(agreement, deployment_id: str = None):
 
 
 @pytest.fixture
-def subscriptions_factory(lines_factory):
+def subscription_price_factory():
+    def _subscription_price(currency="USD"):
+        return {
+            "SPxY": 4590.00000,
+            "SPxM": 382.50000,
+            "PPxY": 4500.00000,
+            "PPxM": 375.00000,
+            "defaultMarkup": 12.0000000000,
+            "defaultMargin": 10.7142857143,
+            "currency": currency,
+            "markup": 2.0000000000,
+            "margin": 1.9607843137,
+        }
+
+    return _subscription_price
+
+
+@pytest.fixture
+def subscriptions_factory(lines_factory, subscription_price_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
         product_name="Awesome product",
@@ -755,13 +773,16 @@ def subscriptions_factory(lines_factory):
         commitment_date=None,
         lines=None,
         auto_renew=True,
+        price=None,
     ):
         start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
         lines = lines_factory() if lines is None else lines
+        price = price or subscription_price_factory()
         return [
             {
                 "id": subscription_id,
                 "name": f"Subscription for {product_name}",
+                "price": price,
                 "parameters": {
                     "fulfillment": [
                         {
