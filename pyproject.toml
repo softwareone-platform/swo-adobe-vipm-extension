@@ -41,7 +41,7 @@ dev = [
     "pytest-randomly==3.15.*",
     "pytest-xdist==3.5.*",
     "responses==0.24.*",
-    "ruff==0.3.*",
+    "ruff==0.12.*",
     "types-openpyxl==3.1.*",
     "types-requests==2.31.*",
 ]
@@ -110,10 +110,10 @@ select = [
     "T10",  # flake8-pytest-style
 ]
 ignore = [
-    "PT004", # fixture '{name}' does not return anything, add leading underscore
     "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
-    "B008",  # do not perform function calls in argument defaults
     "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+    "UP046", # Doesn't properly work with ParamSpec and python 3.12
+    "UP047", # Doesn't properly work with ParamSpec and python 3.12
 ]
 
 [tool.ruff.lint.isort]

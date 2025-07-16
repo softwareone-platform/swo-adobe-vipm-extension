@@ -2,7 +2,7 @@ import pytest
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_get_agreements_by_query(mocker):
     mock = mocker.MagicMock(spec=get_agreements_by_query)
     mocker.patch(
@@ -16,7 +16,7 @@ def mock_get_agreements_by_query(mocker):
     return mock
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_get_agreements_by_customer_deployments(
     agreement_factory, fulfillment_parameters_factory, mocker
 ):
@@ -38,7 +38,7 @@ def mock_get_agreements_by_customer_deployments(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_terminate_subscription(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync.terminate_subscription",
@@ -46,7 +46,7 @@ def mock_terminate_subscription(mocker):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_notify_processing_lost_customer(mocker):
     return mocker.patch(
         "adobe_vipm.notifications.send_notification",
