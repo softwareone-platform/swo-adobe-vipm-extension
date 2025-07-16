@@ -1,6 +1,6 @@
 import logging
 from pprint import pformat
-from typing import Any, Mapping
+from typing import Annotated, Any, Mapping
 
 from django.conf import settings
 from mpt_extension_sdk.core.extension import Extension
@@ -38,7 +38,7 @@ def process_order_fulfillment(client, event):
     },
     auth=JWTAuth(jwt_secret_callback),
 )
-def process_order_validation(request, order: dict = Body(None)):
+def process_order_validation(request, order: Annotated[dict | None, Body()] = None):
     try:
         validated_order = validate_order(request.client, order)
         logger.debug(f"Validated order: {pformat(validated_order)}")

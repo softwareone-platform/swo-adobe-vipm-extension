@@ -25,7 +25,7 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import Param
 
 
-@pytest.fixture()
+@pytest.fixture
 def requests_mocker():
     """
     Allow mocking of http calls made with requests.
@@ -34,7 +34,7 @@ def requests_mocker():
         yield rsps
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_api_error_factory():
     """
     Generate an error message returned by Adobe.
@@ -52,7 +52,7 @@ def adobe_api_error_factory():
     return _adobe_error
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_config_file():
     """
     Return an Adobe VIP Marketplace configuration file
@@ -215,7 +215,7 @@ def adobe_config_file():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_credentials_file():
     """
     Return an Adobe VIP Marketplace credentials file
@@ -232,7 +232,7 @@ def adobe_credentials_file():
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_authorizations_file():
     """
     Return an Adobe VIP Marketplace authorizations file
@@ -257,7 +257,7 @@ def adobe_authorizations_file():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file):
     """
     Mock the Adobe Config object to load test data from the adobe_credentials and
@@ -268,7 +268,7 @@ def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file,
     mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
 
 
-@pytest.fixture()
+@pytest.fixture
 def account_data():
     """
     Returns a adobe account data structure.
@@ -296,7 +296,7 @@ def account_data():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def customer_data(account_data):
     data = copy.copy(account_data)
     data["3YC"] = []
@@ -305,12 +305,12 @@ def customer_data(account_data):
     return data
 
 
-@pytest.fixture()
+@pytest.fixture
 def reseller_data(account_data):
     return account_data
 
 
-@pytest.fixture()
+@pytest.fixture
 def order_parameters_factory():
     def _order_parameters(
         company_name="FF Buyer good enough",
@@ -433,7 +433,7 @@ def order_parameters_factory():
     return _order_parameters
 
 
-@pytest.fixture()
+@pytest.fixture
 def transfer_order_parameters_factory():
     def _order_parameters(
         membership_id="a-membership-id",
@@ -546,7 +546,7 @@ def transfer_order_parameters_factory():
     return _order_parameters
 
 
-@pytest.fixture()
+@pytest.fixture
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
         customer_id="",
@@ -662,7 +662,7 @@ def fulfillment_parameters_factory():
     return _fulfillment_parameters
 
 
-@pytest.fixture()
+@pytest.fixture
 def items_factory():
     def _items(
         item_id=1,
@@ -684,7 +684,7 @@ def items_factory():
     return _items
 
 
-@pytest.fixture()
+@pytest.fixture
 def pricelist_items_factory():
     def _items(
         item_id=1,
@@ -707,7 +707,7 @@ def pricelist_items_factory():
     return _items
 
 
-@pytest.fixture()
+@pytest.fixture
 def lines_factory(agreement, deployment_id: str = None):
     agreement_id = agreement["id"].split("-", 1)[1]
 
@@ -749,7 +749,7 @@ def lines_factory(agreement, deployment_id: str = None):
     return _items
 
 
-@pytest.fixture()
+@pytest.fixture
 def subscriptions_factory(lines_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
@@ -790,7 +790,7 @@ def subscriptions_factory(lines_factory):
     return _subscriptions
 
 
-@pytest.fixture()
+@pytest.fixture
 def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_factory):
     def _agreement(
         licensee_name="My beautiful licensee",
@@ -881,7 +881,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
     return _agreement
 
 
-@pytest.fixture()
+@pytest.fixture
 def provisioning_agreement(agreement_factory):
     agreement = agreement_factory()
     agreement["parameters"]["ordering"] = []
@@ -892,7 +892,7 @@ def provisioning_agreement(agreement_factory):
     return agreement
 
 
-@pytest.fixture()
+@pytest.fixture
 def licensee(buyer):
     return {
         "id": "LCE-1111-2222-3333",
@@ -908,7 +908,7 @@ def licensee(buyer):
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def listing(buyer):
     return {
         "id": "LST-9401-9279",
@@ -929,7 +929,7 @@ def listing(buyer):
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def template():
     return {
         "id": "TPL-1234-1234-4321",
@@ -937,7 +937,7 @@ def template():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def agreement(buyer, licensee, listing):
     return {
         "id": "AGR-2119-4550-8674-5962",
@@ -1011,7 +1011,7 @@ def agreement(buyer, licensee, listing):
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def order_factory(
     agreement,
     order_parameters_factory,
@@ -1083,12 +1083,12 @@ def order_factory(
     return _order
 
 
-@pytest.fixture()
+@pytest.fixture
 def order(order_factory):
     return order_factory()
 
 
-@pytest.fixture()
+@pytest.fixture
 def buyer():
     return {
         "id": "BUY-3731-7971",
@@ -1115,7 +1115,7 @@ def buyer():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def seller():
     return {
         "id": "SEL-9121-8944",
@@ -1142,7 +1142,7 @@ def seller():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def webhook(settings):
     return {
         "id": "WH-123-123",
@@ -1150,7 +1150,7 @@ def webhook(settings):
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_items_factory():
     def _items(
         line_number=1,
@@ -1184,7 +1184,7 @@ def adobe_items_factory():
     return _items
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_order_factory(adobe_items_factory):
     def _order(
         order_type,
@@ -1222,7 +1222,7 @@ def adobe_order_factory(adobe_items_factory):
     return _order
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_subscription_factory():
     def _subscription(
         subscription_id=None,
@@ -1251,7 +1251,7 @@ def adobe_subscription_factory():
     return _subscription
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_preview_transfer_factory(adobe_items_factory):
     def _preview(items=None):
         items = (
@@ -1267,7 +1267,7 @@ def adobe_preview_transfer_factory(adobe_items_factory):
     return _preview
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_transfer_factory(adobe_items_factory):
     def _transfer(
         transfer_id="a-transfer-id",
@@ -1289,7 +1289,7 @@ def adobe_transfer_factory(adobe_items_factory):
     return _transfer
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_client_factory(
     adobe_credentials_file,
     mock_adobe_config,
@@ -1322,7 +1322,7 @@ def adobe_client_factory(
     return _factory
 
 
-@pytest.fixture()
+@pytest.fixture
 def mpt_client(settings):
     """
     Create an instance of the MPT client used by the extension.
@@ -1333,7 +1333,7 @@ def mpt_client(settings):
     return setup_client()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_mpt_client(mocker):
     """
     Create an instance of the MPT client used by the extension.
@@ -1341,7 +1341,7 @@ def mock_mpt_client(mocker):
     return mocker.MagicMock(spec=MPTClient)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_setup_client(mocker, mock_mpt_client):
     """
     Create an instance of the MPT client used by the extension.
@@ -1353,7 +1353,7 @@ def mock_setup_client(mocker, mock_mpt_client):
     return mock_mpt_client
 
 
-@pytest.fixture()
+@pytest.fixture
 def created_agreement_factory():
     def _created_agreement(deployments="", is_profile_address_exists=True):
         created_agreement = {
@@ -1415,7 +1415,7 @@ def created_agreement_factory():
     return _created_agreement
 
 
-@pytest.fixture()
+@pytest.fixture
 def mpt_error_factory():
     """
     Generate an error message returned by the Marketplace platform.
@@ -1442,7 +1442,7 @@ def mpt_error_factory():
     return _mpt_error
 
 
-@pytest.fixture()
+@pytest.fixture
 def airtable_error_factory():
     """
     Generate an error message returned by the Airtable API.
@@ -1464,7 +1464,7 @@ def airtable_error_factory():
     return _airtable_error
 
 
-@pytest.fixture()
+@pytest.fixture
 def mpt_list_response():
     def _wrap_response(objects_list):
         return {
@@ -1474,7 +1474,7 @@ def mpt_list_response():
     return _wrap_response
 
 
-@pytest.fixture()
+@pytest.fixture
 def jwt_token(settings):
     iat = nbf = int(datetime.now().timestamp())
     exp = nbf + 300
@@ -1492,14 +1492,14 @@ def jwt_token(settings):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def extension_settings(settings):
     current_extension_config = copy.copy(settings.EXTENSION_CONFIG)
     yield settings
     settings.EXTENSION_CONFIG = current_extension_config
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_commitment_factory():
     def _commitment(
         licenses=None,
@@ -1535,7 +1535,7 @@ def adobe_commitment_factory():
     return _commitment
 
 
-@pytest.fixture()
+@pytest.fixture
 def adobe_customer_factory():
     def _customer(
         customer_id="a-client-id",
@@ -1601,7 +1601,7 @@ def adobe_customer_factory():
     return _customer
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_adobe_customer_deployments_items():
     return [
         {
@@ -1622,12 +1622,12 @@ def mock_adobe_customer_deployments_items():
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_adobe_customer_deployments_external_ids():
     return "deployment-1 - DE,deployment-2 - US,deployment-3 - ES"
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_pricelist_cache_factory(mocker):
     def _mocked_cache(cache=None):
         new_cache = cache or defaultdict(list)
@@ -1637,12 +1637,12 @@ def mock_pricelist_cache_factory(mocker):
     return _mocked_cache
 
 
-@pytest.fixture()
+@pytest.fixture
 def mocked_pricelist_cache(mock_pricelist_cache_factory):
     return mock_pricelist_cache_factory()
 
 
-@pytest.fixture()
+@pytest.fixture
 def mocked_setup_master_signal_handler():
     signal_handler = signal.getsignal(signal.SIGINT)
 
@@ -1653,7 +1653,7 @@ def mocked_setup_master_signal_handler():
     signal.signal(signal.SIGINT, handler)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_gradient_result():
     return [
         "#00C9CD",
@@ -1669,7 +1669,7 @@ def mock_gradient_result():
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_runtime_master_options():
     return {
         "color": True,
@@ -1679,7 +1679,7 @@ def mock_runtime_master_options():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_swoext_commands():
     return (
         "swo.mpt.extensions.runtime.commands.run.run",
@@ -1687,7 +1687,7 @@ def mock_swoext_commands():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_dispatcher_event():
     return {
         "type": "event",
@@ -1695,7 +1695,7 @@ def mock_dispatcher_event():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_workers_options():
     return {
         "color": False,
@@ -1705,7 +1705,7 @@ def mock_workers_options():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_gunicorn_logging_config():
     return {
         "version": 1,
@@ -1752,12 +1752,12 @@ def mock_gunicorn_logging_config():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_wrap_event():
     return Event("evt-id", "orders", {"id": "ORD-1111-1111"})
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_meta_with_pagination_has_more_pages():
     return {
         "$meta": {
@@ -1770,7 +1770,7 @@ def mock_meta_with_pagination_has_more_pages():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_meta_with_pagination_has_no_more_pages():
     return {
         "$meta": {
@@ -1783,12 +1783,12 @@ def mock_meta_with_pagination_has_no_more_pages():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_logging_account_prefixes():
     return ("ACC", "BUY", "LCE", "MOD", "SEL", "USR", "AUSR", "UGR")
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_logging_catalog_prefixes():
     return (
         "PRD",
@@ -1807,17 +1807,17 @@ def mock_logging_catalog_prefixes():
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_logging_commerce_prefixes():
     return ("AGR", "ORD", "SUB", "REQ")
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_logging_aux_prefixes():
     return ("FIL", "MSG")
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_logging_all_prefixes(
     mock_logging_account_prefixes,
     mock_logging_catalog_prefixes,
@@ -1832,19 +1832,19 @@ def mock_logging_all_prefixes(
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_highlights(mock_logging_all_prefixes):
     return _ReprHighlighter.highlights + [
         rf"(?P<mpt_id>(?:{'|'.join(mock_logging_all_prefixes)})(?:-\d{{4}})*)"
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_settings_product_ids():
     return ",".join(settings.MPT_PRODUCTS_IDS)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_ext_expected_environment_values(
     mock_env_webhook_secret,
     mock_env_airtable_base,
@@ -1859,32 +1859,32 @@ def mock_ext_expected_environment_values(
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_env_webhook_secret():
     return '{ "webhook_secret": "WEBHOOK_SECRET" }'
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_env_airtable_base():
     return '{ "airtable_base": "AIRTABLE_BASE" }'
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_env_airtable_pricing_base():
     return '{ "airtable_pricing_base": "AIRTABLE_PRICING_BASE" }'
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_env_product_segment():
     return '{ "product_segment": "PRODUCT_SEGMENT" }'
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_env_invalid_product_segment():
     return '{ "field_1": , , "field2": "very bad json"}'
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_valid_env_values(
     mock_env_webhook_secret,
     mock_env_airtable_base,
@@ -1899,7 +1899,7 @@ def mock_valid_env_values(
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_invalid_env_values(
     mock_env_webhook_secret,
     mock_env_airtable_base,
@@ -1914,12 +1914,12 @@ def mock_invalid_env_values(
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_worker_initialize(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.initialize")
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_adobe_client(mocker):
     m = mocker.MagicMock(spec=AdobeClient)
     mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=m)
@@ -1927,12 +1927,12 @@ def mock_adobe_client(mocker):
     return m
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_worker_call_command(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.call_command")
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_get_order_for_producer(order, order_factory):
     order = order_factory()
 
@@ -1948,7 +1948,7 @@ def mock_get_order_for_producer(order, order_factory):
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_sku_mapping_data():
     return [
         {
@@ -1968,7 +1968,7 @@ def mock_sku_mapping_data():
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
     base_info = AirTableBaseInfo(
         api_key="airtable-token",
@@ -1990,7 +1990,7 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
     return AdobeProductMapping
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_get_adobe_product_by_marketplace_sku(mock_get_sku_adobe_mapping_model):
     def get_adobe_product_by_marketplace_sku(sku):
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
