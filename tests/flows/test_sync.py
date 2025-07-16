@@ -494,7 +494,7 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock
     )
 
 
-@freeze_time("2024-11-09")
+@freeze_time("2025-07-16")
 @pytest.mark.parametrize("dry_run", [True, False])
 def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
     agreement = agreement_factory()
@@ -519,8 +519,8 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
     mocked_get_agreements_by_query.assert_called_once_with(
         mocked_mpt_client,
         "eq(status,Active)&"
-        "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),eq(displayValue,2024-11-08)))&"
-        "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2024-11-09)))&"
+        "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15))))&"
+        "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-07-16)))&"
         "select=subscriptions,authorization,parameters,listing,lines,"
         "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
         "-externalIds",
