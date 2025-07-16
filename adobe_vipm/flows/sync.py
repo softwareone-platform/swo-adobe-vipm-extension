@@ -4,6 +4,7 @@ import sys
 import traceback
 from datetime import date, datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement_subscription,
@@ -324,10 +325,13 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
     """
     logger.info("Synchronizing agreements by renewal date...")
     today = datetime.now().date().isoformat()
-    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
+    yesterday_every_month = (
+        (datetime.now() - timedelta(days=1) - relativedelta(months=m)).date().isoformat()
+        for m in range(12)
+    )
     rql_query = (
         "eq(status,Active)&"
-        f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),eq(displayValue,{yesterday})))&"
+        f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({",".join(yesterday_every_month)}))))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
         "select=subscriptions,authorization,parameters,listing,lines,"
