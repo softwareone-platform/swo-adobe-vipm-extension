@@ -281,6 +281,12 @@ def _get_subscriptions_for_update(
                 subscription["id"],
                 auto_renewal=False,
             )
+            update_agreement_subscription(
+                mpt_client,
+                subscription["id"],
+                autoRenew=False,
+            )
+
             send_exception(title="Price currency mismatch detected!", text=f"{subscription}")
             continue
 

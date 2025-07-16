@@ -2309,6 +2309,10 @@ def test_get_subscriptions_for_update_wrong_currency(
         "adobe_vipm.flows.sync.send_exception",
         spec=True,
     )
+    mock_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.sync.update_agreement_subscription",
+        spec=True,
+    )
 
     _get_subscriptions_for_update(
         mock_mpt_client,
@@ -2320,6 +2324,9 @@ def test_get_subscriptions_for_update_wrong_currency(
 
     mock_adobe_client.update_subscription.assert_called_once_with(
         "AUT-1234-5678", "a-client-id", "SUB-1000-2000-3000", auto_renewal=False
+    )
+    mock_update_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, "SUB-1000-2000-3000", autoRenew=False
     )
     mock_send_exception.assert_called_once_with(
         title="Price currency mismatch detected!",
