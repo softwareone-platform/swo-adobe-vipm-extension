@@ -98,8 +98,7 @@ def get_authorization(mpt_client, agreement_deployment):
 
     if not authorizations:
         logger.exception(
-            f"Authorization not found for agreement deployment "
-            f"{agreement_deployment.deployment_id}"
+            f"Authorization not found for agreement deployment {agreement_deployment.deployment_id}"
         )
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
@@ -527,7 +526,7 @@ def process_agreement_deployment(
             authorization_id, agreement_deployment.customer_id
         )
         customer_deployment_ids = [
-            f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
+            f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
             for deployment in customer_deployments
         ]
 

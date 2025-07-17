@@ -611,7 +611,6 @@ def test_set_or_update_coterm_date_step_with_3yc(
         parameters=context.order["parameters"],
     )
 
-
     parameter_list = []
     parameter_list.append(
         get_fulfillment_parameter(context.order, Param.THREE_YC_ENROLL_STATUS)["value"]
@@ -625,9 +624,7 @@ def test_set_or_update_coterm_date_step_with_3yc(
     parameter_list.append(
         get_fulfillment_parameter(context.order, Param.THREE_YC_END_DATE)["value"]
     )
-    parameter_list.append(
-        get_fulfillment_parameter(context.order, Param.THREE_YC)
-    )
+    parameter_list.append(get_fulfillment_parameter(context.order, Param.THREE_YC))
 
     assert parameter_list == [
         commitment["status"],
@@ -1410,7 +1407,7 @@ def test_create_or_update_subscriptions_step(
         mocked_client,
         context.order_id,
         {
-            "name": f"Subscription for {order["lines"][0]['item']['name']}",
+            "name": f"Subscription for {order['lines'][0]['item']['name']}",
             "parameters": {
                 "fulfillment": [
                     {

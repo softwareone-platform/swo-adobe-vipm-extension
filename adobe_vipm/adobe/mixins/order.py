@@ -438,7 +438,7 @@ class OrderClientMixin:
         Returns:
             dict: The RETURN order.
         """
-        external_reference_id = f"{order_created["externalReferenceId"]}_{order_created["orderId"]}"
+        external_reference_id = f"{order_created['externalReferenceId']}_{order_created['orderId']}"
         adobe_order_id = order_created["orderId"]
         currency_code = self._config.get_authorization(authorization_id).currency
         adobe_line_items = order_created["lineItems"]

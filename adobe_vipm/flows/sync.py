@@ -331,7 +331,7 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
     )
     rql_query = (
         "eq(status,Active)&"
-        f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({",".join(yesterday_every_month)}))))&"
+        f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
         "select=subscriptions,authorization,parameters,listing,lines,"
@@ -418,13 +418,13 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
         parameters = {Param.PHASE_FULFILLMENT: []}
         global_customer_enabled = get_global_customer(agreement)
         if global_customer_enabled != ["Yes"]:
-            logger.info(f"Setting global customer for agreement {agreement["id"]}")
+            logger.info(f"Setting global customer for agreement {agreement['id']}")
             parameters[Param.PHASE_FULFILLMENT].append(
                 {"externalId": "globalCustomer", "value": ["Yes"]}
             )
 
         deployments = [
-            f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
+            f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
             for deployment in customer_deployments
         ]
         agreement_deployments = get_deployments(agreement)
@@ -432,12 +432,12 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
             parameters[Param.PHASE_FULFILLMENT].append(
                 {"externalId": "deployments", "value": ",".join(deployments)}
             )
-            logger.info(f"Setting deployments for agreement {agreement["id"]}")
+            logger.info(f"Setting deployments for agreement {agreement['id']}")
         if parameters[Param.PHASE_FULFILLMENT]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception as e:
         logger.exception(
-            f"Error setting global customer parameters for agreement {agreement["id"]}: {e}"
+            f"Error setting global customer parameters for agreement {agreement['id']}: {e}"
         )
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
 
@@ -498,7 +498,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
     try:
         customer_id = get_adobe_customer_id(agreement)
         adobe_client = get_adobe_client()
-        logger.info(f"Synchronizing agreement {agreement["id"]}...")
+        logger.info(f"Synchronizing agreement {agreement['id']}...")
 
         processing_subscriptions = list(
             filter(
@@ -508,7 +508,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
         )
 
         if len(processing_subscriptions) > 0:
-            logger.info(f"Agreement {agreement["id"]} has processing subscriptions, skip it")
+            logger.info(f"Agreement {agreement['id']} has processing subscriptions, skip it")
             return
 
         try:
@@ -551,7 +551,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
     except AuthorizationNotFoundError as e:
         logger.error(f"AuthorizationNotFoundError synchronizing agreement {agreement['id']}: {e}")
     except Exception as e:
-        logger.exception(f"Error synchronizing agreement {agreement["id"]}: {e}")
+        logger.exception(f"Error synchronizing agreement {agreement['id']}: {e}")
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
     else:
         if not dry_run:

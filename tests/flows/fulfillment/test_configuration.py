@@ -104,11 +104,11 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     )
     mocked_adobe_client.update_subscription.assert_not_called()
 
-    error_message = f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}"
+    error_message = f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}"
 
     mocked_notify.assert_called_once_with(
         order["id"],
-        f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}",
+        f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}",
         [],
         context.product_id,
     )
@@ -280,11 +280,11 @@ def test_subscription_update_auto_renewal_step_all_failed(
     )
     mocked_adobe_client.update_subscription.assert_not_called()
 
-    error_message = f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}"
+    error_message = f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}"
 
     mocked_notify.assert_called_once_with(
         order["id"],
-        f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}",
+        f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}",
         [],
         context.product_id,
     )

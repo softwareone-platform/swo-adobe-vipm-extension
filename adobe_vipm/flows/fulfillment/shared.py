@@ -251,8 +251,7 @@ def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
         )
         return
     logger.info(
-        f'The order {order["id"]} ({adobe_order_id}) '
-        f"has reached the due date ({due_date_str}).",
+        f"The order {order['id']} ({adobe_order_id}) has reached the due date ({due_date_str}).",
     )
     reason = f"Due date is reached ({due_date_str})."
     fail_order(client, order["id"], reason, ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason))
@@ -284,7 +283,7 @@ def switch_order_to_completed(client, order, template_name):
     )
     order["agreement"] = agreement
     send_mpt_notification(client, order)
-    logger.info(f'Order {order["id"]} has been completed successfully')
+    logger.info(f"Order {order['id']} has been completed successfully")
 
 
 def add_subscription(client, adobe_subscription, order, line):
@@ -344,8 +343,8 @@ def add_subscription(client, adobe_subscription, order, line):
         }
         subscription = create_subscription(client, order["id"], subscription)
         logger.info(
-            f'Subscription {line["subscriptionId"]} ({subscription["id"]}) '
-            f'created for order {order["id"]}'
+            f"Subscription {line['subscriptionId']} ({subscription['id']}) "
+            f"created for order {order['id']}"
         )
     return subscription
 
@@ -803,7 +802,7 @@ class SubmitNewOrder(Step):
                 context.adobe_preview_order,
                 deployment_id=deployment_id,
             )
-            logger.info(f'{context}: new adobe order created: {adobe_order["orderId"]}')
+            logger.info(f"{context}: new adobe order created: {adobe_order['orderId']}")
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
             update_order(client, context.order_id, externalIds=context.order["externalIds"])
         elif not context.adobe_new_order_id and not context.adobe_preview_order:
@@ -909,8 +908,8 @@ class CreateOrUpdateSubscriptions(Step):
                     }
                     subscription = create_subscription(client, context.order_id, subscription)
                     logger.info(
-                        f'{context}: subscription {line["subscriptionId"]} '
-                        f'({subscription["id"]}) created'
+                        f"{context}: subscription {line['subscriptionId']} "
+                        f"({subscription['id']}) created"
                     )
                 else:
                     adobe_sku = line["offerId"]
@@ -921,8 +920,8 @@ class CreateOrUpdateSubscriptions(Step):
                         adobe_sku,
                     )
                     logger.info(
-                        f'{context}: subscription {line["subscriptionId"]} '
-                        f'({order_subscription["id"]}) updated'
+                        f"{context}: subscription {line['subscriptionId']} "
+                        f"({order_subscription['id']}) updated"
                     )
         next_step(client, context)
 
@@ -1013,8 +1012,7 @@ def send_gc_mpt_notification(mpt_client, order: dict, items_with_deployment: lis
     }
 
     subject = (
-        f"This order need your attention {order['id']} "
-        f"for {order['agreement']['buyer']['name']}"
+        f"This order need your attention {order['id']} for {order['agreement']['buyer']['name']}"
     )
 
     mpt_notify(
