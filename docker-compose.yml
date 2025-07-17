@@ -6,7 +6,7 @@ services:
       dockerfile: prod.Dockerfile
     working_dir: /extension
     command: swoext run --no-color
-    volumes: 
+    volumes:
       - .:/extension
     env_file:
       - .env

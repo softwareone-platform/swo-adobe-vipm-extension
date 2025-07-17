@@ -30,7 +30,7 @@ def fulfill_order(client, order):
     Returns:
         None
     """
-    logger.info(f'Start processing {order["type"]} order {order["id"]}')
+    logger.info(f"Start processing {order['type']} order {order['id']}")
     try:
         match order["type"]:
             case constants.ORDER_TYPE_PURCHASE:

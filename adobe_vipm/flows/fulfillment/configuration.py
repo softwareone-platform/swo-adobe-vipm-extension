@@ -33,7 +33,7 @@ def fulfill_configuration_order(client, order):
     """
     Fulfills a configuration order.
     """
-    logger.info(f'Start processing {order["type"]} order {order["id"]}')
+    logger.info(f"Start processing {order['type']} order {order['id']}")
 
     template_name = get_configuration_template_name(order)
 

@@ -152,7 +152,7 @@ def get_agreements_by_3yc_enroll_status(
 ):
     param_condition = (
         f"any(parameters.fulfillment,"
-        f"and(eq(externalId,3YCEnrollStatus),in(displayValue,({",".join(enroll_statuses)}))))"
+        f"and(eq(externalId,3YCEnrollStatus),in(displayValue,({','.join(enroll_statuses)}))))"
     )
     status_condition = f"eq(status,{status})"
 

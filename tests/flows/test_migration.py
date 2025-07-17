@@ -235,7 +235,7 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     assert mock_transfer.status == "failed"
     assert mock_transfer.migration_error_description == (
         "An unexpected error has been received from Adobe asking for preview "
-            f"of transfer for Membership **{mock_transfer.membership_id}**."
+        f"of transfer for Membership **{mock_transfer.membership_id}**."
     )
     mocked_send_exception.assert_called_once_with(
         "Adobe error received during transfer preview.",

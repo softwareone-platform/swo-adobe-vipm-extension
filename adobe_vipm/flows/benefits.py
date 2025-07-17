@@ -132,7 +132,7 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                     "To request the 3YC again, as a Vendor user, "
                     "modify the Agreement and mark the 3-year "
                     f"{request_type_title} {request_type_param_phase} parameter checkbox again.",
-                    button=Button(f"Open {agreement["id"]}", agreement_link),
+                    button=Button(f"Open {agreement['id']}", agreement_link),
                 )
         except Exception:
             logger.exception(
