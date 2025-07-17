@@ -276,6 +276,7 @@ def _get_subscriptions_for_update(
 
         if adobe_subscription["status"] == AdobeStatus.STATUS_SUBSCRIPTION_TERMINATED:
             logger.info(f"Skipping subscription {subscription['id']}. It is terminated by Adobe.")
+            continue
 
         actual_sku = adobe_subscription["offerId"]
 
