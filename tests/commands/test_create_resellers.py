@@ -53,7 +53,7 @@ def test_invalid_file_too_many_sheets(mocker, adobe_authorizations_file, tmp_pat
             tmp_path / "test.xlsx",
         )
 
-    assert str(pr.value) == f"Too many worksheet in the input file: {',' .join(wb.sheetnames)}."
+    assert str(pr.value) == f"Too many worksheet in the input file: {','.join(wb.sheetnames)}."
 
 
 def test_invalid_file_invalid_columns(mocker, adobe_authorizations_file, tmp_path):

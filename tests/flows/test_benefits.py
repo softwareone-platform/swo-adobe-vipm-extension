@@ -202,7 +202,7 @@ def test_check_3yc_commitment_request_declined(
         "To request the 3YC again, as a Vendor user, "
         "modify the Agreement and mark the 3-year "
         f"{request_type_title} {request_type_param_phase} parameter checkbox again.",
-        button=Button(f"Open {agreement["id"]}", agreement_link),
+        button=Button(f"Open {agreement['id']}", agreement_link),
     )
 
 

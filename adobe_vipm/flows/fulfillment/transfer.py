@@ -609,8 +609,9 @@ def send_gc_agreement_deployments_notification(
         None
     """
     facts = {
-        f"Deployment ID: {deployment.get("deploymentId")}": f"Country: {
-            deployment.get("companyProfile", {}).get("address", {}).get("country", "")}"
+        f"Deployment ID: {deployment.get('deploymentId')}": f"Country: {
+            deployment.get('companyProfile', {}).get('address', {}).get('country', '')
+        }"
         for deployment in customer_deployments
     }
     agreement_deployment_view_link = get_agreement_deployment_view_link(product_id)
@@ -891,7 +892,7 @@ def save_gc_parameters(mpt_client, order, customer_deployments):
         return order
 
     deployments = [
-        f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
+        f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
         for deployment in customer_deployments
     ]
     order = set_global_customer(order, "Yes")

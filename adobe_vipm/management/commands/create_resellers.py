@@ -80,7 +80,7 @@ class Command(BaseCommand):
     def validate_input_file(self, workbook):
         if len(workbook.sheetnames) > 1:
             raise CommandError(
-                f"Too many worksheet in the input file: {',' .join(workbook.sheetnames)}.",
+                f"Too many worksheet in the input file: {','.join(workbook.sheetnames)}.",
             )
         ws = workbook.active
 
