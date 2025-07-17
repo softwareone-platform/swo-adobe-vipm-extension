@@ -15,6 +15,7 @@ dependencies = [
     "phonenumbers==8.13.*",
     "pyairtable==2.3.*",
     "pymsteams==0.2.*",
+    "python-dateutil==2.9.*",
     "regex>=2024.7.24,<2025",
     "requests==2.32.*",
     "types-openpyxl==3.1.*",
