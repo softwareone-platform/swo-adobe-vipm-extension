@@ -1673,7 +1673,7 @@ def mock_runtime_master_options():
 @pytest.fixture
 def mock_swoext_commands():
     return (
-        "swo.mpt.extensions.runtime.commands.run.run",
+        "mpt_extension_sdk.runtime.commands.run.run",
         "mpt_extension_sdk.runtime.commands.django.django",
     )
 

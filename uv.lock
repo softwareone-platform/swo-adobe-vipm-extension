@@ -623,7 +623,7 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "5.3.0"
+version = "5.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -654,9 +654,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/40/faacba345717e8144d58c155b3051b362b3511cba89167f650b9a6cfac5c/mpt_extension_sdk-5.3.0.tar.gz", hash = "sha256:c54102af937a02ec227b3e6468be2f78d0f81af0435c0ff5b73bdfa73738eef2", size = 26417, upload-time = "2025-07-11T08:23:42.945Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2f/35/385e222d482e7811af7bf6ff5a10e5d0e00e3ef53ebb591d36adf2a48303/mpt_extension_sdk-5.4.0.tar.gz", hash = "sha256:9b3f064d9c166877029ecd196f3fbc82c6a91468f2105c901dae303034e0e07e", size = 26324, upload-time = "2025-07-17T13:21:09.352Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/37/33e0651cbe2f0ff6175ea1bcd243cc277f2cade3cf52d8703e7c4d8569bc/mpt_extension_sdk-5.3.0-py3-none-any.whl", hash = "sha256:45d6a3e6a457aaf586f1cd83997254e8a042a3f2c3206d9fcb515647fa669feb", size = 38063, upload-time = "2025-07-11T08:23:41.83Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/1f/61ae5ff8b0dd9ee6924ce8def34b13256550fc27b731ea8c302bec460d2e/mpt_extension_sdk-5.4.0-py3-none-any.whl", hash = "sha256:d7534dc74e2cf5da2d80e25e979ce4b9ed8cbacaebd0f7c58d1fb37fc26416b8", size = 38069, upload-time = "2025-07-17T13:21:08.242Z" },
 ]
 
 [[package]]
@@ -1512,7 +1512,7 @@ requires-dist = [
     { name = "django", specifier = "==4.2.*" },
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "markdown-it-py", specifier = "==3.0.*" },
-    { name = "mpt-extension-sdk", specifier = "==5.3.*" },
+    { name = "mpt-extension-sdk", specifier = "==5.4.*" },
     { name = "openpyxl", specifier = "==3.1.*" },
     { name = "phonenumbers", specifier = "==8.13.*" },
     { name = "pyairtable", specifier = "==2.3.*" },
@@ -1589,11 +1589,11 @@ wheels = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.9.0"
+version = "4.14.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0c/1d/eb26f5e75100d531d7399ae800814b069bc2ed2a7410834d57374d010d96/typing_extensions-4.9.0.tar.gz", hash = "sha256:23478f88c37f27d76ac8aee6c905017a143b0b1b886c3c9f66bc2fd94f9f5783", size = 74918, upload-time = "2023-12-10T01:14:22.627Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/5a/da40306b885cc8c09109dc2e1abd358d5684b1425678151cdaed4731c822/typing_extensions-4.14.1.tar.gz", hash = "sha256:38b39f4aeeab64884ce9f74c94263ef78f3c22467c8724005483154c26648d36", size = 107673, upload-time = "2025-07-04T13:28:34.16Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/f4/6a90020cd2d93349b442bfcb657d0dc91eee65491600b2cb1d388bc98e6b/typing_extensions-4.9.0-py3-none-any.whl", hash = "sha256:af72aea155e91adfc61c3ae9e0e342dbc0cba726d6cba4b6c72c1f34e47291cd", size = 32750, upload-time = "2023-12-10T01:14:20.617Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/00/d631e67a838026495268c2f6884f3711a15a9a2a96cd244fdaea53b823fb/typing_extensions-4.14.1-py3-none-any.whl", hash = "sha256:d1e1e3b58374dc93031d6eda2420a48ea44a36c2b4766a4fdeb3710755731d76", size = 43906, upload-time = "2025-07-04T13:28:32.743Z" },
 ]
 
 [[package]]
