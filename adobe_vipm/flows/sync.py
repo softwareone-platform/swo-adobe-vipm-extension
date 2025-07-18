@@ -48,11 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 def sync_agreement_prices(
-    mpt_client: MPTClient,
-    agreement: dict,
-    dry_run: bool,
-    adobe_client: AdobeClient,
-    customer: dict,
+    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict, dry_run: bool
 ) -> None:
     """
     Updates the purchase prices of an Agreement (subscriptions and One-Time items)
@@ -61,7 +57,7 @@ def sync_agreement_prices(
     commitment_start_date = get_commitment_start_date(customer)
 
     subscriptions_for_update = _get_subscriptions_for_update(
-        adobe_client, agreement, customer, mpt_client
+        mpt_client, adobe_client, agreement, customer
     )
 
     product_id = agreement["product"]["id"]
@@ -80,6 +76,8 @@ def sync_agreement_prices(
 
     _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
 
+
+def _update_agreement(mpt_client, customer, agreement, dry_run):
     parameters = {}
     commitment_info = get_3yc_commitment(customer)
     if commitment_info:
@@ -95,7 +93,6 @@ def sync_agreement_prices(
                 parameters[Param.PHASE_ORDERING].append(
                     {"externalId": Param.THREE_YC_CONSUMABLES, "value": str(mq.get("quantity"))}
                 )
-
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -103,7 +100,6 @@ def sync_agreement_prices(
             lines=agreement["lines"],
             parameters=parameters,
         )
-
     logger.info(f"Agreement updated {agreement['id']}")
 
 
@@ -257,7 +253,7 @@ def _update_subscriptions(
 
 
 def _get_subscriptions_for_update(
-    adobe_client: AdobeClient, agreement: dict, customer: dict, mpt_client: MPTClient
+    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
 ) -> list[tuple[dict, dict, str]]:
     for_update = []
 
@@ -532,7 +528,9 @@ def sync_agreement(mpt_client, agreement, dry_run):
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
 
-        sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer)
+        sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run)
+
+        _update_agreement(mpt_client, customer, agreement, dry_run)
 
         if customer.get("globalSalesEnabled", False):
             authorization_id = agreement["authorization"]["id"]
@@ -585,7 +583,10 @@ def sync_deployments_prices(
     )
 
     for deployment_agreement in deployment_agreements:
-        sync_agreement_prices(mpt_client, deployment_agreement, dry_run, adobe_client, customer)
+        sync_agreement_prices(mpt_client, adobe_client, deployment_agreement, customer, dry_run)
+
+        _update_agreement(mpt_client, customer, deployment_agreement, dry_run)
+
         sync_gc_3yc_agreements(
             mpt_client,
             main_agreement,

@@ -2302,10 +2302,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     )
     assert (
         _get_subscriptions_for_update(
-            mock_adobe_client,
-            agreement_factory(),
-            adobe_customer_factory(),
-            mock_mpt_client,
+            mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
         )
         == []
     )
