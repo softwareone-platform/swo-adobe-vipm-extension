@@ -30,10 +30,7 @@ class OrderClientMixin:
     @staticmethod
     def _is_processed(order_item):
         order, item = order_item
-        return (
-            order["status"] == AdobeStatus.STATUS_PROCESSED
-            and item["status"] == AdobeStatus.STATUS_PROCESSED
-        )
+        return order["status"] == AdobeStatus.PROCESSED and item["status"] == AdobeStatus.PROCESSED
 
     @wrap_http_error
     def get_orders(self, authorization_id, customer_id, filters=None):
@@ -309,7 +306,7 @@ class OrderClientMixin:
             customer_id,
             filters={
                 "order-type": ORDER_TYPE_RETURN,
-                "status": [AdobeStatus.STATUS_PROCESSED, AdobeStatus.STATUS_PENDING],
+                "status": [AdobeStatus.PROCESSED, AdobeStatus.PENDING],
             },
         )
         results = defaultdict(list)

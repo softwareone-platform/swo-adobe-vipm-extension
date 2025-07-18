@@ -132,9 +132,9 @@ class CreateCustomer(Step):
 
     def handle_error(self, client, context, error):
         if error.code not in (
-            AdobeStatus.STATUS_INVALID_ADDRESS,
-            AdobeStatus.STATUS_INVALID_FIELDS,
-            AdobeStatus.STATUS_INVALID_MINIMUM_QUANTITY,
+            AdobeStatus.INVALID_ADDRESS,
+            AdobeStatus.INVALID_FIELDS,
+            AdobeStatus.INVALID_MINIMUM_QUANTITY,
         ):
             switch_order_to_failed(
                 client,
@@ -142,14 +142,14 @@ class CreateCustomer(Step):
                 ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
             )
             return
-        if error.code == AdobeStatus.STATUS_INVALID_ADDRESS:
+        if error.code == AdobeStatus.INVALID_ADDRESS:
             param = get_ordering_parameter(context.order, Param.ADDRESS)
             context.order = set_ordering_parameter_error(
                 context.order,
                 Param.ADDRESS,
                 ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
             )
-        elif error.code == AdobeStatus.STATUS_INVALID_MINIMUM_QUANTITY:
+        elif error.code == AdobeStatus.INVALID_MINIMUM_QUANTITY:
             if "LICENSE" in str(error):
                 param = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
                 context.order = set_ordering_parameter_error(

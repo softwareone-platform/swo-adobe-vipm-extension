@@ -274,7 +274,7 @@ def _get_subscriptions_for_update(
             subscription_id=adobe_subscription_id,
         )
 
-        if adobe_subscription["status"] == AdobeStatus.STATUS_SUBSCRIPTION_TERMINATED:
+        if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
             logger.info(f"Skipping subscription {subscription['id']}. It is terminated by Adobe.")
             continue
 
@@ -515,7 +515,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
         try:
             customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
         except AdobeAPIError as e:
-            if e.code == AdobeStatus.STATUS_INVALID_CUSTOMER:
+            if e.code == AdobeStatus.INVALID_CUSTOMER:
                 msg = (
                     f"Received Adobe error {e.code} - {e.message},"
                     " assuming lost customer and proceeding with lost customer procedure."

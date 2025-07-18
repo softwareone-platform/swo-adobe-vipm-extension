@@ -1204,7 +1204,7 @@ def adobe_order_factory(adobe_items_factory):
             order["referenceOrderId"] = reference_order_id
         if status:
             order["status"] = status
-        if status in [AdobeStatus.STATUS_PENDING, AdobeStatus.STATUS_PROCESSED] or order_id:
+        if status in [AdobeStatus.PENDING, AdobeStatus.PROCESSED] or order_id:
             order["orderId"] = order_id or "P0123456789"
         if creation_date:
             order["creationDate"] = creation_date
@@ -1222,7 +1222,7 @@ def adobe_subscription_factory():
         renewal_quantity=10,
         autorenewal_enabled=True,
         deployment_id="",
-        status=AdobeStatus.STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED,
         renewal_date=None,
     ):
         return {
@@ -1263,7 +1263,7 @@ def adobe_transfer_factory(adobe_items_factory):
     def _transfer(
         transfer_id="a-transfer-id",
         customer_id="",
-        status=AdobeStatus.STATUS_PENDING,
+        status=AdobeStatus.PENDING,
         items=None,
         membership_id="membership-id",
     ):
