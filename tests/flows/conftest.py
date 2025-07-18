@@ -57,3 +57,18 @@ def mock_notify_processing_lost_customer(mocker):
 @pytest.fixture
 def mock_get_adobe_client(mocker, mock_adobe_client):
     return mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mock_adobe_client)
+
+
+@pytest.fixture
+def mock_get_agreement_subscription(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.get_agreement_subscription",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_update_agreement_subscription(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.update_agreement_subscription",
+    )
