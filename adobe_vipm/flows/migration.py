@@ -156,7 +156,7 @@ def populate_offers_for_transfer(product_id, transfer, transfer_preview):
 
 def handle_preview_error(transfer, api_err):
     """Handle Adobe API errors during transfer preview"""
-    if api_err.code == AdobeStatus.STATUS_TRANSFER_ALREADY_TRANSFERRED:
+    if api_err.code == AdobeStatus.TRANSFER_ALREADY_TRANSFERRED:
         return True
 
     transfer.adobe_error_code = api_err.code
@@ -323,11 +323,11 @@ def check_running_transfers_for_product(product_id):
             transfer.save()
             continue
 
-        if adobe_transfer["status"] == AdobeStatus.STATUS_PENDING:
+        if adobe_transfer["status"] == AdobeStatus.PENDING:
             check_retries(transfer)
             continue
 
-        elif adobe_transfer["status"] != AdobeStatus.STATUS_PROCESSED:
+        elif adobe_transfer["status"] != AdobeStatus.PROCESSED:
             transfer.migration_error_description = (
                 f"Unexpected status ({adobe_transfer['status']}) "
                 "received from Adobe while retrieving transfer."
@@ -412,7 +412,7 @@ def check_running_transfers_for_product(product_id):
 
 def _update_subscriptions(client, subscriptions, transfer):
     for subscription in subscriptions["items"]:
-        if subscription["status"] != AdobeStatus.STATUS_PROCESSED:
+        if subscription["status"] != AdobeStatus.PROCESSED:
             continue
         client.update_subscription(
             transfer.authorization_uk,

@@ -344,6 +344,7 @@ ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
 
 class SubscriptionStatus(StrEnum):
     TERMINATED = "Terminated"
+    EXPIRED = "Expired"
 
 
 class AgreementStatus(StrEnum):

@@ -901,7 +901,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
             adobe_subscription_factory(
-                deployment_id="deployment_id", status=AdobeStatus.STATUS_INACTIVE_OR_GENERIC_FAILURE
+                deployment_id="deployment_id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE
             ),
         ]
     }

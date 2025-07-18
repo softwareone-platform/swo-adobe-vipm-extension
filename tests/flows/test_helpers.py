@@ -228,7 +228,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     adobe_client, _, _ = adobe_client_factory()
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_api_error = adobe_api_error_factory(
-        code=AdobeStatus.STATUS_INTERNAL_SERVER_ERROR,
+        code=AdobeStatus.INTERNAL_SERVER_ERROR,
         message="Internal Server Error",
     )
 

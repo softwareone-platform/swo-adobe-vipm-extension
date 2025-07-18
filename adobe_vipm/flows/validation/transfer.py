@@ -317,7 +317,7 @@ class ValidateTransferStatus(Step):
             self._set_transfer_error(context, order, "Membership has already been migrated")
             return
 
-        if context.adobe_transfer["status"] == AdobeStatus.STATUS_TRANSFER_INACTIVE_ACCOUNT:
+        if context.adobe_transfer["status"] == AdobeStatus.TRANSFER_INACTIVE_ACCOUNT:
             context.order = set_ordering_parameter_error(
                 context.order,
                 Param.MEMBERSHIP_ID,
