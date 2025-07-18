@@ -734,7 +734,7 @@ class SubmitReturnOrders(Step):
         pending_orders = [
             return_order["orderId"]
             for return_order in all_return_orders
-            if return_order["status"] != AdobeStatus.STATUS_PROCESSED
+            if return_order["status"] != AdobeStatus.PROCESSED
         ]
 
         if pending_orders:
@@ -817,7 +817,7 @@ class SubmitNewOrder(Step):
             )
         context.adobe_new_order = adobe_order
         context.adobe_new_order_id = adobe_order["orderId"]
-        if adobe_order["status"] == AdobeStatus.STATUS_PENDING:
+        if adobe_order["status"] == AdobeStatus.PENDING:
             logger.info(f"{context}: adobe order {context.adobe_new_order_id} is still pending.")
             return
         elif adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
@@ -831,7 +831,7 @@ class SubmitNewOrder(Step):
             )
             logger.warning(f"{context}: The adobe order has been failed {error['message']}.")
             return
-        elif adobe_order["status"] != AdobeStatus.STATUS_PROCESSED:
+        elif adobe_order["status"] != AdobeStatus.PROCESSED:
             error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status=adobe_order["status"])
             switch_order_to_failed(client, context.order, error)
             logger.warning(f"{context}: the order has been failed due to {error['message']}.")
@@ -862,7 +862,7 @@ class CreateOrUpdateSubscriptions(Step):
                         line["subscriptionId"],
                     )
 
-                    if adobe_subscription["status"] != AdobeStatus.STATUS_PROCESSED:
+                    if adobe_subscription["status"] != AdobeStatus.PROCESSED:
                         logger.warning(
                             f"{context}: subscription {adobe_subscription['subscriptionId']} "
                             f"for customer {context.adobe_customer_id} is in status "

@@ -196,8 +196,7 @@ class UpdateRenewalQuantities(Step):
                 )
             except AdobeAPIError as e:
                 if not (
-                    e.code == AdobeStatus.STATUS_LINE_ITEM_OFFER_ID_EXPIRED
-                    and context.adobe_new_order
+                    e.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order
                 ):
                     logger.error(
                         f"{context}: failed to update renewal quantity for "
@@ -227,8 +226,8 @@ class UpdateRenewalQuantities(Step):
     def _handle_subscription_update_error(self, adobe_client, client, context, e):
         self._rollback_updated_subscriptions(adobe_client, context)
         if e.code in [
-            AdobeStatus.STATUS_INVALID_RENEWAL_STATE,
-            AdobeStatus.STATUS_SUBSCRIPTION_INACTIVE,
+            AdobeStatus.INVALID_RENEWAL_STATE,
+            AdobeStatus.SUBSCRIPTION_INACTIVE,
         ]:
             switch_order_to_failed(
                 client,

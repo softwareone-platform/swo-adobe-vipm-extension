@@ -2119,7 +2119,7 @@ def test_sync_agreement_lost_customer(
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.STATUS_INVALID_CUSTOMER),
+        status_code=int(AdobeStatus.INVALID_CUSTOMER),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
 
@@ -2164,7 +2164,7 @@ def test_sync_agreement_lost_customer_error(
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.STATUS_INVALID_CUSTOMER),
+        status_code=int(AdobeStatus.INVALID_CUSTOMER),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
     mock_terminate_subscription.side_effect = [
@@ -2298,7 +2298,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     adobe_subscription_factory,
 ):
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
-        status=AdobeStatus.STATUS_SUBSCRIPTION_TERMINATED
+        status=AdobeStatus.SUBSCRIPTION_TERMINATED
     )
     assert (
         _get_subscriptions_for_update(
