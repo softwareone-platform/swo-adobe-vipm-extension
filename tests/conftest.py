@@ -1959,6 +1959,7 @@ def mock_sku_mapping_data():
             "segment": "segment_1",
             "name": "name_1",
             "type_3yc": "License",
+            "end_of_sale": False,
         },
         {
             "vendor_external_id": "77777777CA",
@@ -1966,6 +1967,7 @@ def mock_sku_mapping_data():
             "segment": "segment_2",
             "name": "name_2",
             "type_3yc": "Consumable",
+            "end_of_sale": False,
         },
     ]
 
