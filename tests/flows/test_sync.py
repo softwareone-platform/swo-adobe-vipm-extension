@@ -9,6 +9,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.flows.constants import AgreementStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
+    _get_subscriptions_for_update,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_3yc_enroll_status,
@@ -2287,3 +2288,24 @@ def test_sync_agreement_skips_inactive_agreement(mock_mpt_client, mock_get_adobe
     sync_agreement(mock_mpt_client, agreement, False)
 
     mock_get_adobe_client.update_last_sync_date.assert_not_called()
+
+
+def test_get_subscriptions_for_update_skip_adobe_inactive(
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    agreement_factory,
+    adobe_subscription_factory,
+):
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        status=AdobeStatus.STATUS_SUBSCRIPTION_TERMINATED
+    )
+    assert (
+        _get_subscriptions_for_update(
+            mock_adobe_client,
+            agreement_factory(),
+            adobe_customer_factory(),
+            mock_mpt_client,
+        )
+        == []
+    )
