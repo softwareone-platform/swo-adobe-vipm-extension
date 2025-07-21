@@ -6,7 +6,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
-from adobe_vipm.flows.constants import AgreementStatus
+from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _get_subscriptions_for_update,
@@ -21,6 +21,11 @@ from adobe_vipm.flows.sync import (
 from adobe_vipm.flows.utils import get_adobe_customer_id
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
+
+
+@pytest.fixture(autouse=True)
+def mock_is_sku_end_of_sale(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.is_sku_end_of_sale", return_value=False, spec=True)
 
 
 @freeze_time("2025-06-23")
@@ -2083,10 +2088,6 @@ def test_sync_agreement_prices_with_missing_prices(
     assert call_args[2] == agreement["product"]["id"]
     assert call_args[3] == agreement["listing"]["priceList"]["currency"]
 
-    assert len(mocked_update_agreement_subscription.call_args_list) == 1
-    update_call = mocked_update_agreement_subscription.call_args_list[0]
-    assert update_call[1]["lines"][0]["price"]["unitPP"] == 20.22
-
     mocked_update_agreement.call_args_list = [
         mocker.call(
             mocked_mpt_client,
@@ -2101,10 +2102,28 @@ def test_sync_agreement_prices_with_missing_prices(
     ]
 
     assert len(mocked_adobe_client.get_subscription.call_args_list) == 3
-
-    assert "77777777CA01A13" not in [
-        call[1]["lines"][0]["price"]["unitPP"]
-        for call in mocked_update_agreement_subscription.call_args_list
+    assert mocked_update_agreement_subscription.mock_calls == [
+        mocker.call(
+            mocked_mpt_client,
+            terminated_mpt_subscription["id"],
+            status=SubscriptionStatus.EXPIRED,
+        ),
+        mocker.call(
+            mocked_mpt_client,
+            another_mpt_subscription["id"],
+            lines=[{"price": {"unitPP": 20.22}, "id": "ALI-2119-4550-8674-5962-0001"}],
+            parameters={
+                "fulfillment": [
+                    {"externalId": Param.ADOBE_SKU, "value": "77777777CA01A12"},
+                    {"externalId": Param.CURRENT_QUANTITY, "value": "15"},
+                    {"externalId": Param.RENEWAL_QUANTITY, "value": "15"},
+                    {"externalId": Param.RENEWAL_DATE, "value": "2026-06-20"},
+                    {"externalId": Param.LAST_SYNC_DATE, "value": "2025-06-19"},
+                ]
+            },
+            commitmentDate="2025-04-04",
+            autoRenew=True,
+        ),
     ]
 
 
@@ -2119,7 +2138,7 @@ def test_sync_agreement_lost_customer(
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.STATUS_INVALID_CUSTOMER),
+        status_code=int(AdobeStatus.INVALID_CUSTOMER),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
 
@@ -2164,7 +2183,7 @@ def test_sync_agreement_lost_customer_error(
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.STATUS_INVALID_CUSTOMER),
+        status_code=int(AdobeStatus.INVALID_CUSTOMER),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
     mock_terminate_subscription.side_effect = [
@@ -2298,14 +2317,71 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     adobe_subscription_factory,
 ):
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
-        status=AdobeStatus.STATUS_SUBSCRIPTION_TERMINATED
+        status=AdobeStatus.SUBSCRIPTION_TERMINATED
     )
+
     assert (
         _get_subscriptions_for_update(
-            mock_adobe_client,
-            agreement_factory(),
-            adobe_customer_factory(),
-            mock_mpt_client,
+            mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
         )
         == []
     )
+
+
+def test_get_subscriptions_for_update_end_sale(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_is_sku_end_of_sale,
+    mock_terminate_subscription,
+    mock_get_agreement_subscription,
+    mock_update_agreement_subscription,
+):
+    mock_is_sku_end_of_sale.return_value = True
+    mpt_subscription = subscriptions_factory()[0]
+    mock_get_agreement_subscription.return_value = mpt_subscription
+    adobe_subscription = adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED)
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
+
+    _get_subscriptions_for_update(
+        mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
+    )
+
+    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_terminate_subscription.assert_called_once_with(
+        mock_mpt_client, mpt_subscription["id"], "Adobe subscription status 1004."
+    )
+    mock_update_agreement_subscription.assert_not_called()
+
+
+def test_get_subscriptions_for_update_not_end_sale(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_terminate_subscription,
+    mock_get_agreement_subscription,
+    mock_update_agreement_subscription,
+):
+    mpt_subscription = subscriptions_factory()[0]
+    mock_get_agreement_subscription.return_value = mpt_subscription
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        status=AdobeStatus.SUBSCRIPTION_TERMINATED
+    )
+
+    _get_subscriptions_for_update(
+        mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
+    )
+
+    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_update_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mpt_subscription["id"], status=SubscriptionStatus.EXPIRED
+    )
+    mock_terminate_subscription.assert_not_called()

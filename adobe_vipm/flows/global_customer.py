@@ -565,7 +565,7 @@ def process_agreement_deployment(
         ]
 
         for adobe_subscription in adobe_subscriptions:
-            if adobe_subscription["status"] != AdobeStatus.STATUS_PROCESSED:
+            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
                 logger.warning(
                     f"Subscription {adobe_subscription['subscriptionId']} "
                     f"is in status {adobe_subscription['status']}, skip it"

@@ -41,7 +41,7 @@ class DeploymentClientMixin:
         active_deployments = []
 
         for customer_deployment in customer_deployments.get("items", []):
-            if customer_deployment.get("status") == AdobeStatus.STATUS_GC_DEPLOYMENT_ACTIVE:
+            if customer_deployment.get("status") == AdobeStatus.GC_DEPLOYMENT_ACTIVE:
                 active_deployments.append(customer_deployment)
 
         return active_deployments

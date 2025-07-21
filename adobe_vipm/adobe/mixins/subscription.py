@@ -71,9 +71,7 @@ class SubscriptionClientMixin:
             dict: The retrieved subscriptions.
         """
         subscriptions = self.get_subscriptions(authorization_id, customer_id)["items"]
-        active_subscriptions = filter(
-            lambda s: s["status"] == AdobeStatus.STATUS_PROCESSED, subscriptions
-        )
+        active_subscriptions = filter(lambda s: s["status"] == AdobeStatus.PROCESSED, subscriptions)
 
         return list(
             filter(

@@ -102,7 +102,7 @@ class SwitchAutoRenewalOff(Step):
                         f"{context}: failed to switch off autorenewal for {subscription['id']} "
                         f"({adobe_subscription['subscriptionId']}) due to {e}"
                     )
-                    if e.code == AdobeStatus.STATUS_INVALID_RENEWAL_STATE:
+                    if e.code == AdobeStatus.INVALID_RENEWAL_STATE:
                         switch_order_to_failed(
                             client,
                             context.order,
