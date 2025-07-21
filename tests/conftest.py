@@ -817,6 +817,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             ]
 
         licensee = {
+            "id": "LC-321-321-321",
             "name": licensee_name,
             "address": licensee_address,
             "useBuyerAddress": use_buyer_address,
