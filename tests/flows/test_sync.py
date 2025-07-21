@@ -9,6 +9,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
+    _add_missing_subscriptions,
     _get_subscriptions_for_update,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
@@ -26,6 +27,16 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 @pytest.fixture(autouse=True)
 def mock_is_sku_end_of_sale(mocker):
     return mocker.patch("adobe_vipm.flows.sync.is_sku_end_of_sale", return_value=False, spec=True)
+
+
+@pytest.fixture(autouse=True)
+def mock_add_missing_subscriptions(mocker):
+    return mocker.patch("adobe_vipm.flows.sync._add_missing_subscriptions", spec=True)
+
+
+@pytest.fixture
+def mock_create_agreement_subscription(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.create_agreement_subscription", spec=True)
 
 
 @freeze_time("2025-06-23")
@@ -2346,3 +2357,149 @@ def test_get_subscriptions_for_update_not_end_sale(
         mock_mpt_client, mpt_subscription["id"], status=SubscriptionStatus.EXPIRED.value
     )
     mock_terminate_subscription.assert_not_called()
+
+
+def test_add_missing_subscriptions_none(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_create_agreement_subscription,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(3)
+        ]
+    }
+    adobe_customer = adobe_customer_factory()
+    _add_missing_subscriptions(
+        mock_mpt_client,
+        mock_adobe_client,
+        adobe_customer,
+        agreement_factory(),
+        subscriptions_for_update=("subscriptionId2", "subscriptionId1", "subscriptionId0"),
+    )
+
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        "AUT-1234-5678", adobe_customer["customerId"]
+    )
+    mock_create_agreement_subscription.assert_not_called()
+
+
+@freeze_time("2025-07-24")
+def test_add_missing_subscriptions(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    items_factory,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_create_agreement_subscription,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(3)
+    ]
+    mock_adobe_client.get_subscriptions.return_value = {"items": adobe_subscriptions}
+    adobe_customer = adobe_customer_factory()
+    mock_get_product_items_by_skus = mocker.patch(
+        "adobe_vipm.flows.sync.get_product_items_by_skus",
+        return_value=items_factory(),
+    )
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        return_value={s["offerId"]: 12.14 for s in adobe_subscriptions},
+    )
+
+    _add_missing_subscriptions(
+        mock_mpt_client,
+        mock_adobe_client,
+        adobe_customer,
+        agreement_factory(),
+        subscriptions_for_update=("subscriptionId1", "b-sub-id"),
+    )
+
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        "AUT-1234-5678", adobe_customer["customerId"]
+    )
+    mock_get_product_items_by_skus.assert_called_once_with(
+        mock_mpt_client, "PRD-1111-1111", ["65304578CA", "65304578CA", "65304578CA"]
+    )
+    assert mock_create_agreement_subscription.mock_calls == [
+        mocker.call(
+            mock_mpt_client,
+            {
+                "status": SubscriptionStatus.ACTIVE.value,
+                "commitmentDate": "2026-07-25",
+                "price": {"unitPP": {"65304578CA01A12": 12.14}},
+                "parameters": {
+                    "fulfillment": [
+                        {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"},
+                        {"externalId": Param.CURRENT_QUANTITY.value, "value": "10"},
+                        {"externalId": Param.RENEWAL_QUANTITY.value, "value": "10"},
+                        {"externalId": Param.RENEWAL_DATE.value, "value": "2026-07-25"},
+                    ]
+                },
+                "agreement": {"id": "AGR-2119-4550-8674-5962"},
+                "buyer": {"id": "BUY-3731-7971"},
+                "licensee": {"id": "LC-321-321-321"},
+                "lines": [
+                    {
+                        "quantity": 10,
+                        "item": {
+                            "id": "ITM-1234-1234-1234-0001",
+                            "name": "Awesome product",
+                            "externalIds": {"vendor": "65304578CA"},
+                            "terms": {"period": "1y"},
+                        },
+                        "price": {"unitPP": {"65304578CA01A12": 12.14}},
+                    }
+                ],
+                "seller": {"id": "SEL-9121-8944"},
+                "name": "Subscription for {agreement['product']['name']}",
+                "startDate": "2019-05-20T22:49:55Z",
+                "externalIds": {"vendor": "subscriptionId0"},
+                "product": {"id": "PRD-1111-1111"},
+                "autoRenew": True,
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            {
+                "status": SubscriptionStatus.ACTIVE.value,
+                "commitmentDate": "2026-07-25",
+                "price": {"unitPP": {"65304578CA01A12": 12.14}},
+                "parameters": {
+                    "fulfillment": [
+                        {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"},
+                        {"externalId": Param.CURRENT_QUANTITY.value, "value": "10"},
+                        {"externalId": Param.RENEWAL_QUANTITY.value, "value": "10"},
+                        {"externalId": Param.RENEWAL_DATE.value, "value": "2026-07-25"},
+                    ]
+                },
+                "agreement": {"id": "AGR-2119-4550-8674-5962"},
+                "buyer": {"id": "BUY-3731-7971"},
+                "licensee": {"id": "LC-321-321-321"},
+                "lines": [
+                    {
+                        "quantity": 10,
+                        "item": {
+                            "id": "ITM-1234-1234-1234-0001",
+                            "name": "Awesome product",
+                            "externalIds": {"vendor": "65304578CA"},
+                            "terms": {"period": "1y"},
+                        },
+                        "price": {"unitPP": {"65304578CA01A12": 12.14}},
+                    }
+                ],
+                "seller": {"id": "SEL-9121-8944"},
+                "name": "Subscription for {agreement['product']['name']}",
+                "startDate": "2019-05-20T22:49:55Z",
+                "externalIds": {"vendor": "subscriptionId2"},
+                "product": {"id": "PRD-1111-1111"},
+                "autoRenew": True,
+            },
+        ),
+    ]
