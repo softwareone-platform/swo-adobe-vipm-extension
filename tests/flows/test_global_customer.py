@@ -901,7 +901,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
             adobe_subscription_factory(
-                deployment_id="deployment_id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE
+                deployment_id="deployment_id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
             ),
         ]
     }
@@ -1223,7 +1223,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         (
             False,
             "A",
-            ThreeYearCommitmentStatus.ACTIVE,
+            ThreeYearCommitmentStatus.ACTIVE.value,
             {
                 "start": date.today() - timedelta(days=-1),
                 "end": date.today() + timedelta(days=365 * 3),
@@ -1235,7 +1235,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         (
             False,
             "A",
-            ThreeYearCommitmentStatus.EXPIRED,
+            ThreeYearCommitmentStatus.EXPIRED.value,
             {
                 "start": date.today() - timedelta(days=365 * 3),
                 "end": date.today() - timedelta(days=1),

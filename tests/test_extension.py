@@ -43,7 +43,7 @@ def test_process_order_validation(client, mocker, order_factory, jwt_token, webh
     )
     validated_order = set_ordering_parameter_error(
         order_factory(),
-        Param.COMPANY_NAME,
+        Param.COMPANY_NAME.value,
         {"id": "my_err_id", "message": "my_msg"},
     )
     order = order_factory()

@@ -16,19 +16,19 @@ from adobe_vipm.flows.mpt import (
 @pytest.mark.parametrize("is_recommitment", [True, False])
 def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_recommitment):
     param_external_id = (
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
         if not is_recommitment
-        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
     )
     request_type_param_ext_id = (
-        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+        Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
     )
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
-        f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED},{ThreeYearCommitmentStatus.ACCEPTED}))"
+        f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED.value},{ThreeYearCommitmentStatus.ACCEPTED.value}))"
         ")"
         ")"
     )
@@ -64,28 +64,28 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_re
 def test_get_agreements_for_3yc_recommitment(mocker, settings):
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
-        f"eq(externalId,{Param.THREE_YC_ENROLL_STATUS}),"
-        f"eq(displayValue,{ThreeYearCommitmentStatus.COMMITTED})"
+        f"eq(externalId,{Param.THREE_YC_ENROLL_STATUS.value}),"
+        f"eq(displayValue,{ThreeYearCommitmentStatus.COMMITTED.value})"
         ")"
         ")"
     )
     recommitment_condition = (
         "any(parameters.fulfillment,and("
-        f"eq(externalId,{Param.THREE_YC_RECOMMITMENT}),"
+        f"eq(externalId,{Param.THREE_YC_RECOMMITMENT.value}),"
         "like(displayValue,*Yes*)"
         ")"
         ")"
     )
     enddate_gt_condition = (
         "any(parameters.ordering,and("
-        f"eq(externalId,{Param.THREE_YC_END_DATE}),"
+        f"eq(externalId,{Param.THREE_YC_END_DATE.value}),"
         f"gt(displayValue,2024-01-31)"
         ")"
         ")"
     )
     enddate_le_condition = (
         "any(parameters.ordering,and("
-        f"eq(externalId,{Param.THREE_YC_END_DATE}),"
+        f"eq(externalId,{Param.THREE_YC_END_DATE.value}),"
         f"le(displayValue,2024-01-01)"
         ")"
         ")"
@@ -118,20 +118,20 @@ def test_get_agreements_for_3yc_recommitment(mocker, settings):
 @pytest.mark.parametrize("is_recommitment", [True, False])
 def test_get_agreements_for_3yc_resubmit(mocker, settings, is_recommitment):
     param_external_id = (
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
         if not is_recommitment
-        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
     )
 
     request_type_param_ext_id = (
-        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+        Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
     )
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
 
     error_statuses = [
-        ThreeYearCommitmentStatus.DECLINED,
-        ThreeYearCommitmentStatus.NONCOMPLIANT,
-        ThreeYearCommitmentStatus.EXPIRED,
+        ThreeYearCommitmentStatus.DECLINED.value,
+        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
+        ThreeYearCommitmentStatus.EXPIRED.value,
     ]
 
     enroll_status_condition = (
