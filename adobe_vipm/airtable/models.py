@@ -741,7 +741,9 @@ def get_adobe_product_by_marketplace_sku(
 
 
 @cache
-def get_adobe_sku(vendor_item_id):
+def get_adobe_sku(
+    vendor_item_id,
+):  # TODO: start using this to avoid multiple, unnecessary requests to Airtable.
     return get_adobe_product_by_marketplace_sku(vendor_item_id).sku
 
 
