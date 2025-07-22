@@ -154,8 +154,8 @@ def test_validate_transfer_lines_exist(
 @pytest.mark.parametrize(
     "status_code",
     [
-        AdobeStatus.TRANSFER_INVALID_MEMBERSHIP,
-        AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+        AdobeStatus.TRANSFER_INVALID_MEMBERSHIP.value,
+        AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS.value,
     ]
     + UNRECOVERABLE_TRANSFER_STATUSES,
 )
@@ -187,7 +187,7 @@ def test_validate_transfer_membership_error(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details=str(api_error),
@@ -231,7 +231,7 @@ def test_validate_transfer_http_error(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details=expected_message,
@@ -271,7 +271,7 @@ def test_validate_transfer_unknown_item(
     has_errors, validated_order = validate_transfer(m_client, order)
 
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
         title=param["name"],
         item_sku=adobe_preview_transfer["items"][0]["offerId"][:10],
@@ -321,7 +321,7 @@ def test_validate_transfer_already_migrated(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
     assert validated_order == order
@@ -369,7 +369,7 @@ def test_validate_transfer_migration_running(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details="Migration in progress, retry later",
@@ -407,7 +407,7 @@ def test_validate_transfer_migration_synchronized(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"],
         details="Membership has already been migrated",
@@ -446,7 +446,7 @@ def test_validate_transfer_no_items(
     has_errors, validated_order = validate_transfer(m_client, order)
 
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict()
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -479,7 +479,7 @@ def test_validate_transfer_account_inactive(
     mocked_adobe_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory()
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.TRANSFER_INACTIVE_ACCOUNT,
+        status=AdobeStatus.TRANSFER_INACTIVE_ACCOUNT.value,
     )
 
     order_params = transfer_order_parameters_factory()
@@ -506,9 +506,9 @@ def test_validate_transfer_account_inactive(
 
     assert has_errors is True
 
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
-        status=AdobeStatus.TRANSFER_INACTIVE_ACCOUNT,
+        status=AdobeStatus.TRANSFER_INACTIVE_ACCOUNT.value,
     )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -516,7 +516,7 @@ def test_validate_transfer_account_inactive(
 
 @pytest.mark.parametrize(
     "commitment_status",
-    [ThreeYearCommitmentStatus.ACTIVE, ThreeYearCommitmentStatus.COMMITTED],
+    [ThreeYearCommitmentStatus.ACTIVE.value, ThreeYearCommitmentStatus.COMMITTED.value],
 )
 def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitment_status):
     commitment = adobe_commitment_factory(
@@ -578,7 +578,9 @@ def test_validate_transfer_already_migrated_all_items_expired(
     mocked_transfer.customer_id = "customer-id"
 
     m_client = mocker.MagicMock()
-    adobe_subscription = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    adobe_subscription = adobe_subscription_factory(
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
 
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
@@ -613,7 +615,7 @@ def test_validate_transfer_already_migrated_all_items_expired(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
 
@@ -658,7 +660,9 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
     mocked_transfer.customer_id = "customer-id"
 
     m_client = mocker.MagicMock()
-    adobe_subscription = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    adobe_subscription = adobe_subscription_factory(
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
 
     product_items = items_factory(
@@ -695,7 +699,7 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
 
@@ -749,10 +753,10 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
 
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304990CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
     )
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304991CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
 
     product_items = items_factory(
@@ -796,7 +800,7 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
 
@@ -860,10 +864,10 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
 
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304990CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
     )
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304991CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
 
     product_items = items_factory(
@@ -907,7 +911,7 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
 
@@ -990,10 +994,10 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
 
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304990CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
     )
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304991CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
 
     product_items = items_factory(
@@ -1043,7 +1047,7 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
 
@@ -1108,7 +1112,9 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     mocked_transfer.customer_id = "customer-id"
 
     m_client = mocker.MagicMock()
-    adobe_subscription = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    adobe_subscription = adobe_subscription_factory(
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
     adobe_subscription_1 = adobe_subscription_factory(offer_id="65304578CA")
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
 
@@ -1160,7 +1166,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
     assert validated_order == order
@@ -1224,7 +1230,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304991CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
 
     product_items = items_factory(
@@ -1310,7 +1316,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304991CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
 
     product_items = items_factory(
@@ -1394,7 +1400,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CA")
     adobe_subscription_3 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE, offer_id="65304991CA"
+        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
 
     product_items = items_factory(
@@ -1629,7 +1635,7 @@ def test_validate_transfer_already_migrated_items_with_deployment(
     )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    membership_param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is True
     assert membership_param["error"] == {
@@ -1790,7 +1796,7 @@ def test_validate_transfer_adobe_errors(
     has_errors, validated_order = validate_transfer(m_client, order)
 
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID)
+    param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
 
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
         membership_id=mocked_transfer.membership_id,

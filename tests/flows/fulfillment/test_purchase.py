@@ -314,7 +314,7 @@ def test_create_customer_step_no_contact(
     assert context.adobe_customer is None
     assert context.adobe_customer_id is None
 
-    param = get_ordering_parameter(context.order, Param.CONTACT)
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
     assert param["error"] == ERR_ADOBE_CONTACT.to_dict(
         title=param["name"], details="it is mandatory."
     )
@@ -492,7 +492,7 @@ def test_create_customer_step_save_data_with_3yc_request(
 
     ff_param = get_fulfillment_parameter(
         context.order,
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS,
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
     )
     assert ff_param["value"] == commitment["status"]
 
@@ -536,7 +536,7 @@ def test_create_customer_step_handle_error_address(mocker, order_factory, adobe_
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.INVALID_ADDRESS,
+            code=AdobeStatus.INVALID_ADDRESS.value,
             message="Invalid address",
             details=["detail1", "detail2"],
         ),
@@ -554,7 +554,7 @@ def test_create_customer_step_handle_error_address(mocker, order_factory, adobe_
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param = get_ordering_parameter(context.order, Param.ADDRESS)
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
     assert param["error"] == ERR_ADOBE_ADDRESS.to_dict(
         title=param["name"],
         details=str(error),
@@ -572,7 +572,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_licenses(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.INVALID_MINIMUM_QUANTITY.value,
             message="Minimum quantity out of range",
             details=["LICENSE"],
         ),
@@ -590,7 +590,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_licenses(
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
+    param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
     assert param_licenses["error"] == ERR_3YC_QUANTITY_LICENSES.to_dict(
         title=param_licenses["name"],
     )
@@ -607,7 +607,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_consumables(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.INVALID_MINIMUM_QUANTITY.value,
             message="Minimum quantity out of range",
             details=["CONSUMABLES"],
         ),
@@ -625,7 +625,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_consumables(
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES)
+    param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
     assert param_consumables["error"] == ERR_3YC_QUANTITY_CONSUMABLES.to_dict(
         title=param_consumables["name"],
     )
@@ -642,7 +642,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_no_minimums(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.INVALID_MINIMUM_QUANTITY.value,
             message="Minimum quantity out of range",
             details=[],
         ),
@@ -660,8 +660,8 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_no_minimums(
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
-    param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES)
+    param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
+    param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
 
     assert context.order["error"] == ERR_3YC_NO_MINIMUMS.to_dict(
         title_min_licenses=param_licenses["name"],
@@ -692,7 +692,7 @@ def test_create_customer_step_handle_error_invalid_fields(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.INVALID_FIELDS,
+            code=AdobeStatus.INVALID_FIELDS.value,
             message="Invalid fields",
             details=[error_details],
         ),

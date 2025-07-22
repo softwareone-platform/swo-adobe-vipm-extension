@@ -343,7 +343,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": Param.COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME.value,
                 "type": "SingleLineText",
                 "value": company_name,
                 "constraints": {
@@ -354,7 +354,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": Param.ADDRESS,
+                "externalId": Param.ADDRESS.value,
                 "type": "Address",
                 "value": address,
                 "constraints": {
@@ -365,7 +365,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": Param.CONTACT,
+                "externalId": Param.CONTACT.value,
                 "type": "Contact",
                 "value": contact,
                 "constraints": {
@@ -376,7 +376,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": Param.AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE.value,
                 "type": "SingleLineText",
                 "value": "New",
                 "constraints": {
@@ -387,7 +387,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0005",
                 "name": "Membership Id",
-                "externalId": Param.MEMBERSHIP_ID,
+                "externalId": Param.MEMBERSHIP_ID.value,
                 "type": "SingleLineText",
                 "value": "",
                 "constraints": {
@@ -398,7 +398,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0006",
                 "name": "3YC",
-                "externalId": Param.THREE_YC,
+                "externalId": Param.THREE_YC.value,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
@@ -409,7 +409,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0007",
                 "name": "3YCLicenses",
-                "externalId": Param.THREE_YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES.value,
                 "type": "SingleLineText",
                 "value": p3yc_licenses,
                 "constraints": {
@@ -420,7 +420,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCConsumables",
-                "externalId": Param.THREE_YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
                 "type": "SingleLineText",
                 "value": p3yc_consumables,
                 "constraints": {
@@ -448,7 +448,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": Param.COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME.value,
                 "type": "SingleLineText",
                 "value": company_name or "",
                 "constraints": {
@@ -460,7 +460,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": Param.ADDRESS,
+                "externalId": Param.ADDRESS.value,
                 "type": "Address",
                 "value": address or {},
                 "constraints": {
@@ -472,7 +472,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": Param.CONTACT,
+                "externalId": Param.CONTACT.value,
                 "type": "Contact",
                 "value": contact or {},
                 "constraints": {
@@ -484,7 +484,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": Param.AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE.value,
                 "type": "SingleLineText",
                 "value": "Migrate",
                 "constraints": {
@@ -496,7 +496,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0005",
                 "name": "Membership Id",
-                "externalId": Param.MEMBERSHIP_ID,
+                "externalId": Param.MEMBERSHIP_ID.value,
                 "type": "SingleLineText",
                 "value": membership_id,
                 "constraints": {
@@ -508,7 +508,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0006",
                 "name": "3YC",
-                "externalId": Param.THREE_YC,
+                "externalId": Param.THREE_YC.value,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
@@ -520,7 +520,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0007",
                 "name": "3YCLicenses",
-                "externalId": Param.THREE_YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES.value,
                 "type": "SingleLineText",
                 "value": p3yc_licenses or "",
                 "constraints": {
@@ -532,7 +532,7 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCConsumables",
-                "externalId": Param.THREE_YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
                 "type": "SingleLineText",
                 "value": p3yc_consumables or "",
                 "constraints": {
@@ -568,76 +568,76 @@ def fulfillment_parameters_factory():
             {
                 "id": "PAR-1234-5678",
                 "name": "Customer Id",
-                "externalId": Param.CUSTOMER_ID,
+                "externalId": Param.CUSTOMER_ID.value,
                 "type": "SingleLineText",
                 "value": customer_id,
             },
             {
                 "id": "PAR-7771-1777",
                 "name": "Due Date",
-                "externalId": Param.DUE_DATE,
+                "externalId": Param.DUE_DATE.value,
                 "type": "Date",
                 "value": due_date,
             },
             {
                 "id": "PAR-9876-5432",
                 "name": "3YC Enroll Status",
-                "externalId": Param.THREE_YC_ENROLL_STATUS,
+                "externalId": Param.THREE_YC_ENROLL_STATUS.value,
                 "type": "SingleLineText",
                 "value": p3yc_enroll_status,
             },
             {
                 "id": "PAR-2266-4848",
                 "name": "3YC Start Date",
-                "externalId": Param.THREE_YC_START_DATE,
+                "externalId": Param.THREE_YC_START_DATE.value,
                 "type": "Date",
                 "value": p3yc_start_date,
             },
             {
                 "id": "PAR-3528-2927",
                 "name": "3YC End Date",
-                "externalId": Param.THREE_YC_END_DATE,
+                "externalId": Param.THREE_YC_END_DATE.value,
                 "type": "Date",
                 "value": p3yc_end_date,
             },
             {
                 "id": "PAR-0022-2200",
                 "name": "3YC Commitment Request Status",
-                "externalId": Param.THREE_YC_COMMITMENT_REQUEST_STATUS,
+                "externalId": Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
                 "type": "SingleLineText",
                 "value": p3yc_commitment_request_status,
             },
             {
                 "id": "PAR-0077-7700",
                 "name": "3YC Recommitment Request Status",
-                "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS,
+                "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value,
                 "type": "SingleLineText",
                 "value": p3yc_recommitment_request_status,
             },
             {
                 "id": "PAR-0000-6666",
                 "name": "3YCRecommitment",
-                "externalId": Param.THREE_YC_RECOMMITMENT,
+                "externalId": Param.THREE_YC_RECOMMITMENT.value,
                 "type": "Checkbox",
                 "value": p3yc_recommitment or [],
             },
             {
                 "id": "PAR-0000-6666",
                 "name": "Eligibility Status",
-                "externalId": Param.MARKET_SEGMENT_ELIGIBILITY_STATUS,
+                "externalId": Param.MARKET_SEGMENT_ELIGIBILITY_STATUS.value,
                 "type": "Dropdown",
                 "value": market_segment_eligibility_status,
             },
             {
                 "id": "PAR-7373-1919",
                 "name": "Customer Coterm date",
-                "externalId": Param.COTERM_DATE,
+                "externalId": Param.COTERM_DATE.value,
                 "type": "Date",
                 "value": coterm_date,
             },
             {
                 "id": "PAR-6179-6384-0024",
-                "externalId": Param.GLOBAL_CUSTOMER,
+                "externalId": Param.GLOBAL_CUSTOMER.value,
                 "name": "Global Customer",
                 "type": "Checkbox",
                 "displayValue": "Yes",
@@ -645,14 +645,14 @@ def fulfillment_parameters_factory():
             },
             {
                 "id": "PAR-6179-6384-0025",
-                "externalId": Param.DEPLOYMENT_ID,
+                "externalId": Param.DEPLOYMENT_ID.value,
                 "name": "Deployment ID",
                 "type": "SingleLineText",
                 "value": deployment_id,
             },
             {
                 "id": "PAR-6179-6384-0026",
-                "externalId": Param.DEPLOYMENTS,
+                "externalId": Param.DEPLOYMENTS.value,
                 "name": "Deployments",
                 "type": "MultiLineText",
                 "value": ",".join(deployments),
@@ -766,7 +766,7 @@ def subscriptions_factory(lines_factory):
                     "fulfillment": [
                         {
                             "name": "Adobe SKU",
-                            "externalId": Param.ADOBE_SKU,
+                            "externalId": Param.ADOBE_SKU.value,
                             "type": "SingleLineText",
                             "value": adobe_sku,
                         }
@@ -1204,7 +1204,7 @@ def adobe_order_factory(adobe_items_factory):
             order["referenceOrderId"] = reference_order_id
         if status:
             order["status"] = status
-        if status in [AdobeStatus.PENDING, AdobeStatus.PROCESSED] or order_id:
+        if status in [AdobeStatus.PENDING.value, AdobeStatus.PROCESSED.value] or order_id:
             order["orderId"] = order_id or "P0123456789"
         if creation_date:
             order["creationDate"] = creation_date
@@ -1222,7 +1222,7 @@ def adobe_subscription_factory():
         renewal_quantity=10,
         autorenewal_enabled=True,
         deployment_id="",
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         renewal_date=None,
     ):
         return {
@@ -1263,7 +1263,7 @@ def adobe_transfer_factory(adobe_items_factory):
     def _transfer(
         transfer_id="a-transfer-id",
         customer_id="",
-        status=AdobeStatus.PENDING,
+        status=AdobeStatus.PENDING.value,
         items=None,
         membership_id="membership-id",
     ):
@@ -1557,11 +1557,11 @@ def adobe_customer_factory():
             },
             "discounts": [
                 {
-                    "offerType": OfferType.LICENSE,
+                    "offerType": OfferType.LICENSE.value,
                     "level": licenses_discount_level,
                 },
                 {
-                    "offerType": OfferType.CONSUMABLES,
+                    "offerType": OfferType.CONSUMABLES.value,
                     "level": consumables_discount_level,
                 },
             ],

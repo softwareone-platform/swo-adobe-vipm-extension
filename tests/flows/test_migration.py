@@ -115,7 +115,7 @@ def test_start_transfers_for_product_preview_already_transferred(
     mocked_adobe_client.preview_transfer.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_ALREADY_TRANSFERRED,
+            code=AdobeStatus.TRANSFER_ALREADY_TRANSFERRED.value,
             message="Already transferred",
         ),
     )
@@ -160,7 +160,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_INELIGIBLE,
+            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
             message="Cannot be transferred",
             details=[f"Reason: {reason}"],
         ),
@@ -180,7 +180,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
     )
 
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE
+    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "rescheduled"
     assert mock_transfer.migration_error_description == (
@@ -210,7 +210,7 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_INELIGIBLE,
+            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
             message="Cannot be transferred",
             details=["Reason: BAD_MARKET_SEGMENT"],
         ),
@@ -230,7 +230,7 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     )
 
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE
+    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "failed"
     assert mock_transfer.migration_error_description == (
@@ -492,7 +492,7 @@ def test_checking_running_transfers_for_product(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -521,7 +521,7 @@ def test_checking_running_transfers_for_product(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -601,7 +601,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -621,7 +621,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -697,7 +697,7 @@ def test_checking_running_transfers_for_product_3yc(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -782,7 +782,7 @@ def test_checking_running_transfers_for_product_get_customer_error_retry(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -831,7 +831,7 @@ def test_checking_running_transfers_for_product_update_subs_error_retry(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -960,7 +960,7 @@ def test_checking_running_transfers_for_product_pending_retry(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer_factory(
-        status=AdobeStatus.PENDING,
+        status=AdobeStatus.PENDING.value,
     )
 
     mocker.patch(
@@ -1076,7 +1076,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1114,7 +1114,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1205,7 +1205,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1234,7 +1234,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1326,7 +1326,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1364,7 +1364,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1460,7 +1460,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1489,7 +1489,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1595,7 +1595,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1633,7 +1633,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1751,7 +1751,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1780,7 +1780,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1910,7 +1910,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_INELIGIBLE,
+            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
             message="Cannot be transferred",
             details=["Reason: RETURNABLE_PURCHASE"],
         ),
@@ -1930,7 +1930,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
     )
 
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE
+    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "failed"
     assert mock_transfer.reschedule_count == 15
@@ -1968,7 +1968,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
