@@ -512,7 +512,7 @@ def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, 
 
 def sync_agreement(mpt_client, agreement, dry_run):
     logger.debug(f"Syncing {agreement=}")
-    if agreement["status"] is not AgreementStatus.ACTIVE:
+    if agreement["status"] != AgreementStatus.ACTIVE:
         logger.info(f"Skipping agreement {agreement['id']} because it is not in Active status")
         return
     try:
