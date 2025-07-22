@@ -22,6 +22,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_TRANSFER_PREVIEW,
+    ERR_DUE_DATE_REACHED,
     ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
     ERR_MEMBERSHIP_ITEMS_DONT_MATCH,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
@@ -35,6 +36,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import fulfill_order
+from adobe_vipm.flows.fulfillment.shared import start_processing_attempt
 from adobe_vipm.flows.fulfillment.transfer import (
     SyncGCMainAgreement,
     UpdateTransferStatus,
@@ -44,6 +46,7 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
     split_phone_number,
 )
+from adobe_vipm.flows.utils.date import reset_due_date
 from adobe_vipm.flows.utils.order import reset_order_error
 from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 
@@ -793,22 +796,26 @@ def test_transfer_reached_due_date(
         external_ids={"vendor": "a-transfer-id"},
     )
 
-    fulfill_order(mocked_mpt_client, order)
+    mocked_notification = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification")
+    mocked_sync_agreements_by_agreement_ids = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids"
+    )
 
-    authorization_id = order["authorization"]["id"]
+    fulfill_order(mocked_mpt_client, order)
 
     mocked_update_order.assert_not_called()
 
-    reason = "Due date is reached (2025-01-01)."
+    reset_due_date(order)
+
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
-        reason,
-        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason),
+        ERR_DUE_DATE_REACHED.to_dict(due_date="2025-01-01"),
+        parameters=order["parameters"],
     )
-    mocked_adobe_client.get_transfer.assert_called_once_with(
-        authorization_id, "a-membership-id", adobe_transfer["transferId"]
-    )
+
+    mocked_notification.assert_called_once()
+    mocked_sync_agreements_by_agreement_ids.assert_called_once()
 
 
 def test_transfer_unexpected_status(
@@ -1660,6 +1667,8 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         return_value=mocked_adobe_client,
     )
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
+
+    start_processing_attempt(mock_mpt_client, order)
 
     fulfill_order(mock_mpt_client, order)
 
@@ -3442,7 +3451,8 @@ def test_transfer_gc_account_all_deployments_created(
         sync_prices=False,
     )
     mocked_get_gc_agreement_deployments_by_main_agreement()
-    mocked_get_gc_main_agreement.assert_called_once_with(
+    assert mocked_get_gc_main_agreement.call_count == 2
+    assert mocked_get_gc_main_agreement.mock_calls[0].args == (
         "PRD-1111-1111", "AUT-1234-4567", "a-membership-id"
     )
 
@@ -5998,7 +6008,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-
+    start_processing_attempt(mock_mpt_client, order)
     fulfill_order(mock_mpt_client, order)
 
     membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID.value)

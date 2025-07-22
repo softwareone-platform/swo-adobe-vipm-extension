@@ -1873,6 +1873,8 @@ def test_add_missing_subscriptions(
     adobe_subscriptions[-1]["deploymentId"] = "deploymentId"
     mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
 
+    agreement = agreement_factory()
+
     _add_missing_subscriptions(
         mock_mpt_client,
         mock_adobe_client,
