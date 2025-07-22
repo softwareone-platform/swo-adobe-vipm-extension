@@ -45,7 +45,7 @@ def test_validate_reseller_change_success(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
@@ -86,7 +86,7 @@ def test_validate_reseller_change_success_adding_line(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
@@ -154,7 +154,7 @@ def test_validate_reseller_change_success_adding_aditional_licenses(
     )
 
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
@@ -202,7 +202,7 @@ def test_validate_reseller_change_expired_code(
     mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
 
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
@@ -225,7 +225,7 @@ def test_validate_reseller_change_adobe_api_error(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_reseller_change.side_effect = api_error
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
@@ -256,7 +256,7 @@ def test_validate_reseller_change_no_subscriptions(
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
     mocked_adobe_client.get_subscriptions.return_value = {"items": []}
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
     mocker.patch(
@@ -297,10 +297,11 @@ def test_validate_reseller_change_missing_admin_email(
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
     mocked_adobe_client.get_subscriptions.return_value = {"items": adobe_items_factory()}
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     has_errors, validated_order = validate_reseller_change(m_client, order)
     assert isinstance(has_errors, bool)
     assert isinstance(validated_order, dict)
+
