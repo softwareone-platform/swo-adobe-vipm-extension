@@ -801,7 +801,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
         fulfillment_parameters=None,
         ordering_parameters=None,
         lines=None,
-        status=AgreementStatus.ACTIVE,
+        status=AgreementStatus.ACTIVE.value,
     ):
         if not subscriptions:
             subscriptions = [
