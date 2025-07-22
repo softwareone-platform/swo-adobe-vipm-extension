@@ -2106,7 +2106,7 @@ def test_sync_agreement_prices_with_missing_prices(
         mocker.call(
             mocked_mpt_client,
             terminated_mpt_subscription["id"],
-            status=SubscriptionStatus.EXPIRED,
+            status=SubscriptionStatus.EXPIRED.value,
         ),
         mocker.call(
             mocked_mpt_client,
@@ -2114,11 +2114,11 @@ def test_sync_agreement_prices_with_missing_prices(
             lines=[{"price": {"unitPP": 20.22}, "id": "ALI-2119-4550-8674-5962-0001"}],
             parameters={
                 "fulfillment": [
-                    {"externalId": Param.ADOBE_SKU, "value": "77777777CA01A12"},
-                    {"externalId": Param.CURRENT_QUANTITY, "value": "15"},
-                    {"externalId": Param.RENEWAL_QUANTITY, "value": "15"},
-                    {"externalId": Param.RENEWAL_DATE, "value": "2026-06-20"},
-                    {"externalId": Param.LAST_SYNC_DATE, "value": "2025-06-19"},
+                    {"externalId": Param.ADOBE_SKU.value, "value": "77777777CA01A12"},
+                    {"externalId": Param.CURRENT_QUANTITY.value, "value": "15"},
+                    {"externalId": Param.RENEWAL_QUANTITY.value, "value": "15"},
+                    {"externalId": Param.RENEWAL_DATE.value, "value": "2026-06-20"},
+                    {"externalId": Param.LAST_SYNC_DATE.value, "value": "2025-06-19"},
                 ]
             },
             commitmentDate="2025-04-04",
@@ -2138,7 +2138,7 @@ def test_sync_agreement_lost_customer(
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.INVALID_CUSTOMER),
+        status_code=int(AdobeStatus.INVALID_CUSTOMER.value),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
 
@@ -2146,11 +2146,8 @@ def test_sync_agreement_lost_customer(
 
     assert mock_terminate_subscription.mock_calls == [
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
-        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
-        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
-        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
     ]
     assert mock_notify_processing_lost_customer.mock_calls == [
         mocker.call(
@@ -2167,7 +2164,6 @@ def test_sync_agreement_lost_customer(
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
         ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1234-5678",
     ]
 
 
@@ -2183,7 +2179,7 @@ def test_sync_agreement_lost_customer_error(
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.INVALID_CUSTOMER),
+        status_code=int(AdobeStatus.INVALID_CUSTOMER.value),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
     mock_terminate_subscription.side_effect = [
@@ -2199,11 +2195,8 @@ def test_sync_agreement_lost_customer_error(
 
     assert mock_terminate_subscription.mock_calls == [
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
-        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
-        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
-        mocker.call(mock_mpt_client, "SUB-1234-5678", "Suspected Lost Customer"),
     ]
     assert mock_notify_processing_lost_customer.mock_calls == [
         mocker.call(
@@ -2225,15 +2218,6 @@ def test_sync_agreement_lost_customer_error(
         ),
         mocker.call(
             "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: 500"
-            " Internal Server Error - Oops!"
-            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-            "#541c2e",
-            button=None,
-            facts=None,
-        ),
-        mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
             ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
             " Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
@@ -2243,25 +2227,7 @@ def test_sync_agreement_lost_customer_error(
         ),
         mocker.call(
             "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: 500"
-            " Internal Server Error - Oops!"
-            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-            "#541c2e",
-            button=None,
-            facts=None,
-        ),
-        mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
             ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
-            " Internal Server Error - Oops!"
-            " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-            "#541c2e",
-            button=None,
-            facts=None,
-        ),
-        mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: 500"
             " Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
             "#541c2e",
@@ -2278,21 +2244,11 @@ def test_sync_agreement_lost_customer_error(
         ">>> Suspected Lost Customer: Error terminating subscription "
         "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
         "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1234-5678",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
-        "500 Internal Server Error - Oops! "
-        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
         ">>> Suspected Lost Customer: Error terminating subscription "
         "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
         "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
-        "500 Internal Server Error - Oops! "
-        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
         ">>> Suspected Lost Customer: Error terminating subscription "
         "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
-        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1234-5678: "
-        "500 Internal Server Error - Oops! "
         "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
     ]
 
@@ -2317,7 +2273,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     adobe_subscription_factory,
 ):
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
-        status=AdobeStatus.SUBSCRIPTION_TERMINATED
+        status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
     )
 
     assert (
@@ -2344,7 +2300,9 @@ def test_get_subscriptions_for_update_end_sale(
     mock_is_sku_end_of_sale.return_value = True
     mpt_subscription = subscriptions_factory()[0]
     mock_get_agreement_subscription.return_value = mpt_subscription
-    adobe_subscription = adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED)
+    adobe_subscription = adobe_subscription_factory(
+        status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
+    )
     mock_adobe_client.get_subscription.return_value = adobe_subscription
 
     _get_subscriptions_for_update(
@@ -2373,7 +2331,7 @@ def test_get_subscriptions_for_update_not_end_sale(
     mpt_subscription = subscriptions_factory()[0]
     mock_get_agreement_subscription.return_value = mpt_subscription
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
-        status=AdobeStatus.SUBSCRIPTION_TERMINATED
+        status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
     )
 
     _get_subscriptions_for_update(
@@ -2382,6 +2340,6 @@ def test_get_subscriptions_for_update_not_end_sale(
 
     mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
     mock_update_agreement_subscription.assert_called_once_with(
-        mock_mpt_client, mpt_subscription["id"], status=SubscriptionStatus.EXPIRED
+        mock_mpt_client, mpt_subscription["id"], status=SubscriptionStatus.EXPIRED.value
     )
     mock_terminate_subscription.assert_not_called()

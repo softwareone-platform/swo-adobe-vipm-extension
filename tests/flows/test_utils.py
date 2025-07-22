@@ -209,14 +209,14 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
     assert (
         is_transferring_item_expired(
             adobe_subscription_factory(
-                status=AdobeStatus.PROCESSED, renewal_date=date.today().isoformat()
+                status=AdobeStatus.PROCESSED.value, renewal_date=date.today().isoformat()
             )
         )
         is False
     )
     assert (
         is_transferring_item_expired(
-            adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE)
+            adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
         )
         is True
     )

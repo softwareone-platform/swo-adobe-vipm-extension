@@ -137,9 +137,9 @@ def test_check_3yc_commitment_request_not_committed(
 @pytest.mark.parametrize(
     "request_status",
     [
-        ThreeYearCommitmentStatus.DECLINED,
-        ThreeYearCommitmentStatus.EXPIRED,
-        ThreeYearCommitmentStatus.NONCOMPLIANT,
+        ThreeYearCommitmentStatus.DECLINED.value,
+        ThreeYearCommitmentStatus.EXPIRED.value,
+        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
     ],
 )
 def test_check_3yc_commitment_request_declined(
@@ -251,8 +251,8 @@ def test_resubmit_3yc_commitment_request(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            Param.THREE_YC_CONSUMABLES: "1021",
-            Param.THREE_YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES.value: "1021",
+            Param.THREE_YC_LICENSES.value: "13",
         },
         is_recommitment=is_recommitment,
     )
@@ -305,8 +305,8 @@ def test_submit_3yc_recommitment_request(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            Param.THREE_YC_CONSUMABLES: "1021",
-            Param.THREE_YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES.value: "1021",
+            Param.THREE_YC_LICENSES.value: "13",
         },
         is_recommitment=True,
     )
@@ -421,7 +421,7 @@ def test_check_3yc_commitment_request_global_customers(
 
     mocked_get_agreements_by_deployments.assert_called_once_with(
         mpt_client,
-        Param.DEPLOYMENT_ID,
+        Param.DEPLOYMENT_ID.value,
         ["0", "1"],
     )
     assert mocked_update_agreement.call_args_list == [
@@ -507,8 +507,8 @@ def test_resubmit_3yc_commitment_request_exception(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            Param.THREE_YC_CONSUMABLES: "1021",
-            Param.THREE_YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES.value: "1021",
+            Param.THREE_YC_LICENSES.value: "13",
         },
         is_recommitment=is_recommitment,
     )
@@ -556,8 +556,8 @@ def test_submit_3yc_recommitment_request_exception(
         agreement["authorization"]["id"],
         get_adobe_customer_id(agreement),
         {
-            Param.THREE_YC_CONSUMABLES: "1021",
-            Param.THREE_YC_LICENSES: "13",
+            Param.THREE_YC_CONSUMABLES.value: "1021",
+            Param.THREE_YC_LICENSES.value: "13",
         },
         is_recommitment=True,
     )

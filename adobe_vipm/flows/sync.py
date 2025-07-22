@@ -464,9 +464,7 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
 
 def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, customer_id):
     for subscription_id in [
-        s["id"]
-        for s in agreement["subscriptions"]
-        if s["status"] is not SubscriptionStatus.TERMINATED
+        s["id"] for s in agreement["subscriptions"] if s["status"] != SubscriptionStatus.TERMINATED
     ]:
         logger.info(f">>> Suspected Lost Customer: Terminating subscription {subscription_id}")
         try:
@@ -497,7 +495,7 @@ def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, 
             for subscription_id in [
                 s["id"]
                 for s in deployment_agreement["subscriptions"]
-                if s["status"] is not SubscriptionStatus.TERMINATED
+                if s["status"] != SubscriptionStatus.TERMINATED
             ]:
                 try:
                     terminate_subscription(mpt_client, subscription_id, "Suspected Lost Customer")

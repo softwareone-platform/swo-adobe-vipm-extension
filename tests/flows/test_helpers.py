@@ -180,7 +180,7 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     )
     fulfillment_parameters.append(
         {
-            "externalId": Param.RETRY_COUNT,
+            "externalId": Param.RETRY_COUNT.value,
             "value": "1",
         }
     )
@@ -228,7 +228,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     adobe_client, _, _ = adobe_client_factory()
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_api_error = adobe_api_error_factory(
-        code=AdobeStatus.INTERNAL_SERVER_ERROR,
+        code=AdobeStatus.INTERNAL_SERVER_ERROR.value,
         message="Internal Server Error",
     )
 
@@ -315,7 +315,7 @@ def test_prepare_customer_data_step_no_company_name(mocker, order_factory, custo
     order = order_factory()
 
     no_company_customer_data = copy.copy(customer_data)
-    del no_company_customer_data[Param.COMPANY_NAME]
+    del no_company_customer_data[Param.COMPANY_NAME.value]
 
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.helpers.update_order",
@@ -333,7 +333,8 @@ def test_prepare_customer_data_step_no_company_name(mocker, order_factory, custo
 
     assert get_customer_data(context.order) == context.customer_data
     assert (
-        context.customer_data[Param.COMPANY_NAME] == context.order["agreement"]["licensee"]["name"]
+        context.customer_data[Param.COMPANY_NAME.value]
+        == context.order["agreement"]["licensee"]["name"]
     )
 
     mocked_update_order.assert_called_once_with(
@@ -348,7 +349,7 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
     order = order_factory()
 
     no_address_customer_data = copy.copy(customer_data)
-    del no_address_customer_data[Param.ADDRESS]
+    del no_address_customer_data[Param.ADDRESS.value]
 
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.helpers.update_order",
@@ -365,7 +366,7 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
     step(mocked_client, context, mocked_next_step)
 
     assert get_customer_data(context.order) == context.customer_data
-    assert context.customer_data[Param.ADDRESS] == {
+    assert context.customer_data[Param.ADDRESS.value] == {
         "country": context.order["agreement"]["licensee"]["address"]["country"],
         "state": context.order["agreement"]["licensee"]["address"]["state"],
         "city": context.order["agreement"]["licensee"]["address"]["city"],
@@ -386,7 +387,7 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
     order = order_factory()
 
     no_contact_customer_data = copy.copy(customer_data)
-    del no_contact_customer_data[Param.CONTACT]
+    del no_contact_customer_data[Param.CONTACT.value]
 
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.helpers.update_order",
@@ -403,7 +404,7 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
     step(mocked_client, context, mocked_next_step)
 
     assert get_customer_data(context.order) == context.customer_data
-    assert context.customer_data[Param.CONTACT] == {
+    assert context.customer_data[Param.CONTACT.value] == {
         "firstName": context.order["agreement"]["licensee"]["contact"]["firstName"],
         "lastName": context.order["agreement"]["licensee"]["contact"]["lastName"],
         "email": context.order["agreement"]["licensee"]["contact"]["email"],
@@ -540,7 +541,7 @@ def test_update_prices_step_with_3yc_commitment(
     """Test price updates when customer has 3YC commitment."""
     order = order_factory()
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2025-01-01",
     )
@@ -602,7 +603,7 @@ def test_update_prices_step_with_expired_3yc_commitment(
     """Test price updates when customer has expired 3YC commitment."""
     order = order_factory()
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2023-01-01",
         end_date="2024-01-01",
     )
@@ -872,7 +873,7 @@ def test_validate_3yc_commitment_requested_status(
 ):
     """Test validation when commitment is in REQUESTED status."""
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.REQUESTED,
+        status=ThreeYearCommitmentStatus.REQUESTED.value,
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
@@ -937,7 +938,7 @@ def test_validate_3yc_commitment_expired_status(
     mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.EXPIRED,
+        status=ThreeYearCommitmentStatus.EXPIRED.value,
         start_date="2024-01-01",
         end_date="2024-01-01",
     )
@@ -1020,7 +1021,7 @@ def test_validate_3yc_commitment_item_not_found(
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
@@ -1099,7 +1100,7 @@ def test_validate_3yc_commitment_item_not_found_validation(
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
@@ -1181,7 +1182,7 @@ def test_validate_3yc_commitment_below_minimum_licenses(
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2027-01-01",
         licenses=100,
@@ -1286,7 +1287,7 @@ def test_validate_3yc_commitment_below_minimum_consumables(
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2027-01-01",
         consumables=100,
@@ -1389,7 +1390,7 @@ def test_validate_3yc_commitment_below_minimum_consumables_and_licenses(
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2027-01-01",
         licenses=100,
@@ -1482,7 +1483,7 @@ def test_validate_3yc_commitment_success(
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
 
     commitment = adobe_commitment_factory(
-        status=ThreeYearCommitmentStatus.COMMITTED,
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2027-01-01",
         licenses=10,
