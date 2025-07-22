@@ -1,4 +1,7 @@
-from adobe_vipm.flows.constants import PARAM_REQUIRED_CUSTOMER_ORDER, Param
+from adobe_vipm.flows.constants import (
+    PARAM_REQUIRED_CUSTOMER_ORDER,
+    Param,
+)
 from adobe_vipm.flows.utils.parameter import get_ordering_parameter, is_ordering_param_required
 from adobe_vipm.flows.utils.subscription import is_line_item_active_subscription
 
@@ -60,7 +63,11 @@ def is_purchase_validation_enabled(order):
         for param_external_id in PARAM_REQUIRED_CUSTOMER_ORDER
     )
 
-
 def is_migrate_customer(order):
     agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
     return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)
+
+def is_reseller_change(order):
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
+    return (agreement_type == "Transfer" and
+            is_ordering_param_required(order, Param.CHANGE_RESELLER_CODE))

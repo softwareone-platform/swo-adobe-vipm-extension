@@ -47,7 +47,8 @@ class Param(StrEnum):
     DEPLOYMENTS = "deployments"
     DEPLOYMENT_ID = "deploymentId"
     LAST_SYNC_DATE = "lastSyncDate"
-
+    CHANGE_RESELLER_CODE = "changeResellerCode"
+    ADOBE_CUSTOMER_ADMIN_EMAIL = "adobeCustomerAdminEmail"
     PHASE_ORDERING = "ordering"
     PHASE_FULFILLMENT = "fulfillment"
 
@@ -71,6 +72,10 @@ STATUS_MARKET_SEGMENT_ELIGIBLE = "eligible"
 STATUS_MARKET_SEGMENT_NOT_ELIGIBLE = "not-eligible"
 STATUS_MARKET_SEGMENT_PENDING = "pending"
 
+TRANSFER_CUSTOMER_PARAMETERS = (
+    Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
+    Param.CHANGE_RESELLER_CODE,
+)
 
 CANCELLATION_WINDOW_DAYS = 14
 GLOBAL_SUFFIX = "_global"
@@ -177,9 +182,27 @@ ERR_ADOBE_ERROR = ValidationError("VIPM0011", "Adobe returned an error: {details
 ERR_ADOBE_MEMBERSHIP_ID_EMPTY = ValidationError(
     "VIPM0018", "No active items have been found for this membership."
 )
+ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY = ValidationError(
+    "VIPM0037", "No active items have been found for this code."
+)
 
 ERR_ADOBE_MEMBERSHIP_PROCESSING = ValidationError(
     "VIPM0032", "Error processing the membership {membership_id}: {error}"
+)
+
+ERR_ADOBE_RESSELLER_CHANGE_PREVIEW = ValidationError(
+    "VIPM0036", "Error processing the reseller change code {reseller_change_code}: {error}"
+)
+
+ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
+    "VIPM0036", "Reseller change operation does not allow to add new lines"
+)
+
+ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(
+    "VIPM0036", (
+        "The adobe reseller change product is not configured for this product and "
+        "cannot be added to the order."
+    )
 )
 
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"

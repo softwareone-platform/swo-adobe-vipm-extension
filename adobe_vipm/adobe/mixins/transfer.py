@@ -87,3 +87,34 @@ class TransferClientMixin:
         )
         response.raise_for_status()
         return response.json()
+
+    @wrap_http_error
+    def preview_reseller_change(
+        self,
+        authorization_id: str,
+        seller_id: str,
+        change_code: str,
+        admin_email: str,
+    ) -> dict:
+        """
+        Retrieve a transfer object by the membership and transfer identifiers.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        reseller: Reseller = self._config.get_reseller(authorization, seller_id)
+        headers = self._get_headers(authorization)
+        response = requests.post(
+            urljoin(
+                self._config.api_base_url,
+                "/v3/transfers",
+            ),
+            headers=headers,
+            json={
+                "type": "RESELLER_CHANGE",
+                "action": "PREVIEW",
+                "approvalCode": change_code,
+                "resellerId": reseller.id,
+                "requestedBy": admin_email
+            },
+        )
+        response.raise_for_status()
+        return response.json()
