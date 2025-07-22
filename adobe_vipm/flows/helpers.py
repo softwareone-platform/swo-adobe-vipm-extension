@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 from operator import itemgetter
 
+from dateutil import parser
 from django.conf import settings
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement,
@@ -12,9 +13,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
@@ -26,6 +25,8 @@ from adobe_vipm.airtable.models import (
     get_prices_for_skus,
 )
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY,
+    ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_COMMITMENT_3YC_CONSUMABLES,
     ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT,
     ERR_COMMITMENT_3YC_LICENSES,
@@ -43,6 +44,7 @@ from adobe_vipm.flows.utils import (
     get_due_date,
     get_market_segment,
     get_order_line_by_sku,
+    get_ordering_parameter,
     get_price_item_by_line_sku,
     get_retry_count,
     reset_order_error,
@@ -51,6 +53,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
+from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -611,3 +614,96 @@ class UpdatePrices(Step):
         """Update the order with new prices."""
         update_order(client, context.order_id, lines=lines)
         logger.info("%s: order lines prices updated successfully", context)
+
+
+class FetchResellerChangeData(Step):
+
+    def __init__(self, is_validation=False):
+        self.is_validation = is_validation
+
+    def __call__(self, mpt_client, context, next_step):
+        if context.adobe_customer_id:
+            next_step(mpt_client, context)
+            return
+
+        authorization_id = context.order["authorization"]["id"]
+        seller_id = context.order["agreement"]["seller"]["id"]
+        reseller_change_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)
+        admin_email = get_ordering_parameter(context.order, Param.ADOBE_CUSTOMER_ADMIN_EMAIL)
+
+        adobe_client = get_adobe_client()
+
+        try:
+            logger.info(f"{context}: Executing the preview reseller change with "
+                        f"{reseller_change_code.get('value')} and {admin_email.get('value')}")
+            context.adobe_transfer = adobe_client.preview_reseller_change(
+                authorization_id,
+                seller_id,
+                reseller_change_code.get("value"),
+                admin_email.get("value")
+            )
+        except AdobeAPIError as e:
+            error_data = ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
+                reseller_change_code=reseller_change_code["value"],
+                error=str(e),
+            )
+            self._handle_error(mpt_client, context, error_data)
+            return
+
+        next_step(mpt_client, context)
+
+    def _handle_error(self, mpt_client, context, error_data):
+        """Handle errors based on validation mode."""
+        if self.is_validation:
+            context.order = set_ordering_parameter_error(
+                context.order,
+                Param.CHANGE_RESELLER_CODE,
+                error_data,
+            )
+            context.validation_succeeded = False
+        else:
+            switch_order_to_failed(mpt_client, context.order, error_data)
+
+
+class ValidateResellerChange(Step):
+    def __init__(self, is_validation=False):
+        self.is_validation = is_validation
+
+    def __call__(self, mpt_client, context, next_step):
+        # Early return if customer already exists
+        if context.adobe_customer_id:
+            next_step(mpt_client, context)
+            return
+
+        expiry_date = context.adobe_transfer["approval"]["expiry"]
+        reseller_change_code = get_ordering_parameter(
+            context.order,
+            Param.CHANGE_RESELLER_CODE
+        )["value"]
+
+        if parser.parse(expiry_date).date() < date.today():
+            error_data = ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
+                reseller_change_code=reseller_change_code,
+                error="Reseller change code has expired",
+            )
+            self._handle_error(mpt_client, context, error_data)
+            return
+
+        if not context.adobe_transfer["lineItems"]:
+            error_data = ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict()
+            self._handle_error(mpt_client, context, error_data)
+            return
+
+        next_step(mpt_client, context)
+
+    def _handle_error(self, mpt_client, context, error_data):
+        """Handle errors based on validation mode."""
+        if self.is_validation:
+            context.order = set_ordering_parameter_error(
+                context.order,
+                Param.CHANGE_RESELLER_CODE,
+                error_data,
+            )
+            context.validation_succeeded = False
+        else:
+            switch_order_to_failed(mpt_client, context.order, error_data)

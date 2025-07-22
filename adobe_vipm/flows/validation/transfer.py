@@ -1,11 +1,13 @@
 import datetime as dt
 import logging
 
-from dateutil import parser
 from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import (
+    AdobeStatus,
+    ThreeYearCommitmentStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_RUNNING,
@@ -15,7 +17,6 @@ from adobe_vipm.airtable.models import (
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
-    ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
@@ -23,7 +24,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_MEMBERSHIP_PROCESSING,
     ERR_ADOBE_RESSELLER_CHANGE_LINES,
-    ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
@@ -31,6 +31,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.helpers import FetchResellerChangeData, ValidateResellerChange
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
@@ -448,7 +449,7 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
         customer = adobe_client.get_customer(
             context.order["authorization"]["id"], context.transfer.customer_id
         )
-        context.customer = customer
+        context.adobe_customer = customer
 
         if len(context.subscriptions["items"]) == 0:
             if customer.get("globalSalesEnabled", False):
@@ -473,8 +474,7 @@ class AddLinesToOrder(Step):
     """Add adobe lines to order."""
 
     def __call__(self, mpt_client, context, next_step):
-        """Add adobe lines to order."""
-        commitment = get_3yc_commitment(context.customer)
+        commitment = get_3yc_commitment(context.adobe_customer)
         has_error, order = add_lines_to_order(
             mpt_client,
             context.order,
@@ -507,84 +507,13 @@ def validate_reseller_change(mpt_client, order):
     """Validate reseller change pipeline."""
     pipeline = Pipeline(
         SetupTransferContext(),
-        FetchResellerChangeData(),
-        ValidateResellerChange(),
+        FetchResellerChangeData(is_validation=True),
+        ValidateResellerChange(is_validation=True),
         AddResellerChangeLinesToOrder(),
     )
     context = Context(order=order)
     pipeline.run(mpt_client, context)
     return not context.validation_succeeded, context.order
-
-
-class FetchResellerChangeData(Step):
-    """Fetch Adobe reseller change data."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Fetch Adobe reseller change data."""
-        authorization_id = context.order["authorization"]["id"]
-        seller_id = context.order["agreement"]["seller"]["id"]
-        reseller_change_code = get_ordering_parameter(
-            context.order, Param.CHANGE_RESELLER_CODE.value
-        )
-        admin_email = get_ordering_parameter(context.order, Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value)
-
-        adobe_client = get_adobe_client()
-
-        try:
-            context.adobe_transfer = adobe_client.preview_reseller_change(
-                authorization_id,
-                seller_id,
-                reseller_change_code.get("value"),
-                admin_email.get("value"),
-            )
-        except AdobeAPIError as e:
-            context.order = set_ordering_parameter_error(
-                context.order,
-                Param.CHANGE_RESELLER_CODE.value,
-                ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
-                    reseller_change_code=reseller_change_code["value"],
-                    error=str(e),
-                ),
-            )
-            context.validation_succeeded = False
-            return
-
-        next_step(mpt_client, context)
-
-
-class ValidateResellerChange(Step):
-    """Validates reseller change."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Validates reseller change."""
-        expiry_date = context.adobe_transfer["approval"]["expiry"]
-        reseller_change_code = get_ordering_parameter(
-            context.order, Param.CHANGE_RESELLER_CODE.value
-        )["value"]
-
-        parsed_expiry_date = parser.parse(expiry_date)
-
-        if parsed_expiry_date.date() < dt.datetime.now(tz=dt.UTC).date():
-            context.order = set_ordering_parameter_error(
-                context.order,
-                Param.CHANGE_RESELLER_CODE.value,
-                ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
-                    reseller_change_code=reseller_change_code,
-                    error="Reseller change code has expired",
-                ),
-            )
-            context.validation_succeeded = False
-            return
-
-        if not context.adobe_transfer["lineItems"]:
-            context.order = set_ordering_parameter_error(
-                context.order,
-                Param.CHANGE_RESELLER_CODE.value,
-                ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict(),
-            )
-
-        next_step(mpt_client, context)
-
 
 class AddResellerChangeLinesToOrder(Step):
     """Add lines from reseller change back to the MPT order."""

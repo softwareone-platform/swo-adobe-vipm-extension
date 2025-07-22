@@ -112,13 +112,14 @@ class TransferClientMixin:
         response.raise_for_status()
         return response.json()
 
-    @wrap_http_error
-    def preview_reseller_change(
+
+    def _reseller_change(
         self,
         authorization_id: str,
         seller_id: str,
         change_code: str,
         admin_email: str,
+        action: str,
     ) -> dict:
         """
         Retrieves a transfer object by the membership and transfer identifiers.
@@ -143,12 +144,65 @@ class TransferClientMixin:
             headers=headers,
             json={
                 "type": "RESELLER_CHANGE",
-                "action": "PREVIEW",
+                "action": action,
                 "approvalCode": change_code,
                 "resellerId": reseller.id,
                 "requestedBy": admin_email,
             },
             timeout=self._TIMEOUT,
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def preview_reseller_change(
+        self,
+        authorization_id: str,
+        seller_id: str,
+        change_code: str,
+        admin_email: str,
+    ) -> dict:
+        """
+        Preview a reseller change.
+        """
+        return self._reseller_change(
+            authorization_id, seller_id, change_code, admin_email, "PREVIEW"
+        )
+
+    @wrap_http_error
+    def commit_reseller_change(
+        self,
+        authorization_id: str,
+        seller_id: str,
+        change_code: str,
+        admin_email: str,
+    ) -> dict:
+        """
+        Commit a reseller change.
+        """
+        return self._reseller_change(
+            authorization_id, seller_id, change_code, admin_email, "COMMIT"
+        )
+
+
+    @wrap_http_error
+    def get_reseller_transfer(
+        self,
+        authorization_id: str,
+        transfer_id: str,
+    ) -> dict:
+        """
+        Retrieve a transfer object by the membership and transfer identifiers.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/transfers/{transfer_id}",
+            ),
+            headers=headers,
         )
         response.raise_for_status()
         return response.json()
