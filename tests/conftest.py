@@ -991,6 +991,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             },
             "product": {
                 "id": "PRD-1111-1111",
+                "name": "Adobe for Commercial",
             },
             "authorization": {"id": "AUT-1234-5678"},
             "lines": lines or [],
