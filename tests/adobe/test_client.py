@@ -2760,3 +2760,93 @@ def test_get_customer_deployments_active_status(
 
     assert len(active_deployments) == 2
     assert active_deployments == active_deployments_response
+
+
+def test_preview_reseller_change(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    """
+    Tests the preview of a reseller change.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
+    change_code = "a-change-code"
+    admin_email = "admin@example.com"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    expected_response = {"result": "preview-ok"}
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/transfers",
+        ),
+        status=200,
+        json=expected_response,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+            matchers.json_params_matcher(
+                {
+                    "type": "RESELLER_CHANGE",
+                    "action": "PREVIEW",
+                    "approvalCode": change_code,
+                    "resellerId": (
+                        adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+                    ),
+                    "requestedBy": admin_email,
+                }
+            ),
+        ],
+    )
+
+    result = client.preview_reseller_change(
+        authorization_uk, seller_id, change_code, admin_email
+    )
+    assert result == expected_response
+
+
+def test_preview_reseller_change_bad_request(
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory
+):
+    """
+    Tests the preview of a reseller change when the response is 400 bad request.
+    """
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_id = (
+        adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
+    )
+    change_code = "a-change-code"
+    admin_email = "admin@example.com"
+
+    client, _, _ = adobe_client_factory()
+
+    error = adobe_api_error_factory("1234", "An error")
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/transfers",
+        ),
+        status=400,
+        json=error,
+    )
+
+    import pytest
+    with pytest.raises(Exception) as cv:
+        client.preview_reseller_change(
+            authorization_uk, seller_id, change_code, admin_email
+        )
+
+    assert repr(cv.value) == str(error)
