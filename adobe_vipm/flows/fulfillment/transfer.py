@@ -12,10 +12,17 @@ import datetime as dt
 import logging
 from operator import itemgetter
 
-from mpt_extension_sdk.mpt_http.mpt import get_product_items_by_skus, update_order
+from mpt_extension_sdk.mpt_http.mpt import (
+    get_product_items_by_skus,
+    update_agreement,
+    update_order,
+)
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import (
+    AdobeStatus,
+    ThreeYearCommitmentStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
@@ -34,6 +41,7 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_ADOBE_TRANSFER_PREVIEW,
     ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
     ERR_MEMBERSHIP_ITEMS_DONT_MATCH,
@@ -51,7 +59,9 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     SetOrUpdateCotermDate,
+    SetupDueDate,
     SubmitNewOrder,
+    SyncAgreement,
     add_subscription,
     check_processing_template,
     handle_retries,
@@ -63,7 +73,12 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
-from adobe_vipm.flows.helpers import SetupContext, UpdatePrices
+from adobe_vipm.flows.helpers import (
+    FetchResellerChangeData,
+    SetupContext,
+    UpdatePrices,
+    ValidateResellerChange,
+)
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
@@ -84,6 +99,7 @@ from adobe_vipm.flows.utils import (
     set_global_customer,
     set_ordering_parameter_error,
 )
+from adobe_vipm.flows.utils.order import set_adobe_order_id
 from adobe_vipm.notifications import Button, FactsSection, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
@@ -622,9 +638,8 @@ def send_gc_agreement_deployments_notification(
         None
     """
     facts = {
-        f"Deployment ID: {deployment.get('deploymentId')}": f"Country: {
-            deployment.get('companyProfile', {}).get('address', {}).get('country', '')
-        }"
+        f"Deployment ID: {deployment.get("deploymentId")}": f"Country: {
+            deployment.get("companyProfile", {}).get("address", {}).get("country", "")}"
         for deployment in customer_deployments
     }
     agreement_deployment_view_link = get_agreement_deployment_view_link(product_id)
@@ -906,7 +921,7 @@ def save_gc_parameters(mpt_client, order, customer_deployments):
         return order
 
     deployments = [
-        f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
+        f'{deployment["deploymentId"]} - {deployment["companyProfile"]["address"]["country"]}'
         for deployment in customer_deployments
     ]
     order = set_global_customer(order, "Yes")
@@ -1036,6 +1051,37 @@ class SetupTransferContext(Step):
         next_step(client, context)
 
 
+class SetupResellerChangeContext(Step):
+    """
+    Sets up the initial context for transfer order processing.
+    """
+    def __call__(self, client, context, next_step):
+        context.membership_id = get_ordering_parameter(
+            context.order,
+            Param.CHANGE_RESELLER_CODE,
+        ).get("value","")
+
+        context.customer_deployments = None
+
+        context.transfer = get_transfer_by_authorization_membership_or_customer(
+            context.product_id,
+            context.authorization_id,
+            context.membership_id,
+        )
+
+        context.gc_main_agreement = get_main_agreement(
+            context.product_id,
+            context.authorization_id,
+            context.membership_id,
+        )
+
+        context.existing_deployments = get_agreement_deployments(
+            context.product_id, context.order.get("agreement", {}).get("id", "")
+        )
+
+        next_step(client, context)
+
+
 class ValidateGCMainAgreement(Step):
     """Validates if the main agreement exists in Airtable and all deployments are synchronized."""
 
@@ -1069,6 +1115,7 @@ class HandleMigratedTransfer(Step):
             return
 
         check_processing_template(client, context.order, TEMPLATE_NAME_BULK_MIGRATE)
+
         _transfer_migrated(
             client,
             context.order,
@@ -1163,6 +1210,7 @@ class ValidateAgreementDeployments(Step):
     def __call__(self, client, context, next_step):
         """Checks if deployments exists in Airtable."""
         adobe_client = get_adobe_client()
+
         if not _check_agreement_deployments(
             adobe_client,
             context.adobe_customer,
@@ -1200,6 +1248,7 @@ class CreateTransferSubscriptions(Step):
     def __call__(self, client, context, next_step):
         """Create transfer subscriptions."""
         adobe_client = get_adobe_client()
+
         context.subscriptions = create_agreement_subscriptions(
             context.adobe_transfer_order,
             client,
@@ -1270,6 +1319,7 @@ def fulfill_transfer_order(mpt_client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        SetupDueDate(),
         SetupTransferContext(),
         ValidateGCMainAgreement(),
         HandleMigratedTransfer(),
@@ -1287,3 +1337,101 @@ def fulfill_transfer_order(mpt_client, order):
 
     context = Context(order=order)
     pipeline.run(mpt_client, context)
+
+
+def fulfill_reseller_change_order(mpt_client, order):
+    pipeline = Pipeline(
+        SetupContext(),
+        SetupDueDate(),
+        SetupResellerChangeContext(),
+        FetchResellerChangeData(),
+        ValidateResellerChange(),
+        CommitResellerChange(),
+        CheckAdobeResellerTransfer(),
+        GetAdobeCustomer(),
+        ValidateGCMainAgreement(),
+        ValidateAgreementDeployments(),
+        CompleteTransferOrder(),
+        SyncAgreement(),
+    )
+
+    context = Context(order=order)
+    pipeline.run(mpt_client, context)
+
+class CheckAdobeResellerTransfer(Step):
+    def __call__(self, mpt_client, context, next_step):
+        if hasattr(context, 'adobe_transfer_order') and context.adobe_transfer_order:
+            next_step(mpt_client, context)
+            return
+
+        adobe_client = get_adobe_client()
+        authorization_id = context.order["authorization"]["id"]
+        transfer_id = get_adobe_order_id(context.order)
+        context.adobe_transfer_order = adobe_client.get_reseller_transfer(
+            authorization_id,
+            transfer_id
+        )
+
+        for item in context.adobe_transfer_order["lineItems"]:
+            item["offerId"] = get_partial_sku(item["offerId"])
+
+        reseller_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)
+        context.adobe_transfer_order["membershipId"] =  reseller_code.get("value")
+        logger.info(f"{context}: Adobe transfer order with status "
+                    f"{context.adobe_transfer_order.get('status')}")
+
+        if context.adobe_transfer_order.get("status") == AdobeStatus.PENDING:
+            return
+
+        next_step(mpt_client, context)
+
+class CommitResellerChange(Step):
+
+    def __call__(self, mpt_client, context, next_step):
+        if context.adobe_customer_id:
+            next_step(mpt_client, context)
+            return
+
+        authorization_id = context.order["authorization"]["id"]
+        seller_id = context.order["agreement"]["seller"]["id"]
+        reseller_change_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)
+        admin_email = get_ordering_parameter(context.order, Param.ADOBE_CUSTOMER_ADMIN_EMAIL)
+
+        adobe_client = get_adobe_client()
+
+        try:
+            logger.info(f"{context}: Executing the commit reseller change with "
+                        f"{reseller_change_code.get('value')} and {admin_email.get('value')}")
+            context.adobe_transfer_order = adobe_client.commit_reseller_change(
+                authorization_id,
+                seller_id,
+                reseller_change_code.get("value",''),
+                admin_email.get("value",'')
+            )
+
+            context.order = set_adobe_order_id(
+                context.order, context.adobe_transfer_order.get("transferId")
+            )
+            context.order = set_adobe_customer_id(
+                context.order, context.adobe_transfer_order.get("customerId")
+            )
+
+            update_order(mpt_client, context.order_id,
+                         externalIds=context.order["externalIds"],
+                         parameters=context.order["parameters"])
+            update_agreement(
+                mpt_client,
+                context.agreement_id,
+                externalIds={"vendor": context.adobe_customer_id},
+            )
+            return
+        except AdobeAPIError as e:
+            switch_order_to_failed(
+                mpt_client,
+                context.order,
+                ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
+                    reseller_change_code=reseller_change_code["value"],
+                    error=str(e),
+                ),
+            )
+        next_step(mpt_client, context)

@@ -11,14 +11,21 @@ from adobe_vipm.adobe.constants import (
     AdobeStatus,
     ThreeYearCommitmentStatus,
 )
-from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import Param
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
+from adobe_vipm.flows.constants import (
+    ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY,
+    ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
+    Param,
+)
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import (
+    FetchResellerChangeData,
     PrepareCustomerData,
     SetupContext,
     UpdatePrices,
     Validate3YCCommitment,
+    ValidateResellerChange,
 )
 from adobe_vipm.flows.utils import get_customer_data
 
@@ -1847,7 +1854,6 @@ def test_validate_3yc_commitment_date_without_coterm_date(
         downsize_lines=[order["lines"][0]],
         upsize_lines=[order["lines"][1]],
     )
-
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
 
@@ -1861,7 +1867,6 @@ def test_validate_3yc_commitment_date_without_coterm_date(
     mocked_next_step.assert_called_once_with(mocked_client, context)
     mocked_switch_order_to_failed.assert_not_called()
     mocked_set_order_error.assert_not_called()
-
     assert context.order.get("status") != "failed"
 
 
@@ -1958,3 +1963,292 @@ def test_validate_3yc_commitment_sku_not_found(
         "would place the account below the minimum commitment "
         "of 10 licenses or 5 consumables for the three-year commitment."
     )
+
+
+def test_fetch_reseller_change_data_success(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    adobe_reseller_change_preview_factory,
+):
+    adobe_transfer = adobe_reseller_change_preview_factory()
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_reseller_change.return_value = adobe_transfer
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        agreement_id="agreement-id",
+        authorization_id="AUT-1234-4567",
+    )
+
+    step = FetchResellerChangeData()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.preview_reseller_change.assert_called_once_with(
+        context.authorization_id,
+        context.order["agreement"]["seller"]["id"],
+        "88888888",
+        "admin@admin.com",
+    )
+    assert context.adobe_transfer == adobe_transfer
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+def test_fetch_reseller_change_data_already_has_customer_id(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        adobe_customer_id="existing-customer-id",
+    )
+
+    step = FetchResellerChangeData()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.preview_reseller_change.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+def test_fetch_reseller_change_data_adobe_api_error_fulfillment_mode(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_reseller_change.side_effect = api_error
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        agreement_id="agreement-id",
+        authorization_id="AUT-1234-4567",
+    )
+    step = FetchResellerChangeData(is_validation=False)
+    step(mocked_client, context, mocked_next_step)
+
+
+    mocked_adobe_client.preview_reseller_change.assert_called_once()
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mocked_client,
+        context.order,
+        ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
+            reseller_change_code="88888888",
+            error=str(api_error),
+        ),
+    )
+    mocked_next_step.assert_not_called()
+
+def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.preview_reseller_change.side_effect = api_error
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        agreement_id="agreement-id",
+        authorization_id="AUT-1234-4567",
+    )
+
+    step = FetchResellerChangeData(is_validation=True)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.preview_reseller_change.assert_called_once()
+    assert context.validation_succeeded is False
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_reseller_change_success_when_customer_id_exists(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=order,
+        adobe_customer_id="existing-customer-id",
+    )
+    step = ValidateResellerChange()
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+def test_validate_reseller_change_success_when_validation_passes(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    adobe_reseller_change_preview_factory
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    adobe_transfer = adobe_reseller_change_preview_factory(
+        approval_expiry=(date.today() + timedelta(days=5)).isoformat()
+    )
+
+    context = Context(
+        order=order
+    )
+    context.adobe_transfer = adobe_transfer
+
+    step = ValidateResellerChange()
+    step(mocked_client, context, mocked_next_step)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+def test_validate_reseller_change_expired_code_fulfillment_mode(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    adobe_reseller_change_preview_factory
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    adobe_transfer = adobe_reseller_change_preview_factory(
+        approval_expiry=(date.today() - timedelta(days=1)).isoformat()
+    )
+
+    context = Context(
+        order=order
+    )
+    context.adobe_transfer = adobe_transfer
+
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+
+    step = ValidateResellerChange(is_validation=False)
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+
+    call_args = mocked_switch_order_to_failed.call_args
+    error_data = call_args[0][2]  # Third argument is error_data
+    assert error_data["id"] == ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.id
+    assert "Reseller change code has expired" in error_data["message"]
+
+
+def test_validate_reseller_change_empty_line_items_fulfillment_mode(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    adobe_reseller_change_preview_factory
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    adobe_transfer = adobe_reseller_change_preview_factory()
+    adobe_transfer["lineItems"] = []
+
+    context = Context(
+        order=order
+    )
+    context.adobe_transfer = adobe_transfer
+
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed"
+    )
+
+    step = ValidateResellerChange(is_validation=False)
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once()
+
+    call_args = mocked_switch_order_to_failed.call_args
+    error_data = call_args[0][2]
+    assert error_data["id"] == ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.id
+
+def test_validate_reseller_change_empty_line_items_validation_mode(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    adobe_reseller_change_preview_factory
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    adobe_transfer = adobe_reseller_change_preview_factory()
+    adobe_transfer["lineItems"] = []
+
+    context = Context(
+        order=order
+    )
+    context.adobe_transfer = adobe_transfer
+
+    mocked_set_ordering_parameter_error = mocker.patch(
+        "adobe_vipm.flows.helpers.set_ordering_parameter_error"
+    )
+
+    step = ValidateResellerChange(is_validation=True)
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_next_step.assert_not_called()
+    mocked_set_ordering_parameter_error.assert_called_once()
+    call_args = mocked_set_ordering_parameter_error.call_args
+    assert call_args[0][1] == Param.CHANGE_RESELLER_CODE
+    error_data = call_args[0][2]
+    assert error_data["id"] == ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.id
+    assert context.validation_succeeded is False

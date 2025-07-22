@@ -2095,6 +2095,8 @@ def test_add_missing_subscriptions(
     customer_subscriptions[-1]["deploymentId"] = "deploymentId"
     mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in customer_subscriptions}
 
+    agreement = agreement_factory()
+
     _add_missing_subscriptions(
         mock_mpt_client,
         mock_adobe_client,
@@ -2138,7 +2140,7 @@ def test_add_missing_subscriptions(
                         "price": {"unitPP": 12.14},
                     }
                 ],
-                "name": "Subscription for {agreement['product']['name']}",
+                "name": f"Subscription for {agreement['product']['name']}",
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "subscriptionId0"},
                 "product": {"id": "PRD-1111-1111"},
@@ -2175,7 +2177,7 @@ def test_add_missing_subscriptions(
                         "price": {"unitPP": 12.14},
                     }
                 ],
-                "name": "Subscription for {agreement['product']['name']}",
+                "name": f"Subscription for {agreement['product']['name']}",
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "subscriptionId2"},
                 "product": {"id": "PRD-1111-1111"},
