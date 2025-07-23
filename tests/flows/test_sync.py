@@ -2284,15 +2284,15 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     )
 
 
+@freeze_time("2025-07-23")
 def test_get_subscriptions_for_update_end_sale(
-    mocker,
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
     subscriptions_factory,
     adobe_customer_factory,
-    adobe_subscription_factory,
     mock_is_sku_end_of_sale,
+    adobe_subscription_factory,
     mock_terminate_subscription,
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
@@ -2310,19 +2310,21 @@ def test_get_subscriptions_for_update_end_sale(
     )
 
     mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
     mock_terminate_subscription.assert_called_once_with(
         mock_mpt_client, mpt_subscription["id"], "Adobe subscription status 1004."
     )
     mock_update_agreement_subscription.assert_not_called()
 
 
+@freeze_time("2025-07-23")
 def test_get_subscriptions_for_update_not_end_sale(
-    mocker,
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
     subscriptions_factory,
     adobe_customer_factory,
+    mock_is_sku_end_of_sale,
     adobe_subscription_factory,
     mock_terminate_subscription,
     mock_get_agreement_subscription,
@@ -2339,6 +2341,7 @@ def test_get_subscriptions_for_update_not_end_sale(
     )
 
     mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
     mock_update_agreement_subscription.assert_called_once_with(
         mock_mpt_client, mpt_subscription["id"], status=SubscriptionStatus.EXPIRED.value
     )
