@@ -43,7 +43,7 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
-from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date
+from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -272,9 +272,11 @@ def _get_subscriptions_for_update(
             subscription_id=adobe_subscription_id,
         )
 
+        actual_sku = adobe_subscription["offerId"]
+
         if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
             logger.info(f"Processing terminated Adobe subscription {adobe_subscription_id}.")
-            if is_sku_end_of_sale(adobe_subscription_id, today_date):
+            if is_sku_end_of_sale(get_partial_sku(actual_sku), today_date):
                 logger.info(
                     "> The subscription is End Of Sale, terminating subscription."
                     f" {subscription['id']}."
@@ -296,8 +298,6 @@ def _get_subscriptions_for_update(
                 )
 
             continue
-
-        actual_sku = adobe_subscription["offerId"]
 
         for_update.append(
             (subscription, adobe_subscription, get_sku_with_discount_level(actual_sku, customer))
