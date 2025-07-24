@@ -34,7 +34,7 @@ jobs:
         docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-vipm:${{ steps.get_version.outputs.VERSION }}
 
   dtrack:
-    uses: softwareone-platform/ops-template/.github/workflows/dependency-track-python-poetry.yml@v2
+    uses: softwareone-platform/ops-template/.github/workflows/dependency-track-python-uv.yml@v1
     with:
       projectName: 'swo-extension-adobe-vipm'
     secrets:
