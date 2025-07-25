@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+import datetime as dt
 
 import pytest
 from freezegun import freeze_time
@@ -205,11 +205,13 @@ def test_split_phone_number_no_number():
     assert split_phone_number("", "US") is None
 
 
+# TODO: rewrite with parametrize
 def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_factory):
+    today = dt.datetime.now(tz=dt.UTC).date()
     assert (
         is_transferring_item_expired(
             adobe_subscription_factory(
-                status=AdobeStatus.PROCESSED.value, renewal_date=date.today().isoformat()
+                status=AdobeStatus.PROCESSED.value, renewal_date=today.isoformat()
             )
         )
         is False
@@ -222,19 +224,19 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
     )
 
     assert (
-        is_transferring_item_expired(adobe_items_factory(renewal_date=date.today().isoformat())[0])
+        is_transferring_item_expired(adobe_items_factory(renewal_date=today.isoformat())[0])
         is False
     )
     assert (
         is_transferring_item_expired(
-            adobe_items_factory(renewal_date=(date.today() + timedelta(days=5)).isoformat())[0]
+            adobe_items_factory(renewal_date=(today + dt.timedelta(days=5)).isoformat())[0]
         )
         is False
     )
 
     assert (
         is_transferring_item_expired(
-            adobe_items_factory(renewal_date=(date.today() - timedelta(days=5)).isoformat())[0]
+            adobe_items_factory(renewal_date=(today - dt.timedelta(days=5)).isoformat())[0]
         )
         is True
     )

@@ -15,9 +15,6 @@ from adobe_vipm.flows.errors import (
 
 
 def test_simple_error(mpt_error_factory):
-    """
-    Test the MPTError.
-    """
     error_data = mpt_error_factory(500, "Internal Server Error", "Oops!")
     error = MPTAPIError(500, error_data)
     assert error.status_code == 500

@@ -50,7 +50,8 @@ def test_send_notification_full(mocker, settings):
     mocked_message.addLinkButton.assert_called_once_with(button.label, button.url)
     mocked_section.title.assert_called_once_with(facts_section.title)
     mocked_section.addFact.assert_called_once_with(
-        list(facts_section.data.keys())[0], list(facts_section.data.values())[0]
+        next(iter(facts_section.data.keys())),
+        next(iter(facts_section.data.values())),
     )
     mocked_message.addSection.assert_called_once_with(mocked_section)
     mocked_message.send.assert_called_once()
@@ -196,7 +197,13 @@ def test_mpt_notify_exception(mocker, mock_mpt_client, caplog):
     ) in caplog.text
 
 
-def test_dateformat():
-    assert dateformat("2024-05-16T10:54:42.831Z") == "16 May 2024"
-    assert dateformat("") == ""
-    assert dateformat(None) == ""
+@pytest.mark.parametrize(
+    ("date_time", "expected_result"),
+    [
+        pytest.param("2024-05-16T10:54:42.831Z", "16 May 2024", id="datetime with timezone"),
+        pytest.param("", "", id="empty string"),
+        pytest.param(None, "", id="None datetime"),
+    ],
+)
+def test_dateformat(date_time, expected_result):
+    assert dateformat(date_time) == expected_result

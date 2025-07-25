@@ -1,4 +1,6 @@
+import datetime as dt
 import logging
+from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from typing import MutableMapping
 from uuid import uuid4
@@ -16,6 +18,10 @@ from adobe_vipm.adobe.mixins.transfer import TransferClientMixin
 
 logger = logging.getLogger(__name__)
 
+# setup cache cleanup in number of seconds before actual Adobe token expire
+# just to be sure to refresh token in time
+EXPIRES_IN_DELAY_SECONDS = 180
+
 
 class AdobeClient(
     CustomerClientMixin,
@@ -25,15 +31,24 @@ class AdobeClient(
     DeploymentClientMixin,
     OrderClientMixin,
 ):
+    """Adobe API Client."""
+
     def __init__(self) -> None:
+        # TODO: client should be refactored cause of several things
+        # 1. There is no shared session for requests
+        # 2. Probably worth to use httpx instead of requests
+        # 3. Mixins are using methods from parent (like _get_headers)
+        # 4. Agreed to use composition instead of inheritance
         self._config: Config = get_config()
         self._token_cache: MutableMapping[Authorization, APIToken] = {}
         self._logger = logger
+        self._TIMEOUT = 60
 
     def _get_headers(self, authorization: Authorization, correlation_id=None):
+        token = self._get_auth_token(authorization).token
         return {
             "X-Api-Key": authorization.client_id,
-            "Authorization": f"Bearer {self._get_auth_token(authorization).token}",
+            "Authorization": f"Bearer {token}",
             "Accept": "application/json",
             "Content-Type": "application/json",
             "X-Request-Id": str(uuid4()),
@@ -41,36 +56,35 @@ class AdobeClient(
         }
 
     def _refresh_auth_token(self, authorization: Authorization):
-        """
-        Request an authentication token for the Adobe VIPM API
-        using the credentials associated to a given the reseller.
-        """
+        """Request an authentication token for the Adobe VIPM API.
 
-        data = {
-            "grant_type": "client_credentials",
-            "client_id": authorization.client_id,
-            "client_secret": authorization.client_secret,
-            "scope": self._config.api_scopes,
-        }
+        Using the credentials associated to a given the reseller.
+        """
         response = requests.post(
             url=self._config.auth_endpoint_url,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
-            data=data,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": authorization.client_id,
+                "client_secret": authorization.client_secret,
+                "scope": self._config.api_scopes,
+            },
+            timeout=self._TIMEOUT,
         )
-        if response.status_code == 200:
-            token_info = response.json()
-            self._token_cache[authorization] = APIToken(
-                token=token_info["access_token"],
-                expires=(datetime.now() + timedelta(seconds=token_info["expires_in"] - 180)),
-            )
         response.raise_for_status()
+
+        token_info = response.json()
+        expires_in = dt.timedelta(seconds=token_info["expires_in"] - EXPIRES_IN_DELAY_SECONDS)
+        self._token_cache[authorization] = APIToken(
+            token=token_info["access_token"],
+            expires=dt.datetime.now(tz=dt.UTC) + expires_in,
+        )
 
     def _get_auth_token(self, authorization: Authorization):
         token: APIToken | None = self._token_cache.get(authorization)
         if not token or token.is_expired():
             self._refresh_auth_token(authorization)
-        token = self._token_cache[authorization]
-        return token
+        return self._token_cache[authorization]
 
 
 _ADOBE_CLIENT = None
@@ -83,7 +97,7 @@ def get_adobe_client() -> AdobeClient:
     Returns:
         AdobeClient: An instance of the `AdobeClient`.
     """
-    global _ADOBE_CLIENT
+    global _ADOBE_CLIENT  # noqa: PLW0603 WPS420
     if not _ADOBE_CLIENT:
         _ADOBE_CLIENT = AdobeClient()
     return _ADOBE_CLIENT

@@ -20,13 +20,24 @@ ext = Extension()
 
 
 def jwt_secret_callback(client: MPTClient, claims: Mapping[str, Any]) -> str:
+    """
+    Extracts JWT secret from the webhook.
+
+    Args:
+        client: MPT client.
+        claims: JT claims to look for webhook id.
+
+    Returns:
+        JWT secret.
+    """
     webhook = get_webhook(client, claims["webhook_id"])
     product_id = webhook["criteria"]["product.id"]
     return get_for_product(settings, "WEBHOOKS_SECRETS", product_id)
 
 
 @ext.events.listener("orders")
-def process_order_fulfillment(client, event):
+def process_order_fulfillment(client: MPTClient, event) -> None:
+    """Hook to process fulfillment order."""
     fulfill_order(client, event.data)
 
 
@@ -39,13 +50,15 @@ def process_order_fulfillment(client, event):
     auth=JWTAuth(jwt_secret_callback),
 )
 def process_order_validation(request, order: Annotated[dict | None, Body()] = None):
+    """API handler to process order validation http query."""
     try:
         validated_order = validate_order(request.client, order)
-        logger.debug(f"Validated order: {pformat(validated_order)}")
-        return 200, validated_order
     except Exception as e:
         logger.exception("Unexpected error during validation")
         return 400, Error(
             id="VIPMG001",
-            message=f"Unexpected error during validation: {str(e)}.",
+            message=f"Unexpected error during validation: {e}.",
         )
+    else:
+        logger.debug("Validated order: %s", pformat(validated_order))
+        return 200, validated_order

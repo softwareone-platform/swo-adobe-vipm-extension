@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+import datetime as dt
 
 import pytest
 
@@ -24,17 +24,15 @@ def test_validate_reseller_change_success(
     items_factory,
     lines_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
 
     adobe_items = adobe_items_factory(
-        renewal_date=(date.today() + timedelta(days=1)).isoformat(),
-        subscription_id="1234567890"
+        renewal_date=(today + dt.timedelta(days=1)).isoformat(), subscription_id="1234567890"
     )
 
-    adobe_preview = adobe_reseller_change_preview_factory(
-        items=adobe_items
-    )
+    adobe_preview = adobe_reseller_change_preview_factory(items=adobe_items)
 
     product_items = items_factory()
 
@@ -66,18 +64,16 @@ def test_validate_reseller_change_success_adding_line(
     items_factory,
     lines_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     order["lines"] = []
 
     adobe_items = adobe_items_factory(
-        renewal_date=(date.today() + timedelta(days=1)).isoformat(),
-        subscription_id="1234567890"
+        renewal_date=(today + dt.timedelta(days=1)).isoformat(), subscription_id="1234567890"
     )
 
-    adobe_preview = adobe_reseller_change_preview_factory(
-        items=adobe_items
-    )
+    adobe_preview = adobe_reseller_change_preview_factory(items=adobe_items)
 
     product_items = items_factory()
 
@@ -95,23 +91,19 @@ def test_validate_reseller_change_success_adding_line(
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
 
-    order_line = [{
-        'item': {
-            'id': 'ITM-1234-1234-1234-0001',
-            'name': 'Awesome product',
-            'externalIds': {
-                'vendor': '65304578CA'
+    order_line = [
+        {
+            "item": {
+                "id": "ITM-1234-1234-1234-0001",
+                "name": "Awesome product",
+                "externalIds": {"vendor": "65304578CA"},
+                "terms": {"period": "1y"},
             },
-            'terms': {
-                'period': '1y'
-            }
-        },
-        'quantity': 1,
-        'oldQuantity': 0,
-        'price': {
-            'unitPP': 0
+            "quantity": 1,
+            "oldQuantity": 0,
+            "price": {"unitPP": 0},
         }
-    }]
+    ]
 
     assert has_errors is False
     assert validated_order["lines"] == order_line
@@ -128,34 +120,28 @@ def test_validate_reseller_change_success_adding_aditional_licenses(
     items_factory,
     lines_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-    order["lines"] = [{
-        'item': {
-            'id': 'ITM-1234-1234-1234-0002',
-            'name': 'Awesome product',
-            'externalIds': {
-                'vendor': '65304578CA'
+    order["lines"] = [
+        {
+            "item": {
+                "id": "ITM-1234-1234-1234-0002",
+                "name": "Awesome product",
+                "externalIds": {"vendor": "65304578CA"},
+                "terms": {"period": "1y"},
             },
-            'terms': {
-                'period': '1y'
-            }
-        },
-        'quantity': 1,
-        'oldQuantity': 0,
-        'price': {
-            'unitPP': 0
-        },
-    }]
+            "quantity": 1,
+            "oldQuantity": 0,
+            "price": {"unitPP": 0},
+        }
+    ]
 
     adobe_items = adobe_items_factory(
-        renewal_date=(date.today() + timedelta(days=1)).isoformat(),
-        subscription_id="1234567890"
+        renewal_date=(today + dt.timedelta(days=1)).isoformat(), subscription_id="1234567890"
     )
 
-    adobe_preview = adobe_reseller_change_preview_factory(
-        items=adobe_items
-    )
+    adobe_preview = adobe_reseller_change_preview_factory(items=adobe_items)
 
     product_items = items_factory()
 
@@ -173,23 +159,19 @@ def test_validate_reseller_change_success_adding_aditional_licenses(
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
 
-    order_line = [{
-        'item': {
-            'id': 'ITM-1234-1234-1234-0001',
-            'name': 'Awesome product',
-            'externalIds': {
-                'vendor': '65304578CA'
+    order_line = [
+        {
+            "item": {
+                "id": "ITM-1234-1234-1234-0001",
+                "name": "Awesome product",
+                "externalIds": {"vendor": "65304578CA"},
+                "terms": {"period": "1y"},
             },
-            'terms': {
-                'period': '1y'
-            }
-        },
-        'quantity': 1,
-        'oldQuantity': 0,
-        'price': {
-            'unitPP': 0
+            "quantity": 1,
+            "oldQuantity": 0,
+            "price": {"unitPP": 0},
         }
-    }]
+    ]
 
     assert has_errors is True
     assert validated_order["lines"] == order_line
@@ -204,17 +186,16 @@ def test_validate_reseller_change_expired_code(
     adobe_customer_factory,
     adobe_items_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
 
     adobe_items = adobe_items_factory(
-        renewal_date=(date.today() + timedelta(days=1)).isoformat(),
-        subscription_id="1234567890"
+        renewal_date=(today + dt.timedelta(days=1)).isoformat(), subscription_id="1234567890"
     )
 
     adobe_preview = adobe_reseller_change_preview_factory(
-        items=adobe_items,
-        approval_expiry=(date.today() - timedelta(days=1)).isoformat()
+        items=adobe_items, approval_expiry=(today - dt.timedelta(days=1)).isoformat()
     )
 
     mocked_adobe_client = mocker.MagicMock()
@@ -264,11 +245,11 @@ def test_validate_reseller_change_no_subscriptions(
     adobe_reseller_change_preview_factory,
     adobe_customer_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     m_client = mocker.MagicMock()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     adobe_preview = adobe_reseller_change_preview_factory(
-        items=[],
-        approval_expiry=(date.today() + timedelta(days=5)).isoformat()
+        items=[], approval_expiry=(today + dt.timedelta(days=5)).isoformat()
     )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
@@ -300,26 +281,21 @@ def test_validate_reseller_change_missing_admin_email(
     adobe_customer_factory,
     adobe_items_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     m_client = mocker.MagicMock()
 
-    params = reseller_change_order_parameters_factory(
-        admin_email=None
-    )
+    params = reseller_change_order_parameters_factory(admin_email=None)
     adobe_items = adobe_items_factory(
-        renewal_date=(date.today() + timedelta(days=1)).isoformat(),
-        subscription_id="1234567890"
+        renewal_date=(today + dt.timedelta(days=1)).isoformat(), subscription_id="1234567890"
     )
     order = order_factory(order_parameters=params)
     adobe_preview = adobe_reseller_change_preview_factory(
-        items=adobe_items,
-        approval_expiry=(date.today() - timedelta(days=1)).isoformat()
+        items=adobe_items, approval_expiry=(today - dt.timedelta(days=1)).isoformat()
     )
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": adobe_items_factory()
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": adobe_items_factory()}
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_adobe_client",
         return_value=mocked_adobe_client,

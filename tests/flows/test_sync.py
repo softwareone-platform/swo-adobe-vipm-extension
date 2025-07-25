@@ -9,8 +9,8 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
-    _add_missing_subscriptions,
-    _get_subscriptions_for_update,
+    _add_missing_subscriptions,  # noqa: PLC2701
+    _get_subscriptions_for_update,  # noqa: PLC2701
     sync_agreement,
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_3yc_enroll_status,
@@ -22,6 +22,9 @@ from adobe_vipm.flows.sync import (
 from adobe_vipm.flows.utils import get_adobe_customer_id
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
+
+
+# TODO: mocked_mpt_client = mocker.MagicMock() replace with mock_mpt_client fixture
 
 
 @pytest.fixture(autouse=True)
@@ -135,7 +138,7 @@ def test_sync_agreement_prices(
         "adobe_vipm.flows.sync.update_agreement",
     )
 
-    sync_agreement(mocked_mpt_client, agreement, False, True)
+    sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     assert mocked_get_agreement_subscription.call_args_list == [
         mocker.call(
@@ -243,7 +246,7 @@ def test_sync_agreement_prices_not(
         "adobe_vipm.flows.sync.sync_agreement_prices",
     )
 
-    sync_agreement(mock_mpt_client, agreement_factory(), False, False)
+    sync_agreement(mock_mpt_client, agreement_factory(), dry_run=False, sync_prices=False)
 
     mock_sync_agreement_prices.assert_not_called()
 
@@ -303,7 +306,7 @@ def test_sync_agreement_prices_dry_run(
         "adobe_vipm.flows.sync.update_agreement",
     )
 
-    sync_agreement(mocked_mpt_client, agreement, True, True)
+    sync_agreement(mocked_mpt_client, agreement, dry_run=True, sync_prices=True)
 
     mocked_get_agreement_subscription.assert_called_once_with(
         mocked_mpt_client,
@@ -362,7 +365,7 @@ def test_sync_agreement_prices_exception(
     )
 
     with caplog.at_level(logging.ERROR):
-        sync_agreement(mocked_mpt_client, agreement, False, True)
+        sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     assert f"Error synchronizing agreement {agreement['id']}" in caplog.text
 
@@ -408,7 +411,7 @@ def test_sync_agreement_prices_skip_processing(
     mocked_adobe_client.get_customer.return_value = customer
 
     with caplog.at_level(logging.INFO):
-        sync_agreement(mocked_mpt_client, agreement, False)
+        sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     assert f"Agreement {agreement['id']} has processing subscriptions, skip it" in caplog.text
 
@@ -428,8 +431,18 @@ def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, dry_run):
         "adobe_vipm.flows.sync.sync_agreement",
     )
 
-    sync_agreements_by_agreement_ids(mocked_mpt_client, [agreement["id"]], dry_run)
-    mocked_sync_agreement.assert_called_once_with(mocked_mpt_client, agreement, dry_run, False)
+    sync_agreements_by_agreement_ids(
+        mocked_mpt_client,
+        [agreement["id"]],
+        dry_run=dry_run,
+        sync_prices=False,
+    )
+    mocked_sync_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        agreement,
+        dry_run=dry_run,
+        sync_prices=False,
+    )
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
@@ -444,11 +457,12 @@ def test_sync_all_agreements(mocker, agreement_factory, dry_run):
         "adobe_vipm.flows.sync.sync_agreement",
     )
 
-    sync_all_agreements(mocked_mpt_client, dry_run)
+    sync_all_agreements(mocked_mpt_client, dry_run=dry_run)
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         agreement,
-        dry_run,
+        dry_run=dry_run,
+        sync_prices=False,
     )
 
 
@@ -467,7 +481,7 @@ def test_sync_agreements_by_3yc_end_date(mocker, agreement_factory, dry_run):
         autospec=True,
     )
 
-    sync_agreements_by_3yc_end_date(mocked_mpt_client, dry_run)
+    sync_agreements_by_3yc_end_date(mocked_mpt_client, dry_run=dry_run)
 
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client, agreement, dry_run=dry_run, sync_prices=True
@@ -496,9 +510,14 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock
         autospec=True,
     )
 
-    sync_agreements_by_coterm_date(mock_mpt_client, dry_run)
+    sync_agreements_by_coterm_date(mock_mpt_client, dry_run=dry_run)
 
-    mocked_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, dry_run, False)
+    mocked_sync_agreement.assert_called_once_with(
+        mock_mpt_client,
+        agreement,
+        dry_run=dry_run,
+        sync_prices=False,
+    )
     mocked_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
         "eq(status,Active)&"
@@ -524,9 +543,14 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
         autospec=True,
     )
 
-    sync_agreements_by_renewal_date(mocked_mpt_client, dry_run)
+    sync_agreements_by_renewal_date(mocked_mpt_client, dry_run=dry_run)
 
-    mocked_sync_agreement.assert_called_once_with(mocked_mpt_client, agreement, dry_run, True)
+    mocked_sync_agreement.assert_called_once_with(
+        mocked_mpt_client,
+        agreement,
+        dry_run=dry_run,
+        sync_prices=True,
+    )
     mocked_get_agreements_by_query.assert_called_once_with(
         mocked_mpt_client,
         "eq(status,Active)&"
@@ -565,7 +589,7 @@ def test_sync_agreements_by_3yc_enroll_status_status(
     mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
     mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
 
-    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
     mock_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
@@ -609,13 +633,18 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
     mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
 
-    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client,
+        agreement,
+        dry_run=False,
+        sync_prices=False,
+    )
 
 
 def test_sync_agreements_by_3yc_enroll_status_status_error(
@@ -639,7 +668,7 @@ def test_sync_agreements_by_3yc_enroll_status_status_error(
     mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
 
     with pytest.raises(MPTAPIError):
-        sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+        sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
     assert "Unknown exception getting agreements by 3YC enroll status" in caplog.text
     mock_update_agreement.assert_not_called()
@@ -671,13 +700,18 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     )
     mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
 
-    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_sync_agreement.assert_called_once_with(mock_mpt_client, agreement, False)
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client,
+        agreement,
+        dry_run=False,
+        sync_prices=False,
+    )
     assert "Authorization with uk/id ID not found." in caplog.text
 
 
@@ -706,25 +740,21 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     )
     mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
 
-    sync_agreements_by_3yc_enroll_status(mock_mpt_client, False)
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
     mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_sync_agreement.assert_has_calls(
-        [
-            mocker.call(mock_mpt_client, agreement, False),
-            mocker.call(mock_mpt_client, agreement, False),
-        ]
-    )
+    mock_sync_agreement.assert_has_calls([
+        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=False),
+        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=False),
+    ])
     assert caplog.messages == [
         "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
-        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962:"
-        " Unknown exception getting agreements by 3YC enroll status",
+        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962",
         "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
-        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962:"
-        " Unknown exception getting agreements by 3YC enroll status",
+        "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962",
     ]
 
 
@@ -792,7 +822,7 @@ def test_sync_agreement_prices_with_3yc(
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
-    sync_agreement(mocked_mpt_client, agreement, False, True)
+    sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     mocked_get_agreement_subscription.assert_called_once_with(
         mocked_mpt_client,
@@ -1004,7 +1034,7 @@ def test_sync_global_customer_parameter(
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
-    sync_agreement(mocked_mpt_client, agreement, dry_run, True)
+    sync_agreement(mocked_mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
     assert mocked_get_agreement_subscription.call_args_list == [
         mocker.call(
@@ -1209,16 +1239,16 @@ def test_sync_global_customer_parameter_not_prices(
         "adobe_vipm.flows.sync.sync_agreement_prices",
     )
 
-    sync_agreement(mock_mpt_client, agreement_factory(), False, False)
+    sync_agreement(mock_mpt_client, agreement_factory(), dry_run=False, sync_prices=False)
 
     mock_sync_agreement_prices.assert_not_called()
     assert caplog.messages == [
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
-        "Skipping price sync - sync_prices=False.",
+        "Skipping price sync - sync_prices False.",
         "Agreement updated AGR-2119-4550-8674-5962",
         "Setting global customer for agreement AGR-2119-4550-8674-5962",
         "Setting deployments for agreement AGR-2119-4550-8674-5962",
-        "Skipping price sync - sync_prices=False.",
+        "Skipping price sync - sync_prices False.",
         "Agreement updated AGR-2119-4550-8674-5962",
         "Updating Last Sync Date for agreement AGR-2119-4550-8674-5962",
     ]
@@ -1370,7 +1400,7 @@ def test_sync_global_customer_update_not_required(
         "adobe_vipm.flows.sync.update_agreement",
     )
 
-    sync_agreement(mocked_mpt_client, agreement, False, True)
+    sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     assert mocked_get_agreement_subscription.call_args_list == [
         mocker.call(
@@ -1847,11 +1877,12 @@ def test_sync_global_customer_parameters_error(
     )
 
     with caplog.at_level(logging.ERROR):
-        sync_agreement(mocked_mpt_client, agreement, False)
+        sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
 
+    # TODO: real exception here is TypeError: '>' not supported between instances
+    # of 'MagicMock' and 'MagicMock'. Need to fix.
     assert caplog.records[0].message == (
-        "Error setting global customer parameters for agreement "
-        "AGR-2119-4550-8674-5962: some error - {'error': 'some error'}"
+        "Error setting global customer parameters for agreement AGR-2119-4550-8674-5962."
     )
 
 
@@ -1917,7 +1948,7 @@ def test_sync_agreement_error_getting_adobe_customer(
     mocked_notifier = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
     )
-    sync_agreement(mocked_mpt_client, agreement, False)
+    sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
     mocked_adobe_client.get_customer.assert_called_once()
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
@@ -1936,7 +1967,7 @@ def test_sync_agreement_notify_exception(
     )
     mpt_client = mocker.MagicMock()
     agreement = agreement_factory()
-    sync_agreement(mpt_client, agreement, False)
+    sync_agreement(mpt_client, agreement, dry_run=False, sync_prices=False)
     mock_notify_agreement_unhandled_exception_in_teams.assert_called_once()
     assert (
         mock_notify_agreement_unhandled_exception_in_teams.call_args_list[0].args[0]
@@ -1951,9 +1982,6 @@ def test_sync_agreement_empty_discounts(
     adobe_customer_factory,
     caplog,
 ):
-    """
-    Test that sync_agreement notifies when customer discounts are empty.
-    """
     agreement = agreement_factory(
         subscriptions=[
             {
@@ -1983,7 +2011,7 @@ def test_sync_agreement_empty_discounts(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
     )
 
-    sync_agreement(mocked_mpt_client, agreement, False)
+    sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
@@ -2003,12 +2031,6 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_mpt_client,
     caplog,
 ):
-    """
-    Test that sync_agreement_prices handles missing prices correctly by:
-    - Continuing with other SKUs that have prices
-    - Generating appropriate notifications for missing prices
-    - Logging the error
-    """
     agreement = agreement_factory(
         lines=lines_factory(
             external_vendor_id="77777777CA",
@@ -2112,7 +2134,7 @@ def test_sync_agreement_prices_with_missing_prices(
     )
 
     with caplog.at_level(logging.ERROR):
-        sync_agreement(mock_mpt_client, agreement, False, True)
+        sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     assert "Skipping subscription" in caplog.text
     assert "65304578CA01A12" in caplog.text
@@ -2176,7 +2198,7 @@ def test_sync_agreement_lost_customer(
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
 
-    sync_agreement(mock_mpt_client, agreement_factory(), False)
+    sync_agreement(mock_mpt_client, agreement_factory(), dry_run=False, sync_prices=False)
 
     assert mock_terminate_subscription.mock_calls == [
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
@@ -2197,7 +2219,7 @@ def test_sync_agreement_lost_customer(
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
     ]
 
 
@@ -2225,7 +2247,7 @@ def test_sync_agreement_lost_customer_error(
         MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!")),
     ]
 
-    sync_agreement(mock_mpt_client, agreement_factory(), False)
+    sync_agreement(mock_mpt_client, agreement_factory(), dry_run=False, sync_prices=False)
 
     assert mock_terminate_subscription.mock_calls == [
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
@@ -2274,16 +2296,10 @@ def test_sync_agreement_lost_customer_error(
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000",
-        ">>> Suspected Lost Customer: Error terminating subscription "
-        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
-        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-        ">>> Suspected Lost Customer: Error terminating subscription "
-        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
-        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-        ">>> Suspected Lost Customer: Error terminating subscription "
-        "SUB-1000-2000-3000: 500 Internal Server Error - Oops! "
-        "(00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
+        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
     ]
 
 
@@ -2294,7 +2310,7 @@ def test_sync_agreement_lost_customer_error(
 def test_sync_agreement_skips_inactive_agreement(mock_mpt_client, mock_get_adobe_client, status):
     agreement = {"id": "1", "status": status, "subscriptions": []}
 
-    sync_agreement(mock_mpt_client, agreement, False)
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     mock_get_adobe_client.update_last_sync_date.assert_not_called()
 

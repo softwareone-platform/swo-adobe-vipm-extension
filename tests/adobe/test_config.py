@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from adobe_vipm.adobe.config import Config
+from adobe_vipm.adobe.config import REQUIRED_API_SCOPES, Config
 from adobe_vipm.adobe.dataclasses import (
     Authorization,
     Country,
@@ -16,20 +16,14 @@ from adobe_vipm.adobe.errors import (
 
 
 def test_properties(mock_adobe_config, adobe_config_file, settings):
-    """
-    Check the Config properties map to the right value.
-    """
     c = Config()
     assert c.api_base_url == settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"]
     assert c.auth_endpoint_url == settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"]
-    assert c.api_scopes == ",".join(Config.REQUIRED_API_SCOPES)
+    assert c.api_scopes == ",".join(REQUIRED_API_SCOPES)
     assert c.language_codes == ["en-US"]
 
 
 def test_get_reseller(mock_adobe_config, adobe_credentials_file, adobe_authorizations_file):
-    """
-    Test the lookup the Reseller object by Authorization and id.
-    """
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     seller_uk = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_uk"]
     seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
@@ -46,10 +40,6 @@ def test_get_reseller(mock_adobe_config, adobe_credentials_file, adobe_authoriza
 
 
 def test_get_reseller_not_found(mock_adobe_config, adobe_authorizations_file):
-    """
-    Check that the lookup of the reseller raises `ResellerNotFoundError`
-    if there is no reseller for a given an authorization and reseller uk/id.
-    """
     c = Config()
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     auth = c.get_authorization(authorization_uk)
@@ -62,9 +52,6 @@ def test_get_reseller_not_found(mock_adobe_config, adobe_authorizations_file):
 
 
 def test_get_authorization(mock_adobe_config, adobe_credentials_file, adobe_authorizations_file):
-    """
-    Test the lookup the Authorization object by uk/id.
-    """
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     authorization_id = adobe_authorizations_file["authorizations"][0]["authorization_id"]
     client_id = adobe_credentials_file[0]["client_id"]
@@ -86,10 +73,6 @@ def test_get_authorization(mock_adobe_config, adobe_credentials_file, adobe_auth
 
 
 def test_get_authorization_not_found(mock_adobe_config):
-    """
-    Check that the lookup of the Authorization raises `AuthorizationNotFoundError`
-    if there is no Authorization for a given uk/id.
-    """
     c = Config()
     with pytest.raises(AuthorizationNotFoundError) as cv:
         assert c.get_authorization("does-not-exist")
@@ -98,10 +81,6 @@ def test_get_authorization_not_found(mock_adobe_config):
 
 
 def test_get_country(mock_adobe_config, adobe_config_file):
-    """
-    Test the lookup the Country object by country code (ISO 3166-2).
-    """
-
     c = Config()
     country = c.get_country("US")
     assert isinstance(country, Country)
@@ -114,10 +93,6 @@ def test_get_country(mock_adobe_config, adobe_config_file):
 
 
 def test_get_country_not_found(mock_adobe_config):
-    """
-    Check that the lookup of the country raises `CountryNotFoundError`
-    if there is no country for a given country code (ISO 3166-2).
-    """
     c = Config()
     with pytest.raises(CountryNotFoundError) as cv:
         assert c.get_country("not-found")
@@ -149,10 +124,10 @@ def test_load_data(
     m_files.joinpath.return_value = m_join
     mocked_files = mocker.patch("adobe_vipm.adobe.config.files", return_value=m_files)
     mocker.patch(
-        "builtins.open",
+        "adobe_vipm.adobe.config.Path.open",
         multi_mock_open(
-            json.dumps(adobe_credentials_file),
             json.dumps(adobe_authorizations_file),
+            json.dumps(adobe_credentials_file),
         ),
     )
     c = Config()

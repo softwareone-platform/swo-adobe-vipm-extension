@@ -55,10 +55,6 @@ def test_get_returnable_orders_step(
     adobe_items_factory,
     test_case,
 ):
-    """
-    Tests the retrieval of returnable orders by sku.
-    Tests both successful and failure cases where quantities match or don't match.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=test_case["quantity"],
@@ -239,10 +235,6 @@ def test_switch_autorenewal_off_already_off(
 
 
 def test_fulfill_termination_order(mocker):
-    """
-    Tests the termination order pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
@@ -420,9 +412,6 @@ def test_get_returnable_orders_step_inactive_subscription(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the GetReturnableOrders step when the subscription is inactive.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=0,
@@ -474,9 +463,6 @@ def test_get_returnable_orders_step_no_returnable_orders(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the GetReturnableOrders step when there are no returnable orders.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=0,

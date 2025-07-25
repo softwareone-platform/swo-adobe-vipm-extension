@@ -19,10 +19,6 @@ from adobe_vipm.flows.validation.shared import (
 
 
 def test_validate_duplicate_lines_step_duplicates(mocker, order_factory, lines_factory):
-    """
-    Tests that if duplicate lines (same Item ID) are present in the order
-    an error is set and the validation pipeline stops.
-    """
     order = order_factory(lines=lines_factory() + lines_factory())
 
     mocked_client = mocker.MagicMock()

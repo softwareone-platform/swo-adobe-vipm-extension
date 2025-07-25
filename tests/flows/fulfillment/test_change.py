@@ -54,9 +54,6 @@ def test_get_returnable_orders_step(
     adobe_items_factory,
     return_orders,
 ):
-    """
-    Tests the computation of the map of returnable orders by sku/quantity.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -150,10 +147,6 @@ def test_get_returnable_orders_step_no_returnable_order(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests the computation of the map of returnable orders by sku/quantity
-    when no returnable orders are found for a given sku.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -206,11 +199,6 @@ def test_get_returnable_orders_step_quantity_mismatch(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests the computation of the map of returnable orders by sku/quantity.
-    Since the quantity doesn't match any of the sums of the avaibale returnable
-    orders for such sku the value have to be None.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=7,
@@ -304,9 +292,6 @@ def test_get_returnable_orders_step_last_two_weeks(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests the computation of the map of returnable orders by sku/quantity.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -343,10 +328,6 @@ def test_get_returnable_orders_step_last_two_weeks(
 
 
 def test_validate_returnable_orders_step(mocker, order_factory):
-    """
-    Tests the validate returnable orders step when all downsize SKUs
-    have returnable orders. The order processing pipeline will continue.
-    """
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
     )
@@ -369,10 +350,6 @@ def test_validate_returnable_orders_step(mocker, order_factory):
 
 
 def test_validate_returnable_orders_step_invalid(mocker, order_factory):
-    """
-    Tests the validate returnable orders step when at least one downsize SKU
-    have no returnable orders. The order processing pipeline will stop.
-    """
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
     )
@@ -441,26 +418,22 @@ def test_update_renewal_quantities_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-            )
-        ]
-    )
+    mocked_adobe_client.get_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+        )
+    ])
     assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-                quantity=5,
-            )
-        ]
-    )
+    mocked_adobe_client.update_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+            quantity=5,
+        )
+    ])
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -505,26 +478,22 @@ def test_update_renewal_quantities_downsize_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-            )
-        ]
-    )
+    mocked_adobe_client.get_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+        )
+    ])
     assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-                quantity=5,
-            )
-        ]
-    )
+    mocked_adobe_client.update_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+            quantity=5,
+        )
+    ])
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -576,10 +545,6 @@ def test_update_renewal_quantities_step_quantity_match(
 
 
 def test_fulfill_change_order(mocker):
-    """
-    Tests the change order pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
@@ -649,10 +614,6 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
     error_code,
     error_message,
 ):
-    """
-    Tests the validate update renewal quantity step when the renewal state is invalid.
-    when the offer has expired or when the subscription is inactive/pending renewal
-    """
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
     )
@@ -714,9 +675,6 @@ def test_validate_update_renewal_quantity_error(
     subscriptions_factory,
     lines_factory,
 ):
-    """
-    Tests the validate update renewal quantity step when the renewal state is invalid.
-    """
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
     )
@@ -772,10 +730,6 @@ def test_rollback_updated_subscriptions_error(
     adobe_subscription_factory,
     adobe_order_factory,
 ):
-    """
-    Tests the rollback of updated subscriptions when an error occurs during the rollback process.
-    Verifies that both successful updates are rolled back and the Adobe order is returned.
-    """
     subscriptions = subscriptions_factory()
     subscriptions2 = subscriptions_factory()
     subscriptions2[0]["id"] = "sub-2"
@@ -886,10 +840,6 @@ def test_rollback_updated_subscriptions_error_during_rollback(
     adobe_subscription_factory,
     adobe_order_factory,
 ):
-    """
-    Tests the rollback of updated subscriptions when an error occurs during the rollback process.
-    Verifies that the error is caught and the notification is sent with the correct error message.
-    """
     subscriptions = subscriptions_factory()
     subscriptions2 = subscriptions_factory()
     subscriptions2[0]["id"] = "sub-2"

@@ -1,14 +1,13 @@
+import json
+
 import pytest
-from requests import HTTPError, JSONDecodeError
+from requests import HTTPError
+from requests.models import Response
 
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, wrap_http_error
 
 
 def test_simple_error(adobe_api_error_factory):
-    """
-    Test the AdobeError exception when the error returned by
-    Adobe does not contain additional details.
-    """
     error_data = adobe_api_error_factory("1234", "error message")
     error = AdobeAPIError(400, error_data)
     assert error.status_code == 400
@@ -20,10 +19,6 @@ def test_simple_error(adobe_api_error_factory):
 
 
 def test_detailed_error(adobe_api_error_factory):
-    """
-    Test the AdobeError exception when the error returned by
-    Adobe does not contain additional details.
-    """
     error_data = adobe_api_error_factory(
         "5678", "error message with details", details=["detail1", "detail2"]
     )
@@ -32,13 +27,17 @@ def test_detailed_error(adobe_api_error_factory):
     assert str(error) == "5678 - error message with details: detail1, detail2"
 
 
-def test_wrap_http_error(mocker, adobe_api_error_factory):
+def test_wrap_http_error(adobe_api_error_factory):
     def func():
-        response = mocker.MagicMock()
+        response = Response()
         response.status_code = 400
-        response.json.return_value = adobe_api_error_factory(
-            "5678", "error message with details", details=["detail1", "detail2"]
-        )
+        response.headers["Content-Type"] = "application/json"
+        response._content = json.dumps(  # noqa: SLF001
+            adobe_api_error_factory(
+                "5678", "error message with details", details=["detail1", "detail2"]
+            ),
+        ).encode("utf-8")
+
         raise HTTPError(response=response)
 
     wrapped_func = wrap_http_error(func)
@@ -51,15 +50,17 @@ def test_wrap_http_error(mocker, adobe_api_error_factory):
     assert str(cv.value) == "5678 - error message with details: detail1, detail2"
 
 
-def test_wrap_http_error_504_error_code(mocker):
+def test_wrap_http_error_504_error_code():
     @wrap_http_error
     def func():
-        response = mocker.MagicMock()
+        response = Response()
         response.status_code = 504
-        response.json.return_value = {
+        response.headers["Content-Type"] = "application/json"
+        response._content = json.dumps({  # noqa: SLF001
             "error_code": "504001",
             "message": "Gateway Timeout",
-        }
+        }).encode("utf-8")
+
         raise HTTPError(response=response)
 
     wrapped_func = wrap_http_error(func)
@@ -73,10 +74,10 @@ def test_wrap_http_error_504_error_code(mocker):
 
 def test_wrap_http_error_json_decode_error(mocker):
     def func():
-        response = mocker.MagicMock()
+        response = Response()
         response.status_code = 500
-        response.content = b"Internal Server Error"
-        response.json.side_effect = JSONDecodeError("msg", "doc", 0)
+        response._content = "Internal Server Error".encode("utf-8")  # noqa: SLF001 UP012
+
         raise HTTPError(response=response)
 
     wrapped_func = wrap_http_error(func)
