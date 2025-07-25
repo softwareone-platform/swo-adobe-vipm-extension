@@ -52,12 +52,15 @@ class Command(BaseCommand):
         client = setup_client()
         if options["agreements"]:
             sync_agreements_by_agreement_ids(
-                client, options["agreements"], options["dry_run"], options["sync_prices"]
+                client,
+                options["agreements"],
+                dry_run=options["dry_run"],
+                sync_prices=options["sync_prices"],
             )
         elif options["all"]:
-            sync_all_agreements(client, options["dry_run"])
+            sync_all_agreements(client, dry_run=options["dry_run"])
         else:
-            sync_agreements_by_3yc_end_date(client, options["dry_run"])
-            sync_agreements_by_coterm_date(client, options["dry_run"])
-            sync_agreements_by_renewal_date(client, options["dry_run"])
+            sync_agreements_by_3yc_end_date(client, dry_run=options["dry_run"])
+            sync_agreements_by_coterm_date(client, dry_run=options["dry_run"])
+            sync_agreements_by_renewal_date(client, dry_run=options["dry_run"])
         self.success("Processing agreements completed.")

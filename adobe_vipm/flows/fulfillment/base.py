@@ -1,7 +1,7 @@
 import logging
 import traceback
 
-import adobe_vipm.flows.constants as constants
+from adobe_vipm.flows import constants
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.configuration import fulfill_configuration_order
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
@@ -18,10 +18,9 @@ from adobe_vipm.flows.utils import (
 logger = logging.getLogger(__name__)
 
 
-def fulfill_order(client, order):
+def fulfill_order(client, order):  # noqa: C901
     """
-    Fulfills an order of any type by processing the necessary actions
-    based on the provided parameters.
+    Fulfills an order of any type by processing the actions based on the provided parameters.
 
     Args:
         client (MPTClient): An instance of the client for consuming the MPT platform API.
@@ -30,7 +29,7 @@ def fulfill_order(client, order):
     Returns:
         None
     """
-    logger.info(f"Start processing {order['type']} order {order['id']}")
+    logger.info("Start processing %s order %s", order["type"], order["id"])
     try:
         match order["type"]:
             case constants.ORDER_TYPE_PURCHASE:

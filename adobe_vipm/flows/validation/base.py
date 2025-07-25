@@ -18,7 +18,7 @@ from adobe_vipm.flows.validation.transfer import validate_reseller_change, valid
 logger = logging.getLogger(__name__)
 
 
-def validate_order(client, order):
+def validate_order(client, order):  # noqa: C901
     """
     Performs the validation of a draft order.
 
@@ -38,10 +38,10 @@ def validate_order(client, order):
         def validate_purchase(client, order):
             if is_migrate_customer(order):
                 return validate_transfer(client, order)
-            elif is_reseller_change(order):
+            if is_reseller_change(order):
                 return validate_reseller_change(client, order)
-            else:
-                return validate_purchase_order(client, order)
+
+            return validate_purchase_order(client, order)
 
         validators = {
             constants.ORDER_TYPE_PURCHASE: validate_purchase,
@@ -52,12 +52,6 @@ def validate_order(client, order):
         if order["type"] in validators:
             has_errors, order = validators[order["type"]](client, order)
             order = update_parameters_visibility(order)
-
-        logger.info(
-            f"Validation of order {order['id']} succeeded "
-            f"with{'out' if not has_errors else ''} errors"
-        )
-        return order
     except Exception:
         notify_unhandled_exception_in_teams(
             "validation",
@@ -65,3 +59,10 @@ def validate_order(client, order):
             strip_trace_id(traceback.format_exc()),
         )
         raise
+    else:
+        logger.info(
+            "Validation of order %s succeeded %s errors",
+            order["id"],
+            f"with{'out' if not has_errors else ''}",
+        )
+        return order

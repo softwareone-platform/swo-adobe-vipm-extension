@@ -8,6 +8,7 @@ from adobe_vipm.flows.context import Context
 NextStep = Callable[[MPTClient, Context], None]
 
 
+# TODO: why it is still here and not in SDK???
 class Step(ABC):
     @abstractmethod
     def __call__(

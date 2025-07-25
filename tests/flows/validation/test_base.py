@@ -138,7 +138,6 @@ def test_validate_termination_order(mocker, caplog, order_factory):
     mocked_validate.assert_called_once_with(mocked_client, reset_ordering_parameters_error(order))
 
 
-
 def test_validate_reseller_change_order(
     mocker,
     caplog,

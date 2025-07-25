@@ -423,26 +423,22 @@ def test_update_renewal_quantities_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-            )
-        ]
-    )
+    mocked_adobe_client.get_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+        )
+    ])
     assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-                quantity=5,
-            )
-        ]
-    )
+    mocked_adobe_client.update_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+            quantity=5,
+        )
+    ])
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -487,26 +483,22 @@ def test_update_renewal_quantities_downsize_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-            )
-        ]
-    )
+    mocked_adobe_client.get_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+        )
+    ])
     assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls(
-        [
-            mocker.call(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub["subscriptionId"],
-                quantity=5,
-            )
-        ]
-    )
+    mocked_adobe_client.update_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            adobe_sub["subscriptionId"],
+            quantity=5,
+        )
+    ])
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
