@@ -60,9 +60,10 @@ def mock_get_adobe_client(mocker, mock_adobe_client):
 
 
 @pytest.fixture
-def mock_get_agreement_subscription(mocker):
+def mock_get_agreement_subscription(mocker, subscriptions_factory):
     return mocker.patch(
         "adobe_vipm.flows.sync.get_agreement_subscription",
+        return_value=subscriptions_factory()[0],
         spec=True,
     )
 
@@ -71,4 +72,20 @@ def mock_get_agreement_subscription(mocker):
 def mock_update_agreement_subscription(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync.update_agreement_subscription",
+    )
+
+
+@pytest.fixture
+def mock_send_exception(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.send_exception",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_get_prices_for_skus(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        spec=True,
     )
