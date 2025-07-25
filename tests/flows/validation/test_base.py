@@ -14,7 +14,6 @@ def test_validate_transfer_order(
     order_factory,
     transfer_order_parameters_factory,
 ):
-    """Tests the validate order entrypoint function for transfer orders when it validates."""
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     m_client = mocker.MagicMock()
 
@@ -42,8 +41,6 @@ def test_validate_transfer_order_no_validate(
     order_factory,
     transfer_order_parameters_factory,
 ):
-    """Tests the validate order entrypoint function for transfers when doesn't validate."""
-
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     m_client = mocker.MagicMock()
 
@@ -79,7 +76,6 @@ def test_validate_order_exception(mocker, mpt_error_factory, order_factory):
 
 
 def test_validate_change_order(mocker, caplog, order_factory):
-    """Tests the validate order entrypoint function when it validates."""
     order = order_factory(order_type="Change")
 
     mocked_client = mocker.MagicMock()
@@ -99,7 +95,6 @@ def test_validate_change_order(mocker, caplog, order_factory):
 
 
 def test_validate_purchase_order(mocker, caplog, order_factory):
-    """Tests the validate order entrypoint function when it validates."""
     order = order_factory(order_type="Purchase")
 
     mocked_client = mocker.MagicMock()
@@ -119,7 +114,6 @@ def test_validate_purchase_order(mocker, caplog, order_factory):
 
 
 def test_validate_termination_order(mocker, caplog, order_factory):
-    """Tests the validate order entrypoint function when it validates."""
     order = order_factory(order_type="Termination")
 
     mocked_client = mocker.MagicMock()
@@ -138,14 +132,12 @@ def test_validate_termination_order(mocker, caplog, order_factory):
     mocked_validate.assert_called_once_with(mocked_client, reset_ordering_parameters_error(order))
 
 
-
 def test_validate_reseller_change_order(
     mocker,
     caplog,
     order_factory,
     reseller_change_order_parameters_factory,
 ):
-    """Tests the validate order entrypoint function for transfer orders when it validates."""
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     m_client = mocker.MagicMock()
 

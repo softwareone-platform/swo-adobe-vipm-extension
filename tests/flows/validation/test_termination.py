@@ -25,9 +25,6 @@ def test_validate_downsizes_step_success(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests the validate downsizes step when all validations pass.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -115,9 +112,6 @@ def test_validate_downsizes_step_no_returnable_orders(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the validate downsizes step when no returnable orders are found.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -172,9 +166,6 @@ def test_validate_downsizes_step_quantity_mismatch(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests the validate downsizes step when the quantity doesn't match the returnable orders.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -248,9 +239,6 @@ def test_validate_downsizes_step_inactive_subscription(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the validate downsizes step when the subscription is inactive.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -292,10 +280,6 @@ def test_validate_downsizes_step_inactive_subscription(
 
 
 def test_validate_termination_order(mocker):
-    """
-    Tests the termination order validation pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(

@@ -5,14 +5,34 @@ from adobe_vipm.flows.utils.parameter import get_ordering_parameter
 from adobe_vipm.notifications import send_exception
 
 
-def get_notifications_recipient(order):
-    return (get_ordering_parameter(order, Param.CONTACT).get("value", {}) or {}).get("email") or (
-        order["agreement"]["buyer"].get("contact", {}) or {}
-    ).get("email")
+def get_notifications_recipient(order: dict) -> str | None:
+    """
+    Retrieves notification recipiend from MPT order.
+
+    It can be either email from contact parameter or buyer contact email.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        Either contact parameter or buyer contact emails.
+    """
+    contact = get_ordering_parameter(order, Param.CONTACT).get("value", {}) or {}
+    buyer = order["agreement"]["buyer"].get("contact", {}) or {}
+
+    return (contact or buyer).get("email")
 
 
 @functools.cache
-def notify_unhandled_exception_in_teams(process, order_id, traceback):
+def notify_unhandled_exception_in_teams(process: str, order_id: str, traceback: str) -> None:
+    """
+    Notify unhandled exception when processing the order to teams channel.
+
+    Args:
+        process: Name of the process or action.
+        order_id: MPT order id.
+        traceback: Traceback to report in the notification.
+    """
     send_exception(
         f"Order {process} unhandled exception!",
         f"An unhandled exception has been raised while performing {process} "
@@ -22,9 +42,13 @@ def notify_unhandled_exception_in_teams(process, order_id, traceback):
 
 
 @functools.cache
-def notify_agreement_unhandled_exception_in_teams(agreement_id, traceback):
+def notify_agreement_unhandled_exception_in_teams(agreement_id: str, traceback: str) -> None:
     """
-    Notify that an agreement has been unhandled exception
+    Notify that an agreement has raised unhandled exception.
+
+    Args:
+        agreement_id: MPT agreement id.
+        traceback: Traceback to report in the notification.
     """
     send_exception(
         "Agreement unhandled exception!",
@@ -33,15 +57,22 @@ def notify_agreement_unhandled_exception_in_teams(agreement_id, traceback):
     )
 
 
-def notify_missing_prices(agreement_id, missing_skus, product_id, currency, commitment_date=None):
+def notify_missing_prices(
+    agreement_id: str,
+    missing_skus: list[str],
+    product_id: str,
+    currency: str,
+    commitment_date: str | None = None,
+) -> None:
     """
     Notifies about SKUs with missing prices in the agreement.
+
     Args:
-        agreement_id (str): The agreement ID
-        missing_skus (list): List of SKUs without prices
-        product_id (str): The product ID
-        currency (str): The currency code
-        commitment_date (str, optional): The 3YC commitment date if applicable
+        agreement_id: The agreement ID
+        missing_skus: List of SKUs without prices
+        product_id: The product ID
+        currency: The currency code
+        commitment_date: The 3YC commitment date if applicable
     """
     context = (
         f"3YC prices (commitment date: {commitment_date})" if commitment_date else "regular prices"
@@ -61,15 +92,17 @@ def notify_missing_prices(agreement_id, missing_skus, product_id, currency, comm
     send_exception("Missing prices detected", message)
 
 
-def notify_not_updated_subscriptions(order_id, error_message, updated_subscriptions, product_id):
+def notify_not_updated_subscriptions(
+    order_id: str, error_message: str, updated_subscriptions: list[dict], product_id: str
+) -> None:
     """
     Notifies about SKUs with missing prices in the agreement.
+
     Args:
-        agreement_id (str): The agreement ID
-        missing_skus (list): List of SKUs without prices
+        order_id: MPT order id.
+        error_message: Error message to include into the notification
+        updated_subscriptions: MPT subscriptions that were updated
         product_id (str): The product ID
-        currency (str): The currency code
-        commitment_date (str, optional): The 3YC commitment date if applicable
     """
     message = (
         f"{error_message}\n\n"
@@ -87,8 +120,11 @@ def notify_not_updated_subscriptions(order_id, error_message, updated_subscripti
     send_exception(f"Error updating the subscriptions in configuration order: {order_id}", message)
 
 
-def notify_processing_lost_customer(msg: str):
+def notify_processing_lost_customer(msg: str) -> None:
     """
     Notifies at the start of execution of Lost Customer Procedure.
+
+    Args:
+        msg: Message to include into the notification.
     """
     send_exception("Executing Lost Customer Procedure.", msg)

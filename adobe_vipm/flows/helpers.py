@@ -1,9 +1,7 @@
-"""
-This module contains orders helper functions.
-"""
+"""This module contains orders helper functions."""
 
+import datetime as dt
 import logging
-from datetime import date, datetime, timedelta
 from operator import itemgetter
 
 from django.conf import settings
@@ -58,17 +56,16 @@ from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 logger = logging.getLogger(__name__)
 
 
-def populate_order_info(client, order):
+def populate_order_info(client, order: dict) -> dict:
     """
-    Enrich the order with the full representation of the
-    agreement object.
+    Enrich the order with the full representation of the agreement object.
 
     Args:
         client (MPTClient): an instance of the Marketplace platform client.
-        order (dict): the order that is being processed.
+        order: the order that is being processed.
 
     Returns:
-        dict: The enriched order.
+        The enriched order.
     """
     order["agreement"] = get_agreement(client, order["agreement"]["id"])
     order["agreement"]["licensee"] = get_licensee(client, order["agreement"]["licensee"]["id"])
@@ -77,7 +74,10 @@ def populate_order_info(client, order):
 
 
 class PrepareCustomerData(Step):
+    """Prepares customer data from order to Adobe format for futher processing."""
+
     def __call__(self, client, context, next_step):
+        """Prepares customer data from order to Adobe format for futher processing."""
         licensee = context.order["agreement"]["licensee"]
         address = licensee["address"]
         contact = licensee.get("contact")
@@ -122,6 +122,7 @@ class PrepareCustomerData(Step):
 class SetupContext(Step):
     """
     Initialize the processing context.
+
     Enrich the order with the full representations of the agreement and the licensee
     retrieving them.
     If the Adobe customerId fulfillment parameter is set, then retrieve the customer
@@ -129,6 +130,7 @@ class SetupContext(Step):
     """
 
     def __call__(self, client, context, next_step):
+        """Initialize the processing context."""
         adobe_client = get_adobe_client()
         context.order = reset_order_error(context.order)
         context.order = reset_ordering_parameters_error(context.order)
@@ -151,7 +153,7 @@ class SetupContext(Step):
             # means retry_count is set and it is > 0
             # just setup due date to not to send email, like new order was
             # created
-            context.due_date = date.today() + timedelta(
+            context.due_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(
                 days=int(settings.EXTENSION_CONFIG.get("DUE_DATE_DAYS"))
             )
         else:
@@ -177,19 +179,22 @@ class SetupContext(Step):
                     context.authorization_id,
                     context.adobe_customer_id,
                 )
-            except AdobeAPIError as e:
-                logger.exception(f"{context}: failed to retrieve Adobe customer: {e}")
+            except AdobeAPIError:
+                logger.exception("%s: failed to retrieve Adobe customer.", context)
                 return
         context.adobe_new_order_id = get_adobe_order_id(context.order)
-        logger.info(f"{context}: initialization completed.")
+        logger.info("%s: initialization completed.", context)
         next_step(client, context)
 
 
 class Validate3YCCommitment(Step):
-    def __init__(self, is_validation=False):
+    """Validates 3YC parameters."""
+
+    def __init__(self, *, is_validation=False):
         self.is_validation = is_validation
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, client, context, next_step):  # noqa: C901
+        """Validates 3YC parameters."""
         is_new_purchase_order_validation = not context.adobe_customer
 
         if context.adobe_return_orders:
@@ -197,22 +202,27 @@ class Validate3YCCommitment(Step):
             return
 
         if is_new_purchase_order_validation:
-            logger.info(f"{context}: No Adobe customer found, validating 3YC quantities parameters")
+            logger.info(
+                "%s: No Adobe customer found, validating 3YC quantities parameters",
+                context,
+            )
             if self.validate_3yc_quantities_parameters(client, context):
                 next_step(client, context)
             return
 
-        commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
-            context.adobe_customer
-        )
+        commitment = get_3yc_commitment_request(
+            context.adobe_customer,
+            is_recommitment=False,
+        ) or get_3yc_commitment(context.adobe_customer)
 
         adobe_client = get_adobe_client()
         commitment_status = commitment.get("status", "")
 
         if commitment_status == ThreeYearCommitmentStatus.REQUESTED and not self.is_validation:
             logger.info(
-                f"{context}: 3YC commitment request is "
-                f"in status {ThreeYearCommitmentStatus.REQUESTED}"
+                "%s: 3YC commitment request is in status %s",
+                context,
+                ThreeYearCommitmentStatus.REQUESTED,
             )
             return
 
@@ -228,7 +238,7 @@ class Validate3YCCommitment(Step):
 
         if commitment:
             if self._validate_3yc_commitment_date_before_coterm_date(context, commitment):
-                logger.info(f"{context}: 3YC commitment end date is before coterm date")
+                logger.info("%s: 3YC commitment end date is before coterm date", context)
                 next_step(client, context)
                 return
 
@@ -255,29 +265,44 @@ class Validate3YCCommitment(Step):
 
     def _is_commitment_expired_or_rejected(self, commitment_status, commitment, context):
         """Check if commitment is expired, noncompliant, or rejected."""
-        if commitment_status in [
+        if commitment_status in {
             ThreeYearCommitmentStatus.EXPIRED,
             ThreeYearCommitmentStatus.NONCOMPLIANT,
             ThreeYearCommitmentStatus.DECLINED,
-        ]:
-            logger.info(f"{context}: 3YC commitment is expired or noncompliant")
+        }:
+            logger.info("%s: 3YC commitment is expired or noncompliant", context)
             return True
 
         if not commitment and context.customer_data.get("3YC") == ["Yes"]:
-            logger.info(f"{context}: 3YC commitment has been rejected")
+            logger.info("%s: 3YC commitment has been rejected", context)
             return True
 
         return False
 
     def _validate_3yc_commitment_date_before_coterm_date(self, context, commitment):
-        if not context.adobe_customer['cotermDate']:
+        if not context.adobe_customer["cotermDate"]:
             return False
 
-        threeyc_end_date = datetime.strptime(commitment['endDate'], "%Y-%m-%d")
-        coterm_date = datetime.strptime(context.adobe_customer['cotermDate'], "%Y-%m-%d")
+        threeyc_end_date = (
+            dt.datetime.strptime(
+                commitment["endDate"],
+                "%Y-%m-%d",
+            )
+            .replace(tzinfo=dt.UTC)
+            .date()
+        )
+        coterm_date = (
+            dt.datetime.strptime(
+                context.adobe_customer["cotermDate"],
+                "%Y-%m-%d",
+            )
+            .replace(tzinfo=dt.UTC)
+            .date()
+        )
         return threeyc_end_date < coterm_date
 
-    def get_quantities(self, context, subscriptions):
+    def get_quantities(self, context, subscriptions) -> tuple[float, float]:
+        """Calculates licensees and consumables quantities of subscriptions."""
         count_licenses, count_consumables = self.get_licenses_and_consumables_count(subscriptions)
 
         count_licenses, count_consumables = self.process_lines_quantities(
@@ -296,7 +321,8 @@ class Validate3YCCommitment(Step):
 
         return count_licenses, count_consumables
 
-    def manage_order_error(self, client, context, error):
+    def manage_order_error(self, client, context, error) -> None:
+        """Set order error if is_validation flag is set, otherwise fail order."""
         if self.is_validation:
             context.order = set_order_error(
                 context.order,
@@ -309,15 +335,15 @@ class Validate3YCCommitment(Step):
                 ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
             )
 
-    @staticmethod
-    def get_licenses_and_consumables_count(subscriptions):
+    def get_licenses_and_consumables_count(self, subscriptions: dict) -> tuple[float, float]:
         """
         Get the count of licenses and consumables from the Adobe customer subscriptions.
-        Args:
-            subscriptions (dict): Adobe customer subscriptions.
-        Returns:
-            tuple: The count of licenses and consumables.
 
+        Args:
+            subscriptions: Adobe customer subscriptions.
+
+        Returns:
+            The count of licenses and consumables.
         """
         count_licenses = 0
         count_consumables = 0
@@ -340,8 +366,14 @@ class Validate3YCCommitment(Step):
         return count_licenses, count_consumables
 
     def process_lines_quantities(
-        self, context, count_licenses=0, count_consumables=0, is_downsize=False
-    ):
+        self,
+        context,
+        count_licenses=0,
+        count_consumables=0,
+        *,
+        is_downsize=False,
+    ) -> tuple[float, float]:
+        """Calculates quantities for licensees and consumables for downsize or upsize lines."""
         lines = context.downsize_lines if is_downsize else context.upsize_lines + context.new_lines
 
         for line in lines:
@@ -352,18 +384,18 @@ class Validate3YCCommitment(Step):
                 continue
 
             count_licenses, count_consumables = self._update_counts(
-                sku, delta, count_licenses, count_consumables, is_downsize
+                sku, delta, count_licenses, count_consumables, is_downsize=is_downsize
             )
 
         return count_licenses, count_consumables
 
-    def _calculate_delta(self, line, is_downsize):
+    def _calculate_delta(self, line, is_downsize) -> float:
         """Calculate the quantity delta for a line."""
         if is_downsize:
             return line["oldQuantity"] - line["quantity"]
         return line["quantity"] - line["oldQuantity"]
 
-    def _update_counts(self, sku, delta, count_licenses, count_consumables, is_downsize):
+    def _update_counts(self, sku, delta, count_licenses, count_consumables, *, is_downsize):
         """Update license and consumable counts based on SKU type and delta."""
         if sku.is_consumable():
             count_consumables += delta if not is_downsize else -delta
@@ -372,8 +404,8 @@ class Validate3YCCommitment(Step):
 
         return count_licenses, count_consumables
 
-    @staticmethod
-    def validate_items_in_subscriptions(context, subscriptions):
+    def validate_items_in_subscriptions(self, context, subscriptions) -> tuple[bool, str]:
+        """Validates items quantities in subscriptions."""
         if subscriptions.get("items", []):
             for line in context.downsize_lines + context.upsize_lines:
                 adobe_item = get_item_by_partial_sku(
@@ -384,13 +416,14 @@ class Validate3YCCommitment(Step):
                     return False, f"Item {vendor_id} not found in Adobe subscriptions"
         return True, None
 
-    @staticmethod
-    def validate_minimum_quantity(
+    def validate_minimum_quantity(  # noqa: C901
+        self,
         context,
         commitment,
         count_licenses,
         count_consumables,
     ):
+        """Validates minimum items quantities in subscriptions."""
         is_invalid_license_minimum = False
         is_invalid_consumable_minimum = False
         minimum_licenses = 0
@@ -406,8 +439,9 @@ class Validate3YCCommitment(Step):
 
         if is_invalid_consumable_minimum and is_invalid_license_minimum:
             logger.error(
-                f"{context}: failed due to reduction quantity is not allowed below "
-                f"the minimum commitment of licenses and consumables"
+                "%s: failed due to reduction quantity is not allowed below "
+                "the minimum commitment of licenses and consumables",
+                context,
             )
             return ERR_DOWNSIZE_MINIMUM_3YC_GENERIC.format(
                 minimum_licenses=minimum_licenses,
@@ -416,8 +450,9 @@ class Validate3YCCommitment(Step):
 
         if is_invalid_license_minimum:
             logger.error(
-                f"{context}: failed due to reduction quantity is not allowed below "
-                f"the minimum commitment of licenses"
+                "%s: failed due to reduction quantity is not allowed below "
+                "the minimum commitment of licenses",
+                context,
             )
             return ERR_COMMITMENT_3YC_LICENSES.format(
                 selected_licenses=count_licenses, minimum_licenses=minimum_licenses
@@ -425,17 +460,21 @@ class Validate3YCCommitment(Step):
 
         if is_invalid_consumable_minimum:
             logger.error(
-                f"{context}: failed due to reduction quantity is not allowed below"
-                f" the minimum commitment of consumables"
+                "%s: failed due to reduction quantity is not allowed below"
+                " the minimum commitment of consumables",
+                context,
             )
             return ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES.format(
                 selected_consumables=count_consumables, minimum_consumables=minimum_consumables
             )
 
+        return None
+
     def validate_3yc_quantities_parameters(self, client, context):
         """
-        Validate the 3YC commitment quantities are not allowed below
-        the minimum commitment of licenses and consumables.
+        Validate the 3YC commitment quantities are not allowed below the minimum commitment.
+
+        For both licenses and consumables.
         """
         count_licenses, count_consumables = self.get_quantities(context, {})
 
@@ -470,7 +509,10 @@ class Validate3YCCommitment(Step):
 
 
 class UpdatePrices(Step):
+    """Update prices based on airtable and adobe discount level."""
+
     def __call__(self, client, context, next_step):
+        """Update prices based on airtable and adobe discount level."""
         if not (context.adobe_new_order or context.adobe_preview_order):
             next_step(client, context)
             return
@@ -491,7 +533,7 @@ class UpdatePrices(Step):
         """Get prices for SKUs considering 3YC commitment if applicable."""
         commitment = (
             (
-                get_3yc_commitment_request(context.adobe_customer)
+                get_3yc_commitment_request(context.adobe_customer, is_recommitment=False)
                 or get_3yc_commitment(context.adobe_customer)
             )
             if context.adobe_customer
@@ -501,7 +543,7 @@ class UpdatePrices(Step):
             return get_prices_for_3yc_skus(
                 context.product_id,
                 context.currency,
-                date.fromisoformat(commitment.get("startDate", "")) if commitment else None,
+                dt.date.fromisoformat(commitment["startDate"]),
                 actual_skus,
             )
         return get_prices_for_skus(context.product_id, context.currency, actual_skus)
@@ -511,14 +553,16 @@ class UpdatePrices(Step):
         if not commitment:
             return False
 
+        end_date = dt.date.fromisoformat(commitment["endDate"])
+
         return (
             commitment["status"]
-            in (
+            in {
                 ThreeYearCommitmentStatus.COMMITTED,
                 ThreeYearCommitmentStatus.ACTIVE,
                 ThreeYearCommitmentStatus.ACCEPTED,
-            )
-            and date.fromisoformat(commitment["endDate"]) >= date.today()
+            }
+            and end_date >= dt.datetime.now(tz=dt.UTC).date()
         )
 
     def _create_updated_lines(self, context, actual_skus, prices):
@@ -531,27 +575,28 @@ class UpdatePrices(Step):
             new_price_item = get_price_item_by_line_sku(
                 prices, line["item"]["externalIds"]["vendor"]
             )
-            updated_lines.append(
-                {
-                    "id": line["id"],
-                    "price": {"unitPP": new_price_item[1]},
-                }
-            )
+            updated_lines.append({
+                "id": line["id"],
+                "price": {"unitPP": new_price_item[1]},
+            })
 
         # Add remaining lines with unchanged prices
         updated_lines_ids = {line["id"] for line in updated_lines}
-        for line in context.order["lines"]:
-            if line["id"] not in updated_lines_ids:
-                updated_lines.append(
-                    {
-                        "id": line["id"],
-                        "price": {"unitPP": line["price"]["unitPP"]},
-                    }
-                )
+        order_lines = [
+            line for line in context.order["lines"] if line["id"] not in updated_lines_ids
+        ]
+        mapped_lines = [
+            {
+                "id": line["id"],
+                "price": {"unitPP": line["price"]["unitPP"]},
+            }
+            for line in order_lines
+        ]
+        updated_lines.extend(mapped_lines)
 
         return sorted(updated_lines, key=itemgetter("id"))
 
     def _update_order(self, client, context, lines):
         """Update the order with new prices."""
         update_order(client, context.order_id, lines=lines)
-        logger.info(f"{context}: order lines prices updated successfully")
+        logger.info("%s: order lines prices updated successfully", context)

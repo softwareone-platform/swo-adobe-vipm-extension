@@ -22,7 +22,7 @@ def test_process_sync_agreements(mocker, dry_run, mock_mpt_client):
     call_command("sync_agreements", dry_run=dry_run)
 
     for v in mocked.values():
-        v.assert_called_once_with(mock_mpt_client, dry_run)
+        v.assert_called_once_with(mock_mpt_client, dry_run=dry_run)
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
@@ -42,7 +42,12 @@ def test_process_by_agreement_ids(mocker, dry_run):
         dry_run=dry_run,
     )
 
-    mocked.assert_called_once_with(mocked_client, ["AGR-0001", "AGR-0002"], dry_run, False)
+    mocked.assert_called_once_with(
+        mocked_client,
+        ["AGR-0001", "AGR-0002"],
+        dry_run=dry_run,
+        sync_prices=False,
+    )
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
@@ -60,4 +65,4 @@ def test_process_all(mocker, dry_run):
         dry_run=dry_run,
     )
 
-    mocked.assert_called_once_with(mocked_client, dry_run)
+    mocked.assert_called_once_with(mocked_client, dry_run=dry_run)

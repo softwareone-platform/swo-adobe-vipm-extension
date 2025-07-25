@@ -20,11 +20,14 @@ logger = logging.getLogger(__name__)
 
 class ValidateDuplicateLines(Step):
     """
-    Validates if there are duplicated lines (lines with the same item ID within this order)
-    or new lines that are not duplicated within this order but that have already a subscription.
+    Validates if there are duplicated lines.
+
+    Lines with the same item ID within this order or new lines that are not duplicated
+    within this order but that have already a subscription.
     """
 
     def __call__(self, client, context, next_step):
+        """Validates if there are duplicated lines."""
         if not context.order["lines"]:
             next_step(client, context)
             return
@@ -34,7 +37,7 @@ class ValidateDuplicateLines(Step):
         if duplicates:
             message = ERR_DUPLICATED_ITEMS.to_dict(duplicates=",".join(duplicates))
             context.order = set_order_error(context.order, message)
-            logger.info(f"{context}: {message}")
+            logger.info("%s: %s", context, message)
             context.validation_succeeded = False
             return
 
@@ -43,9 +46,9 @@ class ValidateDuplicateLines(Step):
             for line in subscription["lines"]:
                 items.append(line["item"]["id"])
 
-        items.extend(
-            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
-        )
+        items.extend([
+            line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0
+        ])
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:
             message = ERR_EXISTING_ITEMS.to_dict(duplicates=",".join(duplicates))
@@ -53,7 +56,7 @@ class ValidateDuplicateLines(Step):
                 context.order,
                 message,
             )
-            logger.info(f"{context}: {message}")
+            logger.info("%s: %s", context, message)
             context.validation_succeeded = False
             return
         next_step(client, context)
@@ -61,12 +64,15 @@ class ValidateDuplicateLines(Step):
 
 class GetPreviewOrder(Step):
     """
-    Retrieve a preview order for the upsize/new lines. If there are incompatible SKUs
-    within the PREVIEW order an error will be thrown by the Adobe API the draft validation
-    fails, otherwise the draft order validation pipeline will continue.
+    Retrieve a preview order for the upsize/new lines.
+
+    If there are incompatible SKUs within the PREVIEW order an error will be thrown by the
+    Adobe API the draft validation fails, otherwise the draft order validation
+    pipeline will continue.
     """
 
     def __call__(self, client, context, next_step):
+        """Retrieve a preview order for the upsize/new lines."""
         if not (context.upsize_lines or context.new_lines):
             next_step(client, context)
             return

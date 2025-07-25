@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+import datetime as dt
 
 import pytest
 
@@ -35,6 +35,31 @@ def gc_agreement_deployment(mocker):
     gc_agreement_deployment.updated_by = "Stu"
 
     return gc_agreement_deployment
+
+
+@pytest.fixture
+def active_3yc_commitment():
+    today = dt.datetime.now(tz=dt.UTC).date()
+
+    return {
+        "start": today - dt.timedelta(days=-1),
+        "end": today + dt.timedelta(days=365 * 3),
+    }
+
+
+@pytest.fixture
+def expired_3yc_commitment():
+    today = dt.datetime.now(tz=dt.UTC).date()
+
+    return {
+        "start": today - dt.timedelta(days=365 * 3),
+        "end": today - dt.timedelta(days=1),
+    }
+
+
+@pytest.fixture
+def empty_3y_commitment():
+    return None
 
 
 def test_check_gc_agreement_deployments_no_licensee(mocker, settings, gc_agreement_deployment):
@@ -1212,22 +1237,19 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         "is_consumable",
         "discount_level",
         "commitment_status",
-        "commitment_dates",
+        "commitment_dates_fixture",
         "expected_sku",
         "expected_price",
         "expected_price_function",
     ),
     [
-        (True, "B", None, None, "65304578CABA12", 100.0, "get_prices_for_skus"),
-        (False, "A", None, None, "65304578CAAA12", 100.0, "get_prices_for_skus"),
+        (True, "B", None, "empty_3y_commitment", "65304578CABA12", 100.0, "get_prices_for_skus"),
+        (False, "A", None, "empty_3y_commitment", "65304578CAAA12", 100.0, "get_prices_for_skus"),
         (
             False,
             "A",
             ThreeYearCommitmentStatus.ACTIVE.value,
-            {
-                "start": date.today() - timedelta(days=-1),
-                "end": date.today() + timedelta(days=365 * 3),
-            },
+            "active_3yc_commitment",
             "65304578CAAA12",
             100.0,
             "get_prices_for_3yc_skus",
@@ -1236,10 +1258,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
             False,
             "A",
             ThreeYearCommitmentStatus.EXPIRED.value,
-            {
-                "start": date.today() - timedelta(days=365 * 3),
-                "end": date.today() - timedelta(days=1),
-            },
+            "expired_3yc_commitment",
             "65304578CAAA12",
             100.0,
             "get_prices_for_skus",
@@ -1247,12 +1266,13 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     ],
 )
 def test_get_sku_price(
+    request,
     mocker,
     adobe_customer_factory,
     is_consumable,
     discount_level,
     commitment_status,
-    commitment_dates,
+    commitment_dates_fixture,
     expected_sku,
     expected_price,
     expected_price_function,
@@ -1261,6 +1281,7 @@ def test_get_sku_price(
     deployment_currency = "USD"
     adobe_customer = adobe_customer_factory()
     offer_ids = [expected_sku]
+    commitment_dates = request.getfixturevalue(commitment_dates_fixture)
 
     mocker.patch("adobe_vipm.flows.utils.is_consumables_sku", return_value=is_consumable)
 
@@ -1305,6 +1326,6 @@ def test_get_sku_price(
         mocked_get_prices.assert_called_once_with(
             product_id,
             deployment_currency,
-            date.fromisoformat(mock_commitment["startDate"]),
+            dt.date.fromisoformat(mock_commitment["startDate"]),
             [expected_sku],
         )

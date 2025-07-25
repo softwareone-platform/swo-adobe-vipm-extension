@@ -15,9 +15,6 @@ def test_subscription_update_auto_renewal_step(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test the successful update of auto renewal status for a subscription.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -65,9 +62,6 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     order_factory,
     subscriptions_factory,
 ):
-    """
-    Test the case when no matching Adobe subscription is found.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -126,9 +120,6 @@ def test_subscription_update_auto_renewal_step_already_updated(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test the case when the subscription already has the desired auto renewal status.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -170,9 +161,6 @@ def test_subscription_update_auto_renewal_step_error(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test the case when an error occurs while updating the subscription.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -241,9 +229,6 @@ def test_subscription_update_auto_renewal_step_all_failed(
     order_factory,
     subscriptions_factory,
 ):
-    """
-    Test the case when all subscription updates fail.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -303,10 +288,6 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test rollback is triggered when one subscription update succeeds and a subsequent one fails.
-    """
-
     subscriptions1 = subscriptions_factory()
     subscriptions2 = subscriptions_factory()
     subscriptions1[0]["externalIds"]["vendor"] = "a-sub-id_1"
@@ -394,9 +375,6 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
 
 
 def test_fulfill_configuration_order(mocker):
-    """
-    Test the configuration order pipeline is created with the expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(

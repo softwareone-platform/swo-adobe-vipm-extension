@@ -1,5 +1,6 @@
 """
 This module contains the logic to implement the purchase fulfillment flow.
+
 It exposes a single function that is the entrypoint for purchase order
 processing.
 """
@@ -62,13 +63,10 @@ logger = logging.getLogger(__name__)
 
 
 class RefreshCustomer(Step):
-    """
-    Refresh the processing context
-    retrieving the Adobe customer object through the
-    VIPM API.
-    """
+    """Refresh the processing context retrieving the Adobe customer object through the VIPM API."""
 
     def __call__(self, client, context, next_step):
+        """Refresh the processing context retrieving the Adobe customer."""
         adobe_client = get_adobe_client()
         context.adobe_customer = adobe_client.get_customer(
             context.authorization_id,
@@ -80,23 +78,28 @@ class RefreshCustomer(Step):
 class ValidateMarketSegmentEligibility(Step):
     """
     Validate if the customer is eligible to place orders for a given market segment.
+
     The market segment the order refers to is determined by the product (product per segment).
     """
 
     def __call__(self, client, context, next_step):
+        """Validate if the customer is eligible to place orders for a given market segment."""
         if context.market_segment != MARKET_SEGMENT_COMMERCIAL:
             status = get_market_segment_eligibility_status(context.order)
             if not status:
                 context.order = set_market_segment_eligibility_status_pending(context.order)
                 switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
                 logger.info(
-                    f"{context}: customer is pending eligibility "
-                    f"approval for segment {context.market_segment}"
+                    "%s: customer is pending eligibility approval for segment %s",
+                    context,
+                    context.market_segment,
                 )
                 return
             if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
                 logger.info(
-                    f"{context}: customer is not eligible for segment {context.market_segment}"
+                    "%s: customer is not eligible for segment %s",
+                    context,
+                    context.market_segment,
                 )
                 switch_order_to_failed(
                     client,
@@ -106,18 +109,29 @@ class ValidateMarketSegmentEligibility(Step):
                 return
             if status == STATUS_MARKET_SEGMENT_PENDING:
                 return
-            logger.info(f"{context}: customer is eligible for segment {context.market_segment}")
+            logger.info("%s: customer is eligible for segment %s", context, context.market_segment)
         next_step(client, context)
 
 
 class CreateCustomer(Step):
     """
-    Creates a customer account in Adobe for the new agreement that belongs to the order
-    currently being processed.
+    Creates a customer account in Adobe for the new agreement.
+
+    That belongs to the order currently being processed.
     """
 
     def save_data(self, client, context):
-        request_3yc_status = get_3yc_commitment_request(context.adobe_customer).get("status")
+        """
+        Saves customer date back to MPT Order and Agreement.
+
+        Args:
+            client (MPTClient): MPT API client.
+            context (Context): step context.
+        """
+        request_3yc_status = get_3yc_commitment_request(
+            context.adobe_customer,
+            is_recommitment=False,
+        ).get("status")
         context.order = set_adobe_customer_id(context.order, context.adobe_customer_id)
         if request_3yc_status:
             context.order = set_adobe_3yc_commitment_request_status(
@@ -130,12 +144,20 @@ class CreateCustomer(Step):
             externalIds={"vendor": context.adobe_customer_id},
         )
 
-    def handle_error(self, client, context, error):
-        if error.code not in (
+    def handle_error(self, client, context, error):  # noqa: C901
+        """
+        Process error from Adobe API.
+
+        Args:
+            client (MPTClient): MPT API client.
+            context (Context): step context.
+            error (Error): API Error.
+        """
+        if error.code not in {
             AdobeStatus.INVALID_ADDRESS,
             AdobeStatus.INVALID_FIELDS,
             AdobeStatus.INVALID_MINIMUM_QUANTITY,
-        ):
+        }:
             switch_order_to_failed(
                 client,
                 context.order,
@@ -188,12 +210,10 @@ class CreateCustomer(Step):
                     Param.COMPANY_NAME,
                     ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(error)),
                 )
-            if len(
-                list(
-                    filter(
-                        lambda x: x.startswith("companyProfile.contacts[0]"),
-                        error.details,
-                    )
+            if list(
+                filter(
+                    lambda x: x.startswith("companyProfile.contacts[0]"),
+                    error.details,
                 )
             ):
                 param = get_ordering_parameter(context.order, Param.CONTACT)
@@ -206,6 +226,7 @@ class CreateCustomer(Step):
         switch_order_to_query(client, context.order)
 
     def __call__(self, client, context, next_step):
+        """Creates a customer account in Adobe for the new agreement."""
         if context.adobe_customer_id:
             next_step(client, context)
             return
@@ -239,11 +260,18 @@ class CreateCustomer(Step):
             )
             next_step(client, context)
         except AdobeError as e:
-            logger.error(repr(e))
+            logger.exception("Create Customer failed")
             self.handle_error(client, context, e)
 
 
 def fulfill_purchase_order(client, order):
+    """
+    Purchase order pipeline.
+
+    Args:
+        client (MPTClient): MPT API client.
+        order (dict): MPT order to process.
+    """
     pipeline = Pipeline(
         SetupContext(),
         SetupDueDate(),

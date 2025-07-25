@@ -1,8 +1,8 @@
 import copy
+import datetime as dt
 import logging
 import sys
 import traceback
-from datetime import date, datetime, timedelta
 
 from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -65,18 +65,18 @@ def _add_missing_subscriptions(
         deployment_id,
     )
     adobe_subscriptions = [
-        item
-        for item in adobe_client.get_subscriptions(
+        line_item
+        for line_item in adobe_client.get_subscriptions(
             agreement["authorization"]["id"], customer["customerId"]
         )["items"]
-        if item.get("deploymentId", "") == deployment_id
+        if line_item.get("deploymentId", "") == deployment_id
     ]
 
     missing_subscriptions = tuple(
-        s
-        for s in adobe_subscriptions
-        if s["subscriptionId"] not in subscriptions_for_update
-        and s["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
+        subc
+        for subc in adobe_subscriptions
+        if subc["subscriptionId"] not in subscriptions_for_update
+        and subc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
     )
 
     if missing_subscriptions:
@@ -96,11 +96,12 @@ def _add_missing_subscriptions(
     ]
 
     for adobe_subscription in missing_subscriptions:
-        logger.info(f">> Adding missing subscription {adobe_subscription['subscriptionId']}")
+        logger.info(">> Adding missing subscription %s", adobe_subscription["subscriptionId"])
 
         if adobe_subscription["currencyCode"] != agreement["listing"]["priceList"]["currency"]:
             logger.warning(
-                f"Skipping {adobe_subscription['subscriptionId']=} due to  currency mismatch."
+                "Skipping adobe subscription %s due to  currency mismatch.",
+                adobe_subscription["subscriptionId"],
             )
             adobe_client.update_subscription(
                 agreement["authorization"]["id"],
@@ -168,11 +169,24 @@ def _add_missing_subscriptions(
 
 
 def sync_agreement_prices(
-    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict, dry_run: bool
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    agreement: dict,
+    customer: dict,
+    *,
+    dry_run: bool,
 ) -> None:
     """
-    Updates the purchase prices of an Agreement (subscriptions and One-Time items)
-    based on the customer discount level and customer benefits (3yc).
+    Updates the purchase prices of an Agreement (subscriptions and One-Time items).
+
+    Based on the customer discount level and customer benefits (3yc).
+
+    Args:
+        mpt_client: MPT API client.
+        adobe_client: Adobe API client.
+        agreement: MPT agreement.
+        customer: Adobe customer.
+        dry_run: Run command in a dry run mode
     """
     commitment_start_date = get_commitment_start_date(customer)
 
@@ -185,7 +199,7 @@ def sync_agreement_prices(
         adobe_client,
         customer,
         agreement,
-        subscriptions_for_update={s[1]["subscriptionId"] for s in subscriptions_for_update},
+        subscriptions_for_update={sub[1]["subscriptionId"] for sub in subscriptions_for_update},
     )
 
     product_id = agreement["product"]["id"]
@@ -202,10 +216,16 @@ def sync_agreement_prices(
         dry_run=dry_run,
     )
 
-    _log_agreement_lines(agreement, currency, customer, dry_run, product_id)
+    _log_agreement_lines(agreement, currency, customer, product_id, dry_run=dry_run)
 
 
-def _update_agreement(mpt_client, customer, agreement, dry_run):
+def _update_agreement(
+    mpt_client: MPTClient,
+    customer: dict,
+    agreement: dict,
+    *,
+    dry_run: bool,
+) -> None:
     parameters = {}
     commitment_info = get_3yc_commitment(customer)
     if commitment_info:
@@ -213,14 +233,16 @@ def _update_agreement(mpt_client, customer, agreement, dry_run):
         for mq in commitment_info.get("minimumQuantities", ()):
             if mq["offerType"] == "LICENSE":
                 parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append(
-                    {"externalId": Param.THREE_YC_LICENSES, "value": str(mq.get("quantity"))}
-                )
+                parameters[Param.PHASE_ORDERING].append({
+                    "externalId": Param.THREE_YC_LICENSES,
+                    "value": str(mq.get("quantity")),
+                })
             if mq["offerType"] == "CONSUMABLES":
                 parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append(
-                    {"externalId": Param.THREE_YC_CONSUMABLES, "value": str(mq.get("quantity"))}
-                )
+                parameters[Param.PHASE_ORDERING].append({
+                    "externalId": Param.THREE_YC_CONSUMABLES,
+                    "value": str(mq.get("quantity")),
+                })
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -228,16 +250,21 @@ def _update_agreement(mpt_client, customer, agreement, dry_run):
             lines=agreement["lines"],
             parameters=parameters,
         )
-    logger.info(f"Agreement updated {agreement['id']}")
+    logger.info("Agreement updated %s", agreement["id"])
 
 
-def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters):
+def _add_3yc_fulfillment_params(
+    agreement: dict,
+    commitment_info: dict,
+    customer: dict,
+    parameters: list[dict],
+) -> list[dict]:
     new_parameters = copy.deepcopy(parameters)
     new_parameters.setdefault(Param.PHASE_FULFILLMENT, [])
     three_yc_recommitment_par = get_parameter(
         Param.PHASE_FULFILLMENT, agreement, Param.THREE_YC_RECOMMITMENT
     )
-    is_recommitment = True if three_yc_recommitment_par else False
+    is_recommitment = bool(three_yc_recommitment_par)
     status_param_ext_id = (
         Param.THREE_YC_COMMITMENT_REQUEST_STATUS
         if not is_recommitment
@@ -250,9 +277,10 @@ def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters
         Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
     )
     request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
-    new_parameters[Param.PHASE_FULFILLMENT].append(
-        {"externalId": status_param_ext_id, "value": request_info.get("status")}
-    )
+    new_parameters[Param.PHASE_FULFILLMENT].append({
+        "externalId": status_param_ext_id,
+        "value": request_info.get("status"),
+    })
     new_parameters.setdefault(request_type_param_phase, [])
     new_parameters[request_type_param_phase].append(
         {"externalId": request_type_param_ext_id, "value": None},
@@ -276,7 +304,12 @@ def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters
 
 
 def _log_agreement_lines(
-    agreement: dict, currency: str, customer: dict, dry_run: bool, product_id: str
+    agreement: dict,
+    currency: str,
+    customer: dict,
+    product_id: str,
+    *,
+    dry_run: bool,
 ) -> None:
     agreement_lines = []
     for line in agreement["lines"]:
@@ -295,7 +328,7 @@ def _log_agreement_lines(
                 f"new_price={prices[actual_sku]}\n",
             )
         else:
-            logger.info(f"OneTime item: {line['id']}: sku={actual_sku}\n")
+            logger.info("OneTime item: %s: sku=%s\n", line["id"], actual_sku)
 
 
 def _update_subscriptions(
@@ -304,8 +337,9 @@ def _update_subscriptions(
     currency: str,
     product_id: str,
     agreement_id: str,
-    commitment_start_date: date,
+    commitment_start_date: dt.date,
     subscriptions_for_update: list[tuple[dict, dict, str]],
+    *,
     dry_run: bool,
 ) -> None:
     skus = [item[2] for item in subscriptions_for_update]
@@ -316,8 +350,9 @@ def _update_subscriptions(
     for subscription, adobe_subscription, actual_sku in subscriptions_for_update:
         if actual_sku not in prices:
             logger.error(
-                f"Skipping subscription {subscription['id']} "
-                f"because the sku {actual_sku} is not in the prices"
+                "Skipping subscription %s because the sku %s is not in the prices",
+                subscription["id"],
+                actual_sku,
             )
             missing_prices_skus.append(actual_sku)
             continue
@@ -340,13 +375,19 @@ def _update_subscriptions(
                     "externalId": Param.RENEWAL_DATE,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
-                {"externalId": Param.LAST_SYNC_DATE, "value": datetime.now().date().isoformat()},
+                {
+                    "externalId": Param.LAST_SYNC_DATE,
+                    "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
+                },
             ],
         }
 
         if not dry_run:
             logger.info(
-                f"Updating subscription: {subscription['id']} ({line_id}): sku={actual_sku}"
+                "Updating subscription: %s (%s): sku=%s",
+                subscription["id"],
+                line_id,
+                actual_sku,
             )
             update_agreement_subscription(
                 mpt_client,
@@ -366,7 +407,7 @@ def _update_subscriptions(
                 f"auto_renew={adobe_subscription['autoRenewal']['enabled']}, "
                 f"current_quantity={adobe_subscription['currentQuantity']}, "
                 f"renewal_quantity={adobe_subscription['autoRenewal']['renewalQuantity']}, "
-                f"renewal_date={str(adobe_subscription['renewalDate'])}, "
+                f"renewal_date={adobe_subscription['renewalDate']}, "
                 f"commitment_date={coterm_date}\n"
             )
 
@@ -383,14 +424,14 @@ def _update_subscriptions(
 def _get_subscriptions_for_update(
     mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
 ) -> list[tuple[dict, dict, str]]:
-    logger.info(f"Getting subscriptions for update for {agreement['id']=}")
+    logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
     for_update = []
 
-    for subscription in agreement["subscriptions"]:
-        if subscription["status"] == SubscriptionStatus.TERMINATED:
+    for sub in agreement["subscriptions"]:
+        if sub["status"] == SubscriptionStatus.TERMINATED:
             continue
 
-        subscription = get_agreement_subscription(mpt_client, subscription["id"])
+        subscription = get_agreement_subscription(mpt_client, sub["id"])
         adobe_subscription_id = subscription["externalIds"]["vendor"]
 
         adobe_subscription = adobe_client.get_subscription(
@@ -402,24 +443,30 @@ def _get_subscriptions_for_update(
         actual_sku = adobe_subscription["offerId"]
 
         if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
-            logger.info(f"Processing terminated Adobe subscription {adobe_subscription_id}.")
+            logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
             terminate_subscription(
                 mpt_client,
                 subscription["id"],
-                "Adobe subscription status 1004.",
+                f"Adobe subscription status {AdobeStatus.SUBSCRIPTION_TERMINATED}.",
             )
             continue
 
-        for_update.append(
-            (subscription, adobe_subscription, get_sku_with_discount_level(actual_sku, customer))
-        )
+        for_update.append((
+            subscription,
+            adobe_subscription,
+            get_sku_with_discount_level(actual_sku, customer),
+        ))
 
     return for_update
 
 
-def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):
+def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, *, dry_run: bool) -> None:
     """
     Synchronizes agreements by their active subscriptions renewed yesterday.
+
+    Args:
+        mpt_client: MPT API client.
+        dry_run: Run in dry run mode.
     """
     logger.info("Syncing agreements by 3yc End Date...")
     _sync_agreements_by_param(
@@ -427,9 +474,13 @@ def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):
     )
 
 
-def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
+def sync_agreements_by_coterm_date(mpt_client: MPTClient, *, dry_run: bool) -> None:
     """
     Synchronizes agreements by their active subscriptions renewed yesterday.
+
+    Args:
+        mpt_client: MPT API client.
+        dry_run: Run in dry run mode.
     """
     logger.info("Synchronizing agreements by cotermDate...")
     _sync_agreements_by_param(mpt_client, Param.COTERM_DATE, dry_run=dry_run, sync_prices=False)
@@ -438,87 +489,103 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
 def _sync_agreements_by_param(
     mpt_client: MPTClient, param: Param, *, dry_run: bool, sync_prices: bool
 ) -> None:
-    today = datetime.now().date().isoformat()
-    yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
+    today = dt.datetime.now(tz=dt.UTC).date()
+    today_iso = today.isoformat()
+    yesterday = (today - dt.timedelta(days=1)).isoformat()
     rql_query = (
         "eq(status,Active)&"
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
         "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
         "-template,-name,-vendor,-client,-price"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
-        logger.debug(f"Syncing {agreement=}")
-        sync_agreement(mpt_client, agreement, dry_run, sync_prices)
+        logger.debug("Syncing agreement %s", agreement)
+        sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=sync_prices)
 
 
-def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
+def sync_agreements_by_renewal_date(mpt_client: MPTClient, *, dry_run: bool) -> None:
     """
     Synchronizes agreements by their active subscriptions renewed yesterday.
+
+    Args:
+        mpt_client: MPT API client.
+        dry_run: Run in dry run mode.
     """
     logger.info("Synchronizing agreements by renewal date...")
-    today = datetime.now().date().isoformat()
+    today = dt.datetime.now(tz=dt.UTC).date()
+    today_iso = today.isoformat()
     yesterday_every_month = (
-        (datetime.now() - timedelta(days=1) - relativedelta(months=m)).date().isoformat()
-        for m in range(12)
+        (today - dt.timedelta(days=1) - relativedelta(months=m)).isoformat() for m in range(12)
     )
     rql_query = (
         "eq(status,Active)&"
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
         "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
         "-template,-name,-vendor,-client,-price"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
-        logger.debug(f"Syncing {agreement=}")
-        sync_agreement(mpt_client, agreement, dry_run, sync_prices=True)
+        logger.debug("Syncing agreement %s", agreement)
+        sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
 
-def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False, sync_prices=False):
+def sync_agreements_by_agreement_ids(
+    mpt_client: MPTClient,
+    ids: list[str],
+    *,
+    dry_run: bool,
+    sync_prices: bool,
+) -> None:
     """
-    Get the agreements given a list of agreement IDs
-    to update the prices for them.
+    Get the agreements given a list of agreement IDs to update the prices for them.
 
     Args:
-        mpt_client (MPTClient): The client used to consume the MPT API.
-        ids (list): List of agreement IDs.
-        dry_run (bool): if True, it just simulate the prices update but doesn't
+        mpt_client: The client used to consume the MPT API.
+        ids: List of agreement IDs.
+        dry_run: if True, it just simulate the prices update but doesn't
         perform it.
+        sync_prices: if True also sync prices.
     """
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
-        sync_agreement(mpt_client, agreement, dry_run, sync_prices)
+        sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=sync_prices)
 
 
-def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = True) -> None:
+def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, *, dry_run: bool) -> None:
     """
-    This function retrieves agreements filtered by their 3YC enrollment status and synchronizes
-    their corresponding statuses.
+    This function retrieves agreements filtered by their 3YC enrollment status.
+
+    Synchronizes their corresponding statuses.
+
+    Args:
+        mpt_client: MPT API client.
+        dry_run: if True, it just simulate parameters update.
     """
     try:
         agreements = get_agreements_by_3yc_enroll_status(mpt_client, THREE_YC_TEMP_3YC_STATUSES)
-    except Exception as e:
-        logger.exception(f"Unknown exception getting agreements by 3YC enroll status: {e}")
+    except Exception:
+        logger.exception("Unknown exception getting agreements by 3YC enroll status.")
         raise
     for agreement in agreements:
         try:
-            logger.info(f"Checking 3YC enroll status for agreement {agreement['id']}")
-            _sync_3yc_enroll_status(mpt_client, agreement, dry_run)
-        except AuthorizationNotFoundError as e:
-            logger.error(
-                f"AuthorizationNotFoundError synchronizing 3YC enroll status for agreement"
-                f" {agreement['id']}: {e}"
-            )
-        except Exception as e:
+            logger.info("Checking 3YC enroll status for agreement %s", agreement["id"])
+            _sync_3yc_enroll_status(mpt_client, agreement, dry_run=dry_run)
+        except AuthorizationNotFoundError:
             logger.exception(
-                f"Unknown exception synchronizing 3YC enroll status for agreement"
-                f" {agreement['id']}: {e}"
+                "AuthorizationNotFoundError synchronizing 3YC enroll status for agreement %s",
+                agreement["id"],
+            )
+        except Exception:
+            logger.exception(
+                "Unknown exception synchronizing 3YC enroll status for agreement %s",
+                agreement["id"],
             )
 
 
-def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: bool) -> None:
+def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, *, dry_run: bool) -> None:
     adobe_client = get_adobe_client()
     customer = adobe_client.get_customer(
         authorization_id=agreement["authorization"]["id"],
@@ -527,11 +594,13 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: boo
     commitment = get_3yc_commitment(customer)
     enroll_status = commitment["status"]
     logger.debug(
-        f"Commitment Status for Adobe customer {customer['customerId']} is {enroll_status}"
+        "Commitment Status for Adobe customer %s is %s",
+        customer["customerId"],
+        enroll_status,
     )
 
     if enroll_status in THREE_YC_TEMP_3YC_STATUSES:
-        logger.info(f"Updating 3YC enroll status for agreement {agreement['id']}")
+        logger.info("Updating 3YC enroll status for agreement %s", agreement["id"])
         if not dry_run:
             update_agreement(
                 mpt_client,
@@ -543,18 +612,31 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, dry_run: boo
                 },
             )
     else:
-        sync_agreement(mpt_client, agreement, dry_run)
+        sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)
 
 
-def sync_global_customer_parameters(mpt_client, customer_deployments, agreement):
+def sync_global_customer_parameters(
+    mpt_client: MPTClient,
+    customer_deployments: list[dict],
+    agreement: dict,
+) -> None:
+    """
+    Sync global customer parameters for the agreement.
+
+    Args:
+        mpt_client: MPT API client.
+        customer_deployments: Adobe customer deployments.
+        agreement: main customer agreement.
+    """
     try:
         parameters = {Param.PHASE_FULFILLMENT: []}
         global_customer_enabled = get_global_customer(agreement)
         if global_customer_enabled != ["Yes"]:
-            logger.info(f"Setting global customer for agreement {agreement['id']}")
-            parameters[Param.PHASE_FULFILLMENT].append(
-                {"externalId": "globalCustomer", "value": ["Yes"]}
-            )
+            logger.info("Setting global customer for agreement %s", agreement["id"])
+            parameters[Param.PHASE_FULFILLMENT].append({
+                "externalId": "globalCustomer",
+                "value": ["Yes"],
+            })
 
         deployments = [
             f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
@@ -562,24 +644,46 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
-            parameters[Param.PHASE_FULFILLMENT].append(
-                {"externalId": "deployments", "value": ",".join(deployments)}
-            )
-            logger.info(f"Setting deployments for agreement {agreement['id']}")
+            parameters[Param.PHASE_FULFILLMENT].append({
+                "externalId": "deployments",
+                "value": ",".join(deployments),
+            })
+            logger.info("Setting deployments for agreement %s", agreement["id"])
         if parameters[Param.PHASE_FULFILLMENT]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
-    except Exception as e:
+    except Exception:
         logger.exception(
-            f"Error setting global customer parameters for agreement {agreement['id']}: {e}"
+            "Error setting global customer parameters for agreement %s.",
+            agreement["id"],
         )
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
 
 
-def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, customer_id):
+def process_lost_customer(  # noqa: C901
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    agreement: dict,
+    customer_id: str,
+) -> None:
+    """
+    Process lost customer exception from Adobe API.
+
+    If agreement exists in MPT, but doesn't exist in Adobe API it should terminate all agreement
+    subscriptions. Agreement itself is terminated automatically after all subscriptions
+    are terminated.
+
+    Args:
+        mpt_client: MPT API client.
+        adobe_client: Adobe API client.
+        agreement: MPT agreement.
+        customer_id: Adobe customer id.
+    """
     for subscription_id in [
-        s["id"] for s in agreement["subscriptions"] if s["status"] != SubscriptionStatus.TERMINATED
+        sub["id"]
+        for sub in agreement["subscriptions"]
+        if sub["status"] != SubscriptionStatus.TERMINATED
     ]:
-        logger.info(f">>> Suspected Lost Customer: Terminating subscription {subscription_id}")
+        logger.info(">>> Suspected Lost Customer: Terminating subscription %s.", subscription_id)
         try:
             terminate_subscription(
                 mpt_client,
@@ -587,12 +691,14 @@ def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, 
                 "Suspected Lost Customer",
             )
         except Exception as e:
-            msg = (
-                f">>> Suspected Lost Customer: Error terminating subscription"
-                f" {subscription_id}: {e}"
+            logger.exception(
+                ">>> Suspected Lost Customer: Error terminating subscription %s.",
+                subscription_id,
             )
-            logger.exception(msg)
-            notify_processing_lost_customer(msg)
+            notify_processing_lost_customer(
+                f">>> Suspected Lost Customer: Error terminating "
+                f"subscription {subscription_id}: {e}",
+            )
 
     customer_deployments = adobe_client.get_customer_deployments_active_status(
         agreement["authorization"]["id"], customer_id
@@ -606,68 +712,89 @@ def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, 
 
         for deployment_agreement in deployment_agreements:
             for subscription_id in [
-                s["id"]
-                for s in deployment_agreement["subscriptions"]
-                if s["status"] != SubscriptionStatus.TERMINATED
+                sub["id"]
+                for sub in deployment_agreement["subscriptions"]
+                if sub["status"] != SubscriptionStatus.TERMINATED
             ]:
                 try:
                     terminate_subscription(mpt_client, subscription_id, "Suspected Lost Customer")
                 except Exception as e:
-                    msg = (
-                        f">>> Suspected Lost Customer: Error terminating subscription"
-                        f" {subscription_id}: {e}"
+                    logger.exception(
+                        ">>> Suspected Lost Customer: Error terminating subscription %s.",
+                        subscription_id,
                     )
-                    logger.exception(msg)
-                    notify_processing_lost_customer(msg)
+                    notify_processing_lost_customer(
+                        f">>> Suspected Lost Customer: Error terminating subscription "
+                        f"{subscription_id}: {e}",
+                    )
 
 
-def sync_agreement(mpt_client, agreement, dry_run, sync_prices=False):
-    logger.debug(f"Syncing {agreement=}")
+def sync_agreement(  # noqa: C901
+    mpt_client: MPTClient,
+    agreement: dict,
+    *,
+    dry_run: bool,
+    sync_prices: bool,
+) -> None:
+    """
+    Sync agreement with parameters, prices from Adobe API, airtable to MPT agreement.
+
+    Args:
+        mpt_client: MPT API client.
+        agreement: MPT agreement.
+        dry_run: If True do not update agreement.
+        sync_prices: If true sync prices. Keep in mind dry_run parameter.
+    """
+    logger.debug("Syncing agreement %s", agreement)
     if agreement["status"] != AgreementStatus.ACTIVE:
-        logger.info(f"Skipping agreement {agreement['id']} because it is not in Active status")
+        logger.info("Skipping agreement %s because it is not in Active status", agreement["id"])
         return
     try:
         customer_id = get_adobe_customer_id(agreement)
         adobe_client = get_adobe_client()
-        logger.info(f"Synchronizing agreement {agreement['id']}...")
+        logger.info("Synchronizing agreement %s...", agreement["id"])
 
         processing_subscriptions = list(
             filter(
-                lambda sub: sub["status"] in ("Updating", "Terminating"),
+                lambda sub: sub["status"] in {"Updating", "Terminating"},
                 agreement["subscriptions"],
             ),
         )
 
         if len(processing_subscriptions) > 0:
-            logger.info(f"Agreement {agreement['id']} has processing subscriptions, skip it")
+            logger.info("Agreement %s has processing subscriptions, skip it", agreement["id"])
             return
 
         try:
             customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
         except AdobeAPIError as e:
             if e.code == AdobeStatus.INVALID_CUSTOMER:
-                msg = (
-                    f"Received Adobe error {e.code} - {e.message},"
-                    " assuming lost customer and proceeding with lost customer procedure."
+                logger.info(
+                    "Received Adobe error %s - %s, assuming lost customer "
+                    "and proceeding with lost customer procedure.",
+                    e.code,
+                    e.message,
                 )
-                logger.info(msg)
-                notify_processing_lost_customer(msg)
+                notify_processing_lost_customer(
+                    f"Received Adobe error {e.code} - {e.message},"
+                    f" assuming lost customer and proceeding with lost customer procedure."
+                )
                 process_lost_customer(mpt_client, adobe_client, agreement, customer_id)
                 return
             raise
 
         if not customer.get("discounts", []):
-            raise CustomerDiscountsNotFoundError(
+            raise CustomerDiscountsNotFoundError(  # noqa: TRY301
                 f"Customer {customer_id} does not have discounts information. "
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
 
         if sync_prices:
-            sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run)
+            sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run=dry_run)
         else:
-            logger.info(f"Skipping price sync - {sync_prices=}.")
+            logger.info("Skipping price sync - sync_prices %s.", sync_prices)
 
-        _update_agreement(mpt_client, customer, agreement, dry_run)
+        _update_agreement(mpt_client, customer, agreement, dry_run=dry_run)
 
         if customer.get("globalSalesEnabled", False):
             authorization_id = agreement["authorization"]["id"]
@@ -681,14 +808,14 @@ def sync_agreement(mpt_client, agreement, dry_run, sync_prices=False):
                 agreement,
                 customer,
                 customer_deployments,
-                dry_run,
-                sync_prices,
+                dry_run=dry_run,
+                sync_prices=sync_prices,
             )
 
-    except AuthorizationNotFoundError as e:
-        logger.error(f"AuthorizationNotFoundError synchronizing agreement {agreement['id']}: {e}")
-    except Exception as e:
-        logger.exception(f"Error synchronizing agreement {agreement['id']}: {e}")
+    except AuthorizationNotFoundError:
+        logger.exception("AuthorizationNotFoundError synchronizing agreement %s.", agreement["id"])
+    except Exception:
+        logger.exception("Error synchronizing agreement %s.", agreement["id"])
         notify_agreement_unhandled_exception_in_teams(agreement["id"], traceback.format_exc())
     else:
         if not dry_run:
@@ -696,27 +823,43 @@ def sync_agreement(mpt_client, agreement, dry_run, sync_prices=False):
 
 
 def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
-    logger.info(f"Updating Last Sync Date for agreement {agreement['id']}")
+    logger.info("Updating Last Sync Date for agreement %s", agreement["id"])
     update_agreement(
         mpt_client,
         agreement["id"],
         parameters={
             "fulfillment": [
-                {"externalId": Param.LAST_SYNC_DATE, "value": datetime.now().date().isoformat()}
+                {
+                    "externalId": Param.LAST_SYNC_DATE,
+                    "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
+                },
             ]
         },
     )
 
 
 def sync_deployments_prices(
-    mpt_client,
-    adobe_client,
-    main_agreement,
-    customer,
-    customer_deployments,
-    dry_run,
-    sync_prices,
-):
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    main_agreement: dict,
+    customer: dict,
+    customer_deployments: list[dict],
+    *,
+    dry_run: bool,
+    sync_prices: bool,
+) -> None:
+    """
+    Sync deployment agreements prices.
+
+    Args:
+        mpt_client: MPT API client.
+        adobe_client: Adobe API client.
+        main_agreement: Main MPT agreement.
+        customer: Adobe customer.
+        customer_deployments: Adobe customer deployments.
+        dry_run: If True doesn't update agreement.
+        sync_prices: If True also sync prices. Keep in mind dry_run parameter also.
+    """
     if not customer_deployments:
         return
 
@@ -728,21 +871,42 @@ def sync_deployments_prices(
 
     for deployment_agreement in deployment_agreements:
         if sync_prices:
-            sync_agreement_prices(mpt_client, adobe_client, deployment_agreement, customer, dry_run)
+            sync_agreement_prices(
+                mpt_client,
+                adobe_client,
+                deployment_agreement,
+                customer,
+                dry_run=dry_run,
+            )
         else:
-            logger.info(f"Skipping price sync - {sync_prices=}.")
+            logger.info("Skipping price sync - sync_prices %s.", sync_prices)
 
-        _update_agreement(mpt_client, customer, deployment_agreement, dry_run)
+        _update_agreement(mpt_client, customer, deployment_agreement, dry_run=dry_run)
 
         sync_gc_3yc_agreements(
             mpt_client,
             main_agreement,
             deployment_agreement,
-            dry_run,
+            dry_run=dry_run,
         )
 
 
-def sync_gc_3yc_agreements(mpt_client, main_agreement, deployment_agreement, dry_run):
+def sync_gc_3yc_agreements(
+    mpt_client: MPTClient,
+    main_agreement: dict,
+    deployment_agreement: list[dict],
+    *,
+    dry_run: bool,
+) -> None:
+    """
+    Sync 3YC parameters from main agreement to provided deployment agreement.
+
+    Args:
+        mpt_client: MPT API client.
+        main_agreement: MPT main agreement. Retrieves 3YC parameters from here.
+        deployment_agreement: MPT deployment agreement.
+        dry_run: If True do not update agreement. Only simulate sync.
+    """
     parameters_3yc = get_3yc_fulfillment_parameters(main_agreement)
 
     if not dry_run:
@@ -755,15 +919,15 @@ def sync_gc_3yc_agreements(mpt_client, main_agreement, deployment_agreement, dry
         )
 
 
-def sync_all_agreements(mpt_client, dry_run):
+def sync_all_agreements(mpt_client: MPTClient, *, dry_run: bool) -> None:
     """
     Get all the active agreements to update the prices for them.
 
     Args:
-        mpt_client (MPTClient): The client used to consume the MPT API.
-        dry_run (bool): if True, it just simulate the prices update but doesn't
+        mpt_client: The client used to consume the MPT API.
+        dry_run: if True, it just simulate the prices update but doesn't
         perform it.
     """
     agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
-        sync_agreement(mpt_client, agreement, dry_run)
+        sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)

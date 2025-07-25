@@ -1,11 +1,14 @@
 import json
 import os
+import types
 from enum import StrEnum
 
 import regex as re
 
 
 class AdobeStatus(StrEnum):
+    """Adobe Order Statuses."""
+
     PROCESSED = "1000"
     PENDING = "1002"
     INACTIVE_OR_GENERIC_FAILURE = "1004"
@@ -36,7 +39,7 @@ class AdobeStatus(StrEnum):
     INVALID_CUSTOMER = "1116"
 
 
-ORDER_STATUS_DESCRIPTION = {
+ORDER_STATUS_DESCRIPTION = types.MappingProxyType({
     AdobeStatus.INACTIVE_OR_GENERIC_FAILURE: "Inactive account, failed order or inactive "
     "subscription.",
     AdobeStatus.ORDER_CANCELLED: "Order has been cancelled.",
@@ -44,21 +47,21 @@ ORDER_STATUS_DESCRIPTION = {
     AdobeStatus.ORDER_INACTIVE_RESELLER: "Reseller is inactive.",
     AdobeStatus.ORDER_INACTIVE_CUSTOMER: "Customer is inactive.",
     AdobeStatus.ORDER_INVALID_CUSTOMER_ID: "The provided customer identifier is invalid.",
-}
+})
 
-SUBSCRIPTION_STATUS_DESCRIPTION = {
+SUBSCRIPTION_STATUS_DESCRIPTION = types.MappingProxyType({
     AdobeStatus.SUBSCRIPTION_TERMINATED: "Subscription is terminated.",
-}
+})
 
-UNRECOVERABLE_ORDER_STATUSES = list(ORDER_STATUS_DESCRIPTION.keys())
+UNRECOVERABLE_ORDER_STATUSES = tuple(ORDER_STATUS_DESCRIPTION.keys())
 
-UNRECOVERABLE_TRANSFER_STATUSES = [
+UNRECOVERABLE_TRANSFER_STATUSES = (
     AdobeStatus.TRANSFER_INELIGIBLE,
     AdobeStatus.TRANSFER_ALREADY_TRANSFERRED,
     AdobeStatus.TRANSFER_INACTIVE_RESELLER,
     AdobeStatus.TRANSFER_NO_ADMIN_CONTACTS,
     AdobeStatus.TRANSFER_IN_PROGRESS,
-]
+)
 
 ORDER_TYPE_NEW = "NEW"
 ORDER_TYPE_PREVIEW = "PREVIEW"
@@ -79,14 +82,16 @@ MAXLEN_NAME = 35
 MINQTY_LICENSES = 10
 MINQTY_CONSUMABLES = 1000
 
-REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")
-REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")
+REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")  # noqa: RUF001
 REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
-REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")
-REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")
+REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")  # noqa: RUF001
+REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")  # noqa: RUF001
+REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")  # noqa: RUF001
 
 
 class ThreeYearCommitmentStatus(StrEnum):
+    """Three year commitments statuses."""
+
     ACCEPTED = "ACCEPTED"
     DECLINED = "DECLINED"
     COMMITTED = "COMMITTED"
@@ -103,6 +108,8 @@ THREE_YC_TEMP_3YC_STATUSES = (
 
 
 class OfferType(StrEnum):
+    """Offer type for customer."""
+
     LICENSE = "LICENSE"
     CONSUMABLES = "CONSUMABLES"
 
