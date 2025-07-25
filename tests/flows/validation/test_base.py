@@ -136,3 +136,32 @@ def test_validate_termination_order(mocker, caplog, order_factory):
     )
 
     mocked_validate.assert_called_once_with(mocked_client, reset_ordering_parameters_error(order))
+
+
+
+def test_validate_reseller_change_order(
+    mocker,
+    caplog,
+    order_factory,
+    reseller_change_order_parameters_factory,
+):
+    """Tests the validate order entrypoint function for transfer orders when it validates."""
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    m_client = mocker.MagicMock()
+
+    m_validate_transfer = mocker.patch(
+        "adobe_vipm.flows.validation.base.validate_reseller_change",
+        return_value=(False, order),
+    )
+
+    with caplog.at_level(logging.INFO):
+        assert validate_order(m_client, order) == order
+
+    assert caplog.records[0].message == (
+        f"Validation of order {order['id']} succeeded without errors"
+    )
+
+    m_validate_transfer.assert_called_once_with(
+        m_client,
+        reset_ordering_parameters_error(order),
+    )
