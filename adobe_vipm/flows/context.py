@@ -1,11 +1,13 @@
+import datetime as dt
 from dataclasses import dataclass, field
-from datetime import date
 
 
 @dataclass
 class Context:
+    """Order flow processing context."""
+
     order: dict
-    due_date: date | None = None
+    due_date: dt.date | None = None
     downsize_lines: list = field(default_factory=list)
     upsize_lines: list = field(default_factory=list)
     new_lines: list = field(default_factory=list)

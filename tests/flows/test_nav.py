@@ -9,11 +9,11 @@ from adobe_vipm.flows.nav import get_token, terminate_contract
 @freeze_time("2024-04-04 12:30:00")
 def test_get_token(mocker, requests_mocker, settings):
     mocker.patch(
-        "adobe_vipm.flows.nav.os.path.exists",
+        "adobe_vipm.flows.nav.Path.is_file",
         return_value=False,
     )
 
-    mocked_open = mocker.patch("adobe_vipm.flows.nav.open", mocker.mock_open())
+    mocked_open = mocker.patch("adobe_vipm.flows.nav.Path.open", mocker.mock_open())
 
     settings.EXTENSION_CONFIG = {
         "NAV_AUTH_ENDPOINT_URL": "https://authenticate.nav",
@@ -50,9 +50,9 @@ def test_get_token(mocker, requests_mocker, settings):
 
 @freeze_time("2024-04-04 12:30:00")
 def test_get_token_from_cache(mocker):
-    mocker.patch("adobe_vipm.flows.nav.os.path.exists", return_value=True)
+    mocker.patch("adobe_vipm.flows.nav.Path.is_file", return_value=True)
     mocker.patch(
-        "adobe_vipm.flows.nav.open",
+        "adobe_vipm.flows.nav.Path.open",
         mocker.mock_open(
             read_data=(
                 '{"access_token": "a-token", "expires_in": 86400, '
@@ -66,9 +66,9 @@ def test_get_token_from_cache(mocker):
 
 @freeze_time("2024-04-04 12:30:00")
 def test_get_token_from_cache_expired(mocker, requests_mocker, settings):
-    mocker.patch("adobe_vipm.flows.nav.os.path.exists", return_value=True)
+    mocker.patch("adobe_vipm.flows.nav.Path.is_file", return_value=True)
     mocker.patch(
-        "adobe_vipm.flows.nav.open",
+        "adobe_vipm.flows.nav.Path.open",
         mocker.mock_open(
             read_data=(
                 '{"access_token": "a-token", "expires_in": 86400, '
@@ -105,12 +105,10 @@ def test_get_token_from_cache_expired(mocker, requests_mocker, settings):
     )
 
     assert get_token() == (True, "a-token")
-    mocked_save_token.assert_called_once_with(
-        {
-            "access_token": "a-token",
-            "expires_in": 86400,
-        }
-    )
+    mocked_save_token.assert_called_once_with({
+        "access_token": "a-token",
+        "expires_in": 86400,
+    })
 
 
 def test_get_token_error(mocker, requests_mocker, settings):

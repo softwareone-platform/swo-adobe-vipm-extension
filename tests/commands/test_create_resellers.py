@@ -188,7 +188,7 @@ def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
     settings.EXTENSION_CONFIG = {"ADOBE_AUTHORIZATIONS_FILE": "/path/to/authorizations.json"}
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
     mocker.patch(
-        "adobe_vipm.management.commands.create_resellers.open",
+        "adobe_vipm.management.commands.create_resellers.Path.open",
         mocker.mock_open(read_data=json.dumps(adobe_authorizations_file)),
     )
     authorization = adobe_authorizations_file["authorizations"][0]
@@ -270,7 +270,7 @@ def test_reseller_create_ok(mocker, settings, adobe_authorizations_file, tmp_pat
     )
     mocked_fobj = mocker.MagicMock()
     mocked_open = mocker.patch(
-        "adobe_vipm.management.commands.create_resellers.open",
+        "adobe_vipm.management.commands.create_resellers.Path.open",
         return_value=mocked_fobj,
     )
     mocked_dump = mocker.patch("adobe_vipm.management.commands.create_resellers.json.dump")
@@ -298,10 +298,10 @@ def test_reseller_create_ok(mocker, settings, adobe_authorizations_file, tmp_pat
 
     mocked_dump.assert_called_once_with(
         new_auth,
-        mocked_fobj,
+        mocked_fobj.__enter__.return_value,
         indent=4,
     )
-    mocked_open.assert_called_once_with("/path/to/authorizations.json", "w")
+    mocked_open.assert_called_once_with("w", encoding="utf-8")
 
 
 def test_api_error(mocker, adobe_authorizations_file, tmp_path, adobe_api_error_factory):

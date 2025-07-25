@@ -20,6 +20,8 @@ ORDER_TYPE_CONFIGURATION = "Configuration"
 
 
 class Param(StrEnum):
+    """Parameters external ids."""
+
     ADDRESS = "address"
     ADOBE_SKU = "adobeSKU"
     COMPANY_NAME = "companyName"
@@ -199,10 +201,11 @@ ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
 )
 
 ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(
-    "VIPM0036", (
+    "VIPM0036",
+    (
         "The adobe reseller change product is not configured for this product and "
         "cannot be added to the order."
-    )
+    ),
 )
 
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
@@ -366,12 +369,16 @@ ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
 
 
 class SubscriptionStatus(StrEnum):
+    """MPT subscription statuses."""
+
     TERMINATED = "Terminated"
     EXPIRED = "Expired"
     ACTIVE = "Active"
 
 
 class AgreementStatus(StrEnum):
+    """MPT agreement statuses."""
+
     NEW = "New"
     DRAFT = "Draft"
     PROVISIONING = "Provisioning"

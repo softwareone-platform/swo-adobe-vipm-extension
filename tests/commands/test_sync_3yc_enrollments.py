@@ -10,4 +10,7 @@ def test_process_sync_agreements(mocker, mock_mpt_client):
 
     call_command("sync_3yc_enrollments")
 
-    mock_sync_agreements_by_3yc_enroll_status.assert_called_once_with(mock_mpt_client, False)
+    mock_sync_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client,
+        dry_run=False,
+    )

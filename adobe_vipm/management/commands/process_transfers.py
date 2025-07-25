@@ -1,18 +1,14 @@
-from django.core.management.base import BaseCommand
-
 from adobe_vipm.flows.migration import process_transfers
+from adobe_vipm.management.commands.base import AdobeBaseCommand
 
 
-class Command(BaseCommand):
+class Command(AdobeBaseCommand):
+    """Process transfer command."""
+
     help = "Process new and rescheduled tranfers taking data from AirTable bases."
 
-    def success(self, message):
-        self.stdout.write(self.style.SUCCESS(message), ending="\n")
-
-    def info(self, message):
-        self.stdout.write(message, ending="\n")
-
     def handle(self, *args, **options):
+        """Run command."""
         self.info("Start processing transfers...")
         process_transfers()
         self.success("Transfer processing completed")

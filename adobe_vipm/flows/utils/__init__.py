@@ -95,7 +95,6 @@ from .three_yc import (
     set_adobe_3yc_start_date,
 )
 from .validation import (
-    has_valid_returnable_quantity,
     is_migrate_customer,
     is_purchase_validation_enabled,
     is_reseller_change,

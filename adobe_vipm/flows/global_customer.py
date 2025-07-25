@@ -48,24 +48,35 @@ from adobe_vipm.utils import get_partial_sku
 logger = logging.getLogger(__name__)
 
 
+# TODO: get function also changes state for agreement deployment :-(
 def get_adobe_subscriptions_by_deployment(adobe_client, authorization_id, agreement_deployment):
+    """
+    Retrieve adobe subscriptions for specific agreement deployment.
+
+    Args:
+        adobe_client (AdobeClient): Adobe API client.
+        authorization_id (str): Agreement auth id.
+        agreement_deployment (AgreementDeployment): agreement deployment.
+
+    Returns:
+        list[dict]: List of adobe subscriptions.
+    """
     try:
         adobe_subscriptions = adobe_client.get_subscriptions(
             authorization_id, agreement_deployment.customer_id
         )
     except Exception as e:
-        logger.exception(f"Error getting Adobe transfer order: {e}")
+        logger.exception("Error getting Adobe transfer order.")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting Adobe transfer order: {e}"
         agreement_deployment.save()
         return None
 
-    deployment_adobe_subscriptions = [
+    return [
         item
         for item in adobe_subscriptions["items"]
         if item.get("deploymentId", "") == agreement_deployment.deployment_id
     ]
-    return deployment_adobe_subscriptions
 
 
 def get_authorization(mpt_client, agreement_deployment):
@@ -90,15 +101,16 @@ def get_authorization(mpt_client, agreement_deployment):
             agreement_deployment.seller_id,
         )
     except Exception as e:
-        logger.exception(f"Error getting authorization: {e}")
+        logger.exception("Error getting authorization.")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting authorization: {e}"
         agreement_deployment.save()
         return None
 
     if not authorizations:
-        logger.exception(
-            f"Authorization not found for agreement deployment {agreement_deployment.deployment_id}"
+        logger.error(
+            "Authorization not found for agreement deployment %s",
+            agreement_deployment.deployment_id,
         )
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
@@ -112,9 +124,9 @@ def get_authorization(mpt_client, agreement_deployment):
 
     if len(authorizations) > 1:
         authorization_ids = [auth["id"] for auth in authorizations]
-        logger.exception(
-            f"More than one authorization found for agreement deployment "
-            f"{agreement_deployment.deployment_id}"
+        logger.error(
+            "More than one authorization found for agreement deployment %s",
+            agreement_deployment.deployment_id,
         )
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
@@ -152,21 +164,25 @@ def get_price_list_id(mpt_client, agreement_deployment):
             agreement_deployment.deployment_currency,
         )
     except Exception as e:
-        logger.exception(f"Error getting price list: {e}")
+        logger.exception("Error getting price list.")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting price list: {e}"
         agreement_deployment.save()
         return None
 
-    global_price_lists = []
-    for price_list in price_lists:
-        if price_list.get("externalIds", {}).get("vendor", "").endswith(GLOBAL_SUFFIX):
-            global_price_lists.append(price_list)
+    global_price_lists = list(
+        filter(
+            lambda price_list: price_list.get("externalIds", {})
+            .get("vendor", "")
+            .endswith(GLOBAL_SUFFIX),
+            price_lists,
+        )
+    )
 
     if not global_price_lists:
-        logger.exception(
-            f"Global price list not found for agreement deployment"
-            f" {agreement_deployment.deployment_id}"
+        logger.error(
+            "Global price list not found for agreement deployment %s",
+            agreement_deployment.deployment_id,
         )
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
@@ -178,9 +194,9 @@ def get_price_list_id(mpt_client, agreement_deployment):
         return None
 
     if len(global_price_lists) > 1:
-        logger.exception(
-            f"More than one price list found for agreement deployment "
-            f"{agreement_deployment.deployment_id}"
+        logger.error(
+            "More than one price list found for agreement deployment %s",
+            agreement_deployment.deployment_id,
         )
         price_list_ids = [price_list["id"] for price_list in price_lists]
         agreement_deployment.status = STATUS_GC_ERROR
@@ -224,16 +240,16 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             authorization_id,
         )
     except Exception as e:
-        logger.exception(f"Error getting listings: {e}")
+        logger.exception("Error getting listings.")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error getting listings: {e}"
         agreement_deployment.save()
         return None
 
     if len(listings) > 1:
-        logger.exception(
-            f"More than one listing found for agreement deployment "
-            f"{agreement_deployment.deployment_id}"
+        logger.error(
+            "More than one listing found for agreement deployment %s",
+            agreement_deployment.deployment_id,
         )
         listing_ids = [listing["id"] for listing in listings]
         agreement_deployment.status = STATUS_GC_ERROR
@@ -247,8 +263,8 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
 
     if not listings:
         logger.info(
-            f"Listing not found for agreement deployment {agreement_deployment.deployment_id}."
-            f" Proceed to create new listing"
+            "Listing not found for agreement deployment %s. Proceed to create new listing",
+            agreement_deployment.deployment_id,
         )
 
         listing = {
@@ -261,9 +277,9 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
         }
         try:
             listing = create_listing(mpt_client, listing)
-            logger.info(f"New listing created {listing['id']}")
+            logger.info("New listing created %s", listing["id"])
         except Exception as e:
-            logger.exception(f"Error creating listing: {e}: {listing}")
+            logger.exception("Error creating listing: %s", listing)
             agreement_deployment.status = STATUS_GC_ERROR
             agreement_deployment.error_description = f"Error creating listing: {e}"
             agreement_deployment.save()
@@ -385,14 +401,14 @@ def create_gc_agreement_deployment(
             "termsAndConditions": [],
         }
         agreement = create_agreement(mpt_o_client, gc_agreement_deployment)
-        logger.info(f"Created GC agreement deployment {agreement['id']}")
+        logger.info("Created GC agreement deployment %s", agreement["id"])
 
         agreement_deployment.agreement_id = agreement["id"]
         agreement_deployment.save()
 
         return agreement["id"]
     except Exception as e:
-        logger.exception(f"Error creating agreement deployment: {e}")
+        logger.exception("Error creating agreement deployment.")
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error creating agreement deployment: {e}"
         agreement_deployment.save()
@@ -412,11 +428,12 @@ def create_gc_agreement_subscription(
         gc_agreement_id (str): The global customer agreement ID.
         buyer_id (str): The buyer ID.
         item (dict): The item data.
+        prices (float): price.
 
     Returns:
         None
     """
-    logger.info(f"Creating GC agreement subscription for {adobe_subscription['subscriptionId']}")
+    logger.info("Creating GC agreement subscription for %s", adobe_subscription["subscriptionId"])
 
     price_component = {}
     if prices is not None:
@@ -456,14 +473,26 @@ def create_gc_agreement_subscription(
         "seller": {"id": agreement_deployment.seller_id},
     }
     subscription = create_agreement_subscription(mpt_client, subscription)
-    logger.info(f"Created GC agreement subscription {subscription['id']}")
+    logger.info("Created GC agreement subscription %s", subscription["id"])
 
 
 def enable_subscription_auto_renewal(
     adobe_client, authorization_id, adobe_customer, adobe_subscription
 ):
+    """
+    Enables auto renewal on adobe subscription.
+
+    Args:
+        adobe_client (AdobeClient): Adobe API client.
+        authorization_id (str): MPT authorization id.
+        adobe_customer (dict): The Adobe customer.
+        adobe_subscription (dict): Adobe subscription.
+
+    Returns:
+        None
+    """
     if not adobe_subscription["autoRenewal"]["enabled"]:
-        logger.info(f"Enabling auto-renewal for {adobe_subscription['subscriptionId']}")
+        logger.info("Enabling auto-renewal for %s", adobe_subscription["subscriptionId"])
         adobe_subscription = adobe_client.update_subscription(
             authorization_id,
             adobe_customer["customerId"],
@@ -473,12 +502,13 @@ def enable_subscription_auto_renewal(
     return adobe_subscription
 
 
-def process_agreement_deployment(
+def process_agreement_deployment(  # noqa: C901
     mpt_client, mpt_o_client, adobe_client, agreement_deployment, product_id
 ):
     """
-    Process the agreement deployment by retrieving necessary data, creating or updating
-    listings, agreements, and subscriptions.
+    Process the agreement deployment.
+
+    By retrieving necessary data, creating or updating listings, agreements, and subscriptions.
 
     Args:
         mpt_client (MPTClient): The MPT client instance.
@@ -490,12 +520,12 @@ def process_agreement_deployment(
     Returns:
         None
     """
-    logger.info(f"Processing agreement deployment {agreement_deployment.deployment_id}")
+    logger.info("Processing agreement deployment %s", agreement_deployment.deployment_id)
 
     if not agreement_deployment.licensee_id:
         logger.info(
-            f"Licensee not found for agreement deployment {agreement_deployment.deployment_id}."
-            f" Continue"
+            "Licensee not found for agreement deployment %s. Continue",
+            agreement_deployment.deployment_id,
         )
         return
 
@@ -567,8 +597,9 @@ def process_agreement_deployment(
         for adobe_subscription in adobe_subscriptions:
             if adobe_subscription["status"] != AdobeStatus.PROCESSED:
                 logger.warning(
-                    f"Subscription {adobe_subscription['subscriptionId']} "
-                    f"is in status {adobe_subscription['status']}, skip it"
+                    "Subscription %s is in status %s, skip it",
+                    adobe_subscription["subscriptionId"],
+                    adobe_subscription["status"],
                 )
                 continue
 
@@ -578,11 +609,12 @@ def process_agreement_deployment(
             )
             if subscription:
                 logger.info(
-                    f"Subscription with external id {adobe_subscription['subscriptionId']} already"
-                    f" exists ({subscription['id']})"
+                    "Subscription with external id %s already exists (%s)",
+                    adobe_subscription["subscriptionId"],
+                    subscription["id"],
                 )
             else:
-                adobe_subscription = enable_subscription_auto_renewal(
+                updated_subscription = enable_subscription_auto_renewal(
                     adobe_client, authorization_id, adobe_customer, adobe_subscription
                 )
 
@@ -590,20 +622,21 @@ def process_agreement_deployment(
                     adobe_customer, offer_ids, product_id, agreement_deployment.deployment_currency
                 )
                 sku_discount_level = get_sku_with_discount_level(
-                    adobe_subscription["offerId"], adobe_customer
+                    updated_subscription["offerId"], adobe_customer
                 )
 
                 create_gc_agreement_subscription(
                     mpt_client,
                     agreement_deployment,
-                    adobe_subscription,
+                    updated_subscription,
                     gc_agreement_id,
                     licensee["buyer"]["id"],
                     item,
                     prices.get(sku_discount_level),
                 )
                 logger.info(
-                    f"GC agreement subscription created for {adobe_subscription['subscriptionId']}"
+                    "GC agreement subscription created for %s",
+                    updated_subscription["subscriptionId"],
                 )
 
         agreement_deployment.status = STATUS_GC_CREATED
@@ -612,7 +645,8 @@ def process_agreement_deployment(
 
     except Exception as e:
         logger.exception(
-            f"Error processing agreement deployment {agreement_deployment.deployment_id}: {e}"
+            "Error processing agreement deployment %s.",
+            agreement_deployment.deployment_id,
         )
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = f"Error processing agreement deployment: {e}"
@@ -621,8 +655,9 @@ def process_agreement_deployment(
 
 def check_gc_agreement_deployments():
     """
-    Check and process Global Customer Agreement Deployments for each product ID
-    defined in the settings.
+    Check and process Global Customer Agreement Deployments for each product ID.
+
+    Product IDs are defined in the settings.
 
     This function retrieves the Adobe and MPT clients, iterates over the product IDs,
     and processes each agreement deployment.
@@ -637,7 +672,7 @@ def check_gc_agreement_deployments():
     for product_id in settings.MPT_PRODUCTS_IDS:
         if get_market_segment(product_id) != MARKET_SEGMENT_COMMERCIAL:
             continue
-        logger.info(f"Checking GC agreement deployments for product {product_id}")
+        logger.info("Checking GC agreement deployments for product %s", product_id)
         try:
             agreement_deployments = get_gc_agreement_deployments_to_check(product_id)
             for agreement_deployment in agreement_deployments:
@@ -648,7 +683,8 @@ def check_gc_agreement_deployments():
                     agreement_deployment,
                     product_id,
                 )
-        except Exception as e:
+        except Exception:
             logger.exception(
-                f"Error checking GC agreement deployments for product {product_id}: {e}"
+                "Error checking GC agreement deployments for product %s.",
+                product_id,
             )

@@ -153,10 +153,10 @@ def test_validate_transfer_lines_exist(
 
 @pytest.mark.parametrize(
     "status_code",
-    [
+    (
         AdobeStatus.TRANSFER_INVALID_MEMBERSHIP.value,
         AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS.value,
-    ]
+    )
     + UNRECOVERABLE_TRANSFER_STATUSES,
 )
 def test_validate_transfer_membership_error(
@@ -336,7 +336,7 @@ def test_validate_transfer_already_migrated(
     )
 
     mocked_add_lines_to_order.assert_called_once_with(
-        m_client, ANY, [adobe_subscription], {}, "currentQuantity", True
+        m_client, ANY, [adobe_subscription], {}, "currentQuantity", is_transferred=True
     )
     assert adobe_subscription["offerId"] == "65304578CA03A12"
 

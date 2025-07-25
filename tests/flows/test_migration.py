@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from freezegun import freeze_time
@@ -532,7 +532,7 @@ def test_checking_running_transfers_for_product(
         return_value=mocked_adobe_client,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -569,7 +569,7 @@ def test_checking_running_transfers_for_product(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -632,7 +632,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
         return_value=mocked_adobe_client,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -668,7 +668,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1050,7 +1050,7 @@ def test_checking_running_transfers_for_product_authorization_not_found(mocker, 
 
     mock_transfer.save.assert_called_once()
     assert mock_transfer.status == "failed"
-    assert mock_transfer.updated_at == datetime(2025, 4, 6, 12, 30)
+    assert mock_transfer.updated_at == datetime(2025, 4, 6, 12, 30, tzinfo=UTC)
     assert mock_transfer.migration_error_description == message_error
 
 
@@ -1134,7 +1134,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -1171,7 +1171,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1254,7 +1254,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -1290,7 +1290,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1384,7 +1384,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1421,7 +1421,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1509,7 +1509,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1545,7 +1545,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1654,7 +1654,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         side_effect=error,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1691,7 +1691,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1801,7 +1801,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         side_effect=error,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1837,7 +1837,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1982,7 +1982,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
         return_value=mocked_adobe_client,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_terminate_contract.assert_called_once_with("nav-cco")
@@ -1990,7 +1990,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
         assert mock_transfer.nav_error == "internal server error"
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == datetime.now(tz=UTC)
 
 
 @pytest.mark.parametrize(
