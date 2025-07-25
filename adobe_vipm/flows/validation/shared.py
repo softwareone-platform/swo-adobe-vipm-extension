@@ -43,9 +43,9 @@ class ValidateDuplicateLines(Step):
             for line in subscription["lines"]:
                 items.append(line["item"]["id"])
 
-        items.extend(
-            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
-        )
+        items.extend([
+            line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0
+        ])
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:
             message = ERR_EXISTING_ITEMS.to_dict(duplicates=",".join(duplicates))

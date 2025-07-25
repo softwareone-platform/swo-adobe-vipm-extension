@@ -62,13 +62,11 @@ def test_check_3yc_commitment_request(
         {"externalId": request_type_param_ext_id, "value": None},
     )
 
-    expected_params["fulfillment"].extend(
-        [
-            {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
-            {"externalId": "3YCStartDate", "value": "2024-01-01"},
-            {"externalId": "3YCEndDate", "value": "2025-01-01"},
-        ]
-    )
+    expected_params["fulfillment"].extend([
+        {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+        {"externalId": "3YCStartDate", "value": "2024-01-01"},
+        {"externalId": "3YCEndDate", "value": "2025-01-01"},
+    ])
 
     check_3yc_commitment_request(mocked_mpt_client, is_recommitment=is_recommitment)
 

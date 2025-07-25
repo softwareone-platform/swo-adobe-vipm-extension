@@ -178,12 +178,10 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     fulfillment_parameters = fulfillment_parameters_factory(
         customer_id="adobe-customer-id",
     )
-    fulfillment_parameters.append(
-        {
-            "externalId": Param.RETRY_COUNT.value,
-            "value": "1",
-        }
-    )
+    fulfillment_parameters.append({
+        "externalId": Param.RETRY_COUNT.value,
+        "value": "1",
+    })
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters,
         external_ids={"vendor": "adobe-order-id"},

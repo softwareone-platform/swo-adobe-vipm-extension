@@ -210,13 +210,11 @@ class UpdateRenewalQuantities(Step):
                 f"{context}: update renewal quantity for sub "
                 f"{subscription['id']} ({adobe_sub_id}) {old_qty} -> {qty}"
             )
-            context.updated.append(
-                {
-                    "subscription_vendor_id": adobe_sub_id,
-                    "old_quantity": old_qty,
-                    "new_quantity": qty,
-                }
-            )
+            context.updated.append({
+                "subscription_vendor_id": adobe_sub_id,
+                "old_quantity": old_qty,
+                "new_quantity": qty,
+            })
 
     def _handle_subscription_update_error(self, adobe_client, client, context, e):
         self._rollback_updated_subscriptions(adobe_client, context)

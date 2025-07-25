@@ -575,9 +575,10 @@ class SetOrUpdateCotermDate(Step):
     def commitment_update_if_needed(self, context):
         if not context.adobe_customer:
             return False
-        commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
-            context.adobe_customer
-        )
+        commitment = get_3yc_commitment_request(
+            context.adobe_customer,
+            is_recommitment=False,
+        ) or get_3yc_commitment(context.adobe_customer)
 
         if not commitment:
             return False
@@ -591,19 +592,18 @@ class SetOrUpdateCotermDate(Step):
     def update_order_parameters(self, client, context, coterm_date):
         update_order(client, context.order_id, parameters=context.order["parameters"])
         updated_params = {"coterm_date": coterm_date.isoformat()}
-        commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
-            context.adobe_customer
-        )
+        commitment = get_3yc_commitment_request(
+            context.adobe_customer,
+            is_recommitment=False,
+        ) or get_3yc_commitment(context.adobe_customer)
         if commitment:
-            updated_params.update(
-                {
-                    "3yc_enroll_status": commitment["status"],
-                    "3yc_commitment_request_status": None,
-                    "3yc_start_date": commitment["startDate"],
-                    "3yc_end_date": commitment["endDate"],
-                    "3yc": None,
-                }
-            )
+            updated_params.update({
+                "3yc_enroll_status": commitment["status"],
+                "3yc_commitment_request_status": None,
+                "3yc_start_date": commitment["startDate"],
+                "3yc_end_date": commitment["endDate"],
+                "3yc": None,
+            })
         params_str = ", ".join(f"{k}={v}" for k, v in updated_params.items())
         logger.info(f"{context}: Updated parameters: {params_str}")
 
@@ -974,9 +974,9 @@ class ValidateDuplicateLines(Step):
             for line in subscription["lines"]:
                 items.append(line["item"]["id"])
 
-        items.extend(
-            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
-        )
+        items.extend([
+            line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0
+        ])
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:
             switch_order_to_failed(

@@ -548,12 +548,10 @@ def create_gc_agreement_deployments(product_id, agreement_deployments):
     GCAgreementDeployment = get_gc_agreement_deployment_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    GCAgreementDeployment.batch_save(
-        [
-            GCAgreementDeployment(**agreement_deployment)
-            for agreement_deployment in agreement_deployments
-        ]
-    )
+    GCAgreementDeployment.batch_save([
+        GCAgreementDeployment(**agreement_deployment)
+        for agreement_deployment in agreement_deployments
+    ])
 
 
 def create_gc_main_agreement(product_id, main_agreement):

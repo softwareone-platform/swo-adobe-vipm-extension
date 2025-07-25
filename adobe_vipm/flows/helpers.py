@@ -202,9 +202,10 @@ class Validate3YCCommitment(Step):
                 next_step(client, context)
             return
 
-        commitment = get_3yc_commitment_request(context.adobe_customer) or get_3yc_commitment(
-            context.adobe_customer
-        )
+        commitment = get_3yc_commitment_request(
+            context.adobe_customer,
+            is_recommitment=False,
+        ) or get_3yc_commitment(context.adobe_customer)
 
         adobe_client = get_adobe_client()
         commitment_status = commitment.get("status", "")
@@ -478,7 +479,7 @@ class UpdatePrices(Step):
         """Get prices for SKUs considering 3YC commitment if applicable."""
         commitment = (
             (
-                get_3yc_commitment_request(context.adobe_customer)
+                get_3yc_commitment_request(context.adobe_customer, is_recommitment=False)
                 or get_3yc_commitment(context.adobe_customer)
             )
             if context.adobe_customer
@@ -518,23 +519,19 @@ class UpdatePrices(Step):
             new_price_item = get_price_item_by_line_sku(
                 prices, line["item"]["externalIds"]["vendor"]
             )
-            updated_lines.append(
-                {
-                    "id": line["id"],
-                    "price": {"unitPP": new_price_item[1]},
-                }
-            )
+            updated_lines.append({
+                "id": line["id"],
+                "price": {"unitPP": new_price_item[1]},
+            })
 
         # Add remaining lines with unchanged prices
         updated_lines_ids = {line["id"] for line in updated_lines}
         for line in context.order["lines"]:
             if line["id"] not in updated_lines_ids:
-                updated_lines.append(
-                    {
-                        "id": line["id"],
-                        "price": {"unitPP": line["price"]["unitPP"]},
-                    }
-                )
+                updated_lines.append({
+                    "id": line["id"],
+                    "price": {"unitPP": line["price"]["unitPP"]},
+                })
 
         return sorted(updated_lines, key=itemgetter("id"))
 

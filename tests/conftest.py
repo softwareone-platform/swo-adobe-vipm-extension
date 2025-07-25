@@ -1303,7 +1303,7 @@ def adobe_client_factory(
         )
         api_token = APIToken(
             "a-token",
-            expires=datetime.now() + timedelta(seconds=86000),
+            expires=datetime.now(tz=UTC) + timedelta(seconds=86000),
         )
         client = AdobeClient()
         client._token_cache[authorization] = api_token
@@ -1388,19 +1388,17 @@ def created_agreement_factory():
             "termsAndConditions": [],
         }
         if is_profile_address_exists:
-            created_agreement["parameters"]["ordering"].append(
-                {
-                    "externalId": "address",
-                    "value": {
-                        "addressLine1": "addressLine1",
-                        "addressLine2": "addressLine2",
-                        "city": "city",
-                        "country": "US",
-                        "postCode": "postalCode",
-                        "state": "region",
-                    },
-                }
-            )
+            created_agreement["parameters"]["ordering"].append({
+                "externalId": "address",
+                "value": {
+                    "addressLine1": "addressLine1",
+                    "addressLine2": "addressLine2",
+                    "city": "city",
+                    "country": "US",
+                    "postCode": "postalCode",
+                    "state": "region",
+                },
+            })
         return created_agreement
 
     return _created_agreement

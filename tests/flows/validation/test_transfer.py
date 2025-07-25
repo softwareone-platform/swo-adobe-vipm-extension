@@ -153,10 +153,10 @@ def test_validate_transfer_lines_exist(
 
 @pytest.mark.parametrize(
     "status_code",
-    [
+    (
         AdobeStatus.TRANSFER_INVALID_MEMBERSHIP.value,
         AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS.value,
-    ]
+    )
     + UNRECOVERABLE_TRANSFER_STATUSES,
 )
 def test_validate_transfer_membership_error(
