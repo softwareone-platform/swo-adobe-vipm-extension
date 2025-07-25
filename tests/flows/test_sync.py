@@ -2282,6 +2282,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     adobe_customer_factory,
     agreement_factory,
     adobe_subscription_factory,
+    mock_get_agreement_subscription,
 ):
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
         status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
@@ -2309,8 +2310,6 @@ def test_get_subscriptions_for_update_end_sale(
     mock_update_agreement_subscription,
 ):
     mock_is_sku_end_of_sale.return_value = True
-    mpt_subscription = subscriptions_factory()[0]
-    mock_get_agreement_subscription.return_value = mpt_subscription
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
     )
@@ -2320,10 +2319,14 @@ def test_get_subscriptions_for_update_end_sale(
         mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
     )
 
-    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    )
     mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
     mock_terminate_subscription.assert_called_once_with(
-        mock_mpt_client, mpt_subscription["id"], "Adobe subscription status 1004."
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        "Adobe subscription status 1004.",
     )
     mock_update_agreement_subscription.assert_not_called()
 
@@ -2341,8 +2344,6 @@ def test_get_subscriptions_for_update_not_end_sale(
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
 ):
-    mpt_subscription = subscriptions_factory()[0]
-    mock_get_agreement_subscription.return_value = mpt_subscription
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
         status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
     )
@@ -2351,10 +2352,14 @@ def test_get_subscriptions_for_update_not_end_sale(
         mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
     )
 
-    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    )
     mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
     mock_update_agreement_subscription.assert_called_once_with(
-        mock_mpt_client, mpt_subscription["id"], status=SubscriptionStatus.EXPIRED.value
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        status=SubscriptionStatus.EXPIRED.value,
     )
     mock_terminate_subscription.assert_not_called()
 
