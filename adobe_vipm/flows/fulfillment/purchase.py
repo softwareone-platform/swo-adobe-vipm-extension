@@ -117,7 +117,10 @@ class CreateCustomer(Step):
     """
 
     def save_data(self, client, context):
-        request_3yc_status = get_3yc_commitment_request(context.adobe_customer).get("status")
+        request_3yc_status = get_3yc_commitment_request(
+            context.adobe_customer,
+            is_recommitment=False,
+        ).get("status")
         context.order = set_adobe_customer_id(context.order, context.adobe_customer_id)
         if request_3yc_status:
             context.order = set_adobe_3yc_commitment_request_status(

@@ -86,14 +86,16 @@ def _update_agreement(mpt_client, customer, agreement, dry_run):
         for mq in commitment_info.get("minimumQuantities", ()):
             if mq["offerType"] == "LICENSE":
                 parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append(
-                    {"externalId": Param.THREE_YC_LICENSES, "value": str(mq.get("quantity"))}
-                )
+                parameters[Param.PHASE_ORDERING].append({
+                    "externalId": Param.THREE_YC_LICENSES,
+                    "value": str(mq.get("quantity")),
+                })
             if mq["offerType"] == "CONSUMABLES":
                 parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append(
-                    {"externalId": Param.THREE_YC_CONSUMABLES, "value": str(mq.get("quantity"))}
-                )
+                parameters[Param.PHASE_ORDERING].append({
+                    "externalId": Param.THREE_YC_CONSUMABLES,
+                    "value": str(mq.get("quantity")),
+                })
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -123,9 +125,10 @@ def _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters
         Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
     )
     request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
-    new_parameters[Param.PHASE_FULFILLMENT].append(
-        {"externalId": status_param_ext_id, "value": request_info.get("status")}
-    )
+    new_parameters[Param.PHASE_FULFILLMENT].append({
+        "externalId": status_param_ext_id,
+        "value": request_info.get("status"),
+    })
     new_parameters.setdefault(request_type_param_phase, [])
     new_parameters[request_type_param_phase].append(
         {"externalId": request_type_param_ext_id, "value": None},
@@ -299,9 +302,11 @@ def _get_subscriptions_for_update(
 
             continue
 
-        for_update.append(
-            (subscription, adobe_subscription, get_sku_with_discount_level(actual_sku, customer))
-        )
+        for_update.append((
+            subscription,
+            adobe_subscription,
+            get_sku_with_discount_level(actual_sku, customer),
+        ))
 
     return for_update
 
@@ -439,9 +444,10 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
         global_customer_enabled = get_global_customer(agreement)
         if global_customer_enabled != ["Yes"]:
             logger.info(f"Setting global customer for agreement {agreement['id']}")
-            parameters[Param.PHASE_FULFILLMENT].append(
-                {"externalId": "globalCustomer", "value": ["Yes"]}
-            )
+            parameters[Param.PHASE_FULFILLMENT].append({
+                "externalId": "globalCustomer",
+                "value": ["Yes"],
+            })
 
         deployments = [
             f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
@@ -449,9 +455,10 @@ def sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
-            parameters[Param.PHASE_FULFILLMENT].append(
-                {"externalId": "deployments", "value": ",".join(deployments)}
-            )
+            parameters[Param.PHASE_FULFILLMENT].append({
+                "externalId": "deployments",
+                "value": ",".join(deployments),
+            })
             logger.info(f"Setting deployments for agreement {agreement['id']}")
         if parameters[Param.PHASE_FULFILLMENT]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)

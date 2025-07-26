@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from adobe_vipm.adobe.config import Config
+from adobe_vipm.adobe.config import REQUIRED_API_SCOPES, Config
 from adobe_vipm.adobe.dataclasses import (
     Authorization,
     Country,
@@ -22,7 +22,7 @@ def test_properties(mock_adobe_config, adobe_config_file, settings):
     c = Config()
     assert c.api_base_url == settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"]
     assert c.auth_endpoint_url == settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"]
-    assert c.api_scopes == ",".join(Config.REQUIRED_API_SCOPES)
+    assert c.api_scopes == ",".join(REQUIRED_API_SCOPES)
     assert c.language_codes == ["en-US"]
 
 
@@ -149,10 +149,10 @@ def test_load_data(
     m_files.joinpath.return_value = m_join
     mocked_files = mocker.patch("adobe_vipm.adobe.config.files", return_value=m_files)
     mocker.patch(
-        "builtins.open",
+        "adobe_vipm.adobe.config.Path.open",
         multi_mock_open(
-            json.dumps(adobe_credentials_file),
             json.dumps(adobe_authorizations_file),
+            json.dumps(adobe_credentials_file),
         ),
     )
     c = Config()

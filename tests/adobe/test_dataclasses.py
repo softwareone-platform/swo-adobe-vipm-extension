@@ -1,5 +1,5 @@
 from dataclasses import FrozenInstanceError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 import pytest
 
@@ -72,7 +72,7 @@ def test_apitoken():
     """
     Check the APIToken dataclass is unmutable and hasheable.
     """
-    token = APIToken("token", datetime.now())
+    token = APIToken("token", datetime.now(tz=UTC))
     with pytest.raises(FrozenInstanceError):
         token.token = "new id"
     assert hash(token) is not None
@@ -83,6 +83,6 @@ def test_api_token_is_expired():
     Test the is_expired method checks the token expires
     against the current date.
     """
-    assert APIToken("token", datetime.now() + timedelta(seconds=1)).is_expired() is False
+    assert APIToken("token", datetime.now(tz=UTC) + timedelta(seconds=1)).is_expired() is False
 
-    assert APIToken("token", datetime.now() - timedelta(seconds=1)).is_expired() is True
+    assert APIToken("token", datetime.now(tz=UTC) - timedelta(seconds=1)).is_expired() is True

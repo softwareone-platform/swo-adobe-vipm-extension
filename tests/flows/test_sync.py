@@ -709,12 +709,10 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_sync_agreement.assert_has_calls(
-        [
-            mocker.call(mock_mpt_client, agreement, False),
-            mocker.call(mock_mpt_client, agreement, False),
-        ]
-    )
+    mock_sync_agreement.assert_has_calls([
+        mocker.call(mock_mpt_client, agreement, False),
+        mocker.call(mock_mpt_client, agreement, False),
+    ])
     assert caplog.messages == [
         "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
         "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962:"

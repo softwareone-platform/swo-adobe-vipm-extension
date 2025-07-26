@@ -102,13 +102,11 @@ class SubscriptionUpdateAutoRenewal(Step):
                 f"Error updating the subscription {subscription_vendor_id}: {str(e)}"
             )
 
-        context.updated.append(
-            {
-                "subscription_vendor_id": subscription_vendor_id,
-                "auto_renewal": desired,
-                "quantity": qty,
-            }
-        )
+        context.updated.append({
+            "subscription_vendor_id": subscription_vendor_id,
+            "auto_renewal": desired,
+            "quantity": qty,
+        })
         logger.info(
             f"Updated subscription {subscription_vendor_id}: autoRenew={desired}, qty={qty}"
         )

@@ -1,6 +1,6 @@
 import copy
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from hashlib import sha256
 from urllib.parse import urljoin
 
@@ -10,7 +10,7 @@ from freezegun import freeze_time
 from responses import matchers
 
 from adobe_vipm.adobe import client as adobe_client
-from adobe_vipm.adobe.config import Config
+from adobe_vipm.adobe.config import REQUIRED_API_SCOPES, Config
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
@@ -1678,7 +1678,7 @@ def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_conf
                     "grant_type": "client_credentials",
                     "client_id": authorization.client_id,
                     "client_secret": authorization.client_secret,
-                    "scope": ",".join(Config.REQUIRED_API_SCOPES),
+                    "scope": ",".join(REQUIRED_API_SCOPES),
                 },
             ),
         ],
@@ -1689,7 +1689,7 @@ def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_conf
         token = client._get_auth_token(authorization)
         assert isinstance(token, APIToken)
         assert token.token == "an-access-token"
-        assert token.expires == datetime.now() + timedelta(seconds=83000 - 180)
+        assert token.expires == datetime.now(tz=UTC) + timedelta(seconds=83000 - 180)
         assert client._token_cache[authorization] == token
 
 

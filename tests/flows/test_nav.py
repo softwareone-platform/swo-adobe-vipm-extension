@@ -105,12 +105,10 @@ def test_get_token_from_cache_expired(mocker, requests_mocker, settings):
     )
 
     assert get_token() == (True, "a-token")
-    mocked_save_token.assert_called_once_with(
-        {
-            "access_token": "a-token",
-            "expires_in": 86400,
-        }
-    )
+    mocked_save_token.assert_called_once_with({
+        "access_token": "a-token",
+        "expires_in": 86400,
+    })
 
 
 def test_get_token_error(mocker, requests_mocker, settings):
