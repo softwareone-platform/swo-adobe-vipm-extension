@@ -7,11 +7,13 @@ from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
+    create_agreement_subscription,
     get_agreement_subscription,
     get_agreements_by_customer_deployments,
     get_agreements_by_ids,
     get_agreements_by_query,
     get_all_agreements,
+    get_product_items_by_skus,
     terminate_subscription,
     update_agreement,
     update_agreement_subscription,
@@ -33,6 +35,7 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
+    exclude_subscriptions_with_deployment_id,
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
     get_deployments,
@@ -48,6 +51,97 @@ from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_
 logger = logging.getLogger(__name__)
 
 
+def _add_missing_subscriptions(
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    customer: dict,
+    agreement: dict,
+    subscriptions_for_update: tuple[str],
+) -> None:
+    logger.info(f"Checking missing subscriptions for {agreement["id"]=}")
+    adobe_subscriptions = exclude_subscriptions_with_deployment_id(
+        adobe_client.get_subscriptions(agreement["authorization"]["id"], customer["customerId"])
+    )["items"]
+
+    missing_subscriptions = tuple(
+        s
+        for s in adobe_subscriptions
+        if s["subscriptionId"] not in subscriptions_for_update
+        and s["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
+    )
+
+    if missing_subscriptions:
+        logger.warning("> Found missing subscriptions")
+    else:
+        logger.info("> No missing subscriptions found")
+        return
+
+    skus = [get_partial_sku(item["offerId"]) for item in adobe_subscriptions]
+    items_map = {
+        item["externalIds"]["vendor"]: item
+        for item in get_product_items_by_skus(mpt_client, agreement["product"]["id"], skus)
+    }
+    offer_ids = [
+        get_sku_with_discount_level(adobe_subscription["offerId"], customer)
+        for adobe_subscription in adobe_subscriptions
+    ]
+
+    for adobe_subscription in missing_subscriptions:
+        logger.info(f">> Adding missing subscription {adobe_subscription['subscriptionId']}")
+        item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
+        prices = get_sku_price(
+            customer,
+            offer_ids,
+            agreement["product"]["id"],
+            agreement["listing"]["priceList"]["currency"],
+        )
+        price_component = {"price": {"unitPP": prices}}
+        create_agreement_subscription(
+            mpt_client,
+            {
+                "status": SubscriptionStatus.ACTIVE.value,
+                "commitmentDate": adobe_subscription["renewalDate"],
+                "price": {"unitPP": prices},
+                "parameters": {
+                    "fulfillment": [
+                        {
+                            "externalId": Param.ADOBE_SKU.value,
+                            "value": adobe_subscription["offerId"],
+                        },
+                        {
+                            "externalId": Param.CURRENT_QUANTITY.value,
+                            "value": str(adobe_subscription["currentQuantity"]),
+                        },
+                        {
+                            "externalId": Param.RENEWAL_QUANTITY.value,
+                            "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        },
+                        {
+                            "externalId": Param.RENEWAL_DATE.value,
+                            "value": str(adobe_subscription["renewalDate"]),
+                        },
+                    ]
+                },
+                "agreement": {"id": agreement["id"]},
+                "buyer": {"id": agreement["buyer"]["id"]},
+                "licensee": {"id": agreement["licensee"]["id"]},
+                "seller": {"id": agreement["seller"]["id"]},
+                "lines": [
+                    {
+                        "quantity": adobe_subscription["currentQuantity"],
+                        "item": item,
+                        **price_component,
+                    }
+                ],
+                "name": "Subscription for {agreement['product']['name']}",
+                "startDate": adobe_subscription["creationDate"],
+                "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
+                "product": {"id": agreement["product"]["id"]},
+                "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
+            },
+        )
+
+
 def sync_agreement_prices(
     mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict, dry_run: bool
 ) -> None:
@@ -59,6 +153,14 @@ def sync_agreement_prices(
 
     subscriptions_for_update = _get_subscriptions_for_update(
         mpt_client, adobe_client, agreement, customer
+    )
+
+    _add_missing_subscriptions(
+        mpt_client,
+        adobe_client,
+        customer,
+        agreement,
+        subscriptions_for_update=tuple(s[1]["subscriptionId"] for s in subscriptions_for_update),
     )
 
     product_id = agreement["product"]["id"]
