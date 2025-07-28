@@ -880,8 +880,7 @@ def test_transfer_unexpected_status(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client,
-        [agreement["id"]],
+        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -944,8 +943,7 @@ def test_transfer_items_mismatch(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client,
-        [agreement["id"]],
+        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -1165,8 +1163,7 @@ def test_transfer_unrecoverable_status(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client,
-        [agreement["id"]],
+        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -1222,8 +1219,7 @@ def test_create_transfer_fail(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client,
-        [agreement["id"]],
+        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -1729,8 +1725,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         },
     }
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client,
-        [agreement["id"]],
+        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -2236,8 +2231,7 @@ def test_fulfill_transfer_order_migration_synchronized(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        m_client,
-        [agreement["id"]],
+        m_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -6126,6 +6120,5 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         },
     }
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client,
-        [agreement["id"]],
+        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
