@@ -431,7 +431,9 @@ def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, dry_run: bool):
     Synchronizes agreements by their active subscriptions renewed yesterday.
     """
     logger.info("Syncing agreements by 3yc End Date...")
-    _sync_agreements_by_param(mpt_client, Param.THREE_YC_END_DATE, dry_run)
+    _sync_agreements_by_param(
+        mpt_client, Param.THREE_YC_END_DATE, dry_run=dry_run, sync_prices=True
+    )
 
 
 def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
@@ -439,10 +441,12 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, dry_run: bool):
     Synchronizes agreements by their active subscriptions renewed yesterday.
     """
     logger.info("Synchronizing agreements by cotermDate...")
-    _sync_agreements_by_param(mpt_client, Param.COTERM_DATE, dry_run)
+    _sync_agreements_by_param(mpt_client, Param.COTERM_DATE, dry_run=dry_run, sync_prices=False)
 
 
-def _sync_agreements_by_param(mpt_client: MPTClient, param, dry_run: bool):
+def _sync_agreements_by_param(
+    mpt_client: MPTClient, param: Param, *, dry_run: bool, sync_prices: bool
+) -> None:
     today = datetime.now().date().isoformat()
     yesterday = (datetime.now() - timedelta(days=1)).date().isoformat()
     rql_query = (
@@ -455,7 +459,7 @@ def _sync_agreements_by_param(mpt_client: MPTClient, param, dry_run: bool):
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug(f"Syncing {agreement=}")
-        sync_agreement(mpt_client, agreement, dry_run)
+        sync_agreement(mpt_client, agreement, dry_run, sync_prices)
 
 
 def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
@@ -478,10 +482,10 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug(f"Syncing {agreement=}")
-        sync_agreement(mpt_client, agreement, dry_run)
+        sync_agreement(mpt_client, agreement, dry_run, sync_prices=True)
 
 
-def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
+def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False, sync_prices=False):
     """
     Get the agreements given a list of agreement IDs
     to update the prices for them.
@@ -494,7 +498,7 @@ def sync_agreements_by_agreement_ids(mpt_client, ids, dry_run=False):
     """
     agreements = get_agreements_by_ids(mpt_client, ids)
     for agreement in agreements:
-        sync_agreement(mpt_client, agreement, dry_run)
+        sync_agreement(mpt_client, agreement, dry_run, sync_prices)
 
 
 def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, dry_run: bool = True) -> None:
@@ -626,7 +630,7 @@ def process_lost_customer(mpt_client: MPTClient, adobe_client, agreement: list, 
                     notify_processing_lost_customer(msg)
 
 
-def sync_agreement(mpt_client, agreement, dry_run):
+def sync_agreement(mpt_client, agreement, dry_run, sync_prices=False):
     logger.debug(f"Syncing {agreement=}")
     if agreement["status"] != AgreementStatus.ACTIVE:
         logger.info(f"Skipping agreement {agreement['id']} because it is not in Active status")
@@ -667,7 +671,10 @@ def sync_agreement(mpt_client, agreement, dry_run):
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
 
-        sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run)
+        if sync_prices:
+            sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run)
+        else:
+            logger.info(f"Skipping price sync - {sync_prices=}.")
 
         _update_agreement(mpt_client, customer, agreement, dry_run)
 
@@ -684,6 +691,7 @@ def sync_agreement(mpt_client, agreement, dry_run):
                 customer,
                 customer_deployments,
                 dry_run,
+                sync_prices,
             )
 
     except AuthorizationNotFoundError as e:
@@ -710,7 +718,13 @@ def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
 
 
 def sync_deployments_prices(
-    mpt_client, adobe_client, main_agreement, customer, customer_deployments, dry_run
+    mpt_client,
+    adobe_client,
+    main_agreement,
+    customer,
+    customer_deployments,
+    dry_run,
+    sync_prices,
 ):
     if not customer_deployments:
         return
@@ -722,7 +736,10 @@ def sync_deployments_prices(
     )
 
     for deployment_agreement in deployment_agreements:
-        sync_agreement_prices(mpt_client, adobe_client, deployment_agreement, customer, dry_run)
+        if sync_prices:
+            sync_agreement_prices(mpt_client, adobe_client, deployment_agreement, customer, dry_run)
+        else:
+            logger.info(f"Skipping price sync - {sync_prices=}.")
 
         _update_agreement(mpt_client, customer, deployment_agreement, dry_run)
 
