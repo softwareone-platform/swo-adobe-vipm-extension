@@ -2282,6 +2282,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     adobe_customer_factory,
     agreement_factory,
     adobe_subscription_factory,
+    mock_get_agreement_subscription,
 ):
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
         status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
@@ -2309,8 +2310,6 @@ def test_get_subscriptions_for_update_end_sale(
     mock_update_agreement_subscription,
 ):
     mock_is_sku_end_of_sale.return_value = True
-    mpt_subscription = subscriptions_factory()[0]
-    mock_get_agreement_subscription.return_value = mpt_subscription
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
     )
@@ -2320,10 +2319,14 @@ def test_get_subscriptions_for_update_end_sale(
         mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
     )
 
-    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    )
     mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
     mock_terminate_subscription.assert_called_once_with(
-        mock_mpt_client, mpt_subscription["id"], "Adobe subscription status 1004."
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        "Adobe subscription status 1004.",
     )
     mock_update_agreement_subscription.assert_not_called()
 
@@ -2341,8 +2344,6 @@ def test_get_subscriptions_for_update_not_end_sale(
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
 ):
-    mpt_subscription = subscriptions_factory()[0]
-    mock_get_agreement_subscription.return_value = mpt_subscription
     mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
         status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
     )
@@ -2351,10 +2352,14 @@ def test_get_subscriptions_for_update_not_end_sale(
         mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
     )
 
-    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    )
     mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
     mock_update_agreement_subscription.assert_called_once_with(
-        mock_mpt_client, mpt_subscription["id"], status=SubscriptionStatus.EXPIRED.value
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        status=SubscriptionStatus.EXPIRED.value,
     )
     mock_terminate_subscription.assert_not_called()
 
@@ -2391,27 +2396,24 @@ def test_add_missing_subscriptions_none(
 @freeze_time("2025-07-24")
 def test_add_missing_subscriptions(
     mocker,
+    items_factory,
     mock_mpt_client,
     mock_adobe_client,
-    items_factory,
     agreement_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
+    mock_get_prices_for_skus,
+    mock_get_product_items_by_skus,
     mock_create_agreement_subscription,
+    mock_notify_processing_lost_customer,
 ):
     adobe_subscriptions = [
-        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(3)
+        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(4)
     ]
+    adobe_subscriptions[-1]["deploymentId"] = "deploymentId"
     mock_adobe_client.get_subscriptions.return_value = {"items": adobe_subscriptions}
     adobe_customer = adobe_customer_factory()
-    mock_get_product_items_by_skus = mocker.patch(
-        "adobe_vipm.flows.sync.get_product_items_by_skus",
-        return_value=items_factory(),
-    )
-    mocker.patch(
-        "adobe_vipm.airtable.models.get_prices_for_skus",
-        return_value={s["offerId"]: 12.14 for s in adobe_subscriptions},
-    )
+    mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
 
     _add_missing_subscriptions(
         mock_mpt_client,
@@ -2445,6 +2447,7 @@ def test_add_missing_subscriptions(
                 "agreement": {"id": "AGR-2119-4550-8674-5962"},
                 "buyer": {"id": "BUY-3731-7971"},
                 "licensee": {"id": "LC-321-321-321"},
+                "seller": {"id": "SEL-9121-8944"},
                 "lines": [
                     {
                         "quantity": 10,
@@ -2457,7 +2460,6 @@ def test_add_missing_subscriptions(
                         "price": {"unitPP": {"65304578CA01A12": 12.14}},
                     }
                 ],
-                "seller": {"id": "SEL-9121-8944"},
                 "name": "Subscription for {agreement['product']['name']}",
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "subscriptionId0"},
@@ -2482,6 +2484,7 @@ def test_add_missing_subscriptions(
                 "agreement": {"id": "AGR-2119-4550-8674-5962"},
                 "buyer": {"id": "BUY-3731-7971"},
                 "licensee": {"id": "LC-321-321-321"},
+                "seller": {"id": "SEL-9121-8944"},
                 "lines": [
                     {
                         "quantity": 10,
@@ -2494,7 +2497,6 @@ def test_add_missing_subscriptions(
                         "price": {"unitPP": {"65304578CA01A12": 12.14}},
                     }
                 ],
-                "seller": {"id": "SEL-9121-8944"},
                 "name": "Subscription for {agreement['product']['name']}",
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "subscriptionId2"},
@@ -2503,3 +2505,53 @@ def test_add_missing_subscriptions(
             },
         ),
     ]
+
+
+@freeze_time("2025-07-27")
+def test_add_missing_subscriptions_wrong_currency(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    mock_send_exception,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_create_agreement_subscription,
+    mock_notify_processing_lost_customer,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(
+                subscription_id=f"subscriptionId{i}", currency_code="GBP", renewal_date="2026-07-27"
+            )
+            for i in range(3)
+        ]
+    }
+    adobe_customer = adobe_customer_factory()
+
+    _add_missing_subscriptions(
+        mock_mpt_client,
+        mock_adobe_client,
+        adobe_customer,
+        agreement_factory(),
+        subscriptions_for_update=("subscriptionId1", "subscriptionId0"),
+    )
+
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        "AUT-1234-5678", adobe_customer["customerId"]
+    )
+    mock_get_product_items_by_skus.assert_called_once_with(
+        mock_mpt_client, "PRD-1111-1111", ["65304578CA", "65304578CA", "65304578CA"]
+    )
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        "AUT-1234-5678", "a-client-id", "subscriptionId2", auto_renewal=False
+    )
+    mock_send_exception.assert_called_once_with(
+        title="Price currency mismatch detected!",
+        text="{'subscriptionId': 'subscriptionId2', 'offerId': '65304578CA01A12', "
+        "'currentQuantity': 10, 'currencyCode': 'GBP', 'autoRenewal': "
+        "{'enabled': True, 'renewalQuantity': 10}, 'creationDate': "
+        "'2019-05-20T22:49:55Z', 'renewalDate': '2026-07-27', 'status': "
+        "'1000', 'deploymentId': ''}",
+    )
+    mock_create_agreement_subscription.assert_not_called()
