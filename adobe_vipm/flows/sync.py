@@ -449,9 +449,8 @@ def _sync_agreements_by_param(mpt_client: MPTClient, param, dry_run: bool):
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
-        "select=subscriptions,authorization,parameters,listing,lines,"
-        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
-        "-externalIds"
+        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
+        "-template,-name,-vendor,-client,-price"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug(f"Syncing {agreement=}")
@@ -473,9 +472,8 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, dry_run: bool):
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today})))&"
         # Let's get only what we need
-        "select=subscriptions,authorization,parameters,listing,lines,"
-        "-template,-name,-status,-authorization,-vendor,-client,-price,-licensee,-buyer,-seller,"
-        "-externalIds"
+        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
+        "-template,-name,-vendor,-client,-price"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug(f"Syncing {agreement=}")
