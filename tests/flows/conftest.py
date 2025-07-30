@@ -89,3 +89,11 @@ def mock_get_prices_for_skus(mocker):
         "adobe_vipm.airtable.models.get_prices_for_skus",
         spec=True,
     )
+
+
+@pytest.fixture
+def mock_sync_agreements_by_agreement_ids(mocker):
+    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.sync_agreements_by_agreement_ids")
+    return mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids", new=mock
+    )

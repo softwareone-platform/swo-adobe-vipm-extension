@@ -187,6 +187,7 @@ def switch_order_to_failed(client, order, error):
     )
     order["agreement"] = agreement
     send_mpt_notification(client, order)
+    sync_agreements_by_agreement_ids(client, [agreement["id"]])
     return order
 
 
