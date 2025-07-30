@@ -3,7 +3,7 @@ This module contains orders helper functions.
 """
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from operator import itemgetter
 
 from django.conf import settings
@@ -216,23 +216,7 @@ class Validate3YCCommitment(Step):
             )
             return
 
-        if commitment_status in [
-            ThreeYearCommitmentStatus.EXPIRED,
-            ThreeYearCommitmentStatus.NONCOMPLIANT,
-            ThreeYearCommitmentStatus.DECLINED,
-        ]:
-            logger.info(f"{context}: 3YC commitment is expired or noncompliant")
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT.to_dict(
-                    status=commitment.get("status")
-                ),
-            )
-            return
-
-        if not commitment and context.customer_data.get("3YC") == ["Yes"]:
-            logger.info(f"{context}: 3YC commitment has been rejected")
+        if self._is_commitment_expired_or_rejected(commitment_status, commitment, context):
             switch_order_to_failed(
                 client,
                 context.order,
@@ -243,6 +227,11 @@ class Validate3YCCommitment(Step):
             return
 
         if commitment:
+            if self._validate_3yc_commitment_date_before_coterm_date(context, commitment):
+                logger.info(f"{context}: 3YC commitment end date is before coterm date")
+                next_step(client, context)
+                return
+
             subscriptions = adobe_client.get_subscriptions(
                 context.authorization_id,
                 context.adobe_customer_id,
@@ -263,6 +252,30 @@ class Validate3YCCommitment(Step):
                 return
 
         next_step(client, context)
+
+    def _is_commitment_expired_or_rejected(self, commitment_status, commitment, context):
+        """Check if commitment is expired, noncompliant, or rejected."""
+        if commitment_status in [
+            ThreeYearCommitmentStatus.EXPIRED,
+            ThreeYearCommitmentStatus.NONCOMPLIANT,
+            ThreeYearCommitmentStatus.DECLINED,
+        ]:
+            logger.info(f"{context}: 3YC commitment is expired or noncompliant")
+            return True
+
+        if not commitment and context.customer_data.get("3YC") == ["Yes"]:
+            logger.info(f"{context}: 3YC commitment has been rejected")
+            return True
+
+        return False
+
+    def _validate_3yc_commitment_date_before_coterm_date(self, context, commitment):
+        if not context.adobe_customer['cotermDate']:
+            return False
+
+        threeyc_end_date = datetime.strptime(commitment['endDate'], "%Y-%m-%d")
+        coterm_date = datetime.strptime(context.adobe_customer['cotermDate'], "%Y-%m-%d")
+        return threeyc_end_date < coterm_date
 
     def get_quantities(self, context, subscriptions):
         count_licenses, count_consumables = self.get_licenses_and_consumables_count(subscriptions)
