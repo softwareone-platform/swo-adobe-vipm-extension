@@ -111,7 +111,8 @@ def _add_missing_subscriptions(
             agreement["product"]["id"],
             agreement["listing"]["priceList"]["currency"],
         )
-        price_component = {"price": {"unitPP": prices}}
+        sku_discount_level = get_sku_with_discount_level(adobe_subscription["offerId"], customer)
+        price_component = {"price": {"unitPP": prices.get(sku_discount_level)}}
         create_agreement_subscription(
             mpt_client,
             {
