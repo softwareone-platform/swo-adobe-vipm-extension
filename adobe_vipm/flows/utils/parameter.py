@@ -4,6 +4,7 @@ import functools
 from adobe_vipm.flows.constants import (
     PARAM_NEW_CUSTOMER_PARAMETERS,
     PARAM_OPTIONAL_CUSTOMER_ORDER,
+    TRANSFER_CUSTOMER_PARAMETERS,
     Param,
 )
 from adobe_vipm.utils import find_first
@@ -78,17 +79,35 @@ def reset_ordering_parameters_error(order):
 
 
 def update_parameters_visibility(order):
-    from adobe_vipm.flows.utils.customer import is_new_customer
+    """
+    Update the visibility of parameters based on the agreement type.
+    """
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE)
+    agreement_value = (agreement_type.get("value") or "").lower()
+    updated_order = copy.deepcopy(order)
 
-    if is_new_customer(order):
-        for param in PARAM_NEW_CUSTOMER_PARAMETERS:
-            order = set_parameter_visible(order, param)
-        order = set_parameter_hidden(order, Param.MEMBERSHIP_ID)
-    else:
-        for param in PARAM_NEW_CUSTOMER_PARAMETERS:
-            order = set_parameter_hidden(order, param)
-        order = set_parameter_visible(order, Param.MEMBERSHIP_ID)
-    return order
+    parameters_map = {
+        "new": {
+            "visible": PARAM_NEW_CUSTOMER_PARAMETERS,
+            "hidden": TRANSFER_CUSTOMER_PARAMETERS + (Param.MEMBERSHIP_ID,),
+        },
+        "migrate": {
+            "visible": [Param.MEMBERSHIP_ID],
+            "hidden": PARAM_NEW_CUSTOMER_PARAMETERS + TRANSFER_CUSTOMER_PARAMETERS,
+        },
+        "transfer": {
+            "visible": TRANSFER_CUSTOMER_PARAMETERS,
+            "hidden": PARAM_NEW_CUSTOMER_PARAMETERS + (Param.MEMBERSHIP_ID,),
+        },
+    }
+    param_config = parameters_map.get(agreement_value)
+
+    for param in param_config["visible"]:
+        updated_order = set_parameter_visible(updated_order, param)
+    for param in param_config["hidden"]:
+        updated_order = set_parameter_hidden(updated_order, param)
+
+    return updated_order
 
 
 def is_ordering_param_required(source, param_external_id):

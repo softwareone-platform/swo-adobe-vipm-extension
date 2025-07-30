@@ -547,6 +547,132 @@ def transfer_order_parameters_factory():
 
 
 @pytest.fixture
+def reseller_change_order_parameters_factory():
+    def _order_parameters(
+        reseller_change_code="88888888",
+        admin_email="admin@admin.com",
+        company_name=None,
+        address=None,
+        contact=None,
+        p3yc=None,
+        p3yc_licenses=None,
+        p3yc_consumables=None,
+    ):
+        return [
+            {
+                "id": "PAR-0000-0001",
+                "name": "Company Name",
+                "externalId": Param.COMPANY_NAME,
+                "type": "SingleLineText",
+                "value": company_name or "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0002",
+                "name": "Address",
+                "externalId": Param.ADDRESS,
+                "type": "Address",
+                "value": address or {},
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0003",
+                "name": "Contact",
+                "externalId": Param.CONTACT,
+                "type": "Contact",
+                "value": contact or {},
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0004",
+                "name": "Account type",
+                "externalId": Param.AGREEMENT_TYPE,
+                "type": "SingleLineText",
+                "value": "Transfer",
+                "constraints": {
+                    "hidden": False,
+                    "required": True,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0005",
+                "name": "Change of reseller code",
+                "externalId": Param.CHANGE_RESELLER_CODE,
+                "type": "SingleLineText",
+                "value": reseller_change_code,
+                "constraints": {
+                    "hidden": False,
+                    "required": True,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0006",
+                "name": "Adobe Customer Admin Email",
+                "externalId": Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
+                "type": "SingleLineText",
+                "value": admin_email,
+                "constraints": {
+                    "hidden": False,
+                    "required": True,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0007",
+                "name": "3YC",
+                "externalId": Param.THREE_YC,
+                "type": "Checkbox",
+                "value": p3yc,
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0008",
+                "name": "3YCLicenses",
+                "externalId": Param.THREE_YC_LICENSES,
+                "type": "SingleLineText",
+                "value": p3yc_licenses or "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0009",
+                "name": "3YCConsumables",
+                "externalId": Param.THREE_YC_CONSUMABLES,
+                "type": "SingleLineText",
+                "value": p3yc_consumables or "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+        ]
+
+    return _order_parameters
+
+
+@pytest.fixture
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
         customer_id="",
@@ -1280,6 +1406,36 @@ def adobe_preview_transfer_factory(adobe_items_factory):
         }
 
     return _preview
+
+
+@pytest.fixture
+def adobe_reseller_change_preview_factory(
+        adobe_items_factory,
+    ):
+    def _preview(items=None, approval_expiry=None):
+        items = (
+            items
+            if items is not None
+            else adobe_items_factory(renewal_date=date.today().isoformat())
+        )
+        if approval_expiry is None:
+            approval_expiry = (date.today() + timedelta(days=5)).isoformat()
+        return {
+            "transferId": "",
+            "customerId": "P1005238996",
+            "resellerId": "P1000084165",
+            "approval": {
+                "code": "29595335",
+                "expiry": approval_expiry
+            },
+            "creationDate": "2025-07-21T12:00:27Z",
+            "status": "1002",
+            "totalCount": len(items),
+            "lineItems": items,
+        }
+
+    return _preview
+
 
 
 @pytest.fixture

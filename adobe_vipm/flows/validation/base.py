@@ -9,11 +9,11 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.order import reset_order_error
 from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
-from adobe_vipm.flows.utils.validation import is_migrate_customer
+from adobe_vipm.flows.utils.validation import is_migrate_customer, is_reseller_change
 from adobe_vipm.flows.validation.change import validate_change_order
 from adobe_vipm.flows.validation.purchase import validate_purchase_order
 from adobe_vipm.flows.validation.termination import validate_termination_order
-from adobe_vipm.flows.validation.transfer import validate_transfer
+from adobe_vipm.flows.validation.transfer import validate_reseller_change, validate_transfer
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,8 @@ def validate_order(client, order):
         def validate_purchase(client, order):
             if is_migrate_customer(order):
                 return validate_transfer(client, order)
+            elif is_reseller_change(order):
+                return validate_reseller_change(client, order)
             else:
                 return validate_purchase_order(client, order)
 
