@@ -832,6 +832,8 @@ def test_transfer_unexpected_status(
     order_factory,
     transfer_order_parameters_factory,
     adobe_transfer_factory,
+    mock_mpt_client,
+    mock_sync_agreements_by_agreement_ids,
 ):
     """
     Tests the processing of a transfer order when the Adobe transfer has been processed
@@ -862,7 +864,6 @@ def test_transfer_unexpected_status(
         "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
         return_value=None,
     )
-    mocked_mpt_client = mocker.MagicMock()
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(
@@ -870,13 +871,17 @@ def test_transfer_unexpected_status(
         external_ids={"vendor": "a-transfer-id"},
     )
 
-    fulfill_order(mocked_mpt_client, order)
+    fulfill_order(mock_mpt_client, order)
 
     mocked_fail_order.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         order["id"],
         ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status="9999"),
         parameters=order["parameters"],
+    )
+    mock_sync_agreements_by_agreement_ids.assert_called_once_with(
+        mock_mpt_client,
+        [agreement["id"]],
     )
 
 
@@ -887,6 +892,8 @@ def test_transfer_items_mismatch(
     transfer_order_parameters_factory,
     adobe_preview_transfer_factory,
     adobe_items_factory,
+    mock_mpt_client,
+    mock_sync_agreements_by_agreement_ids,
 ):
     """
     Tests a transfer order when the items contained in the order don't match
@@ -917,12 +924,11 @@ def test_transfer_items_mismatch(
         return_value=mocked_adobe_client,
     )
 
-    mocked_mpt_client = mocker.MagicMock()
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 
-    fulfill_order(mocked_mpt_client, order)
+    fulfill_order(mock_mpt_client, order)
 
     authorization_id = order["authorization"]["id"]
 
@@ -932,10 +938,14 @@ def test_transfer_items_mismatch(
     )
 
     mocked_fail_order.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         order["id"],
         ERR_MEMBERSHIP_ITEMS_DONT_MATCH.to_dict(lines="99999999CA"),
         parameters=order["parameters"],
+    )
+    mock_sync_agreements_by_agreement_ids.assert_called_once_with(
+        mock_mpt_client,
+        [agreement["id"]],
     )
 
 
@@ -1094,6 +1104,8 @@ def test_transfer_unrecoverable_status(
     transfer_order_parameters_factory,
     adobe_api_error_factory,
     transfer_status,
+    mock_sync_agreements_by_agreement_ids,
+    mock_mpt_client,
 ):
     """
     Tests a transfer order when it cannot be processed.
@@ -1134,12 +1146,11 @@ def test_transfer_unrecoverable_status(
         return_value=None,
     )
 
-    mocked_mpt_client = mocker.MagicMock()
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 
-    fulfill_order(mocked_mpt_client, order)
+    fulfill_order(mock_mpt_client, order)
 
     authorization_id = order["authorization"]["id"]
 
@@ -1148,10 +1159,14 @@ def test_transfer_unrecoverable_status(
         "a-membership-id",
     )
     mocked_fail_order.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         order["id"],
         ERR_ADOBE_TRANSFER_PREVIEW.to_dict(error=str(adobe_error)),
         parameters=order["parameters"],
+    )
+    mock_sync_agreements_by_agreement_ids.assert_called_once_with(
+        mock_mpt_client,
+        [agreement["id"]],
     )
 
 
@@ -1161,6 +1176,8 @@ def test_create_transfer_fail(
     order_factory,
     transfer_order_parameters_factory,
     adobe_preview_transfer_factory,
+    mock_mpt_client,
+    mock_sync_agreements_by_agreement_ids,
 ):
     """
     Tests generic failure on transfer order creation.
@@ -1190,20 +1207,23 @@ def test_create_transfer_fail(
         return_value=mocked_adobe_client,
     )
 
-    mocked_mpt_client = mocker.MagicMock()
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(order_parameters=transfer_order_parameters_factory())
 
-    fulfill_order(mocked_mpt_client, order)
+    fulfill_order(mock_mpt_client, order)
 
     order = reset_order_error(reset_ordering_parameters_error(order))
 
     mocked_fail_order.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         order["id"],
         ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error="Unexpected error"),
         parameters=order["parameters"],
+    )
+    mock_sync_agreements_by_agreement_ids.assert_called_once_with(
+        mock_mpt_client,
+        [agreement["id"]],
     )
 
 
@@ -1606,6 +1626,8 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     adobe_customer_factory,
     agreement,
     adobe_subscription_factory,
+    mock_mpt_client,
+    mock_sync_agreements_by_agreement_ids,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -1632,8 +1654,6 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     mocked_transfer.customer_benefits_3yc_status = None
 
     adobe_customer = adobe_customer_factory()
-    m_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -1682,22 +1702,22 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     )
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
-    fulfill_order(m_client, order)
+    fulfill_order(mock_mpt_client, order)
 
     mocked_process_order.assert_called_once_with(
-        m_client,
+        mock_mpt_client,
         order["id"],
         {"id": "TPL-0000"},
     )
     mocked_fail_order.assert_called_once_with(
-        m_client,
+        mock_mpt_client,
         order["id"],
         ERR_UPDATING_TRANSFER_ITEMS.to_dict(),
         parameters=order["parameters"],
     )
 
     assert mocked_update_order.mock_calls[0].args == (
-        m_client,
+        mock_mpt_client,
         order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
@@ -1708,6 +1728,10 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
             "ordering": order["parameters"]["ordering"],
         },
     }
+    mock_sync_agreements_by_agreement_ids.assert_called_once_with(
+        mock_mpt_client,
+        [agreement["id"]],
+    )
 
 
 @freeze_time("2012-01-14 12:00:01")
@@ -2156,6 +2180,7 @@ def test_fulfill_transfer_order_migration_synchronized(
     transfer_order_parameters_factory,
     adobe_authorizations_file,
     agreement,
+    mock_sync_agreements_by_agreement_ids,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -2209,6 +2234,10 @@ def test_fulfill_transfer_order_migration_synchronized(
         order["id"],
         ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED.to_dict(),
         parameters=order["parameters"],
+    )
+    mock_sync_agreements_by_agreement_ids.assert_called_once_with(
+        m_client,
+        [agreement["id"]],
     )
 
 
@@ -5932,6 +5961,8 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     adobe_order_factory,
     adobe_subscription_factory,
     agreement,
+    mock_sync_agreements_by_agreement_ids,
+    mock_mpt_client,
 ):
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
@@ -5976,9 +6007,6 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         ),
         external_ids={"vendor": "transfer-id"},
     )
-
-    m_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.add_subscription",
         return_value=subscriptions_factory(commitment_date="2024-08-04")[0],
@@ -6071,7 +6099,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         return_value=mocked_adobe_client,
     )
 
-    fulfill_order(m_client, order)
+    fulfill_order(mock_mpt_client, order)
 
     membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID.value)
 
@@ -6082,13 +6110,13 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     )
 
     mocked_process_order.assert_called_once_with(
-        m_client,
+        mock_mpt_client,
         order["id"],
         {"id": "TPL-0000"},
     )
 
     assert mocked_update_order.mock_calls[0].args == (
-        m_client,
+        mock_mpt_client,
         order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
@@ -6097,3 +6125,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
             "ordering": order["parameters"]["ordering"],
         },
     }
+    mock_sync_agreements_by_agreement_ids.assert_called_once_with(
+        mock_mpt_client,
+        [agreement["id"]],
+    )
