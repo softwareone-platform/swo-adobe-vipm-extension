@@ -2454,7 +2454,7 @@ def test_add_missing_subscriptions(
                             "externalIds": {"vendor": "65304578CA"},
                             "terms": {"period": "1y"},
                         },
-                        "price": {"unitPP": {"65304578CA01A12": 12.14}},
+                        "price": {"unitPP": 12.14},
                     }
                 ],
                 "name": "Subscription for {agreement['product']['name']}",
@@ -2491,7 +2491,7 @@ def test_add_missing_subscriptions(
                             "externalIds": {"vendor": "65304578CA"},
                             "terms": {"period": "1y"},
                         },
-                        "price": {"unitPP": {"65304578CA01A12": 12.14}},
+                        "price": {"unitPP": 12.14},
                     }
                 ],
                 "name": "Subscription for {agreement['product']['name']}",
