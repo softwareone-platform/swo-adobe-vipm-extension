@@ -178,12 +178,10 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     fulfillment_parameters = fulfillment_parameters_factory(
         customer_id="adobe-customer-id",
     )
-    fulfillment_parameters.append(
-        {
-            "externalId": Param.RETRY_COUNT.value,
-            "value": "1",
-        }
-    )
+    fulfillment_parameters.append({
+        "externalId": Param.RETRY_COUNT.value,
+        "value": "1",
+    })
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters,
         external_ids={"vendor": "adobe-order-id"},
@@ -1156,7 +1154,7 @@ def test_validate_3yc_commitment_item_not_found_validation(
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
 
-    step = Validate3YCCommitment(True)
+    step = Validate3YCCommitment(is_validation=True)
     step(mocked_client, context, mocked_next_step)
 
     mocked_next_step.assert_not_called()
@@ -1221,9 +1219,7 @@ def test_validate_3yc_commitment_below_minimum_licenses(
         },
     ]
 
-    order = order_factory(
-        lines=lines,
-    )
+    order = order_factory(lines=lines)
 
     context = Context(
         order=order,
@@ -1242,7 +1238,7 @@ def test_validate_3yc_commitment_below_minimum_licenses(
     )
 
     if is_validation:
-        step = Validate3YCCommitment(True)
+        step = Validate3YCCommitment(is_validation=True)
         step(mocked_client, context, mocked_next_step)
 
         mocked_next_step.assert_not_called()
@@ -1326,9 +1322,7 @@ def test_validate_3yc_commitment_below_minimum_consumables(
         },
     ]
 
-    order = order_factory(
-        lines=lines,
-    )
+    order = order_factory(lines=lines)
 
     context = Context(
         order=order,
@@ -1347,7 +1341,7 @@ def test_validate_3yc_commitment_below_minimum_consumables(
     )
 
     if is_validation:
-        step = Validate3YCCommitment(True)
+        step = Validate3YCCommitment(is_validation=True)
         step(mocked_client, context, mocked_next_step)
 
         mocked_next_step.assert_not_called()
@@ -1435,9 +1429,7 @@ def test_validate_3yc_commitment_below_minimum_consumables_and_licenses(
         },
     ]
 
-    order = order_factory(
-        lines=lines,
-    )
+    order = order_factory(lines=lines)
 
     context = Context(
         order=order,
@@ -1455,7 +1447,7 @@ def test_validate_3yc_commitment_below_minimum_consumables_and_licenses(
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
 
-    step = Validate3YCCommitment()
+    step = Validate3YCCommitment(is_validation=False)
     step(mocked_client, context, mocked_next_step)
     mocked_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once()

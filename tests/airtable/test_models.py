@@ -329,14 +329,12 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
 
 def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cache_factory):
     cache = defaultdict(list)
-    cache["sku-1"].append(
-        {
-            "currency": "currency",
-            "valid_from": date.fromisoformat("2024-01-01"),
-            "valid_until": date.fromisoformat("2025-01-01"),
-            "unit_pp": 12.44,
-        }
-    )
+    cache["sku-1"].append({
+        "currency": "currency",
+        "valid_from": date.fromisoformat("2024-01-01"),
+        "valid_until": date.fromisoformat("2025-01-01"),
+        "unit_pp": 12.44,
+    })
     mock_pricelist_cache_factory(cache=cache)
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -379,14 +377,12 @@ def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cach
 
 def test_get_prices_for_3yc_skus_just_cache(mocker, settings, mock_pricelist_cache_factory):
     cache = defaultdict(list)
-    cache["sku-1"].append(
-        {
-            "currency": "currency",
-            "valid_from": date.fromisoformat("2024-01-01"),
-            "valid_until": date.fromisoformat("2025-01-01"),
-            "unit_pp": 12.44,
-        }
-    )
+    cache["sku-1"].append({
+        "currency": "currency",
+        "valid_from": date.fromisoformat("2024-01-01"),
+        "valid_until": date.fromisoformat("2025-01-01"),
+        "unit_pp": 12.44,
+    })
     mock_pricelist_cache_factory(cache=cache)
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -464,9 +460,9 @@ def test_create_gc_agreement_deployments(mocker, settings):
 
     create_gc_agreement_deployments("product_id", agreement_deployment)
 
-    mocked_gc_agreement_deployment_model.batch_save.assert_called_once_with(
-        [mocked_gc_agreement_deployment]
-    )
+    mocked_gc_agreement_deployment_model.batch_save.assert_called_once_with([
+        mocked_gc_agreement_deployment
+    ])
 
     mocked_gc_agreement_deployment_model.assert_called_once_with(
         deployment_id=agreement_deployment[0]["deployment_id"],

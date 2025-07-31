@@ -1,6 +1,6 @@
 import copy
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from urllib.parse import urljoin
 
@@ -10,7 +10,7 @@ from freezegun import freeze_time
 from responses import matchers
 
 from adobe_vipm.adobe import client as adobe_client
-from adobe_vipm.adobe.config import Config
+from adobe_vipm.adobe.config import REQUIRED_API_SCOPES, Config
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
@@ -1678,7 +1678,7 @@ def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_conf
                     "grant_type": "client_credentials",
                     "client_id": authorization.client_id,
                     "client_secret": authorization.client_secret,
-                    "scope": ",".join(Config.REQUIRED_API_SCOPES),
+                    "scope": ",".join(REQUIRED_API_SCOPES),
                 },
             ),
         ],
@@ -1689,7 +1689,7 @@ def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_conf
         token = client._get_auth_token(authorization)
         assert isinstance(token, APIToken)
         assert token.token == "an-access-token"
-        assert token.expires == datetime.now() + timedelta(seconds=83000 - 180)
+        assert token.expires == datetime.now(tz=UTC) + timedelta(seconds=83000 - 180)
         assert client._token_cache[authorization] == token
 
 
@@ -2736,23 +2736,19 @@ def test_preview_reseller_change(
                     "Content-Type": "application/json",
                 },
             ),
-            matchers.json_params_matcher(
-                {
-                    "type": "RESELLER_CHANGE",
-                    "action": "PREVIEW",
-                    "approvalCode": change_code,
-                    "resellerId": (
-                        adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
-                    ),
-                    "requestedBy": admin_email,
-                }
-            ),
+            matchers.json_params_matcher({
+                "type": "RESELLER_CHANGE",
+                "action": "PREVIEW",
+                "approvalCode": change_code,
+                "resellerId": (
+                    adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+                ),
+                "requestedBy": admin_email,
+            }),
         ],
     )
 
-    result = client.preview_reseller_change(
-        authorization_uk, seller_id, change_code, admin_email
-    )
+    result = client.preview_reseller_change(authorization_uk, seller_id, change_code, admin_email)
     assert result == expected_response
 
 
@@ -2761,15 +2757,13 @@ def test_preview_reseller_change_bad_request(
     settings,
     adobe_client_factory,
     adobe_authorizations_file,
-    adobe_api_error_factory
+    adobe_api_error_factory,
 ):
     """
     Tests the preview of a reseller change when the response is 400 bad request.
     """
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
-    seller_id = (
-        adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
-    )
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
     change_code = "a-change-code"
     admin_email = "admin@example.com"
 
@@ -2787,9 +2781,8 @@ def test_preview_reseller_change_bad_request(
     )
 
     import pytest
+
     with pytest.raises(Exception) as cv:
-        client.preview_reseller_change(
-            authorization_uk, seller_id, change_code, admin_email
-        )
+        client.preview_reseller_change(authorization_uk, seller_id, change_code, admin_email)
 
     assert repr(cv.value) == str(error)

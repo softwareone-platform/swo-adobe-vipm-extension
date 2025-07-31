@@ -1410,8 +1410,8 @@ def adobe_preview_transfer_factory(adobe_items_factory):
 
 @pytest.fixture
 def adobe_reseller_change_preview_factory(
-        adobe_items_factory,
-    ):
+    adobe_items_factory,
+):
     def _preview(items=None, approval_expiry=None):
         items = (
             items
@@ -1424,10 +1424,7 @@ def adobe_reseller_change_preview_factory(
             "transferId": "",
             "customerId": "P1005238996",
             "resellerId": "P1000084165",
-            "approval": {
-                "code": "29595335",
-                "expiry": approval_expiry
-            },
+            "approval": {"code": "29595335", "expiry": approval_expiry},
             "creationDate": "2025-07-21T12:00:27Z",
             "status": "1002",
             "totalCount": len(items),
@@ -1435,7 +1432,6 @@ def adobe_reseller_change_preview_factory(
         }
 
     return _preview
-
 
 
 @pytest.fixture
@@ -1483,7 +1479,7 @@ def adobe_client_factory(
         )
         api_token = APIToken(
             "a-token",
-            expires=datetime.now() + timedelta(seconds=86000),
+            expires=datetime.now(tz=UTC) + timedelta(seconds=86000),
         )
         client = AdobeClient()
         client._token_cache[authorization] = api_token
@@ -1568,19 +1564,17 @@ def created_agreement_factory():
             "termsAndConditions": [],
         }
         if is_profile_address_exists:
-            created_agreement["parameters"]["ordering"].append(
-                {
-                    "externalId": "address",
-                    "value": {
-                        "addressLine1": "addressLine1",
-                        "addressLine2": "addressLine2",
-                        "city": "city",
-                        "country": "US",
-                        "postCode": "postalCode",
-                        "state": "region",
-                    },
-                }
-            )
+            created_agreement["parameters"]["ordering"].append({
+                "externalId": "address",
+                "value": {
+                    "addressLine1": "addressLine1",
+                    "addressLine2": "addressLine2",
+                    "city": "city",
+                    "country": "US",
+                    "postCode": "postalCode",
+                    "state": "region",
+                },
+            })
         return created_agreement
 
     return _created_agreement

@@ -19,7 +19,7 @@ class Command(BaseCommand):
         self.info("Start processing agreements...")
         client = setup_client()
         self.info("Checking pending commitment requests...")
-        check_3yc_commitment_request(client)
+        check_3yc_commitment_request(client, is_recommitment=False)
         self.info("Checking pending recommitment requests...")
         check_3yc_commitment_request(client, is_recommitment=True)
         self.info("Submit recommitment requests...")

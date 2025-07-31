@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from freezegun import freeze_time
@@ -382,7 +382,8 @@ def test_transfer(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -685,7 +686,8 @@ def test_transfer_with_no_profile_address(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -1223,7 +1225,7 @@ def test_create_transfer_fail(
     )
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_already_migrated(
     mocker,
     order_factory,
@@ -1394,7 +1396,7 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1, tzinfo=UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -1420,7 +1422,7 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
     mocker,
     order_factory,
@@ -1582,7 +1584,7 @@ def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
     )
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1, tzinfo=UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -1729,7 +1731,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     )
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_already_migrated_3yc(
     mocker,
     order_factory,
@@ -1911,7 +1913,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     }
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1, tzinfo=UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -1932,7 +1934,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     mocked_adobe_client.update_subscription.assert_not_called()
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_already_migrated_(
     mocker,
     order_factory,
@@ -2078,7 +2080,7 @@ def test_fulfill_transfer_order_already_migrated_(
     )
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1, tzinfo=UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -2515,7 +2517,8 @@ def test_transfer_3yc_customer(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -2776,7 +2779,8 @@ def test_transfer_3yc_customer_with_no_profile_address(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -3103,7 +3107,7 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
     }
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_update_transfer_status_step(
     mocker,
     order_factory,
@@ -3138,7 +3142,7 @@ def test_update_transfer_status_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1, tzinfo=UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -3485,7 +3489,8 @@ def test_transfer_gc_account_all_deployments_created(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
     mocked_get_gc_agreement_deployments_by_main_agreement()
     mocked_get_gc_main_agreement.assert_called_once_with(
@@ -3835,7 +3840,8 @@ def test_transfer_gc_account_no_deployments(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
     assert mocked_get_gc_main_agreement.mock_calls[0].args == (
         "PRD-1111-1111",
@@ -5101,7 +5107,7 @@ def test_sync_gc_main_agreement_step(
     mocked_gc_main_agreement.main_agreement_id = "agr-id"
     mocked_gc_main_agreement.status = STATUS_GC_PENDING
 
-    step = SyncGCMainAgreement(mocked_transfer, mocked_gc_main_agreement, STATUS_GC_TRANSFERRED)
+    step = SyncGCMainAgreement(mocked_transfer, mocked_gc_main_agreement)
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_gc_main_agreement.status == STATUS_GC_TRANSFERRED
@@ -5785,7 +5791,8 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
     assert mocked_get_gc_main_agreement.mock_calls[0].args == (
         "PRD-1111-1111",
