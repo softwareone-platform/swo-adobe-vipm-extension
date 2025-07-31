@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import cache, lru_cache
+from functools import cache
 
 from django.conf import settings
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
@@ -679,7 +679,6 @@ def get_sku_adobe_mapping_model(
         segment = fields.SelectField("segment")
         name = fields.TextField("name")
         type_3yc = fields.SelectField("type_3yc")
-        end_of_sale = fields.CheckboxField("end_of_sale")
 
         class Meta:
             table_name = "SKU Mapping"
@@ -716,9 +715,6 @@ def get_sku_adobe_mapping_model(
             """
             return self.is_consumable() or self.is_license()
 
-        def is_end_of_sale(self):
-            return bool(self.end_of_sale)
-
     return AdobeProductMapping
 
 
@@ -745,8 +741,3 @@ def get_adobe_sku(
     vendor_item_id,
 ):  # TODO: start using this to avoid multiple, unnecessary requests to Airtable.
     return get_adobe_product_by_marketplace_sku(vendor_item_id).sku
-
-
-@lru_cache(maxsize=1900)
-def is_sku_end_of_sale(vendor_item_id: str, _age_hash_date_do_not_remove: int) -> bool:
-    return get_adobe_product_by_marketplace_sku(vendor_item_id).end_of_sale
