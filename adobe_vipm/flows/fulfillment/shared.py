@@ -187,7 +187,7 @@ def switch_order_to_failed(client, order, error):
     )
     order["agreement"] = agreement
     send_mpt_notification(client, order)
-    sync_agreements_by_agreement_ids(client, [agreement["id"]])
+    sync_agreements_by_agreement_ids(client, [agreement["id"]], dry_run=False, sync_prices=False)
     return order
 
 
@@ -953,7 +953,9 @@ class CompleteOrder(Step):
 
 class SyncAgreement(Step):
     def __call__(self, client, context, next_step):
-        sync_agreements_by_agreement_ids(client, [context.agreement_id])
+        sync_agreements_by_agreement_ids(
+            client, [context.agreement_id], dry_run=False, sync_prices=True
+        )
         logger.info(f"{context}: agreement synchoronized")
         next_step(client, context)
 

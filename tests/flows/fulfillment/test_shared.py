@@ -1796,8 +1796,7 @@ def test_sync_agreement_step(mocker, order_factory):
     step(mocked_client, context, mocked_next_step)
 
     mocked_sync.assert_called_once_with(
-        mocked_client,
-        [context.agreement_id],
+        mocked_client, [context.agreement_id], dry_run=False, sync_prices=True
     )
 
     mocked_next_step.assert_called_once_with(mocked_client, context)

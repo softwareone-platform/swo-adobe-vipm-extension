@@ -34,6 +34,12 @@ class Command(BaseCommand):
             default=False,
             help="Test synchronization without making changes",
         )
+        parser.add_argument(
+            "--sync_prices",
+            action="store_false",
+            default=False,
+            help="Force prices sync",
+        )
 
     def success(self, message):
         self.stdout.write(self.style.SUCCESS(message), ending="\n")
@@ -45,7 +51,9 @@ class Command(BaseCommand):
         self.info("Start processing agreements...")
         client = setup_client()
         if options["agreements"]:
-            sync_agreements_by_agreement_ids(client, options["agreements"], options["dry_run"])
+            sync_agreements_by_agreement_ids(
+                client, options["agreements"], options["dry_run"], options["sync_prices"]
+            )
         elif options["all"]:
             sync_all_agreements(client, options["dry_run"])
         else:
