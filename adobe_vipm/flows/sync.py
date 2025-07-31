@@ -18,6 +18,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     update_agreement,
     update_agreement_subscription,
 )
+from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
@@ -34,9 +35,9 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
-    exclude_subscriptions_with_deployment_id,
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
+    get_deployment_id,
     get_deployments,
     get_global_customer,
     get_parameter,
@@ -57,11 +58,13 @@ def _add_missing_subscriptions(
     customer: dict,
     agreement: dict,
     subscriptions_for_update: set[str],
+    customer_subscriptions,
 ) -> None:
+    deployment_id = get_deployment_id(agreement["parameters"]).get("value", "")
     logger.info(f"Checking missing subscriptions for {agreement["id"]=}")
-    adobe_subscriptions = exclude_subscriptions_with_deployment_id(
-        adobe_client.get_subscriptions(agreement["authorization"]["id"], customer["customerId"])
-    )["items"]
+    adobe_subscriptions = [
+        item for item in customer_subscriptions if item.get("deploymentId", "") == deployment_id
+    ]
 
     missing_subscriptions = tuple(
         s
@@ -159,7 +162,12 @@ def _add_missing_subscriptions(
 
 
 def sync_agreement_prices(
-    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict, dry_run: bool
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    agreement: dict,
+    customer: dict,
+    customer_subscriptions,
+    dry_run: bool,
 ) -> None:
     """
     Updates the purchase prices of an Agreement (subscriptions and One-Time items)
@@ -168,7 +176,7 @@ def sync_agreement_prices(
     commitment_start_date = get_commitment_start_date(customer)
 
     subscriptions_for_update = _get_subscriptions_for_update(
-        mpt_client, adobe_client, agreement, customer
+        mpt_client, agreement, customer, customer_subscriptions
     )
 
     _add_missing_subscriptions(
@@ -177,6 +185,7 @@ def sync_agreement_prices(
         customer,
         agreement,
         subscriptions_for_update={s[1]["subscriptionId"] for s in subscriptions_for_update},
+        customer_subscriptions=customer_subscriptions,
     )
 
     product_id = agreement["product"]["id"]
@@ -372,7 +381,7 @@ def _update_subscriptions(
 
 
 def _get_subscriptions_for_update(
-    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
+    mpt_client: MPTClient, agreement: dict, customer: dict, customer_subscriptions
 ) -> list[tuple[dict, dict, str]]:
     logger.info(f"Getting subscriptions for update for {agreement['id']=}")
     for_update = []
@@ -384,11 +393,13 @@ def _get_subscriptions_for_update(
         subscription = get_agreement_subscription(mpt_client, subscription["id"])
         adobe_subscription_id = subscription["externalIds"]["vendor"]
 
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id=agreement["authorization"]["id"],
-            customer_id=get_adobe_customer_id(agreement),
-            subscription_id=adobe_subscription_id,
+        adobe_subscription = find_first(
+            lambda x: x.get("subscriptionId", "") == adobe_subscription_id, customer_subscriptions
         )
+
+        if not adobe_subscription:
+            logger.error("No subscription found in Adobe customer data!")
+            continue
 
         actual_sku = adobe_subscription["offerId"]
 
@@ -653,8 +664,14 @@ def sync_agreement(mpt_client, agreement, dry_run, sync_prices=False):
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
 
+        customer_subscriptions = adobe_client.get_subscriptions(
+            agreement["authorization"]["id"], customer["customerId"]
+        )["items"]
+
         if sync_prices:
-            sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run)
+            sync_agreement_prices(
+                mpt_client, adobe_client, agreement, customer, customer_subscriptions, dry_run
+            )
         else:
             logger.info(f"Skipping price sync - {sync_prices=}.")
 
@@ -672,6 +689,7 @@ def sync_agreement(mpt_client, agreement, dry_run, sync_prices=False):
                 agreement,
                 customer,
                 customer_deployments,
+                customer_subscriptions,
                 dry_run,
                 sync_prices,
             )
@@ -705,6 +723,7 @@ def sync_deployments_prices(
     main_agreement,
     customer,
     customer_deployments,
+    customer_subscriptions,
     dry_run,
     sync_prices,
 ):
@@ -719,7 +738,14 @@ def sync_deployments_prices(
 
     for deployment_agreement in deployment_agreements:
         if sync_prices:
-            sync_agreement_prices(mpt_client, adobe_client, deployment_agreement, customer, dry_run)
+            sync_agreement_prices(
+                mpt_client,
+                adobe_client,
+                deployment_agreement,
+                customer,
+                customer_subscriptions,
+                dry_run,
+            )
         else:
             logger.info(f"Skipping price sync - {sync_prices=}.")
 

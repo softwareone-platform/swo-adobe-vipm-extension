@@ -2313,7 +2313,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
 
     assert (
         _get_subscriptions_for_update(
-            mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
+            mock_mpt_client, agreement_factory(), adobe_customer_factory(), customer_subscriptions
         )
         == []
     )
@@ -2336,7 +2336,7 @@ def test_get_subscriptions_for_update_terminated(
     )
 
     _get_subscriptions_for_update(
-        mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
+        mock_mpt_client, agreement_factory(), adobe_customer_factory(), customer_subscriptions
     )
 
     mock_get_agreement_subscription.assert_called_once_with(
@@ -2371,6 +2371,7 @@ def test_add_missing_subscriptions_none(
         adobe_customer,
         agreement_factory(),
         subscriptions_for_update=("subscriptionId2", "subscriptionId1", "subscriptionId0"),
+        customer_subscriptions=customer_subscriptions,
     )
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
@@ -2407,6 +2408,7 @@ def test_add_missing_subscriptions(
         adobe_customer,
         agreement_factory(),
         subscriptions_for_update=("subscriptionId1", "b-sub-id"),
+        customer_subscriptions=customer_subscriptions,
     )
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
@@ -2521,6 +2523,7 @@ def test_add_missing_subscriptions_wrong_currency(
         adobe_customer,
         agreement_factory(),
         subscriptions_for_update=("subscriptionId1", "subscriptionId0"),
+        customer_subscriptions=customer_subscriptions,
     )
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
