@@ -58,6 +58,7 @@ def test_process_all(mocker, dry_run):
         "sync_agreements",
         all=True,
         dry_run=dry_run,
+        sync_prices=True,
     )
 
     mocked.assert_called_once_with(mocked_client, dry_run)
