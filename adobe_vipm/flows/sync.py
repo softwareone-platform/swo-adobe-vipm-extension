@@ -34,9 +34,9 @@ from adobe_vipm.airtable.models import (
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
-    exclude_subscriptions_with_deployment_id,
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
+    get_deployment_id,
     get_deployments,
     get_global_customer,
     get_parameter,
@@ -58,10 +58,15 @@ def _add_missing_subscriptions(
     agreement: dict,
     subscriptions_for_update: set[str],
 ) -> None:
-    logger.info(f"Checking missing subscriptions for {agreement["id"]=}")
-    adobe_subscriptions = exclude_subscriptions_with_deployment_id(
-        adobe_client.get_subscriptions(agreement["authorization"]["id"], customer["customerId"])
-    )["items"]
+    deployment_id = get_deployment_id(agreement) or ""
+    logger.info(f"Checking missing subscriptions for {agreement["id"]=}, {deployment_id=}")
+    adobe_subscriptions = [
+        i
+        for i in adobe_client.get_subscriptions(
+            agreement["authorization"]["id"], customer["customerId"]
+        )["items"]
+        if i.get("deploymentId", "") == deployment_id
+    ]
 
     missing_subscriptions = tuple(
         s
