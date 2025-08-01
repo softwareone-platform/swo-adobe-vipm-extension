@@ -2493,6 +2493,84 @@ def test_add_missing_subscriptions(
     ]
 
 
+@freeze_time("2025-07-24")
+def test_add_missing_subscriptions_deployment(
+    mocker,
+    items_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_get_prices_for_skus,
+    mock_get_product_items_by_skus,
+    fulfillment_parameters_factory,
+    mock_create_agreement_subscription,
+    mock_notify_processing_lost_customer,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(4)
+    ]
+    adobe_subscriptions[-1]["deploymentId"] = "deploymentId"
+    mock_adobe_client.get_subscriptions.return_value = {"items": adobe_subscriptions}
+    adobe_customer = adobe_customer_factory()
+    mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
+
+    _add_missing_subscriptions(
+        mock_mpt_client,
+        mock_adobe_client,
+        adobe_customer,
+        agreement_factory(
+            fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
+        ),
+        subscriptions_for_update=("subscriptionId1", "b-sub-id"),
+    )
+
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        "AUT-1234-5678", adobe_customer["customerId"]
+    )
+    mock_get_product_items_by_skus.assert_called_once_with(
+        mock_mpt_client, "PRD-1111-1111", ["65304578CA"]
+    )
+    mock_create_agreement_subscription.assert_called_once_with(
+        mock_mpt_client,
+        {
+            "status": SubscriptionStatus.ACTIVE.value,
+            "commitmentDate": "2026-07-25",
+            "price": {"unitPP": {"65304578CA01A12": 12.14}},
+            "parameters": {
+                "fulfillment": [
+                    {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"},
+                    {"externalId": Param.CURRENT_QUANTITY.value, "value": "10"},
+                    {"externalId": Param.RENEWAL_QUANTITY.value, "value": "10"},
+                    {"externalId": Param.RENEWAL_DATE.value, "value": "2026-07-25"},
+                ]
+            },
+            "agreement": {"id": "AGR-2119-4550-8674-5962"},
+            "buyer": {"id": "BUY-3731-7971"},
+            "licensee": {"id": "LC-321-321-321"},
+            "seller": {"id": "SEL-9121-8944"},
+            "lines": [
+                {
+                    "quantity": 10,
+                    "item": {
+                        "id": "ITM-1234-1234-1234-0001",
+                        "name": "Awesome product",
+                        "externalIds": {"vendor": "65304578CA"},
+                        "terms": {"period": "1y"},
+                    },
+                    "price": {"unitPP": 12.14},
+                }
+            ],
+            "name": "Subscription for {agreement['product']['name']}",
+            "startDate": "2019-05-20T22:49:55Z",
+            "externalIds": {"vendor": "subscriptionId3"},
+            "product": {"id": "PRD-1111-1111"},
+            "autoRenew": True,
+        },
+    )
+
+
 @freeze_time("2025-07-27")
 def test_add_missing_subscriptions_wrong_currency(
     mock_mpt_client,
