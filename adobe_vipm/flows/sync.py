@@ -149,7 +149,7 @@ def _add_missing_subscriptions(
                         **price_component,
                     }
                 ],
-                "name": "Subscription for {agreement['product']['name']}",
+                "name": f"Subscription for {agreement['product']['name']}",
                 "startDate": adobe_subscription["creationDate"],
                 "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
                 "product": {"id": agreement["product"]["id"]},
@@ -170,7 +170,6 @@ def sync_agreement_prices(
     subscriptions_for_update = _get_subscriptions_for_update(
         mpt_client, adobe_client, agreement, customer
     )
-
     _add_missing_subscriptions(
         mpt_client,
         adobe_client,
@@ -271,6 +270,8 @@ def _log_agreement_lines(
 ) -> None:
     agreement_lines = []
     for line in agreement["lines"]:
+        if line["item"]["externalIds"]["vendor"] == "adobe-reseller-transfer":
+            continue
         actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
         agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
 
