@@ -30,7 +30,6 @@ from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_sku_price,
-    is_sku_end_of_sale,
 )
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
@@ -376,7 +375,6 @@ def _get_subscriptions_for_update(
     mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
 ) -> list[tuple[dict, dict, str]]:
     logger.info(f"Getting subscriptions for update for {agreement['id']=}")
-    today_date = datetime.now().date().isoformat()
     for_update = []
 
     for subscription in agreement["subscriptions"]:
@@ -396,27 +394,11 @@ def _get_subscriptions_for_update(
 
         if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
             logger.info(f"Processing terminated Adobe subscription {adobe_subscription_id}.")
-            if is_sku_end_of_sale(get_partial_sku(actual_sku), today_date):
-                logger.info(
-                    "> The subscription is End Of Sale, terminating subscription."
-                    f" {subscription['id']}."
-                )
-                terminate_subscription(
-                    mpt_client,
-                    subscription["id"],
-                    "Adobe subscription status 1004.",
-                )
-            else:
-                logger.info(
-                    "> The subscription not End Of Sale, expiring subscription."
-                    f" {subscription['id']}."
-                )
-                update_agreement_subscription(
-                    mpt_client,
-                    subscription["id"],
-                    status=SubscriptionStatus.EXPIRED,
-                )
-
+            terminate_subscription(
+                mpt_client,
+                subscription["id"],
+                "Adobe subscription status 1004.",
+            )
             continue
 
         for_update.append(

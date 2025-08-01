@@ -1410,8 +1410,8 @@ def adobe_preview_transfer_factory(adobe_items_factory):
 
 @pytest.fixture
 def adobe_reseller_change_preview_factory(
-        adobe_items_factory,
-    ):
+    adobe_items_factory,
+):
     def _preview(items=None, approval_expiry=None):
         items = (
             items
@@ -1424,10 +1424,7 @@ def adobe_reseller_change_preview_factory(
             "transferId": "",
             "customerId": "P1005238996",
             "resellerId": "P1000084165",
-            "approval": {
-                "code": "29595335",
-                "expiry": approval_expiry
-            },
+            "approval": {"code": "29595335", "expiry": approval_expiry},
             "creationDate": "2025-07-21T12:00:27Z",
             "status": "1002",
             "totalCount": len(items),
@@ -1435,7 +1432,6 @@ def adobe_reseller_change_preview_factory(
         }
 
     return _preview
-
 
 
 @pytest.fixture
@@ -2128,7 +2124,6 @@ def mock_sku_mapping_data():
             "segment": "segment_1",
             "name": "name_1",
             "type_3yc": "License",
-            "end_of_sale": False,
         },
         {
             "vendor_external_id": "77777777CA",
@@ -2136,7 +2131,6 @@ def mock_sku_mapping_data():
             "segment": "segment_2",
             "name": "name_2",
             "type_3yc": "Consumable",
-            "end_of_sale": False,
         },
     ]
 

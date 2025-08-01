@@ -25,11 +25,6 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
 @pytest.fixture(autouse=True)
-def mock_is_sku_end_of_sale(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.is_sku_end_of_sale", return_value=False, spec=True)
-
-
-@pytest.fixture(autouse=True)
 def mock_add_missing_subscriptions(mocker):
     return mocker.patch("adobe_vipm.flows.sync._add_missing_subscriptions", spec=True)
 
@@ -2004,6 +1999,8 @@ def test_sync_agreement_prices_with_missing_prices(
     adobe_subscription_factory,
     adobe_customer_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    mock_terminate_subscription,
+    mock_mpt_client,
     caplog,
 ):
     """
@@ -2068,9 +2065,6 @@ def test_sync_agreement_prices_with_missing_prices(
         renewal_quantity=10,
         status="1004",
     )
-
-    mocked_mpt_client = mocker.MagicMock()
-
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.side_effect = [
         adobe_subscription,
@@ -2118,7 +2112,7 @@ def test_sync_agreement_prices_with_missing_prices(
     )
 
     with caplog.at_level(logging.ERROR):
-        sync_agreement(mocked_mpt_client, agreement, False, True)
+        sync_agreement(mock_mpt_client, agreement, False, True)
 
     assert "Skipping subscription" in caplog.text
     assert "65304578CA01A12" in caplog.text
@@ -2132,12 +2126,12 @@ def test_sync_agreement_prices_with_missing_prices(
 
     mocked_update_agreement.call_args_list = [
         mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             agreement["id"],
             lines=agreement["lines"],
         ),
         mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             agreement["id"],
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-19"}]},
         ),
@@ -2146,12 +2140,7 @@ def test_sync_agreement_prices_with_missing_prices(
     assert len(mocked_adobe_client.get_subscription.call_args_list) == 3
     assert mocked_update_agreement_subscription.mock_calls == [
         mocker.call(
-            mocked_mpt_client,
-            terminated_mpt_subscription["id"],
-            status=SubscriptionStatus.EXPIRED.value,
-        ),
-        mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             another_mpt_subscription["id"],
             lines=[{"price": {"unitPP": 20.22}, "id": "ALI-2119-4550-8674-5962-0001"}],
             parameters={
@@ -2167,6 +2156,9 @@ def test_sync_agreement_prices_with_missing_prices(
             autoRenew=True,
         ),
     ]
+    mock_terminate_subscription.assert_called_once_with(
+        mock_mpt_client, "SUB-1000-2000-6000", "Adobe subscription status 1004."
+    )
 
 
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
@@ -2328,48 +2320,12 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
 
 
 @freeze_time("2025-07-23")
-def test_get_subscriptions_for_update_end_sale(
+def test_get_subscriptions_for_update_terminated(
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
     subscriptions_factory,
     adobe_customer_factory,
-    mock_is_sku_end_of_sale,
-    adobe_subscription_factory,
-    mock_terminate_subscription,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
-):
-    mock_is_sku_end_of_sale.return_value = True
-    adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.SUBSCRIPTION_TERMINATED.value
-    )
-    mock_adobe_client.get_subscription.return_value = adobe_subscription
-
-    _get_subscriptions_for_update(
-        mock_mpt_client, mock_adobe_client, agreement_factory(), adobe_customer_factory()
-    )
-
-    mock_get_agreement_subscription.assert_called_once_with(
-        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
-    )
-    mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
-    mock_terminate_subscription.assert_called_once_with(
-        mock_mpt_client,
-        mock_get_agreement_subscription.return_value["id"],
-        "Adobe subscription status 1004.",
-    )
-    mock_update_agreement_subscription.assert_not_called()
-
-
-@freeze_time("2025-07-23")
-def test_get_subscriptions_for_update_not_end_sale(
-    mock_mpt_client,
-    mock_adobe_client,
-    agreement_factory,
-    subscriptions_factory,
-    adobe_customer_factory,
-    mock_is_sku_end_of_sale,
     adobe_subscription_factory,
     mock_terminate_subscription,
     mock_get_agreement_subscription,
@@ -2386,13 +2342,12 @@ def test_get_subscriptions_for_update_not_end_sale(
     mock_get_agreement_subscription.assert_called_once_with(
         mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
     )
-    mock_is_sku_end_of_sale.assert_called_once_with("65304578CA", "2025-07-23")
-    mock_update_agreement_subscription.assert_called_once_with(
+    mock_terminate_subscription.assert_called_once_with(
         mock_mpt_client,
         mock_get_agreement_subscription.return_value["id"],
-        status=SubscriptionStatus.EXPIRED.value,
+        "Adobe subscription status 1004.",
     )
-    mock_terminate_subscription.assert_not_called()
+    mock_update_agreement_subscription.assert_not_called()
 
 
 def test_add_missing_subscriptions_none(
