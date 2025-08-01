@@ -3,6 +3,7 @@ import datetime as dt
 import logging
 import sys
 import traceback
+from collections.abc import Sequence
 
 from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -18,6 +19,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     update_agreement,
     update_agreement_subscription,
 )
+from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
@@ -57,6 +59,7 @@ def _add_missing_subscriptions(
     customer: dict,
     agreement: dict,
     subscriptions_for_update: set[str],
+    customer_subscriptions,
 ) -> None:
     deployment_id = get_deployment_id(agreement) or ""
     logger.info(
@@ -66,9 +69,7 @@ def _add_missing_subscriptions(
     )
     adobe_subscriptions = [
         line_item
-        for line_item in adobe_client.get_subscriptions(
-            agreement["authorization"]["id"], customer["customerId"]
-        )["items"]
+        for line_item in customer_subscriptions
         if line_item.get("deploymentId", "") == deployment_id
     ]
 
@@ -173,6 +174,7 @@ def sync_agreement_prices(
     adobe_client: AdobeClient,
     agreement: dict,
     customer: dict,
+    customer_subscriptions: Sequence[dict],
     *,
     dry_run: bool,
 ) -> None:
@@ -186,12 +188,13 @@ def sync_agreement_prices(
         adobe_client: Adobe API client.
         agreement: MPT agreement.
         customer: Adobe customer.
+        customer_subscriptions: list of subscriptions for customer from Adobe.
         dry_run: Run command in a dry run mode
     """
     commitment_start_date = get_commitment_start_date(customer)
 
     subscriptions_for_update = _get_subscriptions_for_update(
-        mpt_client, adobe_client, agreement, customer
+        mpt_client, agreement, customer, customer_subscriptions
     )
 
     _add_missing_subscriptions(
@@ -200,6 +203,7 @@ def sync_agreement_prices(
         customer,
         agreement,
         subscriptions_for_update={sub[1]["subscriptionId"] for sub in subscriptions_for_update},
+        customer_subscriptions=customer_subscriptions,
     )
 
     product_id = agreement["product"]["id"]
@@ -239,12 +243,10 @@ def _update_agreement(
                 })
             if mq["offerType"] == "CONSUMABLES":
                 parameters.setdefault(Param.PHASE_ORDERING.value, [])
-                parameters[Param.PHASE_ORDERING.value].append(
-                    {
-                        "externalId": Param.THREE_YC_CONSUMABLES.value,
-                        "value": str(mq.get("quantity")),
-                    }
-                )
+                parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_CONSUMABLES.value,
+                    "value": str(mq.get("quantity")),
+                })
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -424,7 +426,10 @@ def _update_subscriptions(
 
 
 def _get_subscriptions_for_update(
-    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
+    mpt_client: MPTClient,
+    agreement: dict,
+    customer: dict,
+    customer_subscriptions: Sequence[dict],
 ) -> list[tuple[dict, dict, str]]:
     logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
     for_update = []
@@ -436,11 +441,14 @@ def _get_subscriptions_for_update(
         subscription = get_agreement_subscription(mpt_client, sub["id"])
         adobe_subscription_id = subscription["externalIds"]["vendor"]
 
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id=agreement["authorization"]["id"],
-            customer_id=get_adobe_customer_id(agreement),
-            subscription_id=adobe_subscription_id,
+        adobe_subscription = find_first(
+            lambda x, subscr_id=adobe_subscription_id: x.get("subscriptionId", "") == subscr_id,
+            customer_subscriptions,
         )
+
+        if not adobe_subscription:
+            logger.error("No subscription found in Adobe customer data!")
+            continue
 
         actual_sku = adobe_subscription["offerId"]
 
@@ -793,8 +801,19 @@ def sync_agreement(  # noqa: C901
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
 
+        customer_subscriptions = adobe_client.get_subscriptions(
+            agreement["authorization"]["id"], customer["customerId"]
+        )["items"]
+
         if sync_prices:
-            sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run=dry_run)
+            sync_agreement_prices(
+                mpt_client,
+                adobe_client,
+                agreement,
+                customer,
+                customer_subscriptions,
+                dry_run=dry_run,
+            )
         else:
             logger.info("Skipping price sync - sync_prices %s.", sync_prices)
 
@@ -812,6 +831,7 @@ def sync_agreement(  # noqa: C901
                 agreement,
                 customer,
                 customer_deployments,
+                customer_subscriptions,
                 dry_run=dry_run,
                 sync_prices=sync_prices,
             )
@@ -848,6 +868,7 @@ def sync_deployments_prices(
     main_agreement: dict,
     customer: dict,
     customer_deployments: list[dict],
+    customer_subscriptions: Sequence[dict],
     *,
     dry_run: bool,
     sync_prices: bool,
@@ -861,8 +882,9 @@ def sync_deployments_prices(
         main_agreement: Main MPT agreement.
         customer: Adobe customer.
         customer_deployments: Adobe customer deployments.
-        dry_run: If True doesn't update agreement.
-        sync_prices: If True also sync prices. Keep in mind dry_run parameter also.
+        customer_subscriptions: list of subscriptions for customer from Adobe.
+        dry_run: Run command in a dry run mode.
+        sync_prices: If True also sync prices.
     """
     if not customer_deployments:
         return
@@ -880,6 +902,7 @@ def sync_deployments_prices(
                 adobe_client,
                 deployment_agreement,
                 customer,
+                customer_subscriptions,
                 dry_run=dry_run,
             )
         else:

@@ -2108,9 +2108,15 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
 
 
 @pytest.fixture
-def mock_get_adobe_product_by_marketplace_sku(mock_get_sku_adobe_mapping_model):
+def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):
     def get_adobe_product_by_marketplace_sku(sku):
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        new=get_adobe_product_by_marketplace_sku,
+        spec=True,
+    )
 
     return get_adobe_product_by_marketplace_sku
 
