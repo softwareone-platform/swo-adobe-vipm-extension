@@ -43,12 +43,17 @@ def test_sync_agreement_prices(
     adobe_subscription_factory,
     adobe_customer_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    mock_add_missing_subscriptions,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_get_adobe_client,
+    fulfillment_parameters_factory,
 ):
     mocker.patch(
         "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
-
+    customer = adobe_customer_factory(coterm_date="2025-04-04")
     agreement = agreement_factory(
         lines=lines_factory(
             external_vendor_id="77777777CA",
@@ -77,6 +82,7 @@ def test_sync_agreement_prices(
                 },
             },
         ],
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id=customer["customerId"]),
     )
     mpt_subscription = subscriptions_factory()[0]
     another_mpt_subscription = subscriptions_factory(
@@ -93,25 +99,15 @@ def test_sync_agreement_prices(
     )
 
     authorization_id = agreement["authorization"]["id"]
-    customer_id = get_adobe_customer_id(agreement)
-
-    mocked_mpt_client = mocker.MagicMock()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.side_effect = [
+    mock_adobe_client.get_subscription.side_effect = [
         adobe_subscription,
         another_adobe_subscription,
     ]
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
+    mock_adobe_client.get_customer.return_value = customer
 
     mocker.patch(
         "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_client",
-        return_value=mocked_adobe_client,
     )
 
     mocked_get_agreement_subscription = mocker.patch(
@@ -135,34 +131,34 @@ def test_sync_agreement_prices(
         "adobe_vipm.flows.sync.update_agreement",
     )
 
-    sync_agreement(mocked_mpt_client, agreement, False, True)
+    sync_agreement(mock_mpt_client, agreement, False, True)
 
     assert mocked_get_agreement_subscription.call_args_list == [
         mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             mpt_subscription["id"],
         ),
         mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             another_mpt_subscription["id"],
         ),
     ]
-    assert mocked_adobe_client.get_subscription.call_args_list == [
+    assert mock_adobe_client.get_subscription.call_args_list == [
         mocker.call(
             authorization_id=authorization_id,
-            customer_id=customer_id,
+            customer_id=customer["customerId"],
             subscription_id=mpt_subscription["externalIds"]["vendor"],
         ),
         mocker.call(
             authorization_id=authorization_id,
-            customer_id=customer_id,
+            customer_id=customer["customerId"],
             subscription_id=another_mpt_subscription["externalIds"]["vendor"],
         ),
     ]
 
     assert mocked_update_agreement_subscription.call_args_list == [
         mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             mpt_subscription["id"],
             lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
             parameters={
@@ -190,7 +186,7 @@ def test_sync_agreement_prices(
             autoRenew=adobe_subscription["autoRenewal"]["enabled"],
         ),
         mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             another_mpt_subscription["id"],
             lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}}],
             parameters={
@@ -225,13 +221,20 @@ def test_sync_agreement_prices(
     )
 
     assert mocked_update_agreement.call_args_list == [
-        mocker.call(mocked_mpt_client, agreement["id"], lines=expected_lines, parameters={}),
+        mocker.call(mock_mpt_client, agreement["id"], lines=expected_lines, parameters={}),
         mocker.call(
-            mocked_mpt_client,
+            mock_mpt_client,
             agreement["id"],
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
         ),
     ]
+    mock_add_missing_subscriptions.assert_called_once_with(
+        mock_mpt_client,
+        mock_adobe_client,
+        customer,
+        agreement,
+        subscriptions_for_update={"b-sub-id", "a-sub-id"},
+    )
 
 
 @freeze_time("2025-06-23")

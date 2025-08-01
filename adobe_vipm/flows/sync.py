@@ -37,6 +37,7 @@ from adobe_vipm.flows.utils import (
     exclude_subscriptions_with_deployment_id,
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
+    get_deployment_id,
     get_deployments,
     get_global_customer,
     get_parameter,
@@ -171,13 +172,14 @@ def sync_agreement_prices(
         mpt_client, adobe_client, agreement, customer
     )
 
-    _add_missing_subscriptions(
-        mpt_client,
-        adobe_client,
-        customer,
-        agreement,
-        subscriptions_for_update={s[1]["subscriptionId"] for s in subscriptions_for_update},
-    )
+    if not get_deployment_id(agreement):  # TODO: it's just workaround, need to be fixed
+        _add_missing_subscriptions(
+            mpt_client,
+            adobe_client,
+            customer,
+            agreement,
+            subscriptions_for_update={s[1]["subscriptionId"] for s in subscriptions_for_update},
+        )
 
     product_id = agreement["product"]["id"]
     currency = agreement["listing"]["priceList"]["currency"]
