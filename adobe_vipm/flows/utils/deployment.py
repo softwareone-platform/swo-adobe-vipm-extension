@@ -16,7 +16,7 @@ def get_deployments(order: dict) -> list[str]:
     """
     deployments_param = get_fulfillment_parameter(
         order,
-        Param.DEPLOYMENTS,
+        Param.DEPLOYMENTS.value,
     )
     return deployments_param.get("value").split(",") if deployments_param.get("value") else []
 
@@ -35,7 +35,7 @@ def set_deployments(order: dict, deployments: list[str]) -> dict:
     updated_order = copy.deepcopy(order)
     deployments_param = get_fulfillment_parameter(
         updated_order,
-        Param.DEPLOYMENTS,
+        Param.DEPLOYMENTS.value,
     )
     deployments_param["value"] = ",".join(deployments)
     return updated_order

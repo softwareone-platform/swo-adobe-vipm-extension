@@ -28,15 +28,15 @@ def get_agreements_by_3yc_commitment_request_status(
         Agreements.
     """
     param_external_id = (
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
         if not is_recommitment
-        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
     )
     request_type_param_ext_id = (
-        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+        Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
     )
     request_type_param_phase = (
-        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+        Param.PHASE_ORDERING.value if not is_recommitment else Param.PHASE_FULFILLMENT.value
     )
 
     enroll_status_condition = (

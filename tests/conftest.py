@@ -538,7 +538,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": Param.COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME.value,
                 "type": "SingleLineText",
                 "value": company_name or "",
                 "constraints": {
@@ -550,7 +550,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": Param.ADDRESS,
+                "externalId": Param.ADDRESS.value,
                 "type": "Address",
                 "value": address or {},
                 "constraints": {
@@ -562,7 +562,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": Param.CONTACT,
+                "externalId": Param.CONTACT.value,
                 "type": "Contact",
                 "value": contact or {},
                 "constraints": {
@@ -574,7 +574,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": Param.AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE.value,
                 "type": "SingleLineText",
                 "value": "Transfer",
                 "constraints": {
@@ -586,7 +586,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0005",
                 "name": "Change of reseller code",
-                "externalId": Param.CHANGE_RESELLER_CODE,
+                "externalId": Param.CHANGE_RESELLER_CODE.value,
                 "type": "SingleLineText",
                 "value": reseller_change_code,
                 "constraints": {
@@ -598,7 +598,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0006",
                 "name": "Adobe Customer Admin Email",
-                "externalId": Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
+                "externalId": Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value,
                 "type": "SingleLineText",
                 "value": admin_email,
                 "constraints": {
@@ -610,7 +610,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0007",
                 "name": "3YC",
-                "externalId": Param.THREE_YC,
+                "externalId": Param.THREE_YC.value,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
@@ -622,7 +622,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCLicenses",
-                "externalId": Param.THREE_YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES.value,
                 "type": "SingleLineText",
                 "value": p3yc_licenses or "",
                 "constraints": {
@@ -634,7 +634,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0009",
                 "name": "3YCConsumables",
-                "externalId": Param.THREE_YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
                 "type": "SingleLineText",
                 "value": p3yc_consumables or "",
                 "constraints": {
