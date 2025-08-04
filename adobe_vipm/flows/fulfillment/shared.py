@@ -109,8 +109,8 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     commitment = get_3yc_commitment(customer)
 
     customer_data = {
-        Param.COMPANY_NAME: sanitize_company_name(customer["companyProfile"]["companyName"]),
-        Param.CONTACT: {
+        Param.COMPANY_NAME.value: sanitize_company_name(customer["companyProfile"]["companyName"]),
+        Param.CONTACT.value: {
             "firstName": sanitize_first_last_name(contact["firstName"]),
             "lastName": sanitize_first_last_name(contact["lastName"]),
             "email": contact["email"],
@@ -119,15 +119,15 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     }
 
     if address:
-        customer_data[Param.ADDRESS] = get_address(address)
+        customer_data[Param.ADDRESS.value] = get_address(address)
 
     if commitment:
-        customer_data[Param.THREE_YC] = None
+        customer_data[Param.THREE_YC.value] = None
         for mq in commitment["minimumQuantities"]:
             if mq["offerType"] == "LICENSE":
-                customer_data[Param.THREE_YC_LICENSES] = str(mq["quantity"])
+                customer_data[Param.THREE_YC_LICENSES.value] = str(mq["quantity"])
             if mq["offerType"] == "CONSUMABLES":
-                customer_data[Param.THREE_YC_CONSUMABLES] = str(mq["quantity"])
+                customer_data[Param.THREE_YC_CONSUMABLES.value] = str(mq["quantity"])
 
         order = set_adobe_3yc_enroll_status(order, commitment["status"])
         order = set_adobe_3yc_start_date(order, commitment["startDate"])
@@ -317,19 +317,19 @@ def add_subscription(client, adobe_subscription, order, line):
             "parameters": {
                 "fulfillment": [
                     {
-                        "externalId": Param.ADOBE_SKU,
+                        "externalId": Param.ADOBE_SKU.value,
                         "value": line["offerId"],
                     },
                     {
-                        "externalId": Param.CURRENT_QUANTITY,
+                        "externalId": Param.CURRENT_QUANTITY.value,
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": Param.RENEWAL_QUANTITY,
+                        "externalId": Param.RENEWAL_QUANTITY.value,
                         "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
-                        "externalId": Param.RENEWAL_DATE,
+                        "externalId": Param.RENEWAL_DATE.value,
                         "value": str(adobe_subscription["renewalDate"]),
                     },
                 ]
@@ -384,7 +384,7 @@ def set_subscription_actual_sku(
         parameters={
             "fulfillment": [
                 {
-                    "externalId": Param.ADOBE_SKU,
+                    "externalId": Param.ADOBE_SKU.value,
                     "value": sku,
                 },
             ],
@@ -937,21 +937,21 @@ class CreateOrUpdateSubscriptions(Step):
                         "parameters": {
                             "fulfillment": [
                                 {
-                                    "externalId": Param.ADOBE_SKU,
+                                    "externalId": Param.ADOBE_SKU.value,
                                     "value": line["offerId"],
                                 },
                                 {
-                                    "externalId": Param.CURRENT_QUANTITY,
+                                    "externalId": Param.CURRENT_QUANTITY.value,
                                     "value": str(adobe_subscription["currentQuantity"]),
                                 },
                                 {
-                                    "externalId": Param.RENEWAL_QUANTITY,
+                                    "externalId": Param.RENEWAL_QUANTITY.value,
                                     "value": str(
                                         adobe_subscription["autoRenewal"]["renewalQuantity"]
                                     ),
                                 },
                                 {
-                                    "externalId": Param.RENEWAL_DATE,
+                                    "externalId": Param.RENEWAL_DATE.value,
                                     "value": str(adobe_subscription["renewalDate"]),
                                 },
                             ]

@@ -207,7 +207,7 @@ def test_validate_reseller_change_expired_code(
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE)
+    param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE.value)
     assert param["error"]["id"] == ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.id
     assert "expired" in param["error"]["message"]
     assert param["constraints"]["hidden"] is False
@@ -230,7 +230,7 @@ def test_validate_reseller_change_adobe_api_error(
     )
     has_errors, validated_order = validate_reseller_change(m_client, order)
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE)
+    param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE.value)
     assert param["error"] == ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
         reseller_change_code=param["value"], error=str(api_error)
     )
@@ -267,7 +267,7 @@ def test_validate_reseller_change_no_subscriptions(
     has_errors, validated_order = validate_reseller_change(m_client, order)
 
     assert has_errors is True
-    param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE)
+    param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE.value)
     assert param["error"] == ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict()
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True

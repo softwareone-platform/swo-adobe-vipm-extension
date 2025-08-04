@@ -18,7 +18,7 @@ def set_adobe_3yc_enroll_status(order: dict, enroll_status: str) -> dict:
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
         updated_order,
-        Param.THREE_YC_ENROLL_STATUS,
+        Param.THREE_YC_ENROLL_STATUS.value,
     )
     ff_param["value"] = enroll_status
     return updated_order
@@ -38,7 +38,7 @@ def set_adobe_3yc_commitment_request_status(order: dict, status: str) -> dict:
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
         updated_order,
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS,
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
     )
     ff_param["value"] = status
     return updated_order
@@ -60,7 +60,7 @@ def set_adobe_3yc_start_date(order: dict, start_date: str) -> dict:
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
         updated_order,
-        Param.THREE_YC_START_DATE,
+        Param.THREE_YC_START_DATE.value,
     )
     ff_param["value"] = start_date
     return updated_order
@@ -80,7 +80,7 @@ def set_adobe_3yc_end_date(order: dict, end_date: str) -> dict:
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
         updated_order,
-        Param.THREE_YC_END_DATE,
+        Param.THREE_YC_END_DATE.value,
     )
     ff_param["value"] = end_date
     return updated_order
@@ -101,7 +101,7 @@ def set_adobe_3yc(order: dict, value: str) -> dict:
     updated_order = copy.deepcopy(order)
     ff_param = get_ordering_parameter(
         updated_order,
-        Param.THREE_YC,
+        Param.THREE_YC.value,
     )
     ff_param["value"] = value
     return updated_order
@@ -130,9 +130,9 @@ def get_3yc_fulfillment_parameters(order_or_agreement: dict) -> list[str]:
         List of parameters' values
     """
     three_yc_fulfillment_parameters = [
-        Param.THREE_YC_END_DATE,
-        Param.THREE_YC_ENROLL_STATUS,
-        Param.THREE_YC_START_DATE,
+        Param.THREE_YC_END_DATE.value,
+        Param.THREE_YC_ENROLL_STATUS.value,
+        Param.THREE_YC_START_DATE.value,
     ]
 
     return [

@@ -26,16 +26,16 @@ def set_due_date(order: dict) -> dict:
     updated_order = copy.deepcopy(order)
     param = get_fulfillment_parameter(
         updated_order,
-        Param.DUE_DATE,
+        Param.DUE_DATE.value,
     )
     if not param:
         # in case of there is no any due date parameter
         # when order was in processing status
         # and due date was created and rolled out to the environment
         param = {
-            "externalId": Param.DUE_DATE,
+            "externalId": Param.DUE_DATE.value,
         }
-        updated_order["parameters"][Param.PHASE_FULFILLMENT].append(param)
+        updated_order["parameters"][Param.PHASE_FULFILLMENT.value].append(param)
 
     if not param.get("value"):
         now = dt.datetime.now(tz=dt.UTC).date()
@@ -57,7 +57,7 @@ def get_due_date(order: dict) -> dt.date | None:
     """
     param = get_fulfillment_parameter(
         order,
-        Param.DUE_DATE,
+        Param.DUE_DATE.value,
     )
 
     if param.get("value"):
@@ -80,7 +80,7 @@ def reset_due_date(order: dict) -> dict:
     """
     param = get_fulfillment_parameter(
         order,
-        Param.DUE_DATE,
+        Param.DUE_DATE.value,
     )
     param["value"] = None
 

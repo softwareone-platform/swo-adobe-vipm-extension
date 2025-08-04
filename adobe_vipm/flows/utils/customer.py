@@ -24,12 +24,12 @@ def get_customer_data(order: dict) -> dict:
     """
     customer_data = {}
     for param_external_id in (
-        Param.COMPANY_NAME,
-        Param.ADDRESS,
-        Param.CONTACT,
-        Param.THREE_YC,
-        Param.THREE_YC_CONSUMABLES,
-        Param.THREE_YC_LICENSES,
+        Param.COMPANY_NAME.value,
+        Param.ADDRESS.value,
+        Param.CONTACT.value,
+        Param.THREE_YC.value,
+        Param.THREE_YC_CONSUMABLES.value,
+        Param.THREE_YC_LICENSES.value,
     ):
         param = get_ordering_parameter(
             order,
@@ -72,7 +72,7 @@ def get_company_name(source: dict) -> str | None:
     """
     return get_ordering_parameter(
         source,
-        Param.COMPANY_NAME,
+        Param.COMPANY_NAME.value,
     ).get("value")
 
 
@@ -88,7 +88,7 @@ def get_adobe_customer_id(source: dict) -> str | None:
     """
     param = get_fulfillment_parameter(
         source,
-        Param.CUSTOMER_ID,
+        Param.CUSTOMER_ID.value,
     )
     return param.get("value")
 
@@ -107,7 +107,7 @@ def set_adobe_customer_id(order: dict, customer_id: str) -> dict:
     updated_order = copy.deepcopy(order)
     customer_ff_param = get_fulfillment_parameter(
         updated_order,
-        Param.CUSTOMER_ID,
+        Param.CUSTOMER_ID.value,
     )
     customer_ff_param["value"] = customer_id
     return updated_order
@@ -159,7 +159,7 @@ def is_new_customer(source: dict) -> bool:
     """
     param = get_ordering_parameter(
         source,
-        Param.AGREEMENT_TYPE,
+        Param.AGREEMENT_TYPE.value,
     )
     return param.get("value") == "New"
 
@@ -176,7 +176,7 @@ def get_global_customer(order: dict) -> list[str] | None:
     """
     global_customer_param = get_fulfillment_parameter(
         order,
-        Param.GLOBAL_CUSTOMER,
+        Param.GLOBAL_CUSTOMER.value,
     )
     return global_customer_param.get("value")
 
@@ -195,7 +195,7 @@ def set_global_customer(order: dict, global_sales_enabled: str) -> dict:
     updated_order = copy.deepcopy(order)
     global_customer_param = get_fulfillment_parameter(
         updated_order,
-        Param.GLOBAL_CUSTOMER,
+        Param.GLOBAL_CUSTOMER.value,
     )
     global_customer_param["value"] = [global_sales_enabled]
     return updated_order

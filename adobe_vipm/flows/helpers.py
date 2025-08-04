@@ -84,12 +84,12 @@ class PrepareCustomerData(Step):
 
         customer_data_updated = False
 
-        if not context.customer_data.get(Param.COMPANY_NAME):
-            context.customer_data[Param.COMPANY_NAME] = licensee["name"]
+        if not context.customer_data.get(Param.COMPANY_NAME.value):
+            context.customer_data[Param.COMPANY_NAME.value] = licensee["name"]
             customer_data_updated = True
 
-        if not context.customer_data.get(Param.ADDRESS):
-            context.customer_data[Param.ADDRESS] = {
+        if not context.customer_data.get(Param.ADDRESS.value):
+            context.customer_data[Param.ADDRESS.value] = {
                 "country": address["country"],
                 "state": address["state"],
                 "city": address["city"],
@@ -99,8 +99,8 @@ class PrepareCustomerData(Step):
             }
             customer_data_updated = True
 
-        if not context.customer_data.get(Param.CONTACT) and contact:
-            context.customer_data[Param.CONTACT] = {
+        if not context.customer_data.get(Param.CONTACT.value) and contact:
+            context.customer_data[Param.CONTACT.value] = {
                 "firstName": contact["firstName"],
                 "lastName": contact["lastName"],
                 "email": contact["email"],

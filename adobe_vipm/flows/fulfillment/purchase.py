@@ -165,35 +165,37 @@ class CreateCustomer(Step):
             )
             return
         if error.code == AdobeStatus.INVALID_ADDRESS:
-            param = get_ordering_parameter(context.order, Param.ADDRESS)
+            param = get_ordering_parameter(context.order, Param.ADDRESS.value)
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.ADDRESS,
+                Param.ADDRESS.value,
                 ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
             )
         elif error.code == AdobeStatus.INVALID_MINIMUM_QUANTITY:
             if "LICENSE" in str(error):
-                param = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
+                param = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    Param.THREE_YC_LICENSES,
+                    Param.THREE_YC_LICENSES.value,
                     ERR_3YC_QUANTITY_LICENSES.to_dict(title=param["name"]),
                     required=False,
                 )
 
             if "CONSUMABLES" in str(error):
-                param = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES)
+                param = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    Param.THREE_YC_CONSUMABLES,
+                    Param.THREE_YC_CONSUMABLES.value,
                     ERR_3YC_QUANTITY_CONSUMABLES.to_dict(title=param["name"]),
                     required=False,
                 )
 
             if not error.details:
-                param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
+                param_licenses = get_ordering_parameter(
+                    context.order, Param.THREE_YC_LICENSES.value
+                )
                 param_consumables = get_ordering_parameter(
-                    context.order, Param.THREE_YC_CONSUMABLES
+                    context.order, Param.THREE_YC_CONSUMABLES.value
                 )
                 context.order = set_order_error(
                     context.order,
@@ -204,10 +206,10 @@ class CreateCustomer(Step):
                 )
         else:
             if "companyProfile.companyName" in error.details:
-                param = get_ordering_parameter(context.order, Param.COMPANY_NAME)
+                param = get_ordering_parameter(context.order, Param.COMPANY_NAME.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    Param.COMPANY_NAME,
+                    Param.COMPANY_NAME.value,
                     ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(error)),
                 )
             if list(
@@ -216,10 +218,10 @@ class CreateCustomer(Step):
                     error.details,
                 )
             ):
-                param = get_ordering_parameter(context.order, Param.CONTACT)
+                param = get_ordering_parameter(context.order, Param.CONTACT.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    Param.CONTACT,
+                    Param.CONTACT.value,
                     ERR_ADOBE_CONTACT.to_dict(title=param["name"], details=str(error)),
                 )
 
@@ -234,10 +236,10 @@ class CreateCustomer(Step):
         adobe_client = get_adobe_client()
         try:
             if not context.customer_data.get("contact"):
-                param = get_ordering_parameter(context.order, Param.CONTACT)
+                param = get_ordering_parameter(context.order, Param.CONTACT.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    Param.CONTACT,
+                    Param.CONTACT.value,
                     ERR_ADOBE_CONTACT.to_dict(title=param["name"], details="it is mandatory."),
                 )
 

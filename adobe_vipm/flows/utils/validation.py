@@ -87,8 +87,10 @@ def is_migrate_customer(order: dict) -> bool:
     Returns:
         if parameter of Agreement Type is marked as 'Migrate'
     """
-    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
-    return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value).get("value")
+    return agreement_type == "Migrate" and is_ordering_param_required(
+        order, Param.MEMBERSHIP_ID.value
+    )
 
 
 def is_reseller_change(order: dict) -> bool:
