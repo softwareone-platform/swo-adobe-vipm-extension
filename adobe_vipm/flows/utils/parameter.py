@@ -31,9 +31,9 @@ def get_parameter(parameter_phase: str, source: str, param_external_id: str) -> 
     )
 
 
-get_ordering_parameter = functools.partial(get_parameter, Param.PHASE_ORDERING)
+get_ordering_parameter = functools.partial(get_parameter, Param.PHASE_ORDERING.value)
 
-get_fulfillment_parameter = functools.partial(get_parameter, Param.PHASE_FULFILLMENT)
+get_fulfillment_parameter = functools.partial(get_parameter, Param.PHASE_FULFILLMENT.value)
 
 
 def set_ordering_parameter_error(
@@ -80,7 +80,7 @@ def reset_ordering_parameters_error(order: dict) -> dict:
     """
     updated_order = copy.deepcopy(order)
 
-    for param in updated_order["parameters"][Param.PHASE_ORDERING]:
+    for param in updated_order["parameters"][Param.PHASE_ORDERING.value]:
         param["error"] = None
 
     return updated_order
@@ -99,22 +99,22 @@ def update_parameters_visibility(order: dict) -> dict:
     Returns:
         Updated MPT order.
     """
-    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE)
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value)
     agreement_value = (agreement_type.get("value") or "").lower()
     updated_order = copy.deepcopy(order)
 
     parameters_map = {
         "new": {
             "visible": PARAM_NEW_CUSTOMER_PARAMETERS,
-            "hidden": (*TRANSFER_CUSTOMER_PARAMETERS, *(Param.MEMBERSHIP_ID,)),
+            "hidden": (*TRANSFER_CUSTOMER_PARAMETERS, *(Param.MEMBERSHIP_ID.value,)),
         },
         "migrate": {
-            "visible": [Param.MEMBERSHIP_ID],
+            "visible": [Param.MEMBERSHIP_ID.value],
             "hidden": (*PARAM_NEW_CUSTOMER_PARAMETERS, *TRANSFER_CUSTOMER_PARAMETERS),
         },
         "transfer": {
             "visible": TRANSFER_CUSTOMER_PARAMETERS,
-            "hidden": (*PARAM_NEW_CUSTOMER_PARAMETERS, *(Param.MEMBERSHIP_ID,)),
+            "hidden": (*PARAM_NEW_CUSTOMER_PARAMETERS, *(Param.MEMBERSHIP_ID.value,)),
         },
     }
     param_config = parameters_map.get(agreement_value)
@@ -156,7 +156,7 @@ def set_coterm_date(order: dict, coterm_date: str) -> dict:
     updated_order = copy.deepcopy(order)
     customer_ff_param = get_fulfillment_parameter(
         updated_order,
-        Param.COTERM_DATE,
+        Param.COTERM_DATE.value,
     )
     customer_ff_param["value"] = coterm_date
     return updated_order
@@ -174,7 +174,7 @@ def get_coterm_date(order: dict) -> str | None:
     """
     return get_fulfillment_parameter(
         order,
-        Param.COTERM_DATE,
+        Param.COTERM_DATE.value,
     ).get("value")
 
 
@@ -212,7 +212,7 @@ def get_adobe_membership_id(source: dict) -> str | None:
     """
     param = get_ordering_parameter(
         source,
-        Param.MEMBERSHIP_ID,
+        Param.MEMBERSHIP_ID.value,
     )
     return param.get("value")
 
@@ -274,7 +274,7 @@ def get_retry_count(order: dict) -> str | None:
         Retry count. None if parameter doesn't exist
     """
     param = find_first(
-        lambda x: x["externalId"] == Param.RETRY_COUNT,
+        lambda x: x["externalId"] == Param.RETRY_COUNT.value,
         order["parameters"]["fulfillment"],
     )
 

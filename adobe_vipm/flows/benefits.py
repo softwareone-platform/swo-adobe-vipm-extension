@@ -29,19 +29,19 @@ logger = logging.getLogger(__name__)
 def _build_3yc_parameters(request_info, commitment_info, is_recommitment):
     """Build parameters for 3YC commitment request."""
     status_param_ext_id = (
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
         if not is_recommitment
-        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
     )
     request_type_param_ext_id = (
-        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+        Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
     )
     request_type_param_phase = (
-        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+        Param.PHASE_ORDERING.value if not is_recommitment else Param.PHASE_FULFILLMENT.value
     )
 
     parameters = {
-        Param.PHASE_FULFILLMENT: [
+        Param.PHASE_FULFILLMENT.value: [
             {
                 "externalId": status_param_ext_id,
                 "value": request_info["status"],
@@ -54,18 +54,18 @@ def _build_3yc_parameters(request_info, commitment_info, is_recommitment):
         parameters[request_type_param_phase].append(
             {"externalId": request_type_param_ext_id, "value": None},
         )
-        parameters[Param.PHASE_FULFILLMENT].extend(
+        parameters[Param.PHASE_FULFILLMENT.value].extend(
             [
                 {
-                    "externalId": Param.THREE_YC_ENROLL_STATUS,
+                    "externalId": Param.THREE_YC_ENROLL_STATUS.value,
                     "value": commitment_info["status"],
                 },
                 {
-                    "externalId": Param.THREE_YC_START_DATE,
+                    "externalId": Param.THREE_YC_START_DATE.value,
                     "value": commitment_info["startDate"],
                 },
                 {
-                    "externalId": Param.THREE_YC_END_DATE,
+                    "externalId": Param.THREE_YC_END_DATE.value,
                     "value": commitment_info["endDate"],
                 },
             ],
@@ -120,7 +120,9 @@ def check_3yc_commitment_request(mpt_client, *, is_recommitment):
                 ThreeYearCommitmentStatus.NONCOMPLIANT,
             }:
                 request_type_param_phase = (
-                    Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+                    Param.PHASE_ORDERING.value
+                    if not is_recommitment
+                    else Param.PHASE_FULFILLMENT.value
                 )
                 agreement_link = urljoin(
                     settings.MPT_PORTAL_BASE_URL,
@@ -159,7 +161,7 @@ def update_deployment_agreements_3yc(
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
-        Param.DEPLOYMENT_ID,
+        Param.DEPLOYMENT_ID.value,
         [deployment["deploymentId"] for deployment in customer_deployments],
     )
 

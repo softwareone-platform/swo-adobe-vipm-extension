@@ -232,17 +232,19 @@ def _update_agreement(
         parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
         for mq in commitment_info.get("minimumQuantities", ()):
             if mq["offerType"] == "LICENSE":
-                parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append({
-                    "externalId": Param.THREE_YC_LICENSES,
+                parameters.setdefault(Param.PHASE_ORDERING.value, [])
+                parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_LICENSES.value,
                     "value": str(mq.get("quantity")),
                 })
             if mq["offerType"] == "CONSUMABLES":
-                parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append({
-                    "externalId": Param.THREE_YC_CONSUMABLES,
-                    "value": str(mq.get("quantity")),
-                })
+                parameters.setdefault(Param.PHASE_ORDERING.value, [])
+                parameters[Param.PHASE_ORDERING.value].append(
+                    {
+                        "externalId": Param.THREE_YC_CONSUMABLES.value,
+                        "value": str(mq.get("quantity")),
+                    }
+                )
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -260,24 +262,24 @@ def _add_3yc_fulfillment_params(
     parameters: list[dict],
 ) -> list[dict]:
     new_parameters = copy.deepcopy(parameters)
-    new_parameters.setdefault(Param.PHASE_FULFILLMENT, [])
+    new_parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
     three_yc_recommitment_par = get_parameter(
-        Param.PHASE_FULFILLMENT, agreement, Param.THREE_YC_RECOMMITMENT
+        Param.PHASE_FULFILLMENT.value, agreement, Param.THREE_YC_RECOMMITMENT.value
     )
     is_recommitment = bool(three_yc_recommitment_par)
     status_param_ext_id = (
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
         if not is_recommitment
-        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
     )
     request_type_param_ext_id = (
-        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+        Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
     )
     request_type_param_phase = (
-        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+        Param.PHASE_ORDERING.value if not is_recommitment else Param.PHASE_FULFILLMENT.value
     )
     request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
-    new_parameters[Param.PHASE_FULFILLMENT].append({
+    new_parameters[Param.PHASE_FULFILLMENT.value].append({
         "externalId": status_param_ext_id,
         "value": request_info.get("status"),
     })
@@ -285,17 +287,17 @@ def _add_3yc_fulfillment_params(
     new_parameters[request_type_param_phase].append(
         {"externalId": request_type_param_ext_id, "value": None},
     )
-    new_parameters[Param.PHASE_FULFILLMENT] += [
+    new_parameters[Param.PHASE_FULFILLMENT.value] += [
         {
-            "externalId": Param.THREE_YC_ENROLL_STATUS,
+            "externalId": Param.THREE_YC_ENROLL_STATUS.value,
             "value": commitment_info.get("status"),
         },
         {
-            "externalId": Param.THREE_YC_START_DATE,
+            "externalId": Param.THREE_YC_START_DATE.value,
             "value": commitment_info.get("startDate"),
         },
         {
-            "externalId": Param.THREE_YC_END_DATE,
+            "externalId": Param.THREE_YC_END_DATE.value,
             "value": commitment_info.get("endDate"),
         },
     ]
@@ -362,21 +364,21 @@ def _update_subscriptions(
 
         parameters = {
             "fulfillment": [
-                {"externalId": Param.ADOBE_SKU, "value": actual_sku},
+                {"externalId": Param.ADOBE_SKU.value, "value": actual_sku},
                 {
-                    "externalId": Param.CURRENT_QUANTITY,
+                    "externalId": Param.CURRENT_QUANTITY.value,
                     "value": str(adobe_subscription["currentQuantity"]),
                 },
                 {
-                    "externalId": Param.RENEWAL_QUANTITY,
+                    "externalId": Param.RENEWAL_QUANTITY.value,
                     "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                 },
                 {
-                    "externalId": Param.RENEWAL_DATE,
+                    "externalId": Param.RENEWAL_DATE.value,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
                 {
-                    "externalId": Param.LAST_SYNC_DATE,
+                    "externalId": Param.LAST_SYNC_DATE.value,
                     "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
                 },
             ],
@@ -470,7 +472,7 @@ def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, *, dry_run: bool) -> 
     """
     logger.info("Syncing agreements by 3yc End Date...")
     _sync_agreements_by_param(
-        mpt_client, Param.THREE_YC_END_DATE, dry_run=dry_run, sync_prices=True
+        mpt_client, Param.THREE_YC_END_DATE.value, dry_run=dry_run, sync_prices=True
     )
 
 
@@ -483,7 +485,9 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, *, dry_run: bool) -> N
         dry_run: Run in dry run mode.
     """
     logger.info("Synchronizing agreements by cotermDate...")
-    _sync_agreements_by_param(mpt_client, Param.COTERM_DATE, dry_run=dry_run, sync_prices=False)
+    _sync_agreements_by_param(
+        mpt_client, Param.COTERM_DATE.value, dry_run=dry_run, sync_prices=False
+    )
 
 
 def _sync_agreements_by_param(
@@ -495,7 +499,7 @@ def _sync_agreements_by_param(
     rql_query = (
         "eq(status,Active)&"
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today_iso})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
         "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
         "-template,-name,-vendor,-client,-price"
@@ -522,7 +526,7 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, *, dry_run: bool) -> 
     rql_query = (
         "eq(status,Active)&"
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today_iso})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
         "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
         "-template,-name,-vendor,-client,-price"
@@ -606,8 +610,8 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, *, dry_run: 
                 mpt_client,
                 agreement["id"],
                 parameters={
-                    Param.PHASE_FULFILLMENT: [
-                        {"externalId": Param.THREE_YC_ENROLL_STATUS, "value": enroll_status}
+                    Param.PHASE_FULFILLMENT.value: [
+                        {"externalId": Param.THREE_YC_ENROLL_STATUS.value, "value": enroll_status}
                     ]
                 },
             )
@@ -629,11 +633,11 @@ def sync_global_customer_parameters(
         agreement: main customer agreement.
     """
     try:
-        parameters = {Param.PHASE_FULFILLMENT: []}
+        parameters = {Param.PHASE_FULFILLMENT.value: []}
         global_customer_enabled = get_global_customer(agreement)
         if global_customer_enabled != ["Yes"]:
             logger.info("Setting global customer for agreement %s", agreement["id"])
-            parameters[Param.PHASE_FULFILLMENT].append({
+            parameters[Param.PHASE_FULFILLMENT.value].append({
                 "externalId": "globalCustomer",
                 "value": ["Yes"],
             })
@@ -644,12 +648,12 @@ def sync_global_customer_parameters(
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
-            parameters[Param.PHASE_FULFILLMENT].append({
+            parameters[Param.PHASE_FULFILLMENT.value].append({
                 "externalId": "deployments",
                 "value": ",".join(deployments),
             })
             logger.info("Setting deployments for agreement %s", agreement["id"])
-        if parameters[Param.PHASE_FULFILLMENT]:
+        if parameters[Param.PHASE_FULFILLMENT.value]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception:
         logger.exception(
@@ -706,7 +710,7 @@ def process_lost_customer(  # noqa: C901
     if customer_deployments:
         deployment_agreements = get_agreements_by_customer_deployments(
             mpt_client,
-            Param.DEPLOYMENT_ID,
+            Param.DEPLOYMENT_ID.value,
             [deployment["deploymentId"] for deployment in customer_deployments],
         )
 
@@ -830,7 +834,7 @@ def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
         parameters={
             "fulfillment": [
                 {
-                    "externalId": Param.LAST_SYNC_DATE,
+                    "externalId": Param.LAST_SYNC_DATE.value,
                     "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
                 },
             ]
@@ -865,7 +869,7 @@ def sync_deployments_prices(
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
-        Param.DEPLOYMENT_ID,
+        Param.DEPLOYMENT_ID.value,
         [deployment["deploymentId"] for deployment in customer_deployments],
     )
 

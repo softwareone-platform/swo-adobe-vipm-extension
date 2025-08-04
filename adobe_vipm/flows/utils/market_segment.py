@@ -34,7 +34,7 @@ def get_market_segment_eligibility_status(order: dict) -> str | None:
     """
     return get_fulfillment_parameter(
         order,
-        Param.MARKET_SEGMENT_ELIGIBILITY_STATUS,
+        Param.MARKET_SEGMENT_ELIGIBILITY_STATUS.value,
     ).get("value")
 
 
@@ -51,7 +51,7 @@ def set_market_segment_eligibility_status_pending(order: dict) -> dict:
     updated_order = copy.deepcopy(order)
     ff_param = get_fulfillment_parameter(
         updated_order,
-        Param.MARKET_SEGMENT_ELIGIBILITY_STATUS,
+        Param.MARKET_SEGMENT_ELIGIBILITY_STATUS.value,
     )
     ff_param["value"] = STATUS_MARKET_SEGMENT_PENDING
     return updated_order
