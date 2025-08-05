@@ -217,6 +217,40 @@ def get_adobe_membership_id(source: dict) -> str | None:
     return param.get("value")
 
 
+def get_change_reseller_code(source):
+    """
+    Get the change reseller code from the corresponding ordering parameter.
+
+    Args:
+        source: The business object from which the change reseller code should be retrieved.
+
+    Returns:
+        The change reseller code or None if it isn't set.
+    """
+    param = get_ordering_parameter(
+        source,
+        Param.CHANGE_RESELLER_CODE,
+    )
+    return param.get("value")
+
+
+def get_change_reseller_admin_email(source):
+    """
+    Get the admin email from the corresponding ordering parameter.
+
+    Args:
+        source: The business object from which the admin email should be retrieved.
+
+    Returns:
+        The admin email or None if it isn't set.
+    """
+    param = get_ordering_parameter(
+        source,
+        Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
+    )
+    return param.get("value")
+
+
 def set_parameter_visible(order: dict, param_external_id: str) -> dict:
     """
     Sets ordering parameter visibility.

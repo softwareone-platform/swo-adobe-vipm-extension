@@ -304,4 +304,3 @@ def test_validate_reseller_change_missing_admin_email(
     has_errors, validated_order = validate_reseller_change(m_client, order)
     assert isinstance(has_errors, bool)
     assert isinstance(validated_order, dict)
-

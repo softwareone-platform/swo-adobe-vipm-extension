@@ -19,7 +19,7 @@ from adobe_vipm.flows.utils.validation import is_migrate_customer, is_reseller_c
 logger = logging.getLogger(__name__)
 
 
-def fulfill_order(client, order):  # noqa: C901
+def fulfill_order(client, order):
     """
     Fulfills an order of any type by processing the actions based on the provided parameters.
 
@@ -32,17 +32,15 @@ def fulfill_order(client, order):  # noqa: C901
     """
     logger.info("Start processing %s order %s", order["type"], order["id"])
 
-
-    def validate_purchase(client, order):
+    def fulfill_purchase_order_router(client, order):
         if is_migrate_customer(order):
             return fulfill_transfer_order(client, order)
-        elif is_reseller_change(order):
+        if is_reseller_change(order):
             return fulfill_reseller_change_order(client, order)
-        else:
-            return fulfill_purchase_order(client, order)
+        return fulfill_purchase_order(client, order)
 
     validators = {
-        constants.ORDER_TYPE_PURCHASE: validate_purchase,
+        constants.ORDER_TYPE_PURCHASE: fulfill_purchase_order_router,
         constants.ORDER_TYPE_CHANGE: fulfill_change_order,
         constants.ORDER_TYPE_TERMINATION: fulfill_termination_order,
         constants.ORDER_TYPE_CONFIGURATION: fulfill_configuration_order,
@@ -51,6 +49,8 @@ def fulfill_order(client, order):  # noqa: C901
     try:
         if order["type"] in validators:
             validators[order["type"]](client, order)
+        else:
+            logger.info("Order %s is not a valid order type", order["id"])
     except Exception:
         notify_unhandled_exception_in_teams(
             "fulfillment",

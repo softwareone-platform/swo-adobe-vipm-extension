@@ -2642,13 +2642,9 @@ def test_preview_reseller_change_bad_request(
     assert repr(cv.value) == str(error)
 
 
-
 def test_commit_reseller_change(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
-    """
-    Tests the preview of a reseller change.
-    """
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     client, authorization, api_token = adobe_client_factory()
     expected_response = {

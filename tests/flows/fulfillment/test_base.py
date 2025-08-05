@@ -43,7 +43,6 @@ def test_fulfill_order_by_order_type(mocker, order_factory, order_type, mock_mpt
     mocked_fulfill.assert_called_once_with(mock_mpt_client, order)
 
 
-
 def test_fulfill_order_reseller_change(
         mocker,
         order_factory,

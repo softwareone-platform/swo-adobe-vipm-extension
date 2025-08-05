@@ -455,6 +455,7 @@ class AddLinesToOrder(Step):
     """Add adobe lines to order."""
 
     def __call__(self, mpt_client, context, next_step):
+        """Add adobe lines to order."""
         commitment = get_3yc_commitment(context.adobe_customer)
         has_error, order = add_lines_to_order(
             mpt_client,
@@ -495,6 +496,7 @@ def validate_reseller_change(mpt_client, order):
     context = Context(order=order)
     pipeline.run(mpt_client, context)
     return not context.validation_succeeded, context.order
+
 
 class AddResellerChangeLinesToOrder(Step):
     """Add lines from reseller change back to the MPT order."""

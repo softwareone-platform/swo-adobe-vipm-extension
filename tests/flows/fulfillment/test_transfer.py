@@ -36,7 +36,6 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import fulfill_order
-from adobe_vipm.flows.fulfillment.shared import start_processing_attempt
 from adobe_vipm.flows.fulfillment.transfer import (
     SyncGCMainAgreement,
     UpdateTransferStatus,
@@ -1668,8 +1667,6 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     )
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
-    start_processing_attempt(mock_mpt_client, order)
-
     fulfill_order(mock_mpt_client, order)
 
     mocked_process_order.assert_called_once_with(
@@ -1689,12 +1686,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "parameters": {
-            "fulfillment": fulfillment_parameters_factory(
-                due_date="2012-02-13",
-            ),
-            "ordering": order["parameters"]["ordering"],
-        },
+        "parameters": order["parameters"],
     }
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
         mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
@@ -3451,7 +3443,7 @@ def test_transfer_gc_account_all_deployments_created(
         sync_prices=False,
     )
     mocked_get_gc_agreement_deployments_by_main_agreement()
-    assert mocked_get_gc_main_agreement.call_count == 2
+    assert mocked_get_gc_main_agreement.call_count == 1
     assert mocked_get_gc_main_agreement.mock_calls[0].args == (
         "PRD-1111-1111", "AUT-1234-4567", "a-membership-id"
     )
@@ -6008,7 +6000,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-    start_processing_attempt(mock_mpt_client, order)
+
     fulfill_order(mock_mpt_client, order)
 
     membership_id_param = get_ordering_parameter(updated_order, Param.MEMBERSHIP_ID.value)
@@ -6030,10 +6022,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         order["id"],
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
-        "parameters": {
-            "fulfillment": fulfillment_parameters_factory(due_date="2012-02-13"),
-            "ordering": order["parameters"]["ordering"],
-        },
+        "parameters": order["parameters"],
     }
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
         mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
