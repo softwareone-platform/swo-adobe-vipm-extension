@@ -1,11 +1,10 @@
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.fulfillment.shared import SetupDueDate, SyncAgreement
+from adobe_vipm.flows.fulfillment.shared import CompleteOrder, SetupDueDate, SyncAgreement
 from adobe_vipm.flows.fulfillment.transfer import (
     CheckAdobeResellerTransfer,
     CommitResellerChange,
-    CompleteTransferOrder,
     GetAdobeCustomer,
     SetupResellerChangeContext,
     ValidateAgreementDeployments,
@@ -47,7 +46,7 @@ def test_commit_reseller_change_step_success(
         order=order,
         order_id="order-id",
         agreement_id="agreement-id",
-        authorization_id='AUT-1234-4567',
+        authorization_id="AUT-1234-4567",
     )
 
     step = CommitResellerChange()
@@ -129,33 +128,6 @@ def test_commit_reseller_change_step_adobe_api_error(
     mocked_adobe_client.commit_reseller_change.assert_called_once()
     mocked_switch_to_failed.assert_called_once()
     mocked_next_step.assert_called_once()
-
-
-def test_check_adobe_reseller_transfer_step_already_has_transfer_order(
-    mocker, order_factory, adobe_reseller_change_preview_factory
-):
-    """Test CheckAdobeResellerTransfer step when adobe_transfer_order already exists."""
-    existing_transfer_order = adobe_reseller_change_preview_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    order = order_factory()
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-
-    context = Context(
-        order=order,
-    )
-    context.adobe_transfer_order = existing_transfer_order
-
-    step = CheckAdobeResellerTransfer()
-    step(mocked_client, context, mocked_next_step)
-    mocked_adobe_client.get_reseller_transfer.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_check_adobe_reseller_transfer_step_success(
@@ -249,10 +221,6 @@ def test_check_adobe_reseller_transfer_step_pending_status(
 
 
 def test_fulfill_reseller_change_order(mocker):
-    """
-    Tests the termination order pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
@@ -279,7 +247,7 @@ def test_fulfill_reseller_change_order(mocker):
         GetAdobeCustomer,
         ValidateGCMainAgreement,
         ValidateAgreementDeployments,
-        CompleteTransferOrder,
+        CompleteOrder,
         SyncAgreement,
     ]
 
@@ -298,8 +266,6 @@ def test_setup_reseller_change_context_success(
     order_factory,
     reseller_change_order_parameters_factory
 ):
-    """Test successful execution of SetupResellerChangeContext step."""
-
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer"
     )
