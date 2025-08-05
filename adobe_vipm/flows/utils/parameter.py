@@ -1,13 +1,14 @@
 import copy
 import functools
 
+from mpt_extension_sdk.mpt_http.utils import find_first
+
 from adobe_vipm.flows.constants import (
     PARAM_NEW_CUSTOMER_PARAMETERS,
     PARAM_OPTIONAL_CUSTOMER_ORDER,
     TRANSFER_CUSTOMER_PARAMETERS,
     Param,
 )
-from adobe_vipm.utils import find_first
 
 
 def get_parameter(parameter_phase: str, source: str, param_external_id: str) -> dict:
