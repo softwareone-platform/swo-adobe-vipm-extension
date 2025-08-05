@@ -4,6 +4,7 @@ import logging
 import sys
 import traceback
 from collections.abc import Sequence
+from functools import partial
 
 from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -40,6 +41,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_deployment_id,
     get_deployments,
+    get_fulfillment_parameter,
     get_global_customer,
     get_parameter,
     get_sku_with_discount_level,
@@ -425,6 +427,10 @@ def _update_subscriptions(
         )
 
 
+def _check_adobe_subscription_id(subscription_id, adobe_subscription):
+    return adobe_subscription.get("subscriptionId", "") == subscription_id
+
+
 def _get_subscriptions_for_update(
     mpt_client: MPTClient,
     agreement: dict,
@@ -434,15 +440,15 @@ def _get_subscriptions_for_update(
     logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
     for_update = []
 
-    for sub in agreement["subscriptions"]:
-        if sub["status"] in {SubscriptionStatus.TERMINATED, SubscriptionStatus.EXPIRED}:
+    for subscription in agreement["subscriptions"]:
+        if subscription["status"] in {SubscriptionStatus.TERMINATED, SubscriptionStatus.EXPIRED}:
             continue
 
-        subscription = get_agreement_subscription(mpt_client, sub["id"])
-        adobe_subscription_id = subscription["externalIds"]["vendor"]
+        mpt_subscription = get_agreement_subscription(mpt_client, subscription["id"])
+        adobe_subscription_id = mpt_subscription["externalIds"]["vendor"]
 
         adobe_subscription = find_first(
-            lambda x, subscr_id=adobe_subscription_id: x.get("subscriptionId", "") == subscr_id,
+            partial(_check_adobe_subscription_id, adobe_subscription_id),
             customer_subscriptions,
         )
 
@@ -456,13 +462,13 @@ def _get_subscriptions_for_update(
             logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
             terminate_subscription(
                 mpt_client,
-                subscription["id"],
+                mpt_subscription["id"],
                 f"Adobe subscription status {AdobeStatus.SUBSCRIPTION_TERMINATED}.",
             )
             continue
 
         for_update.append((
-            subscription,
+            mpt_subscription,
             adobe_subscription,
             get_sku_with_discount_level(actual_sku, customer),
         ))
@@ -862,6 +868,49 @@ def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
     )
 
 
+def _is_subscription_in_set(subscription_ids: set, subscription: dict) -> bool:
+    return subscription["subscriptionId"] in subscription_ids
+
+
+def _process_orphaned_deployment_subscriptions(
+    adobe_client: AdobeClient,
+    authorization_id,
+    customer_id,
+    deployment_agreements: list[dict],
+    customer_subscriptions: Sequence[dict],
+) -> None:
+    logger.info("Looking for orphaned deployment subscriptions in Adobe.")
+    mpt_subscription_ids = {
+        get_fulfillment_parameter(subscription, Param.ADOBE_SKU)["value"]
+        for agreement in deployment_agreements
+        for subscription in agreement["subscriptions"]
+    }
+    adobe_subscription_ids = {
+        subscription["subscriptionId"]
+        for subscription in customer_subscriptions
+        if subscription.get("deploymentId")
+    }
+    orphaned_subscription_ids = adobe_subscription_ids - mpt_subscription_ids
+
+    for subscription in filter(
+        partial(_is_subscription_in_set, orphaned_subscription_ids), customer_subscriptions
+    ):
+        logger.warning("> Disabling auto-renewal for orphaned subscription %s", subscription)
+        try:
+            adobe_client.update_subscription(
+                authorization_id,
+                customer_id,
+                subscription["subscriptionId"],
+                auto_renewal=False,
+            )
+        except Exception as e:
+            send_exception(
+                "Error disabling auto-renewal for orphaned Adobe subscription"
+                f" {subscription['subscriptionId']}.",
+                f"{e}",
+            )
+
+
 def sync_deployments_prices(
     mpt_client: MPTClient,
     adobe_client: AdobeClient,
@@ -893,6 +942,14 @@ def sync_deployments_prices(
         mpt_client,
         Param.DEPLOYMENT_ID.value,
         [deployment["deploymentId"] for deployment in customer_deployments],
+    )
+
+    _process_orphaned_deployment_subscriptions(
+        adobe_client,
+        main_agreement["authorization"]["id"],
+        customer["customerId"],
+        deployment_agreements,
+        customer_subscriptions,
     )
 
     for deployment_agreement in deployment_agreements:
