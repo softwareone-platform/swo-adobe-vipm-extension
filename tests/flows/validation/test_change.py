@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+import datetime as dt
 
 from freezegun import freeze_time
 
@@ -32,7 +32,7 @@ def test_validate_downsizes_step(
             old_quantity=14,
         )
     )
-    coterm_date = datetime.today() + timedelta(days=20)
+    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
@@ -115,7 +115,7 @@ def test_validate_downsizes_step_no_returnable_orders(
             old_quantity=14,
         )
     )
-    coterm_date = datetime.today() + timedelta(days=20)
+    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
@@ -165,7 +165,7 @@ def test_validate_downsizes_step_invalid_quantity(
             old_quantity=16,
         )
     )
-    coterm_date = datetime.today() + timedelta(days=20)
+    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
@@ -261,7 +261,7 @@ def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
             old_quantity=16,
         )
     )
-    coterm_date = datetime.today() + timedelta(days=10)
+    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=10)
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
 
     mocked_adobe_client = mocker.MagicMock()
@@ -303,7 +303,7 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
             old_quantity=16,
         )
     )
-    coterm_date = datetime.today() + timedelta(days=20)
+    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
@@ -362,8 +362,6 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
 
 
 def test_validate_change_order(mocker):
-    """Tests the validate order entrypoint function when it validates."""
-
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(

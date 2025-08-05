@@ -1,4 +1,4 @@
-from datetime import date, datetime
+import datetime as dt
 
 import pytest
 from freezegun import freeze_time
@@ -75,12 +75,6 @@ def test_transfer(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -382,7 +376,8 @@ def test_transfer(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -401,12 +396,6 @@ def test_transfer_with_no_profile_address(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -685,7 +674,8 @@ def test_transfer_with_no_profile_address(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -698,12 +688,6 @@ def test_transfer_not_ready(
     fulfillment_parameters_factory,
     adobe_transfer_factory,
 ):
-    """
-    Tests the continuation of processing a transfer order since in the
-    previous attemp the order has been created but not yet processed
-    on Adobe side. The RetryCount fullfilment paramter must be incremented.
-    The transfer order will not be completed and the processing will be stopped.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -769,9 +753,6 @@ def test_transfer_reached_due_date(
     fulfillment_parameters_factory,
     adobe_transfer_factory,
 ):
-    """
-    Tests that transfer order when it reaches due date fails
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -835,12 +816,6 @@ def test_transfer_unexpected_status(
     mock_mpt_client,
     mock_sync_agreements_by_agreement_ids,
 ):
-    """
-    Tests the processing of a transfer order when the Adobe transfer has been processed
-    unsuccessfully and the status of the transfer returned by Adobe is not documented.
-    The transfer order will be failed with a message that explain that Adobe returned an
-    unexpected error.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -894,10 +869,6 @@ def test_transfer_items_mismatch(
     mock_mpt_client,
     mock_sync_agreements_by_agreement_ids,
 ):
-    """
-    Tests a transfer order when the items contained in the order don't match
-    the subscriptions owned by a given membership id.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -962,9 +933,6 @@ def test_transfer_invalid_membership(
     adobe_api_error_factory,
     transfer_status,
 ):
-    """
-    Tests a transfer order when the membership id is not valid.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-964-112"},
@@ -1034,9 +1002,6 @@ def test_transfer_membership_not_found(
     order_factory,
     transfer_order_parameters_factory,
 ):
-    """
-    Tests a transfer order when the membership id is not found.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-964-112"},
@@ -1105,9 +1070,6 @@ def test_transfer_unrecoverable_status(
     mock_sync_agreements_by_agreement_ids,
     mock_mpt_client,
 ):
-    """
-    Tests a transfer order when it cannot be processed.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -1176,9 +1138,6 @@ def test_create_transfer_fail(
     mock_mpt_client,
     mock_sync_agreements_by_agreement_ids,
 ):
-    """
-    Tests generic failure on transfer order creation.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -1223,7 +1182,7 @@ def test_create_transfer_fail(
     )
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_already_migrated(
     mocker,
     order_factory,
@@ -1394,7 +1353,7 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == dt.datetime(2012, 1, 14, 12, 00, 1, tzinfo=dt.UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -1420,7 +1379,7 @@ def test_fulfill_transfer_order_already_migrated(
     )
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
     mocker,
     order_factory,
@@ -1582,7 +1541,7 @@ def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
     )
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == dt.datetime(2012, 1, 14, 12, 00, 1, tzinfo=dt.UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -1675,7 +1634,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     )
 
     transfer_items = adobe_items_factory(
-        subscription_id="sub-id", renewal_date=date.today().isoformat()
+        subscription_id="sub-id", renewal_date=dt.datetime.now(tz=dt.UTC).date().isoformat()
     ) + adobe_items_factory(
         line_number=2,
         offer_id="99999999CA01A12",
@@ -1729,7 +1688,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     )
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_already_migrated_3yc(
     mocker,
     order_factory,
@@ -1911,7 +1870,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     }
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == dt.datetime(2012, 1, 14, 12, 00, 1, tzinfo=dt.UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -1932,7 +1891,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
     mocked_adobe_client.update_subscription.assert_not_called()
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_fulfill_transfer_order_already_migrated_(
     mocker,
     order_factory,
@@ -2078,7 +2037,7 @@ def test_fulfill_transfer_order_already_migrated_(
     )
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == dt.datetime(2012, 1, 14, 12, 00, 1, tzinfo=dt.UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_transfer.save.assert_called_once()
 
@@ -2251,12 +2210,6 @@ def test_transfer_3yc_customer(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order which customer has 3YC including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1111"},
@@ -2515,7 +2468,8 @@ def test_transfer_3yc_customer(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -2535,12 +2489,6 @@ def test_transfer_3yc_customer_with_no_profile_address(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order which customer has 3YC including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1111"},
@@ -2776,7 +2724,8 @@ def test_transfer_3yc_customer_with_no_profile_address(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -3103,7 +3052,7 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
     }
 
 
-@freeze_time("2012-01-14 12:00:01")
+@freeze_time("2012-01-14 12:00:01", tz_offset=0)
 def test_update_transfer_status_step(
     mocker,
     order_factory,
@@ -3138,7 +3087,7 @@ def test_update_transfer_status_step(
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_transfer.status == "synchronized"
-    assert mocked_transfer.synchronized_at == datetime(2012, 1, 14, 12, 00, 1)
+    assert mocked_transfer.synchronized_at == dt.datetime(2012, 1, 14, 12, 00, 1, tzinfo=dt.UTC)
     assert mocked_transfer.mpt_order_id == order["id"]
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -3158,12 +3107,6 @@ def test_transfer_gc_account_all_deployments_created(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -3485,7 +3428,8 @@ def test_transfer_gc_account_all_deployments_created(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
     mocked_get_gc_agreement_deployments_by_main_agreement()
     mocked_get_gc_main_agreement.assert_called_once_with(
@@ -3508,12 +3452,6 @@ def test_transfer_gc_account_no_deployments(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -3835,7 +3773,8 @@ def test_transfer_gc_account_no_deployments(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
     assert mocked_get_gc_main_agreement.mock_calls[0].args == (
         "PRD-1111-1111",
@@ -3862,12 +3801,6 @@ def test_transfer_gc_account_create_deployments(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -4022,12 +3955,6 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -4190,12 +4117,6 @@ def test_transfer_gc_account_pending_deployments(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -4273,12 +4194,6 @@ def test_transfer_gc_account_main_agreement_error_status(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -4353,12 +4268,6 @@ def test_transfer_gc_account_no_items_error_main_agreement(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -4546,12 +4455,6 @@ def test_transfer_gc_account_some_deployments_not_created(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -4592,7 +4495,7 @@ def test_transfer_gc_account_some_deployments_not_created(
         items=adobe_items_factory(
             subscription_id="a-sub-id",
             deployment_id="deployment-id",
-            currencyCode="EUR",
+            currency_code="EUR",
             offer_id="653045798CA01A12",
             deployment_currency_code="EUR",
         )
@@ -4602,14 +4505,14 @@ def test_transfer_gc_account_some_deployments_not_created(
             offer_id="99999999CA01A12",
             subscription_id="one-time-sub-id",
             deployment_id="deployment-id-2",
-            currencyCode="EUR",
+            currency_code="EUR",
             deployment_currency_code="EUR",
         )
         + adobe_items_factory(
             line_number=4,
             subscription_id="a-sub-id2",
             deployment_id="deployment-id",
-            currencyCode="USD",
+            currency_code="USD",
             offer_id="65304579CA01A12",
             deployment_currency_code="USD",
         ),
@@ -5101,7 +5004,7 @@ def test_sync_gc_main_agreement_step(
     mocked_gc_main_agreement.main_agreement_id = "agr-id"
     mocked_gc_main_agreement.status = STATUS_GC_PENDING
 
-    step = SyncGCMainAgreement(mocked_transfer, mocked_gc_main_agreement, STATUS_GC_TRANSFERRED)
+    step = SyncGCMainAgreement(mocked_transfer, mocked_gc_main_agreement)
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_gc_main_agreement.status == STATUS_GC_TRANSFERRED
@@ -5385,12 +5288,6 @@ def test_transfer_not_ready_not_commercial(
     fulfillment_parameters_factory,
     adobe_transfer_factory,
 ):
-    """
-    Tests the continuation of processing a transfer order since in the
-    previous attemp the order has been created but not yet processed
-    on Adobe side. The RetryCount fullfilment paramter must be incremented.
-    The transfer order will not be completed and the processing will be stopped.
-    """
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -5465,12 +5362,6 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     items_factory,
     subscriptions_factory,
 ):
-    """
-    Tests the processing of a transfer order including:
-        * order creation
-        * subscription creation
-        * order completion
-    """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
@@ -5785,7 +5676,8 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     mocked_sync_agreement.assert_called_once_with(
         mocked_mpt_client,
         [order["agreement"]["id"]],
-        False,
+        dry_run=False,
+        sync_prices=False,
     )
     assert mocked_get_gc_main_agreement.mock_calls[0].args == (
         "PRD-1111-1111",

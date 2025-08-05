@@ -723,10 +723,6 @@ def test_create_customer_step_handle_error_invalid_fields(
 
 
 def test_fulfill_purchase_order(mocker):
-    """
-    Tests the purchase order pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(

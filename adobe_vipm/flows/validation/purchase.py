@@ -65,14 +65,25 @@ logger = logging.getLogger(__name__)
 
 
 class CheckPurchaseValidationEnabled(Step):
+    """Checks that all required parameters for validation are marked as required."""
+
     def __call__(self, client, context, next_step):
+        """Checks that all required parameters for validation are marked as required."""
         if not is_purchase_validation_enabled(context.order):
             return
         next_step(client, context)
 
 
 class ValidateCustomerData(Step):
+    """Validates provided customer data from the MPT order."""
+
     def validate_3yc(self, context):
+        """
+        Validates 3YC parameters in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
         p3yc = context.customer_data[Param.THREE_YC]
 
         if p3yc != ["Yes"]:
@@ -116,6 +127,12 @@ class ValidateCustomerData(Step):
             )
 
     def validate_company_name(self, context):
+        """
+        Validates Company name parameter in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
         param = get_ordering_parameter(context.order, Param.COMPANY_NAME)
         name = context.customer_data[Param.COMPANY_NAME]
         if not is_valid_company_name_length(name):
@@ -134,7 +151,13 @@ class ValidateCustomerData(Step):
                 ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"]),
             )
 
-    def validate_address(self, context):
+    def validate_address(self, context):  # noqa: C901
+        """
+        Validates address parameter in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
         param = get_ordering_parameter(context.order, Param.ADDRESS)
         address = context.customer_data[Param.ADDRESS]
         errors = []
@@ -208,7 +231,13 @@ class ValidateCustomerData(Step):
             address,
         )
 
-    def validate_contact(self, context):
+    def validate_contact(self, context):  # noqa: C901
+        """
+        Validates contact parameter in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
         contact = context.customer_data[Param.CONTACT]
         param = get_ordering_parameter(context.order, Param.CONTACT)
         errors = []
@@ -251,6 +280,7 @@ class ValidateCustomerData(Step):
             )
 
     def __call__(self, client, context, next_step):
+        """Validates provided customer data from the MPT order."""
         self.validate_company_name(context)
         self.validate_address(context)
         self.validate_contact(context)
@@ -263,13 +293,14 @@ class ValidateCustomerData(Step):
 
 
 def validate_purchase_order(client, order):
+    """Validate purchase order pipeline."""
     pipeline = Pipeline(
         SetupContext(),
         PrepareCustomerData(),
         CheckPurchaseValidationEnabled(),
         ValidateCustomerData(),
         ValidateDuplicateLines(),
-        Validate3YCCommitment(True),
+        Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),
         UpdatePrices(),
     )

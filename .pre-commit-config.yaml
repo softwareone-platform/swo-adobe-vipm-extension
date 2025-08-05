@@ -21,3 +21,8 @@ repos:
     rev: 0.7.21
     hooks:
       - id: uv-lock
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.3.0
+    hooks:
+    -   id: flake8

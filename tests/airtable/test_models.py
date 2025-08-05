@@ -1,5 +1,5 @@
+import datetime as dt
 from collections import defaultdict
-from datetime import date
 
 import pytest
 from requests import HTTPError
@@ -47,16 +47,16 @@ def test_airtable_base_info_for_migrations(settings):
 
 def test_get_transfer_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    Transfer = get_transfer_model(base_info)
-    assert Transfer.get_api().api_key == base_info.api_key
-    assert Transfer.get_base().id == base_info.base_id
+    transfer_model = get_transfer_model(base_info)
+    assert transfer_model.get_api().api_key == base_info.api_key
+    assert transfer_model.get_base().id == base_info.base_id
 
 
 def test_get_offer_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    Offer = get_offer_model(base_info)
-    assert Offer.get_api().api_key == base_info.api_key
-    assert Offer.get_base().id == base_info.base_id
+    offer_model = get_offer_model(base_info)
+    assert offer_model.get_api().api_key == base_info.api_key
+    assert offer_model.get_base().id == base_info.base_id
 
 
 def test_get_offer_ids_by_membership_id(mocker, settings):
@@ -98,7 +98,7 @@ def test_create_offers(mocker, settings):
             "transfer": [mocked_transfer],
             "offer_id": "offer-id",
             "quantity": 234,
-            "renewal_date": date(2022, 11, 23),
+            "renewal_date": dt.date(2022, 11, 23),
         }
     ]
 
@@ -227,9 +227,9 @@ def test_airtable_base_info_for_pricing(settings):
 
 def test_get_pricelist_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    PriceList = get_pricelist_model(base_info)
-    assert PriceList.get_api().api_key == base_info.api_key
-    assert PriceList.get_base().id == base_info.base_id
+    pricelist_model = get_pricelist_model(base_info)
+    assert pricelist_model.get_api().api_key == base_info.api_key
+    assert pricelist_model.get_base().id == base_info.base_id
 
 
 def test_get_prices_for_skus(mocker, settings):
@@ -277,27 +277,27 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
     price_item_1 = mocker.MagicMock()
     price_item_1.sku = "sku-1"
     price_item_1.currency = "currency"
-    price_item_1.valid_from = date.fromisoformat("2024-01-01")
-    price_item_1.valid_until = date.fromisoformat("2025-01-01")
+    price_item_1.valid_from = dt.date.fromisoformat("2024-01-01")
+    price_item_1.valid_until = dt.date.fromisoformat("2025-01-01")
     price_item_1.unit_pp = 12.44
     price_item_2 = mocker.MagicMock()
     price_item_2.sku = "sku-2"
     price_item_2.currency = "currency"
-    price_item_2.valid_from = date.fromisoformat("2024-01-01")
+    price_item_2.valid_from = dt.date.fromisoformat("2024-01-01")
     price_item_2.valid_until = None
     price_item_2.unit_pp = 31.23
     price_item_3 = mocker.MagicMock()
     price_item_3.sku = "sku-1"
     price_item_3.unit_pp = 43.10
     price_item_3.currency = "currency"
-    price_item_3.valid_from = date.fromisoformat("2024-01-01")
+    price_item_3.valid_from = dt.date.fromisoformat("2024-01-01")
     price_item_3.valid_until = None
     mocked_pricelist_model.all.return_value = [price_item_1, price_item_2, price_item_3]
 
     prices = get_prices_for_3yc_skus(
         "product_id",
         "currency",
-        date.fromisoformat("2024-03-03"),
+        dt.date.fromisoformat("2024-03-03"),
         ["sku-1", "sku-2"],
     )
 
@@ -329,14 +329,12 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
 
 def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cache_factory):
     cache = defaultdict(list)
-    cache["sku-1"].append(
-        {
-            "currency": "currency",
-            "valid_from": date.fromisoformat("2024-01-01"),
-            "valid_until": date.fromisoformat("2025-01-01"),
-            "unit_pp": 12.44,
-        }
-    )
+    cache["sku-1"].append({
+        "currency": "currency",
+        "valid_from": dt.date.fromisoformat("2024-01-01"),
+        "valid_until": dt.date.fromisoformat("2025-01-01"),
+        "unit_pp": 12.44,
+    })
     mock_pricelist_cache_factory(cache=cache)
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -350,7 +348,7 @@ def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cach
     price_item_2 = mocker.MagicMock()
     price_item_2.sku = "sku-2"
     price_item_2.currency = "currency"
-    price_item_2.valid_from = date.fromisoformat("2024-01-01")
+    price_item_2.valid_from = dt.date.fromisoformat("2024-01-01")
     price_item_2.valid_until = None
     price_item_2.unit_pp = 31.23
     mocked_pricelist_model.all.return_value = [price_item_2]
@@ -358,7 +356,7 @@ def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cach
     prices = get_prices_for_3yc_skus(
         "product_id",
         "currency",
-        date.fromisoformat("2024-03-03"),
+        dt.date.fromisoformat("2024-03-03"),
         ["sku-1", "sku-2"],
     )
 
@@ -379,14 +377,12 @@ def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cach
 
 def test_get_prices_for_3yc_skus_just_cache(mocker, settings, mock_pricelist_cache_factory):
     cache = defaultdict(list)
-    cache["sku-1"].append(
-        {
-            "currency": "currency",
-            "valid_from": date.fromisoformat("2024-01-01"),
-            "valid_until": date.fromisoformat("2025-01-01"),
-            "unit_pp": 12.44,
-        }
-    )
+    cache["sku-1"].append({
+        "currency": "currency",
+        "valid_from": dt.date.fromisoformat("2024-01-01"),
+        "valid_until": dt.date.fromisoformat("2025-01-01"),
+        "unit_pp": 12.44,
+    })
     mock_pricelist_cache_factory(cache=cache)
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -401,7 +397,7 @@ def test_get_prices_for_3yc_skus_just_cache(mocker, settings, mock_pricelist_cac
     prices = get_prices_for_3yc_skus(
         "product_id",
         "currency",
-        date.fromisoformat("2024-03-03"),
+        dt.date.fromisoformat("2024-03-03"),
         ["sku-1"],
     )
 
@@ -414,16 +410,16 @@ def test_get_prices_for_3yc_skus_just_cache(mocker, settings, mock_pricelist_cac
 
 def test_get_gc_main_agreement_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    GCMainAgreement = get_gc_main_agreement_model(base_info)
-    assert GCMainAgreement.get_api().api_key == base_info.api_key
-    assert GCMainAgreement.get_base().id == base_info.base_id
+    gc_main_agreement_model = get_gc_main_agreement_model(base_info)
+    assert gc_main_agreement_model.get_api().api_key == base_info.api_key
+    assert gc_main_agreement_model.get_base().id == base_info.base_id
 
 
 def test_get_gc_agreement_deployment_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    GCAgreementDeployment = get_gc_agreement_deployment_model(base_info)
-    assert GCAgreementDeployment.get_api().api_key == base_info.api_key
-    assert GCAgreementDeployment.get_base().id == base_info.base_id
+    gc_agreement_deployment_model = get_gc_agreement_deployment_model(base_info)
+    assert gc_agreement_deployment_model.get_api().api_key == base_info.api_key
+    assert gc_agreement_deployment_model.get_base().id == base_info.base_id
 
 
 def test_create_gc_agreement_deployments(mocker, settings):
@@ -464,9 +460,9 @@ def test_create_gc_agreement_deployments(mocker, settings):
 
     create_gc_agreement_deployments("product_id", agreement_deployment)
 
-    mocked_gc_agreement_deployment_model.batch_save.assert_called_once_with(
-        [mocked_gc_agreement_deployment]
-    )
+    mocked_gc_agreement_deployment_model.batch_save.assert_called_once_with([
+        mocked_gc_agreement_deployment
+    ])
 
     mocked_gc_agreement_deployment_model.assert_called_once_with(
         deployment_id=agreement_deployment[0]["deployment_id"],
@@ -660,9 +656,9 @@ def test_get_agreement_deployment_view_link_exception(mocker, settings):
 
 def test_get_sku_adobe_mapping_model():
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
-    SkuMappingModel = get_sku_adobe_mapping_model(base_info)
-    assert SkuMappingModel.get_api().api_key == base_info.api_key
-    assert SkuMappingModel.get_base().id == base_info.base_id
+    sku_mapping_model = get_sku_adobe_mapping_model(base_info)
+    assert sku_mapping_model.get_api().api_key == base_info.api_key
+    assert sku_mapping_model.get_base().id == base_info.base_id
 
 
 def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):

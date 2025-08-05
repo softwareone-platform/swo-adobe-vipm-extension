@@ -1,8 +1,8 @@
 import copy
+import datetime as dt
 import json
 import signal
 from collections import defaultdict
-from datetime import UTC, date, datetime, timedelta
 
 import jwt
 import pytest
@@ -27,19 +27,12 @@ from adobe_vipm.flows.constants import AgreementStatus, Param
 
 @pytest.fixture
 def requests_mocker():
-    """
-    Allow mocking of http calls made with requests.
-    """
     with responses.RequestsMock() as rsps:
         yield rsps
 
 
 @pytest.fixture
 def adobe_api_error_factory():
-    """
-    Generate an error message returned by Adobe.
-    """
-
     def _adobe_error(code, message, details=None):
         error = {
             "code": code,
@@ -54,9 +47,6 @@ def adobe_api_error_factory():
 
 @pytest.fixture
 def adobe_config_file():
-    """
-    Return an Adobe VIP Marketplace configuration file
-    """
     return {
         "language_codes": ["en-US"],
         "skus_mapping": [
@@ -217,9 +207,6 @@ def adobe_config_file():
 
 @pytest.fixture
 def adobe_credentials_file():
-    """
-    Return an Adobe VIP Marketplace credentials file
-    """
     return [
         {
             "authorization_uk": "uk-auth-adobe-us-01",
@@ -234,9 +221,6 @@ def adobe_credentials_file():
 
 @pytest.fixture
 def adobe_authorizations_file():
-    """
-    Return an Adobe VIP Marketplace authorizations file
-    """
     return {
         "authorizations": [
             {
@@ -259,10 +243,6 @@ def adobe_authorizations_file():
 
 @pytest.fixture
 def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file):
-    """
-    Mock the Adobe Config object to load test data from the adobe_credentials and
-    adobe_config_file fixtures.
-    """
     mocker.patch.object(Config, "_load_credentials", return_value=adobe_credentials_file)
     mocker.patch.object(Config, "_load_authorizations", return_value=adobe_authorizations_file)
     mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
@@ -270,10 +250,6 @@ def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file,
 
 @pytest.fixture
 def account_data():
-    """
-    Returns a adobe account data structure.
-
-    """
     return {
         "companyName": "ACME Inc",
         "address": {
@@ -834,7 +810,7 @@ def pricelist_items_factory():
 
 
 @pytest.fixture
-def lines_factory(agreement, deployment_id: str = None):
+def lines_factory(agreement, deployment_id=None):
     agreement_id = agreement["id"].split("-", 1)[1]
 
     def _items(
@@ -898,10 +874,12 @@ def subscriptions_factory(lines_factory, subscription_price_factory):
         start_date=None,
         commitment_date=None,
         lines=None,
-        auto_renew=True,
+        auto_renew=True,  # noqa: FBT002
         price=None,
     ):
-        start_date = start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
+        start_date = (
+            start_date.isoformat() if start_date else dt.datetime.now(tz=dt.UTC).isoformat()
+        )
         lines = lines_factory() if lines is None else lines
         price = price or subscription_price_factory()
         return [
@@ -938,7 +916,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
-        use_buyer_address=False,
+        use_buyer_address=False,  # noqa: FBT002
         subscriptions=None,
         fulfillment_parameters=None,
         ordering_parameters=None,
@@ -1159,10 +1137,6 @@ def order_factory(
     status="Processing",
     deployment_id="",
 ):
-    """
-    Marketplace platform order for tests.
-    """
-
     def _order(
         order_id="ORD-0792-5000-2253-4210",
         order_type="Purchase",
@@ -1290,7 +1264,7 @@ def webhook(settings):
 
 
 @pytest.fixture
-def adobe_items_factory():
+def adobe_items_factory():  # noqa: C901
     def _items(
         line_number=1,
         offer_id="65304578CA01A12",
@@ -1299,7 +1273,7 @@ def adobe_items_factory():
         renewal_date=None,
         status=None,
         deployment_id=None,
-        currencyCode=None,
+        currency_code=None,
         deployment_currency_code=None,
     ):
         item = {
@@ -1307,8 +1281,8 @@ def adobe_items_factory():
             "offerId": offer_id,
             "quantity": quantity,
         }
-        if currencyCode:
-            item["currencyCode"] = currencyCode
+        if currency_code:
+            item["currencyCode"] = currency_code
         if deployment_id:
             item["deploymentId"] = deployment_id
             item["currencyCode"] = deployment_currency_code
@@ -1324,7 +1298,7 @@ def adobe_items_factory():
 
 
 @pytest.fixture
-def adobe_order_factory(adobe_items_factory):
+def adobe_order_factory(adobe_items_factory):  # noqa: C901
     def _order(
         order_type,
         currency_code="USD",
@@ -1352,7 +1326,7 @@ def adobe_order_factory(adobe_items_factory):
             order["referenceOrderId"] = reference_order_id
         if status:
             order["status"] = status
-        if status in [AdobeStatus.PENDING.value, AdobeStatus.PROCESSED.value] or order_id:
+        if status in {AdobeStatus.PENDING.value, AdobeStatus.PROCESSED.value} or order_id:
             order["orderId"] = order_id or "P0123456789"
         if creation_date:
             order["creationDate"] = creation_date
@@ -1369,11 +1343,13 @@ def adobe_subscription_factory():
         current_quantity=10,
         renewal_quantity=10,
         currency_code="USD",
-        autorenewal_enabled=True,
+        autorenewal_enabled=True,  # noqa: FBT002
         deployment_id="",
         status=AdobeStatus.PROCESSED.value,
         renewal_date=None,
     ):
+        default_renewal_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=366)
+
         return {
             "subscriptionId": subscription_id or "a-sub-id",
             "offerId": offer_id or "65304578CA01A12",
@@ -1384,7 +1360,7 @@ def adobe_subscription_factory():
                 "renewalQuantity": renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
-            "renewalDate": renewal_date or (date.today() + timedelta(days=366)).isoformat(),
+            "renewalDate": renewal_date or default_renewal_date.isoformat(),
             "status": status,
             "deploymentId": deployment_id,
         }
@@ -1398,7 +1374,7 @@ def adobe_preview_transfer_factory(adobe_items_factory):
         items = (
             items
             if items is not None
-            else adobe_items_factory(renewal_date=date.today().isoformat())
+            else adobe_items_factory(renewal_date=dt.datetime.now(tz=dt.UTC).date().isoformat())
         )
         return {
             "totalCount": len(items),
@@ -1413,13 +1389,10 @@ def adobe_reseller_change_preview_factory(
     adobe_items_factory,
 ):
     def _preview(items=None, approval_expiry=None):
-        items = (
-            items
-            if items is not None
-            else adobe_items_factory(renewal_date=date.today().isoformat())
-        )
+        today = dt.datetime.now(tz=dt.UTC).today()
+        items = items if items is not None else adobe_items_factory(renewal_date=today.isoformat())
         if approval_expiry is None:
-            approval_expiry = (date.today() + timedelta(days=5)).isoformat()
+            approval_expiry = (today + dt.timedelta(days=5)).isoformat()
         return {
             "transferId": "",
             "customerId": "P1005238996",
@@ -1443,15 +1416,13 @@ def adobe_transfer_factory(adobe_items_factory):
         items=None,
         membership_id="membership-id",
     ):
-        transfer = {
+        return {
             "transferId": transfer_id,
             "customerId": customer_id,
             "status": status,
             "membershipId": membership_id,
             "lineItems": items or adobe_items_factory(),
         }
-
-        return transfer
 
     return _transfer
 
@@ -1462,11 +1433,6 @@ def adobe_client_factory(
     mock_adobe_config,
     adobe_authorizations_file,
 ):
-    """
-    Returns a factory that allow the creation of an instance
-    of the AdobeClient with a fake token ready for tests.
-    """
-
     def _factory():
         authorization = Authorization(
             authorization_uk=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
@@ -1479,40 +1445,32 @@ def adobe_client_factory(
         )
         api_token = APIToken(
             "a-token",
-            expires=datetime.now() + timedelta(seconds=86000),
+            expires=dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=86000),
         )
         client = AdobeClient()
-        client._token_cache[authorization] = api_token
+        client._token_cache[authorization] = api_token  # noqa: SLF001
 
         return client, authorization, api_token
 
     return _factory
 
 
+# TODO: what the difference between mpt_client and mock_mpt_client fixtures?????
 @pytest.fixture
 def mpt_client(settings):
-    """
-    Create an instance of the MPT client used by the extension.
-    """
     settings.MPT_API_BASE_URL = "https://localhost"
-    from mpt_extension_sdk.core.utils import setup_client
+    from mpt_extension_sdk.core.utils import setup_client  # noqa: PLC0415
 
     return setup_client()
 
 
 @pytest.fixture
 def mock_mpt_client(mocker):
-    """
-    Create an instance of the MPT client used by the extension.
-    """
     return mocker.MagicMock(spec=MPTClient)
 
 
 @pytest.fixture
 def mock_setup_client(mocker, mock_mpt_client):
-    """
-    Create an instance of the MPT client used by the extension.
-    """
     mocker.patch(
         "adobe_vipm.management.commands.sync_3yc_enrollments.setup_client",
         return_value=mock_mpt_client,
@@ -1522,7 +1480,7 @@ def mock_setup_client(mocker, mock_mpt_client):
 
 @pytest.fixture
 def created_agreement_factory():
-    def _created_agreement(deployments="", is_profile_address_exists=True):
+    def _created_agreement(deployments="", *, is_profile_address_exists=True):
         created_agreement = {
             "status": "Active",
             "listing": {"id": "LST-9401-9279"},
@@ -1564,19 +1522,17 @@ def created_agreement_factory():
             "termsAndConditions": [],
         }
         if is_profile_address_exists:
-            created_agreement["parameters"]["ordering"].append(
-                {
-                    "externalId": "address",
-                    "value": {
-                        "addressLine1": "addressLine1",
-                        "addressLine2": "addressLine2",
-                        "city": "city",
-                        "country": "US",
-                        "postCode": "postalCode",
-                        "state": "region",
-                    },
-                }
-            )
+            created_agreement["parameters"]["ordering"].append({
+                "externalId": "address",
+                "value": {
+                    "addressLine1": "addressLine1",
+                    "addressLine2": "addressLine2",
+                    "city": "city",
+                    "country": "US",
+                    "postCode": "postalCode",
+                    "state": "region",
+                },
+            })
         return created_agreement
 
     return _created_agreement
@@ -1584,10 +1540,6 @@ def created_agreement_factory():
 
 @pytest.fixture
 def mpt_error_factory():
-    """
-    Generate an error message returned by the Marketplace platform.
-    """
-
     def _mpt_error(
         status,
         title,
@@ -1611,22 +1563,16 @@ def mpt_error_factory():
 
 @pytest.fixture
 def airtable_error_factory():
-    """
-    Generate an error message returned by the Airtable API.
-    """
-
     def _airtable_error(
         message,
         error_type="INVALID_REQUEST_UNKNOWN",
     ):
-        error = {
+        return {
             "error": {
                 "type": error_type,
                 "message": message,
             }
         }
-
-        return error
 
     return _airtable_error
 
@@ -1643,7 +1589,7 @@ def mpt_list_response():
 
 @pytest.fixture
 def jwt_token(settings):
-    iat = nbf = int(datetime.now().timestamp())
+    iat = nbf = int(dt.datetime.now(tz=dt.UTC).timestamp())
     exp = nbf + 300
     return jwt.encode(
         {
@@ -1714,6 +1660,7 @@ def adobe_customer_factory():
         licenses_discount_level="01",
         consumables_discount_level="T1",
         coterm_date="2024-01-23",
+        *,
         global_sales_enabled=False,
         company_profile_address_exists=True,
     ):
@@ -2001,8 +1948,9 @@ def mock_logging_all_prefixes(
 
 @pytest.fixture
 def mock_highlights(mock_logging_all_prefixes):
-    return _ReprHighlighter.highlights + [
-        rf"(?P<mpt_id>(?:{'|'.join(mock_logging_all_prefixes)})(?:-\d{{4}})*)"
+    return [
+        *_ReprHighlighter.highlights,
+        rf"(?P<mpt_id>(?:{'|'.join(mock_logging_all_prefixes)})(?:-\d{{4}})*)",
     ]
 
 
@@ -2142,19 +2090,21 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
         base_id="base-id",
     )
 
-    AdobeProductMapping = get_sku_adobe_mapping_model(base_info)
+    adobe_product_mapping_model = get_sku_adobe_mapping_model(base_info)
 
-    all_sku = {i["vendor_external_id"]: AdobeProductMapping(**i) for i in mock_sku_mapping_data}
-    mocker.patch.object(AdobeProductMapping, "all", return_value=all_sku)
+    all_sku = {
+        i["vendor_external_id"]: adobe_product_mapping_model(**i) for i in mock_sku_mapping_data
+    }
+    mocker.patch.object(adobe_product_mapping_model, "all", return_value=all_sku)
 
     def from_id(external_id):
         if external_id not in all_sku:
             raise AdobeProductNotFoundError("Not Found")
         return all_sku[external_id]
 
-    AdobeProductMapping.from_id = from_id
-    AdobeProductMapping.from_short_id = from_id
-    return AdobeProductMapping
+    adobe_product_mapping_model.from_id = from_id
+    adobe_product_mapping_model.from_short_id = from_id
+    return adobe_product_mapping_model
 
 
 @pytest.fixture

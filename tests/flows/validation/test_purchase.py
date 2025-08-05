@@ -48,9 +48,6 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
     ],
 )
 def test_validate_company_name(order_factory, order_parameters_factory, company_name):
-    """
-    Tests the validation of the Company name when it is valid.
-    """
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
 
@@ -78,9 +75,6 @@ def test_validate_company_name(order_factory, order_parameters_factory, company_
 def test_validate_company_name_invalid_length(
     order_factory, order_parameters_factory, company_name
 ):
-    """
-    Tests the validation of the Company name when it is invalid due to length.
-    """
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
 
@@ -110,9 +104,6 @@ def test_validate_company_name_invalid_length(
     ],
 )
 def test_validate_company_name_invalid_chars(order_factory, order_parameters_factory, company_name):
-    """
-    Tests the validation of the Company name when it is invalid due to chars.
-    """
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
     context = Context(
@@ -134,9 +125,6 @@ def test_validate_company_name_invalid_chars(order_factory, order_parameters_fac
 @pytest.mark.parametrize("state_or_province", ["CA", "California", "Californio"])
 @pytest.mark.parametrize("address_line_2", ["", "a value"])
 def test_validate_address(order_factory, address_line_2, state_or_province):
-    """
-    Tests the validation of a valid address.
-    """
     order = order_factory()
     customer_data = get_customer_data(order)
     customer_data[Param.ADDRESS.value]["addressLine2"] = address_line_2
@@ -159,9 +147,6 @@ def test_validate_address(order_factory, address_line_2, state_or_province):
 
 
 def test_validate_address_invalid_country(order_factory, order_parameters_factory):
-    """
-    Tests the validation of an address when the country is invalid.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             address={
@@ -199,9 +184,6 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
 
 
 def test_validate_address_invalid_state(order_factory, order_parameters_factory):
-    """
-    Tests the validation of an address when the state or province is invalid.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             address={
@@ -277,10 +259,6 @@ def test_validate_address_invalid_state_did_u_mean(order_factory, order_paramete
 
 
 def test_validate_address_invalid_postal_code(order_factory, order_parameters_factory):
-    """
-    Tests the validation of an address when the postal code doesn't match
-    the expected pattern.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             address={
@@ -318,10 +296,6 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
 
 
 def test_validate_address_invalid_postal_code_length(order_factory, order_parameters_factory):
-    """
-    Tests the validation of an address when the postal code doesn't match
-    the expected length.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             address={
@@ -359,10 +333,6 @@ def test_validate_address_invalid_postal_code_length(order_factory, order_parame
 
 
 def test_validate_address_invalid_others(order_factory, order_parameters_factory):
-    """
-    Tests the validation of an address when address lines or city exceed the the
-    maximum allowed length.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             address={
@@ -391,25 +361,17 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
         context.order,
         Param.ADDRESS.value,
     )
+    errors = f"{ERR_ADDRESS_LINE_1_LENGTH}; {ERR_CITY_LENGTH}; {ERR_ADDRESS_LINE_2_LENGTH}"
 
     assert param["error"] == ERR_ADDRESS.to_dict(
         title=param["name"],
-        errors="; ".join(
-            (
-                ERR_ADDRESS_LINE_1_LENGTH,
-                ERR_CITY_LENGTH,
-                ERR_ADDRESS_LINE_2_LENGTH,
-            ),
-        ),
+        errors=errors,
     )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
 
 def test_validate_contact(order_factory):
-    """
-    Tests the validation of a valid contact.
-    """
     order = order_factory()
     customer_data = get_customer_data(order)
 
@@ -461,9 +423,6 @@ def test_validate_contact_mandatory(order_factory, order_parameters_factory):
 
 
 def test_validate_contact_invalid_first_name(order_factory, order_parameters_factory):
-    """
-    Tests the validation of a contact when the first name is invalid.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             contact={
@@ -498,9 +457,6 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
 
 
 def test_validate_contact_invalid_last_name(order_factory, order_parameters_factory):
-    """
-    Tests the validation of a contact when the last name is invalid.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             contact={
@@ -535,9 +491,6 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
 
 
 def test_validate_contact_invalid_email(order_factory, order_parameters_factory):
-    """
-    Tests the validation of a contact when the email is invalid.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             contact={
@@ -572,9 +525,6 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
 
 
 def test_validate_contact_invalid_phone(order_factory, order_parameters_factory):
-    """
-    Tests the validation of a contact when the phone is invalid.
-    """
     order = order_factory(
         order_parameters=order_parameters_factory(
             contact={
@@ -613,11 +563,6 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
 
 
 def test_validate_customer_data_step(mocker):
-    """
-    Test that the validation functions are invoked
-    and the validation pipeline continue to the next
-    step.
-    """
     mocked_validate_company_name = mocker.patch.object(
         ValidateCustomerData,
         "validate_company_name",
@@ -651,11 +596,6 @@ def test_validate_customer_data_step(mocker):
 
 
 def test_validate_customer_data_step_no_validate(mocker):
-    """
-    Test that the validation functions are invoked
-    but the validation pipeline doesn't continue to the next
-    step because at least one validation failed.
-    """
     mocked_validate_company_name = mocker.patch.object(
         ValidateCustomerData,
         "validate_company_name",
@@ -828,8 +768,6 @@ def test_check_purchase_validation_enabled_step_disabled(mocker, order_factory):
 
 
 def test_validate_purchase_order(mocker):
-    """Tests the validate order entrypoint function when it validates."""
-
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(

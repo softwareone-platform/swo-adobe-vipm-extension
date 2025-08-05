@@ -11,6 +11,8 @@ from adobe_vipm.adobe.utils import join_phone_number
 
 
 class CustomerClientMixin:
+    """Adobe Client Mixin to manage Customers flows of Adobe VIPM."""
+
     @wrap_http_error
     def create_customer_account(
         self,
@@ -20,16 +22,22 @@ class CustomerClientMixin:
         market_segment: str,
         customer_data: dict,
     ) -> dict:
+        """
+        Create customer account.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            seller_id: MPT Seller ID.
+            agreement_id: MPT Agreement ID what belongs to customer
+            market_segment: Adobe Customer segment
+            customer_data: Customer data including companyName, address, contact, 3YCLicensees
+
+        Returns:
+            dict: Customer.
+        """
         authorization = self._config.get_authorization(authorization_id)
         reseller: Reseller = self._config.get_reseller(authorization, seller_id)
         company_name: str = f"{customer_data['companyName']} ({agreement_id})"
-        country = self._config.get_country(customer_data["address"]["country"])
-        state_or_province = customer_data["address"]["state"]
-        state_code = (
-            state_or_province
-            if not country.provinces_to_code
-            else country.provinces_to_code.get(state_or_province, state_or_province)
-        )
         payload = {
             "resellerId": reseller.id,
             "externalReferenceId": agreement_id,
@@ -39,23 +47,8 @@ class CustomerClientMixin:
                     customer_data["address"]["country"],
                 ),
                 "marketSegment": market_segment,
-                "address": {
-                    "country": customer_data["address"]["country"],
-                    "region": state_code,
-                    "city": customer_data["address"]["city"],
-                    "addressLine1": customer_data["address"]["addressLine1"],
-                    "addressLine2": customer_data["address"]["addressLine2"],
-                    "postalCode": customer_data["address"]["postCode"],
-                    "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
-                },
-                "contacts": [
-                    {
-                        "firstName": customer_data["contact"]["firstName"],
-                        "lastName": customer_data["contact"]["lastName"],
-                        "email": customer_data["contact"]["email"],
-                        "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
-                    },
-                ],
+                "address": self._get_address(customer_data["address"], customer_data["contact"]),
+                "contacts": [self._get_contact(customer_data["contact"])],
             },
         }
         if customer_data["3YC"] == ["Yes"]:
@@ -83,21 +76,24 @@ class CustomerClientMixin:
                 },
             ]
 
-        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
-        headers = self._get_headers(authorization, correlation_id=correlation_id)
         response = requests.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
-            headers=headers,
+            headers=self._get_headers(
+                authorization,
+                correlation_id=sha256(json.dumps(payload).encode()).hexdigest(),
+            ),
             json=payload,
+            timeout=self._TIMEOUT,
         )
 
         response.raise_for_status()
 
         created_customer = response.json()
-        adobe_customer_id = created_customer["customerId"]
         self._logger.info(
-            f"Customer {company_name} "
-            f"created successfully for reseller {reseller.id}: {adobe_customer_id}",
+            "Customer %s created successfully for reseller %s: %s",
+            company_name,
+            reseller.id,
+            created_customer["customerId"],
         )
         return created_customer
 
@@ -107,6 +103,16 @@ class CustomerClientMixin:
         authorization_id: str,
         customer_id: str,
     ) -> dict:
+        """
+        Retrieve customer account.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Adobe customer ID.
+
+        Returns:
+            dict: Customer.
+        """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
         response = requests.get(
@@ -115,6 +121,7 @@ class CustomerClientMixin:
                 f"/v3/customers/{customer_id}",
             ),
             headers=headers,
+            timeout=self._TIMEOUT,
         )
 
         response.raise_for_status()
@@ -126,11 +133,21 @@ class CustomerClientMixin:
         authorization_id: str,
         customer_id: str,
         commitment_request: dict,
-        is_recommitment: bool = False,
+        is_recommitment: bool = False,  # noqa: FBT001, FBT002
     ) -> dict:
-        authorization = self._config.get_authorization(authorization_id)
-        customer = self.get_customer(authorization_id, customer_id)
-        request_type = "commitmentRequest" if not is_recommitment else "recommitmentRequest"
+        """
+        Create 3YC request for account.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Adobe customer ID.
+            commitment_request: commitment request info
+            is_recommitment: is it recommitment or not
+
+        Returns:
+            dict: Customer.
+        """
+        request_type = "recommitmentRequest" if is_recommitment else "commitmentRequest"
         quantities = []
         if commitment_request["3YCLicenses"]:
             quantities.append(
@@ -147,7 +164,7 @@ class CustomerClientMixin:
                 },
             )
         payload = {
-            "companyProfile": customer["companyProfile"],
+            "companyProfile": self.get_customer(authorization_id, customer_id)["companyProfile"],
             "benefits": [
                 {
                     "type": "THREE_YEAR_COMMIT",
@@ -158,13 +175,41 @@ class CustomerClientMixin:
             ],
         }
 
-        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
-        headers = self._get_headers(authorization, correlation_id=correlation_id)
         response = requests.patch(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}"),
-            headers=headers,
+            headers=self._get_headers(
+                self._config.get_authorization(authorization_id),
+                correlation_id=sha256(json.dumps(payload).encode()).hexdigest(),
+            ),
             json=payload,
+            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
-        updated_customer = response.json()
-        return updated_customer
+        return response.json()
+
+    def _get_contact(self, contact: dict) -> dict:
+        return {
+            "firstName": contact["firstName"],
+            "lastName": contact["lastName"],
+            "email": contact["email"],
+            "phoneNumber": join_phone_number(contact["phone"]),
+        }
+
+    def _get_address(self, address: dict, contact: dict) -> dict:
+        state_or_province = address["state"]
+        country = self._config.get_country(address["country"])
+        state_code = (
+            country.provinces_to_code.get(state_or_province, state_or_province)
+            if country.provinces_to_code
+            else state_or_province
+        )
+
+        return {
+            "country": address["country"],
+            "region": state_code,
+            "city": address["city"],
+            "addressLine1": address["addressLine1"],
+            "addressLine2": address["addressLine2"],
+            "postalCode": address["postCode"],
+            "phoneNumber": join_phone_number(contact["phone"]),
+        }

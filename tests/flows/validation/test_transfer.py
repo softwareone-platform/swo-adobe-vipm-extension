@@ -1,11 +1,10 @@
-from datetime import date, timedelta
+import datetime as dt
 from unittest.mock import ANY
 
 import pytest
 from mpt_extension_sdk.mpt_http.wrap_http_error import MPTAPIError
 
 from adobe_vipm.adobe.constants import (
-    UNRECOVERABLE_TRANSFER_STATUSES,
     AdobeStatus,
     ThreeYearCommitmentStatus,
 )
@@ -36,6 +35,7 @@ def test_validate_transfer(
     adobe_items_factory,
     lines_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -47,12 +47,12 @@ def test_validate_transfer(
     )
     product_items = items_factory()
     valid_items = adobe_items_factory(
-        renewal_date=date.today().isoformat(),
+        renewal_date=today.isoformat(),
     )
     expired_items = adobe_items_factory(
         offer_id="65304999CA01A12",
         line_number=2,
-        renewal_date=(date.today() - timedelta(days=5)).isoformat(),
+        renewal_date=(today - dt.timedelta(days=5)).isoformat(),
     )
     items = valid_items + expired_items
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
@@ -98,6 +98,7 @@ def test_validate_transfer_lines_exist(
     adobe_items_factory,
     lines_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -109,12 +110,12 @@ def test_validate_transfer_lines_exist(
     product_items = items_factory()
 
     valid_items = adobe_items_factory(
-        renewal_date=date.today().isoformat(),
+        renewal_date=today.isoformat(),
     )
     expired_items = adobe_items_factory(
         offer_id="65304999CA01A12",
         line_number=2,
-        renewal_date=(date.today() - timedelta(days=5)).isoformat(),
+        renewal_date=(today - dt.timedelta(days=5)).isoformat(),
     )
     items = valid_items + expired_items
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
@@ -156,8 +157,12 @@ def test_validate_transfer_lines_exist(
     [
         AdobeStatus.TRANSFER_INVALID_MEMBERSHIP.value,
         AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS.value,
-    ]
-    + UNRECOVERABLE_TRANSFER_STATUSES,
+        AdobeStatus.TRANSFER_INELIGIBLE.value,
+        AdobeStatus.TRANSFER_ALREADY_TRANSFERRED.value,
+        AdobeStatus.TRANSFER_INACTIVE_RESELLER.value,
+        AdobeStatus.TRANSFER_NO_ADMIN_CONTACTS.value,
+        AdobeStatus.TRANSFER_IN_PROGRESS.value,
+    ],
 )
 def test_validate_transfer_membership_error(
     mocker,
@@ -336,7 +341,7 @@ def test_validate_transfer_already_migrated(
     )
 
     mocked_add_lines_to_order.assert_called_once_with(
-        m_client, ANY, [adobe_subscription], {}, "currentQuantity", True
+        m_client, ANY, [adobe_subscription], {}, "currentQuantity", is_transferred=True
     )
     assert adobe_subscription["offerId"] == "65304578CA03A12"
 
@@ -519,8 +524,9 @@ def test_validate_transfer_account_inactive(
     [ThreeYearCommitmentStatus.ACTIVE.value, ThreeYearCommitmentStatus.COMMITTED.value],
 )
 def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitment_status):
+    today = dt.datetime.now(tz=dt.UTC).date()
     commitment = adobe_commitment_factory(
-        end_date=(date.today() + timedelta(days=1)).isoformat(),
+        end_date=(today + dt.timedelta(days=1)).isoformat(),
         status=commitment_status,
     )
 
@@ -534,14 +540,15 @@ def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitm
     mocked_get_prices_for_skus.assert_called_once_with(
         order["agreement"]["product"]["id"],
         order["agreement"]["listing"]["priceList"]["currency"],
-        date.fromisoformat(commitment["startDate"]),
+        dt.date.fromisoformat(commitment["startDate"]),
         ["sku-1"],
     )
 
 
 def test_get_prices_3yc_expired(mocker, order_factory, adobe_commitment_factory):
+    today = dt.datetime.now(tz=dt.UTC).date()
     commitment = adobe_commitment_factory(
-        end_date=(date.today() - timedelta(days=1)).isoformat(),
+        end_date=(today - dt.timedelta(days=1)).isoformat(),
     )
 
     mocked_get_prices_for_skus = mocker.patch(
@@ -1664,6 +1671,7 @@ def test_validate_transfer_with_one_line_items(
     adobe_items_factory,
     lines_factory,
 ):
+    today = dt.datetime.now(tz=dt.UTC).date()
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
@@ -1678,10 +1686,10 @@ def test_validate_transfer_with_one_line_items(
         items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
     )
     valid_items = adobe_items_factory(
-        renewal_date=date.today().isoformat(),
+        renewal_date=today.isoformat(),
     )
     one_time_item = adobe_items_factory(
-        renewal_date=date.today().isoformat(),
+        renewal_date=today.isoformat(),
         line_number=3,
         offer_id="99999999CA01A12",
     )
@@ -1689,7 +1697,7 @@ def test_validate_transfer_with_one_line_items(
     expired_items = adobe_items_factory(
         offer_id="65304999CA01A12",
         line_number=2,
-        renewal_date=(date.today() - timedelta(days=5)).isoformat(),
+        renewal_date=(today - dt.timedelta(days=5)).isoformat(),
     )
     items = valid_items + expired_items + one_time_item
     adobe_preview_transfer = adobe_preview_transfer_factory(items=items)

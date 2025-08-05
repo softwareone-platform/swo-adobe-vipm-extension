@@ -19,7 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class ValidateDownsizes(Step):
+    """Checks that for downsizes there orders to remove on Adobe side."""
+
     def __call__(self, client, context, next_step):
+        """Checks that for downsizes there orders to remove on Adobe side."""
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
@@ -39,6 +42,7 @@ class ValidateDownsizes(Step):
 
 
 def validate_termination_order(client, order):
+    """Validate termination pipeline."""
     pipeline = Pipeline(
         SetupContext(),
         ValidateDuplicateLines(),

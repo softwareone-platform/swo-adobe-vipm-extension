@@ -1,8 +1,8 @@
 import copy
+import datetime as dt
 import json
 import logging
-import os
-from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
@@ -10,34 +10,46 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-TOKEN_CACHE_FILE = os.path.join(
-    os.path.expanduser("~"),
-    ".nav-token-cache.json",
-)
+TOKEN_CACHE_FILE = Path.home() / ".nav-token-cache.json"
 
 
-def get_token_from_disk():
-    if not os.path.exists(TOKEN_CACHE_FILE):
-        return
+def get_token_from_disk() -> str | None:
+    """Retrieves navision token from file."""
+    token_file_path = Path(TOKEN_CACHE_FILE)
+    if not token_file_path.is_file():
+        return None
 
-    token_data = json.load(open(TOKEN_CACHE_FILE))
-    expires_at = datetime.fromisoformat(token_data["expires_at"])
-    if expires_at < datetime.now(UTC):
-        return
+    token_data = json.load(token_file_path.open(encoding="utf-8"))
+    expires_at = dt.datetime.fromisoformat(token_data["expires_at"]).replace(tzinfo=dt.UTC)
+    if expires_at < dt.datetime.now(tz=dt.UTC):
+        return None
 
     return token_data["access_token"]
 
 
-def save_token_to_disk(token_data):
+def save_token_to_disk(token_data: dict) -> None:
+    """
+    Saves token to file cache.
+
+    Args:
+        token_data: Navision token data.
+    """
     new_token_data = copy.copy(token_data)
     new_token_data["expires_at"] = (
-        datetime.now(UTC) + timedelta(seconds=token_data["expires_in"] - 300)
+        dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=token_data["expires_in"] - 300)
     ).isoformat()
-    with open(TOKEN_CACHE_FILE, "w") as f:
-        f.write(json.dumps(new_token_data))
+
+    with Path(TOKEN_CACHE_FILE).open("w", encoding="utf-8") as token_file:
+        token_file.write(json.dumps(new_token_data))
 
 
-def get_token():
+def get_token() -> tuple[bool, str]:
+    """
+    Retrieves token from the API.
+
+    Returns:
+        Tuple with if token is cached and token itself
+    """
     cached_token = get_token_from_disk()
     if cached_token:
         return True, cached_token
@@ -52,6 +64,7 @@ def get_token():
     resp = requests.post(
         settings.EXTENSION_CONFIG["NAV_AUTH_ENDPOINT_URL"],
         data=payload,
+        timeout=60,
     )
     if resp.status_code == 200:
         token_data = resp.json()
@@ -61,7 +74,16 @@ def get_token():
     return False, f"{resp.status_code} - {resp.content.decode()}"
 
 
-def terminate_contract(cco):
+def terminate_contract(cco: str) -> tuple[bool, str]:
+    """
+    Terminates Navision contract with provided cco.
+
+    Args:
+        cco: CCO number.
+
+    Returns:
+        Tuple with was request succeed and response.
+    """
     ok, response = get_token()
     if not ok:
         return ok, response
@@ -73,6 +95,7 @@ def terminate_contract(cco):
         headers={
             "Authorization": f"Bearer {response}",
         },
+        timeout=60,
     )
     if resp.status_code == 200:
         try:

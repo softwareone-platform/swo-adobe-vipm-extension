@@ -1,6 +1,6 @@
+import datetime as dt
 import itertools
 import logging
-from datetime import datetime, timedelta
 from operator import attrgetter
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -32,15 +32,17 @@ logger = logging.getLogger(__name__)
 
 
 class ValidateDownsizes(Step):
-    @staticmethod
-    def get_returnable_by_quantity_map(returnable_orders):
+    """Validates downsize items in order. Checks if it is possible to return them."""
+
+    def _get_returnable_by_quantity_map(self, returnable_orders):
         returnable_by_quantity = {}
         for r in range(len(returnable_orders), 0, -1):
             for sub in itertools.combinations(returnable_orders, r):
-                returnable_by_quantity[sum([x.quantity for x in sub])] = sub
+                returnable_by_quantity[sum(line_item.quantity for line_item in sub)] = sub
         return returnable_by_quantity
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, client, context, next_step):  # noqa: C901
+        """Validates downsize items in order. Checks if it is possible to return them."""
         adobe_client = get_adobe_client()
         errors = []
 
@@ -64,15 +66,17 @@ class ValidateDownsizes(Step):
             if not returnable_orders:
                 continue
 
-            returnable_by_quantity = self.get_returnable_by_quantity_map(returnable_orders)
+            returnable_by_quantity = self._get_returnable_by_quantity_map(returnable_orders)
 
             delta = line["oldQuantity"] - line["quantity"]
 
             if delta not in returnable_by_quantity:
                 end_of_cancellation_window = max(
-                    datetime.fromisoformat(roi.order["creationDate"]).date()
+                    dt.datetime.fromisoformat(roi.order["creationDate"])
+                    .replace(tzinfo=dt.UTC)
+                    .date()
                     for roi in returnable_orders
-                ) + timedelta(days=15)
+                ) + dt.timedelta(days=15)
 
                 quantities = [
                     str(roi.quantity)
@@ -113,13 +117,14 @@ class ValidateDownsizes(Step):
 
 
 def validate_change_order(client, order):
+    """Validate change order pipeline."""
     pipeline = Pipeline(
         SetupContext(),
         ValidateDuplicateLines(),
         SetOrUpdateCotermDate(),
         ValidateRenewalWindow(is_validation=True),
         ValidateDownsizes(),
-        Validate3YCCommitment(True),
+        Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),
         UpdatePrices(),
     )

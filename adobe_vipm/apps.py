@@ -6,11 +6,15 @@ from .extension import ext
 
 
 class ExtensionConfig(DjAppConfig):
+    """Django configuration for extension."""
+
     name = "adobe_vipm"
     verbose_name = "SWO Adobe VIPM Extension"
     extension = ext
 
+    # TODO: why it is here, but not in SDK???
     def extension_ready(self):
+        """Check for initial configuration for extension."""
         error_msgs = []
 
         for product_id in settings.MPT_PRODUCTS_IDS:
