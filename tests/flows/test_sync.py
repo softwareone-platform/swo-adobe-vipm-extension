@@ -11,6 +11,7 @@ from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _add_missing_subscriptions,  # noqa: PLC2701
     _get_subscriptions_for_update,  # noqa: PLC2701
+    _process_orphaned_deployment_subscriptions,  # noqa: PLC2701
     sync_agreement,
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_3yc_enroll_status,
@@ -19,6 +20,7 @@ from adobe_vipm.flows.sync import (
     sync_agreements_by_renewal_date,
     sync_all_agreements,
 )
+from adobe_vipm.flows.utils import get_fulfillment_parameter
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -1052,6 +1054,7 @@ def test_sync_global_customer_parameter_not_prices(
         "Agreement updated AGR-2119-4550-8674-5962",
         "Setting global customer for agreement AGR-2119-4550-8674-5962",
         "Setting deployments for agreement AGR-2119-4550-8674-5962",
+        "Looking for orphaned deployment subscriptions in Adobe.",
         "Skipping price sync - sync_prices False.",
         "Agreement updated AGR-2119-4550-8674-5962",
         "Updating Last Sync Date for agreement AGR-2119-4550-8674-5962",
@@ -1130,14 +1133,7 @@ def test_sync_global_customer_update_not_required(
         deployment_subscription,
         another_deployment_subscription,
     ]
-    mock_get_prices_for_skus.side_effect = [
-        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-    ]
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22}
     mock_get_agreements_by_customer_deployments.return_value = [
         agreement_factory(
             fulfillment_parameters=fulfillment_parameters_factory(
@@ -2268,3 +2264,69 @@ def test_add_missing_subscriptions_wrong_currency(
         "'1000', 'deploymentId': ''}",
     )
     mock_create_agreement_subscription.assert_not_called()
+
+
+def test_process_orphaned_deployment_subscriptions(
+    agreement_factory, adobe_subscription_factory, mock_adobe_client
+):
+    _process_orphaned_deployment_subscriptions(
+        mock_adobe_client,
+        "authorization_id",
+        "customer_id",
+        [agreement_factory()],
+        [
+            adobe_subscription_factory(subscription_id="a-sub-id", deployment_id="deployment_id"),
+            adobe_subscription_factory(subscription_id="b-sub-id", deployment_id=""),
+        ],
+    )
+
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        "authorization_id", "customer_id", "a-sub-id", auto_renewal=False
+    )
+
+
+def test_process_orphaned_deployment_subscriptions_none(
+    agreement_factory, adobe_subscription_factory, mock_adobe_client
+):
+    agreement = agreement_factory()
+
+    _process_orphaned_deployment_subscriptions(
+        mock_adobe_client,
+        "authorization_id",
+        "customer_id",
+        [agreement],
+        [
+            adobe_subscription_factory(
+                subscription_id=get_fulfillment_parameter(
+                    agreement["subscriptions"][0], Param.ADOBE_SKU
+                )["value"],
+                deployment_id="deployment_id",
+            )
+        ],
+    )
+
+    mock_adobe_client.update_subscription.assert_not_called()
+
+
+def test_process_orphaned_deployment_subscriptions_error(
+    agreement_factory,
+    adobe_subscription_factory,
+    mock_adobe_client,
+    mock_send_exception,
+):
+    mock_adobe_client.update_subscription.side_effect = Exception("Boom!")
+
+    _process_orphaned_deployment_subscriptions(
+        mock_adobe_client,
+        "authorization_id",
+        "customer_id",
+        [agreement_factory()],
+        [
+            adobe_subscription_factory(subscription_id="a-sub-id", deployment_id="deployment_id"),
+            adobe_subscription_factory(subscription_id="b-sub-id", deployment_id=""),
+        ],
+    )
+
+    mock_send_exception.assert_called_once_with(
+        "Error disabling auto-renewal for orphaned Adobe subscription a-sub-id.", "Boom!"
+    )

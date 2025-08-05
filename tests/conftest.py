@@ -936,12 +936,22 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                     "item": {
                         "id": "ITM-0000-0001-0001",
                     },
+                    "parameters": {
+                        "fulfillment": [
+                            {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
+                        ]
+                    },
                 },
                 {
                     "id": "SUB-1234-5678",
                     "status": "Terminated",
                     "item": {
                         "id": "ITM-0000-0001-0002",
+                    },
+                    "parameters": {
+                        "fulfillment": [
+                            {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
+                        ]
                     },
                 },
             ]
