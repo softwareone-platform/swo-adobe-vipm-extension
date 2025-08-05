@@ -67,7 +67,7 @@ def _add_missing_subscriptions(
         agreement["id"],
         deployment_id,
     )
-    adobe_subscriptions = [
+    deployment_subscriptions = [
         line_item
         for line_item in customer_subscriptions
         if line_item.get("deploymentId", "") == deployment_id
@@ -75,7 +75,7 @@ def _add_missing_subscriptions(
 
     missing_subscriptions = tuple(
         subc
-        for subc in adobe_subscriptions
+        for subc in deployment_subscriptions
         if subc["subscriptionId"] not in subscriptions_for_update
         and subc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
     )
@@ -86,14 +86,14 @@ def _add_missing_subscriptions(
         logger.info("> No missing subscriptions found")
         return
 
-    skus = [get_partial_sku(item["offerId"]) for item in adobe_subscriptions]
+    skus = [get_partial_sku(item["offerId"]) for item in deployment_subscriptions]
     items_map = {
         item["externalIds"]["vendor"]: item
         for item in get_product_items_by_skus(mpt_client, agreement["product"]["id"], skus)
     }
     offer_ids = [
         get_sku_with_discount_level(adobe_subscription["offerId"], customer)
-        for adobe_subscription in adobe_subscriptions
+        for adobe_subscription in deployment_subscriptions
     ]
 
     for adobe_subscription in missing_subscriptions:
