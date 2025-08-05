@@ -2,6 +2,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from adobe_vipm.adobe.constants import ResellerChangeAction
 from adobe_vipm.adobe.dataclasses import Reseller
 from adobe_vipm.adobe.errors import wrap_http_error
 
@@ -112,14 +113,14 @@ class TransferClientMixin:
         response.raise_for_status()
         return response.json()
 
-
+    @wrap_http_error
     def _reseller_change(
         self,
         authorization_id: str,
         seller_id: str,
         change_code: str,
         admin_email: str,
-        action: str,
+        action: ResellerChangeAction,
     ) -> dict:
         """
         Retrieves a transfer object by the membership and transfer identifiers.
@@ -129,6 +130,7 @@ class TransferClientMixin:
             seller_id: seller Id.
             change_code: Adobe Reseller change code.
             admin_email: Adobe admin email.
+            action: Reseller change action.
 
         Returns:
             dict: The Transfer.
@@ -163,11 +165,13 @@ class TransferClientMixin:
         change_code: str,
         admin_email: str,
     ) -> dict:
-        """
-        Preview a reseller change.
-        """
+        """Preview a reseller change."""
         return self._reseller_change(
-            authorization_id, seller_id, change_code, admin_email, "PREVIEW"
+            authorization_id,
+            seller_id,
+            change_code,
+            admin_email,
+            ResellerChangeAction.PREVIEW
         )
 
     @wrap_http_error
@@ -178,13 +182,14 @@ class TransferClientMixin:
         change_code: str,
         admin_email: str,
     ) -> dict:
-        """
-        Commit a reseller change.
-        """
+        """Commit a reseller change."""
         return self._reseller_change(
-            authorization_id, seller_id, change_code, admin_email, "COMMIT"
+            authorization_id,
+            seller_id,
+            change_code,
+            admin_email,
+            ResellerChangeAction.COMMIT
         )
-
 
     @wrap_http_error
     def get_reseller_transfer(
@@ -192,9 +197,7 @@ class TransferClientMixin:
         authorization_id: str,
         transfer_id: str,
     ) -> dict:
-        """
-        Retrieve a transfer object by the membership and transfer identifiers.
-        """
+        """Retrieve a transfer object by the membership and transfer identifiers."""
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
         response = requests.get(
@@ -203,6 +206,7 @@ class TransferClientMixin:
                 f"/v3/transfers/{transfer_id}",
             ),
             headers=headers,
+            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
