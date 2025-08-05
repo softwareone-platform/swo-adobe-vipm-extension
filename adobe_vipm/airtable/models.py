@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import cache
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.utils import find_first
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from pyairtable.formulas import (
     AND,
@@ -21,7 +22,7 @@ from pyairtable.orm import Model, fields
 from requests import HTTPError
 
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
-from adobe_vipm.utils import find_first, get_commitment_start_date
+from adobe_vipm.utils import get_commitment_start_date
 
 STATUS_INIT = "init"
 STATUS_RUNNING = "running"
