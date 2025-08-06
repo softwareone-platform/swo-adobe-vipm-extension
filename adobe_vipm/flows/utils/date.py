@@ -122,4 +122,4 @@ def is_coterm_date_within_order_creation_window(order: dict) -> bool:
     # this is for the business logic to be consistent with the Adobe order creation window
     pacific_tz = ZoneInfo("America/Los_Angeles")
     today = dt.datetime.now(pacific_tz).date()
-    return today >= coterm_date - dt.timedelta(hours=int(hours))
+    return coterm_date - dt.timedelta(hours=int(hours)) <= today <= coterm_date
