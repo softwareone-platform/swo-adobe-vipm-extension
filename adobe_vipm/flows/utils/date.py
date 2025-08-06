@@ -99,10 +99,8 @@ def is_coterm_date_within_order_creation_window(order):
         return False
     hours = settings.EXTENSION_CONFIG.get("ORDER_CREATION_WINDOW_HOURS")
     coterm_date = datetime.fromisoformat(get_coterm_date(order)).date()
-    #The zone is set to Pacific time to match the Adobe order creation window
-    #this is for the business logic to be consistent with the Adobe order creation window
-    pacific_tz = ZoneInfo('America/Los_Angeles')
+    # The zone is set to Pacific time to match the Adobe order creation window
+    # this is for the business logic to be consistent with the Adobe order creation window
+    pacific_tz = ZoneInfo("America/Los_Angeles")
     today = datetime.now(pacific_tz).date()
-    return today >= coterm_date - timedelta(hours=int(hours))
-
-
+    return coterm_date - timedelta(hours=int(hours)) <= today <= coterm_date
