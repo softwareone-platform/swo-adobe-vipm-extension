@@ -13,7 +13,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import ResellerChangeAction, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
@@ -634,29 +634,31 @@ class FetchResellerChangeData(Step):
 
         adobe_client = get_adobe_client()
 
+        logger.info(
+            "%s: Executing the preview reseller change with %s and %s",
+            context,
+            reseller_change_code.get("value"),
+            admin_email.get("value"),
+        )
         try:
-            logger.info(
-                "%s: Executing the preview reseller change with %s and %s",
-                context,
-                reseller_change_code.get("value"),
-                admin_email.get("value")
-            )
-            context.adobe_transfer = adobe_client.preview_reseller_change(
+            context.adobe_transfer = adobe_client.reseller_change_request(
                 authorization_id,
                 seller_id,
                 reseller_change_code.get("value"),
-                admin_email.get("value")
+                admin_email.get("value"),
+                ResellerChangeAction.PREVIEW,
             )
-        except AdobeAPIError as e:
+        except AdobeAPIError as ex:
             error_data = ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                 reseller_change_code=reseller_change_code["value"],
-                error=str(e),
+                error=str(ex),
             )
-            handle_error(mpt_client,
-                         context,
-                         error_data,
-                         is_validation=self.is_validation,
-                         parameter=Param.CHANGE_RESELLER_CODE
+            handle_error(
+                mpt_client,
+                context,
+                error_data,
+                is_validation=self.is_validation,
+                parameter=Param.CHANGE_RESELLER_CODE,
             )
             return
 
@@ -676,31 +678,32 @@ class ValidateResellerChange(Step):
             return
 
         expiry_date = context.adobe_transfer["approval"]["expiry"]
-        reseller_change_code = get_ordering_parameter(
-            context.order,
-            Param.CHANGE_RESELLER_CODE
-        )["value"]
+        reseller_change_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)[
+            "value"
+        ]
 
         if parser.parse(expiry_date).date() < dt.datetime.now(tz=dt.UTC).date():
             error_data = ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                 reseller_change_code=reseller_change_code,
                 error="Reseller change code has expired",
             )
-            handle_error(mpt_client,
-                         context,
-                         error_data,
-                         is_validation=self.is_validation,
-                         parameter=Param.CHANGE_RESELLER_CODE
+            handle_error(
+                mpt_client,
+                context,
+                error_data,
+                is_validation=self.is_validation,
+                parameter=Param.CHANGE_RESELLER_CODE,
             )
             return
 
         if not context.adobe_transfer["lineItems"]:
             error_data = ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict()
-            handle_error(mpt_client,
-                         context,
-                         error_data,
-                         is_validation=self.is_validation,
-                         parameter=Param.CHANGE_RESELLER_CODE
+            handle_error(
+                mpt_client,
+                context,
+                error_data,
+                is_validation=self.is_validation,
+                parameter=Param.CHANGE_RESELLER_CODE,
             )
             return
 

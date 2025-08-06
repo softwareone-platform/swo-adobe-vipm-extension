@@ -100,8 +100,7 @@ ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT = ValidationError(
 )
 
 ERR_ADOBE_CUSTOMER_ADMIN_EMAIL = ValidationError(
-    "VIPM0037",
-    "The customer admin Email is not valid"
+    "VIPM0037", "The customer admin Email is not valid"
 )
 
 ERR_COMPANY_NAME_LENGTH = ValidationError(
@@ -202,11 +201,12 @@ ERR_ADOBE_RESSELLER_CHANGE_PREVIEW = ValidationError(
 )
 
 ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
-    "VIPM0036", (
+    "VIPM0036",
+    (
         "Due to reseller change requirements, it is not possible "
         "to add additional items to this order. Only "
         "the automatically included item can be processed"
-    )
+    ),
 )
 
 ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(

@@ -2210,8 +2210,8 @@ def test_add_missing_subscriptions_deployment(
     mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
 
     agreement = agreement_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
-        )
+        fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
+    )
 
     _add_missing_subscriptions(
         mock_mpt_client,
@@ -2383,7 +2383,7 @@ def test_sync_agreement_without_subscriptions(
     lines_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
-    caplog
+    caplog,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
