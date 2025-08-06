@@ -3445,7 +3445,9 @@ def test_transfer_gc_account_all_deployments_created(
     mocked_get_gc_agreement_deployments_by_main_agreement()
     assert mocked_get_gc_main_agreement.call_count == 1
     assert mocked_get_gc_main_agreement.mock_calls[0].args == (
-        "PRD-1111-1111", "AUT-1234-4567", "a-membership-id"
+        "PRD-1111-1111",
+        "AUT-1234-4567",
+        "a-membership-id",
     )
 
 

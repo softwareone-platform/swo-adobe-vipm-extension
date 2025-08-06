@@ -37,7 +37,7 @@ def test_validate_reseller_change_success(
     product_items = items_factory()
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
+    mocked_adobe_client.reseller_change_request.return_value = adobe_preview
 
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
@@ -78,7 +78,7 @@ def test_validate_reseller_change_success_adding_line(
     product_items = items_factory()
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
+    mocked_adobe_client.reseller_change_request.return_value = adobe_preview
 
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
@@ -146,7 +146,7 @@ def test_validate_reseller_change_success_adding_aditional_licenses(
     product_items = items_factory()
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
+    mocked_adobe_client.reseller_change_request.return_value = adobe_preview
 
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
@@ -199,7 +199,7 @@ def test_validate_reseller_change_expired_code(
     )
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
+    mocked_adobe_client.reseller_change_request.return_value = adobe_preview
 
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client",
@@ -223,7 +223,7 @@ def test_validate_reseller_change_adobe_api_error(
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.side_effect = api_error
+    mocked_adobe_client.reseller_change_request.side_effect = api_error
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -252,7 +252,7 @@ def test_validate_reseller_change_no_subscriptions(
         items=[], approval_expiry=(today + dt.timedelta(days=5)).isoformat()
     )
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
+    mocked_adobe_client.reseller_change_request.return_value = adobe_preview
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
     mocked_adobe_client.get_subscriptions.return_value = {"items": []}
     mocker.patch(
@@ -293,7 +293,7 @@ def test_validate_reseller_change_missing_admin_email(
         items=adobe_items, approval_expiry=(today - dt.timedelta(days=1)).isoformat()
     )
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.return_value = adobe_preview
+    mocked_adobe_client.reseller_change_request.return_value = adobe_preview
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
     mocked_adobe_client.get_subscriptions.return_value = {"items": adobe_items_factory()}
     mocker.patch(

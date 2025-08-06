@@ -44,15 +44,12 @@ def test_fulfill_order_by_order_type(mocker, order_factory, order_type, mock_mpt
 
 
 def test_fulfill_order_reseller_change(
-        mocker,
-        order_factory,
-        mock_mpt_client,
-        reseller_change_order_parameters_factory
+    mocker, order_factory, mock_mpt_client, reseller_change_order_parameters_factory
 ):
     mocked_fulfill = mocker.patch("adobe_vipm.flows.fulfillment.base.fulfill_reseller_change_order")
     order = order_factory(
-        order_type="Purchase",
-        order_parameters=reseller_change_order_parameters_factory())
+        order_type="Purchase", order_parameters=reseller_change_order_parameters_factory()
+    )
 
     fulfill_order(mock_mpt_client, order)
 
