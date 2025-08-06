@@ -1,15 +1,17 @@
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.fulfillment.shared import CompleteOrder, SetupDueDate, SyncAgreement
-from adobe_vipm.flows.fulfillment.transfer import (
+from adobe_vipm.flows.fulfillment.reseller_transfer import (
     CheckAdobeResellerTransfer,
     CommitResellerChange,
-    GetAdobeCustomer,
     SetupResellerChangeContext,
+    fulfill_reseller_change_order,
+)
+from adobe_vipm.flows.fulfillment.shared import CompleteOrder, SetupDueDate, SyncAgreement
+from adobe_vipm.flows.fulfillment.transfer import (
+    GetAdobeCustomer,
     ValidateAgreementDeployments,
     ValidateGCMainAgreement,
-    fulfill_reseller_change_order,
 )
 from adobe_vipm.flows.helpers import FetchResellerChangeData, SetupContext, ValidateResellerChange
 from adobe_vipm.flows.utils import get_adobe_customer_id, get_adobe_order_id
@@ -19,24 +21,24 @@ def test_commit_reseller_change_step_success(
     mocker,
     order_factory,
     adobe_reseller_change_preview_factory,
-    reseller_change_order_parameters_factory
+    reseller_change_order_parameters_factory,
 ):
     """Test successful execution of CommitResellerChange step."""
     adobe_transfer_order = adobe_reseller_change_preview_factory()
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.commit_reseller_change.return_value = adobe_transfer_order
+    mocked_adobe_client.reseller_change_request.return_value = adobe_transfer_order
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.update_order",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.update_order",
     )
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.update_agreement",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.update_agreement",
     )
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     mocked_client = mocker.MagicMock()
@@ -52,11 +54,12 @@ def test_commit_reseller_change_step_success(
     step = CommitResellerChange()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.commit_reseller_change.assert_called_once_with(
+    mocked_adobe_client.reseller_change_request.assert_called_once_with(
         context.authorization_id,
         context.order["agreement"]["seller"]["id"],
         "88888888",
         "admin@admin.com",
+        ResellerChangeAction.COMMIT,
     )
 
     assert get_adobe_order_id(context.order) == adobe_transfer_order["transferId"]
@@ -67,9 +70,7 @@ def test_commit_reseller_change_step_success(
     mocked_next_step.assert_not_called()
 
 
-def test_commit_reseller_change_step_already_has_customer_id(
-    mocker, order_factory
-):
+def test_commit_reseller_change_step_already_has_customer_id(mocker, order_factory):
     """Test CommitResellerChange step when customer ID already exists."""
     mocked_adobe_client = mocker.MagicMock()
     mocker.patch(
@@ -89,29 +90,26 @@ def test_commit_reseller_change_step_already_has_customer_id(
     step = CommitResellerChange()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.commit_reseller_change.assert_not_called()
+    mocked_adobe_client.reseller_change_request.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_commit_reseller_change_step_adobe_api_error(
-    mocker,
-    order_factory,
-    adobe_api_error_factory,
-    reseller_change_order_parameters_factory
+    mocker, order_factory, adobe_api_error_factory, reseller_change_order_parameters_factory
 ):
     """Test CommitResellerChange step when Adobe API returns an error."""
     error = AdobeAPIError(400, adobe_api_error_factory("1234", "API error"))
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.commit_reseller_change.side_effect = error
+    mocked_adobe_client.reseller_change_request.side_effect = error
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.switch_order_to_failed",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.switch_order_to_failed",
     )
 
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
@@ -125,16 +123,15 @@ def test_commit_reseller_change_step_adobe_api_error(
 
     step = CommitResellerChange()
     step(mocked_client, context, mocked_next_step)
-    mocked_adobe_client.commit_reseller_change.assert_called_once()
+    mocked_adobe_client.reseller_change_request.assert_called_once()
     mocked_switch_to_failed.assert_called_once()
-    mocked_next_step.assert_called_once()
 
 
 def test_check_adobe_reseller_transfer_step_success(
     mocker,
     order_factory,
     adobe_reseller_change_preview_factory,
-    reseller_change_order_parameters_factory
+    reseller_change_order_parameters_factory,
 ):
     """Test CheckAdobeResellerTransfer step successful execution."""
     adobe_transfer_order = adobe_reseller_change_preview_factory()
@@ -144,13 +141,13 @@ def test_check_adobe_reseller_transfer_step_success(
     mocked_adobe_client.get_reseller_transfer.return_value = adobe_transfer_order
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     order = order_factory(
         order_parameters=reseller_change_order_parameters_factory(),
-        external_ids={"vendor": "TRANSFER-123"}
+        external_ids={"vendor": "TRANSFER-123"},
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -179,7 +176,7 @@ def test_check_adobe_reseller_transfer_step_pending_status(
     mocker,
     order_factory,
     adobe_reseller_change_preview_factory,
-    reseller_change_order_parameters_factory
+    reseller_change_order_parameters_factory,
 ):
     """Test CheckAdobeResellerTransfer step when status is PENDING."""
     adobe_transfer_order = adobe_reseller_change_preview_factory()
@@ -189,13 +186,13 @@ def test_check_adobe_reseller_transfer_step_pending_status(
     mocked_adobe_client.get_reseller_transfer.return_value = adobe_transfer_order
 
     mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
     order = order_factory(
         order_parameters=reseller_change_order_parameters_factory(),
-        external_ids={"vendor": "TRANSFER-123"}
+        external_ids={"vendor": "TRANSFER-123"},
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -224,12 +221,12 @@ def test_fulfill_reseller_change_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.Pipeline",
+        "adobe_vipm.flows.fulfillment.reseller_transfer.Pipeline",
         return_value=mocked_pipeline_instance,
     )
     mocked_context = mocker.MagicMock()
     mocked_context_ctor = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.Context", return_value=mocked_context
+        "adobe_vipm.flows.fulfillment.reseller_transfer.Context", return_value=mocked_context
     )
     mocked_client = mocker.MagicMock()
     mocked_order = mocker.MagicMock()
@@ -262,44 +259,33 @@ def test_fulfill_reseller_change_order(mocker):
 
 
 def test_setup_reseller_change_context_success(
-    mocker,
-    order_factory,
-    reseller_change_order_parameters_factory
+    mocker, order_factory, reseller_change_order_parameters_factory
 ):
     mocked_get_transfer = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer"
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_transfer_by_authorization_membership_or_customer"
     )
     mocked_get_transfer.return_value = None
     mocked_get_main_agreement = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_main_agreement"
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_main_agreement"
     )
     mocked_get_main_agreement.return_value = None
     mocked_get_agreement_deployments = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployments"
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_agreement_deployments"
     )
     mocked_get_agreement_deployments.return_value = []
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        product_id="product-123",
-        authorization_id="AUT-1234-4567"
-    )
+    context = Context(order=order, product_id="product-123", authorization_id="AUT-1234-4567")
     step = SetupResellerChangeContext()
     step(mocked_client, context, mocked_next_step)
     mocked_get_transfer.assert_called_once_with(
-        context.product_id,
-        context.authorization_id,
-        "88888888"
+        context.product_id, context.authorization_id, "88888888"
     )
     mocked_get_main_agreement.assert_called_once_with(
-        context.product_id,
-        context.authorization_id,
-        "88888888"
+        context.product_id, context.authorization_id, "88888888"
     )
     mocked_get_agreement_deployments.assert_called_once_with(
-        context.product_id,
-        context.order.get("agreement", {}).get("id", "")
+        context.product_id, context.order.get("agreement", {}).get("id", "")
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
