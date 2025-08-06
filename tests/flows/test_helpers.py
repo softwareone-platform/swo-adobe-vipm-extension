@@ -9,6 +9,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
     AdobeStatus,
+    ResellerChangeAction,
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
@@ -1879,7 +1880,7 @@ def test_fetch_reseller_change_data_success(
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.return_value = adobe_transfer
+    mocked_adobe_client.reseller_change_request.return_value = adobe_transfer
 
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client",
@@ -1899,11 +1900,12 @@ def test_fetch_reseller_change_data_success(
     step = FetchResellerChangeData(is_validation=False)
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.preview_reseller_change.assert_called_once_with(
+    mocked_adobe_client.reseller_change_request.assert_called_once_with(
         context.authorization_id,
         context.order["agreement"]["seller"]["id"],
         "88888888",
         "admin@admin.com",
+        ResellerChangeAction.PREVIEW
     )
     assert context.adobe_transfer == adobe_transfer
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -1933,7 +1935,7 @@ def test_fetch_reseller_change_data_already_has_customer_id(
     step = FetchResellerChangeData(is_validation=False)
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.preview_reseller_change.assert_not_called()
+    mocked_adobe_client.reseller_change_request.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -1946,7 +1948,7 @@ def test_fetch_reseller_change_data_adobe_api_error_fulfillment_mode(
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.side_effect = api_error
+    mocked_adobe_client.reseller_change_request.side_effect = api_error
 
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client",
@@ -1969,7 +1971,7 @@ def test_fetch_reseller_change_data_adobe_api_error_fulfillment_mode(
     step = FetchResellerChangeData(is_validation=False)
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.preview_reseller_change.assert_called_once()
+    mocked_adobe_client.reseller_change_request.assert_called_once()
     mocked_switch_order_to_failed.assert_called_once_with(
         mocked_client,
         context.order,
@@ -1990,7 +1992,7 @@ def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_reseller_change.side_effect = api_error
+    mocked_adobe_client.reseller_change_request.side_effect = api_error
 
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client",
@@ -2010,7 +2012,7 @@ def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
     step = FetchResellerChangeData(is_validation=True)
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.preview_reseller_change.assert_called_once()
+    mocked_adobe_client.reseller_change_request.assert_called_once()
     assert context.validation_succeeded is False
     mocked_next_step.assert_not_called()
 

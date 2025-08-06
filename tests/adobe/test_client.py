@@ -18,6 +18,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
     AdobeStatus,
+    ResellerChangeAction,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
@@ -2606,7 +2607,13 @@ def test_preview_reseller_change(
         ],
     )
 
-    result = client.preview_reseller_change(authorization_uk, seller_id, change_code, admin_email)
+    result = client.reseller_change_request(
+        authorization_uk,
+        seller_id,
+        change_code,
+        admin_email,
+        ResellerChangeAction.PREVIEW
+    )
     assert result == expected_response
 
 
@@ -2636,7 +2643,13 @@ def test_preview_reseller_change_bad_request(
     )
 
     with pytest.raises(Exception) as cv:
-        client.preview_reseller_change(authorization_uk, seller_id, change_code, admin_email)
+        client.reseller_change_request(
+            authorization_uk,
+            seller_id,
+            change_code,
+            admin_email,
+            ResellerChangeAction.PREVIEW
+        )
 
     assert repr(cv.value) == str(error)
 

@@ -13,7 +13,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import ResellerChangeAction, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
@@ -623,23 +623,24 @@ class FetchResellerChangeData(Step):
 
         adobe_client = get_adobe_client()
 
+        logger.info(
+            "%s: Executing the preview reseller change with %s and %s",
+            context,
+            reseller_change_code.get("value"),
+            admin_email.get("value")
+        )
         try:
-            logger.info(
-                "%s: Executing the preview reseller change with %s and %s",
-                context,
-                reseller_change_code.get("value"),
-                admin_email.get("value")
-            )
-            context.adobe_transfer = adobe_client.preview_reseller_change(
+            context.adobe_transfer = adobe_client.reseller_change_request(
                 authorization_id,
                 seller_id,
                 reseller_change_code.get("value"),
-                admin_email.get("value")
+                admin_email.get("value"),
+                ResellerChangeAction.PREVIEW
             )
-        except AdobeAPIError as e:
+        except AdobeAPIError as ex:
             error_data = ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                 reseller_change_code=reseller_change_code["value"],
-                error=str(e),
+                error=str(ex),
             )
             handle_error(mpt_client,
                          context,

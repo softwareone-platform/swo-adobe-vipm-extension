@@ -102,7 +102,7 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
             return func(*args, **kwargs)
         except HTTPError as exc:
             logger.exception("Http exception")
-            if exc.response.headers.get("Content-Type") == "application/json":
+            if "application/json" in exc.response.headers.get("Content-Type", ""):
                 raise AdobeAPIError(exc.response.status_code, exc.response.json())
 
             raise AdobeHttpError(exc.response.status_code, exc.response.content.decode())
