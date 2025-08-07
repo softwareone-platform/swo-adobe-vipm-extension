@@ -1483,7 +1483,7 @@ def mock_mpt_client(mocker):
 @pytest.fixture
 def mock_setup_client(mocker, mock_mpt_client):
     mocker.patch(
-        "adobe_vipm.management.commands.sync_3yc_enrollments.setup_client",
+        "adobe_vipm.management.commands.sync_3yc_enrol.setup_client",
         return_value=mock_mpt_client,
     )
     return mock_mpt_client
