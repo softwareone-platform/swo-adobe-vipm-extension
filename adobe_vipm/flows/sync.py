@@ -30,10 +30,7 @@ from adobe_vipm.adobe.errors import (
     CustomerDiscountsNotFoundError,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
-from adobe_vipm.airtable.models import (
-    get_adobe_product_by_marketplace_sku,
-    get_sku_price,
-)
+from adobe_vipm.airtable.models import get_adobe_sku, get_sku_price
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
@@ -321,7 +318,7 @@ def _log_agreement_lines(
 ) -> None:
     agreement_lines = []
     for line in agreement["lines"]:
-        actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
+        actual_sku = get_adobe_sku(line["item"]["externalIds"]["vendor"])
         agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
 
     skus = [item[1] for item in agreement_lines]
