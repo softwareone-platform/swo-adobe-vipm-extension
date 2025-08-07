@@ -18,7 +18,7 @@ class Command(AdobeBaseCommand):
             help="Test synchronization without making changes",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # noqa: WPS110
         """Run command."""
         self.info("Start processing 3YC enrollment statuses...")
         mpt_client = setup_client()
