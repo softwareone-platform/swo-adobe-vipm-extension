@@ -212,12 +212,6 @@ def test_sync_agreement_prices_dry_run(
         "adobe_vipm.flows.sync.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
-
     mocked_get_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.sync.get_agreement_subscription",
         return_value=mpt_subscription,
@@ -754,10 +748,6 @@ def test_sync_agreement_prices_with_3yc(
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
     )
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
@@ -914,11 +904,6 @@ def test_sync_global_customer_parameter(
     )
 
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
 
     sync_agreement(mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
@@ -1155,6 +1140,12 @@ def test_sync_global_customer_update_not_required(
     )
     adobe_deployment_subscription = adobe_subscription_factory()
     another_adobe_deployment_subscription = adobe_subscription_factory()
+    mock_adobe_client.get_subscription.side_effect = [
+        adobe_subscription,
+        another_adobe_subscription,
+        adobe_deployment_subscription,
+        another_adobe_deployment_subscription,
+    ]
     mock_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription,
@@ -1389,11 +1380,6 @@ def test_sync_global_customer_update_adobe_error(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
-
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     assert mocked_get_agreement_subscription.call_args_list == [
@@ -1573,11 +1559,6 @@ def test_sync_global_customer_parameters_error(
 
     mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     with caplog.at_level(logging.ERROR):
@@ -1832,11 +1813,6 @@ def test_sync_agreement_prices_with_missing_prices(
     )
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     with caplog.at_level(logging.ERROR):
