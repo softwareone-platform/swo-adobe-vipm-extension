@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 import pytest
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     STATUS_INACTIVE_OR_GENERIC_FAILURE,
@@ -10,6 +11,7 @@ from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
     get_transfer_item_sku_by_subscription,
+    is_coterm_date_within_order_creation_window,
     is_transferring_item_expired,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
@@ -278,3 +280,36 @@ def test_get_customer_consumables_discount_level(adobe_customer_factory):
         )
         == "T2"
     )
+
+
+@freeze_time("2024-05-06")
+def test_is_coterm_date_within_order_creation_window_before_window(
+    order_factory, fulfillment_parameters_factory
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-04-06")
+    )
+
+    assert not is_coterm_date_within_order_creation_window(order)
+
+
+@freeze_time("2024-05-06")
+def test_is_coterm_date_within_order_creation_window_during_window(
+    order_factory, fulfillment_parameters_factory
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-05-05")
+    )
+
+    assert is_coterm_date_within_order_creation_window(order)
+
+
+@freeze_time("2024-05-06")
+def test_is_coterm_date_within_order_creation_window_after_window(
+    order_factory, fulfillment_parameters_factory
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-06-06")
+    )
+
+    assert not is_coterm_date_within_order_creation_window(order)
