@@ -39,6 +39,13 @@ class AdobeStatus(StrEnum):
     INVALID_CUSTOMER = "1116"
 
 
+class ResellerChangeAction(StrEnum):
+    """Reseller change action."""
+
+    PREVIEW = "PREVIEW"
+    COMMIT = "COMMIT"
+
+
 ORDER_STATUS_DESCRIPTION = types.MappingProxyType({
     AdobeStatus.INACTIVE_OR_GENERIC_FAILURE: "Inactive account, failed order or inactive "
     "subscription.",

@@ -2,6 +2,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from adobe_vipm.adobe.constants import ResellerChangeAction
 from adobe_vipm.adobe.dataclasses import Reseller
 from adobe_vipm.adobe.errors import wrap_http_error
 
@@ -113,12 +114,33 @@ class TransferClientMixin:
         return response.json()
 
     @wrap_http_error
-    def preview_reseller_change(
+    def get_reseller_transfer(
+        self,
+        authorization_id: str,
+        transfer_id: str,
+    ) -> dict:
+        """Retrieve a transfer object by the membership and transfer identifiers."""
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/transfers/{transfer_id}",
+            ),
+            headers=headers,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def reseller_change_request(
         self,
         authorization_id: str,
         seller_id: str,
         change_code: str,
         admin_email: str,
+        action: ResellerChangeAction,
     ) -> dict:
         """
         Retrieves a transfer object by the membership and transfer identifiers.
@@ -128,6 +150,7 @@ class TransferClientMixin:
             seller_id: seller Id.
             change_code: Adobe Reseller change code.
             admin_email: Adobe admin email.
+            action: Reseller change action.
 
         Returns:
             dict: The Transfer.
@@ -143,13 +166,14 @@ class TransferClientMixin:
             headers=headers,
             json={
                 "type": "RESELLER_CHANGE",
-                "action": "PREVIEW",
+                "action": action,
                 "approvalCode": change_code,
                 "resellerId": reseller.id,
                 "requestedBy": admin_email,
             },
             timeout=self._TIMEOUT,
         )
+
         response.raise_for_status()
         return response.json()
 
