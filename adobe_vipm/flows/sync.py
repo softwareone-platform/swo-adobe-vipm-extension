@@ -87,7 +87,7 @@ def sync_agreement_prices(mpt_client, agreement, dry_run, adobe_client, customer
         to_update = []
 
         for subscription in subscriptions:
-            if subscription["status"] == "Terminated":
+            if subscription["status"] in ("Terminated", "Expired"):
                 continue
 
             subscription = get_agreement_subscription(mpt_client, subscription["id"])
