@@ -538,7 +538,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": Param.COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME.value,
                 "type": "SingleLineText",
                 "value": company_name or "",
                 "constraints": {
@@ -550,7 +550,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": Param.ADDRESS,
+                "externalId": Param.ADDRESS.value,
                 "type": "Address",
                 "value": address or {},
                 "constraints": {
@@ -562,7 +562,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": Param.CONTACT,
+                "externalId": Param.CONTACT.value,
                 "type": "Contact",
                 "value": contact or {},
                 "constraints": {
@@ -574,7 +574,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": Param.AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE.value,
                 "type": "SingleLineText",
                 "value": "Transfer",
                 "constraints": {
@@ -586,7 +586,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0005",
                 "name": "Change of reseller code",
-                "externalId": Param.CHANGE_RESELLER_CODE,
+                "externalId": Param.CHANGE_RESELLER_CODE.value,
                 "type": "SingleLineText",
                 "value": reseller_change_code,
                 "constraints": {
@@ -598,7 +598,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0006",
                 "name": "Adobe Customer Admin Email",
-                "externalId": Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
+                "externalId": Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value,
                 "type": "SingleLineText",
                 "value": admin_email,
                 "constraints": {
@@ -610,7 +610,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0007",
                 "name": "3YC",
-                "externalId": Param.THREE_YC,
+                "externalId": Param.THREE_YC.value,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
@@ -622,7 +622,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCLicenses",
-                "externalId": Param.THREE_YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES.value,
                 "type": "SingleLineText",
                 "value": p3yc_licenses or "",
                 "constraints": {
@@ -634,7 +634,7 @@ def reseller_change_order_parameters_factory():
             {
                 "id": "PAR-0000-0009",
                 "name": "3YCConsumables",
-                "externalId": Param.THREE_YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
                 "type": "SingleLineText",
                 "value": p3yc_consumables or "",
                 "constraints": {
@@ -931,12 +931,22 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                     "item": {
                         "id": "ITM-0000-0001-0001",
                     },
+                    "parameters": {
+                        "fulfillment": [
+                            {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
+                        ]
+                    },
                 },
                 {
                     "id": "SUB-1234-5678",
                     "status": "Terminated",
                     "item": {
                         "id": "ITM-0000-0001-0002",
+                    },
+                    "parameters": {
+                        "fulfillment": [
+                            {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
+                        ]
                     },
                 },
             ]
@@ -2108,9 +2118,15 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
 
 
 @pytest.fixture
-def mock_get_adobe_product_by_marketplace_sku(mock_get_sku_adobe_mapping_model):
+def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):
     def get_adobe_product_by_marketplace_sku(sku):
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        new=get_adobe_product_by_marketplace_sku,
+        spec=True,
+    )
 
     return get_adobe_product_by_marketplace_sku
 

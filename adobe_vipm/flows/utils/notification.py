@@ -17,7 +17,7 @@ def get_notifications_recipient(order: dict) -> str | None:
     Returns:
         Either contact parameter or buyer contact emails.
     """
-    contact = get_ordering_parameter(order, Param.CONTACT).get("value", {}) or {}
+    contact = get_ordering_parameter(order, Param.CONTACT.value).get("value", {}) or {}
     buyer = order["agreement"]["buyer"].get("contact", {}) or {}
 
     return (contact or buyer).get("email")

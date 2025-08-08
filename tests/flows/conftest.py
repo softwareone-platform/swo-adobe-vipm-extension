@@ -5,14 +5,8 @@ from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 @pytest.fixture
 def mock_get_agreements_by_query(mocker):
     mock = mocker.MagicMock(spec=get_agreements_by_query)
-    mocker.patch(
-        "adobe_vipm.flows.mpt.get_agreements_by_query",
-        new=mock,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_query",
-        new=mock,
-    )
+    mocker.patch("adobe_vipm.flows.mpt.get_agreements_by_query", new=mock)
+    mocker.patch("adobe_vipm.flows.sync.get_agreements_by_query", new=mock)
     return mock
 
 
@@ -40,18 +34,12 @@ def mock_get_agreements_by_customer_deployments(
 
 @pytest.fixture
 def mock_terminate_subscription(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.sync.terminate_subscription",
-        spec=True,
-    )
+    return mocker.patch("adobe_vipm.flows.sync.terminate_subscription", spec=True)
 
 
 @pytest.fixture
 def mock_notify_processing_lost_customer(mocker):
-    return mocker.patch(
-        "adobe_vipm.notifications.send_notification",
-        spec=True,
-    )
+    return mocker.patch("adobe_vipm.notifications.send_notification", spec=True)
 
 
 @pytest.fixture
@@ -70,25 +58,17 @@ def mock_get_agreement_subscription(mocker, subscriptions_factory):
 
 @pytest.fixture
 def mock_update_agreement_subscription(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement_subscription",
-    )
+    return mocker.patch("adobe_vipm.flows.sync.update_agreement_subscription", spec=True)
 
 
 @pytest.fixture
 def mock_send_exception(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.sync.send_exception",
-        spec=True,
-    )
+    return mocker.patch("adobe_vipm.flows.sync.send_exception", spec=True)
 
 
 @pytest.fixture
 def mock_get_prices_for_skus(mocker):
-    return mocker.patch(
-        "adobe_vipm.airtable.models.get_prices_for_skus",
-        spec=True,
-    )
+    return mocker.patch("adobe_vipm.airtable.models.get_prices_for_skus", spec=True)
 
 
 @pytest.fixture

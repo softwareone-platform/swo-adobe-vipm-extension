@@ -84,7 +84,7 @@ class ValidateCustomerData(Step):
         Modifies context.order and context.validation_succeeded with errors in
         case if validation is failed.
         """
-        p3yc = context.customer_data[Param.THREE_YC]
+        p3yc = context.customer_data[Param.THREE_YC.value]
 
         if p3yc != ["Yes"]:
             return
@@ -93,11 +93,11 @@ class ValidateCustomerData(Step):
 
         for param_name, validator, error in (
             (
-                Param.THREE_YC_CONSUMABLES,
+                Param.THREE_YC_CONSUMABLES.value,
                 is_valid_minimum_consumables,
                 ERR_3YC_QUANTITY_CONSUMABLES,
             ),
-            (Param.THREE_YC_LICENSES, is_valid_minimum_licenses, ERR_3YC_QUANTITY_LICENSES),
+            (Param.THREE_YC_LICENSES.value, is_valid_minimum_licenses, ERR_3YC_QUANTITY_LICENSES),
         ):
             param = get_ordering_parameter(context.order, param_name)
 
@@ -111,12 +111,14 @@ class ValidateCustomerData(Step):
                 )
 
         if not errors and not (
-            context.customer_data[Param.THREE_YC_LICENSES]
-            or context.customer_data[Param.THREE_YC_CONSUMABLES]
+            context.customer_data[Param.THREE_YC_LICENSES.value]
+            or context.customer_data[Param.THREE_YC_CONSUMABLES.value]
         ):
             errors = True
-            param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES)
-            param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES)
+            param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
+            param_consumables = get_ordering_parameter(
+                context.order, Param.THREE_YC_CONSUMABLES.value
+            )
             context.validation_succeeded = False
             context.order = set_order_error(
                 context.order,
@@ -133,13 +135,13 @@ class ValidateCustomerData(Step):
         Modifies context.order and context.validation_succeeded with errors in
         case if validation is failed.
         """
-        param = get_ordering_parameter(context.order, Param.COMPANY_NAME)
-        name = context.customer_data[Param.COMPANY_NAME]
+        param = get_ordering_parameter(context.order, Param.COMPANY_NAME.value)
+        name = context.customer_data[Param.COMPANY_NAME.value]
         if not is_valid_company_name_length(name):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.COMPANY_NAME,
+                Param.COMPANY_NAME.value,
                 ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"]),
             )
             return
@@ -147,7 +149,7 @@ class ValidateCustomerData(Step):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.COMPANY_NAME,
+                Param.COMPANY_NAME.value,
                 ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"]),
             )
 
@@ -158,8 +160,8 @@ class ValidateCustomerData(Step):
         Modifies context.order and context.validation_succeeded with errors in
         case if validation is failed.
         """
-        param = get_ordering_parameter(context.order, Param.ADDRESS)
-        address = context.customer_data[Param.ADDRESS]
+        param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+        address = context.customer_data[Param.ADDRESS.value]
         errors = []
 
         country_code = address["country"]
@@ -169,7 +171,7 @@ class ValidateCustomerData(Step):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.ADDRESS,
+                Param.ADDRESS.value,
                 ERR_ADDRESS.to_dict(
                     title=param["name"],
                     errors="".join(errors),
@@ -218,7 +220,7 @@ class ValidateCustomerData(Step):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.ADDRESS,
+                Param.ADDRESS.value,
                 ERR_ADDRESS.to_dict(
                     title=param["name"],
                     errors="; ".join(errors),
@@ -227,7 +229,7 @@ class ValidateCustomerData(Step):
             return
         context.order = update_ordering_parameter_value(
             context.order,
-            Param.ADDRESS,
+            Param.ADDRESS.value,
             address,
         )
 
@@ -238,15 +240,15 @@ class ValidateCustomerData(Step):
         Modifies context.order and context.validation_succeeded with errors in
         case if validation is failed.
         """
-        contact = context.customer_data[Param.CONTACT]
-        param = get_ordering_parameter(context.order, Param.CONTACT)
+        contact = context.customer_data[Param.CONTACT.value]
+        param = get_ordering_parameter(context.order, Param.CONTACT.value)
         errors = []
 
         if not contact:
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.CONTACT,
+                Param.CONTACT.value,
                 ERR_CONTACT.to_dict(
                     title=param["name"],
                     errors="it is mandatory.",
@@ -272,7 +274,7 @@ class ValidateCustomerData(Step):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.CONTACT,
+                Param.CONTACT.value,
                 ERR_CONTACT.to_dict(
                     title=param["name"],
                     errors="; ".join(errors),

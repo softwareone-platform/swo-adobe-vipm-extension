@@ -102,10 +102,10 @@ def _handle_transfer_preview_error(client, order, error):
         error_msg = (
             str(error) if isinstance(error, AdobeAPIError) else ERR_ADOBE_MEMBERSHIP_NOT_FOUND
         )
-        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
         order = set_ordering_parameter_error(
             order,
-            Param.MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID.value,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=error_msg),
         )
         switch_order_to_query(client, order)
@@ -406,10 +406,10 @@ def _transfer_migrated(  # noqa: C901
         existing_deployments (list[dict]): existing created deployments to filter out.
     """
     if transfer.status == STATUS_RUNNING:
-        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
         order = set_ordering_parameter_error(
             order,
-            Param.MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID.value,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(
                 title=param["name"], details="Migration in progress, retry later"
             ),
