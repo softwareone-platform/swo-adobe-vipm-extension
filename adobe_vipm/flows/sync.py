@@ -428,7 +428,7 @@ def _get_subscriptions_for_update(
     for_update = []
 
     for sub in agreement["subscriptions"]:
-        if sub["status"] == SubscriptionStatus.TERMINATED:
+        if sub["status"] in {SubscriptionStatus.TERMINATED, SubscriptionStatus.EXPIRED}:
             continue
 
         subscription = get_agreement_subscription(mpt_client, sub["id"])
