@@ -3,7 +3,7 @@ import logging
 from functools import wraps
 from typing import Callable, ParamSpec, TypeVar
 
-from requests import HTTPError
+from requests import HTTPError, JSONDecodeError
 
 Param = ParamSpec("Param")  # noqa: WPS110
 RetType = TypeVar("RetType")
@@ -99,11 +99,11 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
     def _wrapper(*args: Param.args, **kwargs: Param.kwargs) -> RetType:  # noqa: WPS430
         try:
             return func(*args, **kwargs)
-        except HTTPError as exc:
-            logger.exception("Http exception")
-            if exc.response.headers.get("Content-Type") == "application/json":
-                raise AdobeAPIError(exc.response.status_code, exc.response.json())
-
-            raise AdobeHttpError(exc.response.status_code, exc.response.content.decode())
+        except HTTPError as error:
+            logger.error(error)  # noqa: TRY400
+            try:  # noqa: WPS328, WPS505
+                raise AdobeAPIError(error.response.status_code, error.response.json())
+            except JSONDecodeError:
+                raise AdobeHttpError(error.response.status_code, error.response.content.decode())
 
     return _wrapper
