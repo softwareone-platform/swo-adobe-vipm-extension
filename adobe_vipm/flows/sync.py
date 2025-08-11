@@ -801,15 +801,21 @@ def sync_agreement(  # noqa: C901
                 return
             raise
 
+        adobe_subscriptions = adobe_client.get_subscriptions(
+            agreement["authorization"]["id"], customer["customerId"]
+        )["items"]
+
+        if not adobe_subscriptions:
+            logger.info(
+                "Skipping price sync - no subscriptions found for the customer %s", customer_id
+            )
+            return
+
         if not customer.get("discounts", []):
             raise CustomerDiscountsNotFoundError(  # noqa: TRY301
                 f"Customer {customer_id} does not have discounts information. "
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
-
-        adobe_subscriptions = adobe_client.get_subscriptions(
-            agreement["authorization"]["id"], customer["customerId"]
-        )["items"]
 
         if sync_prices:
             sync_agreement_prices(
