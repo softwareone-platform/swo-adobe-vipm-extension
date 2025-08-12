@@ -5,6 +5,7 @@
 
 trigger:
 - main
+- azure-pipelines
 
 pool:
   name: "Standard-Linux"
