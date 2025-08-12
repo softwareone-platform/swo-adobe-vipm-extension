@@ -9,7 +9,7 @@ resources:
     - repository: templates
       type: git
       name: MPT/ops-build-templates-aks-releases
-      ref: releases/v13
+      ref: releases/v15
       
 variables:
   - name: appName
