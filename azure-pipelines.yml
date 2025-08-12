@@ -60,3 +60,22 @@ stages:
                   workingDirectory: helm/$(appName)
                   skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
 
+  - stage: publish
+    displayName: Publish
+    dependsOn:
+      - prepare
+      - build
+    jobs:
+      - job: publish
+        displayName: Publish
+#        condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/4'), eq(variables['System.Debug'], true))
+        variables:
+          - template: aks-docker-templates/acr-creds-group.yaml@templates
+          - name: buildVersion
+            value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+        steps:
+          - template: aks-docker-templates/publish-steps.yaml@templates
+            parameters:
+              repository: $(appName)
+              buildNumber: $(buildVersion)
+              components: []
