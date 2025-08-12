@@ -31,8 +31,8 @@ stages:
       - template: aks-docker-templates/acr-creds-group.yaml@templates
       - group: swo.platform-build
     jobs:
-      - job: build_web_api
-        displayName: Build web api
+      - job: build_image
+        displayName: Build image
         variables:
           - name: buildVersion
             value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
@@ -41,9 +41,9 @@ stages:
         steps:
           - template: aks-docker-templates/docker-build-steps.yaml@templates
             parameters:
-              repository: $(appName)/api
+              repository: $(appName)
               sourceBuild: $(buildVersion)
-              Dockerfile: src/Mpt.Billing.Api/Dockerfile
+              Dockerfile: prod.Dockerfile 
               skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
 
       - job: BuildHelmChart
