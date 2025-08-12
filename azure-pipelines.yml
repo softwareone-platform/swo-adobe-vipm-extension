@@ -5,11 +5,52 @@ trigger:
 pool:
   name: "Standard-Linux"
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+variables:
+  - name: appName
+    value: swo-extension-adobe
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+stages:
+  - stage: prepare
+    displayName: "Prerequisites"
+    jobs:
+      - template: aks-docker-templates/build_prerequisites.yaml@templates
+      - template: aks-docker-templates/build_artifacts.yaml@templates
+        parameters:
+          application: $(appName)
+
+  - stage: build
+    displayName: "Build"
+    dependsOn: prepare
+    variables:
+      - template: aks-docker-templates/acr-creds-group.yaml@templates
+      - group: swo.platform-build
+    jobs:
+      - job: build_web_api
+        displayName: Build web api
+        variables:
+          - name: buildVersion
+            value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+          - name: majorVersion
+            value: $[ split(variables.buildVersion, '.')[0] ]
+        steps:
+          - template: aks-docker-templates/docker-build-steps.yaml@templates
+            parameters:
+              repository: $(appName)/api
+              sourceBuild: $(buildVersion)
+              Dockerfile: src/Mpt.Billing.Api/Dockerfile
+              skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
+
+      - job: BuildHelmChart
+        displayName: Build Helm Chart
+        variables:
+              - template: aks-docker-templates/acr-creds-group.yaml@templates
+              - name: buildVersion
+                value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+        steps:
+              - template: aks-docker-templates/helm-build-steps.yaml@templates
+                parameters:
+                  buildNumber: $(buildVersion)
+                  repository: $(appName)
+                  workingDirectory: helm/$(appName)
+                  skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
+
