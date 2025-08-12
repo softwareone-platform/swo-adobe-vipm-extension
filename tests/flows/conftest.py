@@ -116,3 +116,35 @@ def mock_notify_not_updated_subscriptions(mocker):
 @pytest.fixture
 def mock_next_step(mocker):
     return mocker.MagicMock()
+
+
+@pytest.fixture
+def mock_airtable_base_info(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.AirTableBaseInfo",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_get_gc_agreement_deployments_by_main_agreement(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_gc_agreement_deployments_by_main_agreement",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_create_gc_agreement_deployments(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.create_gc_agreement_deployments",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_get_gc_agreement_deployment_model(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
+        spec=True,
+    )
