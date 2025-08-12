@@ -6,10 +6,12 @@ from freezegun import freeze_time
 from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
+from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _add_missing_subscriptions,  # noqa: PLC2701
+    _check_update_airtable_missing_deployments,  # noqa: PLC2701
     _get_subscriptions_for_update,  # noqa: PLC2701
     _process_orphaned_deployment_subscriptions,  # noqa: PLC2701
     sync_agreement,
@@ -31,6 +33,13 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 @pytest.fixture(autouse=True)
 def mock_add_missing_subscriptions(mocker):
     return mocker.patch("adobe_vipm.flows.sync._add_missing_subscriptions", spec=True)
+
+
+@pytest.fixture(autouse=True)
+def mock_check_update_airtable_missing_deployments(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync._check_update_airtable_missing_deployments", spec=True
+    )
 
 
 @pytest.fixture
@@ -2366,3 +2375,119 @@ def test_sync_agreement_without_subscriptions(
         sync_agreement(mock_mpt_client, agreement, dry_run=True, sync_prices=True)
 
     assert "Skipping price sync - no subscriptions found for the customer" in caplog.text
+
+
+def test_check_update_airtable_missing_deployments(
+    mocker,
+    mock_settings,
+    mock_pymsteams,
+    agreement_factory,
+    mock_send_notification,
+    mock_airtable_base_info,
+    adobe_deployment_factory,
+    mock_create_gc_agreement_deployments,
+    mock_get_gc_agreement_deployment_model,
+    mock_get_gc_agreement_deployments_by_main_agreement,
+):
+    mock_gc_agreement_deployment_model = mocker.MagicMock(name="GCAgreementDeployment")
+    mock_get_gc_agreement_deployment_model.return_value = mock_gc_agreement_deployment_model
+    deployments = [
+        get_gc_agreement_deployment_model(AirTableBaseInfo(api_key="api-key", base_id="base-id"))(
+            deployment_id=f"{i}"
+        )
+        for i in range(1, 4)
+    ]
+    mock_get_gc_agreement_deployments_by_main_agreement.return_value = deployments
+    agreement = agreement_factory()
+    customer_deployments = [
+        adobe_deployment_factory(deployment_id=f"deployment-{i}") for i in range(1, 4)
+    ]
+    _check_update_airtable_missing_deployments(
+        agreement,
+        customer_deployments,
+    )
+
+    mock_create_gc_agreement_deployments.assert_called_once_with(
+        agreement["product"]["id"],
+        [
+            mock_gc_agreement_deployment_model.return_value,
+            mock_gc_agreement_deployment_model.return_value,
+            mock_gc_agreement_deployment_model.return_value,
+        ],
+    )
+    mock_gc_agreement_deployment_model.assert_has_calls(
+        (
+            mocker.call(
+                deployment_id="deployment-1",
+                main_agreement_id="AGR-2119-4550-8674-5962",
+                account_id="ACC-9121-8944",
+                seller_id="SEL-9121-8944",
+                product_id="PRD-1111-1111",
+                membership_id="membership_id",
+                transfer_id="transfer_id",
+                status="pending",
+                customer_id="AUT-1234-5678",
+                deployment_currency="deployment_currency",
+                deployment_country="DE",
+                licensee_id="LC-321-321-321",
+            ),
+            mocker.call(
+                deployment_id="deployment-2",
+                main_agreement_id="AGR-2119-4550-8674-5962",
+                account_id="ACC-9121-8944",
+                seller_id="SEL-9121-8944",
+                product_id="PRD-1111-1111",
+                membership_id="membership_id",
+                transfer_id="transfer_id",
+                status="pending",
+                customer_id="AUT-1234-5678",
+                deployment_currency="deployment_currency",
+                deployment_country="DE",
+                licensee_id="LC-321-321-321",
+            ),
+            mocker.call(
+                deployment_id="deployment-3",
+                main_agreement_id="AGR-2119-4550-8674-5962",
+                account_id="ACC-9121-8944",
+                seller_id="SEL-9121-8944",
+                product_id="PRD-1111-1111",
+                membership_id="membership_id",
+                transfer_id="transfer_id",
+                status="pending",
+                customer_id="AUT-1234-5678",
+                deployment_currency="deployment_currency",
+                deployment_country="DE",
+                licensee_id="LC-321-321-321",
+            ),
+        ),
+        any_order=True,
+    )
+    mock_send_notification.assert_called_once()
+
+
+def test_check_update_airtable_missing_deployments_none(
+    agreement_factory,
+    mock_send_notification,
+    mock_airtable_base_info,
+    mock_create_gc_agreement_deployments,
+    mock_get_gc_agreement_deployments_by_main_agreement,
+):
+    deployments = [
+        get_gc_agreement_deployment_model(AirTableBaseInfo(api_key="api-key", base_id="base-id"))(
+            deployment_id=f"deployment-{i}"
+        )
+        for i in range(1, 4)
+    ]
+    mock_get_gc_agreement_deployments_by_main_agreement.return_value = deployments
+
+    _check_update_airtable_missing_deployments(
+        agreement_factory(),
+        [
+            {"deploymentId": "deployment-1"},
+            {"deploymentId": "deployment-2"},
+            {"deploymentId": "deployment-3"},
+        ],
+    )
+
+    mock_create_gc_agreement_deployments.assert_not_called()
+    mock_send_notification.assert_not_called()

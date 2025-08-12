@@ -30,7 +30,7 @@ from adobe_vipm.adobe.errors import (
     CustomerDiscountsNotFoundError,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
-from adobe_vipm.airtable.models import get_adobe_sku, get_sku_price
+from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus, TeamsColorCode
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
@@ -113,7 +113,7 @@ def _add_missing_subscriptions(
             continue
 
         item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
-        prices = get_sku_price(
+        prices = models.get_sku_price(
             customer,
             offer_ids,
             agreement["product"]["id"],
@@ -315,11 +315,11 @@ def _log_agreement_lines(
 ) -> None:
     agreement_lines = []
     for line in agreement["lines"]:
-        actual_sku = get_adobe_sku(line["item"]["externalIds"]["vendor"])
+        actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
         agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
 
     skus = [item[1] for item in agreement_lines]
-    prices = get_sku_price(customer, skus, product_id, currency)
+    prices = models.get_sku_price(customer, skus, product_id, currency)
     for line, actual_sku in agreement_lines:
         current_price = line["price"]["unitPP"]
         line["price"]["unitPP"] = prices[actual_sku]
@@ -345,7 +345,7 @@ def _update_subscriptions(
     dry_run: bool,
 ) -> None:
     skus = [item[2] for item in subscriptions_for_update]
-    prices = get_sku_price(customer, skus, product_id, currency)
+    prices = models.get_sku_price(customer, skus, product_id, currency)
     missing_prices_skus = []
     coterm_date = customer["cotermDate"]
 
@@ -425,6 +425,10 @@ def _update_subscriptions(
 
 def _check_adobe_subscription_id(subscription_id, adobe_subscription):
     return adobe_subscription.get("subscriptionId", "") == subscription_id
+
+
+def _check_adobe_deployment_id(deployment_id: str, adobe_deployment: dict) -> bool:
+    return adobe_deployment.get("deploymentId", "") == deployment_id
 
 
 def _get_subscriptions_for_update(
@@ -631,6 +635,53 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, *, dry_run: 
         sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)
 
 
+def _check_update_airtable_missing_deployments(
+    agreement: dict, customer_deployments: list[dict]
+) -> None:
+    agreement_id = agreement["id"]
+    product_id = agreement["product"]["id"]
+    logger.info("Checking airtable for missing deployments for agreement %s", agreement_id)
+    customer_deployment_ids = {cd["deploymentId"] for cd in customer_deployments}
+    airtable_deployment_ids = {
+        ad.deployment_id
+        for ad in models.get_gc_agreement_deployments_by_main_agreement(product_id, agreement_id)
+    }
+    missing_deployment_ids = customer_deployment_ids - airtable_deployment_ids
+    if missing_deployment_ids:
+        logger.info("> Adding missing deployments to Airtable: %s", missing_deployment_ids)
+        deployment_model = models.get_gc_agreement_deployment_model(
+            models.AirTableBaseInfo.for_migrations(product_id)
+        )
+        missing_deployments = []
+        for missing_deployment_id in missing_deployment_ids:
+            missing_deployment = find_first(
+                partial(_check_adobe_deployment_id, missing_deployment_id),
+                customer_deployments,
+            )
+            missing_deployments.append(
+                deployment_model(
+                    deployment_id=missing_deployment["deploymentId"],
+                    main_agreement_id=agreement_id,
+                    account_id=agreement["client"]["id"],  # TODO: confirm
+                    seller_id=agreement["seller"]["id"],
+                    product_id=product_id,
+                    membership_id="membership_id",  # TODO: confirm
+                    transfer_id="transfer_id",  # TODO: confirm
+                    status="pending",
+                    customer_id=agreement["authorization"]["id"],
+                    deployment_currency="deployment_currency",  # TODO: confirm
+                    deployment_country=missing_deployment["companyProfile"]["address"]["country"],
+                    licensee_id=agreement["licensee"]["id"],
+                )
+            )
+        models.create_gc_agreement_deployments(product_id, missing_deployments)
+        send_notification(
+            "Missing deployments added to Airtable",
+            f"agreement {agreement_id}, deployments: {missing_deployment_ids}.",
+            TeamsColorCode.ORANGE.value,
+        )
+
+
 def sync_global_customer_parameters(
     mpt_client: MPTClient,
     customer_deployments: list[dict],
@@ -660,11 +711,12 @@ def sync_global_customer_parameters(
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
+            logger.info("Setting deployments for agreement %s", agreement["id"])
             parameters[Param.PHASE_FULFILLMENT.value].append({
                 "externalId": "deployments",
                 "value": ",".join(deployments),
             })
-            logger.info("Setting deployments for agreement %s", agreement["id"])
+            _check_update_airtable_missing_deployments(agreement, customer_deployments)
         if parameters[Param.PHASE_FULFILLMENT.value]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception:
