@@ -4,7 +4,13 @@ trigger:
 
 pool:
   name: "Standard-Linux"
-
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: MPT/ops-build-templates-aks-releases
+      ref: releases/v13
+      
 variables:
   - name: appName
     value: swo-extension-adobe
