@@ -1111,7 +1111,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     adobe_subscription_factory,
     adobe_authorizations_file,
     items_factory,
-    lines_factory,
 ):
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
@@ -1188,16 +1187,31 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     )
 
     assert adobe_subscription["offerId"] == "65304578CA"
-    lines = lines_factory(
-        line_id=None,
-        item_id=1,
-        quantity=10,
-        name="Awesome Expired product 1",
-        external_vendor_id="65304578CA",
-        unit_purchase_price=33.04,
-    )
-
-    assert len(validated_order["lines"]) == len(lines)
+    assert len(validated_order["lines"]) == 2
+    assert validated_order["lines"] == [
+        {
+            "item": {
+                "externalIds": {"vendor": "65304578CA"},
+                "id": "ITM-1234-1234-1234-0001",
+                "name": "Awesome Expired product 1",
+                "terms": {"period": "1y"},
+            },
+            "oldQuantity": 0,
+            "price": {"unitPP": 33.04},
+            "quantity": 10,
+        },
+        {
+            "item": {
+                "externalIds": {"vendor": "99999999CA"},
+                "id": "ITM-1234-1234-1234-0002",
+                "name": "Awesome one-time product 2",
+                "terms": {"period": "1y"},
+            },
+            "oldQuantity": 0,
+            "price": {"unitPP": 99},
+            "quantity": 10,
+        },
+    ]
 
 
 def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_error(
@@ -1721,9 +1735,33 @@ def test_validate_transfer_with_one_line_items(
     )
 
     has_errors, validated_order = validate_transfer(m_client, order)
-    lines = lines_factory(line_id=None, unit_purchase_price=12.14)
+
     assert has_errors is False
-    assert len(validated_order["lines"]) == len(lines)
+    assert len(validated_order["lines"]) == 2
+    assert validated_order["lines"] == [
+        {
+            "item": {
+                "externalIds": {"vendor": "65304578CA"},
+                "id": "ITM-1234-1234-1234-0001",
+                "name": "Awesome product",
+                "terms": {"period": "1y"},
+            },
+            "oldQuantity": 0,
+            "price": {"unitPP": 12.14},
+            "quantity": 170,
+        },
+        {
+            "item": {
+                "externalIds": {"vendor": "99999999CA"},
+                "id": "ITM-1234-1234-1234-0002",
+                "name": "Awesome product",
+                "terms": {"period": "one-time"},
+            },
+            "oldQuantity": 0,
+            "price": {"unitPP": 0},
+            "quantity": 170,
+        },
+    ]
 
     mocked_get_product_items_by_skus.assert_called_once_with(
         m_client,
