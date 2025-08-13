@@ -1187,7 +1187,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     )
 
     assert adobe_subscription["offerId"] == "65304578CA"
-    assert len(validated_order["lines"]) == 2
     assert validated_order["lines"] == [
         {
             "item": {
@@ -1737,7 +1736,6 @@ def test_validate_transfer_with_one_line_items(
     has_errors, validated_order = validate_transfer(m_client, order)
 
     assert has_errors is False
-    assert len(validated_order["lines"]) == 2
     assert validated_order["lines"] == [
         {
             "item": {
