@@ -15,7 +15,7 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
     get_item_by_partial_sku,
@@ -351,9 +351,14 @@ class Validate3YCCommitment(Step):
         active_subscriptions = [
             sub for sub in subscriptions.get("items", []) if sub["autoRenewal"]["enabled"]
         ]
-
         for subscription in active_subscriptions:
-            sku = get_adobe_product_by_marketplace_sku(get_partial_sku(subscription["offerId"]))
+            try:
+                sku = get_adobe_product_by_marketplace_sku(get_partial_sku(subscription["offerId"]))
+            except AdobeProductNotFoundError:
+                logger.exception(
+                    "Adobe product not found for SKU: %s", get_partial_sku(subscription["offerId"])
+                )
+                continue
 
             if not sku.is_valid_3yc_type():
                 continue
@@ -378,7 +383,13 @@ class Validate3YCCommitment(Step):
 
         for line in lines:
             delta = self._calculate_delta(line, is_downsize)
-            sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
+            try:
+                sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
+            except AdobeProductNotFoundError:
+                logger.exception(
+                    "Adobe product not found for SKU: %s", line["item"]["externalIds"]["vendor"]
+                )
+                continue
 
             if not sku.is_valid_3yc_type():
                 continue
