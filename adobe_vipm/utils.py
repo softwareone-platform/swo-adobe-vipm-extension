@@ -1,11 +1,8 @@
 import datetime as dt
 
+from mpt_extension_sdk.mpt_http.utils import find_first
+
 from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
-
-
-def find_first(func, iterable, default=None):
-    """Return first item from iterable that matches function or default."""
-    return next(filter(func, iterable), default)
 
 
 def get_partial_sku(full_sku: str) -> str:

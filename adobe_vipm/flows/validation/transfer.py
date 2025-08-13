@@ -97,10 +97,10 @@ def _update_order_lines(
     for adobe_line in adobe_items:
         item = items_map.get(get_partial_sku(adobe_line["offerId"]))
         if not item:
-            param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+            param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
             order = set_ordering_parameter_error(
                 order,
-                Param.MEMBERSHIP_ID,
+                Param.MEMBERSHIP_ID.value,
                 ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
                     title=param["name"],
                     item_sku=get_partial_sku(adobe_line["offerId"]),
@@ -207,7 +207,7 @@ def _handle_empty_adobe_items(order: dict) -> tuple[bool, dict]:
     if is_migrate_customer(order):
         order = set_ordering_parameter_error(
             order,
-            Param.MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID.value,
             ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
         )
     return True, order
@@ -304,10 +304,10 @@ def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]
             membership_id,
         )
     except AdobeAPIError as e:
-        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
         order = set_ordering_parameter_error(
             order,
-            Param.MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID.value,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
         )
         return True, order
@@ -315,10 +315,10 @@ def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]
         err_msg = (
             ERR_ADOBE_MEMBERSHIP_NOT_FOUND if he.status_code == 404 else ERR_ADOBE_UNEXPECTED_ERROR
         )
-        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
         order = set_ordering_parameter_error(
             order,
-            Param.MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID.value,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=err_msg),
         )
         return True, order
@@ -365,7 +365,7 @@ class ValidateTransferStatus(Step):
         if context.adobe_transfer["status"] == AdobeStatus.TRANSFER_INACTIVE_ACCOUNT:
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.MEMBERSHIP_ID,
+                Param.MEMBERSHIP_ID.value,
                 ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
                     status=context.adobe_transfer["status"],
                 ),
@@ -376,10 +376,10 @@ class ValidateTransferStatus(Step):
         next_step(mpt_client, context)
 
     def _set_transfer_error(self, context, order, details):
-        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID)
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
         context.order = set_ordering_parameter_error(
             order,
-            Param.MEMBERSHIP_ID,
+            Param.MEMBERSHIP_ID.value,
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=details),
         )
         context.validation_succeeded = False
@@ -411,7 +411,7 @@ class FetchTransferData(Step):
         except AdobeError as e:
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.MEMBERSHIP_ID,
+                Param.MEMBERSHIP_ID.value,
                 ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
                     membership_id=context.transfer.membership_id,
                     error=str(e),
@@ -453,10 +453,10 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
         if len(context.subscriptions["items"]) == 0:
             if customer.get("globalSalesEnabled", False):
                 logger.error(ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT)
-                param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID)
+                param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    Param.MEMBERSHIP_ID,
+                    Param.MEMBERSHIP_ID.value,
                     ERR_ADOBE_MEMBERSHIP_ID.to_dict(
                         title=param["name"], details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
                     ),
@@ -523,8 +523,10 @@ class FetchResellerChangeData(Step):
         """Fetch Adobe reseller change data."""
         authorization_id = context.order["authorization"]["id"]
         seller_id = context.order["agreement"]["seller"]["id"]
-        reseller_change_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)
-        admin_email = get_ordering_parameter(context.order, Param.ADOBE_CUSTOMER_ADMIN_EMAIL)
+        reseller_change_code = get_ordering_parameter(
+            context.order, Param.CHANGE_RESELLER_CODE.value
+        )
+        admin_email = get_ordering_parameter(context.order, Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value)
 
         adobe_client = get_adobe_client()
 
@@ -538,7 +540,7 @@ class FetchResellerChangeData(Step):
         except AdobeAPIError as e:
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.CHANGE_RESELLER_CODE,
+                Param.CHANGE_RESELLER_CODE.value,
                 ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                     reseller_change_code=reseller_change_code["value"],
                     error=str(e),
@@ -556,8 +558,9 @@ class ValidateResellerChange(Step):
     def __call__(self, mpt_client, context, next_step):
         """Validates reseller change."""
         expiry_date = context.adobe_transfer["approval"]["expiry"]
-        reseller_change_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)[
-            "value"
+        reseller_change_code = get_ordering_parameter(
+            context.order, Param.CHANGE_RESELLER_CODE.value
+        )["value"
         ]
 
         parsed_expiry_date = parser.parse(expiry_date)
@@ -565,7 +568,7 @@ class ValidateResellerChange(Step):
         if parsed_expiry_date.date() < dt.datetime.now(tz=dt.UTC).date():
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.CHANGE_RESELLER_CODE,
+                Param.CHANGE_RESELLER_CODE.value,
                 ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                     reseller_change_code=reseller_change_code,
                     error="Reseller change code has expired",
@@ -577,7 +580,7 @@ class ValidateResellerChange(Step):
         if not context.adobe_transfer["lineItems"]:
             context.order = set_ordering_parameter_error(
                 context.order,
-                Param.CHANGE_RESELLER_CODE,
+                Param.CHANGE_RESELLER_CODE.value,
                 ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict(),
             )
 

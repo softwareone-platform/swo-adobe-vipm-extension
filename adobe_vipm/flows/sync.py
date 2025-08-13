@@ -3,6 +3,8 @@ import datetime as dt
 import logging
 import sys
 import traceback
+from collections.abc import Sequence
+from functools import partial
 
 from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -18,6 +20,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     update_agreement,
     update_agreement_subscription,
 )
+from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
@@ -38,6 +41,7 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_deployment_id,
     get_deployments,
+    get_fulfillment_parameter,
     get_global_customer,
     get_parameter,
     get_sku_with_discount_level,
@@ -57,6 +61,7 @@ def _add_missing_subscriptions(
     customer: dict,
     agreement: dict,
     subscriptions_for_update: set[str],
+    customer_subscriptions,
 ) -> None:
     deployment_id = get_deployment_id(agreement) or ""
     logger.info(
@@ -64,17 +69,15 @@ def _add_missing_subscriptions(
         agreement["id"],
         deployment_id,
     )
-    adobe_subscriptions = [
+    deployment_subscriptions = [
         line_item
-        for line_item in adobe_client.get_subscriptions(
-            agreement["authorization"]["id"], customer["customerId"]
-        )["items"]
+        for line_item in customer_subscriptions
         if line_item.get("deploymentId", "") == deployment_id
     ]
 
     missing_subscriptions = tuple(
         subc
-        for subc in adobe_subscriptions
+        for subc in deployment_subscriptions
         if subc["subscriptionId"] not in subscriptions_for_update
         and subc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
     )
@@ -85,14 +88,14 @@ def _add_missing_subscriptions(
         logger.info("> No missing subscriptions found")
         return
 
-    skus = [get_partial_sku(item["offerId"]) for item in adobe_subscriptions]
+    skus = [get_partial_sku(item["offerId"]) for item in deployment_subscriptions]
     items_map = {
         item["externalIds"]["vendor"]: item
         for item in get_product_items_by_skus(mpt_client, agreement["product"]["id"], skus)
     }
     offer_ids = [
         get_sku_with_discount_level(adobe_subscription["offerId"], customer)
-        for adobe_subscription in adobe_subscriptions
+        for adobe_subscription in deployment_subscriptions
     ]
 
     for adobe_subscription in missing_subscriptions:
@@ -173,6 +176,7 @@ def sync_agreement_prices(
     adobe_client: AdobeClient,
     agreement: dict,
     customer: dict,
+    adobe_subscriptions: Sequence[dict],
     *,
     dry_run: bool,
 ) -> None:
@@ -186,12 +190,13 @@ def sync_agreement_prices(
         adobe_client: Adobe API client.
         agreement: MPT agreement.
         customer: Adobe customer.
+        adobe_subscriptions: list of subscriptions for customer from Adobe.
         dry_run: Run command in a dry run mode
     """
     commitment_start_date = get_commitment_start_date(customer)
 
     subscriptions_for_update = _get_subscriptions_for_update(
-        mpt_client, adobe_client, agreement, customer
+        mpt_client, agreement, customer, adobe_subscriptions
     )
 
     _add_missing_subscriptions(
@@ -200,6 +205,7 @@ def sync_agreement_prices(
         customer,
         agreement,
         subscriptions_for_update={sub[1]["subscriptionId"] for sub in subscriptions_for_update},
+        customer_subscriptions=adobe_subscriptions,
     )
 
     product_id = agreement["product"]["id"]
@@ -232,15 +238,15 @@ def _update_agreement(
         parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
         for mq in commitment_info.get("minimumQuantities", ()):
             if mq["offerType"] == "LICENSE":
-                parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append({
-                    "externalId": Param.THREE_YC_LICENSES,
+                parameters.setdefault(Param.PHASE_ORDERING.value, [])
+                parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_LICENSES.value,
                     "value": str(mq.get("quantity")),
                 })
             if mq["offerType"] == "CONSUMABLES":
-                parameters.setdefault(Param.PHASE_ORDERING, [])
-                parameters[Param.PHASE_ORDERING].append({
-                    "externalId": Param.THREE_YC_CONSUMABLES,
+                parameters.setdefault(Param.PHASE_ORDERING.value, [])
+                parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_CONSUMABLES.value,
                     "value": str(mq.get("quantity")),
                 })
     if not dry_run:
@@ -260,24 +266,24 @@ def _add_3yc_fulfillment_params(
     parameters: list[dict],
 ) -> list[dict]:
     new_parameters = copy.deepcopy(parameters)
-    new_parameters.setdefault(Param.PHASE_FULFILLMENT, [])
+    new_parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
     three_yc_recommitment_par = get_parameter(
-        Param.PHASE_FULFILLMENT, agreement, Param.THREE_YC_RECOMMITMENT
+        Param.PHASE_FULFILLMENT.value, agreement, Param.THREE_YC_RECOMMITMENT.value
     )
     is_recommitment = bool(three_yc_recommitment_par)
     status_param_ext_id = (
-        Param.THREE_YC_COMMITMENT_REQUEST_STATUS
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
         if not is_recommitment
-        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS
+        else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
     )
     request_type_param_ext_id = (
-        Param.THREE_YC if not is_recommitment else Param.THREE_YC_RECOMMITMENT
+        Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
     )
     request_type_param_phase = (
-        Param.PHASE_ORDERING if not is_recommitment else Param.PHASE_FULFILLMENT
+        Param.PHASE_ORDERING.value if not is_recommitment else Param.PHASE_FULFILLMENT.value
     )
     request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
-    new_parameters[Param.PHASE_FULFILLMENT].append({
+    new_parameters[Param.PHASE_FULFILLMENT.value].append({
         "externalId": status_param_ext_id,
         "value": request_info.get("status"),
     })
@@ -285,17 +291,17 @@ def _add_3yc_fulfillment_params(
     new_parameters[request_type_param_phase].append(
         {"externalId": request_type_param_ext_id, "value": None},
     )
-    new_parameters[Param.PHASE_FULFILLMENT] += [
+    new_parameters[Param.PHASE_FULFILLMENT.value] += [
         {
-            "externalId": Param.THREE_YC_ENROLL_STATUS,
+            "externalId": Param.THREE_YC_ENROLL_STATUS.value,
             "value": commitment_info.get("status"),
         },
         {
-            "externalId": Param.THREE_YC_START_DATE,
+            "externalId": Param.THREE_YC_START_DATE.value,
             "value": commitment_info.get("startDate"),
         },
         {
-            "externalId": Param.THREE_YC_END_DATE,
+            "externalId": Param.THREE_YC_END_DATE.value,
             "value": commitment_info.get("endDate"),
         },
     ]
@@ -362,21 +368,21 @@ def _update_subscriptions(
 
         parameters = {
             "fulfillment": [
-                {"externalId": Param.ADOBE_SKU, "value": actual_sku},
+                {"externalId": Param.ADOBE_SKU.value, "value": actual_sku},
                 {
-                    "externalId": Param.CURRENT_QUANTITY,
+                    "externalId": Param.CURRENT_QUANTITY.value,
                     "value": str(adobe_subscription["currentQuantity"]),
                 },
                 {
-                    "externalId": Param.RENEWAL_QUANTITY,
+                    "externalId": Param.RENEWAL_QUANTITY.value,
                     "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                 },
                 {
-                    "externalId": Param.RENEWAL_DATE,
+                    "externalId": Param.RENEWAL_DATE.value,
                     "value": str(adobe_subscription["renewalDate"]),
                 },
                 {
-                    "externalId": Param.LAST_SYNC_DATE,
+                    "externalId": Param.LAST_SYNC_DATE.value,
                     "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
                 },
             ],
@@ -421,24 +427,34 @@ def _update_subscriptions(
         )
 
 
+def _check_adobe_subscription_id(subscription_id, adobe_subscription):
+    return adobe_subscription.get("subscriptionId", "") == subscription_id
+
+
 def _get_subscriptions_for_update(
-    mpt_client: MPTClient, adobe_client: AdobeClient, agreement: dict, customer: dict
+    mpt_client: MPTClient,
+    agreement: dict,
+    customer: dict,
+    customer_subscriptions: Sequence[dict],
 ) -> list[tuple[dict, dict, str]]:
     logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
     for_update = []
 
-    for sub in agreement["subscriptions"]:
-        if sub["status"] in {SubscriptionStatus.TERMINATED, SubscriptionStatus.EXPIRED}:
+    for subscription in agreement["subscriptions"]:
+        if subscription["status"] in {SubscriptionStatus.TERMINATED, SubscriptionStatus.EXPIRED}:
             continue
 
-        subscription = get_agreement_subscription(mpt_client, sub["id"])
-        adobe_subscription_id = subscription["externalIds"]["vendor"]
+        mpt_subscription = get_agreement_subscription(mpt_client, subscription["id"])
+        adobe_subscription_id = mpt_subscription["externalIds"]["vendor"]
 
-        adobe_subscription = adobe_client.get_subscription(
-            authorization_id=agreement["authorization"]["id"],
-            customer_id=get_adobe_customer_id(agreement),
-            subscription_id=adobe_subscription_id,
+        adobe_subscription = find_first(
+            partial(_check_adobe_subscription_id, adobe_subscription_id),
+            customer_subscriptions,
         )
+
+        if not adobe_subscription:
+            logger.error("No subscription found in Adobe customer data!")
+            continue
 
         actual_sku = adobe_subscription["offerId"]
 
@@ -446,13 +462,13 @@ def _get_subscriptions_for_update(
             logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
             terminate_subscription(
                 mpt_client,
-                subscription["id"],
+                mpt_subscription["id"],
                 f"Adobe subscription status {AdobeStatus.SUBSCRIPTION_TERMINATED}.",
             )
             continue
 
         for_update.append((
-            subscription,
+            mpt_subscription,
             adobe_subscription,
             get_sku_with_discount_level(actual_sku, customer),
         ))
@@ -470,7 +486,7 @@ def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, *, dry_run: bool) -> 
     """
     logger.info("Syncing agreements by 3yc End Date...")
     _sync_agreements_by_param(
-        mpt_client, Param.THREE_YC_END_DATE, dry_run=dry_run, sync_prices=True
+        mpt_client, Param.THREE_YC_END_DATE.value, dry_run=dry_run, sync_prices=True
     )
 
 
@@ -483,7 +499,9 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, *, dry_run: bool) -> N
         dry_run: Run in dry run mode.
     """
     logger.info("Synchronizing agreements by cotermDate...")
-    _sync_agreements_by_param(mpt_client, Param.COTERM_DATE, dry_run=dry_run, sync_prices=False)
+    _sync_agreements_by_param(
+        mpt_client, Param.COTERM_DATE.value, dry_run=dry_run, sync_prices=False
+    )
 
 
 def _sync_agreements_by_param(
@@ -495,7 +513,7 @@ def _sync_agreements_by_param(
     rql_query = (
         "eq(status,Active)&"
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today_iso})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
         "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
         "-template,-name,-vendor,-client,-price"
@@ -522,7 +540,7 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, *, dry_run: bool) -> 
     rql_query = (
         "eq(status,Active)&"
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
-        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE}),ne(displayValue,{today_iso})))&"
+        f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
         "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
         "-template,-name,-vendor,-client,-price"
@@ -606,8 +624,8 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, *, dry_run: 
                 mpt_client,
                 agreement["id"],
                 parameters={
-                    Param.PHASE_FULFILLMENT: [
-                        {"externalId": Param.THREE_YC_ENROLL_STATUS, "value": enroll_status}
+                    Param.PHASE_FULFILLMENT.value: [
+                        {"externalId": Param.THREE_YC_ENROLL_STATUS.value, "value": enroll_status}
                     ]
                 },
             )
@@ -629,11 +647,11 @@ def sync_global_customer_parameters(
         agreement: main customer agreement.
     """
     try:
-        parameters = {Param.PHASE_FULFILLMENT: []}
+        parameters = {Param.PHASE_FULFILLMENT.value: []}
         global_customer_enabled = get_global_customer(agreement)
         if global_customer_enabled != ["Yes"]:
             logger.info("Setting global customer for agreement %s", agreement["id"])
-            parameters[Param.PHASE_FULFILLMENT].append({
+            parameters[Param.PHASE_FULFILLMENT.value].append({
                 "externalId": "globalCustomer",
                 "value": ["Yes"],
             })
@@ -644,12 +662,12 @@ def sync_global_customer_parameters(
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
-            parameters[Param.PHASE_FULFILLMENT].append({
+            parameters[Param.PHASE_FULFILLMENT.value].append({
                 "externalId": "deployments",
                 "value": ",".join(deployments),
             })
             logger.info("Setting deployments for agreement %s", agreement["id"])
-        if parameters[Param.PHASE_FULFILLMENT]:
+        if parameters[Param.PHASE_FULFILLMENT.value]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception:
         logger.exception(
@@ -706,7 +724,7 @@ def process_lost_customer(  # noqa: C901
     if customer_deployments:
         deployment_agreements = get_agreements_by_customer_deployments(
             mpt_client,
-            Param.DEPLOYMENT_ID,
+            Param.DEPLOYMENT_ID.value,
             [deployment["deploymentId"] for deployment in customer_deployments],
         )
 
@@ -789,8 +807,19 @@ def sync_agreement(  # noqa: C901
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
 
+        adobe_subscriptions = adobe_client.get_subscriptions(
+            agreement["authorization"]["id"], customer["customerId"]
+        )["items"]
+
         if sync_prices:
-            sync_agreement_prices(mpt_client, adobe_client, agreement, customer, dry_run=dry_run)
+            sync_agreement_prices(
+                mpt_client,
+                adobe_client,
+                agreement,
+                customer,
+                adobe_subscriptions,
+                dry_run=dry_run,
+            )
         else:
             logger.info("Skipping price sync - sync_prices %s.", sync_prices)
 
@@ -808,6 +837,7 @@ def sync_agreement(  # noqa: C901
                 agreement,
                 customer,
                 customer_deployments,
+                adobe_subscriptions,
                 dry_run=dry_run,
                 sync_prices=sync_prices,
             )
@@ -830,12 +860,55 @@ def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:
         parameters={
             "fulfillment": [
                 {
-                    "externalId": Param.LAST_SYNC_DATE,
+                    "externalId": Param.LAST_SYNC_DATE.value,
                     "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
                 },
             ]
         },
     )
+
+
+def _is_subscription_in_set(subscription_ids: set, subscription: dict) -> bool:
+    return subscription["subscriptionId"] in subscription_ids
+
+
+def _process_orphaned_deployment_subscriptions(
+    adobe_client: AdobeClient,
+    authorization_id: str,
+    customer_id: str,
+    deployment_agreements: list[dict],
+    customer_subscriptions: Sequence[dict],
+) -> None:
+    logger.info("Looking for orphaned deployment subscriptions in Adobe.")
+    mpt_subscription_ids = {
+        get_fulfillment_parameter(subscription, Param.ADOBE_SKU)["value"]
+        for agreement in deployment_agreements
+        for subscription in agreement["subscriptions"]
+    }
+    adobe_subscription_ids = {
+        subscription["subscriptionId"]
+        for subscription in customer_subscriptions
+        if subscription.get("deploymentId")
+    }
+    orphaned_subscription_ids = adobe_subscription_ids - mpt_subscription_ids
+
+    for subscription in filter(
+        partial(_is_subscription_in_set, orphaned_subscription_ids), customer_subscriptions
+    ):
+        logger.warning("> Disabling auto-renewal for orphaned subscription %s", subscription)
+        try:
+            adobe_client.update_subscription(
+                authorization_id,
+                customer_id,
+                subscription["subscriptionId"],
+                auto_renewal=False,
+            )
+        except Exception as e:
+            send_exception(
+                "Error disabling auto-renewal for orphaned Adobe subscription"
+                f" {subscription['subscriptionId']}.",
+                f"{e}",
+            )
 
 
 def sync_deployments_prices(
@@ -844,6 +917,7 @@ def sync_deployments_prices(
     main_agreement: dict,
     customer: dict,
     customer_deployments: list[dict],
+    customer_subscriptions: Sequence[dict],
     *,
     dry_run: bool,
     sync_prices: bool,
@@ -857,16 +931,25 @@ def sync_deployments_prices(
         main_agreement: Main MPT agreement.
         customer: Adobe customer.
         customer_deployments: Adobe customer deployments.
-        dry_run: If True doesn't update agreement.
-        sync_prices: If True also sync prices. Keep in mind dry_run parameter also.
+        customer_subscriptions: list of subscriptions for customer from Adobe.
+        dry_run: Run command in a dry run mode.
+        sync_prices: If True also sync prices.
     """
     if not customer_deployments:
         return
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
-        Param.DEPLOYMENT_ID,
+        Param.DEPLOYMENT_ID.value,
         [deployment["deploymentId"] for deployment in customer_deployments],
+    )
+
+    _process_orphaned_deployment_subscriptions(
+        adobe_client,
+        main_agreement["authorization"]["id"],
+        customer["customerId"],
+        deployment_agreements,
+        customer_subscriptions,
     )
 
     for deployment_agreement in deployment_agreements:
@@ -876,6 +959,7 @@ def sync_deployments_prices(
                 adobe_client,
                 deployment_agreement,
                 customer,
+                customer_subscriptions,
                 dry_run=dry_run,
             )
         else:
