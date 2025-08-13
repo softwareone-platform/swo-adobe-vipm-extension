@@ -8,6 +8,7 @@ from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     complete_order,
+    create_asset,
     create_subscription,
     fail_order,
     get_order_subscription_by_external_id,
@@ -895,6 +896,79 @@ class SubmitNewOrder(Step):
         next_step(client, context)
 
 
+class CreateOrUpdateAssets(Step):
+    """Create or update assets in MPT based on Adobe Subscriptions."""
+
+    def __call__(self, client, context, next_step):
+        """Create or update assets in MPT based on Adobe Subscriptions."""
+        if not context.adobe_new_order_id:
+            next_step(client, context)
+
+        adobe_client = get_adobe_client()
+        one_time_skus = get_one_time_skus(client, context.order)
+        for line in filter(
+            lambda x: get_partial_sku(x["offerId"]) in one_time_skus,
+            context.adobe_new_order["lineItems"],
+        ):
+            order_line = get_order_line_by_sku(context.order, line["offerId"])
+            adobe_subscription = adobe_client.get_subscription(
+                context.authorization_id, context.adobe_customer_id, line["subscriptionId"]
+            )
+
+            if self._asset_exists(context.order["assets"], adobe_subscription["subscriptionId"]):
+                continue
+
+            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+                logger.warning(
+                    "%s: subscription %s for customer %s is in status %s, skip it",
+                    context,
+                    adobe_subscription["subscriptionId"],
+                    context.adobe_customer_id,
+                    adobe_subscription["status"],
+                )
+                continue
+
+            new_asset_data = self._create_asset_data(adobe_subscription, order_line, line)
+            asset = create_asset(client, context.order_id, new_asset_data)
+            logger.info("%s: asset %s (%s) created", context, line["subscriptionId"], asset["id"])
+
+        next_step(client, context)
+
+    @staticmethod
+    def _create_asset_data(adobe_subscription, order_line, line):
+        return {
+            "name": f"Asset for {order_line['item']['name']}",
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": Param.ADOBE_SKU,
+                        "value": line["offerId"],
+                    },
+                    {
+                        "externalId": Param.CURRENT_QUANTITY,
+                        "value": str(adobe_subscription["currentQuantity"]),
+                    },
+                    {
+                        "externalId": Param.USED_QUANTITY,
+                        "value": str(adobe_subscription["usedQuantity"]),
+                    },
+                ]
+            },
+            "externalIds": {
+                "vendor": line["subscriptionId"],
+            },
+            "lines": [
+                {
+                    "id": order_line["id"],
+                },
+            ],
+        }
+
+    @staticmethod
+    def _asset_exists(assets, subscription_id):
+        return
+
+
 class CreateOrUpdateSubscriptions(Step):
     """Create or update subscriptions in MPT based on Adobe Subscriptions."""
 
@@ -1027,7 +1101,7 @@ class SyncAgreement(Step):
         sync_agreements_by_agreement_ids(
             client, [context.agreement_id], dry_run=False, sync_prices=True
         )
-        logger.info("%s: agreement synchoronized", context)
+        logger.info("%s: agreement synchronized", context)
         next_step(client, context)
 
 

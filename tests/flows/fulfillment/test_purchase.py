@@ -29,6 +29,7 @@ from adobe_vipm.flows.fulfillment.purchase import (
 )
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     SetOrUpdateCotermDate,
@@ -738,7 +739,7 @@ def test_fulfill_purchase_order(mocker):
 
     fulfill_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 16
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 17
 
     expected_steps = [
         SetupContext,
@@ -751,6 +752,7 @@ def test_fulfill_purchase_order(mocker):
         Validate3YCCommitment,
         GetPreviewOrder,
         SubmitNewOrder,
+        CreateOrUpdateAssets,
         CreateOrUpdateSubscriptions,
         RefreshCustomer,
         SetOrUpdateCotermDate,

@@ -19,6 +19,7 @@ from adobe_vipm.flows.fulfillment.change import (
 )
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
@@ -558,6 +559,7 @@ def test_fulfill_change_order(mocker):
         UpdateRenewalQuantities,
         SubmitReturnOrders,
         UpdateRenewalQuantitiesDownsizes,
+        CreateOrUpdateAssets,
         CreateOrUpdateSubscriptions,
         UpdatePrices,
         CompleteOrder,
