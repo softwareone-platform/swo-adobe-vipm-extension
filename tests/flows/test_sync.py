@@ -1869,11 +1869,11 @@ def test_sync_agreement_prices_with_missing_prices(
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
 def test_sync_agreement_lost_customer(
     mocker,
-    mock_adobe_client,
     mock_mpt_client,
+    mock_adobe_client,
     agreement_factory,
+    mock_send_notification,
     mock_terminate_subscription,
-    mock_notify_processing_lost_customer,
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
@@ -1888,33 +1888,31 @@ def test_sync_agreement_lost_customer(
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
     ]
-    assert mock_notify_processing_lost_customer.mock_calls == [
+    assert mock_send_notification.mock_calls == [
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
+            "Executing Lost Customer Procedure.",
             "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
             " with lost customer procedure.",
-            "#541c2e",
-            button=None,
-            facts=None,
+            "FFA500",
         )
     ]
     assert [rec.message for rec in caplog.records] == [
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
     ]
 
 
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
 def test_sync_agreement_lost_customer_error(
     mocker,
-    mock_adobe_client,
     mock_mpt_client,
+    mock_adobe_client,
     mpt_error_factory,
     agreement_factory,
+    mock_send_notification,
     mock_terminate_subscription,
-    mock_notify_processing_lost_customer,
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
@@ -1937,37 +1935,32 @@ def test_sync_agreement_lost_customer_error(
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
     ]
-    assert mock_notify_processing_lost_customer.mock_calls == [
+    assert mock_send_notification.mock_calls == [
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
+            "Executing Lost Customer Procedure.",
             "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
             " with lost customer procedure.",
-            "#541c2e",
-            button=None,
-            facts=None,
+            "FFA500",
         ),
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
-            " Internal Server Error - Oops!"
+            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
             "#541c2e",
             button=None,
             facts=None,
         ),
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
-            " Internal Server Error - Oops!"
+            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
             "#541c2e",
             button=None,
             facts=None,
         ),
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
-            " Internal Server Error - Oops!"
+            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
             "#541c2e",
             button=None,
@@ -1979,10 +1972,10 @@ def test_sync_agreement_lost_customer_error(
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
     ]
 
 
@@ -2084,11 +2077,11 @@ def test_add_missing_subscriptions(
     mock_adobe_client,
     agreement_factory,
     adobe_customer_factory,
-    adobe_subscription_factory,
+    mock_send_notification,
     mock_get_prices_for_skus,
+    adobe_subscription_factory,
     mock_get_product_items_by_skus,
     mock_create_agreement_subscription,
-    mock_notify_processing_lost_customer,
 ):
     customer_subscriptions = [
         adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(4)
@@ -2198,7 +2191,7 @@ def test_add_missing_subscriptions_deployment(
     mock_get_product_items_by_skus,
     fulfillment_parameters_factory,
     mock_create_agreement_subscription,
-    mock_notify_processing_lost_customer,
+    mock_send_notification,
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(4)
@@ -2271,7 +2264,7 @@ def test_add_missing_subscriptions_wrong_currency(
     adobe_subscription_factory,
     mock_get_product_items_by_skus,
     mock_create_agreement_subscription,
-    mock_notify_processing_lost_customer,
+    mock_send_notification,
 ):
     customer_subscriptions = [
         adobe_subscription_factory(
