@@ -77,3 +77,10 @@ def mock_sync_agreements_by_agreement_ids(mocker):
     return mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids", new=mock
     )
+
+
+@pytest.fixture
+def mock_get_customer_or_process_lost_customer(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync._get_customer_or_process_lost_customer", autospec=True
+    )
