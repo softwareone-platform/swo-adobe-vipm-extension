@@ -31,7 +31,7 @@ from adobe_vipm.adobe.errors import (
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import get_adobe_sku, get_sku_price
-from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
+from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus, TeamsColorCode
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
@@ -45,8 +45,7 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
-from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
-from adobe_vipm.notifications import send_exception
+from adobe_vipm.notifications import send_exception, send_notification
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -700,7 +699,7 @@ def process_lost_customer(  # noqa: C901
         for sub in agreement["subscriptions"]
         if sub["status"] != SubscriptionStatus.TERMINATED
     ]:
-        logger.info(">>> Suspected Lost Customer: Terminating subscription %s.", subscription_id)
+        logger.info("> Suspected Lost Customer: Terminating subscription %s.", subscription_id)
         try:
             terminate_subscription(
                 mpt_client,
@@ -709,12 +708,12 @@ def process_lost_customer(  # noqa: C901
             )
         except Exception as e:
             logger.exception(
-                ">>> Suspected Lost Customer: Error terminating subscription %s.",
+                "> Suspected Lost Customer: Error terminating subscription %s.",
                 subscription_id,
             )
-            notify_processing_lost_customer(
-                f">>> Suspected Lost Customer: Error terminating "
-                f"subscription {subscription_id}: {e}",
+            send_exception(
+                f"> Suspected Lost Customer: Error terminating subscription {subscription_id}",
+                f"{e}",
             )
 
     customer_deployments = adobe_client.get_customer_deployments_active_status(
@@ -737,12 +736,13 @@ def process_lost_customer(  # noqa: C901
                     terminate_subscription(mpt_client, subscription_id, "Suspected Lost Customer")
                 except Exception as e:
                     logger.exception(
-                        ">>> Suspected Lost Customer: Error terminating subscription %s.",
+                        "> Suspected Lost Customer: Error terminating subscription %s.",
                         subscription_id,
                     )
-                    notify_processing_lost_customer(
-                        f">>> Suspected Lost Customer: Error terminating subscription "
-                        f"{subscription_id}: {e}",
+                    send_exception(
+                        f"> Suspected Lost Customer: Error terminating subscription"
+                        f" {subscription_id}",
+                        f"{e}",
                     )
 
 
@@ -856,9 +856,11 @@ def _get_customer_or_process_lost_customer(mpt_client, adobe_client, agreement, 
                 e.code,
                 e.message,
             )
-            notify_processing_lost_customer(
+            send_notification(
+                "Executing Lost Customer Procedure.",
                 f"Received Adobe error {e.code} - {e.message},"
-                f" assuming lost customer and proceeding with lost customer procedure."
+                f" assuming lost customer and proceeding with lost customer procedure.",
+                TeamsColorCode.ORANGE.value,
             )
             process_lost_customer(mpt_client, adobe_client, agreement, customer_id)
             return None

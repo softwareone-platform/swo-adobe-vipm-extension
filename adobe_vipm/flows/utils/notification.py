@@ -118,13 +118,3 @@ def notify_not_updated_subscriptions(
         )
 
     send_exception(f"Error updating the subscriptions in configuration order: {order_id}", message)
-
-
-def notify_processing_lost_customer(msg: str) -> None:
-    """
-    Notifies at the start of execution of Lost Customer Procedure.
-
-    Args:
-        msg: Message to include into the notification.
-    """
-    send_exception("Executing Lost Customer Procedure.", msg)
