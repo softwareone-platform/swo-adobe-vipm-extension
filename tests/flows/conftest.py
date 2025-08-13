@@ -38,8 +38,12 @@ def mock_terminate_subscription(mocker):
 
 
 @pytest.fixture
-def mock_notify_processing_lost_customer(mocker):
-    return mocker.patch("adobe_vipm.notifications.send_notification", spec=True)
+def mock_send_notification(mocker):
+    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.send_notification")
+    mocker.patch("adobe_vipm.flows.sync.send_notification", new=mock)
+    mocker.patch("adobe_vipm.notifications.send_notification", new=mock)
+
+    return mock
 
 
 @pytest.fixture
