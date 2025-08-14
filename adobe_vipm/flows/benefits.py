@@ -80,12 +80,12 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 PARAM_PHASE_FULFILLMENT: [
                     {
                         "externalId": status_param_ext_id,
-                        "value": request_info["status"],
+                        "value": request_info.get("status"),
                     },
                 ]
             }
             logger.info(
-                f"3YC request for agreement {agreement['id']} is {request_info['status']}"
+                f"3YC request for agreement {agreement['id']} is {request_info.get("status")}"
             )
             commitment_info = get_3yc_commitment(customer)
             if commitment_info:
@@ -115,31 +115,20 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 agreement["id"],
                 parameters=parameters,
             )
-            if get_global_customer(agreement)[0] == "Yes":
+
+            global_customer = get_global_customer(agreement)
+
+            if global_customer and global_customer[0] == "Yes":
                 update_deployment_agreements_3yc(
                     adobe_client, mpt_client, authorization_id, customer_id, parameters
                 )
 
-            status = request_info["status"]
-            if status in (
-                STATUS_3YC_DECLINED,
-                STATUS_3YC_EXPIRED,
-                STATUS_3YC_NONCOMPLIANT,
-            ):
-                agreement_link = urljoin(
-                    settings.MPT_PORTAL_BASE_URL,
-                    f"/commerce/agreements/{agreement['id']}",
-                )
-                send_warning(
-                    f"3YC {request_type_title.capitalize()} Request {status.capitalize()}",
-                    f"The 3-year {request_type_title} request for agreement {agreement['id']} "
-                    f"**{agreement['name']}** of the customer **{get_company_name(agreement)}** "
-                    f"has been denied: {status}.\n\n"
-                    "To request the 3YC again, as a Vendor user, "
-                    "modify the Agreement and mark the 3-year "
-                    f"{request_type_title} {request_type_param_phase} parameter checkbox again.",
-                    button=Button(f"Open {agreement["id"]}", agreement_link),
-                )
+            _send_3yc_denied_warning_if_needed(
+                agreement,
+                request_info.get("status"),
+                request_type_title,
+                request_type_param_phase,
+            )
         except Exception:
             logger.exception(
                 f"An exception has been raised checking 3YC request for {agreement['id']}",
@@ -148,6 +137,33 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 f"3YC {request_type_title.capitalize()} Request exception for {agreement['id']}",
                 traceback.format_exc(),
             )
+
+
+def _send_3yc_denied_warning_if_needed(
+        agreement,
+        status,
+        request_type_title,
+        request_type_param_phase,
+):
+    if status in (
+        STATUS_3YC_DECLINED,
+        STATUS_3YC_EXPIRED,
+        STATUS_3YC_NONCOMPLIANT,
+    ):
+        agreement_link = urljoin(
+            settings.MPT_PORTAL_BASE_URL,
+            f"/commerce/agreements/{agreement['id']}",
+        )
+        send_warning(
+            f"3YC {request_type_title.capitalize()} Request {status.capitalize()}",
+            f"The 3-year {request_type_title} request for agreement {agreement['id']} "
+            f"**{agreement['name']}** of the customer **{get_company_name(agreement)}** "
+            f"has been denied: {status}.\n\n"
+            "To request the 3YC again, as a Vendor user, "
+            "modify the Agreement and mark the 3-year "
+            f"{request_type_title} {request_type_param_phase} parameter checkbox again.",
+            button=Button(f"Open {agreement['id']}", agreement_link),
+        )
 
 
 def update_deployment_agreements_3yc(
