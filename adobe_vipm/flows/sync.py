@@ -605,10 +605,12 @@ def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, *, dry_run: bool
 
 def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, *, dry_run: bool) -> None:
     adobe_client = get_adobe_client()
-    customer = adobe_client.get_customer(
-        authorization_id=agreement["authorization"]["id"],
-        customer_id=get_adobe_customer_id(agreement),
+    customer = _get_customer_or_process_lost_customer(
+        mpt_client, adobe_client, agreement, customer_id=get_adobe_customer_id(agreement)
     )
+    if not customer:
+        return
+
     commitment = get_3yc_commitment(customer)
     enroll_status = commitment["status"]
     logger.debug(
@@ -783,33 +785,27 @@ def sync_agreement(  # noqa: C901
             logger.info("Agreement %s has processing subscriptions, skip it", agreement["id"])
             return
 
-        try:
-            customer = adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
-        except AdobeAPIError as e:
-            if e.code == AdobeStatus.INVALID_CUSTOMER:
-                logger.info(
-                    "Received Adobe error %s - %s, assuming lost customer "
-                    "and proceeding with lost customer procedure.",
-                    e.code,
-                    e.message,
-                )
-                notify_processing_lost_customer(
-                    f"Received Adobe error {e.code} - {e.message},"
-                    f" assuming lost customer and proceeding with lost customer procedure."
-                )
-                process_lost_customer(mpt_client, adobe_client, agreement, customer_id)
-                return
-            raise
+        customer = _get_customer_or_process_lost_customer(
+            mpt_client, adobe_client, agreement, customer_id
+        )
+        if not customer:
+            return
+
+        adobe_subscriptions = adobe_client.get_subscriptions(
+            agreement["authorization"]["id"], customer["customerId"]
+        )["items"]
+
+        if not adobe_subscriptions:
+            logger.info(
+                "Skipping price sync - no subscriptions found for the customer %s", customer_id
+            )
+            return
 
         if not customer.get("discounts", []):
             raise CustomerDiscountsNotFoundError(  # noqa: TRY301
                 f"Customer {customer_id} does not have discounts information. "
                 f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
             )
-
-        adobe_subscriptions = adobe_client.get_subscriptions(
-            agreement["authorization"]["id"], customer["customerId"]
-        )["items"]
 
         if sync_prices:
             sync_agreement_prices(
@@ -850,6 +846,26 @@ def sync_agreement(  # noqa: C901
     else:
         if not dry_run:
             _update_last_sync_date(mpt_client, agreement)
+
+
+def _get_customer_or_process_lost_customer(mpt_client, adobe_client, agreement, customer_id):
+    try:
+        return adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
+    except AdobeAPIError as e:
+        if e.code == AdobeStatus.INVALID_CUSTOMER:
+            logger.info(
+                "Received Adobe error %s - %s, assuming lost customer "
+                "and proceeding with lost customer procedure.",
+                e.code,
+                e.message,
+            )
+            notify_processing_lost_customer(
+                f"Received Adobe error {e.code} - {e.message},"
+                f" assuming lost customer and proceeding with lost customer procedure."
+            )
+            process_lost_customer(mpt_client, adobe_client, agreement, customer_id)
+            return None
+        raise
 
 
 def _update_last_sync_date(mpt_client: MPTClient, agreement: dict) -> None:

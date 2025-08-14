@@ -679,6 +679,44 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     ]
 
 
+def test_sync_agreements_by_3yc_enroll_status_no_cust(
+    mocker,
+    caplog,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    mock_send_exception,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    mock_get_customer_or_process_lost_customer,
+):
+    agreement = agreement_factory()
+    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        return_value=[agreement],
+        autospec=True,
+    )
+    mock_adobe_client.get_customer.side_effect = AdobeAPIError(
+        status_code=int(AdobeStatus.INVALID_CUSTOMER.value),
+        payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
+    )
+    mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
+    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
+    mock_get_customer_or_process_lost_customer.return_value = None
+
+    sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
+
+    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+        mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
+    )
+    mock_get_customer_or_process_lost_customer.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, agreement, customer_id=""
+    )
+    mock_update_agreement.assert_not_called()
+    mock_sync_agreement.assert_not_called()
+    assert caplog.messages == ["Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962"]
+
+
 @freeze_time("2024-11-09 12:30:00")
 def test_sync_agreement_prices_with_3yc(
     mocker,
@@ -1805,6 +1843,7 @@ def test_sync_agreement_prices_with_missing_prices(
     ]
 
     mock_adobe_client.get_subscriptions.assert_called_once_with("AUT-1234-5678", "a-client-id")
+
     assert mocked_update_agreement_subscription.mock_calls == [
         mocker.call(
             mock_mpt_client,
@@ -2330,3 +2369,31 @@ def test_process_orphaned_deployment_subscriptions_error(
     mock_send_exception.assert_called_once_with(
         "Error disabling auto-renewal for orphaned Adobe subscription a-sub-id.", "Boom!"
     )
+
+
+def test_sync_agreement_without_subscriptions(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    subscriptions_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    caplog
+):
+    agreement = agreement_factory(
+        lines=lines_factory(
+            external_vendor_id="77777777CA",
+            unit_purchase_price=10.11,
+        )
+    )
+    adobe_subscription = adobe_subscription_factory()
+
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
+    mock_adobe_client.get_subscriptions.return_value = {"items": []}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
+
+    with caplog.at_level(logging.INFO):
+        sync_agreement(mock_mpt_client, agreement, dry_run=True, sync_prices=True)
+
+    assert "Skipping price sync - no subscriptions found for the customer" in caplog.text

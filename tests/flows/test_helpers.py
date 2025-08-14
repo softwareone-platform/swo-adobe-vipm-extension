@@ -11,7 +11,7 @@ from adobe_vipm.adobe.constants import (
     AdobeStatus,
     ThreeYearCommitmentStatus,
 )
-from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import (
@@ -1863,3 +1863,98 @@ def test_validate_3yc_commitment_date_without_coterm_date(
     mocked_set_order_error.assert_not_called()
 
     assert context.order.get("status") != "failed"
+
+
+def test_validate_3yc_commitment_sku_not_found(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+):
+    mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
+
+    commitment = adobe_commitment_factory(
+        status=ThreeYearCommitmentStatus.COMMITTED.value,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+        licenses=10,
+        consumables=5,
+    )
+
+    adobe_customer = adobe_customer_factory(
+        commitment=commitment,
+        commitment_request=commitment,
+        coterm_date=None,
+    )
+
+    subscriptions = {
+        "items": [
+            adobe_subscription_factory(
+                offer_id="65304578CA",
+                renewal_quantity=15,
+                autorenewal_enabled=True,
+            ),
+            adobe_subscription_factory(
+                offer_id="77777777CA",
+                renewal_quantity=8,
+                autorenewal_enabled=True,
+            ),
+        ]
+    }
+
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = subscriptions
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    lines = [
+        {
+            "id": "line-1",
+            "item": {
+                "externalIds": {"vendor": "65304578CA"},
+            },
+            "quantity": 12,
+            "oldQuantity": 15,
+        },
+        {
+            "id": "line-1",
+            "item": {
+                "externalIds": {"vendor": "77777777CA"},
+            },
+            "quantity": 12,
+            "oldQuantity": 7,
+        },
+    ]
+
+    order = order_factory(
+        lines=lines,
+    )
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        downsize_lines=[order["lines"][0]],
+        upsize_lines=[order["lines"][1]],
+    )
+
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=AdobeProductNotFoundError("Product not found in Adobe configuration"),
+    )
+
+    step = Validate3YCCommitment()
+    step(mocked_client, context, mocked_next_step)
+
+    assert mocked_switch_order_to_failed.call_args[0][2]["message"] == (
+        "The order has failed. The reduction in quantity "
+        "would place the account below the minimum commitment "
+        "of 10 licenses or 5 consumables for the three-year commitment."
+    )
