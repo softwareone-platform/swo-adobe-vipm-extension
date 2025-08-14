@@ -38,8 +38,12 @@ def mock_terminate_subscription(mocker):
 
 
 @pytest.fixture
-def mock_notify_processing_lost_customer(mocker):
-    return mocker.patch("adobe_vipm.notifications.send_notification", spec=True)
+def mock_send_notification(mocker):
+    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.send_notification")
+    mocker.patch("adobe_vipm.flows.sync.send_notification", new=mock)
+    mocker.patch("adobe_vipm.notifications.send_notification", new=mock)
+
+    return mock
 
 
 @pytest.fixture
@@ -83,4 +87,36 @@ def mock_sync_agreements_by_agreement_ids(mocker):
 def mock_get_customer_or_process_lost_customer(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync._get_customer_or_process_lost_customer", autospec=True
+    )
+
+
+@pytest.fixture
+def mock_airtable_base_info(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.AirTableBaseInfo",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_get_gc_agreement_deployments_by_main_agreement(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_gc_agreement_deployments_by_main_agreement",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_create_gc_agreement_deployments(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.create_gc_agreement_deployments",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_get_gc_agreement_deployment_model(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
+        spec=True,
     )

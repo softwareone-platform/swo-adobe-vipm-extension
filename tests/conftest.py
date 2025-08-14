@@ -2123,7 +2123,7 @@ def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
 
     mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+        "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",
         new=get_adobe_product_by_marketplace_sku,
         spec=True,
     )
@@ -2143,3 +2143,53 @@ def mock_get_product_items_by_skus(mocker, items_factory):
         return_value=items_factory(),
         autospec=True,
     )
+
+
+@pytest.fixture
+def adobe_deployment_factory():
+    def _adobe_deployment_factory(
+        deployment_id="PR1400000882",
+        status="1000",
+        country="DE",
+        region="SN",
+        city="Berlin",
+        address_line1="Marienallee 12",
+        postal_code="01067",
+        phone_number="1005158429",
+        customer_id="P1005158636",
+    ):
+        return {
+            "deploymentId": deployment_id,
+            "status": status,
+            "companyProfile": {
+                "address": {
+                    "country": country,
+                    "region": region,
+                    "city": city,
+                    "addressLine1": address_line1,
+                    "postalCode": postal_code,
+                    "phoneNumber": phone_number,
+                }
+            },
+            "links": {
+                "self": {
+                    "uri": f"/v3/customers/{customer_id}/deployments/{deployment_id}",
+                    "method": "GET",
+                    "headers": [],
+                }
+            },
+        }
+
+    return _adobe_deployment_factory
+
+
+@pytest.fixture
+def mock_settings(settings):
+    settings.EXTENSION_CONFIG = {
+        "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
+    }
+
+
+@pytest.fixture
+def mock_pymsteams(mocker):
+    mocker.patch("pymsteams.connectorcard", autospec=True)
