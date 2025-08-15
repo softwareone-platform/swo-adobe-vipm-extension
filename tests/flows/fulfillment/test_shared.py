@@ -1301,8 +1301,10 @@ def test_create_or_update_subscriptions_step(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",

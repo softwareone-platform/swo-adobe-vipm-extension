@@ -452,7 +452,7 @@ def create_gc_agreement_subscription(
                 },
                 {
                     "externalId": Param.RENEWAL_QUANTITY.value,
-                    "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                    "value": str(adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]),
                 },
                 {
                     "externalId": Param.RENEWAL_DATE.value,

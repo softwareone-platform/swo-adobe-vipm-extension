@@ -326,7 +326,9 @@ def add_subscription(client, adobe_subscription, order, line):
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": Param.RENEWAL_DATE.value,
@@ -947,7 +949,9 @@ class CreateOrUpdateSubscriptions(Step):
                                 {
                                     "externalId": Param.RENEWAL_QUANTITY.value,
                                     "value": str(
-                                        adobe_subscription["autoRenewal"]["renewalQuantity"]
+                                        adobe_subscription["autoRenewal"][
+                                            Param.RENEWAL_QUANTITY.value
+                                        ]
                                     ),
                                 },
                                 {
