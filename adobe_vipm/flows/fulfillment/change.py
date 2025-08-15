@@ -15,6 +15,7 @@ from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
     ERR_NO_RETURABLE_ERRORS_FOUND,
     TEMPLATE_NAME_CHANGE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -185,7 +186,7 @@ class UpdateRenewalQuantities(Step):
             adobe_sub_id,
         )
         qty = line["quantity"]
-        old_qty = adobe_subscription["autoRenewal"]["renewalQuantity"]
+        old_qty = adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
 
         if old_qty != qty:
             try:
@@ -197,8 +198,9 @@ class UpdateRenewalQuantities(Step):
                 )
             except AdobeAPIError as e:
                 if not (
-                    e.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order
-                ):
+                    (e.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order)
+                    or e.code == AdobeStatus.INVALID_RENEWAL_STATE
+                ):  # TODO: and context.adobe_new_order:
                     logger.exception(
                         "%s: failed to update renewal quantity for %s (%s)",
                         context,

@@ -364,9 +364,9 @@ class Validate3YCCommitment(Step):
                 continue
 
             if sku.is_consumable():
-                count_consumables += subscription["autoRenewal"]["renewalQuantity"]
+                count_consumables += subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
             else:
-                count_licenses += subscription["autoRenewal"]["renewalQuantity"]
+                count_licenses += subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
 
         return count_licenses, count_consumables
 

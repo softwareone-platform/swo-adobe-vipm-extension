@@ -244,7 +244,7 @@ def _fulfill_transfer_migrated(  # noqa: C901
         and get_partial_sku(item["offerId"]) not in one_time_skus
     ]
     # If the order items has been updated, the validation order will fail
-    if has_order_line_updated(order["lines"], adobe_items, "currentQuantity"):
+    if has_order_line_updated(order["lines"], adobe_items, Param.CURRENT_QUANTITY.value):
         logger.error(ERR_UPDATING_TRANSFER_ITEMS.message)
         switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS.to_dict())
         return

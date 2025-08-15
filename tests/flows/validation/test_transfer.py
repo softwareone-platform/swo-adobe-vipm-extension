@@ -341,7 +341,7 @@ def test_validate_transfer_already_migrated(
     )
 
     mocked_add_lines_to_order.assert_called_once_with(
-        m_client, ANY, [adobe_subscription], {}, "currentQuantity", is_transferred=True
+        m_client, ANY, [adobe_subscription], {}, Param.CURRENT_QUANTITY.value, is_transferred=True
     )
     assert adobe_subscription["offerId"] == "65304578CA03A12"
 
