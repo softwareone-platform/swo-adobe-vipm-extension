@@ -44,7 +44,13 @@ def mock_notify_processing_lost_customer(mocker):
 
 @pytest.fixture
 def mock_get_adobe_client(mocker, mock_adobe_client):
-    return mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mock_adobe_client)
+    mock = mocker.MagicMock(
+        return_value=mock_adobe_client, spec="adobe_vipm.adobe.client.get_adobe_client"
+    )
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", new=mock)
+    mocker.patch("adobe_vipm.flows.fulfillment.change.get_adobe_client", new=mock)
+
+    return mock
 
 
 @pytest.fixture
@@ -89,3 +95,20 @@ def mock_get_customer_or_process_lost_customer(mocker):
 @pytest.fixture
 def mock_update_last_sync_date(mocker):
     return mocker.patch("adobe_vipm.flows.sync._update_last_sync_date", spec=True)
+
+
+@pytest.fixture
+def mock_switch_order_to_failed(mocker):
+    return mocker.patch("adobe_vipm.flows.fulfillment.change.switch_order_to_failed", spec=True)
+
+
+@pytest.fixture
+def mock_notify_not_updated_subscriptions(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions", spec=True
+    )
+
+
+@pytest.fixture
+def mock_next_step(mocker):
+    return mocker.MagicMock()
