@@ -1374,7 +1374,7 @@ def adobe_subscription_factory():
         return {
             "subscriptionId": subscription_id or "a-sub-id",
             "offerId": offer_id or "65304578CA01A12",
-            "currentQuantity": current_quantity,
+            Param.CURRENT_QUANTITY.value: current_quantity,
             "currencyCode": currency_code,
             "autoRenewal": {
                 "enabled": autorenewal_enabled,

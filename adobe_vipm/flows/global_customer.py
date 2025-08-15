@@ -448,7 +448,7 @@ def create_gc_agreement_subscription(
                 {"externalId": Param.ADOBE_SKU.value, "value": adobe_subscription["offerId"]},
                 {
                     "externalId": Param.CURRENT_QUANTITY.value,
-                    "value": str(adobe_subscription["currentQuantity"]),
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                 },
                 {
                     "externalId": Param.RENEWAL_QUANTITY.value,
@@ -462,7 +462,11 @@ def create_gc_agreement_subscription(
         },
         "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
         "lines": [
-            {"quantity": adobe_subscription["currentQuantity"], "item": item, **price_component}
+            {
+                "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
+                "item": item,
+                **price_component,
+            }
         ],
         "startDate": adobe_subscription["creationDate"],
         "commitmentDate": adobe_subscription["renewalDate"],
