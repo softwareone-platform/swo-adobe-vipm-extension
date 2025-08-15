@@ -198,8 +198,9 @@ class UpdateRenewalQuantities(Step):
                 )
             except AdobeAPIError as e:
                 if not (
-                    e.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order
-                ):
+                    (e.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order)
+                    or e.code == AdobeStatus.INVALID_RENEWAL_STATE
+                ):  # TODO: and context.adobe_new_order:
                     logger.exception(
                         "%s: failed to update renewal quantity for %s (%s)",
                         context,
