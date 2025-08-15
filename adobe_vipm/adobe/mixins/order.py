@@ -24,6 +24,7 @@ from adobe_vipm.adobe.utils import (  # noqa: WPS347
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.utils import get_partial_sku, map_by
 
 
@@ -197,7 +198,7 @@ class OrderClientMixin:
                 )
 
             adobe_subscription = map_by_base_offer_subscriptions[adobe_base_sku]
-            renewal_quantity = adobe_subscription["autoRenewal"]["renewalQuantity"]
+            renewal_quantity = adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
             current_quantity = adobe_subscription["currentQuantity"]
             diff = current_quantity - renewal_quantity if renewal_quantity < current_quantity else 0
 

@@ -284,8 +284,10 @@ def test_transfer(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -590,8 +592,10 @@ def test_transfer_with_no_profile_address(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -2399,8 +2403,10 @@ def test_transfer_3yc_customer(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -2663,8 +2669,10 @@ def test_transfer_3yc_customer_with_no_profile_address(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -3334,8 +3342,10 @@ def test_transfer_gc_account_all_deployments_created(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -3679,8 +3689,10 @@ def test_transfer_gc_account_no_deployments(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -5582,8 +5594,10 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",

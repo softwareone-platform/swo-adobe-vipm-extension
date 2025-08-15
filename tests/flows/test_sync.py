@@ -111,8 +111,10 @@ def test_sync_agreement_prices(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -139,8 +141,10 @@ def test_sync_agreement_prices(
                         "value": str(another_adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(another_adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            another_adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -776,8 +780,8 @@ def test_sync_agreement_prices_with_3yc(
                     "value": str(adobe_subscription["currentQuantity"]),
                 },
                 {
-                    "externalId": "renewalQuantity",
-                    "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                    "externalId": Param.RENEWAL_QUANTITY.value,
+                    "value": str(adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]),
                 },
                 {
                     "externalId": "renewalDate",
@@ -941,8 +945,10 @@ def test_sync_global_customer_parameter(
                             "value": str(adobe_subscription["currentQuantity"]),
                         },
                         {
-                            "externalId": "renewalQuantity",
-                            "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                            "externalId": Param.RENEWAL_QUANTITY.value,
+                            "value": str(
+                                adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                            ),
                         },
                         {
                             "externalId": "renewalDate",
@@ -966,9 +972,11 @@ def test_sync_global_customer_parameter(
                             "value": str(another_adobe_subscription["currentQuantity"]),
                         },
                         {
-                            "externalId": "renewalQuantity",
+                            "externalId": Param.RENEWAL_QUANTITY.value,
                             "value": str(
-                                another_adobe_subscription["autoRenewal"]["renewalQuantity"]
+                                another_adobe_subscription["autoRenewal"][
+                                    Param.RENEWAL_QUANTITY.value
+                                ]
                             ),
                         },
                         {
@@ -993,9 +1001,11 @@ def test_sync_global_customer_parameter(
                             "value": str(adobe_deployment_subscription["currentQuantity"]),
                         },
                         {
-                            "externalId": "renewalQuantity",
+                            "externalId": Param.RENEWAL_QUANTITY.value,
                             "value": str(
-                                adobe_deployment_subscription["autoRenewal"]["renewalQuantity"]
+                                adobe_deployment_subscription["autoRenewal"][
+                                    Param.RENEWAL_QUANTITY.value
+                                ]
                             ),
                         },
                         {
@@ -1203,8 +1213,10 @@ def test_sync_global_customer_update_not_required(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {"externalId": "renewalDate", "value": adobe_subscription["renewalDate"]},
                     {"externalId": "lastSyncDate", "value": "2025-06-30"},
@@ -1225,8 +1237,10 @@ def test_sync_global_customer_update_not_required(
                         "value": str(another_adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(another_adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            another_adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -1250,9 +1264,11 @@ def test_sync_global_customer_update_not_required(
                         "value": str(adobe_deployment_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
+                        "externalId": Param.RENEWAL_QUANTITY.value,
                         "value": str(
-                            adobe_deployment_subscription["autoRenewal"]["renewalQuantity"]
+                            adobe_deployment_subscription["autoRenewal"][
+                                Param.RENEWAL_QUANTITY.value
+                            ]
                         ),
                     },
                     {
@@ -1277,9 +1293,11 @@ def test_sync_global_customer_update_not_required(
                         "value": str(another_adobe_deployment_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
+                        "externalId": Param.RENEWAL_QUANTITY.value,
                         "value": str(
-                            another_adobe_deployment_subscription["autoRenewal"]["renewalQuantity"]
+                            another_adobe_deployment_subscription["autoRenewal"][
+                                Param.RENEWAL_QUANTITY.value
+                            ]
                         ),
                     },
                     {
@@ -1395,8 +1413,10 @@ def test_sync_global_customer_update_adobe_error(
                         "value": str(adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -1420,8 +1440,10 @@ def test_sync_global_customer_update_adobe_error(
                         "value": str(another_adobe_subscription["currentQuantity"]),
                     },
                     {
-                        "externalId": "renewalQuantity",
-                        "value": str(another_adobe_subscription["autoRenewal"]["renewalQuantity"]),
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            another_adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": "renewalDate",
@@ -2379,7 +2401,7 @@ def test_sync_agreement_without_subscriptions(
     lines_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
-    caplog
+    caplog,
 ):
     agreement = agreement_factory(
         lines=lines_factory(

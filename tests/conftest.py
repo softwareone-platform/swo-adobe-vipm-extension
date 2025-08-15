@@ -1367,7 +1367,7 @@ def adobe_subscription_factory():
             "currencyCode": currency_code,
             "autoRenewal": {
                 "enabled": autorenewal_enabled,
-                "renewalQuantity": renewal_quantity,
+                Param.RENEWAL_QUANTITY.value: renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
             "renewalDate": renewal_date or default_renewal_date.isoformat(),
