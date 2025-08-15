@@ -139,7 +139,7 @@ def _add_missing_subscriptions(
                         },
                         {
                             "externalId": Param.CURRENT_QUANTITY.value,
-                            "value": str(adobe_subscription["currentQuantity"]),
+                            "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                         },
                         {
                             "externalId": Param.RENEWAL_QUANTITY.value,
@@ -159,7 +159,7 @@ def _add_missing_subscriptions(
                 "seller": {"id": agreement["seller"]["id"]},
                 "lines": [
                     {
-                        "quantity": adobe_subscription["currentQuantity"],
+                        "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
                         "item": item,
                         **price_component,
                     }
@@ -373,7 +373,7 @@ def _update_subscriptions(
                 {"externalId": Param.ADOBE_SKU.value, "value": actual_sku},
                 {
                     "externalId": Param.CURRENT_QUANTITY.value,
-                    "value": str(adobe_subscription["currentQuantity"]),
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                 },
                 {
                     "externalId": Param.RENEWAL_QUANTITY.value,

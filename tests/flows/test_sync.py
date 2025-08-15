@@ -107,8 +107,8 @@ def test_sync_agreement_prices(
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -137,8 +137,8 @@ def test_sync_agreement_prices(
                         "value": "77777777CA01A12",
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(another_adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(another_adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -776,8 +776,8 @@ def test_sync_agreement_prices_with_3yc(
             "fulfillment": [
                 {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                 {
-                    "externalId": "currentQuantity",
-                    "value": str(adobe_subscription["currentQuantity"]),
+                    "externalId": Param.CURRENT_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                 },
                 {
                     "externalId": Param.RENEWAL_QUANTITY.value,
@@ -941,8 +941,8 @@ def test_sync_global_customer_parameter(
                     "fulfillment": [
                         {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                         {
-                            "externalId": "currentQuantity",
-                            "value": str(adobe_subscription["currentQuantity"]),
+                            "externalId": Param.CURRENT_QUANTITY.value,
+                            "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                         },
                         {
                             "externalId": Param.RENEWAL_QUANTITY.value,
@@ -968,8 +968,8 @@ def test_sync_global_customer_parameter(
                     "fulfillment": [
                         {"externalId": "adobeSKU", "value": "77777777CA01A12"},
                         {
-                            "externalId": "currentQuantity",
-                            "value": str(another_adobe_subscription["currentQuantity"]),
+                            "externalId": Param.CURRENT_QUANTITY.value,
+                            "value": str(another_adobe_subscription[Param.CURRENT_QUANTITY.value]),
                         },
                         {
                             "externalId": Param.RENEWAL_QUANTITY.value,
@@ -997,8 +997,10 @@ def test_sync_global_customer_parameter(
                     "fulfillment": [
                         {"externalId": "adobeSKU", "value": "77777777CA01A12"},
                         {
-                            "externalId": "currentQuantity",
-                            "value": str(adobe_deployment_subscription["currentQuantity"]),
+                            "externalId": Param.CURRENT_QUANTITY.value,
+                            "value": str(
+                                adobe_deployment_subscription[Param.CURRENT_QUANTITY.value]
+                            ),
                         },
                         {
                             "externalId": Param.RENEWAL_QUANTITY.value,
@@ -1209,8 +1211,8 @@ def test_sync_global_customer_update_not_required(
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -1233,8 +1235,8 @@ def test_sync_global_customer_update_not_required(
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "77777777CA01A12"},
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(another_adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(another_adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -1260,8 +1262,8 @@ def test_sync_global_customer_update_not_required(
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_deployment_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_deployment_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -1289,8 +1291,10 @@ def test_sync_global_customer_update_not_required(
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(another_adobe_deployment_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(
+                            another_adobe_deployment_subscription[Param.CURRENT_QUANTITY.value]
+                        ),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -1409,8 +1413,8 @@ def test_sync_global_customer_update_adobe_error(
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65304578CA01A12"},
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -1436,8 +1440,8 @@ def test_sync_global_customer_update_adobe_error(
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "77777777CA01A12"},
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(another_adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(another_adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,

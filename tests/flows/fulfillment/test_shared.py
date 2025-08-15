@@ -1297,8 +1297,8 @@ def test_create_or_update_subscriptions_step(
                         "value": adobe_order["lineItems"][0]["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,

@@ -280,8 +280,8 @@ def test_transfer(
                         "value": adobe_subscription["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -588,8 +588,8 @@ def test_transfer_with_no_profile_address(
                         "value": adobe_subscription["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -2399,8 +2399,8 @@ def test_transfer_3yc_customer(
                         "value": adobe_subscription["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -2665,8 +2665,8 @@ def test_transfer_3yc_customer_with_no_profile_address(
                         "value": adobe_subscription["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -3338,8 +3338,8 @@ def test_transfer_gc_account_all_deployments_created(
                         "value": adobe_subscription["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -3685,8 +3685,8 @@ def test_transfer_gc_account_no_deployments(
                         "value": adobe_subscription["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
@@ -5590,8 +5590,8 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                         "value": adobe_subscription["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
                         "externalId": Param.RENEWAL_QUANTITY.value,
