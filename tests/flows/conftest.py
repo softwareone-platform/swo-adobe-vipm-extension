@@ -84,3 +84,8 @@ def mock_get_customer_or_process_lost_customer(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync._get_customer_or_process_lost_customer", autospec=True
     )
+
+
+@pytest.fixture
+def mock_update_last_sync_date(mocker):
+    return mocker.patch("adobe_vipm.flows.sync._update_last_sync_date", spec=True)

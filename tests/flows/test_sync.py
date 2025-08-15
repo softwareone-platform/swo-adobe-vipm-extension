@@ -2017,12 +2017,14 @@ def test_sync_agreement_lost_customer_error(
     "status",
     (s.value for s in AgreementStatus if s is not AgreementStatus.ACTIVE),
 )
-def test_sync_agreement_skips_inactive_agreement(mock_mpt_client, mock_get_adobe_client, status):
+def test_sync_agreement_skips_inactive_agreement(
+    mock_mpt_client, mock_get_adobe_client, mock_update_last_sync_date, status
+):
     agreement = {"id": "1", "status": status, "subscriptions": []}
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
-    mock_get_adobe_client.update_last_sync_date.assert_not_called()
+    mock_update_last_sync_date.assert_not_called()
 
 
 def test_get_subscriptions_for_update_skip_adobe_inactive(
