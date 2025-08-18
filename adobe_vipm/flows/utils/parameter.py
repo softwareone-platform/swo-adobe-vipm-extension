@@ -118,11 +118,10 @@ def update_parameters_visibility(order: dict) -> dict:
             "hidden": (*PARAM_NEW_CUSTOMER_PARAMETERS, *(Param.MEMBERSHIP_ID.value,)),
         },
     }
-    param_config = parameters_map.get(agreement_value)
-
-    for param in param_config["visible"]:
+    param_config = parameters_map.get(agreement_value, {})
+    for param in param_config.get("visible", []):
         updated_order = set_parameter_visible(updated_order, param)
-    for param in param_config["hidden"]:
+    for param in param_config.get("hidden", []):
         updated_order = set_parameter_hidden(updated_order, param)
 
     return updated_order
