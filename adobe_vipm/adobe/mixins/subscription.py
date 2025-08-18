@@ -4,6 +4,7 @@ import requests
 
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import wrap_http_error
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.utils import get_partial_sku
 
 
@@ -137,7 +138,7 @@ class SubscriptionClientMixin:
             },
         }
         if quantity:
-            payload["autoRenewal"]["renewalQuantity"] = quantity
+            payload["autoRenewal"][Param.RENEWAL_QUANTITY.value] = quantity
 
         response = requests.patch(
             urljoin(

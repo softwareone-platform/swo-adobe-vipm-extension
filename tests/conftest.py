@@ -1363,11 +1363,11 @@ def adobe_subscription_factory():
         return {
             "subscriptionId": subscription_id or "a-sub-id",
             "offerId": offer_id or "65304578CA01A12",
-            "currentQuantity": current_quantity,
+            Param.CURRENT_QUANTITY.value: current_quantity,
             "currencyCode": currency_code,
             "autoRenewal": {
                 "enabled": autorenewal_enabled,
-                "renewalQuantity": renewal_quantity,
+                Param.RENEWAL_QUANTITY.value: renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
             "renewalDate": renewal_date or default_renewal_date.isoformat(),
