@@ -153,13 +153,18 @@ def _check_item_in_order(line, order_item):
 
 
 def _is_invalid_renewal_state_ok(context, line):
+    invalid_renewal_state_allowed = True
     check_item_in_order = partial(_check_item_in_order, line)
     if context.adobe_new_order and find_first(
         check_item_in_order, context.adobe_new_order["lineItems"]
     ):
-        return context.adobe_new_order["status"] == AdobeStatus.PROCESSED.value
+        invalid_renewal_state_allowed = (
+            context.adobe_new_order["status"] == AdobeStatus.PROCESSED.value
+        )
+        if invalid_renewal_state_allowed:
+            logger.info("> Vendor order with the item has status PROCESSED")
 
-    return True
+    return invalid_renewal_state_allowed
 
 
 class UpdateRenewalQuantities(Step):
@@ -219,11 +224,18 @@ class UpdateRenewalQuantities(Step):
                     quantity=qty,
                 )
             except AdobeAPIError as error:
-                invalid_renewal_state_ok = False
+                invalid_renewal_state_allowed = False
                 if error.code == AdobeStatus.INVALID_RENEWAL_STATE and old_qty < qty:
-                    invalid_renewal_state_ok = _is_invalid_renewal_state_ok(context, line)
+                    logger.info(
+                        "Got invalid renewal state error for subscription %s while updating"
+                        " quantity %s -> %s",
+                        subscription["id"],
+                        old_qty,
+                        qty,
+                    )
+                    invalid_renewal_state_allowed = _is_invalid_renewal_state_ok(context, line)
                 if not (
-                    invalid_renewal_state_ok
+                    invalid_renewal_state_allowed
                     or (
                         error.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED
                         and context.adobe_new_order
