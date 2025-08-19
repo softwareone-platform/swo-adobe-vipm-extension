@@ -4,6 +4,11 @@ from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.utils import get_item_by_partial_sku
+from adobe_vipm.flows.constants import (
+    TEMPLATE_SUBSCRIPTION_AUTORENEWAL_DISABLE,
+    TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
+    TEMPLATE_SUBSCRIPTION_EXPIRED,
+)
 from adobe_vipm.flows.utils.customer import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
@@ -174,3 +179,21 @@ def get_subscription_by_line_subs_id(subscriptions, line):
         lambda subscription: subscription["id"] == line["subscription"]["id"], subscriptions
     )
     return subscription and subscription["externalIds"]["vendor"]
+
+
+def get_template_name_by_subscription(adobe_subscription):
+    """
+    Get the template name by subscription.
+
+    Args:
+        adobe_subscription: The Adobe subscription.
+
+    Returns:
+        The template name.
+    """
+    if adobe_subscription.get("status") == AdobeStatus.SUBSCRIPTION_TERMINATED:
+        return TEMPLATE_SUBSCRIPTION_EXPIRED
+
+    if adobe_subscription.get("autoRenewal", {}).get("enabled"):
+        return TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE
+    return TEMPLATE_SUBSCRIPTION_AUTORENEWAL_DISABLE

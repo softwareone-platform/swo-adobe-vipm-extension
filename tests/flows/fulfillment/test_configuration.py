@@ -331,7 +331,6 @@ def test_fulfill_configuration_order(mocker):
         SetSubscriptionTemplate,
         SyncAgreement,
     ]
-
     actual_steps = list(mocked_pipeline_ctor.mock_calls[0].args)
 
     for actual, expected in zip(actual_steps, expected_steps, strict=False):

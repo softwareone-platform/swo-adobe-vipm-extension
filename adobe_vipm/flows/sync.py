@@ -37,6 +37,7 @@ from adobe_vipm.flows.utils import (
     get_global_customer,
     get_parameter,
     get_sku_with_discount_level,
+    get_template_name_by_subscription,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
@@ -153,52 +154,59 @@ def _add_missing_subscriptions(
                 },
             )
         else:
-            mpt.create_agreement_subscription(
-                mpt_client,
-                {
-                    "status": SubscriptionStatus.ACTIVE.value,
-                    "commitmentDate": adobe_subscription["renewalDate"],
-                    "price": {"unitPP": prices},
-                    "parameters": {
-                        "fulfillment": [
-                            {
-                                "externalId": Param.ADOBE_SKU.value,
-                                "value": sku_discount_level,
-                            },
-                            {
-                                "externalId": Param.CURRENT_QUANTITY.value,
-                                "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
-                            },
-                            {
-                                "externalId": Param.RENEWAL_QUANTITY.value,
-                                "value": str(
-                                    adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
-                                ),
-                            },
-                            {
-                                "externalId": Param.RENEWAL_DATE.value,
-                                "value": str(adobe_subscription["renewalDate"]),
-                            },
-                        ]
-                    },
-                    "agreement": {"id": agreement["id"]},
-                    "buyer": {"id": agreement["buyer"]["id"]},
-                    "licensee": {"id": agreement["licensee"]["id"]},
-                    "seller": {"id": agreement["seller"]["id"]},
-                    "lines": [
-                        {
-                            "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
-                            "item": item,
-                            **unit_price,
-                        }
-                    ],
-                    "name": f"Subscription for {item.get('name')}",
-                    "startDate": adobe_subscription["creationDate"],
-                    "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
-                    "product": {"id": agreement["product"]["id"]},
-                    "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
-                },
+            template_name = get_template_name_by_subscription(adobe_subscription)
+            template = mpt.get_template_by_name(
+                mpt_client, agreement["product"]["id"], template_name
             )
+            subscription = {
+                "status": SubscriptionStatus.ACTIVE.value,
+                "commitmentDate": adobe_subscription["renewalDate"],
+                "price": {"unitPP": prices},
+                "parameters": {
+                    "fulfillment": [
+                        {
+                            "externalId": Param.ADOBE_SKU.value,
+                            "value": sku_discount_level,
+                        },
+                        {
+                            "externalId": Param.CURRENT_QUANTITY.value,
+                            "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                        },
+                        {
+                            "externalId": Param.RENEWAL_QUANTITY.value,
+                            "value": str(
+                                adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                            ),
+                        },
+                        {
+                            "externalId": Param.RENEWAL_DATE.value,
+                            "value": str(adobe_subscription["renewalDate"]),
+                        },
+                    ]
+                },
+                "agreement": {"id": agreement["id"]},
+                "buyer": {"id": agreement["buyer"]["id"]},
+                "licensee": {"id": agreement["licensee"]["id"]},
+                "seller": {"id": agreement["seller"]["id"]},
+                "lines": [
+                    {
+                        "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
+                        "item": item,
+                        **unit_price,
+                    }
+                ],
+                "name": f"Subscription for {item.get('name')}",
+                "startDate": adobe_subscription["creationDate"],
+                "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
+                "product": {"id": agreement["product"]["id"]},
+                "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
+            }
+            if template:
+                subscription["template"] = {
+                    "id": template.get("id"),
+                    "name": template.get("name"),
+                }
+            mpt.create_agreement_subscription(mpt_client, subscription)
 
 
 def sync_agreement_prices(
@@ -425,6 +433,9 @@ def _update_subscriptions(
             }
         ]
 
+        template_name = get_template_name_by_subscription(adobe_subscription)
+        template = mpt.get_template_by_name(mpt_client, product_id, template_name)
+
         parameters = {
             "fulfillment": [
                 {"externalId": Param.ADOBE_SKU.value, "value": actual_sku},
@@ -461,6 +472,10 @@ def _update_subscriptions(
                 parameters=parameters,
                 commitmentDate=coterm_date,
                 autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+                template={
+                    "id": template.get("id"),
+                    "name": template.get("name"),
+                },
             )
         else:
             current_price = subscription["lines"][0]["price"]["unitPP"]
