@@ -416,8 +416,7 @@ def test_sync_agreements_by_3yc_end_date(mocker, agreement_factory, dry_run):
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,3YCEndDate),eq(displayValue,2024-11-08)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2024-11-09)))&"
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price",
+        "select=lines,parameters,subscriptions,product,listing",
     )
 
 
@@ -448,8 +447,7 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,cotermDate),eq(displayValue,2025-06-15)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-06-16)))&"
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price",
+        "select=lines,parameters,subscriptions,product,listing",
     )
 
 
@@ -481,8 +479,7 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
         "eq(status,Active)&"
         "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15))))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-07-16)))&"
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price",
+        "select=lines,parameters,subscriptions,product,listing",
     )
 
 
