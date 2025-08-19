@@ -13,6 +13,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_order_subscription_by_external_id,
     get_product_template_or_default,
     get_rendered_template,
+    get_template_by_name,
     query_order,
     set_processing_template,
     update_agreement,
@@ -45,6 +46,7 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_QUERYING,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
+    TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
     Param,
 )
 from adobe_vipm.flows.pipeline import Step
@@ -923,97 +925,146 @@ class CreateOrUpdateSubscriptions(Step):
 
     def __call__(self, client, context, next_step):
         """Create or update subscriptions in MPT based on Adobe Subscriptions."""
-        if context.adobe_new_order:
-            adobe_client = get_adobe_client()
-            one_time_skus = get_one_time_skus(client, context.order)
-            for line in filter(
-                lambda x: get_partial_sku(x["offerId"]) not in one_time_skus,
-                context.adobe_new_order["lineItems"],
-            ):
-                order_line = get_order_line_by_sku(context.order, line["offerId"])
+        if not context.adobe_new_order:
+            next_step(client, context)
+            return
 
-                order_subscription = get_subscription_by_line_and_item_id(
-                    context.order["subscriptions"],
-                    order_line["item"]["id"],
-                    order_line["id"],
-                )
-                if not order_subscription:
-                    adobe_subscription = adobe_client.get_subscription(
-                        context.authorization_id,
-                        context.adobe_customer_id,
-                        line["subscriptionId"],
-                    )
+        adobe_client = get_adobe_client()
+        one_time_skus = get_one_time_skus(client, context.order)
 
-                    if adobe_subscription["status"] != AdobeStatus.PROCESSED:
-                        logger.warning(
-                            "%s: subscription %s for customer %s is in status %s, skip it",
-                            context,
-                            adobe_subscription["subscriptionId"],
-                            context.adobe_customer_id,
-                            adobe_subscription["status"],
-                        )
-                        continue
+        lines = filter(
+            lambda x: get_partial_sku(x["offerId"]) not in one_time_skus,
+            context.adobe_new_order["lineItems"],
+        )
 
-                    subscription = {
-                        "name": f"Subscription for {order_line['item']['name']}",
-                        "parameters": {
-                            "fulfillment": [
-                                {
-                                    "externalId": Param.ADOBE_SKU.value,
-                                    "value": line["offerId"],
-                                },
-                                {
-                                    "externalId": Param.CURRENT_QUANTITY.value,
-                                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
-                                },
-                                {
-                                    "externalId": Param.RENEWAL_QUANTITY.value,
-                                    "value": str(
-                                        adobe_subscription["autoRenewal"][
-                                            Param.RENEWAL_QUANTITY.value
-                                        ]
-                                    ),
-                                },
-                                {
-                                    "externalId": Param.RENEWAL_DATE.value,
-                                    "value": str(adobe_subscription["renewalDate"]),
-                                },
-                            ]
-                        },
-                        "externalIds": {
-                            "vendor": line["subscriptionId"],
-                        },
-                        "lines": [
-                            {
-                                "id": order_line["id"],
-                            },
-                        ],
-                        "startDate": adobe_subscription["creationDate"],
-                        "commitmentDate": adobe_subscription["renewalDate"],
-                        "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
-                    }
-                    subscription = create_subscription(client, context.order_id, subscription)
-                    logger.info(
-                        "%s: subscription %s (%s) created",
-                        context,
-                        line["subscriptionId"],
-                        subscription["id"],
-                    )
-                else:
-                    adobe_sku = line["offerId"]
-                    set_subscription_actual_sku(
-                        client,
-                        context.order,
-                        order_subscription,
-                        adobe_sku,
-                    )
-                    logger.info(
-                        "%s: subscription %s (%s) updated",
-                        context,
-                        line["subscriptionId"],
-                        order_subscription["id"],
-                    )
+        for line in lines:
+            order_line = get_order_line_by_sku(context.order, line["offerId"])
+            order_subscription = get_subscription_by_line_and_item_id(
+                context.order["subscriptions"],
+                order_line["item"]["id"],
+                order_line["id"],
+            )
+
+            if order_subscription:
+                self._update_existing_subscription(client, context, order_subscription, line)
+            else:
+                self._create_new_subscription(client, context, adobe_client, line, order_line)
+
         next_step(client, context)
+
+    def _update_existing_subscription(self, client, context, order_subscription, line):
+        """Update an existing subscription with new Adobe SKU."""
+        adobe_sku = line["offerId"]
+        set_subscription_actual_sku(
+            client,
+            context.order,
+            order_subscription,
+            adobe_sku,
+        )
+        logger.info(
+            "%s: subscription %s (%s) updated",
+            context,
+            line["subscriptionId"],
+            order_subscription["id"],
+        )
+
+    def _create_new_subscription(self, client, context, adobe_client, line, order_line):
+        """Create a new subscription."""
+        adobe_subscription = self._get_adobe_subscription(adobe_client, context, line)
+        if not adobe_subscription:
+            return
+
+        template = self._get_subscription_template(client, context)
+        subscription_data = self._build_subscription_data(
+            line, order_line, adobe_subscription, template
+        )
+
+        subscription = create_subscription(client, context.order_id, subscription_data)
+        logger.info(
+            "%s: subscription %s (%s) created",
+            context,
+            line["subscriptionId"],
+            subscription["id"],
+        )
+
+    def _get_adobe_subscription(self, adobe_client, context, line):
+        """Get Adobe subscription and validate its status."""
+        adobe_subscription = adobe_client.get_subscription(
+            context.authorization_id,
+            context.adobe_customer_id,
+            line["subscriptionId"],
+        )
+
+        if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+            logger.warning(
+                "%s: subscription %s for customer %s is in status %s, skip it",
+                context,
+                adobe_subscription["subscriptionId"],
+                context.adobe_customer_id,
+                adobe_subscription["status"],
+            )
+            return None
+
+        return adobe_subscription
+
+    def _get_subscription_template(self, client, context):
+        """Get subscription template with error handling."""
+        try:
+            return get_template_by_name(
+                client,
+                context.order["agreement"]["product"]["id"],
+                TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
+            )
+        except Exception:
+            logger.exception(
+                "%s: failed to get template %s",
+                context,
+                TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
+            )
+            return None
+
+    def _build_subscription_data(self, line, order_line, adobe_subscription, template):
+        """Build subscription data dictionary."""
+        return {
+            "name": f"Subscription for {order_line['item']['name']}",
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": Param.ADOBE_SKU.value,
+                        "value": line["offerId"],
+                    },
+                    {
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                    },
+                    {
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
+                    },
+                    {
+                        "externalId": Param.RENEWAL_DATE.value,
+                        "value": str(adobe_subscription["renewalDate"]),
+                    },
+                ]
+            },
+            "externalIds": {
+                "vendor": line["subscriptionId"],
+            },
+            "lines": [
+                {
+                    "id": order_line["id"],
+                },
+            ],
+            "startDate": adobe_subscription["creationDate"],
+            "commitmentDate": adobe_subscription["renewalDate"],
+            "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
+            "template": None if not template else {
+                "id": template.get("id"),
+                "name": template.get("name"),
+            },
+        }
 
 
 class CompleteOrder(Step):
