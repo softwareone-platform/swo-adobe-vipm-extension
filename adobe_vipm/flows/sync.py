@@ -30,11 +30,8 @@ from adobe_vipm.adobe.errors import (
     CustomerDiscountsNotFoundError,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
-from adobe_vipm.airtable.models import (
-    get_adobe_product_by_marketplace_sku,
-    get_sku_price,
-)
-from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
+from adobe_vipm.airtable import models
+from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus, TeamsColorCode
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
@@ -48,8 +45,7 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
-from adobe_vipm.flows.utils.notification import notify_processing_lost_customer
-from adobe_vipm.notifications import send_exception
+from adobe_vipm.notifications import send_exception, send_notification
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -61,7 +57,7 @@ def _add_missing_subscriptions(
     customer: dict,
     agreement: dict,
     subscriptions_for_update: set[str],
-    customer_subscriptions,
+    adobe_subscriptions,
 ) -> None:
     deployment_id = get_deployment_id(agreement) or ""
     logger.info(
@@ -71,7 +67,7 @@ def _add_missing_subscriptions(
     )
     deployment_subscriptions = [
         line_item
-        for line_item in customer_subscriptions
+        for line_item in adobe_subscriptions
         if line_item.get("deploymentId", "") == deployment_id
     ]
 
@@ -117,7 +113,7 @@ def _add_missing_subscriptions(
             continue
 
         item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
-        prices = get_sku_price(
+        prices = models.get_sku_price(
             customer,
             offer_ids,
             agreement["product"]["id"],
@@ -207,7 +203,7 @@ def sync_agreement_prices(
         customer,
         agreement,
         subscriptions_for_update={sub[1]["subscriptionId"] for sub in subscriptions_for_update},
-        customer_subscriptions=adobe_subscriptions,
+        adobe_subscriptions=adobe_subscriptions,
     )
 
     product_id = agreement["product"]["id"]
@@ -321,11 +317,11 @@ def _log_agreement_lines(
 ) -> None:
     agreement_lines = []
     for line in agreement["lines"]:
-        actual_sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
+        actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
         agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
 
     skus = [item[1] for item in agreement_lines]
-    prices = get_sku_price(customer, skus, product_id, currency)
+    prices = models.get_sku_price(customer, skus, product_id, currency)
     for line, actual_sku in agreement_lines:
         current_price = line["price"]["unitPP"]
         line["price"]["unitPP"] = prices[actual_sku]
@@ -351,7 +347,7 @@ def _update_subscriptions(
     dry_run: bool,
 ) -> None:
     skus = [item[2] for item in subscriptions_for_update]
-    prices = get_sku_price(customer, skus, product_id, currency)
+    prices = models.get_sku_price(customer, skus, product_id, currency)
     missing_prices_skus = []
     coterm_date = customer["cotermDate"]
 
@@ -434,10 +430,7 @@ def _check_adobe_subscription_id(subscription_id, adobe_subscription):
 
 
 def _get_subscriptions_for_update(
-    mpt_client: MPTClient,
-    agreement: dict,
-    customer: dict,
-    customer_subscriptions: Sequence[dict],
+    mpt_client: MPTClient, agreement: dict, customer: dict, adobe_subscriptions: Sequence[dict]
 ) -> list[tuple[dict, dict, str]]:
     logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
     for_update = []
@@ -451,7 +444,7 @@ def _get_subscriptions_for_update(
 
         adobe_subscription = find_first(
             partial(_check_adobe_subscription_id, adobe_subscription_id),
-            customer_subscriptions,
+            adobe_subscriptions,
         )
 
         if not adobe_subscription:
@@ -517,8 +510,7 @@ def _sync_agreements_by_param(
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price"
+        "select=lines,parameters,subscriptions,product,listing"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug("Syncing agreement %s", agreement)
@@ -544,8 +536,7 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, *, dry_run: bool) -> 
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price"
+        "select=lines,parameters,subscriptions,product,listing"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug("Syncing agreement %s", agreement)
@@ -637,17 +628,99 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, *, dry_run: 
         sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)
 
 
+def _is_deployment_matched(missing_deployment_id: str, subscription: dict) -> bool:
+    return subscription.get("deploymentId") == missing_deployment_id
+
+
+def _check_adobe_deployment_id(deployment_id: str, adobe_deployment: dict) -> bool:
+    return adobe_deployment.get("deploymentId", "") == deployment_id
+
+
+def _check_update_airtable_missing_deployments(
+    agreement: dict, adobe_deployments: list[dict], adobe_subscriptions: Sequence[dict]
+) -> None:
+    agreement_id = agreement["id"]
+    product_id = agreement["product"]["id"]
+    logger.info("Checking airtable for missing deployments for agreement %s", agreement_id)
+    customer_deployment_ids = {cd["deploymentId"] for cd in adobe_deployments}
+    airtable_deployment_ids = {
+        ad.deployment_id
+        for ad in models.get_gc_agreement_deployments_by_main_agreement(product_id, agreement_id)
+    }
+    missing_deployment_ids = customer_deployment_ids - airtable_deployment_ids
+    if not missing_deployment_ids:
+        return
+    logger.info("Found missing deployments: %s", missing_deployment_ids)
+    missing_deployments_data = []
+    for missing_deployment_id in sorted(missing_deployment_ids):
+        transfer = models.get_transfer_by_authorization_membership_or_customer(
+            product_id, agreement["authorization"]["id"], get_adobe_customer_id(agreement)
+        )
+        if not transfer:
+            logger.info("No transfer found for missing deployment %s", missing_deployment_id)
+            continue
+
+        is_deployment_matched = partial(_is_deployment_matched, missing_deployment_id)
+        deployment_currency = (find_first(is_deployment_matched, adobe_subscriptions, {})).get(
+            "currency"
+        )
+        missing_deployments_data.append({
+            "deployment": find_first(
+                partial(_check_adobe_deployment_id, missing_deployment_id), adobe_deployments
+            ),
+            "transfer": transfer,
+            "deployment_currency": deployment_currency,
+        })
+
+    if missing_deployments_data:
+        deployment_model = models.get_gc_agreement_deployment_model(
+            models.AirTableBaseInfo.for_migrations(product_id)
+        )
+        missing_deployments = []
+        for missing_deployment_data in missing_deployments_data:
+            logger.info(
+                "> Adding missing deployment to Airtable: %s",
+                missing_deployment_data["deployment"]["deploymentId"],
+            )
+            missing_deployments.append(
+                deployment_model(
+                    deployment_id=missing_deployment_data["deployment"]["deploymentId"],
+                    main_agreement_id=agreement_id,
+                    account_id=agreement["client"]["id"],
+                    seller_id=agreement["seller"]["id"],
+                    product_id=product_id,
+                    membership_id=missing_deployment_data["transfer"].membership_id,
+                    transfer_id=missing_deployment_data["transfer"].transfer_id,
+                    status="pending",
+                    customer_id=get_adobe_customer_id(agreement),
+                    deployment_currency=missing_deployment_data["deployment_currency"],
+                    deployment_country=missing_deployment_data["deployment"]["companyProfile"][
+                        "address"
+                    ]["country"],
+                    licensee_id=agreement["licensee"]["id"],
+                )
+            )
+        models.create_gc_agreement_deployments(product_id, missing_deployments)
+        send_notification(
+            "Missing deployments added to Airtable",
+            f"agreement {agreement_id}, deployments: {missing_deployment_ids}.",
+            TeamsColorCode.ORANGE.value,
+        )
+
+
 def sync_global_customer_parameters(
     mpt_client: MPTClient,
-    customer_deployments: list[dict],
+    adobe_deployments: list[dict],
+    adobe_subscriptions: Sequence[dict],
     agreement: dict,
 ) -> None:
     """
     Sync global customer parameters for the agreement.
 
     Args:
+        adobe_subscriptions: adobe subscriptions
         mpt_client: MPT API client.
-        customer_deployments: Adobe customer deployments.
+        adobe_deployments: Adobe customer deployments.
         agreement: main customer agreement.
     """
     try:
@@ -662,15 +735,18 @@ def sync_global_customer_parameters(
 
         deployments = [
             f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
-            for deployment in customer_deployments
+            for deployment in adobe_deployments
         ]
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
+            logger.info("Setting deployments for agreement %s", agreement["id"])
             parameters[Param.PHASE_FULFILLMENT.value].append({
                 "externalId": "deployments",
                 "value": ",".join(deployments),
             })
-            logger.info("Setting deployments for agreement %s", agreement["id"])
+            _check_update_airtable_missing_deployments(
+                agreement, adobe_deployments, adobe_subscriptions
+            )
         if parameters[Param.PHASE_FULFILLMENT.value]:
             update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception:
@@ -705,7 +781,7 @@ def process_lost_customer(  # noqa: C901
         for sub in agreement["subscriptions"]
         if sub["status"] != SubscriptionStatus.TERMINATED
     ]:
-        logger.info(">>> Suspected Lost Customer: Terminating subscription %s.", subscription_id)
+        logger.info("> Suspected Lost Customer: Terminating subscription %s.", subscription_id)
         try:
             terminate_subscription(
                 mpt_client,
@@ -714,22 +790,22 @@ def process_lost_customer(  # noqa: C901
             )
         except Exception as e:
             logger.exception(
-                ">>> Suspected Lost Customer: Error terminating subscription %s.",
+                "> Suspected Lost Customer: Error terminating subscription %s.",
                 subscription_id,
             )
-            notify_processing_lost_customer(
-                f">>> Suspected Lost Customer: Error terminating "
-                f"subscription {subscription_id}: {e}",
+            send_exception(
+                f"> Suspected Lost Customer: Error terminating subscription {subscription_id}",
+                f"{e}",
             )
 
-    customer_deployments = adobe_client.get_customer_deployments_active_status(
+    adobe_deployments = adobe_client.get_customer_deployments_active_status(
         agreement["authorization"]["id"], customer_id
     )
-    if customer_deployments:
+    if adobe_deployments:
         deployment_agreements = get_agreements_by_customer_deployments(
             mpt_client,
             Param.DEPLOYMENT_ID.value,
-            [deployment["deploymentId"] for deployment in customer_deployments],
+            [deployment["deploymentId"] for deployment in adobe_deployments],
         )
 
         for deployment_agreement in deployment_agreements:
@@ -742,12 +818,13 @@ def process_lost_customer(  # noqa: C901
                     terminate_subscription(mpt_client, subscription_id, "Suspected Lost Customer")
                 except Exception as e:
                     logger.exception(
-                        ">>> Suspected Lost Customer: Error terminating subscription %s.",
+                        "> Suspected Lost Customer: Error terminating subscription %s.",
                         subscription_id,
                     )
-                    notify_processing_lost_customer(
-                        f">>> Suspected Lost Customer: Error terminating subscription "
-                        f"{subscription_id}: {e}",
+                    send_exception(
+                        "> Suspected Lost Customer: Error terminating subscription"
+                        f" {subscription_id}",
+                        f"{e}",
                     )
 
 
@@ -825,16 +902,18 @@ def sync_agreement(  # noqa: C901
 
         if customer.get("globalSalesEnabled", False):
             authorization_id = agreement["authorization"]["id"]
-            customer_deployments = adobe_client.get_customer_deployments_active_status(
+            adobe_deployments = adobe_client.get_customer_deployments_active_status(
                 authorization_id, customer_id
             )
-            sync_global_customer_parameters(mpt_client, customer_deployments, agreement)
+            sync_global_customer_parameters(
+                mpt_client, adobe_deployments, adobe_subscriptions, agreement
+            )
             sync_deployments_prices(
                 mpt_client,
                 adobe_client,
                 agreement,
                 customer,
-                customer_deployments,
+                adobe_deployments,
                 adobe_subscriptions,
                 dry_run=dry_run,
                 sync_prices=sync_prices,
@@ -861,9 +940,11 @@ def _get_customer_or_process_lost_customer(mpt_client, adobe_client, agreement, 
                 e.code,
                 e.message,
             )
-            notify_processing_lost_customer(
+            send_notification(
+                "Executing Lost Customer Procedure.",
                 f"Received Adobe error {e.code} - {e.message},"
-                f" assuming lost customer and proceeding with lost customer procedure."
+                " assuming lost customer and proceeding with lost customer procedure.",
+                TeamsColorCode.ORANGE.value,
             )
             process_lost_customer(mpt_client, adobe_client, agreement, customer_id)
             return None
@@ -895,7 +976,7 @@ def _process_orphaned_deployment_subscriptions(
     authorization_id: str,
     customer_id: str,
     deployment_agreements: list[dict],
-    customer_subscriptions: Sequence[dict],
+    adobe_subscriptions: Sequence[dict],
 ) -> None:
     logger.info("Looking for orphaned deployment subscriptions in Adobe.")
     mpt_subscription_ids = {
@@ -905,13 +986,13 @@ def _process_orphaned_deployment_subscriptions(
     }
     adobe_subscription_ids = {
         subscription["subscriptionId"]
-        for subscription in customer_subscriptions
+        for subscription in adobe_subscriptions
         if subscription.get("deploymentId")
     }
     orphaned_subscription_ids = adobe_subscription_ids - mpt_subscription_ids
 
     for subscription in filter(
-        partial(_is_subscription_in_set, orphaned_subscription_ids), customer_subscriptions
+        partial(_is_subscription_in_set, orphaned_subscription_ids), adobe_subscriptions
     ):
         logger.warning("> Disabling auto-renewal for orphaned subscription %s", subscription)
         try:
@@ -934,8 +1015,8 @@ def sync_deployments_prices(
     adobe_client: AdobeClient,
     main_agreement: dict,
     customer: dict,
-    customer_deployments: list[dict],
-    customer_subscriptions: Sequence[dict],
+    adobe_deployments: list[dict],
+    adobe_subscriptions: Sequence[dict],
     *,
     dry_run: bool,
     sync_prices: bool,
@@ -948,18 +1029,18 @@ def sync_deployments_prices(
         adobe_client: Adobe API client.
         main_agreement: Main MPT agreement.
         customer: Adobe customer.
-        customer_deployments: Adobe customer deployments.
-        customer_subscriptions: list of subscriptions for customer from Adobe.
+        adobe_deployments: Adobe customer deployments.
+        adobe_subscriptions: list of subscriptions for customer from Adobe.
         dry_run: Run command in a dry run mode.
         sync_prices: If True also sync prices.
     """
-    if not customer_deployments:
+    if not adobe_deployments:
         return
 
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
         Param.DEPLOYMENT_ID.value,
-        [deployment["deploymentId"] for deployment in customer_deployments],
+        [deployment["deploymentId"] for deployment in adobe_deployments],
     )
 
     _process_orphaned_deployment_subscriptions(
@@ -967,7 +1048,7 @@ def sync_deployments_prices(
         main_agreement["authorization"]["id"],
         customer["customerId"],
         deployment_agreements,
-        customer_subscriptions,
+        adobe_subscriptions,
     )
 
     for deployment_agreement in deployment_agreements:
@@ -977,7 +1058,7 @@ def sync_deployments_prices(
                 adobe_client,
                 deployment_agreement,
                 customer,
-                customer_subscriptions,
+                adobe_subscriptions,
                 dry_run=dry_run,
             )
         else:

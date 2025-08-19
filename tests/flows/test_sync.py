@@ -6,10 +6,12 @@ from freezegun import freeze_time
 from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
+from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _add_missing_subscriptions,  # noqa: PLC2701
+    _check_update_airtable_missing_deployments,  # noqa: PLC2701
     _get_subscriptions_for_update,  # noqa: PLC2701
     _process_orphaned_deployment_subscriptions,  # noqa: PLC2701
     sync_agreement,
@@ -31,6 +33,13 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 @pytest.fixture(autouse=True)
 def mock_add_missing_subscriptions(mocker):
     return mocker.patch("adobe_vipm.flows.sync._add_missing_subscriptions", spec=True)
+
+
+@pytest.fixture(autouse=True)
+def mock_check_update_airtable_missing_deployments(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync._check_update_airtable_missing_deployments", spec=True
+    )
 
 
 @pytest.fixture
@@ -212,12 +221,6 @@ def test_sync_agreement_prices_dry_run(
         "adobe_vipm.flows.sync.get_adobe_client",
         return_value=mocked_adobe_client,
     )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
-
     mocked_get_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.sync.get_agreement_subscription",
         return_value=mpt_subscription,
@@ -416,8 +419,7 @@ def test_sync_agreements_by_3yc_end_date(mocker, agreement_factory, dry_run):
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,3YCEndDate),eq(displayValue,2024-11-08)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2024-11-09)))&"
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price",
+        "select=lines,parameters,subscriptions,product,listing",
     )
 
 
@@ -448,8 +450,7 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,cotermDate),eq(displayValue,2025-06-15)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-06-16)))&"
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price",
+        "select=lines,parameters,subscriptions,product,listing",
     )
 
 
@@ -481,8 +482,7 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
         "eq(status,Active)&"
         "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15))))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-07-16)))&"
-        "select=subscriptions,parameters,listing,lines,listing,status,buyer,seller,externalIds,"
-        "-template,-name,-vendor,-client,-price",
+        "select=lines,parameters,subscriptions,product,listing",
     )
 
 
@@ -757,10 +757,6 @@ def test_sync_agreement_prices_with_3yc(
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
     )
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
@@ -917,11 +913,6 @@ def test_sync_global_customer_parameter(
     )
 
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
 
     sync_agreement(mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
@@ -1158,6 +1149,12 @@ def test_sync_global_customer_update_not_required(
     )
     adobe_deployment_subscription = adobe_subscription_factory()
     another_adobe_deployment_subscription = adobe_subscription_factory()
+    mock_adobe_client.get_subscription.side_effect = [
+        adobe_subscription,
+        another_adobe_subscription,
+        adobe_deployment_subscription,
+        another_adobe_deployment_subscription,
+    ]
     mock_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription,
@@ -1392,11 +1389,6 @@ def test_sync_global_customer_update_adobe_error(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
-
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     assert mocked_get_agreement_subscription.call_args_list == [
@@ -1576,11 +1568,6 @@ def test_sync_global_customer_parameters_error(
 
     mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     with caplog.at_level(logging.ERROR):
@@ -1837,11 +1824,6 @@ def test_sync_agreement_prices_with_missing_prices(
         "adobe_vipm.flows.sync.update_agreement",
     )
 
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
-        side_effect=mock_get_adobe_product_by_marketplace_sku,
-    )
-
     with caplog.at_level(logging.ERROR):
         sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
@@ -1896,11 +1878,11 @@ def test_sync_agreement_prices_with_missing_prices(
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
 def test_sync_agreement_lost_customer(
     mocker,
-    mock_adobe_client,
     mock_mpt_client,
+    mock_adobe_client,
     agreement_factory,
+    mock_send_notification,
     mock_terminate_subscription,
-    mock_notify_processing_lost_customer,
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
@@ -1915,33 +1897,31 @@ def test_sync_agreement_lost_customer(
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
     ]
-    assert mock_notify_processing_lost_customer.mock_calls == [
+    assert mock_send_notification.mock_calls == [
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
+            "Executing Lost Customer Procedure.",
             "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
             " with lost customer procedure.",
-            "#541c2e",
-            button=None,
-            facts=None,
+            "FFA500",
         )
     ]
     assert [rec.message for rec in caplog.records] == [
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
     ]
 
 
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
 def test_sync_agreement_lost_customer_error(
     mocker,
-    mock_adobe_client,
     mock_mpt_client,
+    mock_adobe_client,
     mpt_error_factory,
     agreement_factory,
+    mock_send_notification,
     mock_terminate_subscription,
-    mock_notify_processing_lost_customer,
     caplog,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
@@ -1964,37 +1944,32 @@ def test_sync_agreement_lost_customer_error(
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
     ]
-    assert mock_notify_processing_lost_customer.mock_calls == [
+    assert mock_send_notification.mock_calls == [
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
+            "Executing Lost Customer Procedure.",
             "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
             " with lost customer procedure.",
-            "#541c2e",
-            button=None,
-            facts=None,
+            "FFA500",
         ),
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
-            " Internal Server Error - Oops!"
+            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
             "#541c2e",
             button=None,
             facts=None,
         ),
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
-            " Internal Server Error - Oops!"
+            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
             "#541c2e",
             button=None,
             facts=None,
         ),
         mocker.call(
-            "🔥 Executing Lost Customer Procedure.",
-            ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000: 500"
-            " Internal Server Error - Oops!"
+            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
             "#541c2e",
             button=None,
@@ -2006,10 +1981,10 @@ def test_sync_agreement_lost_customer_error(
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
-        ">>> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
-        ">>> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
+        "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
     ]
 
 
@@ -2035,13 +2010,13 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     adobe_subscription_factory,
     mock_get_agreement_subscription,
 ):
-    customer_subscriptions = [
+    adobe_subscriptions = [
         adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
     ]
 
     assert (
         _get_subscriptions_for_update(
-            mock_mpt_client, agreement_factory(), adobe_customer_factory(), customer_subscriptions
+            mock_mpt_client, agreement_factory(), adobe_customer_factory(), adobe_subscriptions
         )
         == []
     )
@@ -2059,12 +2034,12 @@ def test_get_subscriptions_for_update_terminated(
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
 ):
-    customer_subscriptions = [
+    adobe_subscriptions = [
         adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
     ]
 
     _get_subscriptions_for_update(
-        mock_mpt_client, agreement_factory(), adobe_customer_factory(), customer_subscriptions
+        mock_mpt_client, agreement_factory(), adobe_customer_factory(), adobe_subscriptions
     )
 
     mock_get_agreement_subscription.assert_called_once_with(
@@ -2087,7 +2062,7 @@ def test_add_missing_subscriptions_none(
     adobe_subscription_factory,
     mock_create_agreement_subscription,
 ):
-    customer_subscriptions = [
+    adobe_subscriptions = [
         adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(3)
     ]
 
@@ -2097,7 +2072,7 @@ def test_add_missing_subscriptions_none(
         adobe_customer_factory(),
         agreement_factory(),
         subscriptions_for_update=("subscriptionId2", "subscriptionId1", "subscriptionId0"),
-        customer_subscriptions=customer_subscriptions,
+        adobe_subscriptions=adobe_subscriptions,
     )
 
     mock_create_agreement_subscription.assert_not_called()
@@ -2111,17 +2086,17 @@ def test_add_missing_subscriptions(
     mock_adobe_client,
     agreement_factory,
     adobe_customer_factory,
-    adobe_subscription_factory,
+    mock_send_notification,
     mock_get_prices_for_skus,
+    adobe_subscription_factory,
     mock_get_product_items_by_skus,
     mock_create_agreement_subscription,
-    mock_notify_processing_lost_customer,
 ):
-    customer_subscriptions = [
+    adobe_subscriptions = [
         adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(4)
     ]
-    customer_subscriptions[-1]["deploymentId"] = "deploymentId"
-    mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in customer_subscriptions}
+    adobe_subscriptions[-1]["deploymentId"] = "deploymentId"
+    mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
 
     _add_missing_subscriptions(
         mock_mpt_client,
@@ -2129,7 +2104,7 @@ def test_add_missing_subscriptions(
         adobe_customer_factory(),
         agreement_factory(),
         subscriptions_for_update=("subscriptionId1", "b-sub-id"),
-        customer_subscriptions=customer_subscriptions,
+        adobe_subscriptions=adobe_subscriptions,
     )
 
     mock_get_product_items_by_skus.assert_called_once_with(
@@ -2225,7 +2200,7 @@ def test_add_missing_subscriptions_deployment(
     mock_get_product_items_by_skus,
     fulfillment_parameters_factory,
     mock_create_agreement_subscription,
-    mock_notify_processing_lost_customer,
+    mock_send_notification,
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(4)
@@ -2243,7 +2218,7 @@ def test_add_missing_subscriptions_deployment(
             fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
         ),
         subscriptions_for_update=("subscriptionId1", "b-sub-id"),
-        customer_subscriptions=adobe_subscriptions,
+        adobe_subscriptions=adobe_subscriptions,
     )
 
     mock_get_product_items_by_skus.assert_called_once_with(
@@ -2298,9 +2273,9 @@ def test_add_missing_subscriptions_wrong_currency(
     adobe_subscription_factory,
     mock_get_product_items_by_skus,
     mock_create_agreement_subscription,
-    mock_notify_processing_lost_customer,
+    mock_send_notification,
 ):
-    customer_subscriptions = [
+    adobe_subscriptions = [
         adobe_subscription_factory(
             subscription_id=f"subscriptionId{i}", currency_code="GBP", renewal_date="2026-07-27"
         )
@@ -2313,7 +2288,7 @@ def test_add_missing_subscriptions_wrong_currency(
         adobe_customer_factory(),
         agreement_factory(),
         subscriptions_for_update=("subscriptionId1", "subscriptionId0"),
-        customer_subscriptions=customer_subscriptions,
+        adobe_subscriptions=adobe_subscriptions,
     )
 
     mock_get_product_items_by_skus.assert_called_once_with(
@@ -2425,3 +2400,125 @@ def test_sync_agreement_without_subscriptions(
         sync_agreement(mock_mpt_client, agreement, dry_run=True, sync_prices=True)
 
     assert "Skipping price sync - no subscriptions found for the customer" in caplog.text
+
+
+def test_check_update_airtable_missing_deployments(
+    mocker,
+    mock_settings,
+    mock_pymsteams,
+    agreement_factory,
+    mock_send_notification,
+    mock_airtable_base_info,
+    adobe_deployment_factory,
+    adobe_subscription_factory,
+    fulfillment_parameters_factory,
+    mock_create_gc_agreement_deployments,
+    mock_get_gc_agreement_deployment_model,
+    mock_get_gc_agreement_deployments_by_main_agreement,
+):
+    mock_gc_agreement_deployment_model = mocker.MagicMock(name="GCAgreementDeployment")
+    mock_get_gc_agreement_deployment_model.return_value = mock_gc_agreement_deployment_model
+    deployments = [
+        get_gc_agreement_deployment_model(AirTableBaseInfo(api_key="api-key", base_id="base-id"))(
+            deployment_id=f"{i}"
+        )
+        for i in range(1, 4)
+    ]
+    mock_get_gc_agreement_deployments_by_main_agreement.return_value = deployments
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id="P1005158636")
+    )
+    adobe_deployments = [
+        adobe_deployment_factory(deployment_id=f"deployment-{i}") for i in range(1, 4)
+    ]
+    adobe_subscriptions = [
+        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(3)
+    ]
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_transfer_by_authorization_membership_or_customer",
+        side_effect=[
+            mocker.MagicMock(
+                name="Transfer", membership_id="membership_id", transfer_id="transfer_id"
+            )
+            for _ in range(2)
+        ]
+        + [None],
+        spec=True,
+    )
+
+    _check_update_airtable_missing_deployments(agreement, adobe_deployments, adobe_subscriptions)
+
+    mock_create_gc_agreement_deployments.assert_called_once_with(
+        agreement["product"]["id"],
+        [
+            mock_gc_agreement_deployment_model.return_value,
+            mock_gc_agreement_deployment_model.return_value,
+        ],
+    )
+    mock_gc_agreement_deployment_model.assert_has_calls(
+        (
+            mocker.call(
+                deployment_id="deployment-1",
+                main_agreement_id="AGR-2119-4550-8674-5962",
+                account_id="ACC-9121-8944",
+                seller_id="SEL-9121-8944",
+                product_id="PRD-1111-1111",
+                membership_id="membership_id",
+                transfer_id="transfer_id",
+                status="pending",
+                customer_id="P1005158636",
+                deployment_currency=None,
+                deployment_country="DE",
+                licensee_id="LC-321-321-321",
+            ),
+            mocker.call(
+                deployment_id="deployment-2",
+                main_agreement_id="AGR-2119-4550-8674-5962",
+                account_id="ACC-9121-8944",
+                seller_id="SEL-9121-8944",
+                product_id="PRD-1111-1111",
+                membership_id="membership_id",
+                transfer_id="transfer_id",
+                status="pending",
+                customer_id="P1005158636",
+                deployment_currency=None,
+                deployment_country="DE",
+                licensee_id="LC-321-321-321",
+            ),
+        ),
+        any_order=True,
+    )
+    mock_send_notification.assert_called_once()
+
+
+def test_check_update_airtable_missing_deployments_none(
+    agreement_factory,
+    mock_send_notification,
+    mock_airtable_base_info,
+    adobe_subscription_factory,
+    mock_create_gc_agreement_deployments,
+    mock_get_gc_agreement_deployments_by_main_agreement,
+):
+    deployments = [
+        get_gc_agreement_deployment_model(AirTableBaseInfo(api_key="api-key", base_id="base-id"))(
+            deployment_id=f"deployment-{i}"
+        )
+        for i in range(1, 4)
+    ]
+    mock_get_gc_agreement_deployments_by_main_agreement.return_value = deployments
+    adobe_subscriptions = [
+        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(4)
+    ]
+
+    _check_update_airtable_missing_deployments(
+        agreement_factory(),
+        [
+            {"deploymentId": "deployment-1"},
+            {"deploymentId": "deployment-2"},
+            {"deploymentId": "deployment-3"},
+        ],
+        adobe_subscriptions,
+    )
+
+    mock_create_gc_agreement_deployments.assert_not_called()
+    mock_send_notification.assert_not_called()

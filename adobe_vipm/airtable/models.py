@@ -776,7 +776,6 @@ def get_adobe_product_by_marketplace_sku(vendor_external_id: str):
     return adobe_item_model.from_short_id(vendor_external_id)
 
 
-# TODO: start using this to avoid multiple, unnecessary requests to Airtable.
 @cache
 def get_adobe_sku(vendor_item_id: str) -> str:
     """

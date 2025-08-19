@@ -387,3 +387,10 @@ class AgreementStatus(StrEnum):
     TERMINATED = "Terminated"
     FAILED = "Failed"
     DELETED = "Deleted"
+
+
+class TeamsColorCode(StrEnum):
+    """Color codes for the Teams notifications."""
+
+    # TODO: add all used colors
+    ORANGE = "FFA500"
