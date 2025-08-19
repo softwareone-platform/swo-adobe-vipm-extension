@@ -13,11 +13,12 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_order_subscription_by_external_id,
     get_product_template_or_default,
     get_rendered_template,
+    get_template_by_name,
     query_order,
     set_processing_template,
     update_agreement,
     update_order,
-    update_subscription,
+    update_subscription,    
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -45,6 +46,7 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_QUERYING,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
+    TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
     Param,
 )
 from adobe_vipm.flows.pipeline import Step
@@ -933,6 +935,21 @@ class CreateOrUpdateSubscriptions(Step):
                         )
                         continue
 
+                    try:
+                        template = get_template_by_name(
+                            client,
+                            context.order["agreement"]["product"]["id"],
+                            TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
+                        )
+                    except Exception as e:
+                        logger.exception(
+                            "%s: failed to get template %s: %s",
+                            context,
+                            TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
+                            str(e),
+                        )
+                        template = None
+
                     subscription = {
                         "name": f"Subscription for {order_line['item']['name']}",
                         "parameters": {
@@ -970,7 +987,12 @@ class CreateOrUpdateSubscriptions(Step):
                         "startDate": adobe_subscription["creationDate"],
                         "commitmentDate": adobe_subscription["renewalDate"],
                         "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
+                        "template": {
+                            "id": template["id"] if template and template.get("id") else None,
+                            "name": template["name"] if template and template.get("name") else None,
+                        } if template else None,
                     }
+
                     subscription = create_subscription(client, context.order_id, subscription)
                     logger.info(
                         "%s: subscription %s (%s) created",
