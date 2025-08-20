@@ -148,3 +148,27 @@ def mock_get_gc_agreement_deployment_model(mocker):
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         spec=True,
     )
+
+
+@pytest.fixture
+def mock_get_subscriptions_for_update(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync._get_subscriptions_for_update",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_sync_deployments_prices(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.sync_deployments_prices",
+        spec=True,
+    )
+
+
+@pytest.fixture
+def mock_update_subscriptions(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync._update_subscriptions",
+        spec=True,
+    )

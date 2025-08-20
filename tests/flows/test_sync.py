@@ -823,16 +823,19 @@ def test_sync_agreement_prices_with_3yc(
 @pytest.mark.parametrize("dry_run", [True, False])
 def test_sync_global_customer_parameter(
     mocker,
-    agreement_factory,
-    subscriptions_factory,
-    fulfillment_parameters_factory,
     lines_factory,
-    adobe_subscription_factory,
-    adobe_customer_factory,
-    mock_get_adobe_product_by_marketplace_sku,
     mock_mpt_client,
     mock_adobe_client,
+    agreement_factory,
     mock_get_adobe_client,
+    subscriptions_factory,
+    adobe_customer_factory,
+    mock_get_prices_for_skus,
+    mock_update_subscriptions,
+    adobe_subscription_factory,
+    fulfillment_parameters_factory,
+    mock_add_missing_subscriptions,
+    mock_get_adobe_product_by_marketplace_sku,
     dry_run,
 ):
     agreement = agreement_factory(
@@ -843,13 +846,6 @@ def test_sync_global_customer_parameter(
             {"id": "SUB-1000-2000-5000", "status": "Active", "item": {"id": "ITM-0000-0001-0003"}},
         ],
     )
-    mpt_subscription = subscriptions_factory()[0]
-    another_mpt_subscription = subscriptions_factory(
-        adobe_sku="77777777CA01A12",
-        adobe_subscription_id="b-sub-id",
-        subscription_id="SUB-1000-2000-5000",
-    )[0]
-    deployment_subscription = subscriptions_factory(adobe_subscription_id="d-sub-id")[0]
     adobe_subscription = adobe_subscription_factory()
     another_adobe_subscription = adobe_subscription_factory(
         subscription_id="b-sub-id",
@@ -893,126 +889,13 @@ def test_sync_global_customer_parameter(
         "adobe_vipm.flows.sync.get_agreements_by_customer_deployments",
         return_value=deployment_agreements,
     )
-    mocked_get_agreement_subscription = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreement_subscription",
-        side_effect=[mpt_subscription, another_mpt_subscription, deployment_subscription],
-    )
-
-    mocker.patch(
-        "adobe_vipm.airtable.models.get_prices_for_skus",
-        side_effect=[
-            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-        ],
-    )
-
-    mocked_update_agreement_subscription = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement_subscription"
-    )
-
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22}
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
 
     sync_agreement(mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
-    assert mocked_get_agreement_subscription.call_args_list == [
-        mocker.call(mock_mpt_client, mpt_subscription["id"]),
-        mocker.call(mock_mpt_client, another_mpt_subscription["id"]),
-        mocker.call(mock_mpt_client, deployment_subscription["id"]),
-    ]
-
-    if not dry_run:
-        assert mocked_update_agreement_subscription.call_args_list == [
-            mocker.call(
-                mock_mpt_client,
-                mpt_subscription["id"],
-                lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
-                parameters={
-                    "fulfillment": [
-                        {"externalId": "adobeSKU", "value": "65304578CA01A12"},
-                        {
-                            "externalId": Param.CURRENT_QUANTITY.value,
-                            "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
-                        },
-                        {
-                            "externalId": Param.RENEWAL_QUANTITY.value,
-                            "value": str(
-                                adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
-                            ),
-                        },
-                        {
-                            "externalId": "renewalDate",
-                            "value": adobe_subscription["renewalDate"],
-                        },
-                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
-                    ]
-                },
-                commitmentDate="2025-04-04",
-                autoRenew=adobe_subscription["autoRenewal"]["enabled"],
-            ),
-            mocker.call(
-                mock_mpt_client,
-                another_mpt_subscription["id"],
-                lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}}],
-                parameters={
-                    "fulfillment": [
-                        {"externalId": "adobeSKU", "value": "77777777CA01A12"},
-                        {
-                            "externalId": Param.CURRENT_QUANTITY.value,
-                            "value": str(another_adobe_subscription[Param.CURRENT_QUANTITY.value]),
-                        },
-                        {
-                            "externalId": Param.RENEWAL_QUANTITY.value,
-                            "value": str(
-                                another_adobe_subscription["autoRenewal"][
-                                    Param.RENEWAL_QUANTITY.value
-                                ]
-                            ),
-                        },
-                        {
-                            "externalId": "renewalDate",
-                            "value": another_adobe_subscription["renewalDate"],
-                        },
-                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
-                    ]
-                },
-                commitmentDate="2025-04-04",
-                autoRenew=another_adobe_subscription["autoRenewal"]["enabled"],
-            ),
-            mocker.call(
-                mock_mpt_client,
-                deployment_subscription["id"],
-                lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}}],
-                parameters={
-                    "fulfillment": [
-                        {"externalId": "adobeSKU", "value": "77777777CA01A12"},
-                        {
-                            "externalId": Param.CURRENT_QUANTITY.value,
-                            "value": str(
-                                adobe_deployment_subscription[Param.CURRENT_QUANTITY.value]
-                            ),
-                        },
-                        {
-                            "externalId": Param.RENEWAL_QUANTITY.value,
-                            "value": str(
-                                adobe_deployment_subscription["autoRenewal"][
-                                    Param.RENEWAL_QUANTITY.value
-                                ]
-                            ),
-                        },
-                        {
-                            "externalId": "renewalDate",
-                            "value": adobe_deployment_subscription["renewalDate"],
-                        },
-                        {"externalId": "lastSyncDate", "value": "2025-06-19"},
-                    ]
-                },
-                commitmentDate="2025-04-04",
-                autoRenew=adobe_deployment_subscription["autoRenewal"]["enabled"],
-            ),
-        ]
-
+    mock_add_missing_subscriptions.assert_called_once()
+    assert mock_update_subscriptions.call_count == 2
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     if not dry_run:
         assert mocked_update_agreement.call_args_list == [
@@ -1065,11 +948,30 @@ def test_sync_global_customer_parameter(
                 parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-19"}]},
             ),
         ]
+    else:
+        assert mocked_update_agreement.call_args_list == [
+            mocker.call(
+                mock_mpt_client,
+                agreement["id"],
+                parameters={
+                    "fulfillment": [
+                        {"externalId": "globalCustomer", "value": ["Yes"]},
+                        {"externalId": "deployments", "value": "deployment-id - DE"},
+                    ]
+                },
+            )
+        ]
 
 
 @freeze_time("2025-06-19")
 def test_sync_global_customer_parameter_not_prices(
-    mocker, caplog, mock_mpt_client, mock_adobe_client, agreement_factory
+    mocker,
+    caplog,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    mock_add_missing_subscriptions,
+    mock_get_subscriptions_for_update,
 ):
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
@@ -1078,17 +980,20 @@ def test_sync_global_customer_parameter_not_prices(
             "companyProfile": {"address": {"country": "DE"}},
         }
     ]
+    agreement = agreement_factory()
     mocker.patch(
         "adobe_vipm.flows.sync.get_agreements_by_customer_deployments",
-        return_value=[agreement_factory()],
+        return_value=[agreement],
     )
     mock_sync_agreement_prices = mocker.patch(
         "adobe_vipm.flows.sync.sync_agreement_prices",
     )
 
-    sync_agreement(mock_mpt_client, agreement_factory(), dry_run=False, sync_prices=False)
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     mock_sync_agreement_prices.assert_not_called()
+    assert mock_get_subscriptions_for_update.call_count == 2
+    mock_add_missing_subscriptions.assert_called_once()
     assert caplog.messages == [
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Skipping price sync - sync_prices False.",
@@ -1105,20 +1010,21 @@ def test_sync_global_customer_parameter_not_prices(
 @freeze_time("2025-06-30")
 def test_sync_global_customer_update_not_required(
     mocker,
-    agreement_factory,
-    fulfillment_parameters_factory,
-    subscriptions_factory,
     lines_factory,
-    adobe_subscription_factory,
-    adobe_customer_factory,
-    mock_get_adobe_product_by_marketplace_sku,
-    mock_adobe_client,
     mock_mpt_client,
+    agreement_factory,
+    mock_adobe_client,
     mock_get_adobe_client,
-    mock_get_agreement_subscription,
+    subscriptions_factory,
+    adobe_customer_factory,
     mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_update_subscriptions,
+    fulfillment_parameters_factory,
+    mock_add_missing_subscriptions,
+    mock_get_subscriptions_for_update,
+    mock_get_adobe_product_by_marketplace_sku,
     mock_get_agreements_by_customer_deployments,
-    mock_update_agreement_subscription,
 ):
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
@@ -1132,14 +1038,6 @@ def test_sync_global_customer_update_not_required(
             {"id": "SUB-1000-2000-5000", "status": "Active", "item": {"id": "ITM-0000-0001-0003"}},
         ],
     )
-    mpt_subscription = subscriptions_factory()[0]
-    another_mpt_subscription = subscriptions_factory(
-        adobe_sku="77777777CA01A12",
-        adobe_subscription_id="b-sub-id",
-        subscription_id="SUB-1000-2000-5000",
-    )[0]
-    deployment_subscription = subscriptions_factory(adobe_subscription_id="d-sub-id")[0]
-    another_deployment_subscription = subscriptions_factory(adobe_subscription_id="d-sub-id")[0]
     adobe_subscription = adobe_subscription_factory()
     another_adobe_subscription = adobe_subscription_factory(
         subscription_id="b-sub-id",
@@ -1174,12 +1072,6 @@ def test_sync_global_customer_update_not_required(
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
         coterm_date="2025-04-04", global_sales_enabled=True
     )
-    mock_get_agreement_subscription.side_effect = [
-        mpt_subscription,
-        another_mpt_subscription,
-        deployment_subscription,
-        another_deployment_subscription,
-    ]
     mock_get_prices_for_skus.return_value = {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22}
     mock_get_agreements_by_customer_deployments.return_value = [
         agreement_factory(
@@ -1193,129 +1085,42 @@ def test_sync_global_customer_update_not_required(
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
-    assert mock_get_agreement_subscription.call_args_list == [
-        mocker.call(mock_mpt_client, mpt_subscription["id"]),
-        mocker.call(mock_mpt_client, another_mpt_subscription["id"]),
-        mocker.call(mock_mpt_client, deployment_subscription["id"]),
-        mocker.call(mock_mpt_client, another_deployment_subscription["id"]),
-    ]
-    assert mock_update_agreement_subscription.call_args_list == [
+    mock_add_missing_subscriptions.assert_called_once()
+    assert mock_get_subscriptions_for_update.call_count == 3
+    assert mocked_update_agreement.mock_calls == [
         mocker.call(
             mock_mpt_client,
-            mpt_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
-            parameters={
-                "fulfillment": [
-                    {"externalId": "adobeSKU", "value": "65304578CA01A12"},
-                    {
-                        "externalId": Param.CURRENT_QUANTITY.value,
-                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+            "AGR-2119-4550-8674-5962",
+            lines=[
+                {
+                    "item": {
+                        "id": "ITM-1234-1234-1234-0001",
+                        "name": "Awesome product",
+                        "externalIds": {"vendor": "77777777CA"},
                     },
-                    {
-                        "externalId": Param.RENEWAL_QUANTITY.value,
-                        "value": str(
-                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
-                        ),
-                    },
-                    {"externalId": "renewalDate", "value": adobe_subscription["renewalDate"]},
-                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
-                ]
-            },
-            commitmentDate="2025-04-04",
-            autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+                    "oldQuantity": 0,
+                    "quantity": 170,
+                    "price": {"unitPP": 20.22},
+                    "id": "ALI-2119-4550-8674-5962-0001",
+                }
+            ],
+            parameters={},
+        ),
+        mocker.call(mock_mpt_client, "AGR-2119-4550-8674-5962", lines=[], parameters={}),
+        mocker.call(
+            mock_mpt_client, "AGR-2119-4550-8674-5962", parameters={"fulfillment": [{}, {}, {}]}
+        ),
+        mocker.call(mock_mpt_client, "AGR-2119-4550-8674-5962", lines=[], parameters={}),
+        mocker.call(
+            mock_mpt_client, "AGR-2119-4550-8674-5962", parameters={"fulfillment": [{}, {}, {}]}
         ),
         mocker.call(
             mock_mpt_client,
-            another_mpt_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}}],
-            parameters={
-                "fulfillment": [
-                    {"externalId": "adobeSKU", "value": "77777777CA01A12"},
-                    {
-                        "externalId": Param.CURRENT_QUANTITY.value,
-                        "value": str(another_adobe_subscription[Param.CURRENT_QUANTITY.value]),
-                    },
-                    {
-                        "externalId": Param.RENEWAL_QUANTITY.value,
-                        "value": str(
-                            another_adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
-                        ),
-                    },
-                    {
-                        "externalId": "renewalDate",
-                        "value": another_adobe_subscription["renewalDate"],
-                    },
-                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
-                ]
-            },
-            commitmentDate="2025-04-04",
-            autoRenew=another_adobe_subscription["autoRenewal"]["enabled"],
-        ),
-        mocker.call(
-            mock_mpt_client,
-            deployment_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
-            parameters={
-                "fulfillment": [
-                    {"externalId": "adobeSKU", "value": "65304578CA01A12"},
-                    {
-                        "externalId": Param.CURRENT_QUANTITY.value,
-                        "value": str(adobe_deployment_subscription[Param.CURRENT_QUANTITY.value]),
-                    },
-                    {
-                        "externalId": Param.RENEWAL_QUANTITY.value,
-                        "value": str(
-                            adobe_deployment_subscription["autoRenewal"][
-                                Param.RENEWAL_QUANTITY.value
-                            ]
-                        ),
-                    },
-                    {
-                        "externalId": "renewalDate",
-                        "value": adobe_deployment_subscription["renewalDate"],
-                    },
-                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
-                ]
-            },
-            commitmentDate="2025-04-04",
-            autoRenew=adobe_deployment_subscription["autoRenewal"]["enabled"],
-        ),
-        mocker.call(
-            mock_mpt_client,
-            another_deployment_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
-            parameters={
-                "fulfillment": [
-                    {"externalId": "adobeSKU", "value": "65304578CA01A12"},
-                    {
-                        "externalId": Param.CURRENT_QUANTITY.value,
-                        "value": str(
-                            another_adobe_deployment_subscription[Param.CURRENT_QUANTITY.value]
-                        ),
-                    },
-                    {
-                        "externalId": Param.RENEWAL_QUANTITY.value,
-                        "value": str(
-                            another_adobe_deployment_subscription["autoRenewal"][
-                                Param.RENEWAL_QUANTITY.value
-                            ]
-                        ),
-                    },
-                    {
-                        "externalId": "renewalDate",
-                        "value": another_adobe_deployment_subscription["renewalDate"],
-                    },
-                    {"externalId": "lastSyncDate", "value": "2025-06-30"},
-                ]
-            },
-            commitmentDate="2025-04-04",
-            autoRenew=another_adobe_deployment_subscription["autoRenewal"]["enabled"],
+            "AGR-2119-4550-8674-5962",
+            parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-30"}]},
         ),
     ]
-    expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
-    assert mocked_update_agreement.mock_calls[0] == mocker.call(
-        mock_mpt_client, agreement["id"], lines=expected_lines, parameters={}
-    )
+
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
 
 
@@ -1464,46 +1269,35 @@ def test_sync_global_customer_update_adobe_error(
 
 def test_sync_global_customer_parameters_error(
     mocker,
-    agreement_factory,
-    subscriptions_factory,
+    caplog,
     lines_factory,
-    adobe_subscription_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    mock_get_adobe_client,
+    subscriptions_factory,
     adobe_customer_factory,
     adobe_api_error_factory,
+    mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_sync_deployments_prices,
+    mock_get_agreement_subscription,
+    mock_get_subscriptions_for_update,
+    mock_update_agreement_subscription,
     mock_get_adobe_product_by_marketplace_sku,
-    caplog,
+    mock_get_customer_or_process_lost_customer,
+    mock_get_agreements_by_customer_deployments,
 ):
     agreement = agreement_factory(
-        lines=lines_factory(
-            external_vendor_id="77777777CA",
-            unit_purchase_price=10.11,
-        ),
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         fulfillment_parameters=[
             {"externalId": "globalCustomer", "value": ["Yes"]},
             {"externalId": "deployments", "value": "deployment-id - DE"},
         ],
         subscriptions=[
-            {
-                "id": "SUB-1000-2000-3000",
-                "status": "Active",
-                "item": {
-                    "id": "ITM-0000-0001-0001",
-                },
-            },
-            {
-                "id": "SUB-1234-5678",
-                "status": "Terminated",
-                "item": {
-                    "id": "ITM-0000-0001-0002",
-                },
-            },
-            {
-                "id": "SUB-1000-2000-5000",
-                "status": "Active",
-                "item": {
-                    "id": "ITM-0000-0001-0003",
-                },
-            },
+            {"id": "SUB-1000-2000-3000", "status": "Active", "item": {"id": "ITM-0000-0001-0001"}},
+            {"id": "SUB-1234-5678", "status": "Terminated", "item": {"id": "ITM-0000-0001-0002"}},
+            {"id": "SUB-1000-2000-5000", "status": "Active", "item": {"id": "ITM-0000-0001-0003"}},
         ],
     )
     mpt_subscription = subscriptions_factory()[0]
@@ -1519,64 +1313,45 @@ def test_sync_global_customer_parameters_error(
         current_quantity=15,
         renewal_quantity=15,
     )
-
-    mocked_mpt_client = mocker.MagicMock()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.side_effect = [
+    adobe_subscriptions = [
         adobe_subscription,
         another_adobe_subscription,
     ]
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = [
+    mock_adobe_client.get_subscriptions.return_value = {"items": adobe_subscriptions}
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
             "deploymentId": "deployment-id",
             "status": "1000",
             "companyProfile": {"address": {"country": "UK"}},
         }
     ]
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
-        coterm_date="2025-04-04",
-        global_sales_enabled=True,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_agreement_subscription",
-        side_effect=[mpt_subscription, another_mpt_subscription],
-    )
-
-    mocker.patch(
-        "adobe_vipm.airtable.models.get_prices_for_skus",
-        side_effect=[
-            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
-        ],
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement_subscription",
-    )
-
+    customer = adobe_customer_factory(coterm_date="2025-04-04", global_sales_enabled=True)
+    mock_get_customer_or_process_lost_customer.return_value = customer
+    mock_get_agreement_subscription.side_effect = [mpt_subscription, another_mpt_subscription]
+    mock_get_prices_for_skus.side_effect = [
+        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
+        {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
+    ]
     mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
-        side_effect=[mocker.MagicMock(), AdobeAPIError(400, {"error": "some error"})],
+        side_effect=[
+            mocker.MagicMock(),
+            AdobeAPIError(400, {"error": "some error"}),
+            mocker.MagicMock(),
+        ],
     )
-
     mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
     )
 
     with caplog.at_level(logging.ERROR):
-        sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
+        sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
-    # TODO: real exception here is TypeError: '>' not supported between instances
-    # of 'MagicMock' and 'MagicMock'. Need to fix.
-    assert caplog.records[0].message == (
-        "Error setting global customer parameters for agreement AGR-2119-4550-8674-5962."
+    mock_get_subscriptions_for_update.assert_called_once()
+    mock_sync_deployments_prices.assert_called_once()
+    assert (
+        caplog.records[0].message
+        == "Error setting global customer parameters for agreement AGR-2119-4550-8674-5962."
     )
 
 
