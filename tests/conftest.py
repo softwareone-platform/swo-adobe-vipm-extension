@@ -1006,6 +1006,10 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             },
             "product": {
                 "id": "PRD-1111-1111",
+                "name": "Adobe VIP Marketplace for Commercial",
+                "externalIds": {"operations": "adobe-erp"},
+                "icon": "/v1/catalog/products/PRD-6523-2229/icon",
+                "status": "Published",
             },
             "authorization": {"id": "AUT-1234-5678"},
             "lines": lines or [],
