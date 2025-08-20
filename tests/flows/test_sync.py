@@ -1916,7 +1916,7 @@ def test_add_missing_subscriptions(
                         "price": {"unitPP": 12.14},
                     }
                 ],
-                "name": "Subscription for {agreement['product']['name']}",
+                "name": "Subscription for Adobe VIP Marketplace for Commercial",
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "subscriptionId0"},
                 "product": {"id": "PRD-1111-1111"},
@@ -1953,7 +1953,7 @@ def test_add_missing_subscriptions(
                         "price": {"unitPP": 12.14},
                     }
                 ],
-                "name": "Subscription for {agreement['product']['name']}",
+                "name": "Subscription for Adobe VIP Marketplace for Commercial",
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "subscriptionId2"},
                 "product": {"id": "PRD-1111-1111"},
@@ -2029,7 +2029,7 @@ def test_add_missing_subscriptions_deployment(
                     "price": {"unitPP": 12.14},
                 }
             ],
-            "name": "Subscription for {agreement['product']['name']}",
+            "name": "Subscription for Adobe VIP Marketplace for Commercial",
             "startDate": "2019-05-20T22:49:55Z",
             "externalIds": {"vendor": "subscriptionId3"},
             "product": {"id": "PRD-1111-1111"},
