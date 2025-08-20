@@ -1105,6 +1105,9 @@ def agreement(buyer, licensee, listing):
                         "quantity": 10,
                     }
                 ],
+                "externalIds": {
+                    "vendor": "a-sub-id",
+                },
             },
             {
                 "id": "SUB-1234-5678",
@@ -1122,6 +1125,9 @@ def agreement(buyer, licensee, listing):
                         "quantity": 4,
                     }
                 ],
+                "externalIds": {
+                    "vendor": "a-sub-id",
+                },
             },
         ],
         "listing": listing,

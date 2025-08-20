@@ -31,6 +31,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     GetPreviewOrder,
     GetReturnOrders,
     SetOrUpdateCotermDate,
+    SetSubscriptionTemplate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
@@ -2106,4 +2107,333 @@ def test_create_or_update_subscriptions_step_without_template(
             "template": None,
         },
     )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_set_subscription_template_step(mocker, order_factory, subscriptions_factory):
+    """Test SetSubscriptionTemplate step with auto-renewal enabled subscription."""
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            {
+                "subscriptionId": "a-sub-id",
+                "status": "1000",
+                "autoRenewal": {"enabled": True},
+            }
+        ]
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_template_by_name",
+        return_value={"id": "TPL-1234", "name": "Renewing"},
+    )
+
+    mocked_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement_subscription",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    order = order_factory(
+        subscriptions=subscriptions_factory()
+    )
+    order["agreement"]["subscriptions"] = subscriptions_factory()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = SetSubscriptionTemplate()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+    )
+
+    mocked_get_template.assert_called_once_with(
+        mocked_client,
+        context.order["agreement"]["product"]["id"],
+        "Renewing",
+    )
+
+    mocked_update_agreement_subscription.assert_called_once_with(
+        mocked_client,
+        order["subscriptions"][0]["id"],
+        template={"id": "TPL-1234", "name": "Renewing"},
+    )
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_set_subscription_template_step_auto_renewal_disabled(
+    mocker,
+    order_factory,
+    subscriptions_factory,
+):
+    """Test SetSubscriptionTemplate step with auto-renewal disabled subscription."""
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            {
+                "subscriptionId": "a-sub-id",
+                "status": "1000",
+                "autoRenewal": {"enabled": False},
+            }
+        ]
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_template_by_name",
+        return_value={"id": "TPL-5678", "name": "Expiring"},
+    )
+
+    mocked_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement_subscription",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    order = order_factory(
+        subscriptions=subscriptions_factory()
+    )
+    order["agreement"]["subscriptions"] = subscriptions_factory()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = SetSubscriptionTemplate()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_get_template.assert_called_once_with(
+        mocked_client,
+        context.order["agreement"]["product"]["id"],
+        "Expiring",
+    )
+
+    mocked_update_agreement_subscription.assert_called_once_with(
+        mocked_client,
+        order["subscriptions"][0]["id"],
+        template={"id": "TPL-5678", "name": "Expiring"},
+    )
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_set_subscription_template_step_terminated_subscription(
+    mocker,
+    order_factory,
+    subscriptions_factory,
+):
+    """Test SetSubscriptionTemplate step with terminated subscription."""
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            {
+                "subscriptionId": "a-sub-id",
+                "status": "1004",
+                "autoRenewal": {"enabled": True},
+            }
+        ]
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_template_by_name",
+        return_value={"id": "TPL-9999", "name": "Expired"},
+    )
+
+    mocked_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement_subscription",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    order = order_factory(
+        subscriptions=subscriptions_factory()
+    )
+    order["agreement"]["subscriptions"] = subscriptions_factory()
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = SetSubscriptionTemplate()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_get_template.assert_called_once_with(
+        mocked_client,
+        context.order["agreement"]["product"]["id"],
+        "Expired",
+    )
+
+    mocked_update_agreement_subscription.assert_called_once_with(
+        mocked_client,
+        order["subscriptions"][0]["id"],
+        template={"id": "TPL-9999", "name": "Expired"},
+    )
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_set_subscription_template_step_multiple_subscriptions(
+    mocker,
+    order_factory,
+    subscriptions_factory,
+):
+    """Test SetSubscriptionTemplate step with multiple subscriptions."""
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            {
+                "subscriptionId": "adobe-sub-123",
+                "status": "1000",
+                "autoRenewal": {"enabled": True},
+            },
+            {
+                "subscriptionId": "adobe-sub-456",
+                "status": "1000",
+                "autoRenewal": {"enabled": False},
+            },
+            {
+                "subscriptionId": "adobe-sub-789",
+                "status": "1004",
+                "autoRenewal": {"enabled": True},
+            }
+        ]
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_template_by_name",
+        side_effect=[
+            {"id": "TPL-1234", "name": "Renewing"},
+            {"id": "TPL-5678", "name": "Expiring"},
+            {"id": "TPL-9999", "name": "Expired"},
+        ]
+    )
+
+    mocked_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement_subscription",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    subscriptions = subscriptions_factory(
+        adobe_subscription_id="adobe-sub-123"
+    ) + subscriptions_factory(
+        adobe_subscription_id="adobe-sub-456"
+    ) + subscriptions_factory(
+        adobe_subscription_id="adobe-sub-789"
+    )
+
+    order = order_factory(
+        subscriptions=subscriptions
+    )
+    order["agreement"]["subscriptions"] = subscriptions
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = SetSubscriptionTemplate()
+    step(mocked_client, context, mocked_next_step)
+
+    assert mocked_get_template.call_count == 3
+
+    assert mocked_update_agreement_subscription.call_count == 3
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_set_subscription_template_step_subscription_not_found(
+    mocker,
+    order_factory,
+    subscriptions_factory
+):
+    """Test SetSubscriptionTemplate step when Adobe subscription is not found."""
+    mocked_adobe_client = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            {
+                "subscriptionId": "adobe-sub-999",
+                "status": "1000",
+                "autoRenewal": {"enabled": True},
+            }
+        ]
+    }
+
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        return_value=mocked_adobe_client,
+    )
+
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_template_by_name",
+    )
+
+    mocked_update_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement_subscription",
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    order = order_factory(
+        subscriptions=subscriptions_factory(
+            adobe_subscription_id="adobe-sub-123"
+        )
+    )
+    order["agreement"]["subscriptions"] = subscriptions_factory(
+        adobe_subscription_id="adobe-sub-123"
+    )
+
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+
+    step = SetSubscriptionTemplate()
+    step(mocked_client, context, mocked_next_step)
+    mocked_get_template.assert_not_called()
+
+    mocked_update_agreement_subscription.assert_not_called()
+
     mocked_next_step.assert_called_once_with(mocked_client, context)

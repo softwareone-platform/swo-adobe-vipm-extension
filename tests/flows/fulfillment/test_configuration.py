@@ -5,7 +5,8 @@ from adobe_vipm.flows.fulfillment.configuration import (
     SubscriptionUpdateAutoRenewal,
     fulfill_configuration_order,
 )
-from adobe_vipm.flows.fulfillment.shared import SyncAgreement
+from adobe_vipm.flows.fulfillment.shared import CompleteOrder, SetOrUpdateCotermDate, SetSubscriptionTemplate, SetupDueDate, StartOrderProcessing, SyncAgreement, ValidateRenewalWindow
+from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Step
 
 
@@ -391,18 +392,20 @@ def test_fulfill_configuration_order(mocker):
 
     fulfill_configuration_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 9
 
     expected_steps = [
-        Step,
-        Step,
-        Step,
-        Step,
-        Step,
+        SetupContext,
+        StartOrderProcessing,
+        SetupDueDate,
+        SetOrUpdateCotermDate,
+        ValidateRenewalWindow,
         SubscriptionUpdateAutoRenewal,
-        Step,
+        CompleteOrder,
+        SetSubscriptionTemplate,
         SyncAgreement,
     ]
+    
     actual_steps = list(mocked_pipeline_ctor.mock_calls[0].args)
 
     for actual, expected in zip(actual_steps, expected_steps, strict=False):
