@@ -1,6 +1,7 @@
 import pytest
 from freezegun import freeze_time
 
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
@@ -579,29 +580,19 @@ def test_fulfill_change_order(mocker):
     )
 
 
-@pytest.mark.parametrize(
-    ("error_code", "error_message"),
-    [
-        ("3120", "Update could not be performed because it would create an invalid renewal state"),
-        ("3119", "Inactive Subscription or Pending Renewal is not Editable"),
-    ],
-)
 def test_validate_update_renewal_quantity_invalid_renewal_state(
-    mocker,
     order_factory,
     adobe_subscription_factory,
     adobe_api_error_factory,
     subscriptions_factory,
     lines_factory,
-    error_code,
-    error_message,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_get_adobe_client,
+    mock_switch_order_to_failed,
+    mock_notify_not_updated_subscriptions,
+    mock_next_step,
 ):
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
-    )
-    mocked_notify = mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions",
-    )
     subscriptions = subscriptions_factory()
     order = order_factory(
         lines=lines_factory(quantity=5)
@@ -615,38 +606,182 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
     adobe_sub = adobe_subscription_factory(
         renewal_quantity=10,
     )
 
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocked_adobe_client.update_subscription.side_effect = AdobeAPIError(
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            error_code,
-            error_message,
+            AdobeStatus.SUBSCRIPTION_INACTIVE.value,
+            "Inactive Subscription or Pending Renewal is not Editable",
         ),
     )
 
     step = UpdateRenewalQuantities()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mock_next_step)
 
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
+    mock_switch_order_to_failed.assert_called_once_with(
+        mock_mpt_client,
         context.order,
         ERR_INVALID_RENEWAL_STATE.to_dict(
-            error=error_message,
+            error="Inactive Subscription or Pending Renewal is not Editable",
         ),
     )
-    mocked_notify.assert_called_once()
-    mocked_next_step.assert_not_called()
+    mock_notify_not_updated_subscriptions.assert_called_once()
+    mock_next_step.assert_not_called()
+
+
+def test_validate_update_renewal_quantity_invalid_renewal_state_ok(
+    order_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+    subscriptions_factory,
+    lines_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_get_adobe_client,
+    mock_switch_order_to_failed,
+    mock_notify_not_updated_subscriptions,
+    mock_next_step,
+):
+    subscriptions = subscriptions_factory()
+    order = order_factory(
+        lines=lines_factory(quantity=15)
+        + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
+        subscriptions=subscriptions,
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        upsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+    )
+    adobe_sub = adobe_subscription_factory(
+        renewal_quantity=10,
+    )
+
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            AdobeStatus.INVALID_RENEWAL_STATE.value,
+            "Update could not be performed because it would create an invalid renewal state",
+        ),
+    )
+
+    step = UpdateRenewalQuantities()
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_switch_order_to_failed.assert_not_called()
+    mock_notify_not_updated_subscriptions.assert_not_called()
+    mock_next_step.assert_called()
+
+
+def test_validate_update_renewal_quantity_invalid_renewal_state_order_ok(
+    order_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+    adobe_order_factory,
+    subscriptions_factory,
+    lines_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_get_adobe_client,
+    mock_switch_order_to_failed,
+    mock_notify_not_updated_subscriptions,
+    mock_next_step,
+):
+    subscriptions = subscriptions_factory()
+    order = order_factory(
+        lines=lines_factory(quantity=15)
+        + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
+        subscriptions=subscriptions,
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        upsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        adobe_new_order=adobe_order_factory(
+            order_type="NEW",
+            status=AdobeStatus.PROCESSED.value,
+        ),
+    )
+    adobe_sub = adobe_subscription_factory(
+        renewal_quantity=10,
+    )
+
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            AdobeStatus.INVALID_RENEWAL_STATE.value,
+            "Update could not be performed because it would create an invalid renewal state",
+        ),
+    )
+
+    step = UpdateRenewalQuantities()
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_switch_order_to_failed.assert_not_called()
+    mock_notify_not_updated_subscriptions.assert_not_called()
+    mock_next_step.assert_called()
+
+
+def test_validate_update_renewal_quantity_invalid_renewal_state_order_failed(
+    order_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+    adobe_order_factory,
+    subscriptions_factory,
+    lines_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_get_adobe_client,
+    mock_switch_order_to_failed,
+    mock_notify_not_updated_subscriptions,
+    mock_next_step,
+):
+    subscriptions = subscriptions_factory()
+    order = order_factory(
+        lines=lines_factory(quantity=15)
+        + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
+        subscriptions=subscriptions,
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        upsize_lines=order["lines"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        adobe_new_order=adobe_order_factory(
+            order_type="NEW",
+            status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value,
+        ),
+    )
+    adobe_sub = adobe_subscription_factory(
+        renewal_quantity=10,
+    )
+
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            AdobeStatus.INVALID_RENEWAL_STATE.value,
+            "Update could not be performed because it would create an invalid renewal state",
+        ),
+    )
+
+    step = UpdateRenewalQuantities()
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_switch_order_to_failed.assert_called()
+    mock_next_step.assert_not_called()
+    mock_notify_not_updated_subscriptions.assert_called()
 
 
 def test_validate_update_renewal_quantity_error(

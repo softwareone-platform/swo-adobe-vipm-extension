@@ -7,6 +7,9 @@ processing.
 
 import itertools
 import logging
+from functools import partial
+
+from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus
@@ -15,6 +18,7 @@ from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
     ERR_NO_RETURABLE_ERRORS_FOUND,
     TEMPLATE_NAME_CHANGE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -44,6 +48,7 @@ from adobe_vipm.flows.utils import (
     notify_not_updated_subscriptions,
 )
 from adobe_vipm.flows.utils.customer import is_within_coterm_window
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +144,25 @@ class ValidateReturnableOrders(Step):
         next_step(client, context)
 
 
+def _check_item_in_order(line, order_item):
+    return get_partial_sku(order_item["offerId"]) == line["item"]["externalIds"]["vendor"]
+
+
+def _is_invalid_renewal_state_ok(context, line):
+    invalid_renewal_state_allowed = True
+    check_item_in_order = partial(_check_item_in_order, line)
+    if context.adobe_new_order and find_first(
+        check_item_in_order, context.adobe_new_order["lineItems"]
+    ):
+        invalid_renewal_state_allowed = (
+            context.adobe_new_order["status"] == AdobeStatus.PROCESSED.value
+        )
+        if invalid_renewal_state_allowed:
+            logger.info("> Vendor order with the item has status PROCESSED")
+
+    return invalid_renewal_state_allowed
+
+
 class UpdateRenewalQuantities(Step):
     """
     Updates the Adobe subscriptions renewal quantity if it doesn't match the agreement quantity.
@@ -185,7 +209,7 @@ class UpdateRenewalQuantities(Step):
             adobe_sub_id,
         )
         qty = line["quantity"]
-        old_qty = adobe_subscription["autoRenewal"]["renewalQuantity"]
+        old_qty = adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
 
         if old_qty != qty:
             try:
@@ -195,9 +219,23 @@ class UpdateRenewalQuantities(Step):
                     adobe_sub_id,
                     quantity=qty,
                 )
-            except AdobeAPIError as e:
+            except AdobeAPIError as error:
+                invalid_renewal_state_allowed = False
+                if error.code == AdobeStatus.INVALID_RENEWAL_STATE and old_qty < qty:
+                    logger.info(
+                        "Got invalid renewal state error for subscription %s while updating"
+                        " quantity %s -> %s",
+                        subscription["id"],
+                        old_qty,
+                        qty,
+                    )
+                    invalid_renewal_state_allowed = _is_invalid_renewal_state_ok(context, line)
                 if not (
-                    e.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED and context.adobe_new_order
+                    invalid_renewal_state_allowed
+                    or (
+                        error.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED
+                        and context.adobe_new_order
+                    )
                 ):
                     logger.exception(
                         "%s: failed to update renewal quantity for %s (%s)",
@@ -207,11 +245,11 @@ class UpdateRenewalQuantities(Step):
                     )
                     notify_not_updated_subscriptions(
                         context.order["id"],
-                        f"Error updating subscription {subscription['id']}, {e}",
+                        f"Error updating subscription {subscription['id']}, {error}",
                         [],
                         context.product_id,
                     )
-                    self.error = e
+                    self.error = error
                     return
 
             logger.info(

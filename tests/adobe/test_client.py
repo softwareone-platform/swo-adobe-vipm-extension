@@ -22,6 +22,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
+from adobe_vipm.flows.constants import Param
 
 
 def test_create_reseller_account(
@@ -1254,7 +1255,7 @@ def test_update_subscription(
         },
     }
     if "quantity" in update_params:
-        body_to_match["autoRenewal"]["renewalQuantity"] = update_params["quantity"]
+        body_to_match["autoRenewal"][Param.RENEWAL_QUANTITY.value] = update_params["quantity"]
 
     requests_mocker.patch(
         urljoin(

@@ -1001,6 +1001,10 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             },
             "product": {
                 "id": "PRD-1111-1111",
+                "name": "Adobe VIP Marketplace for Commercial",
+                "externalIds": {"operations": "adobe-erp"},
+                "icon": "/v1/catalog/products/PRD-6523-2229/icon",
+                "status": "Published",
             },
             "authorization": {"id": "AUT-1234-5678"},
             "lines": lines or [],
@@ -1363,11 +1367,11 @@ def adobe_subscription_factory():
         return {
             "subscriptionId": subscription_id or "a-sub-id",
             "offerId": offer_id or "65304578CA01A12",
-            "currentQuantity": current_quantity,
+            Param.CURRENT_QUANTITY.value: current_quantity,
             "currencyCode": currency_code,
             "autoRenewal": {
                 "enabled": autorenewal_enabled,
-                "renewalQuantity": renewal_quantity,
+                Param.RENEWAL_QUANTITY.value: renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
             "renewalDate": renewal_date or default_renewal_date.isoformat(),
@@ -2122,13 +2126,11 @@ def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     def get_adobe_product_by_marketplace_sku(sku):
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
 
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_product_by_marketplace_sku",
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",
         new=get_adobe_product_by_marketplace_sku,
         spec=True,
     )
-
-    return get_adobe_product_by_marketplace_sku
 
 
 @pytest.fixture
@@ -2143,3 +2145,53 @@ def mock_get_product_items_by_skus(mocker, items_factory):
         return_value=items_factory(),
         autospec=True,
     )
+
+
+@pytest.fixture
+def adobe_deployment_factory():
+    def _adobe_deployment_factory(
+        deployment_id="PR1400000882",
+        status="1000",
+        country="DE",
+        region="SN",
+        city="Berlin",
+        address_line1="Marienallee 12",
+        postal_code="01067",
+        phone_number="1005158429",
+        customer_id="P1005158636",
+    ):
+        return {
+            "deploymentId": deployment_id,
+            "status": status,
+            "companyProfile": {
+                "address": {
+                    "country": country,
+                    "region": region,
+                    "city": city,
+                    "addressLine1": address_line1,
+                    "postalCode": postal_code,
+                    "phoneNumber": phone_number,
+                }
+            },
+            "links": {
+                "self": {
+                    "uri": f"/v3/customers/{customer_id}/deployments/{deployment_id}",
+                    "method": "GET",
+                    "headers": [],
+                }
+            },
+        }
+
+    return _adobe_deployment_factory
+
+
+@pytest.fixture
+def mock_settings(settings):
+    settings.EXTENSION_CONFIG = {
+        "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
+    }
+
+
+@pytest.fixture
+def mock_pymsteams(mocker):
+    mocker.patch("pymsteams.connectorcard", autospec=True)

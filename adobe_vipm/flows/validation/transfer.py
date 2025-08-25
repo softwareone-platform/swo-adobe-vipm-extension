@@ -461,7 +461,7 @@ class AddLinesToOrder(Step):
             context.order,
             context.subscriptions["items"],
             commitment,
-            "currentQuantity",
+            Param.CURRENT_QUANTITY.value,
             is_transferred=True,
         )
         context.order = order
@@ -541,8 +541,7 @@ class ValidateResellerChange(Step):
         expiry_date = context.adobe_transfer["approval"]["expiry"]
         reseller_change_code = get_ordering_parameter(
             context.order, Param.CHANGE_RESELLER_CODE.value
-        )["value"
-        ]
+        )["value"]
 
         parsed_expiry_date = parser.parse(expiry_date)
 

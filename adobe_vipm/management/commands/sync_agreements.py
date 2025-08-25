@@ -40,7 +40,7 @@ class Command(AdobeBaseCommand):
         )
         parser.add_argument(
             "--sync-prices",
-            action="store_false",
+            action="store_true",
             default=False,
             help="Force prices sync",
         )
