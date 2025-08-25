@@ -163,30 +163,22 @@ def add_lines_to_order(
 
     if adobe_items:
         items = _get_items(adobe_items, mpt_client, order)
-        adobe_items_without_one_time_offers = _get_items_without_one_time_offers(adobe_items, items)
-
         if is_transferred:
-            if are_all_transferring_items_expired(adobe_items_without_one_time_offers):
+            if are_all_transferring_items_expired(adobe_items):
                 # If the order already has items and all the items on Adobe to be migrated are
                 # expired, the user can add, edit or delete the expired subscriptions
                 if len(order["lines"]):
                     return False, order
 
-                adobe_items = adobe_items_without_one_time_offers
-
             else:
                 adobe_items, order, order_error = _fail_validation_if_items_updated(
-                    adobe_items_without_one_time_offers,
+                    adobe_items,
                     order,
                     quantity_field,
                     order_error=order_error,
                 )
         else:
-            adobe_items = [
-                item
-                for item in adobe_items_without_one_time_offers
-                if not is_transferring_item_expired(item)
-            ]
+            adobe_items = [item for item in adobe_items if not is_transferring_item_expired(item)]
 
     if not adobe_items:
         return _handle_empty_adobe_items(order)
@@ -243,18 +235,14 @@ def _get_updated_order_lines(
 
 
 def _fail_validation_if_items_updated(
-    adobe_items_without_one_time_offers: list[dict],
+    adobe_items: list[dict],
     order: dict,
     quantity_field: str,
     *,
     order_error: bool,
 ) -> tuple[list[dict], dict, bool]:
     # remove expired items from adobe items
-    non_expired_items = [
-        item
-        for item in adobe_items_without_one_time_offers
-        if not is_transferring_item_expired(item)
-    ]
+    non_expired_items = [item for item in adobe_items if not is_transferring_item_expired(item)]
     # If the order items has been updated, the validation order will fail
     if len(order["lines"]) and has_order_line_updated(
         order["lines"], non_expired_items, quantity_field
@@ -273,13 +261,6 @@ def _get_items(
     returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
 
     return get_product_items_by_skus(mpt_client, order["agreement"]["product"]["id"], returned_skus)
-
-
-def _get_items_without_one_time_offers(adobe_items: list[dict], items: list[dict]) -> list[dict]:
-    one_time_skus = [
-        item["externalIds"]["vendor"] for item in items if item["terms"]["period"] == "one-time"
-    ]
-    return [item for item in adobe_items if get_partial_sku(item["offerId"]) not in one_time_skus]
 
 
 def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]:
