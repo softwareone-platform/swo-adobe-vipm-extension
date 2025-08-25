@@ -18,6 +18,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
     AdobeStatus,
+    ResellerChangeAction,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
@@ -2607,7 +2608,9 @@ def test_preview_reseller_change(
         ],
     )
 
-    result = client.preview_reseller_change(authorization_uk, seller_id, change_code, admin_email)
+    result = client.reseller_change_request(
+        authorization_uk, seller_id, change_code, admin_email, ResellerChangeAction.PREVIEW
+    )
     assert result == expected_response
 
 
@@ -2637,6 +2640,68 @@ def test_preview_reseller_change_bad_request(
     )
 
     with pytest.raises(Exception) as cv:
-        client.preview_reseller_change(authorization_uk, seller_id, change_code, admin_email)
+        client.reseller_change_request(
+            authorization_uk, seller_id, change_code, admin_email, ResellerChangeAction.PREVIEW
+        )
 
     assert repr(cv.value) == str(error)
+
+
+def test_commit_reseller_change(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    client, authorization, api_token = adobe_client_factory()
+    expected_response = {
+        "transferId": "P110044419",
+        "customerId": "P1005243296",
+        "resellerId": "P1000084165",
+        "creationDate": "2025-07-29T08:50:39Z",
+        "status": "1000",
+        "totalCount": 1,
+        "lineItems": [
+            {
+                "lineItemNumber": 1,
+                "offerId": "65304520CA01A12",
+                "quantity": 50,
+                "subscriptionId": "22d866a3ea47f681030002fabf3470NA",
+                "renewalDate": "2026-07-29T07:00:00.000+00:00",
+            }
+        ],
+        "benefits": [
+            {
+                "type": "THREE_YEAR_COMMIT",
+                "commitment": None,
+                "commitmentRequest": {
+                    "status": "REQUESTED",
+                    "minimumQuantities": [{"offerType": "LICENSE", "quantity": 50}],
+                },
+                "recommitmentRequest": None,
+            }
+        ],
+        "discounts": [{"discountCode": None, "level": "03", "offerType": "LICENSE"}],
+    }
+
+    transfer_id = "a-transfer-id"
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/transfers/{transfer_id}",
+        ),
+        status=200,
+        json=expected_response,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+        ],
+    )
+
+    result = client.get_reseller_transfer(authorization_uk, transfer_id)
+    assert result == expected_response
