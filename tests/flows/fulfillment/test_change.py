@@ -563,10 +563,10 @@ def test_fulfill_change_order(mocker):
 
     expected_steps = [
         SetupContext,
+        StartOrderProcessing,
         SetupDueDate,
         ValidateDuplicateLines,
         SetOrUpdateCotermDate,
-        StartOrderProcessing,
         ValidateRenewalWindow,
         GetReturnOrders,
         GetReturnableOrders,
@@ -588,7 +588,7 @@ def test_fulfill_change_order(mocker):
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
-    assert pipeline_args[4].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
     assert pipeline_args[17].template_name == TEMPLATE_NAME_CHANGE
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)

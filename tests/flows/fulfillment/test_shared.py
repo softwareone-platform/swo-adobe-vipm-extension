@@ -360,7 +360,10 @@ def test_configuration_start_order_processing_selects_template(
 
 
 def test_set_processing_template_step_already_set_not_first_attempt(
-    mocker, order_factory, mocked_send_mpt_notification
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    mocked_send_mpt_notification,
 ):
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -370,8 +373,15 @@ def test_set_processing_template_step_already_set_not_first_attempt(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
+    order = order_factory(
+        template={"id": "TPL-1234"},
+        fulfillment_parameters=fulfillment_parameters_factory(
+            due_date="2025-01-01",
+        ),
+    )
+
     context = Context(
-        order=order_factory(template={"id": "TPL-1234"}),
+        order=order,
         due_date=dt.date(2025, 1, 1),
     )
 
