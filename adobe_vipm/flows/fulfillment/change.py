@@ -324,10 +324,10 @@ def fulfill_change_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         SetupDueDate(),
         ValidateDuplicateLines(),
         SetOrUpdateCotermDate(),
-        StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         ValidateRenewalWindow(),
         GetReturnOrders(),
         GetReturnableOrders(),

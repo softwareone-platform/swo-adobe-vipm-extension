@@ -129,9 +129,9 @@ def fulfill_termination_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
         SetupDueDate(),
         SetOrUpdateCotermDate(),
-        StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
         ValidateRenewalWindow(),
         GetReturnOrders(),
         GetReturnableOrders(),
