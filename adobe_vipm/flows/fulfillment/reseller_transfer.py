@@ -14,6 +14,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     SetupDueDate,
+    StartOrderProcessing,
     SyncAgreement,
     switch_order_to_failed,
 )
@@ -50,6 +51,7 @@ def fulfill_reseller_change_order(mpt_client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        StartOrderProcessing(TEMPLATE_NAME_TRANSFER),
         SetupDueDate(),
         SetupResellerChangeContext(),
         FetchResellerChangeData(is_validation=False),
