@@ -249,9 +249,9 @@ def test_fulfill_termination_order(mocker):
 
     expected_steps = [
         SetupContext,
+        StartOrderProcessing,
         SetupDueDate,
         SetOrUpdateCotermDate,
-        StartOrderProcessing,
         ValidateRenewalWindow,
         GetReturnOrders,
         GetReturnableOrders,
@@ -263,7 +263,7 @@ def test_fulfill_termination_order(mocker):
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
-    assert mocked_pipeline_ctor.mock_calls[0].args[3].template_name == TEMPLATE_NAME_TERMINATION
+    assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_TERMINATION
     assert mocked_pipeline_ctor.mock_calls[0].args[9].template_name == TEMPLATE_NAME_TERMINATION
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)

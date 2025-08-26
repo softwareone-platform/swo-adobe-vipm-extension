@@ -44,9 +44,9 @@ def fulfill_configuration_order(client, order):
 
     pipeline = Pipeline(
         SetupContext(),
+        StartOrderProcessing(template_name),
         SetupDueDate(),
         SetOrUpdateCotermDate(),
-        StartOrderProcessing(template_name),
         ValidateRenewalWindow(),
         SubscriptionUpdateAutoRenewal(),
         CompleteOrder(template_name),

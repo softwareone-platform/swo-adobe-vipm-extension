@@ -276,10 +276,10 @@ def fulfill_purchase_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         SetupDueDate(),
         ValidateDuplicateLines(),
         ValidateMarketSegmentEligibility(),
-        StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         PrepareCustomerData(),
         CreateCustomer(),
         Validate3YCCommitment(),
