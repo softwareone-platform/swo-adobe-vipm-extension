@@ -7,7 +7,12 @@ from adobe_vipm.flows.fulfillment.reseller_transfer import (
     SetupResellerChangeContext,
     fulfill_reseller_change_order,
 )
-from adobe_vipm.flows.fulfillment.shared import CompleteOrder, SetupDueDate, SyncAgreement
+from adobe_vipm.flows.fulfillment.shared import (
+    CompleteOrder,
+    SetupDueDate,
+    StartOrderProcessing,
+    SyncAgreement,
+)
 from adobe_vipm.flows.fulfillment.transfer import (
     GetAdobeCustomer,
     ValidateAgreementDeployments,
@@ -235,6 +240,7 @@ def test_fulfill_reseller_change_order(mocker):
 
     expected_steps = [
         SetupContext,
+        StartOrderProcessing,
         SetupDueDate,
         SetupResellerChangeContext,
         FetchResellerChangeData,
