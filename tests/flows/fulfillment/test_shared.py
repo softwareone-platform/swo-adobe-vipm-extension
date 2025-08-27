@@ -27,6 +27,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
@@ -1239,6 +1240,208 @@ def test_get_return_orders_step(mocker, order_factory, adobe_order_factory):
         context.order_id,
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_create_or_update_asset_step(
+    mocker,
+    order_factory,
+    subscriptions_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_subscription_factory,
+    items_factory,
+):
+    adobe_order = adobe_order_factory(
+        order_type=ORDER_TYPE_NEW, items=adobe_items_factory(subscription_id="adobe-sub-id")
+    )
+    adobe_subscription = adobe_subscription_factory()
+    mocked_adobe_client = mocker.MagicMock(
+        get_subscription=mocker.MagicMock(return_value=adobe_subscription)
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client", return_value=mocked_adobe_client
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
+        return_value=[items_factory()[0]["externalIds"]["vendor"]],
+    )
+    mocked_create_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_asset",
+        return_value=subscriptions_factory()[0],
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        adobe_new_order=adobe_order,
+        adobe_new_order_id=order["id"],
+    )
+    step = CreateOrUpdateAssets()
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.get_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_order["lineItems"][0]["subscriptionId"],
+    )
+    mocked_create_asset.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        {
+            "name": f"Asset for {order['lines'][0]['item']['name']}",
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": "adobeSKU",
+                        "value": adobe_order["lineItems"][0]["offerId"],
+                    },
+                    {
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                    },
+                    {
+                        "externalId": Param.USED_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.USED_QUANTITY.value]),
+                    },
+                ]
+            },
+            "externalIds": {"vendor": adobe_order["lineItems"][0]["subscriptionId"]},
+            "lines": [{"id": order["lines"][0]["id"]}],
+        },
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_create_or_update_assets_exists(
+    mocker,
+    order_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_subscription_factory,
+    assets_factory,
+    items_factory,
+):
+    adobe_order = adobe_order_factory(
+        order_type=ORDER_TYPE_NEW, items=adobe_items_factory(subscription_id="adobe-sub-id")
+    )
+    adobe_subscription = adobe_subscription_factory()
+    mocked_adobe_client = mocker.MagicMock(
+        get_subscription=mocker.MagicMock(return_value=adobe_subscription)
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client", return_value=mocked_adobe_client
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
+        return_value=[items_factory()[0]["externalIds"]["vendor"]],
+    )
+    mocked_update_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_asset")
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    assets = assets_factory()
+    order = order_factory(assets=assets)
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        adobe_new_order=adobe_order,
+        adobe_new_order_id=order["id"],
+    )
+    step = CreateOrUpdateAssets()
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.get_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_order["lineItems"][0]["subscriptionId"],
+    )
+    mocked_update_asset.assert_called_once_with(
+        mocked_client,
+        context.order_id,
+        assets[0]["id"],
+        parameters={
+            "fulfillment": [
+                {
+                    "externalId": "adobeSKU",
+                    "value": adobe_order["lineItems"][0]["offerId"],
+                },
+                {
+                    "externalId": Param.CURRENT_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                },
+                {
+                    "externalId": Param.USED_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.USED_QUANTITY.value]),
+                },
+            ]
+        },
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_create_or_update_asset_step_subscription_not_processed(
+    mocker,
+    order_factory,
+    subscriptions_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_subscription_factory,
+    items_factory,
+):
+    adobe_order = adobe_order_factory(
+        order_type=ORDER_TYPE_NEW, items=adobe_items_factory(subscription_id="adobe-sub-id")
+    )
+    adobe_subscription = adobe_subscription_factory(status=AdobeStatus.PENDING.value)
+    mocked_adobe_client = mocker.MagicMock(
+        get_subscription=mocker.MagicMock(return_value=adobe_subscription)
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client", return_value=mocked_adobe_client
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
+        return_value=[items_factory()[0]["externalIds"]["vendor"]],
+    )
+    mocked_create_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.create_asset")
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="auth-id",
+        adobe_customer_id="adobe-customer-id",
+        adobe_new_order=adobe_order,
+        adobe_new_order_id=order["id"],
+    )
+    step = CreateOrUpdateAssets()
+
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_adobe_client.get_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_order["lineItems"][0]["subscriptionId"],
+    )
+    mocked_create_asset.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_create_or_update_asset_step_no_adobe_new_order(mocker, order_factory):
+    mocked_adobe_client = mocker.patch("adobe_vipm.flows.fulfillment.shared.get_adobe_client")
+    context = Context(adobe_new_order_id=None, order=order_factory())
+    step = CreateOrUpdateAssets()
+
+    step(mocker.MagicMock(), context, mocker.MagicMock())
+
+    mocked_adobe_client.assert_not_called()
 
 
 def test_create_or_update_subscriptions_step(
