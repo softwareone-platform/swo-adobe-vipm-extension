@@ -2239,7 +2239,7 @@ def test_add_missing_subscriptions_wrong_currency(
     mock_send_exception.assert_called_once_with(
         title="Price currency mismatch detected!",
         text="{'subscriptionId': 'subscriptionId2', 'offerId': '65304578CA01A12', "
-        "'currentQuantity': 10, 'currencyCode': 'GBP', 'autoRenewal': "
+        "'currentQuantity': 10, 'usedQuantity': 10, 'currencyCode': 'GBP', 'autoRenewal': "
         "{'enabled': True, 'renewalQuantity': 10}, 'creationDate': "
         "'2019-05-20T22:49:55Z', 'renewalDate': '2026-07-27', 'status': "
         "'1000', 'deploymentId': ''}",
