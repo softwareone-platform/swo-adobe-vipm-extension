@@ -1985,13 +1985,15 @@ def test_add_missing_subscriptions_deployment(
     adobe_customer = adobe_customer_factory()
     mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
 
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
+    )
+
     _add_missing_subscriptions(
         mock_mpt_client,
         mock_adobe_client,
         adobe_customer,
-        agreement_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
-        ),
+        agreement,
         subscriptions_for_update=("subscriptionId1", "b-sub-id"),
         adobe_subscriptions=adobe_subscriptions,
     )

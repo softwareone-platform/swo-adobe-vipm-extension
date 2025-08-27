@@ -76,6 +76,7 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date
+from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
 from adobe_vipm.notifications import mpt_notify
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
@@ -261,6 +262,26 @@ def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
     reason = f"Due date is reached ({due_date_str})."
     fail_order(client, order["id"], reason, ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=reason))
     logger.warning("Order %s has been failed: %s.", order["id"], reason)
+
+
+def handle_error(
+    mpt_client,
+    context,
+    error_data,
+    *,
+    is_validation=False,
+    parameter=None,
+):
+    """Handle errors based on validation mode."""
+    if is_validation:
+        context.order = set_ordering_parameter_error(
+            context.order,
+            parameter,
+            error_data,
+        )
+        context.validation_succeeded = False
+    else:
+        switch_order_to_failed(mpt_client, context.order, error_data)
 
 
 def switch_order_to_completed(client, order, template_name):
