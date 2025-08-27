@@ -8,6 +8,7 @@ from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     complete_order,
+    create_asset,
     create_subscription,
     fail_order,
     get_order_subscription_by_external_id,
@@ -16,6 +17,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     query_order,
     set_processing_template,
     update_agreement,
+    update_asset,
     update_order,
     update_subscription,
 )
@@ -918,6 +920,83 @@ class SubmitNewOrder(Step):
         next_step(client, context)
 
 
+class CreateOrUpdateAssets(Step):
+    """Create or update assets in MPT based on Adobe Subscriptions."""
+
+    def __call__(self, client, context, next_step):
+        """Create or update assets in MPT based on Adobe Subscriptions."""
+        if not context.adobe_new_order_id:
+            next_step(client, context)
+            return
+
+        adobe_client = get_adobe_client()
+        one_time_skus = get_one_time_skus(client, context.order)
+        for line in filter(
+            lambda x: get_partial_sku(x["offerId"]) in one_time_skus,
+            context.adobe_new_order["lineItems"],
+        ):
+            order_line = get_order_line_by_sku(context.order, line["offerId"])
+            adobe_subscription = adobe_client.get_subscription(
+                context.authorization_id, context.adobe_customer_id, line["subscriptionId"]
+            )
+
+            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+                logger.warning(
+                    "%s: subscription %s for customer %s is in status %s, skip it",
+                    context,
+                    adobe_subscription["subscriptionId"],
+                    context.adobe_customer_id,
+                    adobe_subscription["status"],
+                )
+                continue
+
+            asset = order_line.get("asset")
+            if asset is not None:
+                asset_data = self._create_asset_data(adobe_subscription, order_line, line)
+                update_asset(
+                    client, context.order_id, asset["id"], parameters=asset_data["parameters"]
+                )
+                logger.info(
+                    "%s: asset %s (%s) updated.", context, line["subscriptionId"], asset["id"]
+                )
+                continue
+
+            new_asset_data = self._create_asset_data(adobe_subscription, order_line, line)
+            asset = create_asset(client, context.order_id, new_asset_data)
+            logger.info("%s: asset %s (%s) created", context, line["subscriptionId"], asset["id"])
+
+        next_step(client, context)
+
+    def _create_asset_data(self, adobe_subscription, order_line, line):
+        return {
+            "name": f"Asset for {order_line['item']['name']}",
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": Param.ADOBE_SKU.value,
+                        "value": line["offerId"],
+                    },
+                    {
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                    },
+                    {
+                        "externalId": Param.USED_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.USED_QUANTITY.value]),
+                    },
+                ]
+            },
+            "externalIds": {
+                "vendor": line["subscriptionId"],
+            },
+            "lines": [
+                {
+                    "id": order_line["id"],
+                },
+            ],
+        }
+
+
 class CreateOrUpdateSubscriptions(Step):
     """Create or update subscriptions in MPT based on Adobe Subscriptions."""
 
@@ -939,11 +1018,8 @@ class CreateOrUpdateSubscriptions(Step):
                 )
                 if not order_subscription:
                     adobe_subscription = adobe_client.get_subscription(
-                        context.authorization_id,
-                        context.adobe_customer_id,
-                        line["subscriptionId"],
+                        context.authorization_id, context.adobe_customer_id, line["subscriptionId"]
                     )
-
                     if adobe_subscription["status"] != AdobeStatus.PROCESSED:
                         logger.warning(
                             "%s: subscription %s for customer %s is in status %s, skip it",
@@ -1052,7 +1128,7 @@ class SyncAgreement(Step):
         sync_agreements_by_agreement_ids(
             client, [context.agreement_id], dry_run=False, sync_prices=True
         )
-        logger.info("%s: agreement synchoronized", context)
+        logger.info("%s: agreement synchronized", context)
         next_step(client, context)
 
 
