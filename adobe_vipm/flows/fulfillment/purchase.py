@@ -31,6 +31,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     NullifyFlexDiscountParam,
@@ -287,6 +288,7 @@ def fulfill_purchase_order(client, order):
         GetPreviewOrder(),
         UpdatePrices(),
         SubmitNewOrder(),
+        CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),
         RefreshCustomer(),
         SetOrUpdateCotermDate(),

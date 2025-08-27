@@ -23,6 +23,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
@@ -348,6 +349,7 @@ def fulfill_change_order(client, order):
         UpdateRenewalQuantities(),
         SubmitReturnOrders(),
         UpdateRenewalQuantitiesDownsizes(),
+        CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
         SetSubscriptionTemplate(),
