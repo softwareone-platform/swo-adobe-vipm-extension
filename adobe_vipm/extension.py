@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Mapping
 from pprint import pformat
-from typing import Any, Mapping
+from typing import Any
 
 from django.conf import settings
 from mpt_extension_sdk.core.extension import Extension

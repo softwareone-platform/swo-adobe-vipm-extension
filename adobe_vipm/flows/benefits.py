@@ -14,7 +14,7 @@ from adobe_vipm.adobe.constants import (
     STATUS_3YC_EXPIRED,
     STATUS_3YC_NONCOMPLIANT,
 )
-from adobe_vipm.adobe.utils import get_3yc_commitment, get_3yc_commitment_request
+from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
     PARAM_3YC,
     PARAM_3YC_COMMITMENT_REQUEST_STATUS,
@@ -41,6 +41,7 @@ from adobe_vipm.flows.utils import (
     get_ordering_parameter,
 )
 from adobe_vipm.notifications import Button, send_exception, send_warning
+from adobe_vipm.utils import get_3yc_commitment
 
 logger = logging.getLogger(__name__)
 
@@ -60,18 +61,14 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 customer_id,
             )
 
-            request_info = get_3yc_commitment_request(
-                customer, is_recommitment=is_recommitment
-            )
+            request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
 
             status_param_ext_id = (
                 PARAM_3YC_COMMITMENT_REQUEST_STATUS
                 if not is_recommitment
                 else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
             )
-            request_type_param_ext_id = (
-                PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
-            )
+            request_type_param_ext_id = PARAM_3YC if not is_recommitment else PARAM_3YC_RECOMMITMENT
             request_type_param_phase = (
                 PARAM_PHASE_ORDERING if not is_recommitment else PARAM_PHASE_FULFILLMENT
             )
@@ -85,7 +82,7 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
                 ]
             }
             logger.info(
-                f"3YC request for agreement {agreement['id']} is {request_info.get("status")}"
+                f"3YC request for agreement {agreement['id']} is {request_info.get('status')}"
             )
             commitment_info = get_3yc_commitment(customer)
             if commitment_info:
@@ -140,10 +137,10 @@ def check_3yc_commitment_request(mpt_client, is_recommitment=False):
 
 
 def _send_3yc_denied_warning_if_needed(
-        agreement,
-        status,
-        request_type_title,
-        request_type_param_phase,
+    agreement,
+    status,
+    request_type_title,
+    request_type_param_phase,
 ):
     if status in (
         STATUS_3YC_DECLINED,
@@ -178,7 +175,7 @@ def update_deployment_agreements_3yc(
     deployment_agreements = get_agreements_by_customer_deployments(
         mpt_client,
         PARAM_DEPLOYMENT_ID,
-        [deployment["deploymentId"] for deployment in customer_deployments]
+        [deployment["deploymentId"] for deployment in customer_deployments],
     )
 
     for deployment_agreement in deployment_agreements:
@@ -197,21 +194,19 @@ def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
         else PARAM_3YC_RECOMMITMENT_REQUEST_STATUS
     )
     adobe_client = get_adobe_client()
-    agreements = get_agreements_for_3yc_resubmit(
-        mpt_client, is_recommitment=is_recommitment
-    )
+    agreements = get_agreements_for_3yc_resubmit(mpt_client, is_recommitment=is_recommitment)
     for agreement in agreements:
         try:
             authorization_id = agreement["authorization"]["id"]
             customer_id = get_adobe_customer_id(agreement)
 
             commitment_request = {
-                PARAM_3YC_CONSUMABLES: get_ordering_parameter(
-                    agreement, PARAM_3YC_CONSUMABLES
-                ).get("value"),
-                PARAM_3YC_LICENSES: get_ordering_parameter(
-                    agreement, PARAM_3YC_LICENSES
-                ).get("value"),
+                PARAM_3YC_CONSUMABLES: get_ordering_parameter(agreement, PARAM_3YC_CONSUMABLES).get(
+                    "value"
+                ),
+                PARAM_3YC_LICENSES: get_ordering_parameter(agreement, PARAM_3YC_LICENSES).get(
+                    "value"
+                ),
             }
             customer = adobe_client.create_3yc_request(
                 authorization_id,
@@ -220,9 +215,7 @@ def resubmit_3yc_commitment_request(mpt_client, is_recommitment=False):
                 is_recommitment=is_recommitment,
             )
 
-            commitment_info = get_3yc_commitment_request(
-                customer, is_recommitment=is_recommitment
-            )
+            commitment_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
             status = commitment_info["status"]
             parameters = {
                 PARAM_PHASE_FULFILLMENT: [
@@ -254,12 +247,12 @@ def submit_3yc_recommitment_request(mpt_client):
             customer_id = get_adobe_customer_id(agreement)
 
             commitment_request = {
-                PARAM_3YC_CONSUMABLES: get_ordering_parameter(
-                    agreement, PARAM_3YC_CONSUMABLES
-                ).get("value"),
-                PARAM_3YC_LICENSES: get_ordering_parameter(
-                    agreement, PARAM_3YC_LICENSES
-                ).get("value"),
+                PARAM_3YC_CONSUMABLES: get_ordering_parameter(agreement, PARAM_3YC_CONSUMABLES).get(
+                    "value"
+                ),
+                PARAM_3YC_LICENSES: get_ordering_parameter(agreement, PARAM_3YC_LICENSES).get(
+                    "value"
+                ),
             }
 
             customer = adobe_client.create_3yc_request(

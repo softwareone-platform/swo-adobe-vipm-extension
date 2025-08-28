@@ -49,20 +49,20 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
     split_phone_number,
 )
+from adobe_vipm.flows.utils.order import reset_order_error
+from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
 @pytest.fixture(autouse=True)
 def mocked_send_mpt_notification(mocker):
-    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification")
+    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification", spec=True)
 
 
 @pytest.fixture(autouse=True)
 def send_gc_mpt_notification(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.send_gc_mpt_notification"
-    )
+    return mocker.patch("adobe_vipm.flows.fulfillment.transfer.send_gc_mpt_notification", spec=True)
 
 
 @freeze_time("2024-01-01")
@@ -165,9 +165,7 @@ def test_transfer(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
@@ -298,9 +296,7 @@ def test_transfer(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": "renewalDate",
@@ -498,9 +494,7 @@ def test_transfer_with_no_profile_address(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
@@ -614,9 +608,7 @@ def test_transfer_with_no_profile_address(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": "renewalDate",
@@ -744,12 +736,8 @@ def test_transfer_not_ready(
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     order = order_factory(
         order_parameters=transfer_order_parameters_factory(),
@@ -816,9 +804,7 @@ def test_transfer_reached_due_date(
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
 
     order = order_factory(
@@ -1218,6 +1204,8 @@ def test_create_transfer_fail(
 
     fulfill_order(mocked_mpt_client, order)
 
+    order = reset_order_error(reset_ordering_parameters_error(order))
+
     mocked_fail_order.assert_called_once_with(
         mocked_mpt_client,
         order["id"],
@@ -1328,16 +1316,12 @@ def test_fulfill_transfer_order_already_migrated(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     transfer_items = adobe_items_factory(subscription_id="sub-id")
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(
-        current_quantity=170, subscription_id="sub-id"
-    )
+    adobe_subscription = adobe_subscription_factory(current_quantity=170, subscription_id="sub-id")
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1521,16 +1505,12 @@ def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     transfer_items = adobe_items_factory(subscription_id="sub-id")
 
     adobe_transfer = adobe_transfer_factory(items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(
-        current_quantity=170, subscription_id="sub-id"
-    )
+    adobe_subscription = adobe_subscription_factory(current_quantity=170, subscription_id="sub-id")
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -1732,7 +1712,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
-                due_date=None,
+                due_date="2012-02-13",
             ),
             "ordering": order["parameters"]["ordering"],
         },
@@ -1842,9 +1822,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     transfer_items = adobe_items_factory(subscription_id="sub-id")
 
@@ -2055,9 +2033,7 @@ def test_fulfill_transfer_order_already_migrated_(
     transfer_items = adobe_items_factory(subscription_id="sub-id")
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(
-        status=STATUS_PENDING, current_quantity=170
-    )
+    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING, current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -2309,9 +2285,7 @@ def test_transfer_3yc_customer(
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
@@ -2322,9 +2296,7 @@ def test_transfer_3yc_customer(
         return_value=[],
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
@@ -2464,9 +2436,7 @@ def test_transfer_3yc_customer(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": "renewalDate",
@@ -2587,8 +2557,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
     adobe_3yc_commitment = adobe_commitment_factory(licenses=15, consumables=37)
     adobe_transfer_preview = adobe_preview_transfer_factory()
     adobe_customer = adobe_customer_factory(
-        commitment=adobe_3yc_commitment,
-        company_profile_address_exists=False
+        commitment=adobe_3yc_commitment, company_profile_address_exists=False
     )
     adobe_subscription = adobe_subscription_factory()
 
@@ -2604,9 +2573,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
@@ -2617,9 +2584,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
         return_value=[],
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
@@ -2742,9 +2707,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": "renewalDate",
@@ -3288,9 +3251,7 @@ def test_transfer_gc_account_all_deployments_created(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
@@ -3424,9 +3385,7 @@ def test_transfer_gc_account_all_deployments_created(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": "renewalDate",
@@ -3635,9 +3594,7 @@ def test_transfer_gc_account_no_deployments(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
@@ -3678,7 +3635,7 @@ def test_transfer_gc_account_no_deployments(
         mocked_mpt_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[2].kwargs == {
+    order_result = {
         "externalIds": {
             "vendor": adobe_transfer["transferId"],
         },
@@ -3711,11 +3668,17 @@ def test_transfer_gc_account_no_deployments(
         },
     }
 
+    order_result = reset_order_error(reset_ordering_parameters_error(order_result))
+    assert mocked_update_order.mock_calls[2].kwargs.get("parameters") == order_result.get(
+        "parameters"
+    )
+
     assert mocked_update_order.mock_calls[3].args == (
         mocked_mpt_client,
         order["id"],
     )
-    assert mocked_update_order.mock_calls[3].kwargs == {
+
+    order_result = {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -3745,6 +3708,11 @@ def test_transfer_gc_account_no_deployments(
             ),
         },
     }
+    order_result = reset_order_error(reset_ordering_parameters_error(order_result))
+
+    assert mocked_update_order.mock_calls[3].kwargs.get("parameters") == order_result.get(
+        "parameters"
+    )
 
     mocked_update_agreement.assert_called_once_with(
         mocked_mpt_client,
@@ -3769,9 +3737,7 @@ def test_transfer_gc_account_no_deployments(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": "renewalDate",
@@ -4009,9 +3975,7 @@ def test_transfer_gc_account_create_deployments(
     mocked_get_gc_main_agreement.assert_called_once_with(
         "PRD-1111-1111", "AUT-1234-4567", "a-membership-id"
     )
-    mocked_create_gc_main_agreement.assert_called_once_with(
-        "PRD-1111-1111", gc_main_agreement
-    )
+    mocked_create_gc_main_agreement.assert_called_once_with("PRD-1111-1111", gc_main_agreement)
     mocked_get_agreement_deployment_view_link.assert_called_once_with(
         "PRD-1111-1111",
     )
@@ -4075,11 +4039,11 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
         return_value=mocked_gc_main_agreement,
     )
 
-    mocked_get_gc_agreement_deployments_by_main_agreement = (
-        mocked_get_gc_main_agreement
-    ) = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
-        return_value=[],
+    mocked_get_gc_agreement_deployments_by_main_agreement = mocked_get_gc_main_agreement = (
+        mocker.patch(
+            "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
+            return_value=[],
+        )
     )
     mocked_create_gc_agreement_deployments = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.create_gc_agreement_deployments",
@@ -4167,9 +4131,7 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
     mocked_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
-    mocked_get_gc_main_agreement.assert_called_once_with(
-        "PRD-1111-1111", "AGR-2119-4550-8674-5962"
-    )
+    mocked_get_gc_main_agreement.assert_called_once_with("PRD-1111-1111", "AGR-2119-4550-8674-5962")
     mocked_get_agreement_deployment_view_link.assert_called_once_with(
         "PRD-1111-1111",
     )
@@ -4601,11 +4563,11 @@ def test_transfer_gc_account_some_deployments_not_created(
         return_value=mocked_gc_main_agreement,
     )
 
-    mocked_get_gc_agreement_deployments_by_main_agreement = (
-        mocked_get_gc_main_agreement
-    ) = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
-        return_value=[],
+    mocked_get_gc_agreement_deployments_by_main_agreement = mocked_get_gc_main_agreement = (
+        mocker.patch(
+            "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
+            return_value=[],
+        )
     )
     mocked_create_gc_agreement_deployments = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.create_gc_agreement_deployments",
@@ -4714,9 +4676,7 @@ def test_transfer_gc_account_some_deployments_not_created(
     mocked_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
-    mocked_get_gc_main_agreement.assert_called_once_with(
-        "PRD-1111-1111", "AGR-2119-4550-8674-5962"
-    )
+    mocked_get_gc_main_agreement.assert_called_once_with("PRD-1111-1111", "AGR-2119-4550-8674-5962")
     mocked_get_agreement_deployment_view_link.assert_called_once_with(
         "PRD-1111-1111",
     )
@@ -4874,9 +4834,7 @@ def test_fulfill_transfer_gc_order_already_migrated_(
     transfer_items = adobe_items_factory(subscription_id="sub-id")
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
-    adobe_subscription = adobe_subscription_factory(
-        status=STATUS_PENDING, current_quantity=170
-    )
+    adobe_subscription = adobe_subscription_factory(status=STATUS_PENDING, current_quantity=170)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
@@ -5060,9 +5018,7 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
 
     mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
-    transfer_items = adobe_items_factory(
-        subscription_id="sub-id", deployment_id="deployment-id"
-    )
+    transfer_items = adobe_items_factory(subscription_id="sub-id", deployment_id="deployment-id")
 
     adobe_transfer = adobe_transfer_factory(status=STATUS_PENDING, items=transfer_items)
     adobe_subscription = adobe_subscription_factory(
@@ -5141,9 +5097,7 @@ def test_sync_gc_main_agreement_step(
     mocked_gc_main_agreement.main_agreement_id = "agr-id"
     mocked_gc_main_agreement.status = STATUS_GC_PENDING
 
-    step = SyncGCMainAgreement(
-        mocked_transfer, mocked_gc_main_agreement, STATUS_GC_TRANSFERRED
-    )
+    step = SyncGCMainAgreement(mocked_transfer, mocked_gc_main_agreement, STATUS_GC_TRANSFERRED)
     step(mocked_client, context, mocked_next_step)
 
     assert mocked_gc_main_agreement.status == STATUS_GC_TRANSFERRED
@@ -5200,9 +5154,7 @@ def test_transfer_gc_account_items_with_deployment_main_agreement(
     adobe_transfer = adobe_transfer_factory(
         status=STATUS_PROCESSED,
         customer_id="a-client-id",
-        items=adobe_items_factory(
-            subscription_id="a-sub-id", deployment_id="deployment-id"
-        ),
+        items=adobe_items_factory(subscription_id="a-sub-id", deployment_id="deployment-id"),
     )
 
     adobe_transfer_preview = adobe_preview_transfer_factory()
@@ -5292,9 +5244,7 @@ def test_transfer_gc_account_items_with_deployment_main_agreement(
         "status": "error",
         "error_description": "Order contains items with deployment ID",
     }
-    mocked_create_gc_main_agreement.assert_called_once_with(
-        "PRD-1111-1111", gc_main_agreement
-    )
+    mocked_create_gc_main_agreement.assert_called_once_with("PRD-1111-1111", gc_main_agreement)
 
 
 @freeze_time("2024-01-01")
@@ -5348,9 +5298,7 @@ def test_transfer_gc_account_items_with_deployment_main_agreement_bulk_migrated(
     adobe_transfer = adobe_transfer_factory(
         status=STATUS_PROCESSED,
         customer_id="a-client-id",
-        items=adobe_items_factory(
-            subscription_id="a-sub-id", deployment_id="deployment-id"
-        ),
+        items=adobe_items_factory(subscription_id="a-sub-id", deployment_id="deployment-id"),
     )
 
     adobe_transfer_preview = adobe_preview_transfer_factory()
@@ -5465,12 +5413,8 @@ def test_transfer_not_ready_not_commercial(
     )
 
     mocked_mpt_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
 
     order = order_factory(
         order_parameters=transfer_order_parameters_factory(),
@@ -5612,9 +5556,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template",
     )
 
-    mocked_complete_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.complete_order"
-    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
     mocked_sync_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
     )
@@ -5747,9 +5689,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     },
                     {
                         "externalId": "renewalQuantity",
-                        "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
-                        ),
+                        "value": str(adobe_subscription["autoRenewal"]["renewalQuantity"]),
                     },
                     {
                         "externalId": "renewalDate",
@@ -5916,9 +5856,7 @@ def test_transfer_gc_account_items_with_and_without_deployment_main_agreement_bu
             subscription_id="a-sub-id",
             deployment_id="deployment-id",
         )
-        + adobe_items_factory(
-            offer_id="65304578CACA01A12", subscription_id="a-sub-id1"
-        ),
+        + adobe_items_factory(offer_id="65304578CACA01A12", subscription_id="a-sub-id1"),
     )
 
     adobe_transfer_preview = adobe_preview_transfer_factory()
@@ -6113,9 +6051,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
         subscription_id="one-time-sub-id",
         offer_id="99999999CA01A12",
     )
-    adobe_subscription = adobe_subscription_factory(
-        offer_id="65304578CA2", current_quantity=170
-    )
+    adobe_subscription = adobe_subscription_factory(offer_id="65304578CA2", current_quantity=170)
     adobe_inactive_subscription = adobe_subscription_factory(
         subscription_id="inactive-sub-id",
         status=STATUS_INACTIVE_OR_GENERIC_FAILURE,
@@ -6178,7 +6114,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     )
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
-            "fulfillment": fulfillment_parameters_factory(),
+            "fulfillment": fulfillment_parameters_factory(due_date="2012-02-13"),
             "ordering": order["parameters"]["ordering"],
         },
     }
