@@ -304,8 +304,9 @@ def _log_agreement_lines(
 ) -> None:
     agreement_lines = []
     for line in agreement["lines"]:
-        actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
-        agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
+        if line["item"]["externalIds"]["vendor"] != "adobe-reseller-transfer":
+            actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
+            agreement_lines.append((line, get_sku_with_discount_level(actual_sku, customer)))
 
     skus = [item[1] for item in agreement_lines]
     prices = models.get_sku_price(customer, skus, product_id, currency)
