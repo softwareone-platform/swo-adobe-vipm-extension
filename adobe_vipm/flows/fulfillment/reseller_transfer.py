@@ -12,13 +12,13 @@ from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_
 from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    CompleteOrder,
     SetupDueDate,
     StartOrderProcessing,
     SyncAgreement,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.fulfillment.transfer import (
+    CompleteTransferOrder,
     GetAdobeCustomer,
     ValidateAgreementDeployments,
     ValidateGCMainAgreement,
@@ -61,7 +61,7 @@ def fulfill_reseller_change_order(mpt_client, order):
         GetAdobeCustomer(),
         ValidateGCMainAgreement(),
         ValidateAgreementDeployments(),
-        CompleteOrder(TEMPLATE_NAME_TRANSFER),
+        CompleteTransferOrder(),
         SyncAgreement(),
     )
 
