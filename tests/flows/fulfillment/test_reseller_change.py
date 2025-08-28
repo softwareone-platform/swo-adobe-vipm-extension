@@ -8,12 +8,12 @@ from adobe_vipm.flows.fulfillment.reseller_transfer import (
     fulfill_reseller_change_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
-    CompleteOrder,
     SetupDueDate,
     StartOrderProcessing,
     SyncAgreement,
 )
 from adobe_vipm.flows.fulfillment.transfer import (
+    CompleteTransferOrder,
     GetAdobeCustomer,
     ValidateAgreementDeployments,
     ValidateGCMainAgreement,
@@ -256,7 +256,7 @@ def test_fulfill_reseller_change_order(
         GetAdobeCustomer,
         ValidateGCMainAgreement,
         ValidateAgreementDeployments,
-        CompleteOrder,
+        CompleteTransferOrder,
         SyncAgreement,
     ]
 

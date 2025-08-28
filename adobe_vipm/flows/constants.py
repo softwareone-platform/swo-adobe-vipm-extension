@@ -19,6 +19,9 @@ ORDER_TYPE_TERMINATION = "Termination"
 ORDER_TYPE_CONFIGURATION = "Configuration"
 
 
+TRANSFER_RESELLER_PRODUCT_ID = "adobe-reseller-transfer"
+
+
 class Param(StrEnum):
     """Parameters external ids."""
 
