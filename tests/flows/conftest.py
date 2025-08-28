@@ -172,3 +172,11 @@ def mock_update_subscriptions(mocker):
         "adobe_vipm.flows.sync._update_subscriptions",
         spec=True,
     )
+
+
+@pytest.fixture
+def mock_get_product_items_by_period(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.get_product_items_by_period",
+        spec=True,
+    )

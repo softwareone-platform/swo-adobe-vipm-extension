@@ -15,6 +15,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_agreements_by_ids,
     get_agreements_by_query,
     get_all_agreements,
+    get_product_items_by_period,
     get_product_items_by_skus,
     terminate_subscription,
     update_agreement,
@@ -56,7 +57,7 @@ def _add_missing_subscriptions(
     adobe_client: AdobeClient,
     customer: dict,
     agreement: dict,
-    subscriptions_for_update: set[str],
+    subscription_for_update_ids: set[str],
     adobe_subscriptions,
 ) -> None:
     deployment_id = get_deployment_id(agreement) or ""
@@ -66,16 +67,18 @@ def _add_missing_subscriptions(
         deployment_id,
     )
     deployment_subscriptions = [
-        line_item
-        for line_item in adobe_subscriptions
-        if line_item.get("deploymentId", "") == deployment_id
+        a_s for a_s in adobe_subscriptions if a_s.get("deploymentId", "") == deployment_id
     ]
-
+    skus = {get_partial_sku(item["offerId"]) for item in deployment_subscriptions}
+    one_time_skus = get_one_time_skus(
+        mpt_client, agreement["product"]["id"], vendor_external_ids=skus
+    )
     missing_subscriptions = tuple(
-        subc
-        for subc in deployment_subscriptions
-        if subc["subscriptionId"] not in subscriptions_for_update
-        and subc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
+        subsc
+        for subsc in deployment_subscriptions
+        if subsc["subscriptionId"] not in subscription_for_update_ids
+        and subsc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
+        and get_partial_sku(subsc["offerId"]) not in one_time_skus
     )
 
     if missing_subscriptions:
@@ -84,7 +87,6 @@ def _add_missing_subscriptions(
         logger.info("> No missing subscriptions found")
         return
 
-    skus = [get_partial_sku(item["offerId"]) for item in deployment_subscriptions]
     items_map = {
         item["externalIds"]["vendor"]: item
         for item in get_product_items_by_skus(mpt_client, agreement["product"]["id"], skus)
@@ -112,7 +114,7 @@ def _add_missing_subscriptions(
             send_exception(title="Price currency mismatch detected!", text=f"{adobe_subscription}")
             continue
 
-        item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
+        item = items_map[get_partial_sku(adobe_subscription["offerId"])]
         prices = models.get_sku_price(
             customer,
             offer_ids,
@@ -120,7 +122,7 @@ def _add_missing_subscriptions(
             agreement["listing"]["priceList"]["currency"],
         )
         sku_discount_level = get_sku_with_discount_level(adobe_subscription["offerId"], customer)
-        price_component = {"price": {"unitPP": prices.get(sku_discount_level)}}
+        price_component = {"price": {"unitPP": prices[sku_discount_level]}}
         create_agreement_subscription(
             mpt_client,
             {
@@ -883,7 +885,9 @@ def sync_agreement(  # noqa: C901
             adobe_client,
             customer,
             agreement,
-            subscriptions_for_update={sub[1]["subscriptionId"] for sub in subscriptions_for_update},
+            subscription_for_update_ids={
+                sub[1]["subscriptionId"] for sub in subscriptions_for_update
+            },
             adobe_subscriptions=adobe_subscriptions,
         )
 
@@ -1119,3 +1123,23 @@ def sync_all_agreements(mpt_client: MPTClient, *, dry_run: bool) -> None:
     agreements = get_all_agreements(mpt_client)
     for agreement in agreements:
         sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)
+
+
+def get_one_time_skus(mpt_client: MPTClient, product_id: str, vendor_external_ids) -> tuple[str]:
+    """
+    Returns all one-time SKUs associated with a specific product.
+
+    Args:
+        vendor_external_ids: vendors to filter
+        mpt_client: An instance of MPTClient.
+        product_id: product id.
+
+    Returns:
+        A tuple of product ids.
+    """
+    return tuple(
+        item["externalIds"]["vendor"]
+        for item in get_product_items_by_period(
+            mpt_client, product_id, "one-time", vendor_external_ids
+        )
+    )
