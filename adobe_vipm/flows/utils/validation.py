@@ -7,7 +7,7 @@ from adobe_vipm.flows.utils.subscription import is_line_item_active_subscription
 
 
 def validate_subscription_and_returnable_orders(
-    adobe_client, context, line, sku, return_orders=None
+    adobe_client, context, line, subscription_id, return_orders=None
 ):
     """
     Validates if the subscription is active and has valid returnable orders.
@@ -19,7 +19,7 @@ def validate_subscription_and_returnable_orders(
         adobe_client (MPTClient): The Adobe client instance
         context (Context): The context object
         line (dict): The order line to validate
-        sku (str): The SKU to validate
+        subscription_id (str): Subscription ID to validate
         return_orders (list[dict] | None): Optional return orders to pass to
         get_returnable_orders_by_sku
 
@@ -36,10 +36,10 @@ def validate_subscription_and_returnable_orders(
     if not is_line_item_active_subscription(subscriptions, line):
         return True, []
 
-    returnable_orders = adobe_client.get_returnable_orders_by_sku(
+    returnable_orders = adobe_client.get_returnable_orders_by_subscription_id(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        subscription_id,
         context.adobe_customer["cotermDate"],
         return_orders=return_orders,
     )
