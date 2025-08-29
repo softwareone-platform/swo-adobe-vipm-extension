@@ -163,3 +163,19 @@ def get_price_item_by_line_sku(prices: dict, line_sku: str) -> dict | None:
         lambda price_item: price_item[0].startswith(line_sku),
         list(prices.items()),
     )
+
+
+def get_subscription_by_line_subs_id(context, line):
+    """
+    Get the subscription by line subscription id.
+
+    Args:
+        context: The context of the order.
+        line: The line of the order.
+    """
+    return next(
+        (subscription["externalIds"]["vendor"]
+            for subscription in context.order["agreement"]["subscriptions"]
+            if line["subscription"]["id"] == subscription["id"]),
+        None
+    )

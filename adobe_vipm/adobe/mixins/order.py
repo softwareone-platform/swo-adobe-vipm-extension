@@ -289,7 +289,7 @@ class OrderClientMixin:
         Args:
             authorization_id: Id of the authorization to use.
             customer_id: Identifier of the customer that place the RETURN order.
-            sku: item sku
+            subscription_id: Adobe Subscription ID
             customer_coterm_date: customer coterm date
             external_reference: External Reference ID.
             return_orders: orders to return

@@ -19,7 +19,7 @@ def validate_subscription_and_returnable_orders(
         adobe_client (MPTClient): The Adobe client instance
         context (Context): The context object
         line (dict): The order line to validate
-        sku (str): The SKU to validate
+        subscription_id (str): Subscription ID to validate
         return_orders (list[dict] | None): Optional return orders to pass to
         get_returnable_orders_by_sku
 
