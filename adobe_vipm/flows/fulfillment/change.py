@@ -47,6 +47,7 @@ from adobe_vipm.flows.utils import (
     notify_not_updated_subscriptions,
 )
 from adobe_vipm.flows.utils.customer import is_within_coterm_window
+from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +77,16 @@ class GetReturnableOrders(Step):
 
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
-            returnable_orders = adobe_client.get_returnable_orders_by_sku(
+            subscription_id = get_subscription_by_line_subs_id(
+                context.order["agreement"]["subscriptions"],
+                line
+            )
+            returnable_orders = adobe_client.get_returnable_orders_by_subscription_id(
                 context.authorization_id,
                 context.adobe_customer_id,
-                sku,
+                subscription_id,
                 context.adobe_customer["cotermDate"],
-                return_orders=context.adobe_return_orders.get(sku),
+                return_orders=context.adobe_return_orders.get(sku)
             )
             if not returnable_orders:
                 logger.info(f"{context}: no returnable orders found for sku {sku}")

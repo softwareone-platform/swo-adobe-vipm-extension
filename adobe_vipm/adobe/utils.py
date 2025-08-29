@@ -21,6 +21,25 @@ def get_item_by_partial_sku(items, sku):
     return find_first(lambda item: item["offerId"].startswith(sku), items, default={})
 
 
+def get_item_by_subcription_id(line_items, subscription_id):
+    """
+    Get the line item by subscription id.
+
+    Args:
+        line_items (list): List of item to search.
+        subscription_id (str): The subscription id to search in
+        the list of item.
+
+    Returns:
+        dict: The line item if found, None if not.
+    """
+    return find_first(
+        lambda line_item: line_item["subscriptionId"] == subscription_id,
+        line_items,
+        default={},
+    )
+
+
 def to_adobe_line_id(mpt_line_id: str) -> int:
     """
     Converts Marketplace Line id to integer by extracting sequencial part of the line id

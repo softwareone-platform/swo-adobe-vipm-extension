@@ -98,3 +98,17 @@ def get_price_item_by_line_sku(prices, line_sku):
         list(prices.items()),
     )
 
+
+def get_subscription_by_line_subs_id(subscriptions, line):
+    """
+    Get the subscription by line subscription id.
+
+    Args:
+        subscriptions: The subscriptions of the agreement.
+        line: The line of the order.
+    """
+    subscription = find_first(
+        lambda subscription: subscription["id"] == line["subscription"]["id"],
+        subscriptions
+    )
+    return subscription and subscription["externalIds"]["vendor"]

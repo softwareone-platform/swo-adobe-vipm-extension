@@ -66,15 +66,24 @@ def test_get_returnable_orders_step(
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=1),
+        items=adobe_items_factory(
+            quantity=1,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=2),
+        items=adobe_items_factory(
+            quantity=2,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
     adobe_order_3 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=4),
+        items=adobe_items_factory(
+            quantity=4,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
 
     ret_info_1 = ReturnableOrderInfo(
@@ -96,7 +105,7 @@ def test_get_returnable_orders_step(
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
         ret_info_3,
@@ -122,10 +131,10 @@ def test_get_returnable_orders_step(
     step(mocked_client, context, mocked_next_step)
 
     assert context.adobe_returnable_orders[sku] == (ret_info_3,)
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
         return_orders=return_orders,
     )
@@ -156,7 +165,7 @@ def test_get_returnable_orders_step_no_returnable_order(
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
 
     mocker.patch(
         "adobe_vipm.flows.fulfillment.change.get_adobe_client",
@@ -178,10 +187,10 @@ def test_get_returnable_orders_step_no_returnable_order(
     step(mocked_client, context, mocked_next_step)
 
     assert sku not in context.adobe_returnable_orders
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
         return_orders=[],
     )
@@ -211,15 +220,24 @@ def test_get_returnable_orders_step_quantity_mismatch(
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=1),
+        items=adobe_items_factory(
+            quantity=1,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=2),
+        items=adobe_items_factory(
+            quantity=2,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
     adobe_order_3 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=4),
+        items=adobe_items_factory(
+            quantity=4,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
 
     ret_info_1 = ReturnableOrderInfo(
@@ -241,7 +259,7 @@ def test_get_returnable_orders_step_quantity_mismatch(
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
         ret_info_3,
@@ -267,10 +285,10 @@ def test_get_returnable_orders_step_quantity_mismatch(
     step(mocked_client, context, mocked_next_step)
 
     assert context.adobe_returnable_orders[sku] is None
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
         return_orders=None,
     )

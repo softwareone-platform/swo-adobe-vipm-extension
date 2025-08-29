@@ -2,6 +2,7 @@ import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from hashlib import sha256
+from operator import itemgetter
 from urllib.parse import urljoin
 
 import requests
@@ -20,7 +21,7 @@ from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError, wrap_http_error
 from adobe_vipm.adobe.utils import (
     find_first,
-    get_item_by_partial_sku,
+    get_item_by_subcription_id,
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
@@ -232,40 +233,50 @@ class OrderClientMixin:
             "quantity": quantity,
         }
 
-    def get_returnable_orders_by_sku(
+    def get_returnable_orders_by_subscription_id(
         self,
         authorization_id: str,
         customer_id: str,
-        sku: str,
+        subscription_id: str,
         customer_coterm_date: str,
         return_orders: list | None = None,
-    ):
+    ) -> list[dict]:
+        """
+        Retrieve RETURN orders filter by sku.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            subscription_id: Adobe Subscription ID
+            customer_coterm_date: customer coterm date
+            external_reference: External Reference ID.
+            return_orders: orders to return
+
+        Returns:
+            list(dict): The RETURN order.
+        """
         start_date = date.today() - timedelta(days=CANCELLATION_WINDOW_DAYS)
 
-        filters = {
-            "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
-            "start-date": start_date.isoformat(),
-            "end-date": customer_coterm_date,
-        }
-
-        returning_order_ids = [
-            order["referenceOrderId"] for order in (return_orders or [])
-        ]
+        returning_order_ids = [order["referenceOrderId"] for order in (return_orders or [])]
 
         orders = self.get_orders(
             authorization_id,
             customer_id,
-            filters=filters,
+            filters={
+                "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
+                "start-date": start_date.isoformat(),
+                "end-date": customer_coterm_date,
+            },
         )
-
         order_items = (
             (
                 order,
-                get_item_by_partial_sku(order["lineItems"], sku),
+                get_item_by_subcription_id(order["lineItems"], subscription_id),
             )
             for order in orders
         )
-        order_items = filter(lambda order_item: order_item[1], order_items)
+
+        order_items = filter(itemgetter(1), order_items)
         order_items = list(
             filter(
                 lambda order_item: (
@@ -275,31 +286,28 @@ class OrderClientMixin:
                 order_items,
             )
         )
-
         renewal_order_item = find_first(
             lambda order_item: order_item[0]["orderType"] == ORDER_TYPE_RENEWAL,
             order_items,
         )
         if renewal_order_item:
-            renewal_order_date = datetime.fromisoformat(
-                renewal_order_item[0]["creationDate"]
-            )
+            renewal_order_date = datetime.fromisoformat(renewal_order_item[0]["creationDate"])
             order_items = filter(
                 lambda order_item: datetime.fromisoformat(order_item[0]["creationDate"])
                 >= renewal_order_date,
                 order_items,
             )
 
-        result = []
-        for order, item in order_items:
-            result.append(
+        return_orders = []
+        for order, line_item in order_items:
+            return_orders.append(
                 ReturnableOrderInfo(
                     order=order,
-                    line=item,
-                    quantity=item["quantity"],
+                    line=line_item,
+                    quantity=line_item["quantity"],
                 )
             )
-        return result
+        return return_orders
 
     def get_return_orders_by_external_reference(
         self,

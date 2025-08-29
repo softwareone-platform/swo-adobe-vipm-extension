@@ -23,6 +23,7 @@ from adobe_vipm.flows.helpers import (
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import set_order_error
 from adobe_vipm.flows.utils.customer import is_within_coterm_window
+from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
@@ -54,22 +55,21 @@ class ValidateDownsizes(Step):
             return
 
         for line in context.downsize_lines:
-            sku = line["item"]["externalIds"]["vendor"]
-            returnable_orders = adobe_client.get_returnable_orders_by_sku(
+            subscription_id = get_subscription_by_line_subs_id(
+                context.order["agreement"]["subscriptions"],
+                line
+            )
+            returnable_orders = adobe_client.get_returnable_orders_by_subscription_id(
                 context.authorization_id,
                 context.adobe_customer_id,
-                sku,
+                subscription_id,
                 context.adobe_customer["cotermDate"],
             )
             if not returnable_orders:
                 continue
 
-            returnable_by_quantity = self.get_returnable_by_quantity_map(
-                returnable_orders
-            )
-
+            returnable_by_quantity = self.get_returnable_by_quantity_map(returnable_orders)
             delta = line["oldQuantity"] - line["quantity"]
-
             if delta not in returnable_by_quantity:
                 end_of_cancellation_window = max(
                     datetime.fromisoformat(roi.order["creationDate"]).date()
