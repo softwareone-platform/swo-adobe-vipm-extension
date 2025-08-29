@@ -34,15 +34,24 @@ def test_validate_downsizes_step_success(
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=1),
+        items=adobe_items_factory(
+            quantity=1,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=2),
+        items=adobe_items_factory(
+            quantity=2,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
     adobe_order_3 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=1),
+        items=adobe_items_factory(
+            quantity=1,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
 
     ret_info_1 = ReturnableOrderInfo(
@@ -64,7 +73,7 @@ def test_validate_downsizes_step_success(
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
         ret_info_3,
@@ -95,10 +104,10 @@ def test_validate_downsizes_step_success(
         context.authorization_id,
         context.adobe_customer_id,
     )
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
         return_orders=None,
     )
@@ -121,7 +130,7 @@ def test_validate_downsizes_step_no_returnable_orders(
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
 
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
@@ -175,11 +184,17 @@ def test_validate_downsizes_step_quantity_mismatch(
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=1),
+        items=adobe_items_factory(
+            quantity=1,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=2),
+        items=adobe_items_factory(
+            quantity=2,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
     )
 
     ret_info_1 = ReturnableOrderInfo(
@@ -196,7 +211,7 @@ def test_validate_downsizes_step_quantity_mismatch(
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
     ]
@@ -275,7 +290,7 @@ def test_validate_downsizes_step_inactive_subscription(
         context.adobe_customer_id,
     )
 
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_not_called()
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 

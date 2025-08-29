@@ -1087,6 +1087,7 @@ def test_sync_global_customer_update_not_required(
 
     mock_add_missing_subscriptions.assert_called_once()
     assert mock_get_subscriptions_for_update.call_count == 3
+
     assert mocked_update_agreement.mock_calls == [
         mocker.call(
             mock_mpt_client,
@@ -1097,6 +1098,11 @@ def test_sync_global_customer_update_not_required(
                         "id": "ITM-1234-1234-1234-0001",
                         "name": "Awesome product",
                         "externalIds": {"vendor": "77777777CA"},
+                    },
+                    "subscription": {
+                        "id": "SUB-1000-2000-3000",
+                        "status": "Active",
+                        "name": "Subscription for Acrobat Pro for Teams; Multi Language"
                     },
                     "oldQuantity": 0,
                     "quantity": 170,

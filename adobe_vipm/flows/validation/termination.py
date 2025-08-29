@@ -13,6 +13,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     validate_subscription_and_returnable_orders,
 )
+from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
 from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 
 logger = logging.getLogger(__name__)
@@ -25,10 +26,9 @@ class ValidateDownsizes(Step):
         """Checks that for downsizes there orders to remove on Adobe side."""
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
-            sku = line["item"]["externalIds"]["vendor"]
-
+            subscription_id = get_subscription_by_line_subs_id(context, line)
             is_valid, _ = validate_subscription_and_returnable_orders(
-                adobe_client, context, line, sku
+                adobe_client, context, line, subscription_id
             )
             if not is_valid:
                 context.validation_succeeded = False

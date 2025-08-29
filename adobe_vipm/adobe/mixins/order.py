@@ -20,7 +20,7 @@ from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError, wrap_http_error
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
-    get_item_by_partial_sku,
+    get_item_by_subcription_id,
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
@@ -275,11 +275,11 @@ class OrderClientMixin:
         response.raise_for_status()
         return response.json()
 
-    def get_returnable_orders_by_sku(
+    def get_returnable_orders_by_subscription_id(
         self,
         authorization_id: str,
         customer_id: str,
-        sku: str,
+        subscription_id: str,
         customer_coterm_date: str,
         return_orders: list | None = None,
     ) -> list[dict]:
@@ -289,7 +289,7 @@ class OrderClientMixin:
         Args:
             authorization_id: Id of the authorization to use.
             customer_id: Identifier of the customer that place the RETURN order.
-            sku: item sku
+            subscription_id: Adobe Subscription ID
             customer_coterm_date: customer coterm date
             external_reference: External Reference ID.
             return_orders: orders to return
@@ -311,14 +311,14 @@ class OrderClientMixin:
                 "end-date": customer_coterm_date,
             },
         )
-
         order_items = (
             (
                 order,
-                get_item_by_partial_sku(order["lineItems"], sku),
+                get_item_by_subcription_id(order["lineItems"], subscription_id),
             )
             for order in orders
         )
+
         order_items = filter(itemgetter(1), order_items)
         order_items = list(
             filter(
@@ -329,7 +329,6 @@ class OrderClientMixin:
                 order_items,
             )
         )
-
         renewal_order_item = find_first(
             lambda order_item: order_item[0]["orderType"] == ORDER_TYPE_RENEWAL,
             order_items,
