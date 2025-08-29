@@ -1,0 +1,66 @@
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+cliVersion: 2.4.0
+owner: turing
+git:
+  repository: swo-extension-adobe
+image:
+  repository: /swo-extensions-vipm
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+  # Access policy to the service
+  #- pyra-cross-cluster
+  #- pyra-cluster-only
+  #- public used by RBAC configuration to allow such containers to have public endpoints.
+  # Access policy audience is additional setting for publicly exposed service
+  #- frontoffice: APIs consumed by PyC Frontoffice web site
+  #- backoffice: APIs consumed by PyC Backoffice web site
+  #- corporate: APIs consumed by other SWO teams (like BIT or IDP teams � only very few pods, if any should have this value set)
+  #- customer: APIs consumed by customer applications
+accessPolicy: public
+accessPolicyAudience: any
+  # Type of app: test, product, infra
+type: product
+applicationGroup: pyra-cli
+
+ingress:
+  hosts:
+   - customer-api.domain.global     
+   - extensions-api.domain.global
+  gateways:
+   - pyra/ops-pyc-cluster-gateway
+  forward:
+    - match: /swo-extension-adobe-api/
+      rewrite: /
+   
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
