@@ -1,4 +1,8 @@
 import pytest
+from adobe_vipm.flows.validation.shared import (
+    GetPreviewOrder,
+    ValidateDuplicateLines,
+)
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
@@ -12,10 +16,6 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_GOVERNMENT,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.validation.shared import (
-    GetPreviewOrder,
-    ValidateDuplicateLines,
-)
 
 
 def test_validate_duplicate_lines_step_duplicates(mocker, order_factory, lines_factory):

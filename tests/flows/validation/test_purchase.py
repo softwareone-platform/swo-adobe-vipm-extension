@@ -1,4 +1,5 @@
 import pytest
+from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
 
 from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
@@ -30,7 +31,6 @@ from adobe_vipm.flows.validation.purchase import (
     ValidateCustomerData,
     validate_purchase_order,
 )
-from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 

@@ -1,17 +1,40 @@
 import copy
 import functools
 
-from mpt_extension_sdk.mpt_http.mpt import get_product_onetime_items_by_ids
+from mpt_extension_sdk.mpt_http.mpt import (
+    get_product_items_by_skus,
+    get_product_onetime_items_by_ids,
+)
 from mpt_extension_sdk.mpt_http.utils import find_first
 
+from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_MEMBERSHIP_ID,
+    ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
+    ERR_ADOBE_MEMBERSHIP_ID_ITEM,
+    ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
+    ERR_ADOBE_UNEXPECTED_ERROR,
+    ERR_UPDATING_TRANSFER_ITEMS,
     ORDER_TYPE_CHANGE,
     ORDER_TYPE_CONFIGURATION,
     ORDER_TYPE_PURCHASE,
     ORDER_TYPE_TERMINATION,
+    Param,
+)
+from adobe_vipm.flows.utils import (
+    get_ordering_parameter,
+    is_migrate_customer,
+    set_ordering_parameter_error,
 )
 from adobe_vipm.flows.utils.customer import is_new_customer
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.flows.utils.parameter import get_adobe_membership_id
+from adobe_vipm.flows.utils.subscription import (
+    are_all_transferring_items_expired,
+    is_transferring_item_expired,
+)
+from adobe_vipm.flows.validation.transfer import get_prices
+from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 
 def get_adobe_order_id(order: dict) -> str | None:
@@ -270,3 +293,226 @@ def map_returnable_to_return_orders(returnable_orders: list, return_orders: list
         mapped.append((returnable_order, return_order))
 
     return mapped
+
+
+def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]:
+    """
+    Validates a transfer that has not been already migrated by the mass migration tool.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        order: The order to validate.
+
+    Returns:
+        (True, order) if there is a validation error, (False, order) otherwise.
+    """
+    authorization_id = order["authorization"]["id"]
+    membership_id = get_adobe_membership_id(order)
+    transfer_preview = None
+
+    try:
+        adobe_client = get_adobe_client()
+        transfer_preview = adobe_client.preview_transfer(
+            authorization_id,
+            membership_id,
+        )
+    except AdobeAPIError as e:
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
+        order = set_ordering_parameter_error(
+            order,
+            Param.MEMBERSHIP_ID.value,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
+        )
+        return True, order
+    except AdobeHttpError as he:
+        err_msg = (
+            ERR_ADOBE_MEMBERSHIP_NOT_FOUND if he.status_code == 404 else ERR_ADOBE_UNEXPECTED_ERROR
+        )
+        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
+        order = set_ordering_parameter_error(
+            order,
+            Param.MEMBERSHIP_ID.value,
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=err_msg),
+        )
+        return True, order
+    commitment = get_3yc_commitment(transfer_preview)
+    return add_lines_to_order(mpt_client, order, transfer_preview["items"], commitment, "quantity")
+
+
+def add_lines_to_order(
+    mpt_client,
+    order: dict,
+    adobe_items: list[dict],
+    commitment: dict,
+    quantity_field: str,
+    *,
+    is_transferred=False,
+) -> tuple[bool, dict]:
+    """
+    Add the lines that belongs to the provided Adobe VIP membership to the current order.
+
+    Updates the purchase price of each line according to the customer discount level/benefits.
+
+    Args:
+        mpt_client (MPTClient): The client used to consume the MPT API.
+        order: The order to validate.
+        adobe_items: List of Adobe subscriptions to be migrated.
+        commitment: Either the customer 3y commitment data or None if the customer doesn't
+        have such benefit.
+        quantity_field: The name of the field that contains the quantity depending on the
+        provided `adobe_object` argument.
+        is_transferred: True if the order has already been transferred, False otherwise.
+
+    Returns:
+        (True, order) if there is an error adding the lines, (False, order) otherwise.
+    """
+    order_error = False
+    items = []
+
+    if adobe_items:
+        items = _get_items(adobe_items, mpt_client, order)
+        if is_transferred:
+            if are_all_transferring_items_expired(adobe_items):
+                # If the order already has items and all the items on Adobe to be migrated are
+                # expired, the user can add, edit or delete the expired subscriptions
+                if len(order["lines"]):
+                    return False, order
+
+            else:
+                adobe_items, order, order_error = _fail_validation_if_items_updated(
+                    adobe_items,
+                    order,
+                    quantity_field,
+                    order_error=order_error,
+                )
+        else:
+            adobe_items = [item for item in adobe_items if not is_transferring_item_expired(item)]
+
+    if not adobe_items:
+        return _handle_empty_adobe_items(order)
+
+    order_error, order = _get_updated_order_lines(
+        adobe_items,
+        commitment,
+        items,
+        order,
+        quantity_field,
+        order_error=order_error,
+    )
+
+    return order_error, order
+
+
+def _handle_empty_adobe_items(order: dict) -> tuple[bool, dict]:
+    if is_migrate_customer(order):
+        order = set_ordering_parameter_error(
+            order,
+            Param.MEMBERSHIP_ID.value,
+            ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
+        )
+    return True, order
+
+
+def _get_updated_order_lines(
+    adobe_items: list[dict],
+    commitment: dict,
+    items: list[dict],
+    order: dict,
+    quantity_field: str,
+    *,
+    order_error: bool,
+) -> tuple[bool, dict]:
+    valid_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
+    returned_full_skus = [item["offerId"] for item in adobe_items]
+    prices = get_prices(order, commitment, returned_full_skus)
+    items_map = {
+        item["externalIds"]["vendor"]: item
+        for item in items
+        if item["externalIds"]["vendor"] in valid_skus
+    }
+
+    return _update_order_lines(
+        order,
+        adobe_items,
+        prices,
+        items_map,
+        quantity_field,
+        valid_skus,
+        order_error=order_error,
+    )
+
+
+def _fail_validation_if_items_updated(
+    adobe_items: list[dict],
+    order: dict,
+    quantity_field: str,
+    *,
+    order_error: bool,
+) -> tuple[list[dict], dict, bool]:
+    # remove expired items from adobe items
+    non_expired_items = [item for item in adobe_items if not is_transferring_item_expired(item)]
+    # If the order items has been updated, the validation order will fail
+    if len(order["lines"]) and has_order_line_updated(
+        order["lines"], non_expired_items, quantity_field
+    ):
+        order_error = True
+        order = set_order_error(order, ERR_UPDATING_TRANSFER_ITEMS.to_dict())
+
+    return non_expired_items, order, order_error
+
+
+def _get_items(
+    adobe_items: list[dict],
+    mpt_client,
+    order: dict,
+) -> dict[str, dict]:
+    returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
+
+    return get_product_items_by_skus(mpt_client, order["agreement"]["product"]["id"], returned_skus)
+
+
+def _update_order_lines(
+    order: dict,
+    adobe_items: list[dict],
+    prices: dict[str, float],
+    items_map: dict[str, dict],
+    quantity_field: str,
+    returned_skus: list[str],
+    *,
+    order_error: bool,  # TODO: that's a really strange parameter, you pass it down and return back
+) -> tuple[bool, dict]:
+    for adobe_line in adobe_items:
+        item = items_map.get(get_partial_sku(adobe_line["offerId"]))
+        if not item:
+            param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
+            order = set_ordering_parameter_error(
+                order,
+                Param.MEMBERSHIP_ID.value,
+                ERR_ADOBE_MEMBERSHIP_ID_ITEM.to_dict(
+                    title=param["name"],
+                    item_sku=get_partial_sku(adobe_line["offerId"]),
+                ),
+            )
+            order_error = True
+
+            return order_error, order
+
+        current_line = get_order_line_by_sku(order, get_partial_sku(adobe_line["offerId"]))
+        if current_line:
+            current_line["quantity"] = adobe_line[quantity_field]
+        else:
+            new_line = {
+                "item": item,
+                "quantity": adobe_line[quantity_field],
+                "oldQuantity": 0,
+            }
+            new_line.setdefault("price", {})
+            new_line["price"]["unitPP"] = prices.get(adobe_line["offerId"], 0)
+            order["lines"].append(new_line)
+
+    lines = [
+        line for line in order["lines"] if line["item"]["externalIds"]["vendor"] in returned_skus
+    ]
+    order["lines"] = lines
+
+    return order_error, order

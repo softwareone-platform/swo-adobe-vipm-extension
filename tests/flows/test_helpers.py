@@ -1972,7 +1972,7 @@ def test_fetch_reseller_change_data_success(
     adobe_reseller_change_preview_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     adobe_transfer = adobe_reseller_change_preview_factory()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
@@ -2011,7 +2011,7 @@ def test_fetch_reseller_change_data_already_has_customer_id(
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
 
@@ -2038,7 +2038,7 @@ def test_fetch_reseller_change_data_adobe_api_error_fulfillment_mode(
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
@@ -2081,7 +2081,7 @@ def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})

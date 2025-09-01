@@ -226,10 +226,7 @@ def test_check_adobe_reseller_transfer_step_pending_status(
     mock_next_step.assert_not_called()
 
 
-def test_fulfill_reseller_change_order(
-    mocker,
-    mock_mpt_client
-):
+def test_fulfill_reseller_change_order(mocker, mock_mpt_client):
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(

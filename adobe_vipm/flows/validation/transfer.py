@@ -1,46 +1,44 @@
 import datetime as dt
 import logging
 
-from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus
+from mpt_extension_sdk.mpt_http.mpt import get_product_items_by_skus
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
-    AdobeStatus,
     ThreeYearCommitmentStatus,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.airtable.models import (
-    STATUS_RUNNING,
-    STATUS_SYNCHRONIZED,
     get_prices_for_3yc_skus,
     get_prices_for_skus,
-    get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
-    ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
-    ERR_ADOBE_MEMBERSHIP_PROCESSING,
-    ERR_ADOBE_RESSELLER_CHANGE_LINES,
-    ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED,
     ERR_ADOBE_UNEXPECTED_ERROR,
-    ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
     ERR_UPDATING_TRANSFER_ITEMS,
     Param,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import FetchResellerChangeData, ValidateResellerChange
-from adobe_vipm.flows.pipeline import Pipeline, Step
+from adobe_vipm.flows.pipeline import Pipeline
+from adobe_vipm.flows.steps.context import SetupTransferContext
+from adobe_vipm.flows.steps.customer import FetchCustomerAndValidateEmptySubscriptions
+from adobe_vipm.flows.steps.order import AddLinesToOrder
+from adobe_vipm.flows.steps.reseller import (
+    AddResellerChangeLinesToOrder,
+    FetchResellerChangeData,
+    ValidateResellerChange,
+)
+from adobe_vipm.flows.steps.subscription import UpdateSubscriptionSkus
+from adobe_vipm.flows.steps.transfer import FetchTransferData
+from adobe_vipm.flows.steps.validation import ValidateTransferStatus
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
-    exclude_items_with_deployment_id,
-    exclude_subscriptions_with_deployment_id,
     get_adobe_membership_id,
     get_order_line_by_sku,
     get_ordering_parameter,
-    get_transfer_item_sku_by_subscription,
     has_order_line_updated,
     is_migrate_customer,
     is_transferring_item_expired,
@@ -308,168 +306,6 @@ def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]
     return add_lines_to_order(mpt_client, order, transfer_preview["items"], commitment, "quantity")
 
 
-class SetupTransferContext(Step):
-    """Setups Transfer context."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Setups Transfer context."""
-        context.validation_succeeded = True
-        context.order["agreement"] = get_agreement(mpt_client, context.order["agreement"]["id"])
-
-        product_id = context.order["agreement"]["product"]["id"]
-        authorization_id = context.order["authorization"]["id"]
-        context.membership_id = get_adobe_membership_id(context.order)
-
-        if is_migrate_customer(context.order):
-            context.transfer = get_transfer_by_authorization_membership_or_customer(
-                product_id,
-                authorization_id,
-                context.membership_id,
-            )
-        next_step(mpt_client, context)
-
-
-class ValidateTransferStatus(Step):
-    """Checks transfer status for errors."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Checks transfer status for errors."""
-        transfer = context.transfer
-        order = context.order
-
-        if transfer.status == STATUS_RUNNING:
-            self._set_transfer_error(context, order, "Migration in progress, retry later")
-            return
-        if transfer.status == STATUS_SYNCHRONIZED:
-            self._set_transfer_error(context, order, "Membership has already been migrated")
-            return
-
-        if context.adobe_transfer["status"] == AdobeStatus.TRANSFER_INACTIVE_ACCOUNT:
-            context.order = set_ordering_parameter_error(
-                context.order,
-                Param.MEMBERSHIP_ID.value,
-                ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
-                    status=context.adobe_transfer["status"],
-                ),
-            )
-            context.validation_succeeded = False
-            return
-
-        next_step(mpt_client, context)
-
-    def _set_transfer_error(self, context, order, details):
-        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
-        context.order = set_ordering_parameter_error(
-            order,
-            Param.MEMBERSHIP_ID.value,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=details),
-        )
-        context.validation_succeeded = False
-
-
-class FetchTransferData(Step):
-    """Fetches transfer data from Adobe."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Fetches transfer data from Adobe."""
-        if not context.transfer:
-            has_error, order = validate_transfer_not_migrated(mpt_client, context.order)
-            context.order = order
-            context.validation_succeeded = not has_error
-            return
-
-        try:
-            adobe_client = get_adobe_client()
-            subscriptions = adobe_client.get_subscriptions(
-                context.order["authorization"]["id"],
-                context.transfer.customer_id,
-            )
-            subscriptions = exclude_subscriptions_with_deployment_id(subscriptions)
-            adobe_transfer = adobe_client.get_transfer(
-                context.order["authorization"]["id"],
-                context.transfer.membership_id,
-                context.transfer.transfer_id,
-            )
-        except AdobeError as e:
-            context.order = set_ordering_parameter_error(
-                context.order,
-                Param.MEMBERSHIP_ID.value,
-                ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
-                    membership_id=context.transfer.membership_id,
-                    error=str(e),
-                ),
-            )
-            context.validation_succeeded = False
-            return
-
-        context.subscriptions = subscriptions
-        context.adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
-
-        next_step(mpt_client, context)
-
-
-class UpdateSubscriptionSkus(Step):
-    """Update MPT subscription skus."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Update MPT subscription skus."""
-        for subscription in context.subscriptions["items"]:
-            correct_sku = get_transfer_item_sku_by_subscription(
-                context.adobe_transfer, subscription["subscriptionId"]
-            )
-            subscription["offerId"] = correct_sku or subscription["offerId"]
-        next_step(mpt_client, context)
-
-
-class FetchCustomerAndValidateEmptySubscriptions(Step):
-    """Validates transfer empty subscriptions for account revival."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Validates transfer empty subscriptions for account revival."""
-        adobe_client = get_adobe_client()
-        customer = adobe_client.get_customer(
-            context.order["authorization"]["id"], context.transfer.customer_id
-        )
-        context.adobe_customer = customer
-
-        if len(context.subscriptions["items"]) == 0:
-            if customer.get("globalSalesEnabled", False):
-                logger.error(ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT)
-                param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID.value)
-                context.order = set_ordering_parameter_error(
-                    context.order,
-                    Param.MEMBERSHIP_ID.value,
-                    ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-                        title=param["name"], details=ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT
-                    ),
-                )
-                context.validation_succeeded = False
-                return
-            context.validation_succeeded = True
-            return
-
-        next_step(mpt_client, context)
-
-
-class AddLinesToOrder(Step):
-    """Add adobe lines to order."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Add adobe lines to order."""
-        commitment = get_3yc_commitment(context.adobe_customer)
-        has_error, order = add_lines_to_order(
-            mpt_client,
-            context.order,
-            context.subscriptions["items"],
-            commitment,
-            Param.CURRENT_QUANTITY.value,
-            is_transferred=True,
-        )
-        context.order = order
-        context.validation_succeeded = not has_error
-        next_step(mpt_client, context)
-
-
 def validate_transfer(mpt_client, order):
     """Validate transfer pipeline."""
     pipeline = Pipeline(
@@ -496,43 +332,3 @@ def validate_reseller_change(mpt_client, order):
     context = Context(order=order)
     pipeline.run(mpt_client, context)
     return not context.validation_succeeded, context.order
-
-
-class AddResellerChangeLinesToOrder(Step):
-    """Add lines from reseller change back to the MPT order."""
-
-    def __call__(self, mpt_client, context, next_step):
-        """Add lines from reseller change back to the MPT order."""
-        reseller_change_item = get_product_items_by_skus(
-            mpt_client, context.order["agreement"]["product"]["id"], ["adobe-reseller-transfer"]
-        )
-
-        if not reseller_change_item:
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED.to_dict()
-            )
-            context.validation_succeeded = False
-            return
-
-        reseller_change_item = reseller_change_item[0]
-        context.validation_succeeded = True
-
-        lines = context.order["lines"]
-        if lines:
-            if len(lines) == 1 and lines[0]["item"]["id"] == reseller_change_item["id"]:
-                next_step(mpt_client, context)
-                return
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_RESSELLER_CHANGE_LINES.to_dict()
-            )
-            context.validation_succeeded = False
-        new_line = [
-            {
-                "item": reseller_change_item,
-                "quantity": 1,
-                "oldQuantity": 0,
-                "price": {"unitPP": 0},
-            }
-        ]
-        context.order["lines"] = new_line
-        next_step(mpt_client, context)

@@ -1102,7 +1102,7 @@ def test_sync_global_customer_update_not_required(
                     "subscription": {
                         "id": "SUB-1000-2000-3000",
                         "status": "Active",
-                        "name": "Subscription for Acrobat Pro for Teams; Multi Language"
+                        "name": "Subscription for Acrobat Pro for Teams; Multi Language",
                     },
                     "oldQuantity": 0,
                     "quantity": 170,

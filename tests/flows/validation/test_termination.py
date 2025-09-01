@@ -1,3 +1,4 @@
+from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 from freezegun import freeze_time
 
 from adobe_vipm.adobe.client import AdobeClient
@@ -9,7 +10,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
-from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
 from adobe_vipm.flows.validation.termination import (
     ValidateDownsizes,
     validate_termination_order,

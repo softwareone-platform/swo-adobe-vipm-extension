@@ -10,7 +10,6 @@ program.
 
 import datetime as dt
 import logging
-from operator import itemgetter
 
 from mpt_extension_sdk.mpt_http.mpt import (
     get_product_items_by_skus,
@@ -22,7 +21,7 @@ from adobe_vipm.adobe.constants import (
     AdobeStatus,
     ThreeYearCommitmentStatus,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
+from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
     STATUS_GC_ERROR,
@@ -35,30 +34,19 @@ from adobe_vipm.airtable.models import (
     get_agreement_deployment_view_link,
     get_gc_agreement_deployments_by_main_agreement,
     get_gc_main_agreement,
-    get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID,
-    ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
-    ERR_ADOBE_TRANSFER_PREVIEW,
     ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED,
-    ERR_MEMBERSHIP_ITEMS_DONT_MATCH,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UPDATING_TRANSFER_ITEMS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
     TEMPLATE_NAME_BULK_MIGRATE,
-    TEMPLATE_NAME_TRANSFER,
     Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    CompleteOrder,
-    CreateOrUpdateSubscriptions,
-    GetPreviewOrder,
-    SetOrUpdateCotermDate,
-    SetupDueDate,
-    SubmitNewOrder,
     add_subscription,
     check_processing_template,
     handle_retries,
@@ -70,18 +58,39 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
-from adobe_vipm.flows.helpers import (
-    SetupContext,
-    UpdatePrices,
-)
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.steps.agreement import SyncGCMainAgreement
+from adobe_vipm.flows.steps.airtable import UpdateTransferStatus
+from adobe_vipm.flows.steps.commitment_date import SetCommitmentDates
+from adobe_vipm.flows.steps.context import SetupContext, SetupTransferOrderContext
+from adobe_vipm.flows.steps.coterm_date import SetOrUpdateCotermDate
+from adobe_vipm.flows.steps.customer import GetAdobeCustomer, SaveCustomerData
+from adobe_vipm.flows.steps.due_date import SetupDueDate
+from adobe_vipm.flows.steps.order import (
+    CompleteOrder,
+    GetPreviewOrderForUpsizeLines,
+    SubmitNewOrder,
+)
+from adobe_vipm.flows.steps.price import UpdatePrices
+from adobe_vipm.flows.steps.subscription import CreateOrUpdateSubscriptions
+from adobe_vipm.flows.steps.transfer import (
+    CheckAdobeTransferOrder,
+    CheckTransferTemplate,
+    CompleteTransferOrder,
+    CreateTransferSubscriptions,
+    ProcessTransferOrder,
+)
+from adobe_vipm.flows.steps.validation import (
+    ValidateAgreementDeployments,
+    ValidateDeploymentItems,
+    ValidateGCMainAgreement,
+    ValidateTransfer,
+)
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
     exclude_items_with_deployment_id,
     exclude_subscriptions_with_deployment_id,
     get_adobe_customer_id,
-    get_adobe_membership_id,
     get_adobe_order_id,
     get_global_customer,
     get_market_segment,
@@ -100,79 +109,7 @@ from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 logger = logging.getLogger(__name__)
 
 
-def _handle_transfer_preview_error(client, order, error):
-    if (
-        isinstance(error, AdobeAPIError)
-        and error.code
-        in {
-            AdobeStatus.TRANSFER_INVALID_MEMBERSHIP,
-            AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
-        }
-    ) or (isinstance(error, AdobeHttpError) and error.status_code == 404):
-        error_msg = (
-            str(error) if isinstance(error, AdobeAPIError) else ERR_ADOBE_MEMBERSHIP_NOT_FOUND
-        )
-        param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
-        order = set_ordering_parameter_error(
-            order,
-            Param.MEMBERSHIP_ID.value,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=error_msg),
-        )
-        switch_order_to_query(client, order)
-        return
-
-    switch_order_to_failed(
-        client,
-        order,
-        ERR_ADOBE_TRANSFER_PREVIEW.to_dict(error=str(error)),
-    )
-
-
-def _check_transfer(mpt_client, order, membership_id):
-    """
-    Checks the validity of a transfer order based on the provided parameters.
-
-    Args:
-        mpt_client (MPTClient): An instance of the Marketplace platform client.
-        order (dict): The MPT order being processed.
-        membership_id (str): The Adobe membership ID associated with the transfer.
-
-    Returns:
-        bool: True if the transfer is valid, False otherwise.
-    """
-    adobe_client = get_adobe_client()
-    authorization_id = order["authorization"]["id"]
-    transfer_preview = None
-    try:
-        transfer_preview = adobe_client.preview_transfer(authorization_id, membership_id)
-    except AdobeError as e:
-        _handle_transfer_preview_error(mpt_client, order, e)
-        logger.warning("Transfer order %s has been failed: %s.", order["id"], str(e))
-        return False
-
-    adobe_lines = sorted(
-        [
-            (get_partial_sku(item["offerId"]), item["quantity"])
-            for item in transfer_preview["items"]
-        ],
-        key=itemgetter(0),
-    )
-
-    order_lines = sorted(
-        [(line["item"]["externalIds"]["vendor"], line["quantity"]) for line in order["lines"]],
-        key=itemgetter(0),
-    )
-    if adobe_lines != order_lines:
-        error = ERR_MEMBERSHIP_ITEMS_DONT_MATCH.to_dict(
-            lines=",".join([line[0] for line in adobe_lines]),
-        )
-        switch_order_to_failed(mpt_client, order, error)
-        logger.warning("Transfer %s has been failed: %s.", order["id"], error["message"])
-        return False
-    return True
-
-
-def _submit_transfer_order(mpt_client, order, membership_id):
+def submit_transfer_order(mpt_client, order, membership_id):
     """
     Submits a transfer order to the Adobe API based on the provided parameters.
 
@@ -323,56 +260,6 @@ def _fulfill_transfer_migrated(  # noqa: C901
     )
 
 
-class UpdateTransferStatus(Step):
-    """Step to update transfer status in Airtable."""
-
-    # TODO: Why transfer not in the context???
-    def __init__(self, transfer, status):
-        self.transfer = transfer
-        self.status = status
-
-    def __call__(self, client, context, next_step):
-        """Step to update transfer status in Airtable."""
-        self.transfer.status = self.status
-        self.transfer.mpt_order_id = context.order["id"]
-        self.transfer.synchronized_at = dt.datetime.now(tz=dt.UTC)
-        self.transfer.save()
-
-        next_step(client, context)
-
-
-class SaveCustomerData(Step):
-    """Save customer data and order id to the MPT order."""
-
-    def __call__(self, client, context, next_step):
-        """Save customer data and order id to the MPT order."""
-        context.order = save_adobe_order_id_and_customer_data(
-            client,
-            context.order,
-            "",
-            context.adobe_customer,
-        )
-        next_step(client, context)
-
-
-class SyncGCMainAgreement(Step):
-    """Sync Global Customer Main Agreement."""
-
-    def __init__(self, transfer, gc_main_agreement):
-        self.gc_main_agreement = gc_main_agreement
-        self.transfer = transfer
-
-    def __call__(self, client, context, next_step):
-        """Sync global customer main agreement."""
-        sync_main_agreement(
-            self.gc_main_agreement,
-            context.order["agreement"]["product"]["id"],
-            context.order["authorization"]["id"],
-            self.transfer.customer_id,
-        )
-        next_step(client, context)
-
-
 def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
     # Create new order on Adobe with the items selected by the client
     adobe_customer_id = get_adobe_customer_id(order)
@@ -382,7 +269,7 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
     pipeline = Pipeline(
         SetupContext(),
         SaveCustomerData(),
-        GetPreviewOrder(),
+        GetPreviewOrderForUpsizeLines(),
         SubmitNewOrder(),
         CreateOrUpdateSubscriptions(),
         SetOrUpdateCotermDate(),
@@ -458,16 +345,16 @@ def _transfer_migrated(  # noqa: C901
         transfer.membership_id,
         transfer.transfer_id,
     )
-    items_with_deployment_id = _get_order_line_items_with_deployment_id(adobe_transfer, order)
+    items_with_deployment_id = get_order_line_items_with_deployment_id(adobe_transfer, order)
     if items_with_deployment_id:
-        _manage_order_with_deployment_id(
+        manage_order_with_deployment_id(
             mpt_client, order, adobe_transfer, gc_main_agreement, items_with_deployment_id
         )
         return
 
     customer_id = adobe_transfer["customerId"]
     customer = adobe_client.get_customer(authorization_id, customer_id)
-    if not _check_agreement_deployments(
+    if not check_agreement_deployments(
         adobe_client,
         customer,
         adobe_transfer,
@@ -705,7 +592,7 @@ def add_gc_main_agreement(order, adobe_transfer_order, status=STATUS_GC_PENDING,
     create_gc_main_agreement(order["agreement"]["product"]["id"], main_agreement)
 
 
-def _check_agreement_deployments(
+def check_agreement_deployments(
     adobe_client,
     customer,
     adobe_transfer_order,
@@ -772,7 +659,7 @@ def _check_agreement_deployments(
     return True
 
 
-def _check_gc_main_agreement(gc_main_agreement, order):
+def check_gc_main_agreement(gc_main_agreement, order):
     """
     Checks if the main agreement exists in Airtable and if all deployments are synchronized.
 
@@ -878,7 +765,7 @@ def sync_main_agreement(gc_main_agreement, product_id, authorization_id, custome
         gc_main_agreement.save()
 
 
-def _check_pending_deployments(gc_main_agreement, existing_deployments, customer_deployments):
+def check_pending_deployments(gc_main_agreement, existing_deployments, customer_deployments):
     """
     Checks if all deployments are synchronized and the main agreement is in a valid state.
 
@@ -925,7 +812,7 @@ def save_gc_parameters(mpt_client, order, customer_deployments):
     return order
 
 
-def _get_order_line_items_with_deployment_id(adobe_transfer_order, order):
+def get_order_line_items_with_deployment_id(adobe_transfer_order, order):
     """
     Checks if any order line items contain a deployment ID.
 
@@ -953,7 +840,7 @@ def _get_order_line_items_with_deployment_id(adobe_transfer_order, order):
     return items_with_deployment
 
 
-def _manage_order_with_deployment_id(
+def manage_order_with_deployment_id(
     mpt_client, order, adobe_transfer_order, gc_main_agreement, items_with_deployment
 ):
     """
@@ -1019,56 +906,6 @@ def get_agreement_deployments(product_id, agreement_id):
     return None
 
 
-class SetupTransferContext(Step):
-    """Sets up the initial context for transfer order processing."""
-
-    def __call__(self, client, context, next_step):
-        """Sets up the initial context for transfer order processing."""
-        context.membership_id = get_adobe_membership_id(context.order)
-        context.customer_deployments = None
-
-        context.transfer = get_transfer_by_authorization_membership_or_customer(
-            context.product_id,
-            context.authorization_id,
-            context.membership_id,
-        )
-
-        context.gc_main_agreement = get_main_agreement(
-            context.product_id,
-            context.authorization_id,
-            context.membership_id,
-        )
-
-        context.existing_deployments = get_agreement_deployments(
-            context.product_id, context.order.get("agreement", {}).get("id", "")
-        )
-
-        next_step(client, context)
-
-
-class ValidateGCMainAgreement(Step):
-    """Validates if the main agreement exists in Airtable and all deployments are synchronized."""
-
-    def __call__(self, client, context, next_step):
-        """Validates if the main agreement exists in Airtable."""
-        if not _check_gc_main_agreement(context.gc_main_agreement, context.order):
-            return
-
-        if context.gc_main_agreement:
-            adobe_client = get_adobe_client()
-            context.customer_deployments = adobe_client.get_customer_deployments_active_status(
-                context.authorization_id, context.gc_main_agreement.customer_id
-            )
-            context.order = save_gc_parameters(client, context.order, context.customer_deployments)
-
-        if not _check_pending_deployments(
-            context.gc_main_agreement, context.existing_deployments, context.customer_deployments
-        ):
-            return
-
-        next_step(client, context)
-
-
 class HandleMigratedTransfer(Step):
     """Handles transfer orders that have already been processed by the mass migration tool."""
 
@@ -1090,189 +927,6 @@ class HandleMigratedTransfer(Step):
         )
 
 
-class CheckTransferTemplate(Step):
-    """Checks the processing template for transfer orders."""
-
-    def __call__(self, client, context, next_step):
-        """Checks the processing template for transfer orders."""
-        check_processing_template(client, context.order, TEMPLATE_NAME_TRANSFER)
-        next_step(client, context)
-
-
-class ValidateTransfer(Step):
-    """Validates the transfer order by checking membership and items."""
-
-    def __call__(self, client, context, next_step):
-        """Validates the transfer order by checking membership and items."""
-        context.adobe_order_id = get_adobe_order_id(context.order)
-        if context.adobe_order_id:
-            next_step(client, context)
-            return
-
-        if not _check_transfer(client, context.order, context.membership_id):
-            return
-
-        context.order = _submit_transfer_order(client, context.order, context.membership_id)
-        if not context.order:
-            return
-
-        context.adobe_order_id = context.order["externalIds"]["vendor"]
-        next_step(client, context)
-
-
-class CheckAdobeTransferOrder(Step):
-    """Checks if the Adobe transfer order has been fulfilled."""
-
-    def __call__(self, client, context, next_step):
-        """Checks if the Adobe transfer order has been fulfilled."""
-        context.adobe_transfer_order = _check_adobe_transfer_order_fulfilled(
-            client, context.order, context.membership_id, context.adobe_order_id
-        )
-        if not context.adobe_transfer_order:
-            return
-
-        next_step(client, context)
-
-
-class ValidateDeploymentItems(Step):
-    """Validates if order line items contain deployment IDs."""
-
-    def __call__(self, client, context, next_step):
-        """Validates if order line items contain deployment IDs."""
-        context.items_with_deployment_id = _get_order_line_items_with_deployment_id(
-            context.adobe_transfer_order, context.order
-        )
-        if context.items_with_deployment_id:
-            _manage_order_with_deployment_id(
-                client,
-                context.order,
-                context.adobe_transfer_order,
-                context.gc_main_agreement,
-                context.items_with_deployment_id,
-            )
-            return
-
-        next_step(client, context)
-
-
-class GetAdobeCustomer(Step):
-    """Retrieves the Adobe customer information."""
-
-    def __call__(self, client, context, next_step):
-        """Get Adobe customer and saves it to the context."""
-        adobe_client = get_adobe_client()
-        context.customer_id = context.adobe_transfer_order["customerId"]
-        context.adobe_customer = adobe_client.get_customer(
-            context.authorization_id, context.customer_id
-        )
-        next_step(client, context)
-
-
-class ValidateAgreementDeployments(Step):
-    """Validates if the deployments exist in Airtable and if deployments are synchronized."""
-
-    def __call__(self, client, context, next_step):
-        """Checks if deployments exists in Airtable."""
-        adobe_client = get_adobe_client()
-
-        if not _check_agreement_deployments(
-            adobe_client,
-            context.adobe_customer,
-            context.adobe_transfer_order,
-            context.existing_deployments,
-            context.order,
-            context.gc_main_agreement,
-            context.customer_deployments,
-        ):
-            return
-
-        next_step(client, context)
-
-
-class ProcessTransferOrder(Step):
-    """Processes the transfer order by excluding deployment items and saving customer data."""
-
-    def __call__(self, client, context, next_step):
-        """Updates order id and customer data to MPT order."""
-        context.adobe_transfer_order = exclude_items_with_deployment_id(
-            context.adobe_transfer_order
-        )
-        context.order = save_adobe_order_id_and_customer_data(
-            client,
-            context.order,
-            context.adobe_order_id,
-            context.adobe_customer,
-        )
-        next_step(client, context)
-
-
-class CreateTransferSubscriptions(Step):
-    """Creates subscriptions for the transfer order."""
-
-    def __call__(self, client, context, next_step):
-        """Create transfer subscriptions."""
-        adobe_client = get_adobe_client()
-
-        context.subscriptions = create_agreement_subscriptions(
-            context.adobe_transfer_order,
-            client,
-            context.order,
-            adobe_client,
-            context.adobe_customer,
-        )
-
-        if not context.subscriptions:
-            error = "No subscriptions found without deployment ID to be added to the main agreement"
-            logger.error(error)
-            sync_main_agreement(
-                context.gc_main_agreement,
-                context.product_id,
-                context.authorization_id,
-                context.customer_id,
-                error,
-            )
-            return
-
-        next_step(client, context)
-
-
-class SetCommitmentDates(Step):
-    """Sets commitment dates for the subscriptions."""
-
-    def __call__(self, client, context, next_step):
-        """Update commitments dates in context."""
-        context.commitment_date = None
-
-        for subscription in context.subscriptions:
-            context.commitment_date = get_commitment_date(subscription, context.commitment_date)
-
-        if context.commitment_date:  # pragma: no branch
-            context.order = save_coterm_dates(client, context.order, context.commitment_date)
-
-        next_step(client, context)
-
-
-class CompleteTransferOrder(Step):
-    """Completes the transfer order processing."""
-
-    def __call__(self, client, context, next_step):
-        """Completes transfer order with TEMPLATE_NAME_TRANSFER or default Transfer template."""
-        switch_order_to_completed(client, context.order, TEMPLATE_NAME_TRANSFER)
-        sync_agreements_by_agreement_ids(
-            client,
-            [context.order["agreement"]["id"]],
-            dry_run=False,
-            sync_prices=False,
-        )
-        sync_main_agreement(
-            context.gc_main_agreement,
-            context.product_id,
-            context.authorization_id,
-            context.customer_id,
-        )
-        next_step(client, context)
-
-
 def fulfill_transfer_order(mpt_client, order):
     """
     Fulfill transfer order pipeline.
@@ -1284,7 +938,7 @@ def fulfill_transfer_order(mpt_client, order):
     pipeline = Pipeline(
         SetupContext(),
         SetupDueDate(),
-        SetupTransferContext(),
+        SetupTransferOrderContext(),
         ValidateGCMainAgreement(),
         HandleMigratedTransfer(),
         CheckTransferTemplate(),

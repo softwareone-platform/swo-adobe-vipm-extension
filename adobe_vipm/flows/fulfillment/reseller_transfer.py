@@ -12,9 +12,6 @@ from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_
 from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    SetupDueDate,
-    StartOrderProcessing,
-    SyncAgreement,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.fulfillment.transfer import (
@@ -25,12 +22,12 @@ from adobe_vipm.flows.fulfillment.transfer import (
     get_agreement_deployments,
     get_main_agreement,
 )
-from adobe_vipm.flows.helpers import (
-    FetchResellerChangeData,
-    SetupContext,
-    ValidateResellerChange,
-)
 from adobe_vipm.flows.pipeline import Pipeline, Step
+from adobe_vipm.flows.steps.agreement import SyncAgreement
+from adobe_vipm.flows.steps.context import SetupContext
+from adobe_vipm.flows.steps.due_date import SetupDueDate
+from adobe_vipm.flows.steps.order import StartOrderProcessing
+from adobe_vipm.flows.steps.reseller import FetchResellerChangeData, ValidateResellerChange
 from adobe_vipm.flows.utils.customer import set_adobe_customer_id
 from adobe_vipm.flows.utils.order import get_adobe_order_id, set_adobe_order_id
 from adobe_vipm.flows.utils.parameter import (

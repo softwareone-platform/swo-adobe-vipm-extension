@@ -7,120 +7,25 @@ processing.
 
 import logging
 
-from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus
-from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
-    ERR_INVALID_RENEWAL_STATE,
-    ERR_INVALID_TERMINATION_ORDER_QUANTITY,
     TEMPLATE_NAME_TERMINATION,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.fulfillment.shared import (
+from adobe_vipm.flows.pipeline import Pipeline
+from adobe_vipm.flows.steps.agreement import SyncAgreement
+from adobe_vipm.flows.steps.context import SetupContext
+from adobe_vipm.flows.steps.coterm_date import SetOrUpdateCotermDate
+from adobe_vipm.flows.steps.due_date import SetupDueDate
+from adobe_vipm.flows.steps.order import (
     CompleteOrder,
+    GetReturnableOrdersForTermination,
     GetReturnOrders,
-    SetOrUpdateCotermDate,
-    SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
-    SyncAgreement,
-    ValidateRenewalWindow,
-    switch_order_to_failed,
 )
-from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
-from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.utils import (
-    get_adobe_subscription_id,
-    get_subscription_by_line_and_item_id,
-    validate_subscription_and_returnable_orders,
-)
-from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
+from adobe_vipm.flows.steps.validation import Validate3YCCommitment, ValidateRenewalWindow
 
 logger = logging.getLogger(__name__)
-
-
-class GetReturnableOrders(Step):
-    """For each SKU retrieve all the orders that can be returned."""
-
-    def __call__(self, client, context, next_step):
-        """For each SKU retrieve all the orders that can be returned."""
-        adobe_client = get_adobe_client()
-        for line in context.downsize_lines:
-            sku = line["item"]["externalIds"]["vendor"]
-            subscription_id = get_subscription_by_line_subs_id(
-                context.order["agreement"]["subscriptions"],
-                line
-            )
-            is_valid, returnable_orders = validate_subscription_and_returnable_orders(
-                adobe_client,
-                context,
-                line,
-                subscription_id,
-                return_orders=context.adobe_return_orders.get(sku)
-            )
-            logger.info("%s: returnable orders: %s for %s", context, returnable_orders, sku)
-            if not is_valid:
-                switch_order_to_failed(
-                    client,
-                    context.order,
-                    ERR_INVALID_TERMINATION_ORDER_QUANTITY.to_dict(),
-                )
-                return
-
-            context.adobe_returnable_orders[sku] = returnable_orders
-
-        returnable_orders_count = sum(len(v) for v in context.adobe_returnable_orders.values())
-        logger.info("%s: found %s returnable orders.", context, returnable_orders_count)
-        next_step(client, context)
-
-
-class SwitchAutoRenewalOff(Step):
-    """Set the autoRenewal flag to False forsubscription that must be cancelled."""
-
-    def __call__(self, client, context, next_step):
-        """Set the autoRenewal flag to False forsubscription that must be cancelled."""
-        adobe_client = get_adobe_client()
-        for line in context.downsize_lines:
-            subscription = get_subscription_by_line_and_item_id(
-                context.order["subscriptions"],
-                line["item"]["id"],
-                line["id"],
-            )
-            adobe_sub_id = get_adobe_subscription_id(subscription)
-            adobe_subscription = adobe_client.get_subscription(
-                context.authorization_id,
-                context.adobe_customer_id,
-                adobe_sub_id,
-            )
-            if adobe_subscription["autoRenewal"]["enabled"]:
-                try:
-                    adobe_client.update_subscription(
-                        context.authorization_id,
-                        context.adobe_customer_id,
-                        adobe_sub_id,
-                        auto_renewal=False,
-                    )
-                    logger.info(
-                        "%s: autorenewal switched off for %s (%s)",
-                        context,
-                        subscription["id"],
-                        adobe_subscription["subscriptionId"],
-                    )
-                except AdobeAPIError as e:
-                    logger.exception(
-                        "%s: failed to switch off autorenewal for %s (%s)",
-                        context,
-                        subscription["id"],
-                        adobe_subscription["subscriptionId"],
-                    )
-                    if e.code == AdobeStatus.INVALID_RENEWAL_STATE:
-                        switch_order_to_failed(
-                            client,
-                            context.order,
-                            ERR_INVALID_RENEWAL_STATE.to_dict(error=e.message),
-                        )
-                    return
-        next_step(client, context)
 
 
 def fulfill_termination_order(client, order):
@@ -143,7 +48,7 @@ def fulfill_termination_order(client, order):
         SetOrUpdateCotermDate(),
         ValidateRenewalWindow(),
         GetReturnOrders(),
-        GetReturnableOrders(),
+        GetReturnableOrdersForTermination(),
         Validate3YCCommitment(),
         SubmitReturnOrders(),
         CompleteOrder(TEMPLATE_NAME_TERMINATION),
