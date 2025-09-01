@@ -69,7 +69,10 @@ def test_get_returnable_orders_step(
     adobe_orders = [
         adobe_order_factory(
             order_type="NEW",
-            items=adobe_items_factory(quantity=qty),
+            items=adobe_items_factory(
+                quantity=qty,
+                subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+            ),
         )
         for qty in test_case["adobe_orders_quantities"]
     ]
@@ -88,7 +91,7 @@ def test_get_returnable_orders_step(
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = returnable_orders
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = returnable_orders
 
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
@@ -468,7 +471,7 @@ def test_get_returnable_orders_step_inactive_subscription(
         context.authorization_id,
         context.adobe_customer_id,
     )
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_not_called()
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
     mocked_switch_to_failed.assert_not_called()
 
@@ -500,7 +503,7 @@ def test_get_returnable_orders_step_no_returnable_orders(
             }
         ]
     }
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
 
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
@@ -529,10 +532,10 @@ def test_get_returnable_orders_step_no_returnable_orders(
         context.adobe_customer_id,
     )
 
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
         return_orders=context.adobe_return_orders.get(sku),
     )

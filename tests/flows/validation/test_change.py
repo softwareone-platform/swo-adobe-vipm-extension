@@ -38,7 +38,10 @@ def test_validate_downsizes_step(
     )
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=1),
+        items=adobe_items_factory(
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+            quantity=1
+        ),
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
@@ -65,10 +68,8 @@ def test_validate_downsizes_step(
         adobe_order_3["lineItems"][0]["quantity"],
     )
 
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
         ret_info_3,
@@ -93,10 +94,10 @@ def test_validate_downsizes_step(
     step(mocked_client, context, mocked_next_step)
 
     assert context.validation_succeeded is True
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -117,14 +118,11 @@ def test_validate_downsizes_step_no_returnable_orders(
             old_quantity=14,
         )
     )
-    coterm_date = datetime.today() + timedelta(days=20)
-    adobe_customer = adobe_customer_factory(
-        coterm_date=coterm_date.strftime("%Y-%m-%d")
-    )
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
+    coterm_date = datetime.now().date() + timedelta(days=20)
+    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
 
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
 
     mocker.patch(
         "adobe_vipm.flows.validation.change.get_adobe_client",
@@ -145,10 +143,10 @@ def test_validate_downsizes_step_no_returnable_orders(
     step(mocked_client, context, mocked_next_step)
 
     assert context.validation_succeeded is True
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -175,17 +173,26 @@ def test_validate_downsizes_step_invalid_quantity(
     )
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=1),
+        items=adobe_items_factory(
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+            quantity=1
+        ),
         creation_date="2024-05-01",
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=2),
+        items=adobe_items_factory(
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+            quantity=2
+        ),
         creation_date="2024-05-07",
     )
     adobe_order_3 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=4),
+        items=adobe_items_factory(
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+            quantity=4
+        ),
         creation_date="2024-05-11",
     )
 
@@ -204,11 +211,8 @@ def test_validate_downsizes_step_invalid_quantity(
         adobe_order_3["lineItems"][0],
         adobe_order_3["lineItems"][0]["quantity"],
     )
-
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
         ret_info_3,
@@ -233,10 +237,10 @@ def test_validate_downsizes_step_invalid_quantity(
     step(mocked_client, context, mocked_next_step)
 
     assert context.validation_succeeded is False
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
     )
     assert context.order["error"] == {
@@ -317,7 +321,10 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
     )
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(quantity=16),
+        items=adobe_items_factory(
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+            quantity=16
+        ),
         creation_date="2024-05-01",
     )
 
@@ -327,10 +334,8 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
         adobe_order_1["lineItems"][0]["quantity"],
     )
 
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
     mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = [
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
     ]
 
@@ -353,10 +358,10 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
     step(mocked_client, context, mocked_next_step)
 
     assert context.validation_succeeded is False
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_called_once_with(
+    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
-        sku,
+        "6158e1cf0e4414a9b3a06d123969fdNA",
         context.adobe_customer["cotermDate"],
     )
     assert context.order["error"] == {
