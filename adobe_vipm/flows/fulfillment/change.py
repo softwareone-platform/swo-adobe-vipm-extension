@@ -81,7 +81,10 @@ class GetReturnableOrders(Step):
 
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
-            subscription_id = get_subscription_by_line_subs_id(context, line)
+            subscription_id = get_subscription_by_line_subs_id(
+                context.order["agreement"]["subscriptions"],
+                line
+            )
             returnable_orders = adobe_client.get_returnable_orders_by_subscription_id(
                 context.authorization_id,
                 context.adobe_customer_id,
