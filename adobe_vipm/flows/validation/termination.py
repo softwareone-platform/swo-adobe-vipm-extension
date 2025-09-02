@@ -27,8 +27,7 @@ class ValidateDownsizes(Step):
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
             subscription_id = get_subscription_by_line_subs_id(
-                context.order["agreement"]["subscriptions"],
-                line
+                context.order["agreement"]["subscriptions"], line
             )
             is_valid, _ = validate_subscription_and_returnable_orders(
                 adobe_client, context, line, subscription_id

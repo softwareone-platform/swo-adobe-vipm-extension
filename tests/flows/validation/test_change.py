@@ -36,10 +36,7 @@ def test_validate_downsizes_step(
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-            quantity=1
-        ),
+        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=1),
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
@@ -169,26 +166,17 @@ def test_validate_downsizes_step_invalid_quantity(
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-            quantity=1
-        ),
+        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=1),
         creation_date="2024-05-01",
     )
     adobe_order_2 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-            quantity=2
-        ),
+        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=2),
         creation_date="2024-05-07",
     )
     adobe_order_3 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-            quantity=4
-        ),
+        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=4),
         creation_date="2024-05-11",
     )
 
@@ -313,10 +301,7 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
     adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
-        items=adobe_items_factory(
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-            quantity=16
-        ),
+        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=16),
         creation_date="2024-05-01",
     )
 
