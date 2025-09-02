@@ -66,34 +66,34 @@ def _add_missing_subscriptions(
         agreement["id"],
         deployment_id,
     )
-    deployment_subscriptions = [
+    adobe_subscriptions = tuple(
         a_s for a_s in adobe_subscriptions if a_s.get("deploymentId", "") == deployment_id
-    ]
-    skus = {get_partial_sku(item["offerId"]) for item in deployment_subscriptions}
+    )
+    skus = {get_partial_sku(item["offerId"]) for item in adobe_subscriptions}
     one_time_skus = get_one_time_skus(
         mpt_client, agreement["product"]["id"], vendor_external_ids=skus
     )
     missing_subscriptions = tuple(
         subsc
-        for subsc in deployment_subscriptions
+        for subsc in adobe_subscriptions
         if subsc["subscriptionId"] not in subscription_for_update_ids
         and subsc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
         and get_partial_sku(subsc["offerId"]) not in one_time_skus
     )
+    skus = {sku for sku in skus if sku not in one_time_skus}
 
     if missing_subscriptions:
         logger.warning("> Found missing subscriptions")
     else:
         logger.info("> No missing subscriptions found")
         return
-
     items_map = {
         item["externalIds"]["vendor"]: item
         for item in get_product_items_by_skus(mpt_client, agreement["product"]["id"], skus)
     }
     offer_ids = [
         get_sku_with_discount_level(adobe_subscription["offerId"], customer)
-        for adobe_subscription in deployment_subscriptions
+        for adobe_subscription in missing_subscriptions
     ]
 
     for adobe_subscription in missing_subscriptions:
@@ -133,7 +133,7 @@ def _add_missing_subscriptions(
                     "fulfillment": [
                         {
                             "externalId": Param.ADOBE_SKU.value,
-                            "value": adobe_subscription["offerId"],
+                            "value": sku_discount_level,
                         },
                         {
                             "externalId": Param.CURRENT_QUANTITY.value,
@@ -1125,7 +1125,7 @@ def sync_all_agreements(mpt_client: MPTClient, *, dry_run: bool) -> None:
         sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)
 
 
-def get_one_time_skus(mpt_client: MPTClient, product_id: str, vendor_external_ids) -> tuple[str]:
+def get_one_time_skus(mpt_client: MPTClient, product_id: str, vendor_external_ids) -> set[str]:
     """
     Returns all one-time SKUs associated with a specific product.
 
@@ -1137,9 +1137,9 @@ def get_one_time_skus(mpt_client: MPTClient, product_id: str, vendor_external_id
     Returns:
         A tuple of product ids.
     """
-    return tuple(
+    return {
         item["externalIds"]["vendor"]
         for item in get_product_items_by_period(
             mpt_client, product_id, "one-time", vendor_external_ids
         )
-    )
+    }
