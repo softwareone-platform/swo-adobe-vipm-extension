@@ -941,6 +941,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                             {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
                         ]
                     },
+                    "externalIds": {"vendor": "1e5b9c974c4ea1bcabdb0fe697a2f1NA"},
                 },
                 {
                     "id": "SUB-1234-5678",
@@ -953,6 +954,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                             {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
                         ]
                     },
+                    "externalIds": {"vendor": "55feb5038045e0b1ebf026e7522e17NA"},
                 },
             ]
 
