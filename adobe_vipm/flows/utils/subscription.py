@@ -174,7 +174,6 @@ def get_subscription_by_line_subs_id(subscriptions, line):
         line: The line of the order.
     """
     subscription = find_first(
-        lambda subscription: subscription["id"] == line["subscription"]["id"],
-        subscriptions
+        lambda subscription: subscription["id"] == line["subscription"]["id"], subscriptions
     )
     return subscription and subscription["externalIds"]["vendor"]

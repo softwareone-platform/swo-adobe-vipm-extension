@@ -82,15 +82,14 @@ class GetReturnableOrders(Step):
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
             subscription_id = get_subscription_by_line_subs_id(
-                context.order["agreement"]["subscriptions"],
-                line
+                context.order["agreement"]["subscriptions"], line
             )
             returnable_orders = adobe_client.get_returnable_orders_by_subscription_id(
                 context.authorization_id,
                 context.adobe_customer_id,
                 subscription_id,
                 context.adobe_customer["cotermDate"],
-                return_orders=context.adobe_return_orders.get(sku)
+                return_orders=context.adobe_return_orders.get(sku),
             )
             if not returnable_orders:
                 logger.info("%s: no returnable orders found for sku %s", context, sku)

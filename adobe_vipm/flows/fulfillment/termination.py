@@ -48,15 +48,14 @@ class GetReturnableOrders(Step):
         for line in context.downsize_lines:
             sku = line["item"]["externalIds"]["vendor"]
             subscription_id = get_subscription_by_line_subs_id(
-                context.order["agreement"]["subscriptions"],
-                line
+                context.order["agreement"]["subscriptions"], line
             )
             is_valid, returnable_orders = validate_subscription_and_returnable_orders(
                 adobe_client,
                 context,
                 line,
                 subscription_id,
-                return_orders=context.adobe_return_orders.get(sku)
+                return_orders=context.adobe_return_orders.get(sku),
             )
             logger.info("%s: returnable orders: %s for %s", context, returnable_orders, sku)
             if not is_valid:

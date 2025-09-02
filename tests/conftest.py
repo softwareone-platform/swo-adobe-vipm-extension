@@ -1110,9 +1110,7 @@ def agreement(buyer, licensee, listing):
                         "quantity": 10,
                     }
                 ],
-                "externalIds": {
-                    "vendor": "6158e1cf0e4414a9b3a06d123969fdNA"
-                },
+                "externalIds": {"vendor": "6158e1cf0e4414a9b3a06d123969fdNA"},
             },
             {
                 "id": "SUB-1234-5678",
@@ -1130,9 +1128,7 @@ def agreement(buyer, licensee, listing):
                         "quantity": 4,
                     }
                 ],
-                "externalIds": {
-                    "vendor": "6158e1cf0e4414a9b3a06d1239611111"
-                },
+                "externalIds": {"vendor": "6158e1cf0e4414a9b3a06d1239611111"},
             },
         ],
         "listing": listing,
