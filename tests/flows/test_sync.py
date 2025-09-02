@@ -7,7 +7,7 @@ from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
-from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus
+from adobe_vipm.flows.constants import AgreementStatus, Param
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _add_missing_subscriptions,  # noqa: PLC2701
@@ -1102,7 +1102,7 @@ def test_sync_global_customer_update_not_required(
                     "subscription": {
                         "id": "SUB-1000-2000-3000",
                         "status": "Active",
-                        "name": "Subscription for Acrobat Pro for Teams; Multi Language"
+                        "name": "Subscription for Acrobat Pro for Teams; Multi Language",
                     },
                     "oldQuantity": 0,
                     "quantity": 170,
@@ -1902,19 +1902,28 @@ def test_add_missing_subscriptions(
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(
-            subscription_id=f"{i}e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id=f"77777777CAT1A1{i}"
-        )
-        for i in range(4)
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A10"
+        ),
+        adobe_subscription_factory(
+            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A13"
+        ),
+        adobe_subscription_factory(
+            subscription_id="ae5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="75322572CAT1A11"
+        ),
     ]
-    adobe_subscriptions[0]["offerId"] = "65322572CAT1A12"
-    adobe_subscriptions[-1]["deploymentId"] = "deploymentId"
-    mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
+
+    mock_get_prices_for_skus.return_value = {
+        "65322572CAT1A10": 12.14,
+        "65322572CAT1A11": 11.14,
+        "65322572CAT1A12": 10.14,
+        "65322572CAT1A13": 9.14,
+    }
     mock_get_product_items_by_skus.return_value = [
         {
             "id": "ITM-7664-8222-0193",
             "name": "Acrobat Sign Solutions for Business (50 transactions) (AWS)",
             "description": "With app security, a world-class cloud infrastructure.",
-            "externalIds": {"vendor": "77777777CA"},
+            "externalIds": {"vendor": "65322572CA"},
             "group": {"id": "IGR-7664-8222-0002", "name": "Items"},
             "unit": {"id": "UNT-2501", "description": "transaction", "name": "transaction"},
             "terms": {"model": "quantity", "period": "1y"},
@@ -1927,14 +1936,14 @@ def test_add_missing_subscriptions(
                 "icon": "/v1/catalog/products/PRD-7664-8222/icon",
                 "status": "Published",
             },
-        }
+        },
     ]
     mock_get_product_items_by_period.return_value = [
         {
-            "id": "ITM-7664-8222-0193",
+            "id": "ITM-7664-8222-0194",
             "name": "Acrobat Sign Solutions for Business (50 transactions) (AWS)",
             "description": "With app security, a world-class cloud infrastructure.",
-            "externalIds": {"vendor": "65322572CA"},
+            "externalIds": {"vendor": "75322572CA"},
             "group": {"id": "IGR-7664-8222-0002", "name": "Items"},
             "unit": {"id": "UNT-2501", "description": "transaction", "name": "transaction"},
             "terms": {"model": "one-time", "period": "one-time"},
@@ -1960,10 +1969,10 @@ def test_add_missing_subscriptions(
     )
 
     mock_get_product_items_by_skus.assert_called_once_with(
-        mock_mpt_client, "PRD-1111-1111", {"65322572CA", "77777777CA"}
+        mock_mpt_client, "PRD-1111-1111", {"65322572CA"}
     )
     mock_get_product_items_by_period.assert_called_once_with(
-        mock_mpt_client, "PRD-1111-1111", "one-time", {"65322572CA", "77777777CA"}
+        mock_mpt_client, "PRD-1111-1111", "one-time", {"65322572CA", "75322572CA"}
     )
     assert mock_create_agreement_subscription.mock_calls == [
         mocker.call(
@@ -1973,15 +1982,15 @@ def test_add_missing_subscriptions(
                 "commitmentDate": "2026-07-25",
                 "price": {
                     "unitPP": {
-                        "65322572CAT1A12": 12.14,
-                        "77777777CAT1A11": 12.14,
-                        "77777777CAT1A12": 12.14,
-                        "77777777CAT1A13": 12.14,
+                        "65322572CAT1A10": 12.14,
+                        "65322572CAT1A11": 11.14,
+                        "65322572CAT1A12": 10.14,
+                        "65322572CAT1A13": 9.14,
                     }
                 },
                 "parameters": {
                     "fulfillment": [
-                        {"externalId": "adobeSKU", "value": "77777777CAT1A12"},
+                        {"externalId": "adobeSKU", "value": "65322572CAT1A13"},
                         {"externalId": "currentQuantity", "value": "10"},
                         {"externalId": "renewalQuantity", "value": "10"},
                         {"externalId": "renewalDate", "value": "2026-07-25"},
@@ -1998,7 +2007,7 @@ def test_add_missing_subscriptions(
                             "id": "ITM-7664-8222-0193",
                             "name": "Acrobat Sign Solutions for Business (50 transactions) (AWS)",
                             "description": "With app security, a world-class cloud infrastructure.",
-                            "externalIds": {"vendor": "77777777CA"},
+                            "externalIds": {"vendor": "65322572CA"},
                             "group": {"id": "IGR-7664-8222-0002", "name": "Items"},
                             "unit": {
                                 "id": "UNT-2501",
@@ -2016,7 +2025,7 @@ def test_add_missing_subscriptions(
                                 "status": "Published",
                             },
                         },
-                        "price": {"unitPP": 12.14},
+                        "price": {"unitPP": 9.14},
                     }
                 ],
                 "name": "Subscription for Adobe VIP Marketplace for Commercial",
@@ -2031,6 +2040,7 @@ def test_add_missing_subscriptions(
 
 @freeze_time("2025-07-24")
 def test_add_missing_subscriptions_deployment(
+    mocker,
     items_factory,
     mock_mpt_client,
     mock_adobe_client,
@@ -2046,14 +2056,28 @@ def test_add_missing_subscriptions_deployment(
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(
-            subscription_id=f"{i}e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id=f"65322572CAT1A1{i}"
-        )
-        for i in range(4)
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA",
+            offer_id="65322572CAT1A10",
+            deployment_id="deploymentId",
+        ),
+        adobe_subscription_factory(
+            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA",
+            offer_id="65322572CAT1A13",
+            deployment_id="deploymentId",
+        ),
+        adobe_subscription_factory(
+            subscription_id="ae5b9c974c4ea1bcabdb0fe697a2f1NA",
+            offer_id="75322572CAT1A11",
+            deployment_id="deploymentId",
+        ),
     ]
-    adobe_subscriptions[-1]["deploymentId"] = "deploymentId"
-    mock_adobe_client.get_subscriptions.return_value = {"items": adobe_subscriptions}
-    adobe_customer = adobe_customer_factory()
-    mock_get_prices_for_skus.return_value = {s["offerId"]: 12.14 for s in adobe_subscriptions}
+
+    mock_get_prices_for_skus.return_value = {
+        "65322572CAT1A10": 12.14,
+        "65322572CAT1A11": 11.14,
+        "65322572CAT1A12": 10.14,
+        "65322572CAT1A13": 9.14,
+    }
     mock_get_product_items_by_skus.return_value = [
         {
             "id": "ITM-7664-8222-0193",
@@ -2072,9 +2096,28 @@ def test_add_missing_subscriptions_deployment(
                 "icon": "/v1/catalog/products/PRD-7664-8222/icon",
                 "status": "Published",
             },
+        },
+    ]
+    mock_get_product_items_by_period.return_value = [
+        {
+            "id": "ITM-7664-8222-0194",
+            "name": "Acrobat Sign Solutions for Business (50 transactions) (AWS)",
+            "description": "With app security, a world-class cloud infrastructure.",
+            "externalIds": {"vendor": "75322572CA"},
+            "group": {"id": "IGR-7664-8222-0002", "name": "Items"},
+            "unit": {"id": "UNT-2501", "description": "transaction", "name": "transaction"},
+            "terms": {"model": "one-time", "period": "one-time"},
+            "quantityNotApplicable": False,
+            "status": "Pending",
+            "product": {
+                "id": "PRD-7664-8222",
+                "name": "Lukasz Test Adobe VIP Marketplace for Commercial",
+                "externalIds": {},
+                "icon": "/v1/catalog/products/PRD-7664-8222/icon",
+                "status": "Published",
+            },
         }
     ]
-
     agreement = agreement_factory(
         fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
     )
@@ -2082,9 +2125,9 @@ def test_add_missing_subscriptions_deployment(
     _add_missing_subscriptions(
         mock_mpt_client,
         mock_adobe_client,
-        adobe_customer,
+        adobe_customer_factory(),
         agreement,
-        subscription_for_update_ids=("subscriptionId1", "b-sub-id"),
+        subscription_for_update_ids=("1e5b9c974c4ea1bcabdb0fe697a2f1NA", "b-sub-id"),
         adobe_subscriptions=adobe_subscriptions,
     )
 
@@ -2092,68 +2135,70 @@ def test_add_missing_subscriptions_deployment(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA"}
     )
     mock_get_product_items_by_period.assert_called_once_with(
-        mock_mpt_client, "PRD-1111-1111", "one-time", {"65322572CA"}
+        mock_mpt_client, "PRD-1111-1111", "one-time", {"65322572CA", "75322572CA"}
     )
-    mock_create_agreement_subscription.assert_called_once_with(
-        mock_mpt_client,
-        {
-            "status": SubscriptionStatus.ACTIVE.value,
-            "commitmentDate": "2026-07-25",
-            "price": {
-                "unitPP": {
-                    "65322572CAT1A10": 12.14,
-                    "65322572CAT1A11": 12.14,
-                    "65322572CAT1A12": 12.14,
-                    "65322572CAT1A13": 12.14,
-                }
-            },
-            "parameters": {
-                "fulfillment": [
-                    {"externalId": Param.ADOBE_SKU.value, "value": "65322572CAT1A13"},
-                    {"externalId": Param.CURRENT_QUANTITY.value, "value": "10"},
-                    {"externalId": Param.RENEWAL_QUANTITY.value, "value": "10"},
-                    {"externalId": Param.RENEWAL_DATE.value, "value": "2026-07-25"},
-                ]
-            },
-            "agreement": {"id": "AGR-2119-4550-8674-5962"},
-            "buyer": {"id": "BUY-3731-7971"},
-            "licensee": {"id": "LC-321-321-321"},
-            "seller": {"id": "SEL-9121-8944"},
-            "lines": [
-                {
-                    "quantity": 10,
-                    "item": {
-                        "description": "With app security, a world-class cloud infrastructure.",
-                        "externalIds": {"vendor": "65322572CA"},
-                        "group": {"id": "IGR-7664-8222-0002", "name": "Items"},
-                        "id": "ITM-7664-8222-0193",
-                        "name": "Acrobat Sign Solutions for Business (50 transactions) (AWS)",
-                        "product": {
-                            "externalIds": {},
-                            "icon": "/v1/catalog/products/PRD-7664-8222/icon",
-                            "id": "PRD-7664-8222",
-                            "name": "Adobe VIP Marketplace for Commercial",
-                            "status": "Published",
+    assert mock_create_agreement_subscription.mock_calls == [
+        mocker.call(
+            mock_mpt_client,
+            {
+                "status": "Active",
+                "commitmentDate": "2026-07-25",
+                "price": {
+                    "unitPP": {
+                        "65322572CAT1A10": 12.14,
+                        "65322572CAT1A11": 11.14,
+                        "65322572CAT1A12": 10.14,
+                        "65322572CAT1A13": 9.14,
+                    }
+                },
+                "parameters": {
+                    "fulfillment": [
+                        {"externalId": "adobeSKU", "value": "65322572CAT1A13"},
+                        {"externalId": "currentQuantity", "value": "10"},
+                        {"externalId": "renewalQuantity", "value": "10"},
+                        {"externalId": "renewalDate", "value": "2026-07-25"},
+                    ]
+                },
+                "agreement": {"id": "AGR-2119-4550-8674-5962"},
+                "buyer": {"id": "BUY-3731-7971"},
+                "licensee": {"id": "LC-321-321-321"},
+                "seller": {"id": "SEL-9121-8944"},
+                "lines": [
+                    {
+                        "quantity": 10,
+                        "item": {
+                            "id": "ITM-7664-8222-0193",
+                            "name": "Acrobat Sign Solutions for Business (50 transactions) (AWS)",
+                            "description": "With app security, a world-class cloud infrastructure.",
+                            "externalIds": {"vendor": "65322572CA"},
+                            "group": {"id": "IGR-7664-8222-0002", "name": "Items"},
+                            "unit": {
+                                "id": "UNT-2501",
+                                "description": "transaction",
+                                "name": "transaction",
+                            },
+                            "terms": {"model": "quantity", "period": "1y"},
+                            "quantityNotApplicable": False,
+                            "status": "Pending",
+                            "product": {
+                                "id": "PRD-7664-8222",
+                                "name": "Adobe VIP Marketplace for Commercial",
+                                "externalIds": {},
+                                "icon": "/v1/catalog/products/PRD-7664-8222/icon",
+                                "status": "Published",
+                            },
                         },
-                        "quantityNotApplicable": False,
-                        "status": "Pending",
-                        "terms": {"model": "quantity", "period": "1y"},
-                        "unit": {
-                            "description": "transaction",
-                            "id": "UNT-2501",
-                            "name": "transaction",
-                        },
-                    },
-                    "price": {"unitPP": 12.14},
-                }
-            ],
-            "name": "Subscription for Adobe VIP Marketplace for Commercial",
-            "startDate": "2019-05-20T22:49:55Z",
-            "externalIds": {"vendor": "3e5b9c974c4ea1bcabdb0fe697a2f1NA"},
-            "product": {"id": "PRD-1111-1111"},
-            "autoRenew": True,
-        },
-    )
+                        "price": {"unitPP": 9.14},
+                    }
+                ],
+                "name": "Subscription for Adobe VIP Marketplace for Commercial",
+                "startDate": "2019-05-20T22:49:55Z",
+                "externalIds": {"vendor": "2e5b9c974c4ea1bcabdb0fe697a2f1NA"},
+                "product": {"id": "PRD-1111-1111"},
+                "autoRenew": True,
+            },
+        ),
+    ]
 
 
 @freeze_time("2025-07-27")
