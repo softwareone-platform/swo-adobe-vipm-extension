@@ -57,7 +57,6 @@ def _add_missing_subscriptions(
     adobe_client: AdobeClient,
     customer: dict,
     agreement: dict,
-    subscription_for_update_ids: set[str],
     adobe_subscriptions,
 ) -> None:
     deployment_id = get_deployment_id(agreement) or ""
@@ -73,10 +72,13 @@ def _add_missing_subscriptions(
     one_time_skus = get_one_time_skus(
         mpt_client, agreement["product"]["id"], vendor_external_ids=skus
     )
+    mpt_subscriptions_external_ids = {
+        subscription["externalIds"]["vendor"] for subscription in agreement["subscriptions"]
+    }
     missing_subscriptions = tuple(
         subsc
         for subsc in adobe_subscriptions
-        if subsc["subscriptionId"] not in subscription_for_update_ids
+        if subsc["subscriptionId"] not in mpt_subscriptions_external_ids
         and subsc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
         and get_partial_sku(subsc["offerId"]) not in one_time_skus
     )
@@ -881,14 +883,7 @@ def sync_agreement(  # noqa: C901
         )
 
         _add_missing_subscriptions(
-            mpt_client,
-            adobe_client,
-            customer,
-            agreement,
-            subscription_for_update_ids={
-                sub[1]["subscriptionId"] for sub in subscriptions_for_update
-            },
-            adobe_subscriptions=adobe_subscriptions,
+            mpt_client, adobe_client, customer, agreement, adobe_subscriptions=adobe_subscriptions
         )
 
         if sync_prices:
