@@ -53,6 +53,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -360,6 +361,10 @@ class Validate3YCCommitment(Step):
                 logger.exception(
                     "Adobe product not found for SKU: %s", get_partial_sku(subscription["offerId"])
                 )
+                send_exception(
+                    "Adobe product not found in airtable for SKU: %s",
+                    get_partial_sku(subscription["offerId"]),
+                )
                 continue
 
             if not sku.is_valid_3yc_type():
@@ -390,6 +395,10 @@ class Validate3YCCommitment(Step):
             except AdobeProductNotFoundError:
                 logger.exception(
                     "Adobe product not found for SKU: %s", line["item"]["externalIds"]["vendor"]
+                )
+                send_exception(
+                    "Adobe product not found in airtable for SKU: %s",
+                    line["item"]["externalIds"]["vendor"],
                 )
                 continue
 

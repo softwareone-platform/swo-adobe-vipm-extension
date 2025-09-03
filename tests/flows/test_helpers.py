@@ -1,5 +1,6 @@
 import copy
 import datetime as dt
+from unittest import mock
 from urllib.parse import urljoin
 
 import pytest
@@ -1949,6 +1950,7 @@ def test_validate_3yc_commitment_sku_not_found(
 
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
+    mocked_send_notification = mocker.patch("adobe_vipm.flows.helpers.send_exception")
 
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
@@ -1963,6 +1965,10 @@ def test_validate_3yc_commitment_sku_not_found(
         "would place the account below the minimum commitment "
         "of 10 licenses or 5 consumables for the three-year commitment."
     )
+
+    mocked_send_notification.assert_has_calls([
+        mock.call("Adobe product not found in airtable for SKU: %s", "65304578CA")
+    ])
 
 
 def test_fetch_reseller_change_data_success(
