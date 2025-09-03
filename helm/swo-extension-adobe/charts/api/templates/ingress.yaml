@@ -1,0 +1,33 @@
+{{- $root := . -}}
+{{- $serviceName := include "common.fullname" .  -}}
+{{- $nameSufix := "core" -}} 
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ $serviceName }}-{{ $nameSufix }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml .Values.ingress.hosts | nindent 4 }}
+  gateways:
+    {{- toYaml .Values.ingress.gateways | nindent 4 }}
+  http:
+  {{- range .Values.ingress.forward }}
+    - match:
+        - uri:
+            prefix: {{ .match }}
+      rewrite:
+        uri: {{ .rewrite | quote }}
+      route:
+        - destination:
+            host: {{ $serviceName | lower }}.{{ $root.Release.Namespace }}.svc.cluster.local
+            port:
+              number: 80
+      timeout: 30s
+      retries:
+        attempts: 10
+        #retryOn: connect-failure
+        retryOn: 5xx,connect-failure # https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on
+  {{- end }}
