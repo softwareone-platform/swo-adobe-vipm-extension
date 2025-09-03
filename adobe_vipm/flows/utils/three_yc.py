@@ -107,16 +107,6 @@ def set_adobe_3yc(order: dict, value: str) -> dict:
     return updated_order
 
 
-def set_adobe_3yc(order, value):
-    updated_order = copy.deepcopy(order)
-    ff_param = get_ordering_parameter(
-        updated_order,
-        PARAM_3YC,
-    )
-    ff_param["value"] = value
-    return updated_order
-
-
 def get_3yc_fulfillment_parameters(order_or_agreement: dict) -> list[str]:
     """
     Gets list of 3YC parameters from order or agreement.

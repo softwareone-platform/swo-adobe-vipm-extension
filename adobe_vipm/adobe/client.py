@@ -1,7 +1,5 @@
 import datetime as dt
 import logging
-from collections.abc import MutableMapping
-from datetime import datetime, timedelta
 from typing import MutableMapping
 from uuid import uuid4
 
