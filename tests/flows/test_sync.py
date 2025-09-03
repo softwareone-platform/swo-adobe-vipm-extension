@@ -1875,7 +1875,6 @@ def test_add_missing_subscriptions_none(
         mock_adobe_client,
         adobe_customer_factory(),
         agreement_factory(),
-        subscription_for_update_ids=("subscriptionId2", "subscriptionId1", "subscriptionId0"),
         adobe_subscriptions=adobe_subscriptions,
     )
 
@@ -1964,7 +1963,6 @@ def test_add_missing_subscriptions(
         mock_adobe_client,
         adobe_customer_factory(),
         agreement_factory(),
-        subscription_for_update_ids=("1e5b9c974c4ea1bcabdb0fe697a2f1NA", "b-sub-id"),
         adobe_subscriptions=adobe_subscriptions,
     )
 
@@ -2127,7 +2125,6 @@ def test_add_missing_subscriptions_deployment(
         mock_adobe_client,
         adobe_customer_factory(),
         agreement,
-        subscription_for_update_ids=("1e5b9c974c4ea1bcabdb0fe697a2f1NA", "b-sub-id"),
         adobe_subscriptions=adobe_subscriptions,
     )
 
@@ -2216,9 +2213,10 @@ def test_add_missing_subscriptions_wrong_currency(
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(
-            subscription_id=f"subscriptionId{i}", currency_code="GBP", renewal_date="2026-07-27"
+            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA",
+            currency_code="GBP",
+            offer_id="65322572CAT1A13",
         )
-        for i in range(3)
     ]
 
     _add_missing_subscriptions(
@@ -2226,22 +2224,21 @@ def test_add_missing_subscriptions_wrong_currency(
         mock_adobe_client,
         adobe_customer_factory(),
         agreement_factory(),
-        subscription_for_update_ids=("subscriptionId1", "subscriptionId0"),
         adobe_subscriptions=adobe_subscriptions,
     )
 
     mock_get_product_items_by_skus.assert_called_once_with(
-        mock_mpt_client, "PRD-1111-1111", {"65304578CA"}
+        mock_mpt_client, "PRD-1111-1111", {"65322572CA"}
     )
     mock_adobe_client.update_subscription.assert_called_once_with(
-        "AUT-1234-5678", "a-client-id", "subscriptionId2", auto_renewal=False
+        "AUT-1234-5678", "a-client-id", "2e5b9c974c4ea1bcabdb0fe697a2f1NA", auto_renewal=False
     )
     mock_send_exception.assert_called_once_with(
         title="Price currency mismatch detected!",
-        text="{'subscriptionId': 'subscriptionId2', 'offerId': '65304578CA01A12', "
+        text="{'subscriptionId': '2e5b9c974c4ea1bcabdb0fe697a2f1NA', 'offerId': '65322572CAT1A13', "
         "'currentQuantity': 10, 'currencyCode': 'GBP', 'autoRenewal': "
         "{'enabled': True, 'renewalQuantity': 10}, 'creationDate': "
-        "'2019-05-20T22:49:55Z', 'renewalDate': '2026-07-27', 'status': "
+        "'2019-05-20T22:49:55Z', 'renewalDate': '2026-07-28', 'status': "
         "'1000', 'deploymentId': ''}",
     )
     mock_create_agreement_subscription.assert_not_called()
