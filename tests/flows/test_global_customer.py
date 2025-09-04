@@ -9,7 +9,7 @@ from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
 from adobe_vipm.flows.global_customer import check_gc_agreement_deployments
 
 
-@pytest.fixture
+@pytest.fixture()
 def gc_agreement_deployment(mocker):
     gc_agreement_deployment = mocker.MagicMock()
     gc_agreement_deployment.deployment_id = "deployment_id"
@@ -37,7 +37,7 @@ def gc_agreement_deployment(mocker):
     return gc_agreement_deployment
 
 
-@pytest.fixture
+@pytest.fixture()
 def active_3yc_commitment():
     today = dt.datetime.now(tz=dt.UTC).date()
 
@@ -47,7 +47,7 @@ def active_3yc_commitment():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def expired_3yc_commitment():
     today = dt.datetime.now(tz=dt.UTC).date()
 
@@ -57,7 +57,7 @@ def expired_3yc_commitment():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def empty_3y_commitment():
     return None
 

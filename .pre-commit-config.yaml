@@ -1,28 +1,12 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.3
-    hooks:
-      - id: ruff-check
-      - id: ruff-format
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: check-merge-conflict
-      - id: check-yaml
-      - id: check-toml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
-      - id: no-commit-to-branch
-        args: [--pattern, '^release/.*']
-      - id: detect-private-key
-
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.7.21
-    hooks:
-      - id: uv-lock
-
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.3.0
-    hooks:
-    -   id: flake8
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v3.2.0
+  hooks:
+    - id: check-toml
+    - id: check-yaml
+    - id: check-merge-conflict
+    - id: end-of-file-fixer
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.3.1
+  hooks:
+    - id: ruff

@@ -18,26 +18,32 @@ jobs:
     timeout-minutes: 10
 
     steps:
-    - name: "Checkout"
+    - name: Checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: "Create environment file"
+    - name: 'Create environment file'
       run: touch .env
 
-    - name: "Build test containers"
+    - name: 'Build test containers'
       run: docker compose build app_test
 
-    - name: "Run validation & test"
+    - name: 'Run validation & test'
       run: docker compose run --service-ports app_test
 
-    - name: "Run SonarCloud Scan"
+    - name: 'Run SonarCloud Scan'
       uses: SonarSource/sonarcloud-github-action@master
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-    - name: "Stop containers"
+    - name: 'Run SonarQube Quality Gate check'
+      uses: sonarsource/sonarqube-quality-gate-action@master
+      timeout-minutes: 5
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    - name: 'Stop containers'
       if: always()
       run: docker compose down

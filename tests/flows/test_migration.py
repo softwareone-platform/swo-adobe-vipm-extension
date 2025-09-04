@@ -24,7 +24,7 @@ from adobe_vipm.flows.migration import (
 from adobe_vipm.notifications import Button, FactsSection
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_transfer(mocker):
     return mocker.MagicMock(
         authorization_uk="auth-uk",

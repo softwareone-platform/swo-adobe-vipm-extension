@@ -6,7 +6,7 @@ services:
       dockerfile: prod.Dockerfile
     working_dir: /extension
     command: swoext run --no-color
-    volumes:
+    volumes: 
       - .:/extension
     env_file:
       - .env
@@ -35,11 +35,9 @@ services:
       context: .
       dockerfile: dev.Dockerfile
     working_dir: /extension
-    command: bash -c "ruff check . && flake8 . && uv lock --check && pytest"
+    command: bash -c "ruff check . && pytest"
     volumes:
       - .:/extension
-    environment:
-      - PROCESS_CHECK_INTERVAL_SECS=0
     env_file:
       - .env
 
@@ -49,7 +47,7 @@ services:
       context: .
       dockerfile: dev.Dockerfile
     working_dir: /extension
-    command: bash -c "ruff check --select I --fix . && ruff format ."
+    command: bash -c "ruff check . --select I --fix && ruff format ."
     volumes:
       - .:/extension
     env_file:

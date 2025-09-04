@@ -2,7 +2,7 @@ import pytest
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_agreements_by_query(mocker):
     mock = mocker.MagicMock(spec=get_agreements_by_query)
     mocker.patch("adobe_vipm.flows.mpt.get_agreements_by_query", new=mock)
@@ -10,7 +10,7 @@ def mock_get_agreements_by_query(mocker):
     return mock
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_agreements_by_customer_deployments(
     agreement_factory, fulfillment_parameters_factory, mocker
 ):
@@ -32,12 +32,12 @@ def mock_get_agreements_by_customer_deployments(
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_terminate_subscription(mocker):
     return mocker.patch("adobe_vipm.flows.sync.terminate_subscription", spec=True)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_send_notification(mocker):
     mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.send_notification")
     mocker.patch("adobe_vipm.flows.sync.send_notification", new=mock)
@@ -46,7 +46,7 @@ def mock_send_notification(mocker):
     return mock
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_adobe_client(mocker, mock_adobe_client):
     mock = mocker.MagicMock(
         return_value=mock_adobe_client, spec="adobe_vipm.adobe.client.get_adobe_client"
@@ -57,7 +57,7 @@ def mock_get_adobe_client(mocker, mock_adobe_client):
     return mock
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_agreement_subscription(mocker, subscriptions_factory):
     return mocker.patch(
         "adobe_vipm.flows.sync.get_agreement_subscription",
@@ -66,22 +66,22 @@ def mock_get_agreement_subscription(mocker, subscriptions_factory):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_update_agreement_subscription(mocker):
     return mocker.patch("adobe_vipm.flows.sync.update_agreement_subscription", spec=True)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_send_exception(mocker):
     return mocker.patch("adobe_vipm.flows.sync.send_exception", spec=True)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_prices_for_skus(mocker):
     return mocker.patch("adobe_vipm.airtable.models.get_prices_for_skus", spec=True)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_sync_agreements_by_agreement_ids(mocker):
     mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.sync_agreements_by_agreement_ids")
     return mocker.patch(
@@ -89,36 +89,36 @@ def mock_sync_agreements_by_agreement_ids(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_customer_or_process_lost_customer(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync._get_customer_or_process_lost_customer", autospec=True
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_update_last_sync_date(mocker):
     return mocker.patch("adobe_vipm.flows.sync._update_last_sync_date", spec=True)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_switch_order_to_failed(mocker):
     return mocker.patch("adobe_vipm.flows.fulfillment.change.switch_order_to_failed", spec=True)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_notify_not_updated_subscriptions(mocker):
     return mocker.patch(
         "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions", spec=True
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_next_step(mocker):
     return mocker.MagicMock()
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_airtable_base_info(mocker):
     return mocker.patch(
         "adobe_vipm.airtable.models.AirTableBaseInfo",
@@ -126,7 +126,7 @@ def mock_airtable_base_info(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_gc_agreement_deployments_by_main_agreement(mocker):
     return mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployments_by_main_agreement",
@@ -134,7 +134,7 @@ def mock_get_gc_agreement_deployments_by_main_agreement(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_create_gc_agreement_deployments(mocker):
     return mocker.patch(
         "adobe_vipm.airtable.models.create_gc_agreement_deployments",
@@ -142,7 +142,7 @@ def mock_create_gc_agreement_deployments(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_gc_agreement_deployment_model(mocker):
     return mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
@@ -150,7 +150,7 @@ def mock_get_gc_agreement_deployment_model(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_subscriptions_for_update(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync._get_subscriptions_for_update",
@@ -158,7 +158,7 @@ def mock_get_subscriptions_for_update(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_sync_deployments_prices(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync.sync_deployments_prices",
@@ -166,7 +166,7 @@ def mock_sync_deployments_prices(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_update_subscriptions(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync._update_subscriptions",
@@ -174,7 +174,7 @@ def mock_update_subscriptions(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_product_items_by_period(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync.get_product_items_by_period",

@@ -42,7 +42,7 @@ def mock_check_update_airtable_missing_deployments(mocker):
     )
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_create_agreement_subscription(mocker):
     return mocker.patch("adobe_vipm.flows.sync.create_agreement_subscription", spec=True)
 
