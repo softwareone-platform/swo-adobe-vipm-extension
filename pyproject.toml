@@ -61,9 +61,6 @@ pyfiglet = "1.0.*"
 rich = "13.7.*"
 watchfiles = "0.21.*"
 
-[tool.poetry.scripts]
-swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
-
 
 [tool.poetry.plugins."swo.mpt.ext"]
 "app_config" = "adobe_vipm.apps:ExtensionConfig"
