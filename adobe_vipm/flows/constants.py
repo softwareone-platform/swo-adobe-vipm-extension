@@ -44,6 +44,7 @@ class Param(StrEnum):
     THREE_YC_END_DATE = "3YCEndDate"
     MARKET_SEGMENT_ELIGIBILITY_STATUS = "marketSegmentEligibilityStatus"
     CURRENT_QUANTITY = "currentQuantity"
+    USED_QUANTITY = "usedQuantity"
     RENEWAL_QUANTITY = "renewalQuantity"
     RENEWAL_DATE = "renewalDate"
     DUE_DATE = "dueDate"
