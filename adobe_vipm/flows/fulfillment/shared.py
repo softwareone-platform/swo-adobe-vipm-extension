@@ -49,6 +49,7 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
     Param,
 )
+from adobe_vipm.flows.mpt import get_order_asset_by_external_id
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
@@ -314,6 +315,64 @@ def switch_order_to_completed(client, order, template_name):
     order["agreement"] = agreement
     send_mpt_notification(client, order)
     logger.info("Order %s has been completed successfully", order["id"])
+
+
+def add_asset(client, adobe_subscription, order, line):
+    """
+    Adds a asset to the correspoding MPT order based on the provided parameters.
+
+    Args:
+        client (MPTClient): An instance of the Marketplace platform client.
+        adobe_subscription(dict): A subscription object retrieved from the Adobe API.
+        order (dict): The MPT order to which the subscription will be added.
+        line (dict): The order line.
+
+    """
+    asset = get_order_asset_by_external_id(client, order["id"], line["subscriptionId"])
+    if asset:
+        logger.info(
+            "Asset with external id %s already exists (%s)",
+            adobe_subscription["subscriptionId"],
+            asset["id"],
+        )
+        return asset
+
+    order_line = get_order_line_by_sku(order, line["offerId"])
+    asset_data = {
+        "name": f"Asset for {order_line['item']['name']}",
+        "parameters": {
+            "fulfillment": [
+                {
+                    "externalId": Param.ADOBE_SKU.value,
+                    "value": line["offerId"],
+                },
+                {
+                    "externalId": Param.CURRENT_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY]),
+                },
+                {
+                    "externalId": Param.USED_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                },
+            ]
+        },
+        "externalIds": {
+            "vendor": line["subscriptionId"],
+        },
+        "lines": [
+            {
+                "id": order_line["id"],
+            },
+        ],
+    }
+    asset = create_asset(client, order["id"], asset_data)
+    logger.info(
+        "Asset %s (%s) created for order %s",
+        line["subscriptionId"],
+        asset["id"],
+        order["id"],
+    )
+    return asset
 
 
 def add_subscription(client, adobe_subscription, order, line):

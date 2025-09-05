@@ -13,6 +13,7 @@ import logging
 from operator import itemgetter
 
 from mpt_extension_sdk.mpt_http.mpt import (
+    create_asset,
     get_product_items_by_skus,
     update_order,
 )
@@ -54,11 +55,13 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     SetOrUpdateCotermDate,
     SetupDueDate,
     SubmitNewOrder,
+    add_asset,
     add_subscription,
     check_processing_template,
     handle_retries,
@@ -74,6 +77,7 @@ from adobe_vipm.flows.helpers import (
     SetupContext,
     UpdatePrices,
 )
+from adobe_vipm.flows.mpt import get_order_asset_by_external_id
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
@@ -86,6 +90,7 @@ from adobe_vipm.flows.utils import (
     get_global_customer,
     get_market_segment,
     get_one_time_skus,
+    get_order_line_by_sku,
     get_ordering_parameter,
     has_order_line_updated,
     is_transferring_item_expired,
@@ -250,8 +255,7 @@ def _fulfill_transfer_migrated(  # noqa: C901
     adobe_items = [
         item
         for item in adobe_subscriptions["items"]
-        if not is_transferring_item_expired(item)
-        and get_partial_sku(item["offerId"]) not in one_time_skus
+        if not is_transferring_item_expired(item) and get_partial_sku(item["offerId"])
     ]
     # If the order items has been updated, the validation order will fail
     if has_order_line_updated(order["lines"], adobe_items, Param.CURRENT_QUANTITY.value):
@@ -271,11 +275,10 @@ def _fulfill_transfer_migrated(  # noqa: C901
             error,
         )
         return
+
     for line in adobe_items:
         adobe_subscription = adobe_client.get_subscription(
-            authorization_id,
-            transfer.customer_id,
-            line["subscriptionId"],
+            authorization_id, transfer.customer_id, line["subscriptionId"]
         )
         if adobe_subscription["status"] != AdobeStatus.PROCESSED:
             logger.warning(
@@ -286,29 +289,27 @@ def _fulfill_transfer_migrated(  # noqa: C901
             )
             continue
 
-        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
-            adobe_subscription = adobe_client.update_subscription(
-                authorization_id,
-                transfer.customer_id,
-                line["subscriptionId"],
-                auto_renewal=True,
-            )
-        subscription = add_subscription(mpt_client, adobe_subscription, order, line)
-        if subscription and not commitment_date:  # pragma: no branch
-            # subscription are cotermed so it's ok to take the first created
-            commitment_date = subscription["commitmentDate"]
+        if get_partial_sku(line["offerId"]) in one_time_skus:
+            add_asset(mpt_client, adobe_subscription, order, line)
+        else:
+            if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
+                adobe_subscription = adobe_client.update_subscription(
+                    authorization_id,
+                    transfer.customer_id,
+                    line["subscriptionId"],
+                    auto_renewal=True,
+                )
+            subscription = add_subscription(mpt_client, adobe_subscription, order, line)
+            if subscription and not commitment_date:  # pragma: no branch
+                # subscription are cotermed so it's ok to take the first created
+                commitment_date = subscription["commitmentDate"]
 
     if commitment_date:  # pragma: no branch
         order = save_coterm_dates(mpt_client, order, commitment_date)
 
     # Fulfills order with active items
     customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
-    order = save_adobe_order_id_and_customer_data(
-        mpt_client,
-        order,
-        transfer.transfer_id,
-        customer,
-    )
+    order = save_adobe_order_id_and_customer_data(mpt_client, order, transfer.transfer_id, customer)
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
@@ -384,6 +385,7 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
         SaveCustomerData(),
         GetPreviewOrder(),
         SubmitNewOrder(),
+        CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),
         SetOrUpdateCotermDate(),
         UpdatePrices(),
@@ -1206,6 +1208,86 @@ class ProcessTransferOrder(Step):
         next_step(client, context)
 
 
+class CreateTransferAssets(Step):
+    """Create assets for the transfer order."""
+
+    def __call__(self, client, context, next_step):
+        """Create transfer assets."""
+        adobe_client = get_adobe_client()
+        order = context.order
+        adobe_transfer_order = context.adobe_transfer_order
+        mpt_client = client
+
+        authorization_id = order["authorization"]["id"]
+        customer_id = adobe_transfer_order["customerId"]
+        one_time_skus = get_one_time_skus(mpt_client, order)
+        assets = []
+        for item in adobe_transfer_order["lineItems"]:
+            if get_partial_sku(item["offerId"]) not in one_time_skus:
+                continue
+
+            adobe_subscription = adobe_client.get_subscription(
+                authorization_id, customer_id, item["subscriptionId"]
+            )
+            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+                logger.info(
+                    "Subscription %s for customer %s is in status %s, skip it",
+                    adobe_subscription["subscriptionId"],
+                    customer_id,
+                    adobe_subscription["status"],
+                )
+                continue
+
+            assets.append(self._create_asset(mpt_client, adobe_subscription, order, item))
+
+        context.assets = assets
+
+    def _create_asset(self, client, adobe_subscription, order, line):
+        order_line = get_order_line_by_sku(order, line["offerId"])
+
+        asset = get_order_asset_by_external_id(client, order["id"], line["subscriptionId"])
+        if not asset:
+            subscription = create_asset(
+                client, order["id"], self._create_asset_data(adobe_subscription, order_line, line)
+            )
+            logger.info(
+                "Asset %s (%s) created for order %s",
+                line["subscriptionId"],
+                subscription["id"],
+                order["id"],
+            )
+        return asset
+
+    def _create_asset_data(self, adobe_subscription, order_line, line):
+        return {
+            "name": f"Asset for {order_line['item']['name']}",
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": Param.ADOBE_SKU.value,
+                        "value": line["offerId"],
+                    },
+                    {
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY]),
+                    },
+                    {
+                        "externalId": Param.USED_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                    },
+                ]
+            },
+            "externalIds": {
+                "vendor": line["subscriptionId"],
+            },
+            "lines": [
+                {
+                    "id": order_line["id"],
+                },
+            ],
+        }
+
+
 class CreateTransferSubscriptions(Step):
     """Creates subscriptions for the transfer order."""
 
@@ -1220,7 +1302,6 @@ class CreateTransferSubscriptions(Step):
             adobe_client,
             context.adobe_customer,
         )
-
         if not context.subscriptions:
             error = "No subscriptions found without deployment ID to be added to the main agreement"
             logger.error(error)
@@ -1294,6 +1375,7 @@ def fulfill_transfer_order(mpt_client, order):
         GetAdobeCustomer(),
         ValidateAgreementDeployments(),
         ProcessTransferOrder(),
+        CreateTransferAssets(),
         CreateTransferSubscriptions(),
         SetCommitmentDates(),
         CompleteTransferOrder(),
