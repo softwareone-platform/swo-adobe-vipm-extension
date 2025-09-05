@@ -1,6 +1,6 @@
 import copy
+import datetime as dt
 import json
-from datetime import datetime, timedelta
 from hashlib import sha256
 from urllib.parse import urljoin
 
@@ -10,20 +10,20 @@ from freezegun import freeze_time
 from responses import matchers
 
 from adobe_vipm.adobe import client as adobe_client
-from adobe_vipm.adobe.config import Config
+from adobe_vipm.adobe.config import REQUIRED_API_SCOPES
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
-    STATUS_ORDER_CANCELLED,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
+    AdobeStatus,
+    ResellerChangeAction,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
+from adobe_vipm.flows.constants import Param
 
 
 def test_create_reseller_account(
@@ -34,17 +34,12 @@ def test_create_reseller_account(
     reseller_data,
     adobe_client_factory,
 ):
-    """
-    Test the call to Adobe API to create a reselled within a given distributor.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
     distributor_id = adobe_authorizations_file["authorizations"][0]["distributor_id"]
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
 
     client, authorization, api_token = adobe_client_factory()
     payload = {
@@ -95,9 +90,7 @@ def test_create_reseller_account(
         ],
     )
 
-    reseller_id = client.create_reseller_account(
-        authorization_uk, "external_id", reseller_data
-    )
+    reseller_id = client.create_reseller_account(authorization_uk, "external_id", reseller_data)
     assert reseller_id == "a-reseller-id"
 
 
@@ -109,12 +102,7 @@ def test_create_reseller_account_bad_request(
     adobe_api_error_factory,
     adobe_client_factory,
 ):
-    """
-    Test the call to Adobe API to create a reseller when the response is 400 bad request.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
 
     client, _, _ = adobe_client_factory()
 
@@ -140,20 +128,13 @@ def test_create_customer_account(
     customer_data,
     adobe_client_factory,
 ):
-    """
-    Test the call to Adobe API to create a customer.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
-        "seller_id"
-    ]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
     reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
 
     client, authorization, api_token = adobe_client_factory()
 
@@ -221,15 +202,8 @@ def test_create_customer_account_bad_request(
     adobe_api_error_factory,
     adobe_client_factory,
 ):
-    """
-    Test the call to Adobe API to create a customer when the response is 400 bad request.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
-    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
-        "seller_id"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
 
     client, _, _ = adobe_client_factory()
 
@@ -279,10 +253,6 @@ def test_create_preview_order_upsize(
     renewal_quantity,
     expected_quantity,
 ):
-    """
-    Test the call to Adobe API to create a preview order for upsizes
-    """
-
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
@@ -292,18 +262,14 @@ def test_create_preview_order_upsize(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
     customer_id = "a-customer"
     deployment_id = "a_deployment_id"
 
     client, authorization, api_token = adobe_client_factory()
 
-    order = order_factory(
-        lines=lines_factory(old_quantity=old_quantity, quantity=quantity)
-    )
+    order = order_factory(lines=lines_factory(old_quantity=old_quantity, quantity=quantity))
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     adobe_subscription = adobe_subscription_factory(
         current_quantity=current_quantity,
@@ -345,9 +311,7 @@ def test_create_preview_order_upsize(
                     "orderType": "PREVIEW",
                     "lineItems": [
                         {
-                            "extLineItemNumber": to_adobe_line_id(
-                                order["lines"][0]["id"]
-                            ),
+                            "extLineItemNumber": to_adobe_line_id(order["lines"][0]["id"]),
                             "offerId": adobe_full_sku,
                             "quantity": expected_quantity,
                             "deploymentId": deployment_id,
@@ -371,6 +335,7 @@ def test_create_preview_order_upsize(
         "orderId": "adobe-order-id",
     }
 
+
 def test_create_preview_order_upsize_product_not_found(
     mocker,
     settings,
@@ -383,10 +348,6 @@ def test_create_preview_order_upsize_product_not_found(
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
 ):
-    """
-    Test the call to Adobe API to create a preview order for upsizes when the product is not found
-    in Adobe's system.
-    """
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
@@ -396,18 +357,14 @@ def test_create_preview_order_upsize_product_not_found(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     deployment_id = "a_deployment_id"
 
-    client, authorization, api_token = adobe_client_factory()
+    client, _, _ = adobe_client_factory()
 
     # Create an order with a non-existent product SKU
-    order = order_factory(
-        lines=lines_factory(old_quantity=5, quantity=10)
-    )
+    order = order_factory(lines=lines_factory(old_quantity=5, quantity=10))
     order["lines"][0]["item"]["externalIds"] = {"vendor": "NONEXISTENT-SKU"}
 
     # Mock the subscriptions endpoint to return an empty list
@@ -436,6 +393,7 @@ def test_create_preview_order_upsize_product_not_found(
         "or the subscription has been terminated."
     )
 
+
 def test_create_preview_order_upsize_after_downsize_lower(
     mocker,
     settings,
@@ -448,16 +406,6 @@ def test_create_preview_order_upsize_after_downsize_lower(
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
 ):
-    """
-    Test the call to Adobe API to create a preview order for upsizes
-    when there was a downsize in non-returnable window, means
-    renewalQuantity < currentQuantity on Adobe subscription
-    and later upsize is done to the lower number, mean
-    renewalQuantity = 7, currentQuantity = 10
-    and client wants to have 2 licensees more
-    in that case do not create adobe order
-    """
-
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
@@ -467,13 +415,11 @@ def test_create_preview_order_upsize_after_downsize_lower(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     deployment_id = "a_deployment_id"
 
-    client, authorization, api_token = adobe_client_factory()
+    client, _, _ = adobe_client_factory()
 
     order = order_factory(lines=lines_factory(old_quantity=8, quantity=9))
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
@@ -513,10 +459,6 @@ def test_create_preview_newlines(
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
 ):
-    """
-    Test the call to Adobe API to create a preview order for new lines
-    """
-
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
@@ -526,9 +468,7 @@ def test_create_preview_newlines(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
     customer_id = "a-customer"
     deployment_id = "a_deployment_id"
@@ -564,9 +504,7 @@ def test_create_preview_newlines(
                     "orderType": "PREVIEW",
                     "lineItems": [
                         {
-                            "extLineItemNumber": to_adobe_line_id(
-                                order["lines"][0]["id"]
-                            ),
+                            "extLineItemNumber": to_adobe_line_id(order["lines"][0]["id"]),
                             "offerId": adobe_full_sku,
                             "quantity": 5,
                             "deploymentId": deployment_id,
@@ -602,10 +540,6 @@ def test_create_preview_newlines_wo_deployment(
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
 ):
-    """
-    Test the call to Adobe API to create a preview order for new lines
-    """
-
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
@@ -615,9 +549,7 @@ def test_create_preview_newlines_wo_deployment(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
     customer_id = "a-customer"
 
@@ -652,9 +584,7 @@ def test_create_preview_newlines_wo_deployment(
                     "orderType": "PREVIEW",
                     "lineItems": [
                         {
-                            "extLineItemNumber": to_adobe_line_id(
-                                order["lines"][0]["id"]
-                            ),
+                            "extLineItemNumber": to_adobe_line_id(order["lines"][0]["id"]),
                             "offerId": adobe_full_sku,
                             "quantity": 5,
                         },
@@ -687,19 +617,13 @@ def test_create_preview_order_bad_request(
     order,
     mock_get_adobe_product_by_marketplace_sku,
 ):
-    """
-    Test the call to Adobe API to create a preview order when the response is 400 bad request.
-    """
-
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     deployment_id = "a_deployment_id"
 
@@ -737,16 +661,11 @@ def test_create_new_order(
     adobe_authorizations_file,
     adobe_order_factory,
 ):
-    """
-    Test the call to Adobe API to create a new order.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     deployment_id = "a_deployment_id"
@@ -802,16 +721,11 @@ def test_create_new_order_no_deployment(
     adobe_authorizations_file,
     adobe_order_factory,
 ):
-    """
-    Test the call to Adobe API to create a new order.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     deployment_id = None
@@ -867,12 +781,7 @@ def test_create_new_order_bad_request(
     adobe_order_factory,
     adobe_api_error_factory,
 ):
-    """
-    Test the call to Adobe API to create a new order when the response is 400 bad request.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -906,16 +815,11 @@ def test_create_preview_renewal(
     adobe_client_factory,
     adobe_order_factory,
 ):
-    """
-    Test the call to Adobe API to create a preview renewal.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, authorization, api_token = adobe_client_factory()
@@ -962,12 +866,7 @@ def test_create_preview_renewal_bad_request(
     adobe_api_error_factory,
     adobe_client_factory,
 ):
-    """
-    Test the call to Adobe API to create a preview renewal when the response is 400 bad request.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -992,15 +891,8 @@ def test_create_preview_renewal_bad_request(
     assert repr(cv.value) == str(error)
 
 
-def test_get_order(
-    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
-):
-    """
-    Tests the retrieval of an order.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+def test_get_order(requests_mocker, settings, adobe_client_factory, adobe_authorizations_file):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     order_id = "an-order-id"
 
@@ -1035,12 +927,7 @@ def test_get_order_not_found(
     adobe_authorizations_file,
     adobe_api_error_factory,
 ):
-    """
-    Tests the retrieval of an order when it doesn't exist.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     order_id = "an-order-id"
 
@@ -1064,12 +951,7 @@ def test_get_order_not_found(
 def test_get_subscription(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
-    """
-    Tests the retrieval of a subscription.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
@@ -1094,9 +976,7 @@ def test_get_subscription(
         ],
     )
 
-    assert client.get_subscription(authorization_uk, customer_id, sub_id) == {
-        "a": "subscription"
-    }
+    assert client.get_subscription(authorization_uk, customer_id, sub_id) == {"a": "subscription"}
 
 
 def test_get_subscription_not_found(
@@ -1106,12 +986,7 @@ def test_get_subscription_not_found(
     adobe_authorizations_file,
     adobe_api_error_factory,
 ):
-    """
-    Tests the retrieval of a subscription when it doesn't exist.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
@@ -1141,16 +1016,11 @@ def test_create_return_order(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Test the call to Adobe API to create a return order.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     deployment_id = "a_deployment_id"
@@ -1161,7 +1031,7 @@ def test_create_return_order(
         ORDER_TYPE_NEW,
         external_id="ORD-1234",
         order_id="returning-order-id",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         deployment_id=deployment_id,
     )
 
@@ -1169,17 +1039,15 @@ def test_create_return_order(
 
     ext_ref_prefix = "ext-ref-prefix"
 
-    extReferenceId = returning_order["externalReferenceId"]
-    extItemNumber = returning_item["extLineItemNumber"]
-    expected_external_id = f"{ext_ref_prefix}_{extReferenceId}_{extItemNumber}"
+    ext_reference_id = returning_order["externalReferenceId"]
+    ext_item_number = returning_item["extLineItemNumber"]
+    expected_external_id = f"{ext_ref_prefix}_{ext_reference_id}_{ext_item_number}"
 
     expected_body = adobe_order_factory(
         ORDER_TYPE_RETURN,
         reference_order_id=returning_order["orderId"],
         external_id=expected_external_id,
-        items=adobe_items_factory(
-            deployment_id=deployment_id, deployment_currency_code="USD"
-        ),
+        items=adobe_items_factory(deployment_id=deployment_id, deployment_currency_code="USD"),
         deployment_id=deployment_id,
     )
 
@@ -1228,12 +1096,7 @@ def test_create_return_order_bad_request(
     adobe_order_factory,
     adobe_api_error_factory,
 ):
-    """
-    Test the call to Adobe API to create a return order when the response is 400 bad request.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -1248,7 +1111,7 @@ def test_create_return_order_bad_request(
         status=400,
         json=error,
     )
-    returning_order = adobe_order_factory(ORDER_TYPE_NEW, status=STATUS_PROCESSED)
+    returning_order = adobe_order_factory(ORDER_TYPE_NEW, status=AdobeStatus.PROCESSED.value)
 
     with pytest.raises(AdobeError) as cv:
         client.create_return_order(
@@ -1270,16 +1133,11 @@ def test_create_return_order_by_adobe_order(
     adobe_authorizations_file,
     adobe_order_factory,
 ):
-    """
-    Test the call to Adobe API to create a return order using an Adobe order as input.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, authorization, api_token = adobe_client_factory()
@@ -1288,7 +1146,7 @@ def test_create_return_order_by_adobe_order(
         ORDER_TYPE_NEW,
         external_id="ORD-1234",
         order_id="order-id",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
     )
 
     expected_body = {
@@ -1341,13 +1199,7 @@ def test_create_return_order_by_adobe_order_bad_request(
     adobe_order_factory,
     adobe_api_error_factory,
 ):
-    """
-    Test the call to Adobe API to create a return order using an Adobe
-    order as input when the response is 400 bad request.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, _, _ = adobe_client_factory()
@@ -1362,7 +1214,7 @@ def test_create_return_order_by_adobe_order_bad_request(
         status=400,
         json=error,
     )
-    order_created = adobe_order_factory(ORDER_TYPE_NEW, status=STATUS_PROCESSED)
+    order_created = adobe_order_factory(ORDER_TYPE_NEW, status=AdobeStatus.PROCESSED.value)
 
     with pytest.raises(AdobeError) as cv:
         client.create_return_order_by_adobe_order(
@@ -1392,12 +1244,7 @@ def test_update_subscription(
     adobe_authorizations_file,
     update_params,
 ):
-    """
-    Tests the update of a subscription.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
@@ -1409,7 +1256,7 @@ def test_update_subscription(
         },
     }
     if "quantity" in update_params:
-        body_to_match["autoRenewal"]["renewalQuantity"] = update_params["quantity"]
+        body_to_match["autoRenewal"][Param.RENEWAL_QUANTITY.value] = update_params["quantity"]
 
     requests_mocker.patch(
         urljoin(
@@ -1465,12 +1312,7 @@ def test_update_subscription_not_found(
     adobe_authorizations_file,
     adobe_api_error_factory,
 ):
-    """
-    Tests the update of a subscription when it doesn't exist.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     sub_id = "a-sub-id"
 
@@ -1494,12 +1336,7 @@ def test_update_subscription_not_found(
 def test_preview_transfer(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
-    """
-    Tests the retrieval subscriptions for a transfer given a membership id.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     membership_id = "a-membership-id"
 
     client, authorization, api_token = adobe_client_factory()
@@ -1529,9 +1366,7 @@ def test_preview_transfer(
         ],
     )
 
-    assert client.preview_transfer(authorization_uk, membership_id) == {
-        "a": "transfer-preview"
-    }
+    assert client.preview_transfer(authorization_uk, membership_id) == {"a": "transfer-preview"}
 
 
 def test_preview_transfer_not_found(
@@ -1541,12 +1376,7 @@ def test_preview_transfer_not_found(
     adobe_authorizations_file,
     adobe_api_error_factory,
 ):
-    """
-    Tests the retrieval subscriptions for a transfer given a membership id when they don't exist.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     membership_id = "a-membership-id"
 
     client, _, _ = adobe_client_factory()
@@ -1573,20 +1403,13 @@ def test_create_transfer(
     adobe_client_factory,
     adobe_authorizations_file,
 ):
-    """
-    Test the call to Adobe API to create a transfer order.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
-    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
-        "seller_id"
-    ]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
     membership_id = "a-membership-id"
     order_id = "an-order-id"
 
@@ -1640,15 +1463,8 @@ def test_create_transfer_bad_request(
     adobe_authorizations_file,
     adobe_api_error_factory,
 ):
-    """
-    Test the call to Adobe API to create a transfer order when the response is 400 bad request.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
-    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
-        "seller_id"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
     membership_id = "a-membership-id"
 
     client, _, _ = adobe_client_factory()
@@ -1675,15 +1491,8 @@ def test_create_transfer_bad_request(
     assert repr(cv.value) == str(error)
 
 
-def test_get_transfer(
-    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
-):
-    """
-    Tests the retrieval of a transfer order.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+def test_get_transfer(requests_mocker, settings, adobe_client_factory, adobe_authorizations_file):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     membership_id = "a-membership-id"
     transfer_id = "a-transfer-id"
 
@@ -1708,9 +1517,7 @@ def test_get_transfer(
         ],
     )
 
-    assert client.get_transfer(authorization_uk, membership_id, transfer_id) == {
-        "a": "transfer"
-    }
+    assert client.get_transfer(authorization_uk, membership_id, transfer_id) == {"a": "transfer"}
 
 
 def test_get_transfer_not_found(
@@ -1720,12 +1527,7 @@ def test_get_transfer_not_found(
     adobe_authorizations_file,
     adobe_api_error_factory,
 ):
-    """
-    Tests the retrieval of a transfer when it doesn't exist.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     membership_id = "a-membership-id"
     transfer_id = "a-transfer-id"
 
@@ -1746,18 +1548,13 @@ def test_get_transfer_not_found(
     assert cv.value.code == "404"
 
 
-def test_get_auth_token(
-    requests_mocker, settings, mock_adobe_config, adobe_config_file
-):
-    """
-    Test issuing of authentication token.
-    """
+def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_config_file):
     authorization = Authorization(
         authorization_uk="auth_uk",
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",
+        client_secret="client_secret",  # noqa: S106
         currency="USD",
         distributor_id="distributor_id",
     )
@@ -1774,7 +1571,7 @@ def test_get_auth_token(
                     "grant_type": "client_credentials",
                     "client_id": authorization.client_id,
                     "client_secret": authorization.client_secret,
-                    "scope": ",".join(Config.REQUIRED_API_SCOPES),
+                    "scope": ",".join(REQUIRED_API_SCOPES),
                 },
             ),
         ],
@@ -1782,25 +1579,20 @@ def test_get_auth_token(
 
     client = adobe_client.AdobeClient()
     with freeze_time("2024-01-01 12:00:00"):
-        token = client._get_auth_token(authorization)
+        token = client._get_auth_token(authorization)  # noqa: SLF001
         assert isinstance(token, APIToken)
         assert token.token == "an-access-token"
-        assert token.expires == datetime.now() + timedelta(seconds=83000 - 180)
-        assert client._token_cache[authorization] == token
+        assert token.expires == dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=83000 - 180)
+        assert client._token_cache[authorization] == token  # noqa: SLF001
 
 
-def test_get_auth_token_error(
-    requests_mocker, settings, mock_adobe_config, adobe_config_file
-):
-    """
-    Test error issuing of authentication token.
-    """
+def test_get_auth_token_error(requests_mocker, settings, mock_adobe_config, adobe_config_file):
     authorization = Authorization(
         authorization_uk="auth_uk",
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",
+        client_secret="client_secret",  # noqa: S106
         currency="USD",
         distributor_id="distributor_id",
     )
@@ -1812,14 +1604,11 @@ def test_get_auth_token_error(
 
     client = adobe_client.AdobeClient()
     with pytest.raises(requests.HTTPError):
-        client._get_auth_token(authorization)
+        client._get_auth_token(authorization)  # noqa: SLF001
 
 
 def test_get_adobe_client(mocker):
-    """
-    Test AdobeClient is cached per process.
-    """
-    adobe_client._ADOBE_CLIENT = None
+    adobe_client._ADOBE_CLIENT = None  # noqa: SLF001
 
     mocked_client = mocker.MagicMock()
     mocked_client_constructor = mocker.patch(
@@ -1834,12 +1623,7 @@ def test_get_adobe_client(mocker):
 def test_get_subscriptions(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
-    """
-    Tests the retrieval of all the subscriptions of a given customer.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, authorization, api_token = adobe_client_factory()
@@ -1868,15 +1652,8 @@ def test_get_subscriptions(
     }
 
 
-def test_get_customer(
-    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
-):
-    """
-    Tests the retrieval of a customer.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+def test_get_customer(requests_mocker, settings, adobe_client_factory, adobe_authorizations_file):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer-id"
 
     client, authorization, api_token = adobe_client_factory()
@@ -1910,12 +1687,7 @@ def test_get_customer_not_found(
     adobe_authorizations_file,
     adobe_api_error_factory,
 ):
-    """
-    Tests the retrieval of a transfer when it doesn't exist.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer-id"
 
     client, _, _ = adobe_client_factory()
@@ -1984,20 +1756,13 @@ def test_create_customer_account_3yc(
     quantities,
     expected,
 ):
-    """
-    Test the call to Adobe API to create a customer.
-    """
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         return_value="uuid-1",
     )
-    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0][
-        "seller_id"
-    ]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
     reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
 
     client, authorization, api_token = adobe_client_factory()
 
@@ -2028,9 +1793,7 @@ def test_create_customer_account_3yc(
                     "firstName": modified_customer["contact"]["firstName"],
                     "lastName": modified_customer["contact"]["lastName"],
                     "email": modified_customer["contact"]["email"],
-                    "phoneNumber": join_phone_number(
-                        modified_customer["contact"]["phone"]
-                    ),
+                    "phoneNumber": join_phone_number(modified_customer["contact"]["phone"]),
                 }
             ],
         },
@@ -2134,9 +1897,7 @@ def test_create_3yc_request(
         return_value="uuid-1",
     )
 
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
 
     client, authorization, api_token = adobe_client_factory()
 
@@ -2144,7 +1905,7 @@ def test_create_3yc_request(
 
     company_name = f"{modified_customer['companyName']} (external_id)"
 
-    companyProfile = {
+    company_profile = {
         "companyName": company_name,
         "preferredLanguage": "en-US",
         "address": {
@@ -2167,13 +1928,13 @@ def test_create_3yc_request(
     }
 
     client.get_customer = mocker.MagicMock(
-        return_value={"companyProfile": companyProfile},
+        return_value={"companyProfile": company_profile},
     )
 
     request_type = "commitmentRequest" if not is_recommitment else "recommitmentRequest"
 
     payload = {
-        "companyProfile": companyProfile,
+        "companyProfile": company_profile,
         "benefits": [
             {
                 "type": "THREE_YEAR_COMMIT",
@@ -2218,15 +1979,8 @@ def test_create_3yc_request(
     assert customer_id == {"customerId": "a-customer-id"}
 
 
-def test_get_orders(
-    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
-):
-    """
-    Tests the retrieval of all the orders of a given customer.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+def test_get_orders(requests_mocker, settings, adobe_client_factory, adobe_authorizations_file):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, authorization, api_token = adobe_client_factory()
@@ -2293,12 +2047,7 @@ def test_get_orders(
 def test_get_orders_extra_filters(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
-    """
-    Tests the retrieval of all the orders of a given customer.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
 
     client, authorization, api_token = adobe_client_factory()
@@ -2327,10 +2076,7 @@ def test_get_orders_extra_filters(
         ],
     )
 
-    assert (
-        client.get_orders(authorization_uk, customer_id, filters={"extra": "filter"})
-        == page
-    )
+    assert client.get_orders(authorization_uk, customer_id, filters={"extra": "filter"}) == page
 
 
 @freeze_time("2024-01-01")
@@ -2347,9 +2093,10 @@ def test_get_returnable_orders_by_subscription_id(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3001",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-06T00:00:00Z",
     )
     order_ok_1 = adobe_order_factory(
@@ -2357,9 +2104,10 @@ def test_get_returnable_orders_by_subscription_id(
         order_type=ORDER_TYPE_RENEWAL,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-07T00:00:00Z",
     )
     order_ok_2 = adobe_order_factory(
@@ -2367,9 +2115,10 @@ def test_get_returnable_orders_by_subscription_id(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-08T00:00:00Z",
     )
     order_ko_1 = adobe_order_factory(
@@ -2377,9 +2126,10 @@ def test_get_returnable_orders_by_subscription_id(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3001",
-            status=STATUS_ORDER_CANCELLED
+            status=AdobeStatus.ORDER_CANCELLED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-09T00:00:00Z",
     )
     order_ko_2 = adobe_order_factory(
@@ -2387,9 +2137,10 @@ def test_get_returnable_orders_by_subscription_id(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_ORDER_CANCELLED,
+        status=AdobeStatus.ORDER_CANCELLED.value,
     )
     # for another sku
     order_ko_3 = adobe_order_factory(
@@ -2398,9 +2149,10 @@ def test_get_returnable_orders_by_subscription_id(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3002",
             offer_id="99999999CA01A12",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-10T00:00:00Z",
     )
 
@@ -2417,9 +2169,7 @@ def test_get_returnable_orders_by_subscription_id(
         ],
     )
 
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     client, _, _ = adobe_client_factory()
 
@@ -2465,9 +2215,10 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3001",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-06T00:00:00Z",
     )
     order_ok_1 = adobe_order_factory(
@@ -2475,9 +2226,10 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_type=ORDER_TYPE_RENEWAL,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-07T00:00:00Z",
     )
     order_ok_2 = adobe_order_factory(
@@ -2485,9 +2237,10 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-08T00:00:00Z",
     )
     order_ok_3 = adobe_order_factory(
@@ -2495,9 +2248,10 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_ORDER_CANCELLED
+            status=AdobeStatus.ORDER_CANCELLED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-09T00:00:00Z",
     )
     order_ok_4 = adobe_order_factory(
@@ -2505,9 +2259,10 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_ORDER_CANCELLED,
+        status=AdobeStatus.ORDER_CANCELLED.value,
         creation_date="2024-01-10T00:00:00Z",
     )
     order_ko_1 = adobe_order_factory(
@@ -2516,9 +2271,10 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3002",
             offer_id="99999999CA01A12",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-11T00:00:00Z",
     )
 
@@ -2544,9 +2300,7 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         ],
     )
 
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     client, _, _ = adobe_client_factory()
 
@@ -2599,20 +2353,20 @@ def test_get_return_orders_by_external_reference(
 ):
     order_ok_1 = adobe_order_factory(
         order_type=ORDER_TYPE_RETURN,
-        items=adobe_items_factory(status=STATUS_PROCESSED),
-        status=STATUS_PROCESSED,
+        items=adobe_items_factory(status=AdobeStatus.PROCESSED.value),
+        status=AdobeStatus.PROCESSED.value,
         external_id="returning-mpt-order-123_returned-mpt-order-456_line1",
     )
     order_ok_2 = adobe_order_factory(
         order_type=ORDER_TYPE_RETURN,
-        items=adobe_items_factory(status=STATUS_PROCESSED),
-        status=STATUS_PENDING,
+        items=adobe_items_factory(status=AdobeStatus.PROCESSED.value),
+        status=AdobeStatus.PENDING.value,
         external_id="returning-mpt-order-123_returned-mpt-order-789_line1",
     )
     order_ko_1 = adobe_order_factory(
         order_type=ORDER_TYPE_RETURN,
-        items=adobe_items_factory(status=STATUS_PROCESSED),
-        status=STATUS_PROCESSED,
+        items=adobe_items_factory(status=AdobeStatus.PROCESSED.value),
+        status=AdobeStatus.PROCESSED.value,
         external_id="returning-mpt-order-987_returned-mpt-order-456_line1",
     )
 
@@ -2622,9 +2376,7 @@ def test_get_return_orders_by_external_reference(
         return_value=[order_ok_1, order_ok_2, order_ko_1],
     )
 
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     client, _, _ = adobe_client_factory()
 
@@ -2643,7 +2395,7 @@ def test_get_return_orders_by_external_reference(
         customer_id,
         filters={
             "order-type": ORDER_TYPE_RETURN,
-            "status": [STATUS_PROCESSED, STATUS_PENDING],
+            "status": [AdobeStatus.PROCESSED.value, AdobeStatus.PENDING.value],
         },
     )
 
@@ -2661,9 +2413,10 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-06T00:00:00Z",
     )
     order_ok_1 = adobe_order_factory(
@@ -2671,9 +2424,10 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-07T00:00:00Z",
     )
     order_ok_2 = adobe_order_factory(
@@ -2681,9 +2435,10 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3000",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-08T00:00:00Z",
     )
     order_ko_1 = adobe_order_factory(
@@ -2691,9 +2446,10 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3001",
-            status=STATUS_ORDER_CANCELLED
+            status=AdobeStatus.ORDER_CANCELLED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-09T00:00:00Z",
     )
     order_ko_2 = adobe_order_factory(
@@ -2701,9 +2457,10 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3002",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_ORDER_CANCELLED,
+        status=AdobeStatus.ORDER_CANCELLED.value,
     )
     # for another sku
     order_ko_3 = adobe_order_factory(
@@ -2712,9 +2469,10 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3003",
             offer_id="99999999CA01A12",
-            status=STATUS_PROCESSED
+            status=AdobeStatus.PROCESSED
+        .value
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-10T00:00:00Z",
     )
 
@@ -2731,9 +2489,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         ],
     )
 
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     client, _, _ = adobe_client_factory()
 
@@ -2774,12 +2530,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
 def test_get_customer_deployments(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
-    """
-    Tests the retrieval of customer deployments.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer-id"
 
     client, authorization, api_token = adobe_client_factory()
@@ -2827,12 +2578,7 @@ def test_get_customer_deployments(
 def test_get_customer_deployments_active_status(
     requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
 ):
-    """
-    Tests the retrieval of customer deployments filtered by status.
-    """
-    authorization_uk = adobe_authorizations_file["authorizations"][0][
-        "authorization_uk"
-    ]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer-id"
 
     client, authorization, api_token = adobe_client_factory()
@@ -2895,3 +2641,142 @@ def test_get_customer_deployments_active_status(
 
     assert len(active_deployments) == 2
     assert active_deployments == active_deployments_response
+
+
+def test_preview_reseller_change(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
+    change_code = "a-change-code"
+    admin_email = "admin@example.com"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    expected_response = {"result": "preview-ok"}
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/transfers",
+        ),
+        status=200,
+        json=expected_response,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            ),
+            matchers.json_params_matcher({
+                "type": "RESELLER_CHANGE",
+                "action": "PREVIEW",
+                "approvalCode": change_code,
+                "resellerId": (
+                    adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+                ),
+                "requestedBy": admin_email,
+            }),
+        ],
+    )
+
+    result = client.reseller_change_request(
+        authorization_uk, seller_id, change_code, admin_email, ResellerChangeAction.PREVIEW
+    )
+    assert result == expected_response
+
+
+def test_preview_reseller_change_bad_request(
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
+    change_code = "a-change-code"
+    admin_email = "admin@example.com"
+
+    client, _, _ = adobe_client_factory()
+
+    error = adobe_api_error_factory("1234", "An error")
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/transfers",
+        ),
+        status=400,
+        json=error,
+    )
+
+    with pytest.raises(Exception) as cv:
+        client.reseller_change_request(
+            authorization_uk, seller_id, change_code, admin_email, ResellerChangeAction.PREVIEW
+        )
+
+    assert repr(cv.value) == str(error)
+
+
+def test_commit_reseller_change(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    client, authorization, api_token = adobe_client_factory()
+    expected_response = {
+        "transferId": "P110044419",
+        "customerId": "P1005243296",
+        "resellerId": "P1000084165",
+        "creationDate": "2025-07-29T08:50:39Z",
+        "status": "1000",
+        "totalCount": 1,
+        "lineItems": [
+            {
+                "lineItemNumber": 1,
+                "offerId": "65304520CA01A12",
+                "quantity": 50,
+                "subscriptionId": "22d866a3ea47f681030002fabf3470NA",
+                "renewalDate": "2026-07-29T07:00:00.000+00:00",
+            }
+        ],
+        "benefits": [
+            {
+                "type": "THREE_YEAR_COMMIT",
+                "commitment": None,
+                "commitmentRequest": {
+                    "status": "REQUESTED",
+                    "minimumQuantities": [{"offerType": "LICENSE", "quantity": 50}],
+                },
+                "recommitmentRequest": None,
+            }
+        ],
+        "discounts": [{"discountCode": None, "level": "03", "offerType": "LICENSE"}],
+    }
+
+    transfer_id = "a-transfer-id"
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/transfers/{transfer_id}",
+        ),
+        status=200,
+        json=expected_response,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+        ],
+    )
+
+    result = client.get_reseller_transfer(authorization_uk, transfer_id)
+    assert result == expected_response

@@ -1,30 +1,27 @@
+import datetime as dt
 import logging
-import os
 from dataclasses import dataclass
-from datetime import datetime
+from pathlib import Path
 
 import pymsteams
 from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from mpt_extension_sdk.mpt_http.mpt import NotifyCategories, notify
+from mpt_extension_sdk.mpt_http.base import MPTClient
+from mpt_extension_sdk.mpt_http.mpt import notify
 
-from adobe_vipm.shared import mpt_client
+from adobe_vipm.adobe.constants import MPT_NOTIFY_CATEGORIES
 
 logger = logging.getLogger(__name__)
 
 
-def dateformat(date_string):
-    return (
-        datetime.fromisoformat(date_string).strftime("%-d %B %Y") if date_string else ""
-    )
+def dateformat(date_string: str) -> str:
+    """Adjusts format of date strings for jinja notification templates."""
+    return dt.datetime.fromisoformat(date_string).strftime("%-d %B %Y") if date_string else ""
 
 
 env = Environment(
     loader=FileSystemLoader(
-        os.path.join(
-            os.path.abspath(os.path.dirname(__file__)),
-            "templates",
-        ),
+        Path(__file__).resolve().parent / "templates",
     ),
     autoescape=select_autoescape(),
 )
@@ -34,12 +31,16 @@ env.filters["dateformat"] = dateformat
 
 @dataclass
 class Button:
+    """Teams button."""
+
     label: str
     url: str
 
 
 @dataclass
 class FactsSection:
+    """Facts section."""
+
     title: str
     data: dict
 
@@ -51,6 +52,7 @@ def send_notification(
     button: Button | None = None,
     facts: FactsSection | None = None,
 ) -> None:
+    """Send notification to the Teams channel."""
     message = pymsteams.connectorcard(settings.EXTENSION_CONFIG["MSTEAMS_WEBHOOK_URL"])
     message.color(color)
     message.title(title)
@@ -76,6 +78,7 @@ def send_warning(
     button: Button | None = None,
     facts: FactsSection | None = None,
 ) -> None:
+    """Send warning to the Teams channel."""
     send_notification(
         f"\u2622 {title}",
         text,
@@ -91,6 +94,7 @@ def send_error(
     button: Button | None = None,
     facts: FactsSection | None = None,
 ) -> None:
+    """Send error to the Teams channel."""
     send_notification(
         f"\U0001f4a3 {title}",
         text,
@@ -106,6 +110,7 @@ def send_exception(
     button: Button | None = None,
     facts: FactsSection | None = None,
 ) -> None:
+    """Send exception to the Teams channel."""
     send_notification(
         f"\U0001f525 {title}",
         text,
@@ -116,7 +121,12 @@ def send_exception(
 
 
 def mpt_notify(
-    account_id: str, buyer_id: str, subject: str, template_name: str, context: dict
+    mpt_client: MPTClient,
+    account_id: str,
+    buyer_id: str,
+    subject: str,
+    template_name: str,
+    context: dict,
 ) -> None:
     """
     Sends a notification through the MPT API using a specified template and context.
@@ -132,7 +142,7 @@ def mpt_notify(
     try:
         notify(
             mpt_client,
-            NotifyCategories.ORDERS.value,
+            MPT_NOTIFY_CATEGORIES["ORDERS"],
             account_id,
             buyer_id,
             subject,
@@ -140,10 +150,11 @@ def mpt_notify(
         )
     except Exception:
         logger.exception(
-            f"Cannot send MPT API notification:"
-            f" Category: '{NotifyCategories.ORDERS.value}',"
-            f" Account ID: '{account_id}',"
-            f" Buyer ID: '{buyer_id}',"
-            f" Subject: '{subject}',"
-            f" Message: '{rendered_template}'"
+            "Cannot send MPT API notification: Category: '%s', Account ID: '%s',"
+            " Buyer ID: '%s', Subject: '%s', Message: '%s'",
+            MPT_NOTIFY_CATEGORIES["ORDERS"],
+            account_id,
+            buyer_id,
+            subject,
+            rendered_template,
         )

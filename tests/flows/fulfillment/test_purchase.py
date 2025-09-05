@@ -2,11 +2,7 @@ import copy
 
 import pytest
 
-from adobe_vipm.adobe.constants import (
-    STATUS_INVALID_ADDRESS,
-    STATUS_INVALID_FIELDS,
-    STATUS_INVALID_MINIMUM_QUANTITY,
-)
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_3YC_NO_MINIMUMS,
@@ -18,15 +14,11 @@ from adobe_vipm.flows.constants import (
     ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
-    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_LICENSES,
-    PARAM_ADDRESS,
-    PARAM_CONTACT,
     STATUS_MARKET_SEGMENT_ELIGIBLE,
     STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
     STATUS_MARKET_SEGMENT_PENDING,
     TEMPLATE_NAME_PURCHASE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.purchase import (
@@ -39,10 +31,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
+    SyncAgreement,
     ValidateDuplicateLines,
 )
 from adobe_vipm.flows.helpers import (
@@ -230,9 +223,7 @@ def test_validate_market_segment_eligibility_step_status_eligible(
     mocked_next_step.assert_not_called()
 
 
-def test_create_customer_step(
-    mocker, order_factory, customer_data, adobe_customer_factory
-):
+def test_create_customer_step(mocker, order_factory, customer_data, adobe_customer_factory):
     adobe_customer = adobe_customer_factory()
 
     mocked_adobe_client = mocker.MagicMock()
@@ -323,7 +314,7 @@ def test_create_customer_step_no_contact(
     assert context.adobe_customer is None
     assert context.adobe_customer_id is None
 
-    param = get_ordering_parameter(context.order, PARAM_CONTACT)
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
     assert param["error"] == ERR_ADOBE_CONTACT.to_dict(
         title=param["name"], details="it is mandatory."
     )
@@ -501,7 +492,7 @@ def test_create_customer_step_save_data_with_3yc_request(
 
     ff_param = get_fulfillment_parameter(
         context.order,
-        PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
     )
     assert ff_param["value"] == commitment["status"]
 
@@ -541,13 +532,11 @@ def test_create_customer_step_handle_error_unexpected_error(
     )
 
 
-def test_create_customer_step_handle_error_address(
-    mocker, order_factory, adobe_api_error_factory
-):
+def test_create_customer_step_handle_error_address(mocker, order_factory, adobe_api_error_factory):
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_ADDRESS,
+            code=AdobeStatus.INVALID_ADDRESS.value,
             message="Invalid address",
             details=["detail1", "detail2"],
         ),
@@ -565,7 +554,7 @@ def test_create_customer_step_handle_error_address(
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param = get_ordering_parameter(context.order, PARAM_ADDRESS)
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
     assert param["error"] == ERR_ADOBE_ADDRESS.to_dict(
         title=param["name"],
         details=str(error),
@@ -583,7 +572,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_licenses(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.INVALID_MINIMUM_QUANTITY.value,
             message="Minimum quantity out of range",
             details=["LICENSE"],
         ),
@@ -601,7 +590,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_licenses(
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param_licenses = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
+    param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
     assert param_licenses["error"] == ERR_3YC_QUANTITY_LICENSES.to_dict(
         title=param_licenses["name"],
     )
@@ -618,7 +607,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_consumables(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.INVALID_MINIMUM_QUANTITY.value,
             message="Minimum quantity out of range",
             details=["CONSUMABLES"],
         ),
@@ -636,7 +625,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_consumables(
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param_consumables = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
+    param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
     assert param_consumables["error"] == ERR_3YC_QUANTITY_CONSUMABLES.to_dict(
         title=param_consumables["name"],
     )
@@ -653,7 +642,7 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_no_minimums(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_MINIMUM_QUANTITY,
+            code=AdobeStatus.INVALID_MINIMUM_QUANTITY.value,
             message="Minimum quantity out of range",
             details=[],
         ),
@@ -671,8 +660,8 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_no_minimums(
     step = CreateCustomer()
     step.handle_error(mocked_client, context, error)
 
-    param_licenses = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
-    param_consumables = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
+    param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
+    param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
 
     assert context.order["error"] == ERR_3YC_NO_MINIMUMS.to_dict(
         title_min_licenses=param_licenses["name"],
@@ -703,7 +692,7 @@ def test_create_customer_step_handle_error_invalid_fields(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_INVALID_FIELDS,
+            code=AdobeStatus.INVALID_FIELDS.value,
             message="Invalid fields",
             details=[error_details],
         ),
@@ -734,10 +723,6 @@ def test_create_customer_step_handle_error_invalid_fields(
 
 
 def test_fulfill_purchase_order(mocker):
-    """
-    Tests the purchase order pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
@@ -753,14 +738,14 @@ def test_fulfill_purchase_order(mocker):
 
     fulfill_purchase_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 15
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 16
 
     expected_steps = [
         SetupContext,
+        StartOrderProcessing,
         SetupDueDate,
         ValidateDuplicateLines,
         ValidateMarketSegmentEligibility,
-        StartOrderProcessing,
         PrepareCustomerData,
         CreateCustomer,
         Validate3YCCommitment,
@@ -768,15 +753,16 @@ def test_fulfill_purchase_order(mocker):
         SubmitNewOrder,
         CreateOrUpdateSubscriptions,
         RefreshCustomer,
-        SetOrUpdateCotermNextSyncDates,
+        SetOrUpdateCotermDate,
         UpdatePrices,
         CompleteOrder,
+        SyncAgreement,
     ]
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
 
-    assert mocked_pipeline_ctor.mock_calls[0].args[4].template_name == TEMPLATE_NAME_PURCHASE
+    assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_PURCHASE
     assert mocked_pipeline_ctor.mock_calls[0].args[14].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(

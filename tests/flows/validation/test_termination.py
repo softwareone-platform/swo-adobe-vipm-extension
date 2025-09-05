@@ -5,7 +5,7 @@ from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.constants import ERR_INVALID_TERMINATION_ORDER_QUANTITY
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
@@ -25,9 +25,6 @@ def test_validate_downsizes_step_success(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests the validate downsizes step when all validations pass.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -82,12 +79,7 @@ def test_validate_downsizes_step_success(
         ret_info_3,
     ]
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     mocker.patch(
@@ -129,9 +121,6 @@ def test_validate_downsizes_step_no_returnable_orders(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the validate downsizes step when no returnable orders are found.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -153,12 +142,7 @@ def test_validate_downsizes_step_no_returnable_orders(
     mocked_next_step = mocker.MagicMock()
 
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     context = Context(
@@ -171,7 +155,6 @@ def test_validate_downsizes_step_no_returnable_orders(
 
     step = ValidateDownsizes()
     step(mocked_client, context, mocked_next_step)
-
 
     mocked_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id,
@@ -192,9 +175,6 @@ def test_validate_downsizes_step_quantity_mismatch(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests the validate downsizes step when the quantity doesn't match the returnable orders.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -237,12 +217,7 @@ def test_validate_downsizes_step_quantity_mismatch(
     ]
 
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     mocker.patch(
@@ -279,9 +254,6 @@ def test_validate_downsizes_step_inactive_subscription(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the validate downsizes step when the subscription is inactive.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=3,
@@ -293,12 +265,7 @@ def test_validate_downsizes_step_inactive_subscription(
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1004",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1004", "offerId": sku}]
     }
 
     mocker.patch(
@@ -328,10 +295,6 @@ def test_validate_downsizes_step_inactive_subscription(
 
 
 def test_validate_termination_order(mocker):
-    """
-    Tests the termination order validation pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
@@ -352,7 +315,7 @@ def test_validate_termination_order(mocker):
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
-        SetOrUpdateCotermNextSyncDates,
+        SetOrUpdateCotermDate,
         ValidateRenewalWindow,
         ValidateDownsizes,
         Validate3YCCommitment,

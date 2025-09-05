@@ -1,24 +1,28 @@
+from mpt_extension_sdk.mpt_http.utils import find_first
+
 from adobe_vipm.adobe.constants import (
     REGEX_SANITIZE_COMPANY_NAME,
     REGEX_SANITIZE_FIRST_LAST_NAME,
 )
-from adobe_vipm.utils import find_first
 
 
-def get_item_by_partial_sku(items, sku):
+def get_item_by_partial_sku(line_items, sku):
     """
-    Get the full SKU from a list of items
-    given the partial sku.
+    Get the full SKU from a list of line_items given the partial sku.
 
     Args:
-        items (list): List of item to search.
+        line_items (list): List of item to search.
         sku (str): The partial SKU to search in
         the list of item.
 
     Returns:
         str: The full SKU if found, None if not.
     """
-    return find_first(lambda item: item["offerId"].startswith(sku), items, default={})
+    return find_first(
+        lambda line_item: line_item["offerId"].startswith(sku),
+        line_items,
+        default={},
+    )
 
 
 def get_item_by_subcription_id(line_items, subscription_id):
@@ -42,10 +46,11 @@ def get_item_by_subcription_id(line_items, subscription_id):
 
 def to_adobe_line_id(mpt_line_id: str) -> int:
     """
-    Converts Marketplace Line id to integer by extracting sequencial part of the line id
+    Converts Marketplace Line id to integer by extracting sequencial part of the line id.
+
     Example: ALI-1234-1234-1234-0001 --> 1
     """
-    return int(mpt_line_id.split("-")[-1])
+    return int(mpt_line_id.rsplit("-", maxsplit=1)[-1])
 
 
 def join_phone_number(phone: dict) -> str:
@@ -64,32 +69,9 @@ def join_phone_number(phone: dict) -> str:
     return f"{phone['prefix']}{phone['number']}" if phone else ""
 
 
-def get_3yc_commitment(customer_or_transfer_preview):
+def get_3yc_commitment_request(customer, *, is_recommitment=False):  # noqa: WPS114
     """
-    Extract the commitment object from the customer object
-    or from the transfer preview object.
-
-    Args:
-        customer_or_transfer_preview (dict): A customer object
-        or a transfer preview object from which extract the commitment
-        object.
-
-    Returns:
-        dict: The commitment object if it exists or an empty object.
-    """
-    benefit_3yc = find_first(
-        lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
-        customer_or_transfer_preview.get("benefits", []),
-        {},
-    )
-
-    return benefit_3yc.get("commitment", {}) or {}
-
-
-def get_3yc_commitment_request(customer, is_recommitment=False):
-    """
-    Extract the commitment or recommitment request object
-    from the customer object.
+    Extract the commitment or recommitment request object from the customer object.
 
     Args:
         customer (dict): A customer object from which extract the commitment
@@ -101,24 +83,21 @@ def get_3yc_commitment_request(customer, is_recommitment=False):
         dict: The commitment or recommitment request object if
         it exists or an empty object.
     """
-    benefit_3yc = find_first(
+    recommitment_or_commitment = "recommitmentRequest" if is_recommitment else "commitmentRequest"
+    benefit_3yc = find_first(  # noqa: WPS114
         lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
         customer.get("benefits", []),
         {},
     )
 
-    return (
-        benefit_3yc.get(
-            "commitmentRequest" if not is_recommitment else "recommitmentRequest", {}
-        )
-        or {}
-    )
+    return benefit_3yc.get(recommitment_or_commitment, {}) or {}
 
 
 def sanitize_company_name(company_name):
     """
-    Replaces the characters not allowed by the Marketeplace platform for
-    spaces and trim the result string.
+    Replaces the characters not allowed by the Marketeplace platform.
+
+    For spaces and trim the result string.
 
     Args:
         company_name (str): The Company Name string.
@@ -131,8 +110,9 @@ def sanitize_company_name(company_name):
 
 def sanitize_first_last_name(first_last_name):
     """
-    Replaces the characters not allowed by the Marketeplace platform for
-    spaces and trim the result string.
+    Replaces the characters not allowed by the Marketeplace platform.
+
+    For spaces and trim the result string.
 
     Args:
         first_last_name (str): The First or Last Name string.

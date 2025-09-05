@@ -1,31 +1,24 @@
 import logging
 import traceback
 
-from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows import constants
-from adobe_vipm.flows.helpers import (
-    populate_order_info,
-)
 from adobe_vipm.flows.utils import (
-    is_transfer_order,
-    is_transfer_validation_enabled,
     notify_unhandled_exception_in_teams,
-    reset_order_error,
-    reset_ordering_parameters_error,
     strip_trace_id,
     update_parameters_visibility,
 )
+from adobe_vipm.flows.utils.order import reset_order_error
+from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
+from adobe_vipm.flows.utils.validation import is_migrate_customer, is_reseller_change
 from adobe_vipm.flows.validation.change import validate_change_order
-from adobe_vipm.flows.validation.purchase import (
-    validate_purchase_order,
-)
+from adobe_vipm.flows.validation.purchase import validate_purchase_order
 from adobe_vipm.flows.validation.termination import validate_termination_order
-from adobe_vipm.flows.validation.transfer import validate_transfer
+from adobe_vipm.flows.validation.transfer import validate_reseller_change, validate_transfer
 
 logger = logging.getLogger(__name__)
 
 
-def validate_order(client, order):
+def validate_order(client, order):  # noqa: C901
     """
     Performs the validation of a draft order.
 
@@ -39,34 +32,26 @@ def validate_order(client, order):
     try:
         has_errors = False
 
-        match order["type"]:
-            case constants.ORDER_TYPE_PURCHASE:
-                if is_transfer_order(order) and is_transfer_validation_enabled(
-                    order
-                ):
-                    adobe_client = get_adobe_client()
-                    order = populate_order_info(client, order)
-                    order = reset_ordering_parameters_error(order)
-                    order = reset_order_error(order)
-                    has_errors, order = validate_transfer(client, adobe_client, order)
-                else:
-                    has_errors, order = validate_purchase_order(client, order)
-            case constants.ORDER_TYPE_CHANGE:
-                has_errors, order = validate_change_order(client, order)
-            case constants.ORDER_TYPE_TERMINATION:
-                has_errors, order = validate_termination_order(client, order)
+        order = reset_ordering_parameters_error(order)
+        order = reset_order_error(order)
 
+        def validate_purchase(client, order):
+            if is_migrate_customer(order):
+                return validate_transfer(client, order)
+            if is_reseller_change(order):
+                return validate_reseller_change(client, order)
 
-        order = update_parameters_visibility(order)
+            return validate_purchase_order(client, order)
 
-        if not order["lines"]:  # pragma: no cover
-            del order["lines"]
+        validators = {
+            constants.ORDER_TYPE_PURCHASE: validate_purchase,
+            constants.ORDER_TYPE_CHANGE: validate_change_order,
+            constants.ORDER_TYPE_TERMINATION: validate_termination_order,
+        }
 
-        logger.info(
-            f"Validation of order {order['id']} succeeded "
-            f"with{'out' if not has_errors else ''} errors"
-        )
-        return order
+        if order["type"] in validators:
+            has_errors, order = validators[order["type"]](client, order)
+            order = update_parameters_visibility(order)
     except Exception:
         notify_unhandled_exception_in_teams(
             "validation",
@@ -74,3 +59,10 @@ def validate_order(client, order):
             strip_trace_id(traceback.format_exc()),
         )
         raise
+    else:
+        logger.info(
+            "Validation of order %s succeeded %s errors",
+            order["id"],
+            f"with{'out' if not has_errors else ''}",
+        )
+        return order

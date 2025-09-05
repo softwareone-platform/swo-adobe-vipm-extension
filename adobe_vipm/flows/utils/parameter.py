@@ -1,31 +1,29 @@
 import copy
 import functools
 
+from mpt_extension_sdk.mpt_http.utils import find_first
+
 from adobe_vipm.flows.constants import (
-    NEW_CUSTOMER_PARAMETERS,
-    OPTIONAL_CUSTOMER_ORDER_PARAMS,
-    PARAM_COTERM_DATE,
-    PARAM_MEMBERSHIP_ID,
-    PARAM_NEXT_SYNC_DATE,
-    PARAM_PHASE_FULFILLMENT,
-    PARAM_PHASE_ORDERING,
-    PARAM_RETRY_COUNT,
+    PARAM_NEW_CUSTOMER_PARAMETERS,
+    PARAM_OPTIONAL_CUSTOMER_ORDER,
+    TRANSFER_CUSTOMER_PARAMETERS,
+    Param,
 )
-from adobe_vipm.utils import find_first
 
 
-def get_parameter(parameter_phase, source, param_external_id):
+def get_parameter(parameter_phase: str, source: str, param_external_id: str) -> dict:
     """
     Returns a parameter of a given phase by its external identifier.
+
     Returns an empty dictionary if the parameter is not found.
+
     Args:
-        parameter_phase (str): The phase of the parameter (ordering, fulfillment).
-        source (str): The source business object from which the parameter
-        should be extracted.
-        param_external_id (str): The unique external identifier of the parameter.
+        parameter_phase: The phase of the parameter (ordering, fulfillment).
+        source: The source business object from which the parameter should be extracted.
+        param_external_id: The unique external identifier of the parameter.
 
     Returns:
-        dict: The parameter object or an empty dictionary if not found.
+        The parameter object or an empty dictionary if not found.
     """
     return find_first(
         lambda x: x["externalId"] == param_external_id,
@@ -33,21 +31,30 @@ def get_parameter(parameter_phase, source, param_external_id):
         default={},
     )
 
-get_ordering_parameter = functools.partial(get_parameter, PARAM_PHASE_ORDERING)
 
-get_fulfillment_parameter = functools.partial(get_parameter, PARAM_PHASE_FULFILLMENT)
+get_ordering_parameter = functools.partial(get_parameter, Param.PHASE_ORDERING.value)
 
-def set_ordering_parameter_error(order, param_external_id, error, required=True):
+get_fulfillment_parameter = functools.partial(get_parameter, Param.PHASE_FULFILLMENT.value)
+
+
+def set_ordering_parameter_error(
+    order: dict,
+    param_external_id: str,
+    error: dict,
+    *,
+    required=True,
+) -> dict:
     """
     Set a validation error on an ordering parameter.
 
     Args:
-        order (dict): The order that contains the parameter.
-        param_external_id (str): The external identifier of the parameter.
-        error (dict): The error (id, message) that must be set.
+        order: The order that contains the parameter.
+        param_external_id: The external identifier of the parameter.
+        error: The error (id, message) that must be set.
+        required: Sets parameter required field.
 
     Returns:
-        dict: The order updated.
+        Updated MPT order.
     """
     updated_order = copy.deepcopy(order)
     param = get_ordering_parameter(
@@ -61,58 +68,128 @@ def set_ordering_parameter_error(order, param_external_id, error, required=True)
     }
     return updated_order
 
-def reset_ordering_parameters_error(order):
+
+def reset_ordering_parameters_error(order: dict) -> dict:
     """
-    Reset errors for all ordering parameters
+    Reset errors for all ordering parameters.
 
     Args:
-        order (dict): The order that contains the parameter.
+        order: The order that contains the parameter.
 
     Returns:
-        dict: The order updated.
+        Updated order.
     """
     updated_order = copy.deepcopy(order)
 
-    for param in updated_order["parameters"][PARAM_PHASE_ORDERING]:
+    for param in updated_order["parameters"][Param.PHASE_ORDERING.value]:
         param["error"] = None
 
     return updated_order
 
-def update_parameters_visibility(order):
-    from adobe_vipm.flows.utils.customer import is_new_customer
 
-    if is_new_customer(order):
-        for param in NEW_CUSTOMER_PARAMETERS:
-            order = set_parameter_visible(order, param)
-        order = set_parameter_hidden(order, PARAM_MEMBERSHIP_ID)
-    else:
-        for param in NEW_CUSTOMER_PARAMETERS:
-            order = set_parameter_hidden(order, param)
-        order = set_parameter_visible(order, PARAM_MEMBERSHIP_ID)
-    return order
+def update_parameters_visibility(order: dict) -> dict:
+    """
+    Update order parameters visibility based on choosen parameter of agreement type.
 
-def is_ordering_param_required(source, param_external_id):
+    If it is new customer order sets parameters that are requied for new customer to visible
+    and required. Otherise hide them and unmark as required.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        Updated MPT order.
+    """
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value)
+    agreement_value = (agreement_type.get("value") or "").lower()
+    updated_order = copy.deepcopy(order)
+
+    parameters_map = {
+        "new": {
+            "visible": PARAM_NEW_CUSTOMER_PARAMETERS,
+            "hidden": (*TRANSFER_CUSTOMER_PARAMETERS, *(Param.MEMBERSHIP_ID.value,)),
+        },
+        "migrate": {
+            "visible": [Param.MEMBERSHIP_ID.value],
+            "hidden": (*PARAM_NEW_CUSTOMER_PARAMETERS, *TRANSFER_CUSTOMER_PARAMETERS),
+        },
+        "transfer": {
+            "visible": TRANSFER_CUSTOMER_PARAMETERS,
+            "hidden": (*PARAM_NEW_CUSTOMER_PARAMETERS, *(Param.MEMBERSHIP_ID.value,)),
+        },
+    }
+    param_config = parameters_map.get(agreement_value, {})
+    for param in param_config.get("visible", []):
+        updated_order = set_parameter_visible(updated_order, param)
+    for param in param_config.get("hidden", []):
+        updated_order = set_parameter_hidden(updated_order, param)
+
+    return updated_order
+
+
+def is_ordering_param_required(source: dict, param_external_id: str) -> bool:
+    """
+    Checks if ordering parameter is required.
+
+    Args:
+        source: MPT order or agreement.
+        param_external_id: Parameter external id.
+
+    Returns:
+        If the parameter is set as required in provided order or agreement.
+    """
     param = get_ordering_parameter(source, param_external_id)
     return (param.get("constraints", {}) or {}).get("required", False)
 
-def set_coterm_date(order, coterm_date):
+
+def set_coterm_date(order: dict, coterm_date: str) -> dict:
+    """
+    Sets coterm date parameter in MPT order.
+
+    Args:
+        order: MPT order.
+        coterm_date: coterm date value.
+
+    Returns:
+        Updated MPT order.
+    """
     updated_order = copy.deepcopy(order)
     customer_ff_param = get_fulfillment_parameter(
         updated_order,
-        PARAM_COTERM_DATE,
+        Param.COTERM_DATE.value,
     )
     customer_ff_param["value"] = coterm_date
     return updated_order
 
 
-def get_coterm_date(order):
+def get_coterm_date(order: dict) -> str | None:
+    """
+    Returns coterm date from MPT order coterm date parameter.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        Coterm date or None
+    """
     return get_fulfillment_parameter(
         order,
-        PARAM_COTERM_DATE,
+        Param.COTERM_DATE.value,
     ).get("value")
 
 
-def update_ordering_parameter_value(order, param_external_id, value):
+def update_ordering_parameter_value(order: dict, param_external_id: str, value: str) -> dict:
+    """
+    Update ordering parameter value in MPT order.
+
+    Args:
+        order: MPT order.
+        param_external_id: MPT parameter external id.
+        value: parameter value.
+
+    Returns:
+        Updated MPT order.
+    """
     updated_order = copy.deepcopy(order)
     param = get_ordering_parameter(
         updated_order,
@@ -122,42 +199,69 @@ def update_ordering_parameter_value(order, param_external_id, value):
 
     return updated_order
 
-def get_adobe_membership_id(source):
+
+def get_adobe_membership_id(source: dict) -> str | None:
     """
-    Get the Adobe membership identifier from the corresponding ordering
-    parameter or None if it is not set.
+    Get the Adobe membership id from the corresponding ordering parameter.
 
     Args:
-        source (dict): The business object from which the membership id
-        should be retrieved.
+        source: The business object from which the membership id should be retrieved.
 
     Returns:
-        str: The Adobe membership identifier or None if it isn't set.
+        The Adobe membership identifier or None if it isn't set.
     """
     param = get_ordering_parameter(
         source,
-        PARAM_MEMBERSHIP_ID,
+        Param.MEMBERSHIP_ID.value,
     )
     return param.get("value")
 
 
-def set_next_sync(order, next_sync):
-    updated_order = copy.deepcopy(order)
-    customer_ff_param = get_fulfillment_parameter(
-        updated_order,
-        PARAM_NEXT_SYNC_DATE,
+def get_change_reseller_code(source):
+    """
+    Get the change reseller code from the corresponding ordering parameter.
+
+    Args:
+        source: The business object from which the change reseller code should be retrieved.
+
+    Returns:
+        The change reseller code or None if it isn't set.
+    """
+    param = get_ordering_parameter(
+        source,
+        Param.CHANGE_RESELLER_CODE,
     )
-    customer_ff_param["value"] = next_sync
-    return updated_order
+    return param.get("value")
 
 
-def get_next_sync(order):
-    return get_fulfillment_parameter(
-        order,
-        PARAM_NEXT_SYNC_DATE,
-    ).get("value")
+def get_change_reseller_admin_email(source):
+    """
+    Get the admin email from the corresponding ordering parameter.
 
-def set_parameter_visible(order, param_external_id):
+    Args:
+        source: The business object from which the admin email should be retrieved.
+
+    Returns:
+        The admin email or None if it isn't set.
+    """
+    param = get_ordering_parameter(
+        source,
+        Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
+    )
+    return param.get("value")
+
+
+def set_parameter_visible(order: dict, param_external_id: str) -> dict:
+    """
+    Sets ordering parameter visibility.
+
+    Args:
+        order: MPT order.
+        param_external_id: Parameter external id.
+
+    Returns:
+        Updated MPT order.
+    """
     updated_order = copy.deepcopy(order)
     param = get_ordering_parameter(
         updated_order,
@@ -165,12 +269,22 @@ def set_parameter_visible(order, param_external_id):
     )
     param["constraints"] = {
         "hidden": False,
-        "required": param_external_id not in OPTIONAL_CUSTOMER_ORDER_PARAMS,
+        "required": param_external_id not in PARAM_OPTIONAL_CUSTOMER_ORDER,
     }
     return updated_order
 
 
-def set_parameter_hidden(order, param_external_id):
+def set_parameter_hidden(order: dict, param_external_id: str) -> dict:
+    """
+    Sets ordering parameter with param_external_id hidden in MPT order.
+
+    Args:
+        order: MPT order.
+        param_external_id: Parameter external id.
+
+    Returns:
+        Update MPT order.
+    """
     updated_order = copy.deepcopy(order)
     param = get_ordering_parameter(
         updated_order,
@@ -183,23 +297,22 @@ def set_parameter_hidden(order, param_external_id):
     return updated_order
 
 
-def get_retry_count(order):
+def get_retry_count(order: dict) -> str | None:
     """
-    Gets RETRY_COUNT parameter
+    Gets RETRY_COUNT parameter.
+
     Args:
-        order (dict): The order that contains the retry count fulfillment
-        parameter.
+        order: The order that contains the retry count fulfillment parameter.
 
     Returns:
-        str: retry count. None if parameter doesn't exist
+        Retry count. None if parameter doesn't exist
     """
     param = find_first(
-        lambda x: x["externalId"] == PARAM_RETRY_COUNT,
+        lambda x: x["externalId"] == Param.RETRY_COUNT.value,
         order["parameters"]["fulfillment"],
     )
 
     if not param:
-        return
+        return None
 
     return param["value"] if param.get("value") else ""
-

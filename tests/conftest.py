@@ -1,73 +1,38 @@
 import copy
+import datetime as dt
 import json
 import signal
 from collections import defaultdict
-from datetime import UTC, date, datetime, timedelta
 
 import jwt
 import pytest
 import responses
 from django.conf import settings
 from mpt_extension_sdk.core.events.dataclasses import Event
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from rich.highlighter import ReprHighlighter as _ReprHighlighter
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
-from adobe_vipm.adobe.constants import (
-    OFFER_TYPE_CONSUMABLES,
-    OFFER_TYPE_LICENSE,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, OfferType
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
     AdobeProductNotFoundError,
     AirTableBaseInfo,
     get_sku_adobe_mapping_model,
 )
-from adobe_vipm.flows.constants import (
-    PARAM_3YC,
-    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_END_DATE,
-    PARAM_3YC_ENROLL_STATUS,
-    PARAM_3YC_LICENSES,
-    PARAM_3YC_RECOMMITMENT,
-    PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_START_DATE,
-    PARAM_ADDRESS,
-    PARAM_ADOBE_SKU,
-    PARAM_AGREEMENT_TYPE,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
-    PARAM_COTERM_DATE,
-    PARAM_CUSTOMER_ID,
-    PARAM_DEPLOYMENT_ID,
-    PARAM_DEPLOYMENTS,
-    PARAM_DUE_DATE,
-    PARAM_GLOBAL_CUSTOMER,
-    PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
-    PARAM_MEMBERSHIP_ID,
-    PARAM_NEXT_SYNC_DATE,
-)
+from adobe_vipm.flows.constants import AgreementStatus, Param
 
 
 @pytest.fixture()
 def requests_mocker():
-    """
-    Allow mocking of http calls made with requests.
-    """
     with responses.RequestsMock() as rsps:
         yield rsps
 
 
 @pytest.fixture()
 def adobe_api_error_factory():
-    """
-    Generate an error message returned by Adobe.
-    """
-
     def _adobe_error(code, message, details=None):
         error = {
             "code": code,
@@ -82,9 +47,6 @@ def adobe_api_error_factory():
 
 @pytest.fixture()
 def adobe_config_file():
-    """
-    Return an Adobe VIP Marketplace configuration file
-    """
     return {
         "language_codes": ["en-US"],
         "skus_mapping": [
@@ -245,9 +207,6 @@ def adobe_config_file():
 
 @pytest.fixture()
 def adobe_credentials_file():
-    """
-    Return an Adobe VIP Marketplace credentials file
-    """
     return [
         {
             "authorization_uk": "uk-auth-adobe-us-01",
@@ -262,9 +221,6 @@ def adobe_credentials_file():
 
 @pytest.fixture()
 def adobe_authorizations_file():
-    """
-    Return an Adobe VIP Marketplace authorizations file
-    """
     return {
         "authorizations": [
             {
@@ -286,28 +242,14 @@ def adobe_authorizations_file():
 
 
 @pytest.fixture()
-def mock_adobe_config(
-    mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file
-):
-    """
-    Mock the Adobe Config object to load test data from the adobe_credentials and
-    adobe_config_file fixtures.
-    """
-    mocker.patch.object(
-        Config, "_load_credentials", return_value=adobe_credentials_file
-    )
-    mocker.patch.object(
-        Config, "_load_authorizations", return_value=adobe_authorizations_file
-    )
+def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file):
+    mocker.patch.object(Config, "_load_credentials", return_value=adobe_credentials_file)
+    mocker.patch.object(Config, "_load_authorizations", return_value=adobe_authorizations_file)
     mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
 
 
 @pytest.fixture()
 def account_data():
-    """
-    Returns a adobe account data structure.
-
-    """
     return {
         "companyName": "ACME Inc",
         "address": {
@@ -377,7 +319,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": PARAM_COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME.value,
                 "type": "SingleLineText",
                 "value": company_name,
                 "constraints": {
@@ -388,7 +330,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": PARAM_ADDRESS,
+                "externalId": Param.ADDRESS.value,
                 "type": "Address",
                 "value": address,
                 "constraints": {
@@ -399,7 +341,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": PARAM_CONTACT,
+                "externalId": Param.CONTACT.value,
                 "type": "Contact",
                 "value": contact,
                 "constraints": {
@@ -410,7 +352,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": PARAM_AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE.value,
                 "type": "SingleLineText",
                 "value": "New",
                 "constraints": {
@@ -421,7 +363,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0005",
                 "name": "Membership Id",
-                "externalId": PARAM_MEMBERSHIP_ID,
+                "externalId": Param.MEMBERSHIP_ID.value,
                 "type": "SingleLineText",
                 "value": "",
                 "constraints": {
@@ -432,7 +374,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0006",
                 "name": "3YC",
-                "externalId": PARAM_3YC,
+                "externalId": Param.THREE_YC.value,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
@@ -443,7 +385,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0007",
                 "name": "3YCLicenses",
-                "externalId": PARAM_3YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES.value,
                 "type": "SingleLineText",
                 "value": p3yc_licenses,
                 "constraints": {
@@ -454,7 +396,7 @@ def order_parameters_factory():
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCConsumables",
-                "externalId": PARAM_3YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
                 "type": "SingleLineText",
                 "value": p3yc_consumables,
                 "constraints": {
@@ -482,90 +424,224 @@ def transfer_order_parameters_factory():
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
-                "externalId": PARAM_COMPANY_NAME,
+                "externalId": Param.COMPANY_NAME.value,
                 "type": "SingleLineText",
                 "value": company_name or "",
                 "constraints": {
                     "hidden": True,
                     "required": False,
                 },
+                "error": None,
             },
             {
                 "id": "PAR-0000-0002",
                 "name": "Address",
-                "externalId": PARAM_ADDRESS,
+                "externalId": Param.ADDRESS.value,
                 "type": "Address",
                 "value": address or {},
                 "constraints": {
                     "hidden": True,
                     "required": False,
                 },
+                "error": None,
             },
             {
                 "id": "PAR-0000-0003",
                 "name": "Contact",
-                "externalId": PARAM_CONTACT,
+                "externalId": Param.CONTACT.value,
                 "type": "Contact",
                 "value": contact or {},
                 "constraints": {
                     "hidden": True,
                     "required": False,
                 },
+                "error": None,
             },
             {
                 "id": "PAR-0000-0004",
                 "name": "Account type",
-                "externalId": PARAM_AGREEMENT_TYPE,
+                "externalId": Param.AGREEMENT_TYPE.value,
                 "type": "SingleLineText",
                 "value": "Migrate",
                 "constraints": {
                     "hidden": False,
                     "required": True,
                 },
+                "error": None,
             },
             {
                 "id": "PAR-0000-0005",
                 "name": "Membership Id",
-                "externalId": PARAM_MEMBERSHIP_ID,
+                "externalId": Param.MEMBERSHIP_ID.value,
                 "type": "SingleLineText",
                 "value": membership_id,
                 "constraints": {
                     "hidden": False,
                     "required": True,
                 },
+                "error": None,
             },
             {
                 "id": "PAR-0000-0006",
                 "name": "3YC",
-                "externalId": PARAM_3YC,
+                "externalId": Param.THREE_YC.value,
                 "type": "Checkbox",
                 "value": p3yc,
                 "constraints": {
                     "hidden": True,
                     "required": False,
                 },
+                "error": None,
             },
             {
                 "id": "PAR-0000-0007",
                 "name": "3YCLicenses",
-                "externalId": PARAM_3YC_LICENSES,
+                "externalId": Param.THREE_YC_LICENSES.value,
                 "type": "SingleLineText",
                 "value": p3yc_licenses or "",
                 "constraints": {
                     "hidden": True,
                     "required": False,
                 },
+                "error": None,
             },
             {
                 "id": "PAR-0000-0008",
                 "name": "3YCConsumables",
-                "externalId": PARAM_3YC_CONSUMABLES,
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
                 "type": "SingleLineText",
                 "value": p3yc_consumables or "",
                 "constraints": {
                     "hidden": True,
                     "required": False,
                 },
+                "error": None,
+            },
+        ]
+
+    return _order_parameters
+
+
+@pytest.fixture()
+def reseller_change_order_parameters_factory():
+    def _order_parameters(
+        reseller_change_code="88888888",
+        admin_email="admin@admin.com",
+        company_name=None,
+        address=None,
+        contact=None,
+        p3yc=None,
+        p3yc_licenses=None,
+        p3yc_consumables=None,
+    ):
+        return [
+            {
+                "id": "PAR-0000-0001",
+                "name": "Company Name",
+                "externalId": Param.COMPANY_NAME.value,
+                "type": "SingleLineText",
+                "value": company_name or "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0002",
+                "name": "Address",
+                "externalId": Param.ADDRESS.value,
+                "type": "Address",
+                "value": address or {},
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0003",
+                "name": "Contact",
+                "externalId": Param.CONTACT.value,
+                "type": "Contact",
+                "value": contact or {},
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0004",
+                "name": "Account type",
+                "externalId": Param.AGREEMENT_TYPE.value,
+                "type": "SingleLineText",
+                "value": "Transfer",
+                "constraints": {
+                    "hidden": False,
+                    "required": True,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0005",
+                "name": "Change of reseller code",
+                "externalId": Param.CHANGE_RESELLER_CODE.value,
+                "type": "SingleLineText",
+                "value": reseller_change_code,
+                "constraints": {
+                    "hidden": False,
+                    "required": True,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0006",
+                "name": "Adobe Customer Admin Email",
+                "externalId": Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value,
+                "type": "SingleLineText",
+                "value": admin_email,
+                "constraints": {
+                    "hidden": False,
+                    "required": True,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0007",
+                "name": "3YC",
+                "externalId": Param.THREE_YC.value,
+                "type": "Checkbox",
+                "value": p3yc,
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0008",
+                "name": "3YCLicenses",
+                "externalId": Param.THREE_YC_LICENSES.value,
+                "type": "SingleLineText",
+                "value": p3yc_licenses or "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0009",
+                "name": "3YCConsumables",
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
+                "type": "SingleLineText",
+                "value": p3yc_consumables or "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
             },
         ]
 
@@ -583,7 +659,6 @@ def fulfillment_parameters_factory():
         p3yc_recommitment_request_status="",
         p3yc_start_date="",
         p3yc_end_date="",
-        next_sync_date="",
         market_segment_eligibility_status=None,
         coterm_date="",
         global_customer=None,
@@ -595,83 +670,76 @@ def fulfillment_parameters_factory():
             {
                 "id": "PAR-1234-5678",
                 "name": "Customer Id",
-                "externalId": PARAM_CUSTOMER_ID,
+                "externalId": Param.CUSTOMER_ID.value,
                 "type": "SingleLineText",
                 "value": customer_id,
             },
             {
                 "id": "PAR-7771-1777",
                 "name": "Due Date",
-                "externalId": PARAM_DUE_DATE,
+                "externalId": Param.DUE_DATE.value,
                 "type": "Date",
                 "value": due_date,
             },
             {
                 "id": "PAR-9876-5432",
                 "name": "3YC Enroll Status",
-                "externalId": PARAM_3YC_ENROLL_STATUS,
+                "externalId": Param.THREE_YC_ENROLL_STATUS.value,
                 "type": "SingleLineText",
                 "value": p3yc_enroll_status,
             },
             {
                 "id": "PAR-2266-4848",
                 "name": "3YC Start Date",
-                "externalId": PARAM_3YC_START_DATE,
+                "externalId": Param.THREE_YC_START_DATE.value,
                 "type": "Date",
                 "value": p3yc_start_date,
             },
             {
                 "id": "PAR-3528-2927",
                 "name": "3YC End Date",
-                "externalId": PARAM_3YC_END_DATE,
+                "externalId": Param.THREE_YC_END_DATE.value,
                 "type": "Date",
                 "value": p3yc_end_date,
             },
             {
-                "id": "PAR-4141-1414",
-                "name": "Next Sync",
-                "externalId": PARAM_NEXT_SYNC_DATE,
-                "type": "Date",
-                "value": next_sync_date,
-            },
-            {
                 "id": "PAR-0022-2200",
                 "name": "3YC Commitment Request Status",
-                "externalId": PARAM_3YC_COMMITMENT_REQUEST_STATUS,
+                "externalId": Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
                 "type": "SingleLineText",
                 "value": p3yc_commitment_request_status,
             },
             {
                 "id": "PAR-0077-7700",
                 "name": "3YC Recommitment Request Status",
-                "externalId": PARAM_3YC_RECOMMITMENT_REQUEST_STATUS,
+                "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value,
                 "type": "SingleLineText",
                 "value": p3yc_recommitment_request_status,
             },
             {
                 "id": "PAR-0000-6666",
                 "name": "3YCRecommitment",
-                "externalId": PARAM_3YC_RECOMMITMENT,
+                "externalId": Param.THREE_YC_RECOMMITMENT.value,
                 "type": "Checkbox",
                 "value": p3yc_recommitment or [],
             },
             {
                 "id": "PAR-0000-6666",
                 "name": "Eligibility Status",
-                "externalId": PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS,
+                "externalId": Param.MARKET_SEGMENT_ELIGIBILITY_STATUS.value,
                 "type": "Dropdown",
                 "value": market_segment_eligibility_status,
             },
             {
                 "id": "PAR-7373-1919",
                 "name": "Customer Coterm date",
-                "externalId": PARAM_COTERM_DATE,
+                "externalId": Param.COTERM_DATE.value,
                 "type": "Date",
                 "value": coterm_date,
             },
             {
                 "id": "PAR-6179-6384-0024",
-                "externalId": PARAM_GLOBAL_CUSTOMER,
+                "externalId": Param.GLOBAL_CUSTOMER.value,
                 "name": "Global Customer",
                 "type": "Checkbox",
                 "displayValue": "Yes",
@@ -679,14 +747,14 @@ def fulfillment_parameters_factory():
             },
             {
                 "id": "PAR-6179-6384-0025",
-                "externalId": PARAM_DEPLOYMENT_ID,
+                "externalId": Param.DEPLOYMENT_ID.value,
                 "name": "Deployment ID",
                 "type": "SingleLineText",
                 "value": deployment_id,
             },
             {
                 "id": "PAR-6179-6384-0026",
-                "externalId": PARAM_DEPLOYMENTS,
+                "externalId": Param.DEPLOYMENTS.value,
                 "name": "Deployments",
                 "type": "MultiLineText",
                 "value": ",".join(deployments),
@@ -742,7 +810,7 @@ def pricelist_items_factory():
 
 
 @pytest.fixture()
-def lines_factory(agreement, deployment_id: str = None):
+def lines_factory(agreement, deployment_id=None):
     agreement_id = agreement["id"].split("-", 1)[1]
 
     def _items(
@@ -784,7 +852,25 @@ def lines_factory(agreement, deployment_id: str = None):
 
 
 @pytest.fixture()
-def subscriptions_factory(lines_factory):
+def subscription_price_factory():
+    def _subscription_price(currency="USD"):
+        return {
+            "SPxY": 4590.00000,
+            "SPxM": 382.50000,
+            "PPxY": 4500.00000,
+            "PPxM": 375.00000,
+            "defaultMarkup": 12.0000000000,
+            "defaultMargin": 10.7142857143,
+            "currency": currency,
+            "markup": 2.0000000000,
+            "margin": 1.9607843137,
+        }
+
+    return _subscription_price
+
+
+@pytest.fixture()
+def subscriptions_factory(lines_factory, subscription_price_factory):
     def _subscriptions(
         subscription_id="SUB-1000-2000-3000",
         product_name="Awesome product",
@@ -793,21 +879,24 @@ def subscriptions_factory(lines_factory):
         start_date=None,
         commitment_date=None,
         lines=None,
-        auto_renew=True,
+        auto_renew=True,  # noqa: FBT002
+        price=None,
     ):
         start_date = (
-            start_date.isoformat() if start_date else datetime.now(UTC).isoformat()
+            start_date.isoformat() if start_date else dt.datetime.now(tz=dt.UTC).isoformat()
         )
         lines = lines_factory() if lines is None else lines
+        price = price or subscription_price_factory()
         return [
             {
                 "id": subscription_id,
                 "name": f"Subscription for {product_name}",
+                "price": price,
                 "parameters": {
                     "fulfillment": [
                         {
                             "name": "Adobe SKU",
-                            "externalId": PARAM_ADOBE_SKU,
+                            "externalId": Param.ADOBE_SKU.value,
                             "type": "SingleLineText",
                             "value": adobe_sku,
                         }
@@ -832,11 +921,12 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
-        use_buyer_address=False,
+        use_buyer_address=False,  # noqa: FBT002
         subscriptions=None,
         fulfillment_parameters=None,
         ordering_parameters=None,
         lines=None,
+        status=AgreementStatus.ACTIVE.value,
     ):
         if not subscriptions:
             subscriptions = [
@@ -846,6 +936,12 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                     "item": {
                         "id": "ITM-0000-0001-0001",
                     },
+                    "parameters": {
+                        "fulfillment": [
+                            {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
+                        ]
+                    },
+                    "externalIds": {"vendor": "1e5b9c974c4ea1bcabdb0fe697a2f1NA"},
                 },
                 {
                     "id": "SUB-1234-5678",
@@ -853,10 +949,17 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
                     "item": {
                         "id": "ITM-0000-0001-0002",
                     },
+                    "parameters": {
+                        "fulfillment": [
+                            {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"}
+                        ]
+                    },
+                    "externalIds": {"vendor": "55feb5038045e0b1ebf026e7522e17NA"},
                 },
             ]
 
         licensee = {
+            "id": "LC-321-321-321",
             "name": licensee_name,
             "address": licensee_address,
             "useBuyerAddress": use_buyer_address,
@@ -866,6 +969,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
 
         return {
             "id": "AGR-2119-4550-8674-5962",
+            "status": status,
             "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
             "icon": None,
             "name": "Product Name 1",
@@ -904,14 +1008,17 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             },
             "product": {
                 "id": "PRD-1111-1111",
+                "name": "Adobe VIP Marketplace for Commercial",
+                "externalIds": {"operations": "adobe-erp"},
+                "icon": "/v1/catalog/products/PRD-6523-2229/icon",
+                "status": "Published",
             },
             "authorization": {"id": "AUT-1234-5678"},
             "lines": lines or [],
             "subscriptions": subscriptions,
             "parameters": {
                 "ordering": ordering_parameters or order_parameters_factory(),
-                "fulfillment": fulfillment_parameters
-                or fulfillment_parameters_factory(),
+                "fulfillment": fulfillment_parameters or fulfillment_parameters_factory(),
             },
         }
 
@@ -1057,10 +1164,6 @@ def order_factory(
     status="Processing",
     deployment_id="",
 ):
-    """
-    Marketplace platform order for tests.
-    """
-
     def _order(
         order_id="ORD-0792-5000-2253-4210",
         order_type="Purchase",
@@ -1188,7 +1291,7 @@ def webhook(settings):
 
 
 @pytest.fixture()
-def adobe_items_factory():
+def adobe_items_factory():  # noqa: C901
     def _items(
         line_number=1,
         offer_id="65304578CA01A12",
@@ -1197,7 +1300,7 @@ def adobe_items_factory():
         renewal_date=None,
         status=None,
         deployment_id=None,
-        currencyCode=None,
+        currency_code=None,
         deployment_currency_code=None,
     ):
         item = {
@@ -1205,8 +1308,8 @@ def adobe_items_factory():
             "offerId": offer_id,
             "quantity": quantity,
         }
-        if currencyCode:
-            item["currencyCode"] = currencyCode
+        if currency_code:
+            item["currencyCode"] = currency_code
         if deployment_id:
             item["deploymentId"] = deployment_id
             item["currencyCode"] = deployment_currency_code
@@ -1222,7 +1325,7 @@ def adobe_items_factory():
 
 
 @pytest.fixture()
-def adobe_order_factory(adobe_items_factory):
+def adobe_order_factory(adobe_items_factory):  # noqa: C901
     def _order(
         order_type,
         currency_code="USD",
@@ -1250,7 +1353,7 @@ def adobe_order_factory(adobe_items_factory):
             order["referenceOrderId"] = reference_order_id
         if status:
             order["status"] = status
-        if status in [STATUS_PENDING, STATUS_PROCESSED] or order_id:
+        if status in {AdobeStatus.PENDING.value, AdobeStatus.PROCESSED.value} or order_id:
             order["orderId"] = order_id or "P0123456789"
         if creation_date:
             order["creationDate"] = creation_date
@@ -1266,22 +1369,25 @@ def adobe_subscription_factory():
         offer_id=None,
         current_quantity=10,
         renewal_quantity=10,
-        autorenewal_enabled=True,
+        currency_code="USD",
+        autorenewal_enabled=True,  # noqa: FBT002
         deployment_id="",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         renewal_date=None,
     ):
+        default_renewal_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=366)
+
         return {
             "subscriptionId": subscription_id or "a-sub-id",
             "offerId": offer_id or "65304578CA01A12",
-            "currentQuantity": current_quantity,
+            Param.CURRENT_QUANTITY.value: current_quantity,
+            "currencyCode": currency_code,
             "autoRenewal": {
                 "enabled": autorenewal_enabled,
-                "renewalQuantity": renewal_quantity,
+                Param.RENEWAL_QUANTITY.value: renewal_quantity,
             },
             "creationDate": "2019-05-20T22:49:55Z",
-            "renewalDate": renewal_date
-            or (date.today() + timedelta(days=366)).isoformat(),
+            "renewalDate": renewal_date or default_renewal_date.isoformat(),
             "status": status,
             "deploymentId": deployment_id,
         }
@@ -1295,7 +1401,7 @@ def adobe_preview_transfer_factory(adobe_items_factory):
         items = (
             items
             if items is not None
-            else adobe_items_factory(renewal_date=date.today().isoformat())
+            else adobe_items_factory(renewal_date=dt.datetime.now(tz=dt.UTC).date().isoformat())
         )
         return {
             "totalCount": len(items),
@@ -1306,23 +1412,44 @@ def adobe_preview_transfer_factory(adobe_items_factory):
 
 
 @pytest.fixture()
+def adobe_reseller_change_preview_factory(
+    adobe_items_factory,
+):
+    def _preview(items=None, approval_expiry=None):
+        today = dt.datetime.now(tz=dt.UTC).today()
+        items = items if items is not None else adobe_items_factory(renewal_date=today.isoformat())
+        if approval_expiry is None:
+            approval_expiry = (today + dt.timedelta(days=5)).isoformat()
+        return {
+            "transferId": "",
+            "customerId": "P1005238996",
+            "resellerId": "P1000084165",
+            "approval": {"code": "29595335", "expiry": approval_expiry},
+            "creationDate": "2025-07-21T12:00:27Z",
+            "status": "1002",
+            "totalCount": len(items),
+            "lineItems": items,
+        }
+
+    return _preview
+
+
+@pytest.fixture()
 def adobe_transfer_factory(adobe_items_factory):
     def _transfer(
         transfer_id="a-transfer-id",
         customer_id="",
-        status=STATUS_PENDING,
+        status=AdobeStatus.PENDING.value,
         items=None,
         membership_id="membership-id",
     ):
-        transfer = {
+        return {
             "transferId": transfer_id,
             "customerId": customer_id,
             "status": status,
             "membershipId": membership_id,
             "lineItems": items or adobe_items_factory(),
         }
-
-        return transfer
 
     return _transfer
 
@@ -1333,52 +1460,54 @@ def adobe_client_factory(
     mock_adobe_config,
     adobe_authorizations_file,
 ):
-    """
-    Returns a factory that allow the creation of an instance
-    of the AdobeClient with a fake token ready for tests.
-    """
-
     def _factory():
         authorization = Authorization(
-            authorization_uk=adobe_authorizations_file["authorizations"][0][
-                "authorization_uk"
-            ],
-            authorization_id=adobe_authorizations_file["authorizations"][0][
-                "authorization_id"
-            ],
+            authorization_uk=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+            authorization_id=adobe_authorizations_file["authorizations"][0]["authorization_id"],
             name=adobe_credentials_file[0]["name"],
             client_id=adobe_credentials_file[0]["client_id"],
             client_secret=adobe_credentials_file[0]["client_secret"],
             currency=adobe_authorizations_file["authorizations"][0]["currency"],
-            distributor_id=adobe_authorizations_file["authorizations"][0][
-                "distributor_id"
-            ],
+            distributor_id=adobe_authorizations_file["authorizations"][0]["distributor_id"],
         )
         api_token = APIToken(
             "a-token",
-            expires=datetime.now() + timedelta(seconds=86000),
+            expires=dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=86000),
         )
         client = AdobeClient()
-        client._token_cache[authorization] = api_token
+        client._token_cache[authorization] = api_token  # noqa: SLF001
 
         return client, authorization, api_token
 
     return _factory
 
 
+# TODO: what the difference between mpt_client and mock_mpt_client fixtures?????
 @pytest.fixture()
 def mpt_client(settings):
-    """
-    Create an instance of the MPT client used by the extension.
-    """
     settings.MPT_API_BASE_URL = "https://localhost"
-    from mpt_extension_sdk.core.utils import setup_client
+    from mpt_extension_sdk.core.utils import setup_client  # noqa: PLC0415
 
     return setup_client()
 
+
+@pytest.fixture()
+def mock_mpt_client(mocker):
+    return mocker.MagicMock(spec=MPTClient)
+
+
+@pytest.fixture()
+def mock_setup_client(mocker, mock_mpt_client):
+    mocker.patch(
+        "adobe_vipm.management.commands.sync_3yc_enrol.setup_client",
+        return_value=mock_mpt_client,
+    )
+    return mock_mpt_client
+
+
 @pytest.fixture()
 def created_agreement_factory():
-    def _created_agreement(deployments="", is_profile_address_exists=True):
+    def _created_agreement(deployments="", *, is_profile_address_exists=True):
         created_agreement = {
             "status": "Active",
             "listing": {"id": "LST-9401-9279"},
@@ -1407,10 +1536,7 @@ def created_agreement_factory():
                 "fulfillment": [
                     {"externalId": "globalCustomer", "value": ["Yes"]},
                     {"externalId": "deploymentId", "value": "deployment_id"},
-                    {
-                        "externalId": "deployments",
-                        "value": deployments
-                    },
+                    {"externalId": "deployments", "value": deployments},
                     {"externalId": "customerId", "value": "P0112233"},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                 ],
@@ -1423,29 +1549,24 @@ def created_agreement_factory():
             "termsAndConditions": [],
         }
         if is_profile_address_exists:
-            created_agreement["parameters"]["ordering"].append(
-                {
-                    "externalId": "address",
-                    "value": {
-                        "addressLine1": "addressLine1",
-                        "addressLine2": "addressLine2",
-                        "city": "city",
-                        "country": "US",
-                        "postCode": "postalCode",
-                        "state": "region",
-                    },
-                }
-            )
+            created_agreement["parameters"]["ordering"].append({
+                "externalId": "address",
+                "value": {
+                    "addressLine1": "addressLine1",
+                    "addressLine2": "addressLine2",
+                    "city": "city",
+                    "country": "US",
+                    "postCode": "postalCode",
+                    "state": "region",
+                },
+            })
         return created_agreement
+
     return _created_agreement
 
 
 @pytest.fixture()
 def mpt_error_factory():
-    """
-    Generate an error message returned by the Marketplace platform.
-    """
-
     def _mpt_error(
         status,
         title,
@@ -1469,22 +1590,16 @@ def mpt_error_factory():
 
 @pytest.fixture()
 def airtable_error_factory():
-    """
-    Generate an error message returned by the Airtable API.
-    """
-
     def _airtable_error(
         message,
         error_type="INVALID_REQUEST_UNKNOWN",
     ):
-        error = {
+        return {
             "error": {
                 "type": error_type,
                 "message": message,
             }
         }
-
-        return error
 
     return _airtable_error
 
@@ -1501,7 +1616,7 @@ def mpt_list_response():
 
 @pytest.fixture()
 def jwt_token(settings):
-    iat = nbf = int(datetime.now().timestamp())
+    iat = nbf = int(dt.datetime.now(tz=dt.UTC).timestamp())
     exp = nbf + 300
     return jwt.encode(
         {
@@ -1572,6 +1687,7 @@ def adobe_customer_factory():
         licenses_discount_level="01",
         consumables_discount_level="T1",
         coterm_date="2024-01-23",
+        *,
         global_sales_enabled=False,
         company_profile_address_exists=True,
     ):
@@ -1591,11 +1707,11 @@ def adobe_customer_factory():
             },
             "discounts": [
                 {
-                    "offerType": OFFER_TYPE_LICENSE,
+                    "offerType": OfferType.LICENSE.value,
                     "level": licenses_discount_level,
                 },
                 {
-                    "offerType": OFFER_TYPE_CONSUMABLES,
+                    "offerType": OfferType.CONSUMABLES.value,
                     "level": consumables_discount_level,
                 },
             ],
@@ -1629,22 +1745,22 @@ def adobe_customer_factory():
 @pytest.fixture()
 def mock_adobe_customer_deployments_items():
     return [
-            {
-                "deploymentId": "deployment-1",
-                "status": "1000",
-                "companyProfile": {"address": {"country": "DE"}},
-            },
-            {
-                "deploymentId": "deployment-2",
-                "status": "1004",
-                "companyProfile": {"address": {"country": "US"}},
-            },
-            {
-                "deploymentId": "deployment-3",
-                "status": "1000",
-                "companyProfile": {"address": {"country": "ES"}},
-            },
-        ]
+        {
+            "deploymentId": "deployment-1",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        },
+        {
+            "deploymentId": "deployment-2",
+            "status": "1004",
+            "companyProfile": {"address": {"country": "US"}},
+        },
+        {
+            "deploymentId": "deployment-3",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "ES"}},
+        },
+    ]
 
 
 @pytest.fixture()
@@ -1707,7 +1823,7 @@ def mock_runtime_master_options():
 @pytest.fixture()
 def mock_swoext_commands():
     return (
-        "swo.mpt.extensions.runtime.commands.run.run",
+        "mpt_extension_sdk.runtime.commands.run.run",
         "mpt_extension_sdk.runtime.commands.django.django",
     )
 
@@ -1737,7 +1853,8 @@ def mock_gunicorn_logging_config():
         "disable_existing_loggers": False,
         "formatters": {
             "verbose": {
-                "format": "{asctime} {name} {levelname} (pid: {process}) {message}",
+                "format": "{asctime} {name} {levelname} (pid: {process}, thread: {thread})"
+                " {message}",
                 "style": "{",
             },
             "rich": {
@@ -1778,7 +1895,7 @@ def mock_gunicorn_logging_config():
 
 @pytest.fixture()
 def mock_wrap_event():
-    return Event("evt-id", "orders", {"id": "ORD-1111-1111-1111"})
+    return Event("evt-id", "orders", {"id": "ORD-1111-1111"})
 
 
 @pytest.fixture()
@@ -1858,8 +1975,9 @@ def mock_logging_all_prefixes(
 
 @pytest.fixture()
 def mock_highlights(mock_logging_all_prefixes):
-    return _ReprHighlighter.highlights + [
-        rf"(?P<mpt_id>(?:{'|'.join(mock_logging_all_prefixes)})(?:-\d{{4}})*)"
+    return [
+        *_ReprHighlighter.highlights,
+        rf"(?P<mpt_id>(?:{'|'.join(mock_logging_all_prefixes)})(?:-\d{{4}})*)",
     ]
 
 
@@ -1944,6 +2062,14 @@ def mock_worker_initialize(mocker):
 
 
 @pytest.fixture()
+def mock_adobe_client(mocker):
+    m = mocker.MagicMock(spec=AdobeClient)
+    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=m)
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=m)
+    return m
+
+
+@pytest.fixture()
 def mock_worker_call_command(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.call_command")
 
@@ -1972,14 +2098,14 @@ def mock_sku_mapping_data():
             "sku": "65304578CA01A12",
             "segment": "segment_1",
             "name": "name_1",
-            "type_3yc": "License"
+            "type_3yc": "License",
         },
         {
             "vendor_external_id": "77777777CA",
             "sku": "77777777CA01A12",
             "segment": "segment_2",
             "name": "name_2",
-            "type_3yc": "Consumable"
+            "type_3yc": "Consumable",
         },
     ]
 
@@ -1991,26 +2117,94 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
         base_id="base-id",
     )
 
-    AdobeProductMapping = get_sku_adobe_mapping_model(base_info)
+    adobe_product_mapping_model = get_sku_adobe_mapping_model(base_info)
 
     all_sku = {
-        i["vendor_external_id"]: AdobeProductMapping(**i) for i in mock_sku_mapping_data
+        i["vendor_external_id"]: adobe_product_mapping_model(**i) for i in mock_sku_mapping_data
     }
-    mocker.patch.object(AdobeProductMapping, "all", return_value=all_sku)
+    mocker.patch.object(adobe_product_mapping_model, "all", return_value=all_sku)
 
     def from_id(external_id):
         if external_id not in all_sku:
             raise AdobeProductNotFoundError("Not Found")
         return all_sku[external_id]
 
-    AdobeProductMapping.from_id = from_id
-    AdobeProductMapping.from_short_id = from_id
-    return AdobeProductMapping
+    adobe_product_mapping_model.from_id = from_id
+    adobe_product_mapping_model.from_short_id = from_id
+    return adobe_product_mapping_model
 
 
 @pytest.fixture()
-def mock_get_adobe_product_by_marketplace_sku(mock_get_sku_adobe_mapping_model):
+def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):
     def get_adobe_product_by_marketplace_sku(sku):
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
 
-    return get_adobe_product_by_marketplace_sku
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",
+        new=get_adobe_product_by_marketplace_sku,
+        spec=True,
+    )
+
+
+@pytest.fixture()
+def mock_notify_processing_lost_customer(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.notify_processing_lost_customer", autospec=True)
+
+
+@pytest.fixture()
+def mock_get_product_items_by_skus(mocker, items_factory):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.get_product_items_by_skus",
+        return_value=items_factory(),
+        autospec=True,
+    )
+
+
+@pytest.fixture()
+def adobe_deployment_factory():
+    def _adobe_deployment_factory(
+        deployment_id="PR1400000882",
+        status="1000",
+        country="DE",
+        region="SN",
+        city="Berlin",
+        address_line1="Marienallee 12",
+        postal_code="01067",
+        phone_number="1005158429",
+        customer_id="P1005158636",
+    ):
+        return {
+            "deploymentId": deployment_id,
+            "status": status,
+            "companyProfile": {
+                "address": {
+                    "country": country,
+                    "region": region,
+                    "city": city,
+                    "addressLine1": address_line1,
+                    "postalCode": postal_code,
+                    "phoneNumber": phone_number,
+                }
+            },
+            "links": {
+                "self": {
+                    "uri": f"/v3/customers/{customer_id}/deployments/{deployment_id}",
+                    "method": "GET",
+                    "headers": [],
+                }
+            },
+        }
+
+    return _adobe_deployment_factory
+
+
+@pytest.fixture()
+def mock_settings(settings):
+    settings.EXTENSION_CONFIG = {
+        "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
+    }
+
+
+@pytest.fixture()
+def mock_pymsteams(mocker):
+    mocker.patch("pymsteams.connectorcard", autospec=True)

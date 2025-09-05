@@ -1,15 +1,9 @@
-from datetime import date, datetime
+import datetime as dt
 
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.constants import (
-    STATUS_INACTIVE_OR_GENERIC_FAILURE,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
-    STATUS_TRANSFER_ALREADY_TRANSFERRED,
-    STATUS_TRANSFER_INELIGIBLE,
-)
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AuthorizationNotFoundError,
@@ -91,7 +85,7 @@ def test_start_transfers_for_product(
                 "transfer": [mock_transfer],
                 "offer_id": adobe_preview_transfer["items"][0]["offerId"],
                 "quantity": adobe_preview_transfer["items"][0]["quantity"],
-                "renewal_date": date.fromisoformat(
+                "renewal_date": dt.date.fromisoformat(
                     adobe_preview_transfer["items"][0]["renewalDate"]
                 ),
             },
@@ -117,17 +111,14 @@ def test_start_transfers_for_product_preview_already_transferred(
         "adobe_vipm.flows.migration.populate_offers_for_transfer",
     )
 
-    adobe_transfer = adobe_transfer_factory()
-
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.preview_transfer.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_TRANSFER_ALREADY_TRANSFERRED,
+            code=AdobeStatus.TRANSFER_ALREADY_TRANSFERRED.value,
             message="Already transferred",
         ),
     )
-    mocked_adobe_client.create_transfer.return_value = adobe_transfer
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -140,9 +131,7 @@ def test_start_transfers_for_product_preview_already_transferred(
         mock_transfer.membership_id,
     )
 
-    mock_transfer.save.assert_called_once()
-    assert mock_transfer.transfer_id == adobe_transfer["transferId"]
-    assert mock_transfer.status == "running"
+    mock_transfer.save.assert_not_called()
     mocked_populate_offers_for_transfer.assert_not_called()
 
 
@@ -171,7 +160,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_TRANSFER_INELIGIBLE,
+            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
             message="Cannot be transferred",
             details=[f"Reason: {reason}"],
         ),
@@ -191,7 +180,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
     )
 
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == STATUS_TRANSFER_INELIGIBLE
+    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "rescheduled"
     assert mock_transfer.migration_error_description == (
@@ -221,7 +210,7 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_TRANSFER_INELIGIBLE,
+            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
             message="Cannot be transferred",
             details=["Reason: BAD_MARKET_SEGMENT"],
         ),
@@ -241,11 +230,12 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     )
 
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == STATUS_TRANSFER_INELIGIBLE
+    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "failed"
     assert mock_transfer.migration_error_description == (
-        "Adobe error received during transfer preview."
+        "An unexpected error has been received from Adobe asking for preview "
+        f"of transfer for Membership **{mock_transfer.membership_id}**."
     )
     mocked_send_exception.assert_called_once_with(
         "Adobe error received during transfer preview.",
@@ -325,7 +315,7 @@ def test_start_transfers_for_product_error(
                 "transfer": [mock_transfer],
                 "offer_id": adobe_preview_transfer["items"][0]["offerId"],
                 "quantity": adobe_preview_transfer["items"][0]["quantity"],
-                "renewal_date": date.fromisoformat(
+                "renewal_date": dt.date.fromisoformat(
                     adobe_preview_transfer["items"][0]["renewalDate"]
                 ),
             },
@@ -337,16 +327,15 @@ def test_start_transfers_for_product_error(
     assert mock_transfer.adobe_error_description == str(error)
     assert (
         mock_transfer.migration_error_description
-        == "Adobe error received during transfer creation."
+        == "An unexpected error has been received from Adobe creating the "
+        f"transfer for Membership **{mock_transfer.membership_id}**."
     )
 
     mocked_send_exception.assert_called_once_with(
         "Adobe error received during transfer creation.",
         "An unexpected error has been received from Adobe creating "
         "the transfer for Membership **membership-id**.",
-        facts=FactsSection(
-            title="Last error from Adobe", data={"9999": "9999 - Unexpected error"}
-        ),
+        facts=FactsSection(title="Last error from Adobe", data={"9999": "9999 - Unexpected error"}),
         button=Button(label="membership-id", url="https://link.to.transfer"),
     )
 
@@ -395,9 +384,7 @@ def test_start_transfers_for_product_no_authorization_found_error(
         "Authorization is not found",
         facts=FactsSection(
             title="Transfer error",
-            data={
-                "AuthorizationNotFoundError": mock_transfer.migration_error_description
-            },
+            data={"AuthorizationNotFoundError": mock_transfer.migration_error_description},
         ),
         button=Button(label="membership-id", url="https://link.to.transfer"),
     )
@@ -462,7 +449,7 @@ def test_start_transfers_for_product_reseller_not_found_error(
                 "transfer": [mock_transfer],
                 "offer_id": adobe_preview_transfer["items"][0]["offerId"],
                 "quantity": adobe_preview_transfer["items"][0]["quantity"],
-                "renewal_date": date.fromisoformat(
+                "renewal_date": dt.date.fromisoformat(
                     adobe_preview_transfer["items"][0]["renewalDate"]
                 ),
             },
@@ -505,7 +492,7 @@ def test_checking_running_transfers_for_product(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -534,20 +521,18 @@ def test_checking_running_transfers_for_product(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -558,10 +543,7 @@ def test_checking_running_transfers_for_product(
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
@@ -587,7 +569,7 @@ def test_checking_running_transfers_for_product(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -619,7 +601,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -639,20 +621,18 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -663,22 +643,19 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
         )
 
-        assert mock_transfer.customer_address_address_line_1 == ""
-        assert mock_transfer.customer_address_address_line_2 == ""
-        assert mock_transfer.customer_address_city == ""
-        assert mock_transfer.customer_address_region == ""
-        assert mock_transfer.customer_address_postal_code == ""
-        assert mock_transfer.customer_address_country == ""
-        assert mock_transfer.customer_address_phone_number == ""
+        assert not mock_transfer.customer_address_address_line_1
+        assert not mock_transfer.customer_address_address_line_2
+        assert not mock_transfer.customer_address_city
+        assert not mock_transfer.customer_address_region
+        assert not mock_transfer.customer_address_postal_code
+        assert not mock_transfer.customer_address_country
+        assert not mock_transfer.customer_address_phone_number
 
         contact = customer["companyProfile"]["contacts"][0]
         assert mock_transfer.customer_contact_first_name == contact["firstName"]
@@ -691,7 +668,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -720,7 +697,7 @@ def test_checking_running_transfers_for_product_3yc(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -737,10 +714,10 @@ def test_checking_running_transfers_for_product_3yc(
 
     check_running_transfers_for_product("product-id")
 
-    assert mock_transfer.customer_benefits_3yc_start_date == date.fromisoformat(
+    assert mock_transfer.customer_benefits_3yc_start_date == dt.date.fromisoformat(
         commitment["startDate"]
     )
-    assert mock_transfer.customer_benefits_3yc_end_date == date.fromisoformat(
+    assert mock_transfer.customer_benefits_3yc_end_date == dt.date.fromisoformat(
         commitment["endDate"]
     )
     assert mock_transfer.customer_benefits_3yc_status == commitment["status"]
@@ -807,7 +784,7 @@ def test_checking_running_transfers_for_product_get_customer_error_retry(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -856,7 +833,7 @@ def test_checking_running_transfers_for_product_update_subs_error_retry(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -895,9 +872,7 @@ def test_checking_running_transfers_for_product_update_subs_error_retry(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription_factory()]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
     mocked_adobe_client.update_subscription.side_effect = error
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
@@ -966,9 +941,7 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
         "The maximum amount of retries (15) has been exceeded for "
         "the Membership **membership-id**.",
         button=Button(label="membership-id", url="https://link.to.transfer"),
-        facts=FactsSection(
-            title="Last error from Adobe", data={"9999": "9999 - Unexpected error"}
-        ),
+        facts=FactsSection(title="Last error from Adobe", data={"9999": "9999 - Unexpected error"}),
     )
 
 
@@ -989,7 +962,7 @@ def test_checking_running_transfers_for_product_pending_retry(
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer_factory(
-        status=STATUS_PENDING,
+        status=AdobeStatus.PENDING.value,
     )
 
     mocker.patch(
@@ -1058,9 +1031,7 @@ def test_checking_running_transfers_for_product_unexpected_status(
 
 
 @freeze_time("2025-04-06 12:30:00")
-def test_checking_running_transfers_for_product_authorization_not_found(
-    mocker, mock_transfer
-):
+def test_checking_running_transfers_for_product_authorization_not_found(mocker, mock_transfer):
     mock_transfer.status = (STATUS_RUNNING,)
     mock_transfer.updated_at = (None,)
     mock_transfer.migration_error_description = (None,)
@@ -1070,12 +1041,8 @@ def test_checking_running_transfers_for_product_authorization_not_found(
         return_value=[mock_transfer],
     )
     mocked_adobe_client = mocker.MagicMock()
-    message_error = (
-        f"Authorization with uk/id {mock_transfer.authorization_uk} not found."
-    )
-    mocked_adobe_client.get_transfer.side_effect = [
-        AuthorizationNotFoundError(message_error)
-    ]
+    message_error = f"Authorization with uk/id {mock_transfer.authorization_uk} not found."
+    mocked_adobe_client.get_transfer.side_effect = [AuthorizationNotFoundError(message_error)]
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1085,7 +1052,7 @@ def test_checking_running_transfers_for_product_authorization_not_found(
 
     mock_transfer.save.assert_called_once()
     assert mock_transfer.status == "failed"
-    assert mock_transfer.updated_at == datetime(2025, 4, 6, 12, 30)
+    assert mock_transfer.updated_at == dt.datetime(2025, 4, 6, 12, 30, tzinfo=dt.UTC)
     assert mock_transfer.migration_error_description == message_error
 
 
@@ -1111,7 +1078,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1149,14 +1116,12 @@ def test_checking_running_transfers_with_gc_exists_for_product(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1171,7 +1136,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -1182,10 +1147,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
@@ -1211,7 +1173,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1245,7 +1207,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1274,14 +1236,12 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1296,7 +1256,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
@@ -1307,22 +1267,19 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
         )
 
-        assert mock_transfer.customer_address_address_line_1 == ""
-        assert mock_transfer.customer_address_address_line_2 == ""
-        assert mock_transfer.customer_address_city == ""
-        assert mock_transfer.customer_address_region == ""
-        assert mock_transfer.customer_address_postal_code == ""
-        assert mock_transfer.customer_address_country == ""
-        assert mock_transfer.customer_address_phone_number == ""
+        assert not mock_transfer.customer_address_address_line_1
+        assert not mock_transfer.customer_address_address_line_2
+        assert not mock_transfer.customer_address_city
+        assert not mock_transfer.customer_address_region
+        assert not mock_transfer.customer_address_postal_code
+        assert not mock_transfer.customer_address_country
+        assert not mock_transfer.customer_address_phone_number
 
         contact = customer["companyProfile"]["contacts"][0]
         assert mock_transfer.customer_contact_first_name == contact["firstName"]
@@ -1335,7 +1292,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1371,7 +1328,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1409,14 +1366,12 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1431,7 +1386,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1442,10 +1397,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
@@ -1471,7 +1423,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1510,7 +1462,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1539,14 +1491,12 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1561,7 +1511,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1572,22 +1522,19 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
         )
 
-        assert mock_transfer.customer_address_address_line_1 == ""
-        assert mock_transfer.customer_address_address_line_2 == ""
-        assert mock_transfer.customer_address_city == ""
-        assert mock_transfer.customer_address_region == ""
-        assert mock_transfer.customer_address_postal_code == ""
-        assert mock_transfer.customer_address_country == ""
-        assert mock_transfer.customer_address_phone_number == ""
+        assert not mock_transfer.customer_address_address_line_1
+        assert not mock_transfer.customer_address_address_line_2
+        assert not mock_transfer.customer_address_city
+        assert not mock_transfer.customer_address_region
+        assert not mock_transfer.customer_address_postal_code
+        assert not mock_transfer.customer_address_country
+        assert not mock_transfer.customer_address_phone_number
 
         contact = customer["companyProfile"]["contacts"][0]
         assert mock_transfer.customer_contact_first_name == contact["firstName"]
@@ -1600,7 +1547,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1650,7 +1597,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1688,14 +1635,12 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1711,7 +1656,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         side_effect=error,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1722,10 +1667,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
@@ -1751,7 +1693,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1811,7 +1753,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -1840,14 +1782,12 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
     }
 
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=STATUS_INACTIVE_OR_GENERIC_FAILURE)
+    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_transfer.return_value = adobe_transfer
     mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [sub_active, sub_inactive]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
         "adobe_vipm.flows.migration.get_adobe_client",
         return_value=mocked_adobe_client,
@@ -1863,7 +1803,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         side_effect=error,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
@@ -1874,22 +1814,19 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         )
         mock_transfer.save.assert_called_once()
 
-        assert (
-            mock_transfer.customer_company_name
-            == customer["companyProfile"]["companyName"]
-        )
+        assert mock_transfer.customer_company_name == customer["companyProfile"]["companyName"]
         assert (
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
         )
 
-        assert mock_transfer.customer_address_address_line_1 == ""
-        assert mock_transfer.customer_address_address_line_2 == ""
-        assert mock_transfer.customer_address_city == ""
-        assert mock_transfer.customer_address_region == ""
-        assert mock_transfer.customer_address_postal_code == ""
-        assert mock_transfer.customer_address_country == ""
-        assert mock_transfer.customer_address_phone_number == ""
+        assert not mock_transfer.customer_address_address_line_1
+        assert not mock_transfer.customer_address_address_line_2
+        assert not mock_transfer.customer_address_city
+        assert not mock_transfer.customer_address_region
+        assert not mock_transfer.customer_address_postal_code
+        assert not mock_transfer.customer_address_country
+        assert not mock_transfer.customer_address_phone_number
 
         contact = customer["companyProfile"]["contacts"][0]
         assert mock_transfer.customer_contact_first_name == contact["firstName"]
@@ -1902,7 +1839,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         assert mock_transfer.nav_error is None
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
         mocked_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
@@ -1945,12 +1882,8 @@ def test_check_running_transfers(mocker, settings):
     )
     check_running_transfers()
 
-    assert mocked_check_running_transfers_for_product.mock_calls[0].args == (
-        "PRD-1111",
-    )
-    assert mocked_check_running_transfers_for_product.mock_calls[1].args == (
-        "PRD-2222",
-    )
+    assert mocked_check_running_transfers_for_product.mock_calls[0].args == ("PRD-1111",)
+    assert mocked_check_running_transfers_for_product.mock_calls[1].args == ("PRD-2222",)
 
 
 def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_exceeded(
@@ -1979,7 +1912,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=STATUS_TRANSFER_INELIGIBLE,
+            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
             message="Cannot be transferred",
             details=["Reason: RETURNABLE_PURCHASE"],
         ),
@@ -1999,13 +1932,11 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
     )
 
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == STATUS_TRANSFER_INELIGIBLE
+    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "failed"
     assert mock_transfer.reschedule_count == 15
-    assert mock_transfer.migration_error_description == (
-        "Max reschedules (15) exceeded."
-    )
+    assert mock_transfer.migration_error_description == ("Max reschedules (15) exceeded.")
     mocked_send_warning.assert_called_once_with(
         "Migration max reschedules exceeded.",
         "The maximum amount of reschedules (15) has been exceeded for the Membership "
@@ -2039,7 +1970,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
     )
 
     adobe_transfer = adobe_transfer_factory(
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         customer_id="customer-id",
     )
 
@@ -2053,7 +1984,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
         return_value=mocked_adobe_client,
     )
 
-    with freeze_time("2024-01-01 12:00:00"):
+    with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_terminate_contract.assert_called_once_with("nav-cco")
@@ -2061,7 +1992,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
         assert mock_transfer.nav_error == "internal server error"
 
         assert mock_transfer.status == "completed"
-        assert mock_transfer.completed_at == datetime.now()
+        assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
 
 @pytest.mark.parametrize(
@@ -2072,9 +2003,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
     ],
 )
 def test_get_transfer_link_button(mocker, return_value, expected_value):
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link", return_value=return_value
-    )
+    mocker.patch("adobe_vipm.flows.migration.get_transfer_link", return_value=return_value)
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.membership_id = "label"
     assert get_transfer_link_button(mocked_transfer) == expected_value

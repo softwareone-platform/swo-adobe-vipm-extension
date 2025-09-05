@@ -1,5 +1,6 @@
 """
 This module contains the logic to implement the purchase fulfillment flow.
+
 It exposes a single function that is the entrypoint for purchase order
 processing.
 """
@@ -9,11 +10,7 @@ import logging
 from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    STATUS_INVALID_ADDRESS,
-    STATUS_INVALID_FIELDS,
-    STATUS_INVALID_MINIMUM_QUANTITY,
-)
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.flows.constants import (
@@ -26,24 +23,21 @@ from adobe_vipm.flows.constants import (
     ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_LICENSES,
-    PARAM_ADDRESS,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
     STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
     STATUS_MARKET_SEGMENT_PENDING,
     TEMPLATE_NAME_PURCHASE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
+    SyncAgreement,
     ValidateDuplicateLines,
     switch_order_to_failed,
     switch_order_to_query,
@@ -69,13 +63,10 @@ logger = logging.getLogger(__name__)
 
 
 class RefreshCustomer(Step):
-    """
-    Refresh the processing context
-    retrieving the Adobe customer object through the
-    VIPM API.
-    """
+    """Refresh the processing context retrieving the Adobe customer object through the VIPM API."""
 
     def __call__(self, client, context, next_step):
+        """Refresh the processing context retrieving the Adobe customer."""
         adobe_client = get_adobe_client()
         context.adobe_customer = adobe_client.get_customer(
             context.authorization_id,
@@ -87,54 +78,60 @@ class RefreshCustomer(Step):
 class ValidateMarketSegmentEligibility(Step):
     """
     Validate if the customer is eligible to place orders for a given market segment.
+
     The market segment the order refers to is determined by the product (product per segment).
     """
 
     def __call__(self, client, context, next_step):
+        """Validate if the customer is eligible to place orders for a given market segment."""
         if context.market_segment != MARKET_SEGMENT_COMMERCIAL:
             status = get_market_segment_eligibility_status(context.order)
             if not status:
-                context.order = set_market_segment_eligibility_status_pending(
-                    context.order
-                )
-                switch_order_to_query(
-                    client, context.order, template_name=TEMPLATE_NAME_PURCHASE
-                )
+                context.order = set_market_segment_eligibility_status_pending(context.order)
+                switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
                 logger.info(
-                    f"{context}: customer is pending eligibility "
-                    f"approval for segment {context.market_segment}"
+                    "%s: customer is pending eligibility approval for segment %s",
+                    context,
+                    context.market_segment,
                 )
                 return
             if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
                 logger.info(
-                    f"{context}: customer is not eligible for segment {context.market_segment}"
+                    "%s: customer is not eligible for segment %s",
+                    context,
+                    context.market_segment,
                 )
                 switch_order_to_failed(
                     client,
                     context.order,
-                    ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(
-                        segment=context.market_segment
-                    ),
+                    ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(segment=context.market_segment),
                 )
                 return
             if status == STATUS_MARKET_SEGMENT_PENDING:
                 return
-            logger.info(
-                f"{context}: customer is eligible for segment {context.market_segment}"
-            )
+            logger.info("%s: customer is eligible for segment %s", context, context.market_segment)
         next_step(client, context)
 
 
 class CreateCustomer(Step):
     """
-    Creates a customer account in Adobe for the new agreement that belongs to the order
-    currently being processed.
+    Creates a customer account in Adobe for the new agreement.
+
+    That belongs to the order currently being processed.
     """
 
     def save_data(self, client, context):
-        request_3yc_status = get_3yc_commitment_request(context.adobe_customer).get(
-            "status"
-        )
+        """
+        Saves customer date back to MPT Order and Agreement.
+
+        Args:
+            client (MPTClient): MPT API client.
+            context (Context): step context.
+        """
+        request_3yc_status = get_3yc_commitment_request(
+            context.adobe_customer,
+            is_recommitment=False,
+        ).get("status")
         context.order = set_adobe_customer_id(context.order, context.adobe_customer_id)
         if request_3yc_status:
             context.order = set_adobe_3yc_commitment_request_status(
@@ -147,50 +144,58 @@ class CreateCustomer(Step):
             externalIds={"vendor": context.adobe_customer_id},
         )
 
-    def handle_error(self, client, context, error):
-        if error.code not in (
-            STATUS_INVALID_ADDRESS,
-            STATUS_INVALID_FIELDS,
-            STATUS_INVALID_MINIMUM_QUANTITY,
-        ):
+    def handle_error(self, client, context, error):  # noqa: C901
+        """
+        Process error from Adobe API.
+
+        Args:
+            client (MPTClient): MPT API client.
+            context (Context): step context.
+            error (Error): API Error.
+        """
+        if error.code not in {
+            AdobeStatus.INVALID_ADDRESS,
+            AdobeStatus.INVALID_FIELDS,
+            AdobeStatus.INVALID_MINIMUM_QUANTITY,
+        }:
             switch_order_to_failed(
                 client,
                 context.order,
                 ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
             )
             return
-        if error.code == STATUS_INVALID_ADDRESS:
-            param = get_ordering_parameter(context.order, PARAM_ADDRESS)
+        if error.code == AdobeStatus.INVALID_ADDRESS:
+            param = get_ordering_parameter(context.order, Param.ADDRESS.value)
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_ADDRESS,
+                Param.ADDRESS.value,
                 ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error)),
             )
-        elif error.code == STATUS_INVALID_MINIMUM_QUANTITY:
+        elif error.code == AdobeStatus.INVALID_MINIMUM_QUANTITY:
             if "LICENSE" in str(error):
-                param = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
+                param = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_3YC_LICENSES,
+                    Param.THREE_YC_LICENSES.value,
                     ERR_3YC_QUANTITY_LICENSES.to_dict(title=param["name"]),
                     required=False,
                 )
 
             if "CONSUMABLES" in str(error):
-                param = get_ordering_parameter(context.order, PARAM_3YC_CONSUMABLES)
+                param = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_3YC_CONSUMABLES,
+                    Param.THREE_YC_CONSUMABLES.value,
                     ERR_3YC_QUANTITY_CONSUMABLES.to_dict(title=param["name"]),
                     required=False,
                 )
 
             if not error.details:
                 param_licenses = get_ordering_parameter(
-                    context.order, PARAM_3YC_LICENSES
+                    context.order, Param.THREE_YC_LICENSES.value
                 )
                 param_consumables = get_ordering_parameter(
-                    context.order, PARAM_3YC_CONSUMABLES
+                    context.order, Param.THREE_YC_CONSUMABLES.value
                 )
                 context.order = set_order_error(
                     context.order,
@@ -201,32 +206,29 @@ class CreateCustomer(Step):
                 )
         else:
             if "companyProfile.companyName" in error.details:
-                param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
+                param = get_ordering_parameter(context.order, Param.COMPANY_NAME.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_COMPANY_NAME,
-                    ERR_ADOBE_COMPANY_NAME.to_dict(
-                        title=param["name"], details=str(error)
-                    ),
+                    Param.COMPANY_NAME.value,
+                    ERR_ADOBE_COMPANY_NAME.to_dict(title=param["name"], details=str(error)),
                 )
-            if len(
-                list(
-                    filter(
-                        lambda x: x.startswith("companyProfile.contacts[0]"),
-                        error.details,
-                    )
+            if list(
+                filter(
+                    lambda x: x.startswith("companyProfile.contacts[0]"),
+                    error.details,
                 )
             ):
-                param = get_ordering_parameter(context.order, PARAM_CONTACT)
+                param = get_ordering_parameter(context.order, Param.CONTACT.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_CONTACT,
+                    Param.CONTACT.value,
                     ERR_ADOBE_CONTACT.to_dict(title=param["name"], details=str(error)),
                 )
 
         switch_order_to_query(client, context.order)
 
     def __call__(self, client, context, next_step):
+        """Creates a customer account in Adobe for the new agreement."""
         if context.adobe_customer_id:
             next_step(client, context)
             return
@@ -234,13 +236,11 @@ class CreateCustomer(Step):
         adobe_client = get_adobe_client()
         try:
             if not context.customer_data.get("contact"):
-                param = get_ordering_parameter(context.order, PARAM_CONTACT)
+                param = get_ordering_parameter(context.order, Param.CONTACT.value)
                 context.order = set_ordering_parameter_error(
                     context.order,
-                    PARAM_CONTACT,
-                    ERR_ADOBE_CONTACT.to_dict(
-                        title=param["name"], details="it is mandatory."
-                    ),
+                    Param.CONTACT.value,
+                    ERR_ADOBE_CONTACT.to_dict(title=param["name"], details="it is mandatory."),
                 )
 
                 switch_order_to_query(client, context.order)
@@ -262,17 +262,24 @@ class CreateCustomer(Step):
             )
             next_step(client, context)
         except AdobeError as e:
-            logger.error(repr(e))
+            logger.exception("Create Customer failed")
             self.handle_error(client, context, e)
 
 
 def fulfill_purchase_order(client, order):
+    """
+    Purchase order pipeline.
+
+    Args:
+        client (MPTClient): MPT API client.
+        order (dict): MPT order to process.
+    """
     pipeline = Pipeline(
         SetupContext(),
+        StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         SetupDueDate(),
         ValidateDuplicateLines(),
         ValidateMarketSegmentEligibility(),
-        StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         PrepareCustomerData(),
         CreateCustomer(),
         Validate3YCCommitment(),
@@ -280,9 +287,10 @@ def fulfill_purchase_order(client, order):
         SubmitNewOrder(),
         CreateOrUpdateSubscriptions(),
         RefreshCustomer(),
-        SetOrUpdateCotermNextSyncDates(),
+        SetOrUpdateCotermDate(),
         UpdatePrices(),
         CompleteOrder(TEMPLATE_NAME_PURCHASE),
+        SyncAgreement(),
     )
 
     context = Context(order=order)

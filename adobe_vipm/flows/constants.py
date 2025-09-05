@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from adobe_vipm.adobe.constants import (
     MAXLEN_ADDRESS_LINE_1,
     MAXLEN_ADDRESS_LINE_2,
@@ -16,50 +18,69 @@ ORDER_TYPE_CHANGE = "Change"
 ORDER_TYPE_TERMINATION = "Termination"
 ORDER_TYPE_CONFIGURATION = "Configuration"
 
-PARAM_ADDRESS = "address"
-PARAM_ADOBE_SKU = "adobeSKU"
-PARAM_COMPANY_NAME = "companyName"
-PARAM_CONTACT = "contact"
-PARAM_CUSTOMER_ID = "customerId"
-PARAM_MEMBERSHIP_ID = "membershipId"
-PARAM_NEXT_SYNC_DATE = "nextSync"
-PARAM_COTERM_DATE = "cotermDate"
-PARAM_AGREEMENT_TYPE = "agreementType"
-PARAM_3YC = "3YC"
-PARAM_3YC_RECOMMITMENT = "3YCRecommitment"
-PARAM_3YC_LICENSES = "3YCLicenses"
-PARAM_3YC_CONSUMABLES = "3YCConsumables"
-PARAM_3YC_ENROLL_STATUS = "3YCEnrollStatus"
-PARAM_3YC_COMMITMENT_REQUEST_STATUS = "3YCCommitmentRequestStatus"
-PARAM_3YC_RECOMMITMENT_REQUEST_STATUS = "3YCRecommitmentRequestStatus"
-PARAM_3YC_START_DATE = "3YCStartDate"
-PARAM_3YC_END_DATE = "3YCEndDate"
-PARAM_MARKET_SEGMENT_ELIGIBILITY_STATUS = "marketSegmentEligibilityStatus"
-PARAM_CURRENT_QUANTITY = "currentQuantity"
-PARAM_RENEWAL_QUANTITY = "renewalQuantity"
-PARAM_RENEWAL_DATE = "renewalDate"
-PARAM_DUE_DATE = "dueDate"
-PARAM_RETRY_COUNT = "retryCount"
-PARAM_GLOBAL_CUSTOMER = "globalCustomer"
-PARAM_DEPLOYMENTS = "deployments"
-PARAM_DEPLOYMENT_ID = "deploymentId"
+
+TRANSFER_RESELLER_PRODUCT_ID = "adobe-reseller-transfer"
+
+
+class Param(StrEnum):
+    """Parameters external ids."""
+
+    ADDRESS = "address"
+    ADOBE_SKU = "adobeSKU"
+    COMPANY_NAME = "companyName"
+    CONTACT = "contact"
+    CUSTOMER_ID = "customerId"
+    MEMBERSHIP_ID = "membershipId"
+    COTERM_DATE = "cotermDate"
+    AGREEMENT_TYPE = "agreementType"
+    THREE_YC = "3YC"
+    THREE_YC_RECOMMITMENT = "3YCRecommitment"
+    THREE_YC_LICENSES = "3YCLicenses"
+    THREE_YC_CONSUMABLES = "3YCConsumables"
+    THREE_YC_ENROLL_STATUS = "3YCEnrollStatus"
+    THREE_YC_COMMITMENT_REQUEST_STATUS = "3YCCommitmentRequestStatus"
+    THREE_YC_RECOMMITMENT_REQUEST_STATUS = "3YCRecommitmentRequestStatus"
+    THREE_YC_START_DATE = "3YCStartDate"
+    THREE_YC_END_DATE = "3YCEndDate"
+    MARKET_SEGMENT_ELIGIBILITY_STATUS = "marketSegmentEligibilityStatus"
+    CURRENT_QUANTITY = "currentQuantity"
+    RENEWAL_QUANTITY = "renewalQuantity"
+    RENEWAL_DATE = "renewalDate"
+    DUE_DATE = "dueDate"
+    RETRY_COUNT = "retryCount"
+    GLOBAL_CUSTOMER = "globalCustomer"
+    DEPLOYMENTS = "deployments"
+    DEPLOYMENT_ID = "deploymentId"
+    LAST_SYNC_DATE = "lastSyncDate"
+    CHANGE_RESELLER_CODE = "changeResellerCode"
+    ADOBE_CUSTOMER_ADMIN_EMAIL = "adobeCustomerAdminEmail"
+    PHASE_ORDERING = "ordering"
+    PHASE_FULFILLMENT = "fulfillment"
+
+
+PARAM_REQUIRED_CUSTOMER_ORDER = (
+    Param.COMPANY_NAME.value,
+    Param.ADDRESS.value,
+    Param.CONTACT.value,
+)
+
+PARAM_OPTIONAL_CUSTOMER_ORDER = (
+    Param.THREE_YC.value,
+    Param.THREE_YC_CONSUMABLES.value,
+    Param.THREE_YC_LICENSES.value,
+)
+
+PARAM_NEW_CUSTOMER_PARAMETERS = PARAM_REQUIRED_CUSTOMER_ORDER + PARAM_OPTIONAL_CUSTOMER_ORDER
+
 
 STATUS_MARKET_SEGMENT_ELIGIBLE = "eligible"
 STATUS_MARKET_SEGMENT_NOT_ELIGIBLE = "not-eligible"
 STATUS_MARKET_SEGMENT_PENDING = "pending"
 
-REQUIRED_CUSTOMER_ORDER_PARAMS = (
-    PARAM_COMPANY_NAME,
-    PARAM_ADDRESS,
-    PARAM_CONTACT,
+TRANSFER_CUSTOMER_PARAMETERS = (
+    Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value,
+    Param.CHANGE_RESELLER_CODE.value,
 )
-OPTIONAL_CUSTOMER_ORDER_PARAMS = (PARAM_3YC, PARAM_3YC_CONSUMABLES, PARAM_3YC_LICENSES)
-NEW_CUSTOMER_PARAMETERS = (
-    REQUIRED_CUSTOMER_ORDER_PARAMS + OPTIONAL_CUSTOMER_ORDER_PARAMS
-)
-
-PARAM_PHASE_ORDERING = "ordering"
-PARAM_PHASE_FULFILLMENT = "fulfillment"
 
 CANCELLATION_WINDOW_DAYS = 14
 GLOBAL_SUFFIX = "_global"
@@ -79,6 +100,10 @@ ERR_ADOBE_MEMBERSHIP_ID_ITEM = ValidationError(
 ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT = ValidationError(
     "VIPM0007",
     "Customer account is inactive or blocked. Adobe status code is `{status}`.",
+)
+
+ERR_ADOBE_CUSTOMER_ADMIN_EMAIL = ValidationError(
+    "VIPM0037", "The customer admin Email is not valid"
 )
 
 ERR_COMPANY_NAME_LENGTH = ValidationError(
@@ -113,9 +138,7 @@ ERR_ADDRESS_LINE_2_LENGTH = (
     "The provided `Address line 2` is too long, the maximum "
     f"length is {MAXLEN_ADDRESS_LINE_2} characters"
 )
-ERR_CITY_LENGTH = (
-    f"The provided `City` is too long, the maximum length is {MAXLEN_CITY} characters"
-)
+ERR_CITY_LENGTH = f"The provided `City` is too long, the maximum length is {MAXLEN_CITY} characters"
 ERR_CONTACT = ValidationError(
     "VIPM0011",
     "The `{title}` contains invalid components: {errors}.",
@@ -143,14 +166,12 @@ ERR_VIPM_UNHANDLED_EXCEPTION = ValidationError(
 
 ERR_3YC_QUANTITY_LICENSES = ValidationError(
     "VIPM0013",
-    f"The minimum number of licenses must be numeric "
-    f"and greater than or equal to ten ({MINQTY_LICENSES}).",
+    f"The `{{title}}` must be an integer number equal to {MINQTY_LICENSES} or greater.",
 )
 
 ERR_3YC_QUANTITY_CONSUMABLES = ValidationError(
     "VIPM0014",
-    f"The minimum number of consumables must be numeric "
-    f"and greater than or equal to one thousand ({MINQTY_CONSUMABLES}).",
+    f"The `{{title}}` must be an integer number equal to {MINQTY_CONSUMABLES} or greater.",
 )
 
 ERR_3YC_NO_MINIMUMS = ValidationError(
@@ -170,9 +191,33 @@ ERR_ADOBE_ERROR = ValidationError("VIPM0011", "Adobe returned an error: {details
 ERR_ADOBE_MEMBERSHIP_ID_EMPTY = ValidationError(
     "VIPM0018", "No active items have been found for this membership."
 )
+ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY = ValidationError(
+    "VIPM0037", "No active items have been found for this code."
+)
 
 ERR_ADOBE_MEMBERSHIP_PROCESSING = ValidationError(
     "VIPM0032", "Error processing the membership {membership_id}: {error}"
+)
+
+ERR_ADOBE_RESSELLER_CHANGE_PREVIEW = ValidationError(
+    "VIPM0036", "Error processing the reseller change code {reseller_change_code}: {error}"
+)
+
+ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
+    "VIPM0036",
+    (
+        "Due to reseller change requirements, it is not possible "
+        "to add additional items to this order. Only "
+        "the automatically included item can be processed"
+    ),
+)
+
+ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(
+    "VIPM0036",
+    (
+        "The adobe reseller change product is not configured for this product and "
+        "cannot be added to the order."
+    ),
 )
 
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
@@ -189,8 +234,8 @@ TEMPLATE_NAME_PURCHASE = "Purchase"
 TEMPLATE_NAME_CHANGE = "Change"
 TEMPLATE_NAME_DELAYED = "Delayed"
 TEMPLATE_NAME_TERMINATION = "Termination"
-TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE="EnableAutoRenewal"
-TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE="DisableAutoRenewal"
+TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE = "EnableAutoRenewal"
+TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE = "DisableAutoRenewal"
 
 MARKET_SEGMENT_COMMERCIAL = "COM"
 MARKET_SEGMENT_EDUCATION = "EDU"
@@ -206,9 +251,7 @@ ERR_INVALID_DOWNSIZE_QUANTITY = ValidationError(
     "VIPM0019", "Could not find suitable returnable orders for all items.\n{messages}"
 )
 
-ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = (
-    " or any combination of these values,"
-)
+ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = " or any combination of these values,"
 
 ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
     "Cannot reduce item `{item}` quantity by {delta}. "
@@ -220,7 +263,7 @@ ERR_INVALID_TERMINATION_ORDER_QUANTITY = ValidationError(
     "VIPM0033",
     "Cannot return the entire quantity of all subscriptions in this order. "
     "Consider disabling auto-renewal for these subscriptions "
-    "instead using a Configuration Order."
+    "instead using a Configuration Order.",
 )
 
 ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
@@ -253,12 +296,12 @@ ERR_DOWNSIZE_MINIMUM_3YC_VALIDATION = ValidationError(
     "{error}",
 )
 
-ERR_COMMITMENT_3YC_LICENSES =(
+ERR_COMMITMENT_3YC_LICENSES = (
     "The quantity selected of {selected_licenses} would place the account below the "
     "minimum commitment of {minimum_licenses} licenses for the three-year commitment."
 )
 
-ERR_COMMITMENT_3YC_CONSUMABLES =(
+ERR_COMMITMENT_3YC_CONSUMABLES = (
     "The quantity selected of {selected_consumables} would place the account below the "
     "minimum commitment of {minimum_consumables} consumables for the three-year commitment."
 )
@@ -270,7 +313,7 @@ ERR_COMMITMENT_3YC_VALIDATION = ValidationError(
 
 ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT = ValidationError(
     "VIPM0035",
-    "The 3-year commitment is in status {status}. Please contact support to renew the commitment."
+    "The 3-year commitment is in status {status}. Please contact support to renew the commitment.",
 )
 
 ERR_UPDATING_TRANSFER_ITEMS = ValidationError(
@@ -330,10 +373,36 @@ ERR_MEMBERSHIP_HAS_BEEN_TRANSFERED = ValidationError(
     "Membership has already been migrated.",
 )
 
-ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR = ValidationError(
-    "VIPM0031", "{error}"
-)
+ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR = ValidationError("VIPM0031", "{error}")
 
 ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
     "No subscriptions found without deployment ID to be added to the main agreement",
 )
+
+
+class SubscriptionStatus(StrEnum):
+    """MPT subscription statuses."""
+
+    TERMINATED = "Terminated"
+    EXPIRED = "Expired"
+    ACTIVE = "Active"
+
+
+class AgreementStatus(StrEnum):
+    """MPT agreement statuses."""
+
+    NEW = "New"
+    DRAFT = "Draft"
+    PROVISIONING = "Provisioning"
+    UPDATING = "Updating"
+    ACTIVE = "Active"
+    TERMINATED = "Terminated"
+    FAILED = "Failed"
+    DELETED = "Deleted"
+
+
+class TeamsColorCode(StrEnum):
+    """Color codes for the Teams notifications."""
+
+    # TODO: add all used colors
+    ORANGE = "FFA500"

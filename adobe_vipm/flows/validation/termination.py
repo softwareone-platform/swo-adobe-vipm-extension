@@ -4,7 +4,7 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows.constants import ERR_INVALID_TERMINATION_ORDER_QUANTITY
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class ValidateDownsizes(Step):
+    """Checks that for downsizes there orders to remove on Adobe side."""
+
     def __call__(self, client, context, next_step):
+        """Checks that for downsizes there orders to remove on Adobe side."""
         adobe_client = get_adobe_client()
         for line in context.downsize_lines:
             subscription_id = get_subscription_by_line_subs_id(
@@ -42,10 +45,11 @@ class ValidateDownsizes(Step):
 
 
 def validate_termination_order(client, order):
+    """Validate termination pipeline."""
     pipeline = Pipeline(
         SetupContext(),
         ValidateDuplicateLines(),
-        SetOrUpdateCotermNextSyncDates(),
+        SetOrUpdateCotermDate(),
         ValidateRenewalWindow(is_validation=True),
         ValidateDownsizes(),
         Validate3YCCommitment(is_validation=True),

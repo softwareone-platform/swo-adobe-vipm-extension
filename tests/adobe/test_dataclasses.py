@@ -1,5 +1,5 @@
+import datetime as dt
 from dataclasses import FrozenInstanceError
-from datetime import datetime, timedelta
 
 import pytest
 
@@ -7,15 +7,12 @@ from adobe_vipm.adobe.dataclasses import APIToken, Authorization, Reseller
 
 
 def test_authorization():
-    """
-    Check the Authorization dataclass is unmutable and hasheable.
-    """
     auth = Authorization(
         authorization_uk="auth_uk",
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",
+        client_secret="client_secret",  # noqa: S106
         currency="EUR",
         distributor_id="distributor_id",
     )
@@ -25,15 +22,12 @@ def test_authorization():
 
 
 def test_authorization_repr():
-    """
-    Check the Authorization repr offuscate the client_id, client_secret.
-    """
     auth = Authorization(
         authorization_uk="auth_uk",
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",
+        client_secret="client_secret",  # noqa: S106
         currency="EUR",
         distributor_id="distributor_id",
     )
@@ -45,15 +39,12 @@ def test_authorization_repr():
 
 
 def test_reseller():
-    """
-    Check the Reseller dataclass is unmutable and hasheable.
-    """
     auth = Authorization(
         authorization_uk="auth_uk",
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",
+        client_secret="client_secret",  # noqa: S106
         currency="EUR",
         distributor_id="distributor_id",
     )
@@ -69,22 +60,17 @@ def test_reseller():
 
 
 def test_apitoken():
-    """
-    Check the APIToken dataclass is unmutable and hasheable.
-    """
-    token = APIToken("token", datetime.now())
+    token = APIToken("token", dt.datetime.now(tz=dt.UTC))
     with pytest.raises(FrozenInstanceError):
         token.token = "new id"
     assert hash(token) is not None
 
 
 def test_api_token_is_expired():
-    """
-    Test the is_expired method checks the token expires
-    against the current date.
-    """
-    assert (
-        APIToken("token", datetime.now() + timedelta(seconds=1)).is_expired() is False
-    )
+    token_expire_date = dt.datetime.now(tz=dt.UTC) - dt.timedelta(seconds=1)
+    assert APIToken("token", token_expire_date).is_expired() is True
 
-    assert APIToken("token", datetime.now() - timedelta(seconds=1)).is_expired() is True
+
+def test_api_token_is_no_expired():
+    token_expire_date = dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=1)
+    assert APIToken("token", token_expire_date).is_expired() is False

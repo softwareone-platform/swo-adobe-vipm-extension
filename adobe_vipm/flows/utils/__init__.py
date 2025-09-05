@@ -64,14 +64,12 @@ from .parameter import (
     get_adobe_membership_id,
     get_coterm_date,
     get_fulfillment_parameter,
-    get_next_sync,
     get_ordering_parameter,
     get_parameter,
     get_retry_count,
     is_ordering_param_required,
     reset_ordering_parameters_error,
     set_coterm_date,
-    set_next_sync,
     set_ordering_parameter_error,
     set_parameter_hidden,
     set_parameter_visible,
@@ -97,8 +95,8 @@ from .three_yc import (
     set_adobe_3yc_start_date,
 )
 from .validation import (
-    has_valid_returnable_quantity,
+    is_migrate_customer,
     is_purchase_validation_enabled,
-    is_transfer_validation_enabled,
+    is_reseller_change,
     validate_subscription_and_returnable_orders,
 )

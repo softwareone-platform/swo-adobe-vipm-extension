@@ -1,9 +1,10 @@
+import datetime as dt
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
 from functools import cache
 
 from django.conf import settings
+from mpt_extension_sdk.mpt_http.utils import find_first
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from pyairtable.formulas import (
     AND,
@@ -20,13 +21,8 @@ from pyairtable.formulas import (
 from pyairtable.orm import Model, fields
 from requests import HTTPError
 
-from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_COMMITTED,
-)
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
-from adobe_vipm.adobe.utils import get_3yc_commitment
-from adobe_vipm.utils import find_first
+from adobe_vipm.utils import get_commitment_start_date
 
 STATUS_INIT = "init"
 STATUS_RUNNING = "running"
@@ -45,17 +41,20 @@ PRICELIST_CACHE = defaultdict(list)
 
 @dataclass(frozen=True)
 class AirTableBaseInfo:
+    """Airtable base info for access information."""
+
     api_key: str
     base_id: str
 
     @staticmethod
-    def for_migrations(product_id):
+    def for_migrations(product_id: str):
         """
-        Returns an AirTableBaseInfo object with the base identifier of the base that
-        contains the migrations tables and the API key for a given product.
+        Returns an AirTableBaseInfo object with the base identifier of the base.
+
+        That contains the migrations tables and the API key for a given product.
 
         Args:
-            product_id (str): Identifier of the product.
+            product_id: Identifier of the product.
 
         Returns:
             AirTableBaseInfo: The base info.
@@ -66,13 +65,14 @@ class AirTableBaseInfo:
         )
 
     @staticmethod
-    def for_pricing(product_id):
+    def for_pricing(product_id: str):
         """
-        Returns an AirTableBaseInfo object with the base identifier of the base that
-        contains the pricing tables and the API key for a given product.
+        Returns an AirTableBaseInfo object with the base identifier of the base.
+
+        That contains the pricing tables and the API key for a given product.
 
         Args:
-            product_id (str): Identifier of the product.
+            product_id: Identifier of the product.
 
         Returns:
             AirTableBaseInfo: The base info.
@@ -84,6 +84,17 @@ class AirTableBaseInfo:
 
     @staticmethod
     def for_sku_mapping():
+        """
+        Returns an AirTableBaseInfo object with the base identifier of the base.
+
+        That contains the sku mapping table and the API key for a given product.
+
+        Args:
+            product_id: Identifier of the product.
+
+        Returns:
+            AirTableBaseInfo: The base info.
+        """
         return AirTableBaseInfo(
             api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
             base_id=settings.EXTENSION_CONFIG["AIRTABLE_SKU_MAPPING_BASE"],
@@ -91,13 +102,12 @@ class AirTableBaseInfo:
 
 
 @cache
-def get_transfer_model(base_info):
+def get_transfer_model(base_info: AirTableBaseInfo):
     """
-    Returns the Transfer model class connected to the right base and with
-    the right API key.
+    Returns the Transfer model class connected to the right base and with the right API key.
 
     Args:
-        base_info (AirTableBaseInfo): The base info instance.
+        base_info: The base info instance.
 
     Returns:
         Transfer: The AirTable Transfer model.
@@ -113,31 +123,19 @@ def get_transfer_model(base_info):
         customer_id = fields.TextField("customer_id")
         customer_company_name = fields.TextField("customer_company_name")
         customer_preferred_language = fields.TextField("customer_preferred_language")
-        customer_address_address_line_1 = fields.TextField(
-            "customer_address_address_line_1"
-        )
-        customer_address_address_line_2 = fields.TextField(
-            "customer_address_address_line_2"
-        )
+        customer_address_address_line_1 = fields.TextField("customer_address_address_line_1")
+        customer_address_address_line_2 = fields.TextField("customer_address_address_line_2")
         customer_address_city = fields.TextField("customer_address_city")
         customer_address_region = fields.TextField("customer_address_region")
         customer_address_postal_code = fields.TextField("customer_address_postal_code")
         customer_address_country = fields.TextField("customer_address_country")
-        customer_address_phone_number = fields.TextField(
-            "customer_address_phone_number"
-        )
+        customer_address_phone_number = fields.TextField("customer_address_phone_number")
         customer_contact_first_name = fields.TextField("customer_contact_first_name")
         customer_contact_last_name = fields.TextField("customer_contact_last_name")
         customer_contact_email = fields.TextField("customer_contact_email")
-        customer_contact_phone_number = fields.TextField(
-            "customer_contact_phone_number"
-        )
-        customer_benefits_3yc_start_date = fields.DateField(
-            "customer_benefits_3yc_start_date"
-        )
-        customer_benefits_3yc_end_date = fields.DateField(
-            "customer_benefits_3yc_end_date"
-        )
+        customer_contact_phone_number = fields.TextField("customer_contact_phone_number")
+        customer_benefits_3yc_start_date = fields.DateField("customer_benefits_3yc_start_date")
+        customer_benefits_3yc_end_date = fields.DateField("customer_benefits_3yc_end_date")
         customer_benefits_3yc_status = fields.TextField("customer_benefits_3yc_status")
         customer_benefits_3yc_minimum_quantity_license = fields.NumberField(
             "customer_benefits_3yc_minimum_quantity_license",
@@ -168,7 +166,7 @@ def get_transfer_model(base_info):
 
 
 @cache
-def get_gc_main_agreement_model(base_info):
+def get_gc_main_agreement_model(base_info: AirTableBaseInfo):
     """
     Retrieves the Global Customer (gc) main agreement model based on the provided base information.
 
@@ -176,7 +174,7 @@ def get_gc_main_agreement_model(base_info):
     right API key.
 
     Args:
-        base_info (AirTableBaseInfo): The base info instance.
+        base_info: The base info instance.
 
     Returns:
         GCMainAgreement: The AirTable GCMainAgreement model.
@@ -204,16 +202,15 @@ def get_gc_main_agreement_model(base_info):
 
 
 @cache
-def get_gc_agreement_deployment_model(base_info):
+def get_gc_agreement_deployment_model(base_info: AirTableBaseInfo):
     """
-    Retrieves the Global Customer (gc) agreement deployment model based on the provided
-    base information.
+    Retrieves the Global Customer agreement deployment model.
 
     This method returns the GCAgreementDeployments model class connected to the right base
     and with the right API key.
 
     Args:
-        base_info (AirTableBaseInfo): The base info instance.
+        base_info: The base info instance.
 
     Returns:
         GCAgreementDeployments: The AirTable GCAgreementDeployments (Global Customer Agreement
@@ -252,21 +249,20 @@ def get_gc_agreement_deployment_model(base_info):
 
 
 @cache
-def get_offer_model(base_info):
+def get_offer_model(base_info: AirTableBaseInfo):
     """
-    Returns the Offer model class connected to the right base and with
-    the right API key.
+    Returns the Offer model class connected to the right base and with the right API key.
 
     Args:
-        base_info (AirTableBaseInfo): The base info instance.
+        base_info: The base info instance.
 
     Returns:
         Offer: The AirTable Offer model.
     """
-    Transfer = get_transfer_model(base_info)
+    transfer_model = get_transfer_model(base_info)
 
     class Offer(Model):
-        transfer = fields.LinkField("membership_id", Transfer, lazy=True)
+        transfer = fields.LinkField("membership_id", transfer_model, lazy=True)
         offer_id = fields.TextField("offer_id")
         quantity = fields.NumberField("quantity")
         renewal_date = fields.DateField("renewal_date")
@@ -282,50 +278,47 @@ def get_offer_model(base_info):
     return Offer
 
 
-def get_offer_ids_by_membership_id(product_id, membership_id):
+def get_offer_ids_by_membership_id(product_id: str, membership_id: str) -> list[str]:
     """
     Returns a list of SKUs associated with a given membership_id.
 
     Args:
-        product_id (str): The ID of the product to which the membership refers to.
-        membership_id (str): The membership ID used to retrieve the list of SKUs.
+        product_id: The ID of the product to which the membership refers to.
+        membership_id: The membership ID used to retrieve the list of SKUs.
 
     Returns:
         list: List of SKUs that belong to the given membership.
     """
-    Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
-    return [
-        offer.offer_id
-        for offer in Offer.all(
-            formula=EQUAL(FIELD("membership_id"), STR_VALUE(membership_id))
-        )
-    ]
+    offer_model = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
+    formula = EQUAL(FIELD("membership_id"), STR_VALUE(membership_id))
+
+    return [offer.offer_id for offer in offer_model.all(formula=formula)]
 
 
-def create_offers(product_id, offers):
+def create_offers(product_id: str, offers: list):
     """
     Creates a list of Offer objects in batch.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        offers (list): List of Offer objects to create.
+        product_id: The ID of the product used to determine the AirTable base.
+        offers: List of Offer objects to create.
     """
-    Offer = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
-    Offer.batch_save([Offer(**offer) for offer in offers])
+    offer_model = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
+    offer_model.batch_save([offer_model(**offer) for offer in offers])
 
 
-def get_transfers_to_process(product_id):
+def get_transfers_to_process(product_id: str):
     """
     Get a list of transfers that must be submitted to Adobe.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
+        product_id: The ID of the product used to determine the AirTable base.
 
     Returns:
         list: List of Transfer objects.
     """
-    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
-    return Transfer.all(
+    transfer_model = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
+    return transfer_model.all(
         formula=OR(
             EQUAL(FIELD("status"), STR_VALUE(STATUS_INIT)),
             EQUAL(FIELD("status"), STR_VALUE(STATUS_RESCHEDULED)),
@@ -333,39 +326,40 @@ def get_transfers_to_process(product_id):
     )
 
 
-def get_transfers_to_check(product_id):
+def get_transfers_to_check(product_id: str):
     """
     Returns a list of transfers currently in running state.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
+        product_id: The ID of the product used to determine the AirTable base.
 
     Returns:
         list: List of running transfers.
     """
-    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
-    return Transfer.all(
+    transfer_model = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
+    return transfer_model.all(
         formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
     )
 
 
 def get_transfer_by_authorization_membership_or_customer(
-    product_id, authorization_uk, membership_or_customer_id
+    product_id: str, authorization_uk: str, membership_or_customer_id: str
 ):
     """
-    Retrieve a Transfer object given the authorization ID and
-    the membership ID or the customer ID.
+    Retrieve a Transfer object.
+
+    Given the authorization ID and the membership ID or the customer ID.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        authorization_uk (str): The ID of the authorization.
-        membership_or_customer_id (str): Either a membership ID or a customer ID.
+        product_id: The ID of the product used to determine the AirTable base.
+        authorization_uk: The ID of the authorization.
+        membership_or_customer_id: Either a membership ID or a customer ID.
 
     Returns:
         Transfer: The Transfer if it has been found, None otherwise.
     """
-    Transfer = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
-    transfers = Transfer.all(
+    transfer_model = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
+    transfers = transfer_model.all(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
             OR(
@@ -382,13 +376,12 @@ def get_transfer_by_authorization_membership_or_customer(
     return transfers[0] if transfers else None
 
 
-def get_transfer_link(transfer):
+def get_transfer_link(transfer) -> str:
     """
     Generate a link to a record of the Transfer table in the AirTable UI.
 
     Args:
-        transfer (Transfer): The Transfer object for which the link must be
-        generated.
+        transfer (Transfer): The Transfer object for which the link must be generated.
 
     Returns:
         str: The link to the transfer record or None in case of an error.
@@ -398,19 +391,19 @@ def get_transfer_link(transfer):
         table_id = transfer.get_table().id
         view_id = transfer.get_table().schema().view("Transfer View").id
         record_id = transfer.id
-        return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
     except HTTPError:
-        pass
+        return None
+
+    return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
 
 
 @cache
-def get_pricelist_model(base_info):
+def get_pricelist_model(base_info: AirTableBaseInfo):
     """
-    Returns the PriceList model class connected to the right base and with
-    the right API key.
+    Returns the PriceList model class connected to the right base and with the right API key.
 
     Args:
-        base_info (AirTableBaseInfo): The base info instance.
+        base_info: The base info instance.
 
     Returns:
         PriceList: The AirTable PriceList model.
@@ -425,6 +418,7 @@ def get_pricelist_model(base_info):
         valid_from = fields.DateField("valid_from")
         valid_until = fields.DateField("valid_until")
         currency = fields.SelectField("currency")
+        # TODO: should be decimal
         unit_pp = fields.NumberField("unit_pp")
         unit_lp = fields.NumberField("unit_lp")
         status = fields.SelectField("status")
@@ -441,21 +435,22 @@ def get_pricelist_model(base_info):
     return PriceList
 
 
-def get_prices_for_skus(product_id, currency, skus):
+def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict:
     """
-    Given a currency and a list of SKUs it retrieves
-    the purchase price for each SKU in the given currency.
+    Given a currency and a list of SKUs it retrieves the purchase price.
+
+    For each SKU in the given currency.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        currency (str): The currency for which the price must be retrieved.
-        skus (list): List of SKUs which purchase prices must be retrieved.
+        product_id: The ID of the product used to determine the AirTable base.
+        currency: The currency for which the price must be retrieved.
+        skus: List of SKUs which purchase prices must be retrieved.
 
     Returns:
         dict: A dictionary with SKU, purchase price items.
     """
-    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
-    items = PriceList.all(
+    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    items = pricelist_model.all(
         formula=AND(
             EQUAL(FIELD("currency"), to_airtable_value(currency)),
             EQUAL(FIELD("valid_until"), "BLANK()"),
@@ -467,19 +462,22 @@ def get_prices_for_skus(product_id, currency, skus):
     return {item.sku: item.unit_pp for item in items}
 
 
-def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
+def get_prices_for_3yc_skus(  # noqa: C901
+    product_id: str, currency: str, start_date: dt.date, skus: list[str]
+) -> dict:
     """
-    Given a currency and a list of SKUs and the 3YC start date it retrieves
-    the purchase price for each SKU in the given currency from the pricelist that was valid
+    Given a currency and a list of SKUs and the 3YC start date it retrieves the purchase price.
+
+    For each SKU in the given currency from the pricelist that was valid
     when the 3YC started.
     Such prices are cached since they will not change ever to reduce the amount of API calls
     to the AirTable API.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        currency (str): The currency for which the price must be retrieved.
-        start_date (date): The date in which the 3YC started.
-        skus (list): List of SKUs which purchase prices must be retrieved.
+        product_id: The ID of the product used to determine the AirTable base.
+        currency: The currency for which the price must be retrieved.
+        start_date: The date in which the 3YC started.
+        skus: List of SKUs which purchase prices must be retrieved.
 
     Returns:
         dict: A dictionary with SKU, purchase price items.
@@ -499,27 +497,20 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
     if not skus_to_lookup:
         return prices
 
-    PriceList = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
 
-    items = PriceList.all(
+    items = pricelist_model.all(
         formula=AND(
             EQUAL(FIELD("currency"), to_airtable_value(currency)),
             OR(
                 EQUAL(FIELD("valid_until"), "BLANK()"),
                 AND(
-                    LESS_EQUAL(
-                        FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))
-                    ),
-                    GREATER(
-                        FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))
-                    ),
+                    LESS_EQUAL(FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))),
+                    GREATER(FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))),
                 ),
             ),
             OR(
-                *[
-                    EQUAL(FIELD("sku"), to_airtable_value(sku))
-                    for sku in skus_to_lookup
-                ],
+                *[EQUAL(FIELD("sku"), to_airtable_value(sku)) for sku in skus_to_lookup],
             ),
         ),
         sort=["-valid_until"],
@@ -539,80 +530,68 @@ def get_prices_for_3yc_skus(product_id, currency, start_date, skus):
     return prices
 
 
-def get_sku_price(adobe_customer, offer_ids, product_id, deployment_currency):
+def get_sku_price(
+    adobe_customer: dict, offer_ids: list[str], product_id: str, deployment_currency: str
+) -> float | None:
     """
     Get the SKU price considering the level dicount and the 3YC commitment.
 
     Args:
-        adobe_customer (dict): Adobe customer
-        adobe_subscription (dict): Adobe subscription
-        product_id (str): ID of the product
-        deployment_currency (str): deployment currency
+        adobe_customer: Adobe customer
+        offer_ids: List of Adobe offer ids
+        product_id: ID of the product
+        deployment_currency: deployment currency
 
     Returns:
         float or None: Sku price if is available, None in other case
     """
-    commitment = get_3yc_commitment(adobe_customer)
-    commitment_start_date = None
-    if (
-        commitment
-        and commitment["status"] in (STATUS_3YC_COMMITTED, STATUS_3YC_ACTIVE)
-        and date.fromisoformat(commitment["endDate"]) >= date.today()
-    ):
-        commitment_start_date = date.fromisoformat(commitment["startDate"])
+    commitment_start_date = get_commitment_start_date(adobe_customer)
 
     if commitment_start_date:
         prices = get_prices_for_3yc_skus(
-            product_id,
-            deployment_currency,
-            commitment_start_date,
-            offer_ids
+            product_id, deployment_currency, commitment_start_date, offer_ids
         )
     else:
-        prices = get_prices_for_skus(
-            product_id,
-            deployment_currency,
-            offer_ids
-        )
-    return prices if prices else {}
+        prices = get_prices_for_skus(product_id, deployment_currency, offer_ids)
+    return prices or {}
 
 
-def create_gc_agreement_deployments(product_id, agreement_deployments):
+def create_gc_agreement_deployments(product_id: str, agreement_deployments: list):
     """
     Add a new Global Customer (GC) agreement deployments on Airtable for a given product.
+
     This method creates a list of GCAgreementDeployment objects on Airtable in batch.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        agreement_deployments (list): List of GCAgreementDeployment object to create.
+        product_id: The ID of the product used to determine the AirTable base.
+        agreement_deployments: List of GCAgreementDeployment object to create.
     """
-    GCAgreementDeployment = get_gc_agreement_deployment_model(
+    gc_agreement_deployment_model = get_gc_agreement_deployment_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    GCAgreementDeployment.batch_save(
-        [
-            GCAgreementDeployment(**agreement_deployment)
-            for agreement_deployment in agreement_deployments
-        ]
-    )
+    gc_agreement_deployment_model.batch_save([
+        gc_agreement_deployment_model(**agreement_deployment)
+        for agreement_deployment in agreement_deployments
+    ])
 
 
-def create_gc_main_agreement(product_id, main_agreement):
+def create_gc_main_agreement(product_id: str, main_agreement: dict):
     """
     Add a new Global Customer (GC) main agreement on Airtable for a given product.
+
     This method creates a GCMainAgreement object on Airtable.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        main_agreement (dict): The main agreement object to create.
+        product_id: The ID of the product used to determine the AirTable base.
+        main_agreement: The main agreement object to create.
     """
-    GCMainAgreement = get_gc_main_agreement_model(
-        AirTableBaseInfo.for_migrations(product_id)
+    gc_main_agreement_model = get_gc_main_agreement_model(
+        AirTableBaseInfo.for_migrations(product_id),
     )
-    GCMainAgreement(**main_agreement).save()
+    gc_main_agreement_model(**main_agreement).save()
 
 
-def get_gc_main_agreement(product_id, authorization_uk, membership_or_customer_id):
+def get_gc_main_agreement(product_id: str, authorization_uk: str, membership_or_customer_id: str):
     """
     Retrieves the Global Customer (gc) main agreement for a given product.
 
@@ -620,18 +599,18 @@ def get_gc_main_agreement(product_id, authorization_uk, membership_or_customer_i
     product, using the provided authorization and membership or customer ID.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        authorization_uk (str): The ID of the authorization.
-        membership_or_customer_id (str): Either a membership ID or a customer ID.
+        product_id: The ID of the product used to determine the AirTable base.
+        authorization_uk: The ID of the authorization.
+        membership_or_customer_id: Either a membership ID or a customer ID.
 
     Returns:
         GCMainAgreement: The GCMainOrder if it has been found,
         None otherwise.
     """
-    GCMainAgreement = get_gc_main_agreement_model(
-        AirTableBaseInfo.for_migrations(product_id)
+    gc_main_agreement_model = get_gc_main_agreement_model(
+        AirTableBaseInfo.for_migrations(product_id),
     )
-    gc_main_agreements = GCMainAgreement.all(
+    gc_main_agreements = gc_main_agreement_model.all(
         formula=AND(
             EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
             OR(
@@ -643,7 +622,7 @@ def get_gc_main_agreement(product_id, authorization_uk, membership_or_customer_i
     return gc_main_agreements[0] if gc_main_agreements else None
 
 
-def get_gc_agreement_deployments_by_main_agreement(product_id, main_agreement_id):
+def get_gc_agreement_deployments_by_main_agreement(product_id: str, main_agreement_id: str):
     """
     Retrieves Global Customer (gc) agreement deployments associated with a specific main agreement.
 
@@ -651,23 +630,23 @@ def get_gc_agreement_deployments_by_main_agreement(product_id, main_agreement_id
     main agreement ID for the given product.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
-        main_agreement_id (str): The ID of the main agreement.
+        product_id: The ID of the product used to determine the AirTable base.
+        main_agreement_id: The ID of the main agreement.
 
     Returns:
-        GCAgreementDeployment (list): The list of GCAgreementDeployment
+        GCAgreementDeployment: The list of GCAgreementDeployment
     """
-    GCAgreementDeployment = get_gc_agreement_deployment_model(
+    gc_agreement_deployment_model = get_gc_agreement_deployment_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    return GCAgreementDeployment.all(
+    return gc_agreement_deployment_model.all(
         formula=AND(
             EQUAL(FIELD("main_agreement_id"), STR_VALUE(main_agreement_id)),
         ),
     )
 
 
-def get_gc_agreement_deployments_to_check(product_id):
+def get_gc_agreement_deployments_to_check(product_id: str):
     """
     Retrieves Global Customer (gc) agreement deployments that require verification or review.
 
@@ -675,15 +654,15 @@ def get_gc_agreement_deployments_to_check(product_id):
     specified product that are in pending or error state
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
+        product_id: The ID of the product used to determine the AirTable base.
 
     Returns:
-        GCAgreementDeployment (list): The list of GCAgreementDeployment
+        GCAgreementDeployment: The list of GCAgreementDeployment
     """
-    GCAgreementDeployment = get_gc_agreement_deployment_model(
+    gc_agreement_deployment_model = get_gc_agreement_deployment_model(
         AirTableBaseInfo.for_migrations(product_id)
     )
-    return GCAgreementDeployment.all(
+    return gc_agreement_deployment_model.all(
         formula=OR(
             EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_PENDING)),
             EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_ERROR)),
@@ -691,38 +670,49 @@ def get_gc_agreement_deployments_to_check(product_id):
     )
 
 
-def get_agreement_deployment_view_link(product_id):
+def get_agreement_deployment_view_link(product_id: str) -> str | None:
     """
     Generate a link to a record of the Agreement Deployments table in the AirTable UI.
 
     Args:
-        product_id (str): The ID of the product used to determine the AirTable base.
+        product_id: The ID of the product used to determine the AirTable base.
 
     Returns:
-        str: The link to the agreement deployments record or None in case of an error.
+        str | None: The link to the agreement deployments record or None in case of an error.
     """
     try:
-        GCAgreementDeployment = get_gc_agreement_deployment_model(
+        gc_agreement_deployment_model = get_gc_agreement_deployment_model(
             AirTableBaseInfo.for_migrations(product_id)
         )
-        base_id = GCAgreementDeployment.Meta.base_id
-        table_id = GCAgreementDeployment.get_table().id
+        base_id = gc_agreement_deployment_model.Meta.base_id
+        table_id = gc_agreement_deployment_model.get_table().id
         view_id = (
-            GCAgreementDeployment.get_table()
+            gc_agreement_deployment_model.get_table()
             .schema()
-            .view("Agreement Deployments View")
+            .view(
+                "Agreement Deployments View",
+            )
             .id
         )
-        record_id = GCAgreementDeployment.id
-        return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
+        record_id = gc_agreement_deployment_model.id
     except HTTPError:
-        pass
+        return None
+
+    return f"https://airtable.com/{base_id}/{table_id}/{view_id}/{record_id}"
 
 
 @cache
-def get_sku_adobe_mapping_model(
-    base_info: AirTableBaseInfo,
-):
+def get_sku_adobe_mapping_model(base_info: AirTableBaseInfo):
+    """
+    Returns the AdobeProductMapping model class connected to the right base.
+
+    Args:
+        base_info: The base info instance.
+
+    Returns:
+        AdobeProductMapping: The AirTable AdobeProductMapping model.
+    """
+
     class AdobeProductMapping(Model):
         vendor_external_id = fields.TextField("vendor_external_id")
         sku = fields.TextField("sku")
@@ -737,10 +727,17 @@ def get_sku_adobe_mapping_model(
 
         @classmethod
         def from_short_id(cls, vendor_external_id: str):
+            """
+            Returns the AdobeProductMapping entity for the cutted Adobe SKU.
+
+            Args:
+                vendor_external_id: cutted Adobe SKU.
+
+            Returns:
+                AdobeProductMapping: entity of the AdobeProductMapping.
+            """
             entity = cls.first(
-                formula=EQUAL(
-                    FIELD("vendor_external_id"), STR_VALUE(vendor_external_id)
-                )
+                formula=EQUAL(FIELD("vendor_external_id"), STR_VALUE(vendor_external_id))
             )
             if entity is None:
                 raise AdobeProductNotFoundError(
@@ -749,40 +746,47 @@ def get_sku_adobe_mapping_model(
 
             return entity
 
-        def is_consumable(self):
-            """
-            Check if the SKU is a consumable.
-            """
+        def is_consumable(self) -> bool:
+            """Check if the SKU is a consumable."""
             return self.type_3yc == TYPE_3YC_CONSUMABLE
 
-        def is_license(self):
-            """
-            Check if the SKU is a license.
-            """
+        def is_license(self) -> bool:
+            """Check if the SKU is a license."""
             return self.type_3yc == TYPE_3YC_LICENSE
 
-        def is_valid_3yc_type(self):
-            """
-            Check if the SKU is a valid 3YC type.
-            """
+        def is_valid_3yc_type(self) -> bool:
+            """Check if the SKU is a valid 3YC type."""
             return self.is_consumable() or self.is_license()
 
     return AdobeProductMapping
 
 
-def get_adobe_product_by_marketplace_sku(
-    vendor_external_id: str,
-):
+def get_adobe_product_by_marketplace_sku(vendor_external_id: str):
     """
     Get an AdobeProductMapping object by the vendor_external_id.
 
     Args:
-        vendor_external_id (str): The vendor external id to search for the AdobeProductMapping.
+        vendor_external_id: The vendor external id to search for the AdobeProductMapping.
 
     Raises:
         AdobeProductNotFoundError: If no AdobeProductMapping exists for the given
         vendor external id.
     """
+    adobe_item_model = get_sku_adobe_mapping_model(AirTableBaseInfo.for_sku_mapping())
+    return adobe_item_model.from_short_id(vendor_external_id)
 
-    AdobeItemModel = get_sku_adobe_mapping_model(AirTableBaseInfo.for_sku_mapping())
-    return AdobeItemModel.from_short_id(vendor_external_id)
+
+@cache
+def get_adobe_sku(vendor_item_id: str) -> str:
+    """
+    Retrieves full sku with first discount level based on cutted Adobe SKU.
+
+    Uses AdobeProductMapping table
+
+    Args:
+        vendor_item_id: cutted Adobe SKU.
+
+    Returns:
+        str: full sku with first discount level.
+    """
+    return get_adobe_product_by_marketplace_sku(vendor_item_id).sku

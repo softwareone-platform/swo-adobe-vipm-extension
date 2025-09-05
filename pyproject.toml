@@ -14,7 +14,7 @@ python = ">=3.12,<4"
 django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
 jinja2 = "3.1.*"
 markdown-it-py = "3.0.*"
-mpt-extension-sdk = "4.2.*"
+mpt-extension-sdk = "4.4.*"
 openpyxl = "3.1.*"
 phonenumbers = "8.13.*"
 pyairtable = "2.3.*"
@@ -45,7 +45,6 @@ types-requests = "2.31.*"
 [tool.poetry.group.sdk.dependencies] # Move to the SDK when splitting
 django-ninja = "1.1.*"
 pyjwt = "2.8.*"
-typing-extensions = "4.9.*"
 
 
 [tool.poetry.group.runtime.dependencies] # Move to runtime when splitting
@@ -61,9 +60,6 @@ opentelemetry-sdk = "1.30.*"
 pyfiglet = "1.0.*"
 rich = "13.7.*"
 watchfiles = "0.21.*"
-
-[tool.poetry.scripts]
-swoext = 'swo.mpt.extensions.runtime.swoext:main' # Move to runtime when splitting
 
 
 [tool.poetry.plugins."swo.mpt.ext"]

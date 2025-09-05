@@ -39,12 +39,7 @@ from adobe_vipm.flows.constants import (
     ERR_POSTAL_CODE_LENGTH,
     ERR_STATE_DID_YOU_MEAN,
     ERR_STATE_OR_PROVINCE,
-    PARAM_3YC,
-    PARAM_3YC_CONSUMABLES,
-    PARAM_3YC_LICENSES,
-    PARAM_ADDRESS,
-    PARAM_COMPANY_NAME,
-    PARAM_CONTACT,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import (
@@ -70,15 +65,26 @@ logger = logging.getLogger(__name__)
 
 
 class CheckPurchaseValidationEnabled(Step):
+    """Checks that all required parameters for validation are marked as required."""
+
     def __call__(self, client, context, next_step):
+        """Checks that all required parameters for validation are marked as required."""
         if not is_purchase_validation_enabled(context.order):
             return
         next_step(client, context)
 
 
 class ValidateCustomerData(Step):
+    """Validates provided customer data from the MPT order."""
+
     def validate_3yc(self, context):
-        p3yc = context.customer_data[PARAM_3YC]
+        """
+        Validates 3YC parameters in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
+        p3yc = context.customer_data[Param.THREE_YC.value]
 
         if p3yc != ["Yes"]:
             return
@@ -87,11 +93,11 @@ class ValidateCustomerData(Step):
 
         for param_name, validator, error in (
             (
-                PARAM_3YC_CONSUMABLES,
+                Param.THREE_YC_CONSUMABLES.value,
                 is_valid_minimum_consumables,
                 ERR_3YC_QUANTITY_CONSUMABLES,
             ),
-            (PARAM_3YC_LICENSES, is_valid_minimum_licenses, ERR_3YC_QUANTITY_LICENSES),
+            (Param.THREE_YC_LICENSES.value, is_valid_minimum_licenses, ERR_3YC_QUANTITY_LICENSES),
         ):
             param = get_ordering_parameter(context.order, param_name)
 
@@ -105,13 +111,13 @@ class ValidateCustomerData(Step):
                 )
 
         if not errors and not (
-            context.customer_data[PARAM_3YC_LICENSES]
-            or context.customer_data[PARAM_3YC_CONSUMABLES]
+            context.customer_data[Param.THREE_YC_LICENSES.value]
+            or context.customer_data[Param.THREE_YC_CONSUMABLES.value]
         ):
             errors = True
-            param_licenses = get_ordering_parameter(context.order, PARAM_3YC_LICENSES)
+            param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
             param_consumables = get_ordering_parameter(
-                context.order, PARAM_3YC_CONSUMABLES
+                context.order, Param.THREE_YC_CONSUMABLES.value
             )
             context.validation_succeeded = False
             context.order = set_order_error(
@@ -123,13 +129,19 @@ class ValidateCustomerData(Step):
             )
 
     def validate_company_name(self, context):
-        param = get_ordering_parameter(context.order, PARAM_COMPANY_NAME)
-        name = context.customer_data[PARAM_COMPANY_NAME]
+        """
+        Validates Company name parameter in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
+        param = get_ordering_parameter(context.order, Param.COMPANY_NAME.value)
+        name = context.customer_data[Param.COMPANY_NAME.value]
         if not is_valid_company_name_length(name):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_COMPANY_NAME,
+                Param.COMPANY_NAME.value,
                 ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"]),
             )
             return
@@ -137,13 +149,19 @@ class ValidateCustomerData(Step):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_COMPANY_NAME,
+                Param.COMPANY_NAME.value,
                 ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"]),
             )
 
-    def validate_address(self, context):
-        param = get_ordering_parameter(context.order, PARAM_ADDRESS)
-        address = context.customer_data[PARAM_ADDRESS]
+    def validate_address(self, context):  # noqa: C901
+        """
+        Validates address parameter in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
+        param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+        address = context.customer_data[Param.ADDRESS.value]
         errors = []
 
         country_code = address["country"]
@@ -153,7 +171,7 @@ class ValidateCustomerData(Step):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_ADDRESS,
+                Param.ADDRESS.value,
                 ERR_ADDRESS.to_dict(
                     title=param["name"],
                     errors="".join(errors),
@@ -195,16 +213,14 @@ class ValidateCustomerData(Step):
             if not validator_func(address[field]):
                 errors.append(err_msg)
 
-        if address["addressLine2"] and not is_valid_address_line_2_length(
-            address["addressLine2"]
-        ):
+        if address["addressLine2"] and not is_valid_address_line_2_length(address["addressLine2"]):
             errors.append(ERR_ADDRESS_LINE_2_LENGTH)
 
         if errors:
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_ADDRESS,
+                Param.ADDRESS.value,
                 ERR_ADDRESS.to_dict(
                     title=param["name"],
                     errors="; ".join(errors),
@@ -213,20 +229,26 @@ class ValidateCustomerData(Step):
             return
         context.order = update_ordering_parameter_value(
             context.order,
-            PARAM_ADDRESS,
+            Param.ADDRESS.value,
             address,
         )
 
-    def validate_contact(self, context):
-        contact = context.customer_data[PARAM_CONTACT]
-        param = get_ordering_parameter(context.order, PARAM_CONTACT)
+    def validate_contact(self, context):  # noqa: C901
+        """
+        Validates contact parameter in MPT order.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
+        contact = context.customer_data[Param.CONTACT.value]
+        param = get_ordering_parameter(context.order, Param.CONTACT.value)
         errors = []
 
         if not contact:
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_CONTACT,
+                Param.CONTACT.value,
                 ERR_CONTACT.to_dict(
                     title=param["name"],
                     errors="it is mandatory.",
@@ -252,7 +274,7 @@ class ValidateCustomerData(Step):
             context.validation_succeeded = False
             context.order = set_ordering_parameter_error(
                 context.order,
-                PARAM_CONTACT,
+                Param.CONTACT.value,
                 ERR_CONTACT.to_dict(
                     title=param["name"],
                     errors="; ".join(errors),
@@ -260,6 +282,7 @@ class ValidateCustomerData(Step):
             )
 
     def __call__(self, client, context, next_step):
+        """Validates provided customer data from the MPT order."""
         self.validate_company_name(context)
         self.validate_address(context)
         self.validate_contact(context)
@@ -272,13 +295,14 @@ class ValidateCustomerData(Step):
 
 
 def validate_purchase_order(client, order):
+    """Validate purchase order pipeline."""
     pipeline = Pipeline(
         SetupContext(),
         PrepareCustomerData(),
         CheckPurchaseValidationEnabled(),
         ValidateCustomerData(),
         ValidateDuplicateLines(),
-        Validate3YCCommitment(True),
+        Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),
         UpdatePrices(),
     )

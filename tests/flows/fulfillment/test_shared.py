@@ -1,4 +1,4 @@
-from datetime import date
+import datetime as dt
 
 import pytest
 from freezegun import freeze_time
@@ -7,9 +7,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
-    STATUS_ORDER_CANCELLED,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
+    AdobeStatus,
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
@@ -22,14 +20,9 @@ from adobe_vipm.flows.constants import (
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
-    PARAM_3YC,
-    PARAM_3YC_COMMITMENT_REQUEST_STATUS,
-    PARAM_3YC_END_DATE,
-    PARAM_3YC_ENROLL_STATUS,
-    PARAM_3YC_START_DATE,
-    PARAM_DUE_DATE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -37,7 +30,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
@@ -54,16 +47,14 @@ from adobe_vipm.flows.utils import (
     get_adobe_order_id,
     get_coterm_date,
     get_due_date,
-    get_next_sync,
     set_coterm_date,
-    set_next_sync,
 )
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 
 
 @pytest.fixture(autouse=True)
 def mocked_send_mpt_notification(mocker):
-    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification")
+    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification", spec=True)
 
 
 @pytest.mark.parametrize(
@@ -87,9 +78,7 @@ def mocked_send_mpt_notification(mocker):
         ),
     ],
 )
-def test_send_mpt_notification(mocker, settings, order_factory, status, subject):
-    mocked_mpt_client = mocker.MagicMock()
-
+def test_send_mpt_notification(mocker, settings, order_factory, mock_mpt_client, status, subject):
     mocked_get_rendered_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
         return_value="rendered-template",
@@ -99,10 +88,11 @@ def test_send_mpt_notification(mocker, settings, order_factory, status, subject)
 
     order = order_factory(order_id="ORD-1234", status=status)
 
-    send_mpt_notification(mocked_mpt_client, order)
-    mocked_get_rendered_template.assert_called_once_with(mocked_mpt_client, order["id"])
+    send_mpt_notification(mock_mpt_client, order)
+    mocked_get_rendered_template.assert_called_once_with(mock_mpt_client, order["id"])
 
     mocked_mpt_notify.assert_called_once_with(
+        mock_mpt_client,
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
@@ -118,16 +108,13 @@ def test_send_mpt_notification(mocker, settings, order_factory, status, subject)
 
 @freeze_time("2025-01-01")
 def test_start_processing_attempt_first_attempt(
-    mocker, settings, order_factory, fulfillment_parameters_factory
+    mocker, settings, order_factory, fulfillment_parameters_factory, mocked_send_mpt_notification
 ):
     order = order_factory()
     updated_order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             due_date="2025-01-31",
         ),
-    )
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
     )
     mocked_update = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
@@ -138,7 +125,7 @@ def test_start_processing_attempt_first_attempt(
 
     start_processing_attempt(mocked_client, order)
 
-    mocked_send_notification.assert_called_once_with(mocked_client, updated_order)
+    mocked_send_mpt_notification.assert_called_once_with(mocked_client, updated_order)
     mocked_update.assert_called_once_with(
         mocked_client,
         updated_order["id"],
@@ -148,12 +135,8 @@ def test_start_processing_attempt_first_attempt(
 
 @freeze_time("2025-01-01")
 def test_start_processing_attempt_other_attempts(
-    mocker, order_factory, fulfillment_parameters_factory
+    mocker, order_factory, fulfillment_parameters_factory, mocked_send_mpt_notification
 ):
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
-    )
-
     mocked_client = mocker.MagicMock()
 
     order = order_factory(
@@ -164,7 +147,7 @@ def test_start_processing_attempt_other_attempts(
 
     start_processing_attempt(mocked_client, order)
 
-    mocked_send_notification.assert_not_called()
+    mocked_send_mpt_notification.assert_not_called()
 
 
 def test_set_customer_coterm_date_if_null(
@@ -178,9 +161,7 @@ def test_set_customer_coterm_date_if_null(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
     order = order_factory()
-    order = set_customer_coterm_date_if_null(
-        mocked_mpt_client, mocked_adobe_client, order
-    )
+    order = set_customer_coterm_date_if_null(mocked_mpt_client, mocked_adobe_client, order)
     assert get_coterm_date(order) == customer["cotermDate"]
     mocked_update_order.assert_called_once_with(
         mocked_mpt_client,
@@ -205,10 +186,7 @@ def test_set_customer_coterm_date_if_null_already_set(
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(coterm_date="whatever")
     )
-    assert (
-        set_customer_coterm_date_if_null(mocked_mpt_client, mocked_adobe_client, order)
-        == order
-    )
+    assert set_customer_coterm_date_if_null(mocked_mpt_client, mocked_adobe_client, order) == order
 
     mocked_update_order.assert_not_called()
     mocked_adobe_client.get_customer_assert_not_called()
@@ -219,16 +197,8 @@ def test_setup_due_date_for_first_time(
     mocker,
     order_factory,
 ):
-    """
-    Tests that the `SetupDueDate` processing step
-    setups the fulfillment parameter `dueDate` to now
-    if it is not set
-    and updates the order to reflect the change.
-    """
     order = order_factory()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
 
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -240,7 +210,7 @@ def test_setup_due_date_for_first_time(
 
     step(mocked_client, context, mocked_next_step)
 
-    assert get_due_date(context.order) == date(2024, 1, 31)
+    assert get_due_date(context.order) == dt.date(2024, 1, 31)
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -256,20 +226,13 @@ def test_increment_attempts_counter_step_max_reached(
     order_factory,
     fulfillment_parameters_factory,
 ):
-    """
-    Tests that the `SetupDueDate` processing step
-    fail the order if the current date is more than due date
-    parameter
-    """
     settings.EXTENSION_CONFIG = {"DUE_DATE_DAYS": "30"}
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(
             due_date="2024-06-01",
         ),
     )
-    mocked_fail = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
-    )
+    mocked_fail = mocker.patch("adobe_vipm.flows.fulfillment.shared.switch_order_to_failed")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -293,25 +256,18 @@ def test_setup_due_date_when_parameter_is_missed(
     order_factory,
     fulfillment_parameters_factory,
 ):
-    """
-    Tests that the `SetupDueDate` processing step
-    fail the order if the current date is more than due date
-    parameter
-    """
     settings.EXTENSION_CONFIG = {"DUE_DATE_DAYS": "30"}
     fulfillment_parameters = fulfillment_parameters_factory()
     fulfillment_parameters = list(
         filter(
-            lambda p: p["externalId"] != PARAM_DUE_DATE,
+            lambda p: p["externalId"] != Param.DUE_DATE.value,
             fulfillment_parameters,
         )
     )
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters,
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
 
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -323,7 +279,7 @@ def test_setup_due_date_when_parameter_is_missed(
 
     step(mocked_client, context, mocked_next_step)
 
-    assert get_due_date(context.order) == date(2025, 1, 31)
+    assert get_due_date(context.order) == dt.date(2025, 1, 31)
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -332,22 +288,12 @@ def test_setup_due_date_when_parameter_is_missed(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_start_order_processing_step(mocker, order_factory):
-    """
-    Tests that the template for the `Processing` status
-    with the name provided during the instantiation of the step class
-    is set for the order and the notification email is sent.
-    """
+def test_start_order_processing_step(mocker, order_factory, mocked_send_mpt_notification):
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1234"},
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     order = order_factory()
@@ -370,7 +316,7 @@ def test_start_order_processing_step(mocker, order_factory):
         context.order["id"],
         template={"id": "TPL-1234"},
     )
-    mocked_send_notification.assert_called_once_with(mocked_client, context.order)
+    mocked_send_mpt_notification.assert_called_once_with(mocked_client, context.order)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -393,9 +339,7 @@ def test_configuration_start_order_processing_selects_template(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1234"},
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
 
     step = StartOrderProcessing(expected_template)
     step(mocked_client, context, mocked_next_step)
@@ -416,30 +360,29 @@ def test_configuration_start_order_processing_selects_template(
 
 
 def test_set_processing_template_step_already_set_not_first_attempt(
-    mocker, order_factory
+    mocker,
+    order_factory,
+    fulfillment_parameters_factory,
+    mocked_send_mpt_notification,
 ):
-    """
-    Tests that the template for the `Processing` status
-    with the name provided during the instantiation of the step class
-    is not set for the order if it was already set.
-    Also the notification email is not sent since it's not the first attempt.
-    """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1234"},
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
+    order = order_factory(
+        template={"id": "TPL-1234"},
+        fulfillment_parameters=fulfillment_parameters_factory(
+            due_date="2025-01-01",
+        ),
+    )
+
     context = Context(
-        order=order_factory(template={"id": "TPL-1234"}),
-        due_date=date(2025, 1, 1),
+        order=order,
+        due_date=dt.date(2025, 1, 1),
     )
 
     step = StartOrderProcessing("my template")
@@ -452,7 +395,7 @@ def test_set_processing_template_step_already_set_not_first_attempt(
         "my template",
     )
     mocked_update_order.assert_not_called()
-    mocked_send_notification.assert_not_called()
+    mocked_send_mpt_notification.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -460,18 +403,11 @@ def test_set_processing_template_step_already_set_not_first_attempt(
 def test_set_processing_template_to_delayed_in_renewal_win(
     mocker, order_factory, fulfillment_parameters_factory
 ):
-    """
-    Tests that the template for the `Processing` status
-    that must be used when the processing is delayed due to the renewal window open
-    is set.
-    """
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-5678"},
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order"
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -483,7 +419,7 @@ def test_set_processing_template_to_delayed_in_renewal_win(
         order=order,
         order_id=order["id"],
         product_id=order["agreement"]["product"]["id"],
-        due_date=date(2025, 1, 1),
+        due_date=dt.date(2025, 1, 1),
     )
 
     assert "template" not in context.order
@@ -507,32 +443,24 @@ def test_set_processing_template_to_delayed_in_renewal_win(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-
 @pytest.mark.parametrize(
-    ("coterm_date", "next_sync"),
+    "coterm_date",
     [
-        ("2025-01-01", None),
-        ("2024-12-31", "2026-01-02"),
-        (None, "2026-01-02"),
+        "2026-01-01",
+        "2024-12-31",
+        None,
     ],
 )
-def test_set_or_update_coterm_next_sync_dates_step(
+def test_set_or_update_coterm_date_step(
     mocker,
     order_factory,
     adobe_customer_factory,
     coterm_date,
-    next_sync,
 ):
-    """
-    Tests that the order is updated when either the `cotermDate`
-    either the `nextSync` fulfillment parameter are not in sync with
-    the adobe customer coterm date.
-    """
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     customer = adobe_customer_factory(coterm_date="2025-01-01")
     order = order_factory()
     order = set_coterm_date(order, coterm_date)
-    order = set_next_sync(order, next_sync)
 
     context = Context(
         order=order,
@@ -544,7 +472,7 @@ def test_set_or_update_coterm_next_sync_dates_step(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
 
     step(mocked_client, context, mocked_next_step)
 
@@ -554,20 +482,14 @@ def test_set_or_update_coterm_next_sync_dates_step(
         parameters=context.order["parameters"],
     )
     assert get_coterm_date(context.order) == "2025-01-01"
-    assert get_next_sync(context.order) == "2025-01-02"
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_set_or_update_withouCotermDate(
+def test_set_or_update_without_coterm_date(
     mocker,
     order_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests that the order is updated when either the `cotermDate`
-    either the `nextSync` fulfillment parameter are not in sync with
-    the adobe customer coterm date.
-    """
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     customer = adobe_customer_factory(coterm_date=None)
     order = order_factory()
@@ -582,7 +504,7 @@ def test_set_or_update_withouCotermDate(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
 
     step(mocked_client, context, mocked_next_step)
 
@@ -590,21 +512,15 @@ def test_set_or_update_withouCotermDate(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
+def test_set_or_update_coterm_date_step_are_in_sync(
     mocker,
     order_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests that the order is not updated when both the `cotermDate`
-    and the `nextSync` fulfillment parameter are in sync with
-    the adobe customer coterm date.
-    """
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     customer = adobe_customer_factory(coterm_date="2025-01-01")
     order = order_factory()
     order = set_coterm_date(order, "2025-01-01")
-    order = set_next_sync(order, "2025-01-02")
 
     context = Context(
         order=order,
@@ -615,7 +531,7 @@ def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
 
     step(mocked_client, context, mocked_next_step)
 
@@ -623,26 +539,19 @@ def test_set_or_update_coterm_next_sync_dates_step_are_in_sync(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
+def test_set_or_update_coterm_date_step_with_3yc(
     mocker,
     order_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
 ):
-    """
-    Tests that the order is updated with 3YC parameters when the Adobe customer
-    has a 3YC commitment request.
-    """
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     commitment = adobe_commitment_factory(
         status="REQUESTED",
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
-    customer = adobe_customer_factory(
-        coterm_date="2025-01-01",
-        commitment_request=commitment
-    )
+    customer = adobe_customer_factory(coterm_date="2025-01-01", commitment_request=commitment)
 
     order = order_factory()
 
@@ -656,7 +565,7 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    step = SetOrUpdateCotermNextSyncDates()
+    step = SetOrUpdateCotermDate()
     step(mocked_client, context, mocked_next_step)
     mocked_update.assert_called_once_with(
         mocked_client,
@@ -664,29 +573,15 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
         parameters=context.order["parameters"],
     )
 
-
-    parameter_list = []
-    parameter_list.append(get_fulfillment_parameter(
-        context.order,
-        PARAM_3YC_ENROLL_STATUS
-    )["value"])
-    parameter_list.append(get_fulfillment_parameter(
-        context.order,
-        PARAM_3YC_COMMITMENT_REQUEST_STATUS
-    )["value"])
-    parameter_list.append(get_fulfillment_parameter(
-        context.order,
-        PARAM_3YC_START_DATE
-    )["value"])
-    parameter_list.append(get_fulfillment_parameter(
-        context.order,
-        PARAM_3YC_END_DATE
-    )["value"])
-    parameter_list.append(get_fulfillment_parameter(
-        context.order,
-        PARAM_3YC
-    ))
-
+    parameter_list = [
+        get_fulfillment_parameter(context.order, Param.THREE_YC_ENROLL_STATUS.value)["value"],
+        get_fulfillment_parameter(context.order, Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value)[
+            "value"
+        ],
+        get_fulfillment_parameter(context.order, Param.THREE_YC_START_DATE.value)["value"],
+        get_fulfillment_parameter(context.order, Param.THREE_YC_END_DATE.value)["value"],
+        get_fulfillment_parameter(context.order, Param.THREE_YC.value),
+    ]
 
     assert parameter_list == [
         commitment["status"],
@@ -696,10 +591,8 @@ def test_set_or_update_coterm_next_sync_dates_step_with_3yc(
         {},
     ]
     assert get_coterm_date(context.order) == "2025-01-01"
-    assert get_next_sync(context.order) == "2025-01-02"
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
 
 
 def test_submit_return_orders_step(
@@ -709,11 +602,6 @@ def test_submit_return_orders_step(
     adobe_items_factory,
     settings,
 ):
-    """
-    Tests the creation of a return order for a returnable order.
-    The newly created return order is still pending of processing by Adobe so
-    the processing pipeline will be stopped.
-    """
     api_key = "airtable-token"
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": api_key,
@@ -724,7 +612,7 @@ def test_submit_return_orders_step(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -735,7 +623,7 @@ def test_submit_return_orders_step(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PENDING,
+        status=AdobeStatus.PENDING.value,
     )
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
@@ -775,11 +663,6 @@ def test_submit_return_orders_step_with_deployment_id(
     adobe_items_factory,
     settings,
 ):
-    """
-    Tests the creation of a return order for a returnable order.
-    The newly created return order is still pending of processing by Adobe so
-    the processing pipeline will be stopped.
-    """
     deployment_id = "deployment-id-1"
     api_key = "airtable-token"
     settings.EXTENSION_CONFIG = {
@@ -795,7 +678,7 @@ def test_submit_return_orders_step_with_deployment_id(
             deployment_id=deployment_id,
             deployment_currency_code="USD",
         ),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         deployment_id=deployment_id,
     )
     ret_info_1 = ReturnableOrderInfo(
@@ -808,7 +691,7 @@ def test_submit_return_orders_step_with_deployment_id(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PENDING,
+        status=AdobeStatus.PENDING.value,
         deployment_id=deployment_id,
     )
 
@@ -851,11 +734,6 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     adobe_items_factory,
     settings,
 ):
-    """
-    Tests the creation of a return order for a returnable order.
-    The newly created return order is still pending of processing by Adobe so
-    the processing pipeline will be stopped.
-    """
     deployment_id = "deployment-id"
     api_key = "airtable-token"
     settings.EXTENSION_CONFIG = {
@@ -867,7 +745,7 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         deployment_id=deployment_id,
     )
     ret_info_1 = ReturnableOrderInfo(
@@ -880,7 +758,7 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PENDING,
+        status=AdobeStatus.PENDING.value,
     )
 
     mocker.patch(
@@ -913,10 +791,6 @@ def test_submit_return_orders_step_order_processed(
     adobe_items_factory,
     settings,
 ):
-    """
-    Tests that all return orders previously created have been processed
-    and the order processing pipeline will continue.
-    """
     api_key = "airtable-token"
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": api_key,
@@ -925,7 +799,7 @@ def test_submit_return_orders_step_order_processed(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -936,7 +810,7 @@ def test_submit_return_orders_step_order_processed(
 
     return_order = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         reference_order_id=adobe_order_1["orderId"],
     )
 
@@ -967,14 +841,9 @@ def test_submit_return_orders_step_order_processed(
 
 
 def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
-    """
-    Test the creation of an Adobe new order.
-    The Adobe new order id is saved as the vendor external id of the order.
-    The created new order is still in processing so the order processing pipeline will stop.
-    """
     order = order_factory(deployment_id=None)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
-    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=STATUS_PENDING)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.PENDING.value)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_new_order.return_value = new_order
@@ -1022,20 +891,13 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
 def test_submit_new_order_step_with_deployment_id(
     mocker, order_factory, adobe_order_factory, settings
 ):
-    """
-    Test the creation of an Adobe new order.
-    The Adobe new order id is saved as the vendor external id of the order.
-    The created new order is still in processing so the order processing pipeline will stop.
-    """
     deployment_id = "deployment-id"
 
     order = order_factory(deployment_id=deployment_id)
-    preview_order = adobe_order_factory(
-        order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id
-    )
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
     new_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
-        status=STATUS_PENDING,
+        status=AdobeStatus.PENDING.value,
         deployment_id=deployment_id,
     )
 
@@ -1087,15 +949,9 @@ def test_submit_new_order_step_order_created_and_processed(
     order_factory,
     adobe_order_factory,
 ):
-    """
-    Test that if the NEW order has already been created no new order will be sumbitted to Adobe.
-    Furthermore it retrieves the NEW order from Adobe and since it has been processed, the
-    order processing pipeline will continue.
-    """
-
     new_order = adobe_order_factory(
         order_type="NEW",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
     )
     order = order_factory(external_ids={"vendor": new_order["orderId"]})
 
@@ -1142,17 +998,11 @@ def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
     order_factory,
     adobe_order_factory,
 ):
-    """
-    Test that if the NEW order has already been created no new order will be sumbitted to Adobe.
-    Furthermore it retrieves the NEW order from Adobe and since it has been processed, the
-    order processing pipeline will continue.
-    """
-
     deployment_id = "deployment-id"
 
     new_order = adobe_order_factory(
         order_type="NEW",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
     )
     order = order_factory(external_ids={"vendor": new_order["orderId"]})
 
@@ -1199,12 +1049,6 @@ def test_submit_new_order_step_order_no_upsize_lines(
     order_factory,
     lines_factory,
 ):
-    """
-    Test that if there are no upsize lines in the order
-    no NEW order will be placed and the order processing
-    pipeline will continue.
-    """
-
     order = order_factory(
         lines=lines_factory(quantity=10, old_quantity=12),
     )
@@ -1246,12 +1090,6 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
     adobe_order_factory,
     processing_status,
 ):
-    """
-    Test that if the NEW order has already been created no new order will be sumbitted to Adobe.
-    Furthermore it retries the NEW order from Adobe and since its processing status is an error,
-    the order will be failed and the processing pipeline will not continue.
-    """
-
     new_order = adobe_order_factory(
         order_type="NEW",
         status=processing_status,
@@ -1311,12 +1149,6 @@ def test_submit_new_order_step_order_created_unexpected_status(
     order_factory,
     adobe_order_factory,
 ):
-    """
-    Test that if the NEW order has already been created no new order will be sumbitted to Adobe.
-    Furthermore it retries the NEW order from Adobe and since its processing status is unexpected,
-    the order will be failed and the processing pipeline will not continue.
-    """
-
     new_order = adobe_order_factory(
         order_id="order-id",
         order_type="NEW",
@@ -1370,12 +1202,9 @@ def test_submit_new_order_step_order_created_unexpected_status(
 
 
 def test_get_return_orders_step(mocker, order_factory, adobe_order_factory):
-    """
-    Tests the retrieval of return orders for the current order.
-    """
     return_order = adobe_order_factory(
         order_type="RETURN",
-        status=STATUS_PROCESSED,
+        status=AdobeStatus.PROCESSED.value,
         reference_order_id="new-order-id",
     )
 
@@ -1420,9 +1249,6 @@ def test_create_or_update_subscriptions_step(
     adobe_items_factory,
     adobe_subscription_factory,
 ):
-    """
-    Tests the creation of the corresponding subscriptions for new purchased items.
-    """
     adobe_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
@@ -1473,7 +1299,7 @@ def test_create_or_update_subscriptions_step(
         mocked_client,
         context.order_id,
         {
-            "name": f"Subscription for {order["lines"][0]['item']['name']}",
+            "name": f"Subscription for {order['lines'][0]['item']['name']}",
             "parameters": {
                 "fulfillment": [
                     {
@@ -1481,13 +1307,13 @@ def test_create_or_update_subscriptions_step(
                         "value": adobe_order["lineItems"][0]["offerId"],
                     },
                     {
-                        "externalId": "currentQuantity",
-                        "value": str(adobe_subscription["currentQuantity"]),
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
                     },
                     {
-                        "externalId": "renewalQuantity",
+                        "externalId": Param.RENEWAL_QUANTITY.value,
                         "value": str(
-                            adobe_subscription["autoRenewal"]["renewalQuantity"]
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
                         ),
                     },
                     {
@@ -1514,10 +1340,6 @@ def test_create_or_update_subscriptions_step_subscription_exists(
     adobe_items_factory,
     adobe_subscription_factory,
 ):
-    """
-    Tests that the existing subscription for upsized line is update to reflect
-    the actual SKU.
-    """
     adobe_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
@@ -1575,12 +1397,6 @@ def test_create_or_update_subscriptions_step_no_adobe_new_order(
     order_factory,
     subscriptions_factory,
 ):
-    """
-    Tests that no subscription will be created or updated if no
-    Adobe NEW order has been placed (downsizes only order) and
-    the order processing pipeline will continue.
-    """
-
     mocked_adobe_client = mocker.MagicMock()
 
     mocker.patch(
@@ -1627,15 +1443,12 @@ def test_create_or_update_subscriptions_step_sub_expired(
     adobe_items_factory,
     adobe_subscription_factory,
 ):
-    """
-    Tests that for expired adobe subscription no subscription is created.
-    """
     adobe_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
     )
     adobe_subscription = adobe_subscription_factory(
-        status=STATUS_ORDER_CANCELLED,
+        status=AdobeStatus.ORDER_CANCELLED.value,
     )
 
     mocked_adobe_client = mocker.MagicMock()
@@ -1688,10 +1501,6 @@ def test_create_or_update_subscriptions_step_update_existing_subscription(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    """
-    Tests that when a subscription already exists, it updates the subscription's SKU
-    with the new Adobe SKU from the order line.
-    """
     adobe_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
@@ -1737,15 +1546,8 @@ def test_create_or_update_subscriptions_step_update_existing_subscription(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-
 @freeze_time("2024-01-01")
 def test_complete_order_step(mocker, order_factory):
-    """
-    Tests the right Completed template is set,
-    the retry count is reset
-    and the order transitions to the Completed status.
-    """
-
     order = order_factory()
 
     resetted_order = order_factory()
@@ -1797,7 +1599,7 @@ def test_complete_order_step(mocker, order_factory):
     ],
 )
 def test_complete_configuration_order_selects_template(
-    mocker, order_factory, auto_renew, expected_template
+    mocker, order_factory, auto_renew, expected_template, mocked_send_mpt_notification
 ):
     order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
     completed_order = order_factory(status="Completed")
@@ -1818,9 +1620,6 @@ def test_complete_configuration_order_selects_template(
         "adobe_vipm.flows.fulfillment.shared.complete_order",
         return_value=completed_order,
     )
-    mocked_send_email = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.send_mpt_notification"
-    )
 
     step = CompleteOrder(expected_template)
     step(mocked_client, context, mocked_next_step)
@@ -1837,16 +1636,12 @@ def test_complete_configuration_order_selects_template(
         {"id": "TPL-0000"},
         parameters=order["parameters"],
     )
-    mocked_send_email.assert_called_once_with(mocked_client, completed_order)
+    mocked_send_mpt_notification.assert_called_once_with(mocked_client, completed_order)
     assert context.order == completed_order
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_sync_agreement_step(mocker, order_factory):
-    """
-    Tests the step call the synchronization of an agreement and then
-    continue with the order processing pipeline.
-    """
     mocked_sync = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids",
     )
@@ -1866,18 +1661,13 @@ def test_sync_agreement_step(mocker, order_factory):
     step(mocked_client, context, mocked_next_step)
 
     mocked_sync.assert_called_once_with(
-        mocked_client,
-        [context.agreement_id],
+        mocked_client, [context.agreement_id], dry_run=False, sync_prices=True
     )
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_validate_duplicate_lines_step(
-    mocker,
-    order_factory,
-    lines_factory,
-):
+def test_validate_duplicate_lines_step(mocker, order_factory, lines_factory):
     order = order_factory(
         order_type="Change",
         lines=lines_factory() + lines_factory(),
@@ -1960,9 +1750,7 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
     deployment_id = "deployment-id"
 
     order = order_factory(deployment_id=deployment_id)
-    preview_order = adobe_order_factory(
-        order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id
-    )
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.create_preview_order.return_value = preview_order
@@ -2005,12 +1793,6 @@ def test_get_preview_order_step_order_no_upsize_lines(
     order_factory,
     lines_factory,
 ):
-    """
-    Test that if there are no upsize lines in the order
-    no PREVIEW order will be retrieved and the order processing
-    pipeline will continue.
-    """
-
     order = order_factory(
         lines=lines_factory(quantity=10, old_quantity=12),
     )
@@ -2045,13 +1827,6 @@ def test_get_preview_order_step_order_new_order_created(
     order_factory,
     lines_factory,
 ):
-    """
-    Test that if there are  upsize lines but the NEW order
-    has already been submitted
-    no PREVIEW order will be retrieved and the order processing
-    pipeline will continue.
-    """
-
     order = order_factory(
         lines=lines_factory(quantity=12, old_quantity=10),
     )
@@ -2088,12 +1863,6 @@ def test_get_preview_order_step_adobe_error(
     lines_factory,
     adobe_api_error_factory,
 ):
-    """
-    Test that if adobe returns an error retrieving the PREVIEW
-    order, the order is failed and stop the order processing
-    pipeline
-    """
-
     order = order_factory(
         lines=lines_factory(quantity=12, old_quantity=10),
     )
@@ -2144,14 +1913,17 @@ def test_get_preview_order_step_adobe_error(
         )
     ],
 )
-def test_send_gc_mpt_notification(mocker, settings, order_factory, status, subject):
+def test_send_gc_mpt_notification(
+    mocker, settings, order_factory, mock_mpt_client, status, subject
+):
     mock_mpt_notify = mocker.patch("adobe_vipm.flows.fulfillment.shared.mpt_notify")
 
     order = order_factory(order_id="ORD-1234", status=status)
 
-    send_gc_mpt_notification(order, ["deployment 1"])
+    send_gc_mpt_notification(mock_mpt_client, order, ["deployment 1"])
 
     mock_mpt_notify.assert_called_once_with(
+        mock_mpt_client,
         order["agreement"]["licensee"]["account"]["id"],
         order["agreement"]["buyer"]["id"],
         subject,
@@ -2173,16 +1945,9 @@ def test_send_gc_mpt_notification(mocker, settings, order_factory, status, subje
 def test_validate_renewal_window_creation_window_validation_mode(
     mocker, order_factory, fulfillment_parameters_factory
 ):
-    """
-    Tests that ValidateRenewalWindow in validation mode:
-    - Sets the error if coterm date is in creation window
-    - Continues to next step if there is no coterm date
-    """
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    mocked_set_order_error = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.set_order_error"
-    )
+    mocked_set_order_error = mocker.patch("adobe_vipm.flows.fulfillment.shared.set_order_error")
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
@@ -2205,16 +1970,9 @@ def test_validate_renewal_window_creation_window_validation_mode(
 def test_validate_renewal_window_creation_window_non_validation_mode(
     mocker, order_factory, fulfillment_parameters_factory
 ):
-    """
-    Tests that ValidateRenewalWindow in non-validation mode:
-    - Fails the order if coterm date is in creation window
-    - Continues to next step if there is no coterm date
-    """
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    mocked_set_order_error = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.set_order_error"
-    )
+    mocked_set_order_error = mocker.patch("adobe_vipm.flows.fulfillment.shared.set_order_error")
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
@@ -2237,9 +1995,7 @@ def test_validate_renewal_window_creation_window_non_validation_mode(
     mocked_next_step.reset_mock()
 
     # Test with no coterm date
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(coterm_date=None)
-    )
+    order = order_factory(fulfillment_parameters=fulfillment_parameters_factory(coterm_date=None))
     context = Context(order=order, order_id=order["id"])
 
     step = ValidateRenewalWindow(is_validation=False)

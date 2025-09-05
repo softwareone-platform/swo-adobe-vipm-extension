@@ -2,8 +2,8 @@ import logging
 
 import pymsteams
 import pytest
-from mpt_extension_sdk.mpt_http.mpt import NotifyCategories
 
+from adobe_vipm.adobe.constants import MPT_NOTIFY_CATEGORIES
 from adobe_vipm.notifications import (
     Button,
     FactsSection,
@@ -14,7 +14,6 @@ from adobe_vipm.notifications import (
     send_notification,
     send_warning,
 )
-from adobe_vipm.shared import mpt_client
 
 
 def test_send_notification_full(mocker, settings):
@@ -51,7 +50,8 @@ def test_send_notification_full(mocker, settings):
     mocked_message.addLinkButton.assert_called_once_with(button.label, button.url)
     mocked_section.title.assert_called_once_with(facts_section.title)
     mocked_section.addFact.assert_called_once_with(
-        list(facts_section.data.keys())[0], list(facts_section.data.values())[0]
+        next(iter(facts_section.data.keys())),
+        next(iter(facts_section.data.values())),
     )
     mocked_message.addSection.assert_called_once_with(mocked_section)
     mocked_message.send.assert_called_once()
@@ -136,7 +136,7 @@ def test_send_others(mocker, function, color, icon):
     )
 
 
-def test_mpt_notify(mocker):
+def test_mpt_notify(mocker, mock_mpt_client):
     mocked_template = mocker.MagicMock()
     mocked_template.render.return_value = "rendered-template"
     mocked_jinja_env = mocker.MagicMock()
@@ -145,13 +145,18 @@ def test_mpt_notify(mocker):
 
     mocked_notify = mocker.patch("adobe_vipm.notifications.notify", autospec=True)
     mpt_notify(
-        "account_id", "buyer_id", "email-subject", "template_name", {"test": "context"}
+        mock_mpt_client,
+        "account_id",
+        "buyer_id",
+        "email-subject",
+        "template_name",
+        {"test": "context"},
     )
 
     mocked_jinja_env.get_template.assert_called_once_with("template_name.html")
     mocked_template.render.assert_called_once_with({"test": "context"})
     mocked_notify.assert_called_once_with(
-        mpt_client,
+        mock_mpt_client,
         "NTC-0000-0006",
         "account_id",
         "buyer_id",
@@ -160,7 +165,7 @@ def test_mpt_notify(mocker):
     )
 
 
-def test_mpt_notify_exception(mocker, caplog):
+def test_mpt_notify_exception(mocker, mock_mpt_client, caplog):
     mocked_template = mocker.MagicMock()
     mocked_template.render.return_value = "rendered-template"
     mocked_jinja_env = mocker.MagicMock()
@@ -174,6 +179,7 @@ def test_mpt_notify_exception(mocker, caplog):
     )
     with caplog.at_level(logging.ERROR):
         mpt_notify(
+            mock_mpt_client,
             "account_id",
             "buyer_id",
             "email-subject",
@@ -183,7 +189,7 @@ def test_mpt_notify_exception(mocker, caplog):
 
     assert (
         f"Cannot send MPT API notification:"
-        f" Category: '{NotifyCategories.ORDERS.value}',"
+        f" Category: '{MPT_NOTIFY_CATEGORIES['ORDERS']}',"
         f" Account ID: 'account_id',"
         f" Buyer ID: 'buyer_id',"
         f" Subject: 'email-subject',"
@@ -191,7 +197,13 @@ def test_mpt_notify_exception(mocker, caplog):
     ) in caplog.text
 
 
-def test_dateformat():
-    assert dateformat("2024-05-16T10:54:42.831Z") == "16 May 2024"
-    assert dateformat("") == ""
-    assert dateformat(None) == ""
+@pytest.mark.parametrize(
+    ("date_time", "expected_result"),
+    [
+        pytest.param("2024-05-16T10:54:42.831Z", "16 May 2024", id="datetime with timezone"),
+        pytest.param("", "", id="empty string"),
+        pytest.param(None, "", id="None datetime"),
+    ],
+)
+def test_dateformat(date_time, expected_result):
+    assert dateformat(date_time) == expected_result

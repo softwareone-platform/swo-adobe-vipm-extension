@@ -12,10 +12,11 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     GetReturnOrders,
-    SetOrUpdateCotermNextSyncDates,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitReturnOrders,
+    SyncAgreement,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.fulfillment.termination import (
@@ -54,10 +55,6 @@ def test_get_returnable_orders_step(
     adobe_items_factory,
     test_case,
 ):
-    """
-    Tests the retrieval of returnable orders by sku.
-    Tests both successful and failure cases where quantities match or don't match.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=test_case["quantity"],
@@ -105,12 +102,7 @@ def test_get_returnable_orders_step(
     mocked_next_step = mocker.MagicMock()
 
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
 
     context = Context(
@@ -243,10 +235,6 @@ def test_switch_autorenewal_off_already_off(
 
 
 def test_fulfill_termination_order(mocker):
-    """
-    Tests the termination order pipeline is created with the
-    expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
@@ -264,20 +252,21 @@ def test_fulfill_termination_order(mocker):
 
     expected_steps = [
         SetupContext,
-        SetupDueDate,
-        SetOrUpdateCotermNextSyncDates,
         StartOrderProcessing,
+        SetupDueDate,
+        SetOrUpdateCotermDate,
         ValidateRenewalWindow,
         GetReturnOrders,
         GetReturnableOrders,
         Validate3YCCommitment,
         SubmitReturnOrders,
         CompleteOrder,
+        SyncAgreement,
     ]
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
-    assert mocked_pipeline_ctor.mock_calls[0].args[3].template_name == TEMPLATE_NAME_TERMINATION
+    assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_TERMINATION
     assert mocked_pipeline_ctor.mock_calls[0].args[9].template_name == TEMPLATE_NAME_TERMINATION
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
@@ -423,9 +412,6 @@ def test_get_returnable_orders_step_inactive_subscription(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the GetReturnableOrders step when the subscription is inactive.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=0,
@@ -437,12 +423,7 @@ def test_get_returnable_orders_step_inactive_subscription(
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "INACTIVE",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "INACTIVE", "offerId": sku}]
     }
 
     mocked_switch_to_failed = mocker.patch(
@@ -482,9 +463,6 @@ def test_get_returnable_orders_step_no_returnable_orders(
     lines_factory,
     adobe_customer_factory,
 ):
-    """
-    Tests the GetReturnableOrders step when there are no returnable orders.
-    """
     order = order_factory(
         lines=lines_factory(
             quantity=0,
@@ -496,12 +474,7 @@ def test_get_returnable_orders_step_no_returnable_orders(
 
     mocked_adobe_client = mocker.MagicMock(spec=AdobeClient)
     mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            {
-                "status": "1000",
-                "offerId": sku
-            }
-        ]
+        "items": [{"status": "1000", "offerId": sku}]
     }
     mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
 

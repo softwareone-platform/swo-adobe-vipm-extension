@@ -2,11 +2,13 @@ from urllib.parse import urljoin
 
 import requests
 
-from adobe_vipm.adobe.constants import STATUS_GC_DEPLOYMENT_ACTIVE
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import wrap_http_error
 
 
 class DeploymentClientMixin:
+    """Adobe Client Mixin to manage Deployments flows of Adobe VIPM."""
+
     @wrap_http_error
     def get_customer_deployments(
         self,
@@ -15,6 +17,14 @@ class DeploymentClientMixin:
     ) -> dict:
         """
         Retrieve the customer deployment object.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+
+        Returns:
+            dict: Deployments.
+
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
@@ -24,6 +34,7 @@ class DeploymentClientMixin:
                 f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
             ),
             headers=headers,
+            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -35,15 +46,18 @@ class DeploymentClientMixin:
     ) -> list[dict]:
         """
         Retrieve the active deployments for a given customer.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+
+        Returns:
+            list: Customer Deployments.
         """
-        customer_deployments = self.get_customer_deployments(
-            authorization_id, customer_id
-        )
+        customer_deployments = self.get_customer_deployments(authorization_id, customer_id)
 
-        active_deployments = []
-
-        for customer_deployment in customer_deployments.get("items", []):
-            if customer_deployment.get("status") == STATUS_GC_DEPLOYMENT_ACTIVE:
-                active_deployments.append(customer_deployment)
-
-        return active_deployments
+        return [
+            deployment
+            for deployment in customer_deployments.get("items", [])
+            if deployment.get("status") == AdobeStatus.GC_DEPLOYMENT_ACTIVE
+        ]

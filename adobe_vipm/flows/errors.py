@@ -5,10 +5,12 @@ from requests import HTTPError, JSONDecodeError
 
 
 class MPTError(Exception):
-    pass
+    """Base exception for MPT errors."""
 
 
 class MPTHttpError(MPTError):
+    """Base exception for MPT Http errors."""
+
     def __init__(self, status_code: int, content: str):
         self.status_code = status_code
         self.content = content
@@ -16,6 +18,8 @@ class MPTHttpError(MPTError):
 
 
 class MPTAPIError(MPTHttpError):
+    """Base exception for MPT API errors."""
+
     def __init__(self, status_code, payload):
         super().__init__(status_code, json.dumps(payload))
         self.payload = payload
@@ -37,6 +41,8 @@ class MPTAPIError(MPTHttpError):
 
 
 def wrap_http_error(func):
+    """Wraps and processes http errors for provided function."""
+
     @wraps(func)
     def _wrapper(*args, **kwargs):
         try:
@@ -50,12 +56,16 @@ def wrap_http_error(func):
     return _wrapper
 
 
+# TODO: why not dataclass?
 class ValidationError:
-    def __init__(self, id, message):
-        self.id = id
+    """Validation error."""
+
+    def __init__(self, message_id, message):
+        self.id = message_id
         self.message = message
 
     def to_dict(self, **kwargs):
+        """Converts validation error to the MPT error message dict."""
         return {
             "id": self.id,
             "message": self.message.format(**kwargs),
@@ -63,10 +73,12 @@ class ValidationError:
 
 
 class AirTableError(Exception):
-    pass
+    """Base exception to Airtable Error."""
 
 
 class AirTableHttpError(AirTableError):
+    """Base exception for Airtable Http Error."""
+
     def __init__(self, status_code: int, content: str):
         self.status_code = status_code
         self.content = content
@@ -74,6 +86,8 @@ class AirTableHttpError(AirTableError):
 
 
 class AirTableAPIError(AirTableHttpError):
+    """Base exception for Airtable API Error."""
+
     def __init__(self, status_code: int, payload) -> None:
         super().__init__(status_code, json.dumps(payload))
         self.payload = payload
@@ -88,6 +102,8 @@ class AirTableAPIError(AirTableHttpError):
 
 
 def wrap_airtable_http_error(func):
+    """Wraps and processes http errors for provided function."""
+
     @wraps(func)
     def _wrapper(*args, **kwargs):
         try:
@@ -96,8 +112,6 @@ def wrap_airtable_http_error(func):
             try:
                 raise AirTableAPIError(e.response.status_code, e.response.json())
             except JSONDecodeError:
-                raise AirTableHttpError(
-                    e.response.status_code, e.response.content.decode()
-                )
+                raise AirTableHttpError(e.response.status_code, e.response.content.decode())
 
     return _wrapper

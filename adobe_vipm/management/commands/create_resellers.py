@@ -2,7 +2,8 @@ import json
 from pathlib import Path
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
+from mpt_extension_sdk.mpt_http.utils import find_first
 from openpyxl import load_workbook
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -23,7 +24,7 @@ from adobe_vipm.adobe.validation import (
     is_valid_postal_code_length,
     is_valid_state_or_province,
 )
-from adobe_vipm.utils import find_first
+from adobe_vipm.management.commands.base import AdobeBaseCommand
 
 COLUMNS = {
     "A": "authorization_uk",
@@ -45,22 +46,13 @@ COLUMNS = {
 }
 
 
-class Command(BaseCommand):
+class Command(AdobeBaseCommand):
+    """Creates Resellers in Adobe VIPM based on provided excel file."""
+
     help = "Creates Resellers in Adobe VIP Marketplace"
 
-    def success(self, message):
-        self.stdout.write(self.style.SUCCESS(message), ending="\n")
-
-    def info(self, message):
-        self.stdout.write(message, ending="\n")
-
-    def warning(self, message):
-        self.stdout.write(self.style.WARNING(message), ending="\n")
-
-    def error(self, message):
-        self.stderr.write(self.style.ERROR(message), ending="\n")
-
     def add_arguments(self, parser):
+        """Add required parameters."""
         parser.add_argument(
             "infile",
             metavar="[RESELLERS EXCEL FILE]",
@@ -68,19 +60,25 @@ class Command(BaseCommand):
             help="Input Excel file with resellers data.",
         )
 
-    def load_authorizations_data(self):
-        return json.load(open(settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"]))
+    def load_authorizations_data(self) -> list:
+        """Load authorization configuration."""
+        authorization_file = Path(settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"])
 
-    def validate_reseller_data(self, reseller_data):
+        with authorization_file.open(encoding="utf-8") as auth_file:
+            return json.load(auth_file)
+
+    def validate_reseller_data(self, reseller_data: dict) -> list:
+        """Validates provided resellers data."""
         errors = self._validate_company_profile(reseller_data)
         errors.extend(self._validate_reseller_address(reseller_data))
         errors.extend(self._validate_reseller_contact(reseller_data))
         return errors
 
     def validate_input_file(self, workbook):
+        """Validates input excel file."""
         if len(workbook.sheetnames) > 1:
             raise CommandError(
-                f"Too many worksheet in the input file: {',' .join(workbook.sheetnames)}.",
+                f"Too many worksheet in the input file: {','.join(workbook.sheetnames)}.",
             )
         ws = workbook.active
 
@@ -100,12 +98,13 @@ class Command(BaseCommand):
         return ws
 
     def load_row(self, row):
+        """Converts excel row to key-value dictionary."""
         return {
-            COLUMNS[cel.column_letter]: str(cel.value) if cel.value else cel.value
-            for cel in row
+            COLUMNS[cel.column_letter]: str(cel.value) if cel.value else cel.value for cel in row
         }
 
-    def prepare_reseller_data(self, row_data):
+    def prepare_reseller_data(self, row_data: dict) -> dict:
+        """Converts excel raw data to dictionary that can be consumed by Adobe Reseller API."""
         return {
             "companyName": row_data["company_name"],
             "address": {
@@ -127,11 +126,24 @@ class Command(BaseCommand):
 
     def add_reseller_to_authorization(
         self,
-        authorizations_data,
-        authorization_uk,
-        seller_uk,
-        reseller_id,
-    ):
+        authorizations_data: dict,
+        authorization_uk: str,
+        seller_uk: str,
+        reseller_id: str,
+    ) -> None:
+        """
+        Adds created Adobe reseller to authorization file.
+
+        Unique key are used because at the moment of the creation of the resellers on Adobe side
+        there were no Marketplace authorizations and sellers. Later they were mapped to proper
+        authorizations and sellers ids.
+
+        Args:
+            authorizations_data: Extension authorizations configuration.
+            authorization_uk: Unique MPT authorizations key.
+            seller_uk: Unique MPT seller key.
+            reseller_id: Adobe reseller id.
+        """
         auth_data = find_first(
             lambda auth: auth["authorization_uk"] == authorization_uk,
             authorizations_data["authorizations"],
@@ -142,13 +154,13 @@ class Command(BaseCommand):
                 "seller_uk": seller_uk,
             },
         )
-        json.dump(
-            authorizations_data,
-            open(settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"], "w"),
-            indent=4,
-        )
+        authorizations_file = Path(settings.EXTENSION_CONFIG["ADOBE_AUTHORIZATIONS_FILE"])
 
-    def handle(self, *args, **options):
+        with authorizations_file.open("w", encoding="utf-8") as auth_file:
+            json.dump(authorizations_data, auth_file, indent=4)
+
+    def handle(self, *args, **options):  # noqa: C901
+        """Run command."""
         adobe_config = get_config()
         adobe_client = get_adobe_client()
         authorizations_data = self.load_authorizations_data()
@@ -220,7 +232,7 @@ class Command(BaseCommand):
                 workbook.save(excel_file)
                 self.error(
                     f"Error creating {row_data['seller_uk']} - "
-                    f"{row_data['company_name']} ({row_data['authorization_uk']}): {str(e)}.",
+                    f"{row_data['company_name']} ({row_data['authorization_uk']}): {e}.",
                 )
                 continue
 
@@ -238,7 +250,7 @@ class Command(BaseCommand):
                 f"created: id is {reseller_id}.",
             )
 
-    def _validate_company_profile(self, reseller_data):
+    def _validate_company_profile(self, reseller_data: dict) -> list:
         errors = []
         if not is_valid_company_name_length(reseller_data["companyName"]):
             errors.append("invalid company_name length.")
@@ -248,7 +260,7 @@ class Command(BaseCommand):
 
         return errors
 
-    def _validate_reseller_address(self, reseller_data):
+    def _validate_reseller_address(self, reseller_data: dict) -> list:
         errors = []
 
         address = reseller_data["address"]
@@ -282,7 +294,7 @@ class Command(BaseCommand):
 
         return errors
 
-    def _validate_reseller_contact(self, reseller_data):
+    def _validate_reseller_contact(self, reseller_data: dict) -> list:
         errors = []
         contact = reseller_data["contact"]
 

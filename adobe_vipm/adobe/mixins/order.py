@@ -1,6 +1,6 @@
+import datetime as dt
 import json
 from collections import defaultdict
-from datetime import date, datetime, timedelta
 from hashlib import sha256
 from operator import itemgetter
 from urllib.parse import urljoin
@@ -14,28 +14,36 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
-    STATUS_PENDING,
-    STATUS_PROCESSED,
+    AdobeStatus,
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError, wrap_http_error
-from adobe_vipm.adobe.utils import (
+from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
     get_item_by_subcription_id,
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.utils import get_partial_sku, map_by
 
 
 class OrderClientMixin:
-
-    def _is_processed(self, order_item):
-        order, item = order_item
-        return order["status"] == STATUS_PROCESSED and item["status"] == STATUS_PROCESSED
+    """Adobe Client Mixin to manage Orders flows of Adobe VIPM."""
 
     @wrap_http_error
-    def get_orders(self, authorization_id, customer_id, filters=None):
+    def get_orders(self, authorization_id: str, customer_id: str, filters: dict | None = None):
+        """
+        Retrieve Adobe orders.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            filters: key-value dictionary to filter orders.
+
+        Returns:
+            dict: The Preview order.
+        """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
         orders = []
@@ -46,6 +54,7 @@ class OrderClientMixin:
                 urljoin(self._config.api_base_url, next_url),
                 headers=headers,
                 params=filters,
+                timeout=self._TIMEOUT,
             )
             response.raise_for_status()
             page = response.json()
@@ -60,6 +69,17 @@ class OrderClientMixin:
         customer_id: str,
         order_id: str,
     ) -> dict:
+        """
+        Retrieve order by ID.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            order_id: MPT Order id to refer to.
+
+        Returns:
+            dict: Adobe order.
+        """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
         response = requests.get(
@@ -68,6 +88,7 @@ class OrderClientMixin:
                 f"/v3/customers/{customer_id}/orders/{order_id}",
             ),
             headers=headers,
+            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -78,29 +99,29 @@ class OrderClientMixin:
         authorization_id: str,
         customer_id: str,
         adobe_preview_order: dict,
-        deployment_id: str = None,
+        deployment_id: str | None = None,
     ) -> dict:
+        """
+        Create Adobe Order based on Preview order.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            adobe_preview_order: Adobe Preview order.
+            deployment_id: Adobe Deployment ID.
+
+        Returns:
+            dict: Adobe order.
+        """
         authorization = self._config.get_authorization(authorization_id)
-
-        def build_line_item(item):
-            line_item = {
-                "extLineItemNumber": item["extLineItemNumber"],
-                "offerId": item["offerId"],
-                "quantity": item["quantity"],
-            }
-            if "deploymentId" in item:
-                line_item["deploymentId"] = item["deploymentId"]
-                line_item["currencyCode"] = item["currencyCode"]
-            return line_item
-
-        lineItems = [
-            build_line_item(item) for item in adobe_preview_order["lineItems"]
+        line_items = [
+            self._build_line_item(line_item) for line_item in adobe_preview_order["lineItems"]
         ]
 
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
             "orderType": ORDER_TYPE_NEW,
-            "lineItems": lineItems,
+            "lineItems": line_items,
         }
         if not deployment_id:
             payload["currencyCode"] = authorization.currency
@@ -114,20 +135,35 @@ class OrderClientMixin:
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
+            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
 
     @wrap_http_error
-    def create_preview_order(
+    def create_preview_order(  # noqa: C901 WPS231
         self,
         authorization_id: str,
         customer_id: str,
         order_id: str,
         upsize_lines: list,
         new_lines: list,
-        deployment_id: str = None,
+        deployment_id: str | None = None,
     ) -> dict | None:
+        """
+        Create Preview orders.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            order_id: MPT Order id to refer to.
+            upsize_lines: lines to be upsized.
+            new_lines: lines eto be created.
+            deployment_id: Adobe Deployment ID.
+
+        Returns:
+            dict: The Preview order.
+        """
         authorization = self._config.get_authorization(authorization_id)
         payload = {
             "externalReferenceId": order_id,
@@ -140,15 +176,15 @@ class OrderClientMixin:
             payload["lineItems"].append(line_item)
 
         if upsize_lines:
-            offer_ids = [line["item"]["externalIds"]["vendor"] for line in upsize_lines]
+            offer_ids = [line_item["item"]["externalIds"]["vendor"] for line_item in upsize_lines]
             upsize_subscriptions = self.get_subscriptions_for_offers(
                 authorization_id,
                 customer_id,
                 offer_ids,
             )
-            map_by_offer_subscriptions = map_by("offerId", upsize_subscriptions)
+            offer_subscriptions = map_by("offerId", upsize_subscriptions)
             map_by_base_offer_subscriptions = {
-                get_partial_sku(k): v for k, v in map_by_offer_subscriptions.items()
+                get_partial_sku(offer_id): subs for offer_id, subs in offer_subscriptions.items()
             }
 
         for line in upsize_lines:
@@ -162,22 +198,25 @@ class OrderClientMixin:
                 )
 
             adobe_subscription = map_by_base_offer_subscriptions[adobe_base_sku]
-            renewal_quantity = adobe_subscription["autoRenewal"]["renewalQuantity"]
-            current_quantity = adobe_subscription["currentQuantity"]
-            if renewal_quantity < current_quantity:
-                diff = current_quantity - renewal_quantity
-            else:
-                diff = 0
+            renewal_quantity = adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+            current_quantity = adobe_subscription[Param.CURRENT_QUANTITY.value]
+            diff = current_quantity - renewal_quantity if renewal_quantity < current_quantity else 0
 
             quantity = line["quantity"] - line["oldQuantity"] - diff
             if quantity <= 0:
                 self._logger.info(
-                    f"Upsizing item {line['id']}({adobe_base_sku}) is skipped. "
-                    f"Because overall quantity is equal or below 0. "
-                    f"line quantity = {line['quantity']}, "
-                    f"line old quantity = {line['oldQuantity']}, "
-                    f"adobe renewal quantity = {renewal_quantity}, "
-                    f"adobe current quantity = {current_quantity}."
+                    "Upsizing item %s(%s) is skipped. "
+                    "Because overall quantity is equal or below 0. "
+                    "line quantity = %s, "
+                    "line old quantity = %s, "
+                    "adobe renewal quantity = %s, "
+                    "adobe current quantity = %s.",
+                    line["id"],
+                    adobe_base_sku,
+                    line["quantity"],
+                    line["oldQuantity"],
+                    renewal_quantity,
+                    current_quantity,
                 )
                 continue
 
@@ -193,15 +232,17 @@ class OrderClientMixin:
 
         if not payload["lineItems"]:
             self._logger.info(
-                f"Preview Order for {order_id} was not created: line items are empty."
+                "Preview Order for %s was not created: line items are empty.",
+                order_id,
             )
-            return
+            return None
 
         headers = self._get_headers(authorization)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
+            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -212,6 +253,16 @@ class OrderClientMixin:
         authorization_id: str,
         customer_id: str,
     ) -> dict:
+        """
+        Create preview order for Renewal.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+
+        Returns:
+            dict: The Preview Renewal order.
+        """
         authorization = self._config.get_authorization(authorization_id)
         payload = {"orderType": ORDER_TYPE_PREVIEW_RENEWAL}
         headers = self._get_headers(authorization)
@@ -219,19 +270,10 @@ class OrderClientMixin:
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
+            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
-
-    def _get_preview_order_line_item(self, line: dict, quantity: int) -> dict:
-        adobe_base_sku = line["item"]["externalIds"]["vendor"]
-        product_sku = get_adobe_product_by_marketplace_sku(adobe_base_sku).sku
-
-        return {
-            "extLineItemNumber": to_adobe_line_id(line["id"]),
-            "offerId": product_sku,
-            "quantity": quantity,
-        }
 
     def get_returnable_orders_by_subscription_id(
         self,
@@ -255,7 +297,8 @@ class OrderClientMixin:
         Returns:
             list(dict): The RETURN order.
         """
-        start_date = date.today() - timedelta(days=CANCELLATION_WINDOW_DAYS)
+        current_date = dt.datetime.now(tz=dt.UTC).date()
+        start_date = current_date - dt.timedelta(days=CANCELLATION_WINDOW_DAYS)
 
         returning_order_ids = [order["referenceOrderId"] for order in (return_orders or [])]
 
@@ -291,9 +334,9 @@ class OrderClientMixin:
             order_items,
         )
         if renewal_order_item:
-            renewal_order_date = datetime.fromisoformat(renewal_order_item[0]["creationDate"])
+            renewal_order_date = dt.datetime.fromisoformat(renewal_order_item[0]["creationDate"])
             order_items = filter(
-                lambda order_item: datetime.fromisoformat(order_item[0]["creationDate"])
+                lambda order_item: dt.datetime.fromisoformat(order_item[0]["creationDate"])
                 >= renewal_order_date,
                 order_items,
             )
@@ -314,53 +357,33 @@ class OrderClientMixin:
         authorization_id: str,
         customer_id: str,
         external_reference: str,
-    ):
+    ) -> list[dict]:
+        """
+        Retrieve RETURN orders filter by external reference.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            external_reference: External Reference ID.
+
+        Returns:
+            list(dict): The RETURN order.
+        """
         orders = self.get_orders(
             authorization_id,
             customer_id,
             filters={
                 "order-type": ORDER_TYPE_RETURN,
-                "status": [STATUS_PROCESSED, STATUS_PENDING],
+                "status": [AdobeStatus.PROCESSED, AdobeStatus.PENDING],
             },
         )
-        results = defaultdict(list)
+        return_orders = defaultdict(list)
         for order in orders:
             if not order["externalReferenceId"].startswith(external_reference):
                 continue
-            for item in order["lineItems"]:
-                results[get_partial_sku(item["offerId"])].append(order)
-        return results
-
-
-    @wrap_http_error
-    def _create_return_order_base(
-        self,
-        authorization_id: str,
-        customer_id: str,
-        payload: dict,
-        correlation_id: str = None,
-    ) -> dict:
-        """
-        Base method to create a return order with the given payload.
-
-        Args:
-            authorization_id (str): Id of the authorization to use.
-            customer_id (str): Identifier of the customer that place the RETURN order.
-            payload (dict): The payload for the return order.
-            correlation_id (str, optional): Correlation ID for the request.
-
-        Returns:
-            dict: The RETURN order.
-        """
-        authorization = self._config.get_authorization(authorization_id)
-        headers = self._get_headers(authorization, correlation_id=correlation_id)
-        response = requests.post(
-            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
-        return response.json()
+            for line_item in order["lineItems"]:
+                return_orders[get_partial_sku(line_item["offerId"])].append(order)
+        return return_orders
 
     @wrap_http_error
     def create_return_order(
@@ -370,26 +393,25 @@ class OrderClientMixin:
         returning_order: dict,
         returning_item: dict,
         external_reference: str,
-        deployment_id: str = None,
+        deployment_id: str | None = None,
     ) -> dict:
         """
-        Creates an order of type RETURN for a given `item` that was purchased in the
-        order identified by `returning_order_id`.
+        Creates an order of type RETURN for a given `item` that was purchased.
+
+        In the order identified by `returning_order_id`.
 
         Args:
-            authorization_id (str): Id of the authorization to use.
-            customer_id (str): Identifier of the customer that place the RETURN order.
-            returning_order (dict): The order that contains the item to return.
-            returning_item (dict): The item that must be returned.
-            external_reference (str): External reference for the return order.
-            deployment_id (str, optional): Deployment ID if the return is for a deployment.
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            returning_order: The order that contains the item to return.
+            returning_item: The item that must be returned.
+            external_reference: External reference for the return order.
+            deployment_id: Deployment ID if the return is for a deployment.
 
         Returns:
             dict: The RETURN order.
         """
         line_number = returning_item["extLineItemNumber"]
-        quantity = returning_item["quantity"]
-        sku = returning_item["offerId"]
         external_id = f"{external_reference}_{returning_order['externalReferenceId']}_{line_number}"
 
         payload = {
@@ -404,8 +426,8 @@ class OrderClientMixin:
 
         line_item = {
             "extLineItemNumber": line_number,
-            "offerId": sku,
-            "quantity": quantity,
+            "offerId": returning_item["offerId"],
+            "quantity": returning_item["quantity"],
         }
         if deployment_id:
             line_item["deploymentId"] = deployment_id
@@ -425,14 +447,14 @@ class OrderClientMixin:
         Creates a return order for a given Adobe order.
 
         Args:
-            authorization_id (str): Id of the authorization to use.
-            customer_id (str): Identifier of the customer that place the RETURN order.
-            order_created (dict): The Adobe order to return.
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            order_created: The Adobe order to return.
 
         Returns:
             dict: The RETURN order.
         """
-        external_reference_id = f"{order_created["externalReferenceId"]}_{order_created["orderId"]}"
+        external_reference_id = f"{order_created['externalReferenceId']}_{order_created['orderId']}"
         adobe_order_id = order_created["orderId"]
         currency_code = self._config.get_authorization(authorization_id).currency
         adobe_line_items = order_created["lineItems"]
@@ -445,3 +467,62 @@ class OrderClientMixin:
             "lineItems": adobe_line_items,
         }
         return self._create_return_order_base(authorization_id, customer_id, payload)
+
+    def _build_line_item(self, adobe_line_item: dict) -> dict:
+        line_item = {
+            "extLineItemNumber": adobe_line_item["extLineItemNumber"],
+            "offerId": adobe_line_item["offerId"],
+            "quantity": adobe_line_item["quantity"],
+        }
+        if adobe_line_item.get("deploymentId"):
+            line_item["deploymentId"] = adobe_line_item["deploymentId"]
+            line_item["currencyCode"] = adobe_line_item["currencyCode"]
+        return line_item
+
+    @wrap_http_error
+    def _create_return_order_base(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        payload: dict,
+        correlation_id: str | None = None,
+    ) -> dict:
+        """
+        Base method to create a return order with the given payload.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that place the RETURN order.
+            payload: The payload for the return order.
+            correlation_id: Correlation ID for the request.
+
+        Returns:
+            dict: The RETURN order.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        response = requests.post(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            headers=headers,
+            json=payload,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _get_preview_order_line_item(self, line: dict, quantity: int) -> dict:
+        adobe_base_sku = line["item"]["externalIds"]["vendor"]
+        product_sku = get_adobe_product_by_marketplace_sku(adobe_base_sku).sku
+
+        return {
+            "extLineItemNumber": to_adobe_line_id(line["id"]),
+            "offerId": product_sku,
+            "quantity": quantity,
+        }
+
+    def _is_processed(self, order_item: tuple[dict, dict]) -> bool:
+        order, mpt_item = order_item
+
+        return (
+            order["status"] == AdobeStatus.PROCESSED and mpt_item["status"] == AdobeStatus.PROCESSED
+        )

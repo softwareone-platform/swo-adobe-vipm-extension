@@ -5,6 +5,7 @@ from adobe_vipm.flows.fulfillment.configuration import (
     SubscriptionUpdateAutoRenewal,
     fulfill_configuration_order,
 )
+from adobe_vipm.flows.fulfillment.shared import SyncAgreement
 from adobe_vipm.flows.pipeline import Step
 
 
@@ -14,9 +15,6 @@ def test_subscription_update_auto_renewal_step(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test the successful update of auto renewal status for a subscription.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -38,8 +36,7 @@ def test_subscription_update_auto_renewal_step(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(order=order, adobe_customer_id="adobe-customer-id")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -65,9 +62,6 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     order_factory,
     subscriptions_factory,
 ):
-    """
-    Test the case when no matching Adobe subscription is found.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -90,9 +84,9 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      product_id='PRD-1111-1111',
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(
+        order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
+    )
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -104,11 +98,11 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     )
     mocked_adobe_client.update_subscription.assert_not_called()
 
-    error_message = f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}"
+    error_message = f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}"
 
     mocked_notify.assert_called_once_with(
         order["id"],
-        f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}",
+        f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}",
         [],
         context.product_id,
     )
@@ -126,9 +120,6 @@ def test_subscription_update_auto_renewal_step_already_updated(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test the case when the subscription already has the desired auto renewal status.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -150,8 +141,7 @@ def test_subscription_update_auto_renewal_step_already_updated(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(order=order, adobe_customer_id="adobe-customer-id")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -171,9 +161,6 @@ def test_subscription_update_auto_renewal_step_error(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test the case when an error occurs while updating the subscription.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -204,9 +191,9 @@ def test_subscription_update_auto_renewal_step_error(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      product_id='PRD-1111-1111',
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(
+        order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
+    )
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -242,9 +229,6 @@ def test_subscription_update_auto_renewal_step_all_failed(
     order_factory,
     subscriptions_factory,
 ):
-    """
-    Test the case when all subscription updates fail.
-    """
     subscriptions = subscriptions_factory()
     order = order_factory(
         subscriptions=subscriptions,
@@ -267,9 +251,9 @@ def test_subscription_update_auto_renewal_step_all_failed(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order,
-                      product_id='PRD-1111-1111',
-                      adobe_customer_id="adobe-customer-id")
+    context = Context(
+        order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
+    )
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -281,11 +265,11 @@ def test_subscription_update_auto_renewal_step_all_failed(
     )
     mocked_adobe_client.update_subscription.assert_not_called()
 
-    error_message = f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}"
+    error_message = f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}"
 
     mocked_notify.assert_called_once_with(
         order["id"],
-        f"No Adobe subscription for vendor {subscriptions[0]["externalIds"]["vendor"]}",
+        f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}",
         [],
         context.product_id,
     )
@@ -304,10 +288,6 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
     subscriptions_factory,
     adobe_subscription_factory,
 ):
-    """
-    Test rollback is triggered when one subscription update succeeds and a subsequent one fails.
-    """
-
     subscriptions1 = subscriptions_factory()
     subscriptions2 = subscriptions_factory()
     subscriptions1[0]["externalIds"]["vendor"] = "a-sub-id_1"
@@ -355,7 +335,7 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
-    context = Context(order=order, product_id='PRD-1111-1111')
+    context = Context(order=order, product_id="PRD-1111-1111")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
@@ -395,9 +375,6 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
 
 
 def test_fulfill_configuration_order(mocker):
-    """
-    Test the configuration order pipeline is created with the expected steps and executed.
-    """
     mocked_pipeline_instance = mocker.MagicMock()
 
     mocked_pipeline_ctor = mocker.patch(
@@ -414,7 +391,7 @@ def test_fulfill_configuration_order(mocker):
 
     fulfill_configuration_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
 
     expected_steps = [
         Step,
@@ -424,6 +401,7 @@ def test_fulfill_configuration_order(mocker):
         Step,
         SubscriptionUpdateAutoRenewal,
         Step,
+        SyncAgreement,
     ]
     actual_steps = list(mocked_pipeline_ctor.mock_calls[0].args)
 

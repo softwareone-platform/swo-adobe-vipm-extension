@@ -4,7 +4,7 @@ from mpt_extension_sdk.core.events.dataclasses import Event
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.extension import ext, jwt_secret_callback, process_order_fulfillment
-from adobe_vipm.flows.constants import PARAM_COMPANY_NAME
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils import set_ordering_parameter_error
 
 
@@ -30,9 +30,9 @@ def test_jwt_secret_callback(mocker, settings, mpt_client, webhook):
         "adobe_vipm.extension.get_webhook",
         return_value=webhook,
     )
-    assert jwt_secret_callback(
-        mpt_client, {"webhook_id": "WH-123-123"}
-    ) == get_for_product(settings, "WEBHOOKS_SECRETS", "PRD-1111-1111")
+    assert jwt_secret_callback(mpt_client, {"webhook_id": "WH-123-123"}) == get_for_product(
+        settings, "WEBHOOKS_SECRETS", "PRD-1111-1111"
+    )
     mocked_webhook.assert_called_once_with(mpt_client, "WH-123-123")
 
 
@@ -43,13 +43,11 @@ def test_process_order_validation(client, mocker, order_factory, jwt_token, webh
     )
     validated_order = set_ordering_parameter_error(
         order_factory(),
-        PARAM_COMPANY_NAME,
+        Param.COMPANY_NAME.value,
         {"id": "my_err_id", "message": "my_msg"},
     )
     order = order_factory()
-    m_validate = mocker.patch(
-        "adobe_vipm.extension.validate_order", return_value=validated_order
-    )
+    m_validate = mocker.patch("adobe_vipm.extension.validate_order", return_value=validated_order)
     resp = client.post(
         "/api/v1/orders/validate",
         content_type="application/json",

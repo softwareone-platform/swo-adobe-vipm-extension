@@ -1,12 +1,8 @@
-from datetime import date, timedelta
+import datetime as dt
 
 import pytest
 
-from adobe_vipm.adobe.constants import (
-    STATUS_3YC_ACTIVE,
-    STATUS_3YC_EXPIRED,
-    STATUS_INACTIVE_OR_GENERIC_FAILURE,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_sku_price
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
@@ -41,9 +37,32 @@ def gc_agreement_deployment(mocker):
     return gc_agreement_deployment
 
 
-def test_check_gc_agreement_deployments_no_licensee(
-    mocker, settings, gc_agreement_deployment
-):
+@pytest.fixture()
+def active_3yc_commitment():
+    today = dt.datetime.now(tz=dt.UTC).date()
+
+    return {
+        "start": today - dt.timedelta(days=-1),
+        "end": today + dt.timedelta(days=365 * 3),
+    }
+
+
+@pytest.fixture()
+def expired_3yc_commitment():
+    today = dt.datetime.now(tz=dt.UTC).date()
+
+    return {
+        "start": today - dt.timedelta(days=365 * 3),
+        "end": today - dt.timedelta(days=1),
+    }
+
+
+@pytest.fixture()
+def empty_3y_commitment():
+    return None
+
+
+def test_check_gc_agreement_deployments_no_licensee(mocker, settings, gc_agreement_deployment):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
@@ -68,9 +87,7 @@ def test_check_gc_agreement_deployments_no_licensee(
     mocked_gc_agreement_deployments_model.all.assert_called_once()
 
 
-def test_check_gc_agreement_deployments_unexpected_error(
-    mocker, settings, airtable_error_factory
-):
+def test_check_gc_agreement_deployments_unexpected_error(mocker, settings, airtable_error_factory):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
@@ -395,8 +412,7 @@ def test_check_gc_agreement_deployments_create_listing(
     agreement = agreement_factory()
 
     expected_created_agreement_arg = created_agreement_factory(
-        deployments="",
-        is_profile_address_exists=True
+        deployments="", is_profile_address_exists=True
     )
 
     settings.EXTENSION_CONFIG = {
@@ -450,12 +466,8 @@ def test_check_gc_agreement_deployments_create_listing(
 
     adobe_customer = adobe_customer_factory(company_profile_address_exists=True)
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
-        mocker.MagicMock()
-    )
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription_factory()]
-    }
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
 
     gc_agreement_deployment.listing_id = None
     gc_agreement_deployment.agreement_id = None
@@ -557,9 +569,7 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
     mocked_adobe_client.get_customer_deployments_active_status.return_value = (
         mock_adobe_customer_deployments_items
     )
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription_factory()]
-    }
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
 
     gc_agreement_deployment.listing_id = None
     gc_agreement_deployment.agreement_id = None
@@ -725,12 +735,8 @@ def test_check_gc_agreement_deployments_create_agreement_error(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
-        mocker.MagicMock()
-    )
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription_factory()]
-    }
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
 
     gc_agreement_deployment.listing_id = None
     gc_agreement_deployment.agreement_id = None
@@ -821,9 +827,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
 
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
-        mocker.MagicMock()
-    )
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
@@ -916,15 +920,13 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
-        mocker.MagicMock()
-    )
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
             adobe_subscription_factory(
-                deployment_id="deployment_id", status=STATUS_INACTIVE_OR_GENERIC_FAILURE
+                deployment_id="deployment_id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
             ),
         ]
     }
@@ -1011,9 +1013,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
-        mocker.MagicMock()
-    )
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
@@ -1110,9 +1110,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
-        mocker.MagicMock()
-    )
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
@@ -1137,6 +1135,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     mocked_create_agreement_subscription.assert_called_once()
     mocked_get_agreement.assert_called_once()
     mocked_get_sku_price.assert_called_once()
+
 
 def test_check_gc_agreement_deployments_create_agreement_subscription_enable_auto_renew(
     mocker,
@@ -1204,14 +1203,10 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     )
     adobe_customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
-        mocker.MagicMock()
-    )
+    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
     mocked_adobe_client.get_subscriptions.return_value = {
         "items": [
-            adobe_subscription_factory(
-                deployment_id="deployment_id", autorenewal_enabled=False
-            )
+            adobe_subscription_factory(deployment_id="deployment_id", autorenewal_enabled=False)
         ]
     }
 
@@ -1238,88 +1233,67 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
 
 
 @pytest.mark.parametrize(
-    ("is_consumable",
-     "discount_level",
-     "commitment_status",
-     "commitment_dates",
-     "expected_sku",
-     "expected_price",
-     "expected_price_function"),
+    (
+        "is_consumable",
+        "discount_level",
+        "commitment_status",
+        "commitment_dates_fixture",
+        "expected_sku",
+        "expected_price",
+        "expected_price_function",
+    ),
     [
+        (True, "B", None, "empty_3y_commitment", "65304578CABA12", 100.0, "get_prices_for_skus"),
+        (False, "A", None, "empty_3y_commitment", "65304578CAAA12", 100.0, "get_prices_for_skus"),
         (
-            True,
-            "B",
-            None,
-            None,
-            "65304578CABA12",
+            False,
+            "A",
+            ThreeYearCommitmentStatus.ACTIVE.value,
+            "active_3yc_commitment",
+            "65304578CAAA12",
             100.0,
-            "get_prices_for_skus"
+            "get_prices_for_3yc_skus",
         ),
         (
             False,
             "A",
-            None,
-            None,
+            ThreeYearCommitmentStatus.EXPIRED.value,
+            "expired_3yc_commitment",
             "65304578CAAA12",
             100.0,
-            "get_prices_for_skus"
+            "get_prices_for_skus",
         ),
-        (
-            False,
-            "A",
-            STATUS_3YC_ACTIVE,
-            {
-                "start": date.today() - timedelta(days=-1),
-                "end": date.today() + timedelta(days=365*3)
-            },
-            "65304578CAAA12",
-            100.0,
-            "get_prices_for_3yc_skus"
-        ),
-        (
-            False,
-            "A",
-            STATUS_3YC_EXPIRED,
-            {
-                "start": date.today() - timedelta(days=365*3),
-                "end": date.today() - timedelta(days=1)
-            },
-            "65304578CAAA12",
-            100.0,
-            "get_prices_for_skus"
-        ),
-    ]
+    ],
 )
 def test_get_sku_price(
+    request,
     mocker,
     adobe_customer_factory,
     is_consumable,
     discount_level,
     commitment_status,
-    commitment_dates,
+    commitment_dates_fixture,
     expected_sku,
     expected_price,
-    expected_price_function
+    expected_price_function,
 ):
     product_id = "test_product_id"
     deployment_currency = "USD"
     adobe_customer = adobe_customer_factory()
     offer_ids = [expected_sku]
+    commitment_dates = request.getfixturevalue(commitment_dates_fixture)
 
-    mocker.patch(
-        "adobe_vipm.flows.utils.is_consumables_sku",
-        return_value=is_consumable
-    )
+    mocker.patch("adobe_vipm.flows.utils.is_consumables_sku", return_value=is_consumable)
 
     if is_consumable:
         mocker.patch(
             "adobe_vipm.flows.utils.get_customer_consumables_discount_level",
-            return_value=discount_level
+            return_value=discount_level,
         )
     else:
         mocker.patch(
             "adobe_vipm.flows.utils.get_customer_licenses_discount_level",
-            return_value=discount_level
+            return_value=discount_level,
         )
 
     mock_commitment = None
@@ -1327,47 +1301,31 @@ def test_get_sku_price(
         mock_commitment = {
             "status": commitment_status,
             "startDate": commitment_dates["start"].isoformat(),
-            "endDate": commitment_dates["end"].isoformat()
+            "endDate": commitment_dates["end"].isoformat(),
         }
-    mocker.patch(
-        "adobe_vipm.airtable.models.get_3yc_commitment",
-        return_value=mock_commitment
-    )
+    mocker.patch("adobe_vipm.utils.get_3yc_commitment", return_value=mock_commitment)
 
     if expected_price_function == "get_prices_for_skus":
         mocked_get_prices = mocker.patch(
             "adobe_vipm.airtable.models.get_prices_for_skus",
-            return_value=[
-                {expected_sku: expected_price}
-            ]
+            return_value=[{expected_sku: expected_price}],
         )
     else:
         mocked_get_prices = mocker.patch(
             "adobe_vipm.airtable.models.get_prices_for_3yc_skus",
-            return_value=[
-                {expected_sku: expected_price}
-            ]
+            return_value=[{expected_sku: expected_price}],
         )
 
-    result = get_sku_price(
-        adobe_customer,
-        offer_ids,
-        product_id,
-        deployment_currency
-    )
+    result = get_sku_price(adobe_customer, offer_ids, product_id, deployment_currency)
 
     assert result == [{expected_sku: 100.0}]
 
     if expected_price_function == "get_prices_for_skus":
-        mocked_get_prices.assert_called_once_with(
-            product_id,
-            deployment_currency,
-            [expected_sku]
-        )
+        mocked_get_prices.assert_called_once_with(product_id, deployment_currency, [expected_sku])
     else:
         mocked_get_prices.assert_called_once_with(
             product_id,
             deployment_currency,
-            date.fromisoformat(mock_commitment["startDate"]),
-            [expected_sku]
+            dt.date.fromisoformat(mock_commitment["startDate"]),
+            [expected_sku],
         )
