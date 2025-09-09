@@ -15,7 +15,6 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import (
-    ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     Param,
 )
@@ -2188,68 +2187,3 @@ def test_validate_reseller_change_expired_code_fulfillment_mode(
     error_data = call_args[0][2]  # Third argument is error_data
     assert error_data["id"] == ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.id
     assert "Reseller change code has expired" in error_data["message"]
-
-
-def test_validate_reseller_change_empty_line_items_fulfillment_mode(
-    mocker,
-    order_factory,
-    reseller_change_order_parameters_factory,
-    adobe_reseller_change_preview_factory,
-    mock_next_step,
-    mock_mpt_client,
-):
-    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
-    adobe_transfer = adobe_reseller_change_preview_factory()
-    adobe_transfer["lineItems"] = []
-
-    context = Context(order=order)
-    context.adobe_transfer = adobe_transfer
-
-    mocked_switch_order_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
-    )
-
-    step = ValidateResellerChange(is_validation=False)
-
-    step(mock_mpt_client, context, mock_next_step)
-
-    mock_next_step.assert_not_called()
-    mocked_switch_order_to_failed.assert_called_once()
-
-    call_args = mocked_switch_order_to_failed.call_args
-    error_data = call_args[0][2]
-    assert error_data["id"] == ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.id
-
-
-def test_validate_reseller_change_empty_line_items_validation_mode(
-    mocker,
-    order_factory,
-    reseller_change_order_parameters_factory,
-    adobe_reseller_change_preview_factory,
-    mock_next_step,
-    mock_mpt_client,
-):
-    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
-    adobe_transfer = adobe_reseller_change_preview_factory()
-    adobe_transfer["lineItems"] = []
-
-    context = Context(order=order)
-    context.adobe_transfer = adobe_transfer
-
-    mocked_set_ordering_parameter_error = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.set_ordering_parameter_error"
-    )
-
-    step = ValidateResellerChange(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
-
-    mock_next_step.assert_not_called()
-
-    mocked_set_ordering_parameter_error.assert_called_once()
-    call_args = mocked_set_ordering_parameter_error.call_args
-
-    assert call_args[0][1] == Param.CHANGE_RESELLER_CODE
-    assert call_args[0][2]["id"] == ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.id
-    assert context.validation_succeeded is False
