@@ -191,9 +191,6 @@ ERR_ADOBE_ERROR = ValidationError("VIPM0011", "Adobe returned an error: {details
 ERR_ADOBE_MEMBERSHIP_ID_EMPTY = ValidationError(
     "VIPM0018", "No active items have been found for this membership."
 )
-ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY = ValidationError(
-    "VIPM0037", "No active items have been found for this code."
-)
 
 ERR_ADOBE_MEMBERSHIP_PROCESSING = ValidationError(
     "VIPM0032", "Error processing the membership {membership_id}: {error}"

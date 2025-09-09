@@ -4,7 +4,6 @@ import pytest
 
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
-    ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     Param,
 )
@@ -244,6 +243,7 @@ def test_validate_reseller_change_no_subscriptions(
     reseller_change_order_parameters_factory,
     adobe_reseller_change_preview_factory,
     adobe_customer_factory,
+    items_factory,
 ):
     today = dt.datetime.now(tz=dt.UTC).date()
     m_client = mocker.MagicMock()
@@ -259,18 +259,17 @@ def test_validate_reseller_change_no_subscriptions(
         "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mocked_adobe_client,
     )
+
+    product_items = items_factory()
+
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
-        return_value=[],
+        return_value=product_items,
     )
 
     has_errors, validated_order = validate_reseller_change(m_client, order)
-
-    assert has_errors is True
-    param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE.value)
-    assert param["error"] == ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict()
-    assert param["constraints"]["hidden"] is False
-    assert param["constraints"]["required"] is True
+    assert has_errors is False
+    assert isinstance(validated_order["lines"], list)
 
 
 def test_validate_reseller_change_missing_admin_email(

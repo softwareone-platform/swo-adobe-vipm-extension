@@ -25,7 +25,6 @@ from adobe_vipm.airtable.models import (
     get_prices_for_skus,
 )
 from adobe_vipm.flows.constants import (
-    ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_COMMITMENT_3YC_CONSUMABLES,
     ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT,
@@ -53,6 +52,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -360,6 +360,10 @@ class Validate3YCCommitment(Step):
                 logger.exception(
                     "Adobe product not found for SKU: %s", get_partial_sku(subscription["offerId"])
                 )
+                send_exception(
+                    "Adobe product not found in airtable for SKU: %s",
+                    get_partial_sku(subscription["offerId"]),
+                )
                 continue
 
             if not sku.is_valid_3yc_type():
@@ -390,6 +394,10 @@ class Validate3YCCommitment(Step):
             except AdobeProductNotFoundError:
                 logger.exception(
                     "Adobe product not found for SKU: %s", line["item"]["externalIds"]["vendor"]
+                )
+                send_exception(
+                    "Adobe product not found in airtable for SKU: %s",
+                    line["item"]["externalIds"]["vendor"],
                 )
                 continue
 
@@ -687,17 +695,6 @@ class ValidateResellerChange(Step):
                 reseller_change_code=reseller_change_code,
                 error="Reseller change code has expired",
             )
-            handle_error(
-                mpt_client,
-                context,
-                error_data,
-                is_validation=self.is_validation,
-                parameter=Param.CHANGE_RESELLER_CODE,
-            )
-            return
-
-        if not context.adobe_transfer["lineItems"]:
-            error_data = ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict()
             handle_error(
                 mpt_client,
                 context,
