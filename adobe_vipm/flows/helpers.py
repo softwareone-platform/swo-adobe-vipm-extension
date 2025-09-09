@@ -25,7 +25,6 @@ from adobe_vipm.airtable.models import (
     get_prices_for_skus,
 )
 from adobe_vipm.flows.constants import (
-    ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_COMMITMENT_3YC_CONSUMABLES,
     ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT,
@@ -696,17 +695,6 @@ class ValidateResellerChange(Step):
                 reseller_change_code=reseller_change_code,
                 error="Reseller change code has expired",
             )
-            handle_error(
-                mpt_client,
-                context,
-                error_data,
-                is_validation=self.is_validation,
-                parameter=Param.CHANGE_RESELLER_CODE,
-            )
-            return
-
-        if not context.adobe_transfer["lineItems"]:
-            error_data = ERR_ADOBE_CHANGE_RESELLER_CODE_EMPTY.to_dict()
             handle_error(
                 mpt_client,
                 context,
