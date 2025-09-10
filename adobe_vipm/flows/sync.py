@@ -238,6 +238,12 @@ def _update_agreement(
                     "externalId": Param.THREE_YC_CONSUMABLES.value,
                     "value": str(mq.get("quantity")),
                 })
+
+    parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
+    parameters[Param.PHASE_FULFILLMENT.value].append({
+        "externalId": Param.COTERM_DATE.value,
+        "value": customer.get("cotermDate", ""),
+    })
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -487,7 +493,7 @@ def sync_agreements_by_coterm_date(mpt_client: MPTClient, *, dry_run: bool) -> N
     """
     logger.info("Synchronizing agreements by cotermDate...")
     _sync_agreements_by_param(
-        mpt_client, Param.COTERM_DATE.value, dry_run=dry_run, sync_prices=False
+        mpt_client, Param.COTERM_DATE.value, dry_run=dry_run, sync_prices=True
     )
 
 
@@ -518,11 +524,13 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, *, dry_run: bool) -> 
         dry_run: Run in dry run mode.
     """
     logger.info("Synchronizing agreements by renewal date...")
-    today = dt.datetime.now(tz=dt.UTC).date()
-    today_iso = today.isoformat()
+    today_plus_1_year = dt.datetime.now(tz=dt.UTC).date() + relativedelta(years=1)
+    today_iso = dt.datetime.now(tz=dt.UTC).date().isoformat()
     yesterday_every_month = (
-        (today - dt.timedelta(days=1) - relativedelta(months=m)).isoformat() for m in range(12)
+        (today_plus_1_year - dt.timedelta(days=1) - relativedelta(months=m)).isoformat()
+        for m in range(24)
     )
+
     rql_query = (
         "eq(status,Active)&"
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
@@ -597,27 +605,13 @@ def _sync_3yc_enroll_status(mpt_client: MPTClient, agreement: dict, *, dry_run: 
         return
 
     commitment = get_3yc_commitment(customer)
-    enroll_status = commitment["status"]
+    enroll_status = commitment.get("status")
     logger.debug(
         "Commitment Status for Adobe customer %s is %s",
         customer["customerId"],
         enroll_status,
     )
-
-    if enroll_status in THREE_YC_TEMP_3YC_STATUSES:
-        logger.info("Updating 3YC enroll status for agreement %s", agreement["id"])
-        if not dry_run:
-            update_agreement(
-                mpt_client,
-                agreement["id"],
-                parameters={
-                    Param.PHASE_FULFILLMENT.value: [
-                        {"externalId": Param.THREE_YC_ENROLL_STATUS.value, "value": enroll_status}
-                    ]
-                },
-            )
-    else:
-        sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)
+    sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
 
 def _is_deployment_matched(missing_deployment_id: str, subscription: dict) -> bool:
