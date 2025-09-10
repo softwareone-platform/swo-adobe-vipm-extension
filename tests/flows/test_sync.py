@@ -170,7 +170,12 @@ def test_sync_agreement_prices(
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
 
     assert mocked_update_agreement.call_args_list == [
-        mocker.call(mock_mpt_client, agreement["id"], lines=expected_lines, parameters={}),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+        ),
         mocker.call(
             mock_mpt_client,
             agreement["id"],
@@ -443,7 +448,7 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock
         mock_mpt_client,
         agreement,
         dry_run=dry_run,
-        sync_prices=False,
+        sync_prices=True,
     )
     mocked_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
@@ -477,10 +482,11 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
         dry_run=dry_run,
         sync_prices=True,
     )
+
     mocked_get_agreements_by_query.assert_called_once_with(
         mocked_mpt_client,
         "eq(status,Active)&"
-        "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15))))&"
+        "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2026-07-15,2026-06-15,2026-05-15,2026-04-15,2026-03-15,2026-02-15,2026-01-15,2025-12-15,2025-11-15,2025-10-15,2025-09-15,2025-08-15,2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15))))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-07-16)))&"
         "select=lines,parameters,subscriptions,product,listing",
     )
@@ -512,19 +518,18 @@ def test_sync_agreements_by_3yc_enroll_status_status(
         commitment=adobe_commitment_factory(status=status)
     )
     mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
-    mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
 
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
     mock_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
-    mock_update_agreement.assert_called_once_with(
+    mock_sync_agreement.assert_called_once_with(
         mock_mpt_client,
-        agreement["id"],
-        parameters={"fulfillment": [{"externalId": "3YCEnrollStatus", "value": status}]},
+        agreement,
+        dry_run=False,
+        sync_prices=True,
     )
-    mock_sync_agreement.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -568,7 +573,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
         mock_mpt_client,
         agreement,
         dry_run=False,
-        sync_prices=False,
+        sync_prices=True,
     )
 
 
@@ -635,7 +640,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
         mock_mpt_client,
         agreement,
         dry_run=False,
-        sync_prices=False,
+        sync_prices=True,
     )
     assert "Authorization with uk/id ID not found." in caplog.text
 
@@ -672,8 +677,8 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_has_calls([
-        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=False),
-        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=False),
+        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=True),
+        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=True),
     ])
     assert caplog.messages == [
         "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
@@ -804,6 +809,7 @@ def test_sync_agreement_prices_with_3yc(
                     {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
                     {"externalId": "3YCStartDate", "value": "2024-01-01"},
                     {"externalId": "3YCEndDate", "value": "2025-01-01"},
+                    {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
                 "ordering": [
                     {"externalId": "3YCLicenses", "value": "9"},
@@ -899,7 +905,12 @@ def test_sync_global_customer_parameter(
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     if not dry_run:
         assert mocked_update_agreement.call_args_list == [
-            mocker.call(mock_mpt_client, agreement["id"], lines=expected_lines, parameters={}),
+            mocker.call(
+                mock_mpt_client,
+                agreement["id"],
+                lines=expected_lines,
+                parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            ),
             mocker.call(
                 mock_mpt_client,
                 agreement["id"],
@@ -911,7 +922,10 @@ def test_sync_global_customer_parameter(
                 },
             ),
             mocker.call(
-                mock_mpt_client, deployment_agreements[0]["id"], lines=expected_lines, parameters={}
+                mock_mpt_client,
+                deployment_agreements[0]["id"],
+                lines=expected_lines,
+                parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
             ),
             mocker.call(
                 mock_mpt_client,
@@ -1110,15 +1124,27 @@ def test_sync_global_customer_update_not_required(
                     "id": "ALI-2119-4550-8674-5962-0001",
                 }
             ],
-            parameters={},
+            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
         ),
-        mocker.call(mock_mpt_client, "AGR-2119-4550-8674-5962", lines=[], parameters={}),
+        mocker.call(
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
+            lines=[],
+            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+        ),
         mocker.call(
             mock_mpt_client, "AGR-2119-4550-8674-5962", parameters={"fulfillment": [{}, {}, {}]}
         ),
-        mocker.call(mock_mpt_client, "AGR-2119-4550-8674-5962", lines=[], parameters={}),
         mocker.call(
-            mock_mpt_client, "AGR-2119-4550-8674-5962", parameters={"fulfillment": [{}, {}, {}]}
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
+            lines=[],
+            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
+            parameters={"fulfillment": [{}, {}, {}]},
         ),
         mocker.call(
             mock_mpt_client,
@@ -1266,7 +1292,10 @@ def test_sync_global_customer_update_adobe_error(
 
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     mocked_update_agreement.assert_called_once_with(
-        mock_mpt_client, agreement["id"], lines=expected_lines, parameters={}
+        mock_mpt_client,
+        agreement["id"],
+        lines=expected_lines,
+        parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
     )
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_notifier.assert_called_once()
