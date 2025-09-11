@@ -164,7 +164,7 @@ def _add_missing_subscriptions(
                         **price_component,
                     }
                 ],
-                "name": f"Subscription for {agreement['product']['name']}",
+                "name": f"Subscription for {item.get('name')}",
                 "startDate": adobe_subscription["creationDate"],
                 "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
                 "product": {"id": agreement["product"]["id"]},

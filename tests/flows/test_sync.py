@@ -2067,7 +2067,9 @@ def test_add_missing_subscriptions(
                         "price": {"unitPP": 9.14},
                     }
                 ],
-                "name": "Subscription for Adobe VIP Marketplace for Commercial",
+                "name": (
+                    "Subscription for Acrobat Sign Solutions for Business (50 transactions) (AWS)"
+                ),
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "2e5b9c974c4ea1bcabdb0fe697a2f1NA"},
                 "product": {"id": "PRD-1111-1111"},
@@ -2229,7 +2231,9 @@ def test_add_missing_subscriptions_deployment(
                         "price": {"unitPP": 9.14},
                     }
                 ],
-                "name": "Subscription for Adobe VIP Marketplace for Commercial",
+                "name": (
+                    "Subscription for Acrobat Sign Solutions for Business (50 transactions) (AWS)"
+                ),
                 "startDate": "2019-05-20T22:49:55Z",
                 "externalIds": {"vendor": "2e5b9c974c4ea1bcabdb0fe697a2f1NA"},
                 "product": {"id": "PRD-1111-1111"},
