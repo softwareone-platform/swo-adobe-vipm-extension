@@ -360,7 +360,13 @@ def _update_subscriptions(
             continue
 
         line_id = subscription["lines"][0]["id"]
-        lines = [{"price": {"unitPP": prices[actual_sku]}, "id": line_id}]
+        lines = [
+            {
+                "price": {"unitPP": prices[actual_sku]},
+                "id": line_id,
+                "quantity": adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value],
+            }
+        ]
 
         parameters = {
             "fulfillment": [
