@@ -111,7 +111,9 @@ def test_sync_agreement_prices(
         mocker.call(
             mock_mpt_client,
             mpt_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}, "quantity": 10}
+            ],
             parameters={
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65304578CA01A12"},
@@ -138,7 +140,9 @@ def test_sync_agreement_prices(
         mocker.call(
             mock_mpt_client,
             another_mpt_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}}],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}, "quantity": 15}
+            ],
             parameters={
                 "fulfillment": [
                     {
@@ -772,7 +776,9 @@ def test_sync_agreement_prices_with_3yc(
     mock_update_agreement_subscription.assert_called_once_with(
         mock_mpt_client,
         mpt_subscription["id"],
-        lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
+        lines=[
+            {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}, "quantity": 10}
+        ],
         parameters={
             "fulfillment": [
                 {"externalId": "adobeSKU", "value": "65304578CA01A12"},
@@ -1237,7 +1243,9 @@ def test_sync_global_customer_update_adobe_error(
         mocker.call(
             mock_mpt_client,
             mpt_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}}],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}, "quantity": 10}
+            ],
             parameters={
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65304578CA01A12"},
@@ -1264,7 +1272,9 @@ def test_sync_global_customer_update_adobe_error(
         mocker.call(
             mock_mpt_client,
             another_mpt_subscription["id"],
-            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}}],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 20.22}, "quantity": 15}
+            ],
             parameters={
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "77777777CA01A12"},
@@ -1666,7 +1676,9 @@ def test_sync_agreement_prices_with_missing_prices(
         mocker.call(
             mock_mpt_client,
             another_mpt_subscription["id"],
-            lines=[{"price": {"unitPP": 20.22}, "id": "ALI-2119-4550-8674-5962-0001"}],
+            lines=[
+                {"price": {"unitPP": 20.22}, "id": "ALI-2119-4550-8674-5962-0001", "quantity": 15}
+            ],
             parameters={
                 "fulfillment": [
                     {"externalId": Param.ADOBE_SKU.value, "value": "77777777CA01A12"},
