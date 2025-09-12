@@ -1,0 +1,11 @@
+{
+  "name": "danger-pr-check",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "danger": "danger ci"
+  },
+  "dependencies": {
+    "danger": "13.0.*"
+  }
+}

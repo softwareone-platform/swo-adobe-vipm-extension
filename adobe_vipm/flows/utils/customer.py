@@ -13,7 +13,7 @@ from adobe_vipm.flows.utils.parameter import (
 )
 
 
-def get_customer_data(order: dict) -> dict:
+def get_customer_data(order: dict) -> list:
     """
     Returns a customer data extracted from the corresponding ordering parameters.
 

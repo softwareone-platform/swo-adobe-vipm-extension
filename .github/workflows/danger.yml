@@ -1,0 +1,35 @@
+name: Danger
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  danger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # Checkout the base repo (trusted), not the fork’s head code
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Install Node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: "Install Danger deps"
+        working-directory: ./.danger
+        run: npm ci
+
+      - name: Run Danger
+        run: npx danger ci --dangerfile ../dangerfile.js
+        working-directory: ./.danger
+        env:
+          DANGER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
