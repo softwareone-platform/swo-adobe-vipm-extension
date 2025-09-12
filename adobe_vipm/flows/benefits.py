@@ -44,7 +44,7 @@ def _build_3yc_parameters(request_info, commitment_info, is_recommitment):
         Param.PHASE_FULFILLMENT.value: [
             {
                 "externalId": status_param_ext_id,
-                "value": request_info["status"],
+                "value": request_info.get("status"),
             },
         ]
     }
@@ -58,15 +58,15 @@ def _build_3yc_parameters(request_info, commitment_info, is_recommitment):
             [
                 {
                     "externalId": Param.THREE_YC_ENROLL_STATUS.value,
-                    "value": commitment_info["status"],
+                    "value": commitment_info.get("status"),
                 },
                 {
                     "externalId": Param.THREE_YC_START_DATE.value,
-                    "value": commitment_info["startDate"],
+                    "value": commitment_info.get("startDate"),
                 },
                 {
                     "externalId": Param.THREE_YC_END_DATE.value,
-                    "value": commitment_info["endDate"],
+                    "value": commitment_info.get("endDate"),
                 },
             ],
         )
