@@ -1,13 +1,24 @@
 import pytest
+from click.testing import CliRunner
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
 from mpt_extension_sdk.core.extension import Extension
+from mpt_extension_sdk.runtime.swoext import cli
 
 from adobe_vipm.apps import ExtensionConfig
 
 
 def test_app_config():
     assert isinstance(ExtensionConfig.extension, Extension)
+
+
+def test_cli():
+    app_config_name = "adobe_vipm"
+    app_config = apps.get_app_config(app_config_name)
+    app_config.ready()
+    runner = CliRunner()
+    result = runner.invoke(cli, ["django", "--help"])
+    assert result.return_value is None
 
 
 def test_products_empty(settings):
