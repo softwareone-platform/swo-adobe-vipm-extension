@@ -86,6 +86,7 @@ TRANSFER_CUSTOMER_PARAMETERS = (
 CANCELLATION_WINDOW_DAYS = 14
 GLOBAL_SUFFIX = "_global"
 LAST_TWO_WEEKS_DAYS = 13
+NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC = 365
 
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
 
@@ -378,6 +379,11 @@ ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
 )
 
 ERR_CUSTOMER_LOST_EXCEPTION = ValidationError("VIPM0039", "{error}")
+
+ERR_SKU_AVAILABILITY = ValidationError(
+    "VIPM0038",
+    "The following SKUs are expired: {missing_skus}. Available SKUs: {available_skus}.",
+)
 
 
 class SubscriptionStatus(StrEnum):

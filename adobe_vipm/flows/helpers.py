@@ -33,6 +33,8 @@ from adobe_vipm.flows.constants import (
     ERR_CUSTOMER_LOST_EXCEPTION,
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
+    ERR_SKU_AVAILABILITY,
+    NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC,
     Param,
     TeamsColorCode,
 )
@@ -76,6 +78,14 @@ def populate_order_info(client, order: dict) -> dict:
     order["agreement"]["licensee"] = get_licensee(client, order["agreement"]["licensee"]["id"])
 
     return order
+
+
+def manage_order_error(client, context, error_data, *, is_validation=False) -> None:
+    """Set order error if is_validation flag is set, otherwise fail order."""
+    if is_validation:
+        context.order = set_order_error(context.order, error_data)
+    else:
+        switch_order_to_failed(client, context.order, error_data)
 
 
 class PrepareCustomerData(Step):
@@ -276,7 +286,12 @@ class Validate3YCCommitment(Step):
 
             is_valid, error = self.validate_items_in_subscriptions(context, subscriptions)
             if not is_valid:
-                self.manage_order_error(client, context, error)
+                manage_order_error(
+                    client,
+                    context,
+                    ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
+                    is_validation=self.is_validation,
+                )
                 return
 
             count_licenses, count_consumables = self.get_quantities(context, subscriptions)
@@ -285,7 +300,12 @@ class Validate3YCCommitment(Step):
                 context, commitment, count_licenses, count_consumables
             )
             if error:
-                self.manage_order_error(client, context, error)
+                manage_order_error(
+                    client,
+                    context,
+                    ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
+                    is_validation=self.is_validation,
+                )
                 return
 
         next_step(client, context)
@@ -531,23 +551,29 @@ class Validate3YCCommitment(Step):
         minimum_consumables_commited = int(context.customer_data.get("3YCConsumables", 0) or 0)
 
         if count_licenses < minimum_licenses_commited:
-            self.manage_order_error(
+            manage_order_error(
                 client,
                 context,
-                ERR_COMMITMENT_3YC_LICENSES.format(
-                    selected_licenses=count_licenses, minimum_licenses=minimum_licenses_commited
+                ERR_COMMITMENT_3YC_VALIDATION.to_dict(
+                    error=ERR_COMMITMENT_3YC_LICENSES.format(
+                        selected_licenses=count_licenses, minimum_licenses=minimum_licenses_commited
+                    )
                 ),
+                is_validation=self.is_validation,
             )
             return False
 
         if count_consumables < minimum_consumables_commited:
-            self.manage_order_error(
+            manage_order_error(
                 client,
                 context,
-                ERR_COMMITMENT_3YC_CONSUMABLES.format(
-                    selected_consumables=count_consumables,
-                    minimum_consumables=minimum_consumables_commited,
+                ERR_COMMITMENT_3YC_VALIDATION.to_dict(
+                    error=ERR_COMMITMENT_3YC_CONSUMABLES.format(
+                        selected_consumables=count_consumables,
+                        minimum_consumables=minimum_consumables_commited,
+                    )
                 ),
+                is_validation=self.is_validation,
             )
             return False
 
@@ -729,4 +755,51 @@ class ValidateResellerChange(Step):
             )
             return
 
+        next_step(mpt_client, context)
+
+
+class ValidateSkuAvailability(Step):
+    """Validate the SKU availability."""
+
+    def __init__(self, *, is_validation: bool) -> None:
+        self.is_validation = is_validation
+
+    def __call__(self, mpt_client, context, next_step):
+        """Validate the SKU availability."""
+        commitment = get_3yc_commitment(context.adobe_customer)
+        if commitment:
+            # If the 3YCEndDate > today + 1 year, then the renewal quantity will be modifiable
+            # and the validation will be ok
+            commitment_end_date = dt.date.fromisoformat(commitment["endDate"])
+            if commitment_end_date > (
+                dt.datetime.now(tz=dt.UTC).date()
+                + dt.timedelta(days=NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC)
+            ):
+                next_step(mpt_client, context)
+                return
+
+        adobe_skus = context.new_lines + context.upsize_lines + context.downsize_lines
+        adobe_skus = [
+            get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
+            for line in adobe_skus
+        ]
+        sku_prices = get_prices_for_skus(context.product_id, context.currency, adobe_skus)
+        sku_prices = list(sku_prices.keys())
+        missing_skus = [sku for sku in adobe_skus if sku not in sku_prices]
+        if missing_skus:
+            logger.warning(
+                "SKU availability validation failed. Missing SKUs: %s. Available SKUs: %s",
+                missing_skus,
+                sku_prices,
+            )
+            context.validation_succeeded = False
+            manage_order_error(
+                mpt_client,
+                context,
+                ERR_SKU_AVAILABILITY.to_dict(missing_skus=missing_skus, available_skus=sku_prices),
+                is_validation=self.is_validation,
+            )
+            return
+
+        logger.info("SKU availability validation passed. All SKUs found in pricing.")
         next_step(mpt_client, context)
