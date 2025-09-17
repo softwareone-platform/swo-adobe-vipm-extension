@@ -39,6 +39,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SyncAgreement,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
+    add_asset,
     send_gc_mpt_notification,
     send_mpt_notification,
     set_customer_coterm_date_if_null,
@@ -1086,6 +1087,75 @@ def test_get_return_orders_step(mocker, mock_adobe_client, mock_order, adobe_ord
         context.order_id,
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_add_asset(mocker, order_factory, adobe_subscription_factory, assets_factory):
+    client = mocker.MagicMock()
+    order = order_factory()
+    adobe_subscription = adobe_subscription_factory(
+        subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
+    mocked_get_order_asset_by_external_id = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_order_asset_by_external_id", return_value=None
+    )
+    asset = assets_factory()[0]
+    mocked_create_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_asset", return_value=asset
+    )
+
+    add_asset(client, adobe_subscription, order, adobe_subscription)
+
+    mocked_get_order_asset_by_external_id.assert_called_once_with(
+        client, "ORD-0792-5000-2253-4210", "one-time-sub-id"
+    )
+    expected_payload = {
+        "name": "Asset for Awesome product",
+        "parameters": {
+            "fulfillment": [
+                {
+                    "externalId": Param.ADOBE_SKU.value,
+                    "value": "65304578CA01A12",
+                },
+                {
+                    "externalId": Param.CURRENT_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY]),
+                },
+                {
+                    "externalId": Param.USED_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                },
+            ]
+        },
+        "externalIds": {
+            "vendor": "one-time-sub-id",
+        },
+        "lines": [
+            {
+                "id": "ALI-2119-4550-8674-5962-0001",
+            },
+        ],
+    }
+    mocked_create_asset.assert_called_once_with(client, "ORD-0792-5000-2253-4210", expected_payload)
+
+
+def test_add_asset_exists(mocker, order_factory, adobe_subscription_factory, assets_factory):
+    client = mocker.MagicMock()
+    order = order_factory()
+    adobe_subscription = adobe_subscription_factory(
+        subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
+    asset = assets_factory()[0]
+    mocked_get_order_asset_by_external_id = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_order_asset_by_external_id", return_value=asset
+    )
+    mocked_create_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.create_asset")
+
+    add_asset(client, adobe_subscription, order, adobe_subscription)
+
+    mocked_get_order_asset_by_external_id.assert_called_once_with(
+        client, "ORD-0792-5000-2253-4210", "one-time-sub-id"
+    )
+    mocked_create_asset.assert_not_called()
 
 
 def test_create_or_update_asset_step(
