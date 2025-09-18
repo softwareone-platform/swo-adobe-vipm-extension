@@ -13,7 +13,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import ResellerChangeAction, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
@@ -30,12 +30,15 @@ from adobe_vipm.flows.constants import (
     ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT,
     ERR_COMMITMENT_3YC_LICENSES,
     ERR_COMMITMENT_3YC_VALIDATION,
+    ERR_CUSTOMER_LOST_EXCEPTION,
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     Param,
+    TeamsColorCode,
 )
 from adobe_vipm.flows.fulfillment.shared import handle_error, switch_order_to_failed
 from adobe_vipm.flows.pipeline import Step
+from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
@@ -52,7 +55,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
-from adobe_vipm.notifications import send_exception
+from adobe_vipm.notifications import send_exception, send_notification
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -181,7 +184,29 @@ class SetupContext(Step):
                     context.authorization_id,
                     context.adobe_customer_id,
                 )
-            except AdobeAPIError:
+            except AdobeAPIError as ex:
+                if ex.code == AdobeStatus.INVALID_CUSTOMER:
+                    error = f"Received Adobe error {ex.code} - {ex.message}"
+                    logger.info(
+                        "Received Adobe error %s - %s, assuming lost customer "
+                        "and proceeding to fail the order.",
+                        ex.code,
+                        ex.message,
+                    )
+                    send_notification(
+                        f"Lost customer {context.adobe_customer_id}.",
+                        f"{error}",
+                        TeamsColorCode.ORANGE.value,
+                    )
+                    switch_order_to_failed(
+                        client,
+                        context.order,
+                        ERR_CUSTOMER_LOST_EXCEPTION.to_dict(error=error),
+                    )
+                    sync_agreements_by_agreement_ids(
+                        client, [context.agreement_id], dry_run=False, sync_prices=False
+                    )
+                    return
                 logger.exception("%s: failed to retrieve Adobe customer.", context)
                 return
         context.adobe_new_order_id = get_adobe_order_id(context.order)

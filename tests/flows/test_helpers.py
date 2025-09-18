@@ -16,6 +16,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
+    ERR_CUSTOMER_LOST_EXCEPTION,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -283,6 +284,87 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     mocked_get_licensee.assert_called_once_with(
         mocked_client,
         order["agreement"]["licensee"]["id"],
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
+    mocker,
+    requests_mocker,
+    settings,
+    agreement,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_api_error_factory,
+    adobe_authorizations_file,
+    adobe_client_factory,
+):
+    customer_id = "adobe-customer-id"
+    adobe_client, _, _ = adobe_client_factory()
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    adobe_api_error = adobe_api_error_factory(
+        code=AdobeStatus.INVALID_CUSTOMER.value,
+        message="Invalid Customer",
+    )
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}",
+        ),
+        status=400,
+        json=adobe_api_error,
+    )
+
+    with pytest.raises(AdobeError):
+        adobe_client.get_customer(authorization_uk, customer_id)
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=adobe_client,
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"])
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed",
+    )
+    mocked_send_notification = mocker.patch(
+        "adobe_vipm.flows.helpers.send_notification",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.sync_agreements_by_agreement_ids",
+    )
+
+    fulfillment_parameters = fulfillment_parameters_factory(
+        customer_id=customer_id,
+    )
+
+    external_ids = {"vendor": customer_id}
+
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters,
+        external_ids=external_ids,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order)
+
+    step = SetupContext()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mocked_client,
+        context.order,
+        ERR_CUSTOMER_LOST_EXCEPTION.to_dict(
+            error=f"Received Adobe error {adobe_api_error['code']} - {adobe_api_error['message']}"
+        ),
+    )
+    mocked_send_notification.assert_called_once_with(
+        "Lost customer adobe-customer-id.",
+        f"Received Adobe error {adobe_api_error['code']} - {adobe_api_error['message']}",
+        "FFA500",
     )
     mocked_next_step.assert_not_called()
 
