@@ -39,7 +39,6 @@ from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_deployment_id,
     get_deployments,
-    get_fulfillment_parameter,
     get_global_customer,
     get_parameter,
     get_sku_with_discount_level,
@@ -980,7 +979,7 @@ def _process_orphaned_deployment_subscriptions(
 ) -> None:
     logger.info("Looking for orphaned deployment subscriptions in Adobe.")
     mpt_subscription_ids = {
-        get_fulfillment_parameter(subscription, Param.ADOBE_SKU)["value"]
+        subscription["externalIds"]["vendor"]
         for agreement in deployment_agreements
         for subscription in agreement["subscriptions"]
     }
