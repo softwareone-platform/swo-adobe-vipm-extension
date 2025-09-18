@@ -8,7 +8,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
+from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment, ValidateSkuAvailability
 from adobe_vipm.flows.validation.change import (
     GetPreviewOrder,
     ValidateDownsizes,
@@ -369,19 +369,20 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 9
 
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
         SetOrUpdateCotermDate,
         ValidateRenewalWindow,
+        ValidateSkuAvailability,
         ValidateDownsizes,
         Validate3YCCommitment,
         GetPreviewOrder,
     ]
 
-    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:7]]
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:8]]
     assert actual_steps == expected_steps
 
     mocked_context_ctor.assert_called_once_with(order=mocked_order)

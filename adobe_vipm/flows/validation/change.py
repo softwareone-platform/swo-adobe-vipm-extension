@@ -19,6 +19,7 @@ from adobe_vipm.flows.helpers import (
     SetupContext,
     UpdatePrices,
     Validate3YCCommitment,
+    ValidateSkuAvailability,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import set_order_error
@@ -124,6 +125,7 @@ def validate_change_order(client, order):
         ValidateDuplicateLines(),
         SetOrUpdateCotermDate(),
         ValidateRenewalWindow(is_validation=True),
+        ValidateSkuAvailability(is_validation=True),
         ValidateDownsizes(),
         Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),

@@ -41,6 +41,7 @@ from adobe_vipm.flows.helpers import (
     SetupContext,
     UpdatePrices,
     Validate3YCCommitment,
+    ValidateSkuAvailability,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
@@ -334,6 +335,7 @@ def fulfill_change_order(client, order):
         ValidateDuplicateLines(),
         SetOrUpdateCotermDate(),
         ValidateRenewalWindow(),
+        ValidateSkuAvailability(is_validation=False),
         GetReturnOrders(),
         GetReturnableOrders(),
         ValidateReturnableOrders(),
