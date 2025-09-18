@@ -26,9 +26,6 @@ from adobe_vipm.flows.sync import (
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
-# TODO: mocked_mpt_client = mocker.MagicMock() replace with mock_mpt_client fixture
-
-
 @pytest.fixture(autouse=True)
 def mock_add_missing_subscriptions(mocker):
     return mocker.patch("adobe_vipm.flows.sync._add_missing_subscriptions", spec=True)
@@ -204,6 +201,7 @@ def test_sync_agreement_prices_not(
 
 def test_sync_agreement_prices_dry_run(
     mocker,
+    mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
     lines_factory,
@@ -219,47 +217,34 @@ def test_sync_agreement_prices_dry_run(
     )
     mpt_subscription = subscriptions_factory()[0]
     adobe_subscription = adobe_subscription_factory()
-    mocked_mpt_client = mocker.MagicMock()
-
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreement_subscription = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreement_subscription",
-        return_value=mpt_subscription,
+        "adobe_vipm.flows.sync.get_agreement_subscription", return_value=mpt_subscription
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[{"65304578CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
     )
-
     mocked_update_agreement_subscription = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement_subscription",
+        "adobe_vipm.flows.sync.update_agreement_subscription"
     )
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
 
-    mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement",
-    )
-
-    sync_agreement(mocked_mpt_client, agreement, dry_run=True, sync_prices=True)
+    sync_agreement(mock_mpt_client, agreement, dry_run=True, sync_prices=True)
 
     mocked_get_agreement_subscription.assert_called_once_with(
-        mocked_mpt_client,
-        mpt_subscription["id"],
+        mock_mpt_client, mpt_subscription["id"]
     )
-
     mocked_update_agreement_subscription.assert_not_called()
     mocked_update_agreement.assert_not_called()
 
 
 def test_sync_agreement_prices_exception(
     mocker,
+    mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
     adobe_api_error_factory,
@@ -268,8 +253,6 @@ def test_sync_agreement_prices_exception(
 ):
     agreement = agreement_factory()
     mpt_subscription = subscriptions_factory()[0]
-
-    mocked_mpt_client = mocker.MagicMock()
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
@@ -301,15 +284,12 @@ def test_sync_agreement_prices_exception(
     )
 
     with caplog.at_level(logging.ERROR):
-        sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=True)
+        sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
     assert f"Error synchronizing agreement {agreement['id']}" in caplog.text
-
     mocked_get_agreement_subscription.assert_called_once_with(
-        mocked_mpt_client,
-        mpt_subscription["id"],
+        mock_mpt_client, mpt_subscription["id"]
     )
-
     mocked_update_agreement_subscription.assert_not_called()
     mocked_update_agreement.assert_not_called()
     mocked_notifier.assert_called_once()
@@ -317,7 +297,7 @@ def test_sync_agreement_prices_exception(
 
 
 def test_sync_agreement_prices_skip_processing(
-    mocker, agreement_factory, caplog, adobe_customer_factory
+    mocker, mock_mpt_client, agreement_factory, caplog, adobe_customer_factory
 ):
     agreement = agreement_factory(
         subscriptions=[
@@ -331,14 +311,10 @@ def test_sync_agreement_prices_skip_processing(
             },
         ],
     )
-    mocked_mpt_client = mocker.MagicMock()
-
     mocker.patch("adobe_vipm.flows.sync.get_adobe_client")
-
     mocked_update_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement_subscription",
     )
-
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
     )
@@ -347,7 +323,7 @@ def test_sync_agreement_prices_skip_processing(
     mocked_adobe_client.get_customer.return_value = customer
 
     with caplog.at_level(logging.INFO):
-        sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
+        sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     assert f"Agreement {agreement['id']} has processing subscriptions, skip it" in caplog.text
 
@@ -356,9 +332,8 @@ def test_sync_agreement_prices_skip_processing(
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, dry_run):
+def test_sync_agreements_by_agreement_ids(mocker, mock_mpt_client, agreement_factory, dry_run):
     agreement = agreement_factory()
-    mocked_mpt_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.sync.get_agreements_by_ids",
         return_value=[agreement],
@@ -368,13 +343,13 @@ def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, dry_run):
     )
 
     sync_agreements_by_agreement_ids(
-        mocked_mpt_client,
+        mock_mpt_client,
         [agreement["id"]],
         dry_run=dry_run,
         sync_prices=False,
     )
     mocked_sync_agreement.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         agreement,
         dry_run=dry_run,
         sync_prices=False,
@@ -382,48 +357,33 @@ def test_sync_agreements_by_agreement_ids(mocker, agreement_factory, dry_run):
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_all_agreements(mocker, agreement_factory, dry_run):
+def test_sync_all_agreements(mocker, mock_mpt_client, agreement_factory, dry_run):
     agreement = agreement_factory()
-    mocked_mpt_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_all_agreements",
-        return_value=[agreement],
-    )
-    mocked_sync_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.sync_agreement",
-    )
+    mocker.patch("adobe_vipm.flows.sync.get_all_agreements", return_value=[agreement])
+    mocked_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement")
 
-    sync_all_agreements(mocked_mpt_client, dry_run=dry_run)
+    sync_all_agreements(mock_mpt_client, dry_run=dry_run)
     mocked_sync_agreement.assert_called_once_with(
-        mocked_mpt_client,
-        agreement,
-        dry_run=dry_run,
-        sync_prices=False,
+        mock_mpt_client, agreement, dry_run=dry_run, sync_prices=False
     )
 
 
 @freeze_time("2024-11-09")
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_3yc_end_date(mocker, agreement_factory, dry_run):
+def test_sync_agreements_by_3yc_end_date(mocker, mock_mpt_client, agreement_factory, dry_run):
     agreement = agreement_factory()
-    mocked_mpt_client = mocker.MagicMock()
     mocked_get_agreements_by_query = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_query",
-        return_value=[agreement],
-        autospec=True,
+        "adobe_vipm.flows.sync.get_agreements_by_query", return_value=[agreement], autospec=True
     )
-    mocked_sync_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.sync_agreement",
-        autospec=True,
-    )
+    mocked_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
 
-    sync_agreements_by_3yc_end_date(mocked_mpt_client, dry_run=dry_run)
+    sync_agreements_by_3yc_end_date(mock_mpt_client, dry_run=dry_run)
 
     mocked_sync_agreement.assert_called_once_with(
-        mocked_mpt_client, agreement, dry_run=dry_run, sync_prices=True
+        mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True
     )
     mocked_get_agreements_by_query.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,3YCEndDate),eq(displayValue,2024-11-08)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2024-11-09)))&"
@@ -433,7 +393,7 @@ def test_sync_agreements_by_3yc_end_date(mocker, agreement_factory, dry_run):
 
 @freeze_time("2025-06-16")
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock_mpt_client):
+def test_sync_agreements_by_coterm_date(mocker, mock_mpt_client, agreement_factory, dry_run):
     agreement = agreement_factory()
     mocked_get_agreements_by_query = mocker.patch(
         "adobe_vipm.flows.sync.get_agreements_by_query",
@@ -464,9 +424,8 @@ def test_sync_agreements_by_coterm_date(mocker, agreement_factory, dry_run, mock
 
 @freeze_time("2025-07-16")
 @pytest.mark.parametrize("dry_run", [True, False])
-def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
+def test_sync_agreements_by_renewal_date(mocker, mock_mpt_client, agreement_factory, dry_run):
     agreement = agreement_factory()
-    mocked_mpt_client = mocker.MagicMock()
     mocked_get_agreements_by_query = mocker.patch(
         "adobe_vipm.flows.sync.get_agreements_by_query",
         return_value=[agreement],
@@ -477,17 +436,13 @@ def test_sync_agreements_by_renewal_date(mocker, agreement_factory, dry_run):
         autospec=True,
     )
 
-    sync_agreements_by_renewal_date(mocked_mpt_client, dry_run=dry_run)
+    sync_agreements_by_renewal_date(mock_mpt_client, dry_run=dry_run)
 
     mocked_sync_agreement.assert_called_once_with(
-        mocked_mpt_client,
-        agreement,
-        dry_run=dry_run,
-        sync_prices=True,
+        mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True
     )
-
     mocked_get_agreements_by_query.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         "eq(status,Active)&"
         "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2026-07-15,2026-06-15,2026-05-15,2026-04-15,2026-03-15,2026-02-15,2026-01-15,2025-12-15,2025-11-15,2025-10-15,2025-09-15,2025-08-15,2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15))))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-07-16)))&"
@@ -528,10 +483,7 @@ def test_sync_agreements_by_3yc_enroll_status_status(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_sync_agreement.assert_called_once_with(
-        mock_mpt_client,
-        agreement,
-        dry_run=False,
-        sync_prices=True,
+        mock_mpt_client, agreement, dry_run=False, sync_prices=True
     )
 
 
@@ -573,10 +525,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_called_once_with(
-        mock_mpt_client,
-        agreement,
-        dry_run=False,
-        sync_prices=True,
+        mock_mpt_client, agreement, dry_run=False, sync_prices=True
     )
 
 
@@ -1401,6 +1350,7 @@ def test_sync_global_customer_parameters_error(
 
 def test_sync_agreement_error_getting_adobe_customer(
     mocker,
+    mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
     lines_factory,
@@ -1441,10 +1391,7 @@ def test_sync_agreement_error_getting_adobe_customer(
             },
         ],
     )
-    mocked_mpt_client = mocker.MagicMock()
-
     mocked_adobe_client = mocker.MagicMock()
-
     adobe_error = AdobeAPIError(
         400,
         adobe_api_error_factory(
@@ -1453,34 +1400,29 @@ def test_sync_agreement_error_getting_adobe_customer(
         ),
     )
     mocked_adobe_client.get_customer.side_effect = adobe_error
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mocked_adobe_client)
     mocked_notifier = mocker.patch(
-        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
-    sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
+
     mocked_adobe_client.get_customer.assert_called_once()
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
 
 
-def test_sync_agreement_notify_exception(
-    mocker,
-    agreement_factory,
-):
+def test_sync_agreement_notify_exception(mocker, mock_mpt_client, agreement_factory):
     mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
     mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_customer_id",
-        side_effect=Exception("Test exception"),
+        "adobe_vipm.flows.sync.get_adobe_customer_id", side_effect=Exception("Test exception")
     )
-    mpt_client = mocker.MagicMock()
     agreement = agreement_factory()
-    sync_agreement(mpt_client, agreement, dry_run=False, sync_prices=False)
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
+
     mock_notify_agreement_unhandled_exception_in_teams.assert_called_once()
     assert (
         mock_notify_agreement_unhandled_exception_in_teams.call_args_list[0].args[0]
@@ -1490,6 +1432,7 @@ def test_sync_agreement_notify_exception(
 
 def test_sync_agreement_empty_discounts(
     mocker,
+    mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
     adobe_customer_factory,
@@ -1506,25 +1449,16 @@ def test_sync_agreement_empty_discounts(
             },
         ],
     )
-
-    mocked_mpt_client = mocker.MagicMock()
     mocked_adobe_client = mocker.MagicMock()
-
     customer = adobe_customer_factory()
     customer["discounts"] = []
-
     mocked_adobe_client.get_customer.return_value = customer
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mocked_adobe_client)
     mocked_notifier = mocker.patch(
-        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
 
-    sync_agreement(mocked_mpt_client, agreement, dry_run=False, sync_prices=False)
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
