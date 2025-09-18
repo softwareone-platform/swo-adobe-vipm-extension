@@ -376,6 +376,8 @@ ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT = (
     "No subscriptions found without deployment ID to be added to the main agreement",
 )
 
+ERR_CUSTOMER_LOST_EXCEPTION = ValidationError("VIPM0039", "{error}")
+
 
 class SubscriptionStatus(StrEnum):
     """MPT subscription statuses."""
