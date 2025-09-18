@@ -22,7 +22,6 @@ from adobe_vipm.flows.sync import (
     sync_agreements_by_renewal_date,
     sync_all_agreements,
 )
-from adobe_vipm.flows.utils import get_fulfillment_parameter
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -2320,9 +2319,7 @@ def test_process_orphaned_deployment_subscriptions_none(
         [agreement],
         [
             adobe_subscription_factory(
-                subscription_id=get_fulfillment_parameter(
-                    agreement["subscriptions"][0], Param.ADOBE_SKU
-                )["value"],
+                subscription_id=agreement["subscriptions"][0]["externalIds"]["vendor"],
                 deployment_id="deployment_id",
             )
         ],
