@@ -25,12 +25,7 @@ def test_validate_downsizes_step_success(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(
-            quantity=3,
-            old_quantity=7,
-        )
-    )
+    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
@@ -108,12 +103,7 @@ def test_validate_downsizes_step_no_returnable_orders(
     lines_factory,
     adobe_customer_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(
-            quantity=3,
-            old_quantity=7,
-        )
-    )
+    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
     mocked_next_step = mocker.MagicMock()

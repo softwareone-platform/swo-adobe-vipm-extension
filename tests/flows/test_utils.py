@@ -113,9 +113,8 @@ def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
     )
 
 
-def test_reset_order_error(order_factory):
-    order = order_factory()
-    order = reset_order_error(order)
+def test_reset_order_error(mock_order):
+    order = reset_order_error(mock_order)
     assert order["error"] is None
 
     order = set_order_error(order, {"id": "ERR-1234", "message": "error_message"})
