@@ -208,7 +208,9 @@ def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
     assert ws["P2"].value is None
 
 
-def test_reseller_create_ok(mocker, settings, adobe_authorizations_file, tmp_path, reseller_data):
+def test_reseller_create_ok(
+    mocker, mock_adobe_client, settings, adobe_authorizations_file, tmp_path, reseller_data
+):
     settings.EXTENSION_CONFIG = {"ADOBE_AUTHORIZATIONS_FILE": "/path/to/authorizations.json"}
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
@@ -255,13 +257,7 @@ def test_reseller_create_ok(mocker, settings, adobe_authorizations_file, tmp_pat
     )
     mocked_dump = mocker.patch("adobe_vipm.management.commands.create_resellers.json.dump")
 
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_reseller_account.return_value = {"resellerId": "adobe-reseller-id"}
-    mocker.patch(
-        "adobe_vipm.management.commands.create_resellers.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.create_reseller_account.return_value = {"resellerId": "adobe-reseller-id"}
     out = StringIO()
 
     call_command(
@@ -284,7 +280,9 @@ def test_reseller_create_ok(mocker, settings, adobe_authorizations_file, tmp_pat
     mocked_open.assert_called_once_with("w", encoding="utf-8")
 
 
-def test_api_error(mocker, adobe_authorizations_file, tmp_path, adobe_api_error_factory):
+def test_api_error(
+    mocker, mock_adobe_client, adobe_authorizations_file, tmp_path, adobe_api_error_factory
+):
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
 
@@ -303,32 +301,13 @@ def test_api_error(mocker, adobe_authorizations_file, tmp_path, adobe_api_error_
             ws[f"{letter}2"].value = f"row_1_{column}"
 
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
-
-    mocker.patch.object(
-        Command,
-        "validate_reseller_data",
-        return_value=[],
-    )
-
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
+    mocker.patch.object(Command, "validate_reseller_data", return_value=[])
     api_error = AdobeAPIError(
         400,
         adobe_api_error_factory(code="7777", message="Test Api Error"),
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_reseller_account.side_effect = api_error
-
-    mocker.patch(
-        "adobe_vipm.management.commands.create_resellers.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.create_reseller_account.side_effect = api_error
     out = StringIO()
 
     call_command(

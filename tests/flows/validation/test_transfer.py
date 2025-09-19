@@ -28,6 +28,7 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 def test_validate_transfer(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     items_factory,
@@ -61,15 +62,10 @@ def test_validate_transfer(
             expired_items[0]["offerId"]: 33.04,
         },
     )
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
     mocked_get_product_items_by_skus = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
         return_value=product_items,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
     )
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
@@ -89,6 +85,7 @@ def test_validate_transfer(
 
 def test_validate_transfer_lines_exist(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     items_factory,
@@ -119,15 +116,10 @@ def test_validate_transfer_lines_exist(
             expired_items[0]["offerId"]: 33.04,
         },
     )
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
     mocked_get_product_items_by_skus = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
         return_value=product_items,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
     )
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
@@ -158,6 +150,7 @@ def test_validate_transfer_lines_exist(
 )
 def test_validate_transfer_membership_error(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -170,11 +163,7 @@ def test_validate_transfer_membership_error(
     )
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     api_error = AdobeAPIError(400, adobe_api_error_factory(status_code, "An error"))
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.side_effect = api_error
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mock_adobe_client.preview_transfer.side_effect = api_error
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -199,6 +188,7 @@ def test_validate_transfer_membership_error(
 )
 def test_validate_transfer_http_error(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -210,12 +200,7 @@ def test_validate_transfer_http_error(
         return_value=None,
     )
     order = order_factory(order_parameters=transfer_order_parameters_factory())
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.preview_transfer.side_effect = error
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -230,6 +215,7 @@ def test_validate_transfer_http_error(
 
 def test_validate_transfer_unknown_item(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -241,15 +227,9 @@ def test_validate_transfer_unknown_item(
     )
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     adobe_preview_transfer = adobe_preview_transfer_factory()
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
-
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
     mocker.patch("adobe_vipm.flows.validation.transfer.get_product_items_by_skus", return_value=[])
     mocker.patch("adobe_vipm.flows.validation.transfer.get_prices", return_value=[])
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -265,6 +245,7 @@ def test_validate_transfer_unknown_item(
 
 def test_validate_transfer_already_migrated(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -288,13 +269,8 @@ def test_validate_transfer_already_migrated(
         return_value="65304578CA03A12",
     )
     adobe_subscription = adobe_subscription_factory()
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -306,7 +282,7 @@ def test_validate_transfer_already_migrated(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
@@ -323,21 +299,17 @@ def test_validate_transfer_already_migrated(
 
 def test_validate_transfer_migration_running(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
 ):
-    mocked_adobe_client = mocker.MagicMock()
-
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
     mocked_transfer = mocker.MagicMock(customer_id="customer-id", status="running")
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client", return_value=mocked_adobe_client
     )
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
@@ -354,21 +326,17 @@ def test_validate_transfer_migration_running(
 
 def test_validate_transfer_migration_synchronized(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
 ):
-    mocked_adobe_client = mocker.MagicMock()
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
     mocked_transfer = mocker.MagicMock(customer_id="customer-id", status="synchronized")
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
     )
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
@@ -384,6 +352,7 @@ def test_validate_transfer_migration_synchronized(
 
 def test_validate_transfer_no_items(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -399,11 +368,7 @@ def test_validate_transfer_no_items(
     )
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     adobe_preview_transfer = adobe_preview_transfer_factory(items=[])
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -434,13 +399,13 @@ def test_get_prices(mocker, order_factory):
 
 def test_validate_transfer_account_inactive(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_transfer_factory,
     adobe_subscription_factory,
 ):
-    mocked_adobe_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory()
     adobe_transfer = adobe_transfer_factory(status=AdobeStatus.TRANSFER_INACTIVE_ACCOUNT.value)
     order_params = transfer_order_parameters_factory()
@@ -450,12 +415,8 @@ def test_validate_transfer_account_inactive(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -520,6 +481,7 @@ def test_get_prices_3yc_expired(mocker, order_factory, adobe_commitment_factory)
 
 def test_validate_transfer_already_migrated_all_items_expired(
     mocker,
+    mock_adobe_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -530,14 +492,11 @@ def test_validate_transfer_already_migrated_all_items_expired(
 ):
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
-
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
     ) + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
@@ -558,35 +517,23 @@ def test_validate_transfer_already_migrated_all_items_expired(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         return_value="65304578CA01A12",
     )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription],
-    }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
-
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     has_errors, validated_order = validate_transfer(m_client, order)
 
     membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
-
     assert has_errors is False
-
     assert validated_order == order
-
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
-
     assert adobe_subscription["offerId"] == "65304578CA01A12"
     lines = lines_factory(
         line_id=None,
@@ -596,12 +543,12 @@ def test_validate_transfer_already_migrated_all_items_expired(
         external_vendor_id="65304578CA",
         unit_purchase_price=33.04,
     )
-
     assert len(validated_order["lines"]) == len(lines)
 
 
 def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item_active(
     mocker,
+    mock_adobe_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -612,19 +559,15 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
 ):
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
-
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
     ) + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
-
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -637,39 +580,29 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
         "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
         return_value={adobe_subscription["offerId"]: 33.04},
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304578CA01A12", "99999999CA01A12"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription, adobe_one_time_subscription],
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
-
     assert has_errors is False
-
     assert validated_order == order
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
-
     assert adobe_subscription["offerId"] == "65304578CA01A12"
     lines = lines_factory(
         line_id=None,
@@ -679,12 +612,12 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
         external_vendor_id="65304578CA",
         unit_purchase_price=33.04,
     )
-
     assert len(validated_order["lines"]) == len(lines)
 
 
 def test_validate_transfer_already_migrated_all_items_expired_delete_existing_line(
     mocker,
+    mock_adobe_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -706,7 +639,6 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
     )
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
-
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
@@ -714,14 +646,12 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
     adobe_subscription_2 = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
-
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
     )
     product_items.extend(
         items_factory(item_id=2, name="Awesome Expired product 2", external_vendor_id="65304991CA")
     )
-
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -738,22 +668,15 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
         "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
         return_value={adobe_subscription["offerId"]: 33.04},
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304990CA03A12", "65304991CA"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription, adobe_subscription_2],
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     has_errors, validated_order = validate_transfer(m_client, order)
 
     membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
@@ -767,11 +690,10 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
-
     assert adobe_subscription["offerId"] == "65304990CA03A12"
     lines = lines_factory(
         line_id=None,
@@ -787,6 +709,7 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
 
 def test_validate_transfer_already_migrated_all_items_expired_update_existing_line(
     mocker,
+    mock_adobe_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -815,9 +738,7 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
         )
     )
     order = order_factory(order_parameters=order_params, lines=order_lines)
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
@@ -832,7 +753,6 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
     product_items.extend(
         items_factory(item_id=2, name="Awesome Expired product 2", external_vendor_id="65304991CA")
     )
-
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -849,39 +769,29 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
         "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
         return_value={adobe_subscription["offerId"]: 33.04},
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304990CA03A12", "65304991CA"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription, adobe_subscription_2],
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
-
     assert has_errors is False
-
     assert validated_order == order
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
-
     assert adobe_subscription["offerId"] == "65304990CA03A12"
     lines = lines_factory(
         line_id=None,
@@ -901,12 +811,12 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
             unit_purchase_price=35.09,
         )
     )
-
     assert validated_order["lines"] == lines
 
 
 def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     mocker,
+    mock_adobe_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -945,9 +855,7 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
         )
     )
     order = order_factory(order_parameters=order_params, lines=order_lines)
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
@@ -955,7 +863,6 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     adobe_subscription_2 = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
-
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
     )
@@ -965,7 +872,6 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     product_items.extend(
         items_factory(item_id=3, name="Awesome Expired product 3", external_vendor_id="65304992CA")
     )
-
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -990,35 +896,25 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304990CA03A12", "65304991CA"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription, adobe_subscription_2],
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     has_errors, validated_order = validate_transfer(m_client, order)
 
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
-
     assert has_errors is False
-
     assert validated_order == order
-
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
-
     assert adobe_subscription["offerId"] == "65304990CA03A12"
     lines = lines_factory(
         line_id=None,
@@ -1048,12 +944,12 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
             unit_purchase_price=65.25,
         )
     )
-
     assert validated_order["lines"] == lines
 
 
 def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_item_active(
     mocker,
+    mock_adobe_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -1063,16 +959,13 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
 ):
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     m_client = mocker.MagicMock()
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
     adobe_subscription_1 = adobe_subscription_factory(offer_id="65304578CA")
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
-
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
     ) + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
@@ -1083,7 +976,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
             external_vendor_id="99999999CA",
         )
     )
-
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -1099,42 +991,33 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
             adobe_one_time_subscription["offerId"]: 99,
         },
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304578CA", "65304578CA", "99999999CA"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription,
             adobe_subscription_1,
             adobe_one_time_subscription,
         ],
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     has_errors, validated_order = validate_transfer(m_client, order)
-
-    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
 
     assert has_errors is False
     assert validated_order == order
+    membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
     mocked_get_transfer.assert_called_once_with(
         order["agreement"]["product"]["id"],
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
-
     assert adobe_subscription["offerId"] == "65304578CA"
     assert validated_order["lines"] == [
         {
@@ -1164,6 +1047,8 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
 
 def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_error(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -1191,24 +1076,18 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
             unit_purchase_price=35.09,
         )
     )
-
     order = order_factory(order_parameters=order_params, lines=order_lines)
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
-    m_client = mocker.MagicMock()
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
-
     product_items = items_factory(
         item_id=1, name="Awesome product 1", external_vendor_id="65304990CA"
     )
     product_items.extend(
         items_factory(item_id=2, name="Awesome Expired product 2", external_vendor_id="65304991CA")
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -1225,27 +1104,19 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
         "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
         return_value={adobe_subscription["offerId"]: 33.04},
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304990CA03A12", "65304991CA"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [adobe_subscription, adobe_subscription_2],
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription, adobe_subscription_2]
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    has_errors, validated_order = validate_transfer(m_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
     assert has_errors is True
     assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
-
     lines = lines_factory(
         line_id=None,
         item_id=1,
@@ -1254,12 +1125,13 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
         external_vendor_id="65304990CA",
         unit_purchase_price=33.04,
     )
-
     assert validated_order["lines"] == lines
 
 
 def test_validate_transfer_already_migrated_partial_items_expired_update_line_error(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -1277,21 +1149,15 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
         external_vendor_id="65304990CA",
         unit_purchase_price=33.04,
     )
-
     order = order_factory(order_parameters=order_params, lines=order_lines)
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
-    m_client = mocker.MagicMock()
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
-
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -1301,30 +1167,22 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
     mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
-        return_value=product_items,
+        "adobe_vipm.flows.validation.transfer.get_product_items_by_skus", return_value=product_items
     )
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
         return_value={adobe_subscription["offerId"]: 33.04},
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304990CA03A12", "65304991CA"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription, adobe_subscription_2],
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    has_errors, validated_order = validate_transfer(m_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
     assert has_errors is True
     assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
@@ -1343,6 +1201,8 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
 
 def test_validate_transfer_already_migrated_partial_items_expired_remove_line_error(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -1360,18 +1220,13 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
         external_vendor_id="65304990CA",
         unit_purchase_price=33.04,
     )
-
     order = order_factory(order_parameters=order_params, lines=order_lines)
-    mocked_transfer = mocker.MagicMock()
-    mocked_transfer.customer_id = "customer-id"
-
-    m_client = mocker.MagicMock()
+    mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CA")
     adobe_subscription_3 = adobe_subscription_factory(
         status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
     )
-
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
     )
@@ -1379,12 +1234,10 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
         items_factory(item_id=2, name="Awesome Expired product 2", external_vendor_id="65304991CA")
         + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
         return_value=product_items,
@@ -1396,27 +1249,19 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
             adobe_subscription_2["offerId"]: 35.04,
         },
     )
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_item_sku_by_subscription",
         side_effect=["65304990CA", "65304991CA", "99999999CA"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription, adobe_subscription_2, adobe_subscription_3],
     }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    has_errors, validated_order = validate_transfer(m_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
     assert has_errors is True
     assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
-
     lines = lines_factory(
         line_id=None,
         item_id=1,
@@ -1435,12 +1280,13 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
             unit_purchase_price=35.04,
         )
     )
-
     assert len(validated_order["lines"]) == len(lines)
 
 
 def test_validate_transfer_already_migrated_no_items(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_customer_factory,
@@ -1450,37 +1296,25 @@ def test_validate_transfer_already_migrated_no_items(
     lines_factory,
 ):
     order_params = transfer_order_parameters_factory()
-
     order = order_factory(order_parameters=order_params, lines=[])
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
-
-    m_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
+    mock_adobe_client.get_subscriptions.return_value = {"items": []}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
-        "items": [],
-    }
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    has_errors, validated_order = validate_transfer(m_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
     assert has_errors is False
-
     assert validated_order["lines"] == []
 
 
 def test_validate_transfer_already_migrated_no_items_add_line(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -1528,13 +1362,8 @@ def test_validate_transfer_already_migrated_no_items_add_line(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {"items": []}
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": []}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -1552,6 +1381,7 @@ def test_validate_transfer_already_migrated_no_items_add_line(
 
 def test_validate_transfer_already_migrated_items_with_deployment(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -1571,14 +1401,8 @@ def test_validate_transfer_already_migrated_items_with_deployment(
         return_value="65304578CA03A12",
     )
     adobe_subscription = adobe_subscription_factory(deployment_id="deployment-id")
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory(
-        global_sales_enabled=True
-    )
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(global_sales_enabled=True)
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 
@@ -1594,7 +1418,7 @@ def test_validate_transfer_already_migrated_items_with_deployment(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         membership_param["value"],
     )
-    mocked_adobe_client.get_subscriptions.assert_called_once_with(
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
         adobe_authorizations_file["authorizations"][0]["authorization_id"],
         mocked_transfer.customer_id,
     )
@@ -1602,6 +1426,7 @@ def test_validate_transfer_already_migrated_items_with_deployment(
 
 def test_validate_transfer_with_one_line_items(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     items_factory,
@@ -1615,19 +1440,14 @@ def test_validate_transfer_with_one_line_items(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
-    order = order_factory(
-        order_parameters=transfer_order_parameters_factory(),
-        lines=[],
-    )
+    order = order_factory(order_parameters=transfer_order_parameters_factory(), lines=[])
     product_items = items_factory()
     product_items.extend(
         items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
     )
     valid_items = adobe_items_factory(renewal_date=today.isoformat())
     one_time_item = adobe_items_factory(
-        renewal_date=today.isoformat(),
-        line_number=3,
-        offer_id="99999999CA01A12",
+        renewal_date=today.isoformat(), line_number=3, offer_id="99999999CA01A12"
     )
     expired_items = adobe_items_factory(
         offer_id="65304999CA01A12",
@@ -1643,14 +1463,10 @@ def test_validate_transfer_with_one_line_items(
             expired_items[0]["offerId"]: 33.04,
         },
     )
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
     mocked_get_product_items_by_skus = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
         return_value=product_items,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client", return_value=mocked_adobe_client
     )
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
@@ -1718,6 +1534,7 @@ def test_validate_transfer_with_one_line_items(
 )
 def test_validate_transfer_adobe_errors(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     order_factory,
     transfer_order_parameters_factory,
@@ -1733,12 +1550,7 @@ def test_validate_transfer_adobe_errors(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
     )
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_subscriptions.side_effect = error
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)
 

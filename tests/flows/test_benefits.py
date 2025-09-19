@@ -15,6 +15,7 @@ from adobe_vipm.notifications import Button
 @pytest.mark.parametrize("is_recommitment", [False, True])
 def test_check_3yc_commitment_request(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     adobe_customer_factory,
@@ -33,9 +34,7 @@ def test_check_3yc_commitment_request(
     customer_kwargs[request_type] = adobe_commitment_factory(status="COMMITTED")
     agreement = agreement_factory()
     customer = adobe_customer_factory(**customer_kwargs)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_customer.return_value = customer
-    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
+    mock_adobe_client.get_customer.return_value = customer
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -59,7 +58,7 @@ def test_check_3yc_commitment_request(
     check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)
 
     mocked_get_agreements.assert_called_once_with(mock_mpt_client, is_recommitment=is_recommitment)
-    mocked_adobe_client.get_customer.assert_called_once_with(
+    mock_adobe_client.get_customer.assert_called_once_with(
         agreement["authorization"]["id"], get_adobe_customer_id(agreement)
     )
     mocked_update_agreement.assert_called_once_with(
@@ -70,6 +69,7 @@ def test_check_3yc_commitment_request(
 @pytest.mark.parametrize("is_recommitment", [False, True])
 def test_check_3yc_commitment_request_not_committed(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     adobe_customer_factory,
@@ -83,9 +83,7 @@ def test_check_3yc_commitment_request_not_committed(
     customer_kwargs = {request_type: adobe_commitment_factory(status="ACCEPTED")}
     agreement = agreement_factory()
     customer = adobe_customer_factory(**customer_kwargs)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_customer.return_value = customer
-    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
+    mock_adobe_client.get_customer.return_value = customer
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -117,6 +115,7 @@ def test_check_3yc_commitment_request_not_committed(
 )
 def test_check_3yc_commitment_request_declined(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     settings,
     agreement_factory,
@@ -132,9 +131,7 @@ def test_check_3yc_commitment_request_declined(
     customer_kwargs = {request_type: adobe_commitment_factory(status=request_status)}
     agreement = agreement_factory()
     customer = adobe_customer_factory(**customer_kwargs)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_customer.return_value = customer
-    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
+    mock_adobe_client.get_customer.return_value = customer
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -174,6 +171,7 @@ def test_check_3yc_commitment_request_declined(
 @pytest.mark.parametrize("is_recommitment", [False, True])
 def test_check_3yc_commitment_request_exception(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     adobe_api_error_factory,
@@ -181,12 +179,10 @@ def test_check_3yc_commitment_request_exception(
 ):
     req_type = "Recommitment" if is_recommitment else "Commitment"
     agreement = agreement_factory()
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_customer.side_effect = AdobeAPIError(
+    mock_adobe_client.get_customer.side_effect = AdobeAPIError(
         500,
         adobe_api_error_factory(code="1224", message="Internal Server Error"),
     )
-    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
     mocked_get_agreements = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -196,7 +192,7 @@ def test_check_3yc_commitment_request_exception(
     check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)
 
     mocked_get_agreements.assert_called_once_with(mock_mpt_client, is_recommitment=is_recommitment)
-    mocked_adobe_client.get_customer.assert_called_once_with(
+    mock_adobe_client.get_customer.assert_called_once_with(
         agreement["authorization"]["id"], get_adobe_customer_id(agreement)
     )
     assert (
@@ -208,6 +204,7 @@ def test_check_3yc_commitment_request_exception(
 
 def test_check_3yc_commitment_request_global_customers(
     mocker,
+    mock_adobe_client,
     mpt_client,
     agreement_factory,
     fulfillment_parameters_factory,
@@ -236,23 +233,17 @@ def test_check_3yc_commitment_request_global_customers(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
     )
-    mocked_adobe_client = mocker.MagicMock()
-
     customer_kwargs = {
         "commitment": adobe_commitment_factory(status="COMMITTED"),
         "commitment_request": adobe_commitment_factory(status="COMMITTED"),
         "global_sales_enabled": True,
     }
     customer = adobe_customer_factory(**customer_kwargs)
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = [
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {"deploymentId": str(i)} for i in range(2)
     ]
-
-    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=mocked_adobe_client)
-
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.benefits.update_agreement")
-
     mocked_get_agreements_by_deployments = mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_customer_deployments",
         return_value=deployment_agreements,
