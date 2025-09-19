@@ -152,9 +152,8 @@ def test_start_processing_attempt_other_attempts(
 
 
 def test_set_customer_coterm_date_if_null(
-    mocker, order_factory, adobe_customer_factory, fulfillment_parameters_factory
+    mocker, mock_mpt_client, order_factory, adobe_customer_factory, fulfillment_parameters_factory
 ):
-    mocked_mpt_client = mocker.MagicMock()
     mocked_adobe_client = mocker.MagicMock()
     customer = adobe_customer_factory()
     mocked_adobe_client.get_customer.return_value = customer
@@ -162,10 +161,10 @@ def test_set_customer_coterm_date_if_null(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
     order = order_factory()
-    order = set_customer_coterm_date_if_null(mocked_mpt_client, mocked_adobe_client, order)
+    order = set_customer_coterm_date_if_null(mock_mpt_client, mocked_adobe_client, order)
     assert get_coterm_date(order) == customer["cotermDate"]
     mocked_update_order.assert_called_once_with(
-        mocked_mpt_client,
+        mock_mpt_client,
         order["id"],
         parameters={
             "ordering": order["parameters"]["ordering"],
@@ -177,9 +176,8 @@ def test_set_customer_coterm_date_if_null(
 
 
 def test_set_customer_coterm_date_if_null_already_set(
-    mocker, order_factory, fulfillment_parameters_factory
+    mocker, mock_mpt_client, order_factory, fulfillment_parameters_factory
 ):
-    mocked_mpt_client = mocker.MagicMock()
     mocked_adobe_client = mocker.MagicMock()
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
@@ -187,7 +185,7 @@ def test_set_customer_coterm_date_if_null_already_set(
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(coterm_date="whatever")
     )
-    assert set_customer_coterm_date_if_null(mocked_mpt_client, mocked_adobe_client, order) == order
+    assert set_customer_coterm_date_if_null(mock_mpt_client, mocked_adobe_client, order) == order
 
     mocked_update_order.assert_not_called()
     mocked_adobe_client.get_customer_assert_not_called()
