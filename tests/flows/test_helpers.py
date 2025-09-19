@@ -337,15 +337,13 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
     mocked_next_step.assert_not_called()
 
 
-def test_prepare_customer_data_step(mocker, order_factory, customer_data):
-    order = order_factory()
-
+def test_prepare_customer_data_step(mocker, mock_order, customer_data):
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.helpers.update_order",
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=mock_order, customer_data=customer_data)
 
     step = PrepareCustomerData()
     step(mocked_client, context, mocked_next_step)
@@ -354,9 +352,7 @@ def test_prepare_customer_data_step(mocker, order_factory, customer_data):
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_prepare_customer_data_step_no_company_name(mocker, order_factory, customer_data):
-    order = order_factory()
-
+def test_prepare_customer_data_step_no_company_name(mocker, mock_order, customer_data):
     no_company_customer_data = copy.copy(customer_data)
     del no_company_customer_data[Param.COMPANY_NAME.value]
 
@@ -366,7 +362,7 @@ def test_prepare_customer_data_step_no_company_name(mocker, order_factory, custo
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
-        order=order,
+        order=mock_order,
         order_id="order-id",
         customer_data=no_company_customer_data,
     )
@@ -388,9 +384,7 @@ def test_prepare_customer_data_step_no_company_name(mocker, order_factory, custo
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_data):
-    order = order_factory()
-
+def test_prepare_customer_data_step_no_address(mocker, mock_order, customer_data):
     no_address_customer_data = copy.copy(customer_data)
     del no_address_customer_data[Param.ADDRESS.value]
 
@@ -400,7 +394,7 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
-        order=order,
+        order=mock_order,
         order_id="order-id",
         customer_data=no_address_customer_data,
     )
@@ -426,9 +420,7 @@ def test_prepare_customer_data_step_no_address(mocker, order_factory, customer_d
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_data):
-    order = order_factory()
-
+def test_prepare_customer_data_step_no_contact(mocker, mock_order, customer_data):
     no_contact_customer_data = copy.copy(customer_data)
     del no_contact_customer_data[Param.CONTACT.value]
 
@@ -438,7 +430,7 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
-        order=order,
+        order=mock_order,
         order_id="order-id",
         customer_data=no_contact_customer_data,
     )
@@ -462,156 +454,124 @@ def test_prepare_customer_data_step_no_contact(mocker, order_factory, customer_d
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_update_prices_step_no_orders(mocker, order_factory):
-    order = order_factory()
-    mocked_client = mocker.MagicMock()
+def test_update_prices_step_no_orders(mocker, mock_mpt_client, mock_order):
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
-        order=order,
-        order_id=order["id"],
+        order=mock_order,
+        order_id=mock_order["id"],
         adobe_new_order=None,
         adobe_preview_order=None,
     )
 
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
-def test_update_prices_step_with_new_order(mocker, order_factory, adobe_order_factory):
-    order = order_factory()
+def test_update_prices_step_with_new_order(
+    mocker, mock_mpt_client, mock_order, adobe_order_factory
+):
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
     sku = adobe_order["lineItems"][0]["offerId"]
-
     mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
+        "adobe_vipm.flows.helpers.get_prices_for_skus", return_value={sku: 121.36}
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
-        order=order,
-        order_id=order["id"],
-        product_id=order["agreement"]["product"]["id"],
-        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
         adobe_new_order=adobe_order,
     )
 
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
+    mocked_get_prices.assert_called_once_with(context.product_id, context.currency, [sku])
     mocked_update_order.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         lines=[
             {
-                "id": order["lines"][0]["id"],
+                "id": mock_order["lines"][0]["id"],
                 "price": {"unitPP": 121.36},
             },
         ],
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
-def test_update_prices_step_with_preview_order(mocker, order_factory, adobe_order_factory):
-    order = order_factory()
+def test_update_prices_step_with_preview_order(
+    mocker, mock_mpt_client, mock_order, adobe_order_factory
+):
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
     sku = adobe_order["lineItems"][0]["offerId"]
-
     mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
+        "adobe_vipm.flows.helpers.get_prices_for_skus", return_value={sku: 121.36}
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
-        order=order,
-        order_id=order["id"],
-        product_id=order["agreement"]["product"]["id"],
-        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
         adobe_preview_order=adobe_order,
     )
 
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
+    mocked_get_prices.assert_called_once_with(context.product_id, context.currency, [sku])
     mocked_update_order.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         lines=[
             {
-                "id": order["lines"][0]["id"],
+                "id": mock_order["lines"][0]["id"],
                 "price": {"unitPP": 121.36},
             },
         ],
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 @freeze_time("2024-11-09")
 def test_update_prices_step_with_3yc_commitment(
     mocker,
-    order_factory,
+    mock_mpt_client,
+    mock_order,
     adobe_order_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
 ):
-    order = order_factory()
     commitment = adobe_commitment_factory(
         status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
         end_date="2025-01-01",
     )
-    adobe_customer = adobe_customer_factory(
-        commitment=commitment,
-        commitment_request=commitment,
-    )
+    adobe_customer = adobe_customer_factory(commitment=commitment, commitment_request=commitment)
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
     sku = adobe_order["lineItems"][0]["offerId"]
-
     mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_3yc_skus",
-        return_value={sku: 121.36},
+        "adobe_vipm.flows.helpers.get_prices_for_3yc_skus", return_value={sku: 121.36}
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
-        order=order,
-        order_id=order["id"],
-        product_id=order["agreement"]["product"]["id"],
-        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
         adobe_customer=adobe_customer,
         adobe_new_order=adobe_order,
     )
+
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     mocked_get_prices.assert_called_once_with(
         context.product_id,
@@ -620,26 +580,26 @@ def test_update_prices_step_with_3yc_commitment(
         [sku],
     )
     mocked_update_order.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         lines=[
             {
-                "id": order["lines"][0]["id"],
+                "id": mock_order["lines"][0]["id"],
                 "price": {"unitPP": 121.36},
             },
         ],
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_update_prices_step_with_expired_3yc_commitment(
     mocker,
-    order_factory,
+    mock_mpt_client,
+    mock_order,
     adobe_order_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
 ):
-    order = order_factory()
     commitment = adobe_commitment_factory(
         status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2023-01-01",
@@ -648,46 +608,35 @@ def test_update_prices_step_with_expired_3yc_commitment(
     adobe_customer = adobe_customer_factory(commitment=commitment)
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
     sku = adobe_order["lineItems"][0]["offerId"]
-
     mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
+        "adobe_vipm.flows.helpers.get_prices_for_skus", return_value={sku: 121.36}
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
-        order=order,
-        order_id=order["id"],
-        product_id=order["agreement"]["product"]["id"],
-        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
         adobe_customer=adobe_customer,
         adobe_new_order=adobe_order,
     )
 
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
+    mocked_get_prices.assert_called_once_with(context.product_id, context.currency, [sku])
     mocked_update_order.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         lines=[
             {
-                "id": order["lines"][0]["id"],
+                "id": mock_order["lines"][0]["id"],
                 "price": {"unitPP": 121.36},
             },
         ],
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_update_prices_step_with_multiple_lines(

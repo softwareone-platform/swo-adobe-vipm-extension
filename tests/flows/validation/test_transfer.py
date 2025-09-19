@@ -380,19 +380,18 @@ def test_validate_transfer_no_items(
     get_product_items_by_skus_mock.assert_not_called()
 
 
-def test_get_prices(mocker, order_factory):
+def test_get_prices(mocker, mock_order):
     mocked_get_prices_for_skus = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
         return_value={"sku-1": 10.11},
     )
 
-    order = order_factory()
+    prices = get_prices(mock_order, None, ["sku-1"])
 
-    assert get_prices(order, None, ["sku-1"]) == {"sku-1": 10.11}
-
+    assert prices == {"sku-1": 10.11}
     mocked_get_prices_for_skus.assert_called_once_with(
-        order["agreement"]["product"]["id"],
-        order["agreement"]["listing"]["priceList"]["currency"],
+        mock_order["agreement"]["product"]["id"],
+        mock_order["agreement"]["listing"]["priceList"]["currency"],
         ["sku-1"],
     )
 
@@ -433,47 +432,45 @@ def test_validate_transfer_account_inactive(
     "commitment_status",
     [ThreeYearCommitmentStatus.ACTIVE.value, ThreeYearCommitmentStatus.COMMITTED.value],
 )
-def test_get_prices_3yc(mocker, order_factory, adobe_commitment_factory, commitment_status):
+def test_get_prices_3yc(mocker, mock_order, adobe_commitment_factory, commitment_status):
     today = dt.datetime.now(tz=dt.UTC).date()
     commitment = adobe_commitment_factory(
         end_date=(today + dt.timedelta(days=1)).isoformat(),
         status=commitment_status,
     )
-
     mocked_get_prices_for_skus = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_prices_for_3yc_skus",
         return_value={"sku-1": 10.11},
     )
-    order = order_factory()
-    assert get_prices(order, commitment, ["sku-1"]) == {"sku-1": 10.11}
 
+    prices = get_prices(mock_order, commitment, ["sku-1"])
+
+    assert prices == {"sku-1": 10.11}
     mocked_get_prices_for_skus.assert_called_once_with(
-        order["agreement"]["product"]["id"],
-        order["agreement"]["listing"]["priceList"]["currency"],
+        mock_order["agreement"]["product"]["id"],
+        mock_order["agreement"]["listing"]["priceList"]["currency"],
         dt.date.fromisoformat(commitment["startDate"]),
         ["sku-1"],
     )
 
 
-def test_get_prices_3yc_expired(mocker, order_factory, adobe_commitment_factory):
+def test_get_prices_3yc_expired(mocker, mock_order, adobe_commitment_factory):
     today = dt.datetime.now(tz=dt.UTC).date()
     commitment = adobe_commitment_factory(
         end_date=(today - dt.timedelta(days=1)).isoformat(),
     )
-
     mocked_get_prices_for_skus = mocker.patch(
-        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
-        return_value={"sku-1": 10.11},
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus", return_value={"sku-1": 10.11}
     )
     mocked_get_prices_for_3yc_skus = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_prices_for_3yc_skus",
     )
-    order = order_factory()
-    assert get_prices(order, commitment, ["sku-1"]) == {"sku-1": 10.11}
+    prices = get_prices(mock_order, commitment, ["sku-1"])
 
+    assert prices == {"sku-1": 10.11}
     mocked_get_prices_for_skus.assert_called_once_with(
-        order["agreement"]["product"]["id"],
-        order["agreement"]["listing"]["priceList"]["currency"],
+        mock_order["agreement"]["product"]["id"],
+        mock_order["agreement"]["listing"]["priceList"]["currency"],
         ["sku-1"],
     )
     mocked_get_prices_for_3yc_skus.assert_not_called()

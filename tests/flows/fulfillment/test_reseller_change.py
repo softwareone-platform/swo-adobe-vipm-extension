@@ -77,23 +77,16 @@ def test_commit_reseller_change_step_success(
 
 def test_commit_reseller_change_step_already_has_customer_id(
     mocker,
-    order_factory,
     mock_next_step,
     mock_mpt_client,
     mock_adobe_client,
+    mock_order,
 ):
-    """Test CommitResellerChange step when customer ID already exists."""
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mock_adobe_client,
     )
-
-    order = order_factory()
-
-    context = Context(
-        order=order,
-        adobe_customer_id="existing-customer-id",
-    )
+    context = Context(order=mock_order, adobe_customer_id="existing-customer-id")
 
     step = CommitResellerChange()
     step(mock_mpt_client, context, mock_next_step)
@@ -104,33 +97,25 @@ def test_commit_reseller_change_step_already_has_customer_id(
 
 def test_commit_reseller_change_step_adobe_api_error(
     mocker,
-    order_factory,
     adobe_api_error_factory,
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
     mock_adobe_client,
+    order_factory,
 ):
-    """Test CommitResellerChange step when Adobe API returns an error."""
     error = AdobeAPIError(400, adobe_api_error_factory("1234", "API error"))
-
     mock_adobe_client.reseller_change_request.side_effect = error
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
         return_value=mock_adobe_client,
     )
-
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.reseller_transfer.switch_order_to_failed",
     )
 
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
-    context = Context(
-        order=order,
-        authorization_id="authorization-id",
-    )
+    context = Context(order=order, authorization_id="authorization-id")
 
     step = CommitResellerChange()
     step(mock_mpt_client, context, mock_next_step)
@@ -157,7 +142,6 @@ def test_check_adobe_reseller_transfer_step_success(
         "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
         return_value=mock_adobe_client,
     )
-
     order = order_factory(
         order_parameters=reseller_change_order_parameters_factory(),
         external_ids={"vendor": "TRANSFER-123"},

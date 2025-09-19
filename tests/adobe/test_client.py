@@ -614,23 +614,19 @@ def test_create_preview_order_bad_request(
     adobe_authorizations_file,
     adobe_api_error_factory,
     adobe_client_factory,
-    order,
+    mock_order,
     mock_get_adobe_product_by_marketplace_sku,
 ):
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
-
-    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+    mock_order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     deployment_id = "a_deployment_id"
-
     client, _, _ = adobe_client_factory()
-
     error = adobe_api_error_factory("1234", "An error")
-
     requests_mocker.post(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -644,12 +640,11 @@ def test_create_preview_order_bad_request(
         client.create_preview_order(
             authorization_uk,
             customer_id,
-            order["id"],
+            mock_order["id"],
             [],
-            order["lines"],
+            mock_order["lines"],
             deployment_id=deployment_id,
         )
-
     assert repr(cv.value) == str(error)
 
 

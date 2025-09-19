@@ -124,25 +124,17 @@ def test_validate_company_name_invalid_chars(order_factory, order_parameters_fac
 
 @pytest.mark.parametrize("state_or_province", ["CA", "California", "Californio"])
 @pytest.mark.parametrize("address_line_2", ["", "a value"])
-def test_validate_address(order_factory, address_line_2, state_or_province):
-    order = order_factory()
-    customer_data = get_customer_data(order)
+def test_validate_address(mock_order, address_line_2, state_or_province):
+    customer_data = get_customer_data(mock_order)
     customer_data[Param.ADDRESS.value]["addressLine2"] = address_line_2
     customer_data[Param.ADDRESS.value]["state"] = state_or_province
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
+    context = Context(order=mock_order, customer_data=customer_data)
 
     step = ValidateCustomerData()
     step.validate_address(context)
 
     assert context.validation_succeeded is True
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.ADDRESS.value,
-    )
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
     assert "error" not in param
 
 
@@ -371,24 +363,15 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
     assert param["constraints"]["required"] is True
 
 
-def test_validate_contact(order_factory):
-    order = order_factory()
-    customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
+def test_validate_contact(mock_order):
+    customer_data = get_customer_data(mock_order)
+    context = Context(order=mock_order, customer_data=customer_data)
 
     step = ValidateCustomerData()
     step.validate_contact(context)
 
     assert context.validation_succeeded is True
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.CONTACT.value,
-    )
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
     assert "error" not in param
 
 
@@ -735,56 +718,43 @@ def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
     assert context.order["error"] == error
 
 
-def test_check_purchase_validation_enabled_step(mocker, order_factory):
-    order = order_factory()
-
-    mocked_client = mocker.MagicMock()
+def test_check_purchase_validation_enabled_step(mocker, mock_mpt_client, mock_order):
     mocked_next_step = mocker.MagicMock()
-
-    context = Context(order=order)
+    context = Context(order=mock_order)
 
     step = CheckPurchaseValidationEnabled()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
-def test_check_purchase_validation_enabled_step_disabled(mocker, order_factory):
-    order = order_factory()
-
-    mocked_client = mocker.MagicMock()
+def test_check_purchase_validation_enabled_step_disabled(mocker, mock_mpt_client, mock_order):
     mocked_next_step = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.validation.purchase.is_purchase_validation_enabled",
         return_value=False,
     )
-
-    context = Context(order=order)
+    context = Context(order=mock_order)
 
     step = CheckPurchaseValidationEnabled()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     mocked_next_step.assert_not_called()
 
 
-def test_validate_purchase_order(mocker):
+def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
     mocked_pipeline_instance = mocker.MagicMock()
-
     mocked_pipeline_ctor = mocker.patch(
-        "adobe_vipm.flows.validation.purchase.Pipeline",
-        return_value=mocked_pipeline_instance,
+        "adobe_vipm.flows.validation.purchase.Pipeline", return_value=mocked_pipeline_instance
     )
     mocked_context = mocker.MagicMock()
     mocked_context_ctor = mocker.patch(
         "adobe_vipm.flows.validation.purchase.Context", return_value=mocked_context
     )
-    mocked_client = mocker.MagicMock()
-    mocked_order = mocker.MagicMock()
 
-    validate_purchase_order(mocked_client, mocked_order)
+    validate_purchase_order(mock_mpt_client, mock_order)
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
-
     expected_steps = [
         SetupContext,
         PrepareCustomerData,
@@ -798,9 +768,5 @@ def test_validate_purchase_order(mocker):
 
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
-
-    mocked_context_ctor.assert_called_once_with(order=mocked_order)
-    mocked_pipeline_instance.run.assert_called_once_with(
-        mocked_client,
-        mocked_context,
-    )
+    mocked_context_ctor.assert_called_once_with(order=mock_order)
+    mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)

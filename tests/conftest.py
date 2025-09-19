@@ -1284,7 +1284,7 @@ def order_factory(
 
 
 @pytest.fixture
-def order(order_factory):
+def mock_order(order_factory):
     return order_factory()
 
 
@@ -2156,11 +2156,9 @@ def mock_worker_call_command(mocker):
 
 
 @pytest.fixture
-def mock_get_order_for_producer(order, order_factory):
-    order = order_factory()
-
+def mock_get_order_for_producer(mock_order):
     return {
-        "data": [order],
+        "data": [mock_order],
         "$meta": {
             "pagination": {
                 "offset": 0,
