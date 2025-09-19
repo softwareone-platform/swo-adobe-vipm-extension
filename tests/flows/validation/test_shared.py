@@ -83,20 +83,13 @@ def test_validate_duplicate_lines_step_no_lines(mocker, order_factory):
     "segment",
     [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
 )
-def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segment):
+def test_get_preview_order_step(
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, segment
+):
     deployment_id = "deployment-id"
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    order = order_factory(
-        deployment_id=deployment_id,
-    )
-
+    mock_adobe_client.create_preview_order.return_value = adobe_preview_order
+    order = order_factory(deployment_id=deployment_id)
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
@@ -114,8 +107,7 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segm
 
     assert context.validation_succeeded is True
     assert context.adobe_preview_order == adobe_preview_order
-
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
+    mock_adobe_client.create_preview_order.assert_called_once_with(
         context.authorization_id,
         FAKE_CUSTOMERS_IDS[segment],
         context.order_id,
@@ -130,20 +122,13 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segm
     "segment",
     [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
 )
-def test_get_preview_order_step_no_deployment(mocker, order_factory, adobe_order_factory, segment):
+def test_get_preview_order_step_no_deployment(
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, segment
+):
     deployment_id = None
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    order = order_factory(
-        deployment_id=deployment_id,
-    )
-
+    mock_adobe_client.create_preview_order.return_value = adobe_preview_order
+    order = order_factory(deployment_id=deployment_id)
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
@@ -161,8 +146,7 @@ def test_get_preview_order_step_no_deployment(mocker, order_factory, adobe_order
 
     assert context.validation_succeeded is True
     assert context.adobe_preview_order == adobe_preview_order
-
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
+    mock_adobe_client.create_preview_order.assert_called_once_with(
         context.authorization_id,
         FAKE_CUSTOMERS_IDS[segment],
         context.order_id,
@@ -173,18 +157,11 @@ def test_get_preview_order_step_no_deployment(mocker, order_factory, adobe_order
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_get_preview_order_step_no_lines(mocker, order_factory):
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+def test_get_preview_order_step_no_lines(mocker, mock_adobe_client, order_factory):
     order = order_factory()
     order["lines"] = []
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         upsize_lines=order["lines"],
@@ -196,24 +173,18 @@ def test_get_preview_order_step_no_lines(mocker, order_factory):
 
     assert context.validation_succeeded is True
     assert context.adobe_preview_order is None
-
-    mocked_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_preview_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_get_preview_order_step_api_error(mocker, order_factory, adobe_api_error_factory):
+def test_get_preview_order_step_api_error(
+    mocker, mock_adobe_client, order_factory, adobe_api_error_factory
+):
     error = AdobeAPIError(400, adobe_api_error_factory("9999", "unexpected"))
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.create_preview_order.side_effect = error
     order = order_factory()
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         upsize_lines=order["lines"],
@@ -231,19 +202,12 @@ def test_get_preview_order_step_api_error(mocker, order_factory, adobe_api_error
     mocked_next_step.assert_not_called()
 
 
-def test_get_preview_order_step_product_not_found_error(mocker, order_factory):
+def test_get_preview_order_step_product_not_found_error(mocker, mock_adobe_client, order_factory):
     error = AdobeProductNotFoundError("Product not found")
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.create_preview_order.side_effect = error
     order = order_factory()
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         upsize_lines=order["lines"],
@@ -257,5 +221,4 @@ def test_get_preview_order_step_product_not_found_error(mocker, order_factory):
     assert context.validation_succeeded is False
     assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details=str(error))
     assert context.adobe_preview_order is None
-
     mocked_next_step.assert_not_called()

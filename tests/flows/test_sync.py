@@ -201,6 +201,7 @@ def test_sync_agreement_prices_not(
 
 def test_sync_agreement_prices_dry_run(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
@@ -210,17 +211,12 @@ def test_sync_agreement_prices_dry_run(
     mock_get_adobe_product_by_marketplace_sku,
 ):
     agreement = agreement_factory(
-        lines=lines_factory(
-            external_vendor_id="77777777CA",
-            unit_purchase_price=10.11,
-        )
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11)
     )
     mpt_subscription = subscriptions_factory()[0]
     adobe_subscription = adobe_subscription_factory()
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
-    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mocked_adobe_client)
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
     mocked_get_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.sync.get_agreement_subscription", return_value=mpt_subscription
     )
@@ -244,6 +240,7 @@ def test_sync_agreement_prices_dry_run(
 
 def test_sync_agreement_prices_exception(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
@@ -253,32 +250,17 @@ def test_sync_agreement_prices_exception(
 ):
     agreement = agreement_factory()
     mpt_subscription = subscriptions_factory()[0]
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_customer.return_value = adobe_customer_factory()
-    mocked_adobe_client.get_subscription.side_effect = AdobeAPIError(
-        400,
-        adobe_api_error_factory(code="9999", message="Error from Adobe."),
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_subscription.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory(code="9999", message="Error from Adobe.")
     )
-
-    mocker.patch(
-        "adobe_vipm.flows.sync.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
     mocked_get_agreement_subscription = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreement_subscription",
-        return_value=mpt_subscription,
+        "adobe_vipm.flows.sync.get_agreement_subscription", return_value=mpt_subscription
     )
-
     mocked_update_agreement_subscription = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement_subscription",
+        "adobe_vipm.flows.sync.update_agreement_subscription"
     )
-
-    mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement",
-    )
-
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
     mocked_notifier = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams",
     )
@@ -297,7 +279,7 @@ def test_sync_agreement_prices_exception(
 
 
 def test_sync_agreement_prices_skip_processing(
-    mocker, mock_mpt_client, agreement_factory, caplog, adobe_customer_factory
+    mocker, mock_adobe_client, mock_mpt_client, agreement_factory, caplog, adobe_customer_factory
 ):
     agreement = agreement_factory(
         subscriptions=[
@@ -313,14 +295,11 @@ def test_sync_agreement_prices_skip_processing(
     )
     mocker.patch("adobe_vipm.flows.sync.get_adobe_client")
     mocked_update_agreement_subscription = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement_subscription",
+        "adobe_vipm.flows.sync.update_agreement_subscription"
     )
-    mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.sync.update_agreement",
-    )
-    mocked_adobe_client = mocker.MagicMock()
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
     customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_customer.return_value = customer
 
     with caplog.at_level(logging.INFO):
         sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
@@ -1350,6 +1329,7 @@ def test_sync_global_customer_parameters_error(
 
 def test_sync_agreement_error_getting_adobe_customer(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
@@ -1359,10 +1339,7 @@ def test_sync_agreement_error_getting_adobe_customer(
     adobe_api_error_factory,
 ):
     agreement = agreement_factory(
-        lines=lines_factory(
-            external_vendor_id="77777777CA",
-            unit_purchase_price=10.11,
-        ),
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         fulfillment_parameters=[
             {"externalId": "globalCustomer", "value": ["Yes"]},
             {"externalId": "deployments", "value": "deployment-id - DE"},
@@ -1391,23 +1368,18 @@ def test_sync_agreement_error_getting_adobe_customer(
             },
         ],
     )
-    mocked_adobe_client = mocker.MagicMock()
     adobe_error = AdobeAPIError(
         400,
-        adobe_api_error_factory(
-            "9999",
-            "some error",
-        ),
+        adobe_api_error_factory("9999", "some error"),
     )
-    mocked_adobe_client.get_customer.side_effect = adobe_error
-    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mocked_adobe_client)
+    mock_adobe_client.get_customer.side_effect = adobe_error
     mocked_notifier = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
-    mocked_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer.assert_called_once()
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
 
@@ -1432,6 +1404,7 @@ def test_sync_agreement_notify_exception(mocker, mock_mpt_client, agreement_fact
 
 def test_sync_agreement_empty_discounts(
     mocker,
+    mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
@@ -1449,11 +1422,9 @@ def test_sync_agreement_empty_discounts(
             },
         ],
     )
-    mocked_adobe_client = mocker.MagicMock()
     customer = adobe_customer_factory()
     customer["discounts"] = []
-    mocked_adobe_client.get_customer.return_value = customer
-    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=mocked_adobe_client)
+    mock_adobe_client.get_customer.return_value = customer
     mocked_notifier = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )

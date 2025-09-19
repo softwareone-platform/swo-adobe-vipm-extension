@@ -6,7 +6,9 @@ from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_sku_price
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
-from adobe_vipm.flows.global_customer import check_gc_agreement_deployments
+from adobe_vipm.flows.global_customer import (
+    check_gc_agreement_deployments,
+)
 
 
 @pytest.fixture
@@ -62,18 +64,15 @@ def empty_3y_commitment():
     return None
 
 
-def test_check_gc_agreement_deployments_no_licensee(mocker, settings, gc_agreement_deployment):
+def test_check_gc_agreement_deployments_no_licensee(
+    mocker, mock_adobe_client, settings, gc_agreement_deployment
+):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM", "PRD-2222-2222": "GOV"},
     }
     settings.MPT_PRODUCTS_IDS = ["PRD-1111-1111", "PRD-2222-2222"]
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
@@ -87,29 +86,20 @@ def test_check_gc_agreement_deployments_no_licensee(mocker, settings, gc_agreeme
     mocked_gc_agreement_deployments_model.all.assert_called_once()
 
 
-def test_check_gc_agreement_deployments_unexpected_error(mocker, settings, airtable_error_factory):
+def test_check_gc_agreement_deployments_unexpected_error(
+    mocker, mock_adobe_client, settings, airtable_error_factory
+):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-    error = AirTableAPIError(
-        400,
-        airtable_error_factory(
-            "Bad Request",
-            "BAD_REQUEST",
-        ),
-    )
+    error = AirTableAPIError(400, airtable_error_factory("Bad Request", "BAD_REQUEST"))
     mocked_gc_agreement_deployments_model.all.side_effect = error
 
     check_gc_agreement_deployments()
@@ -118,6 +108,7 @@ def test_check_gc_agreement_deployments_unexpected_error(mocker, settings, airta
 
 def test_check_gc_agreement_deployments_no_authorization_id(
     mocker,
+    mock_adobe_client,
     settings,
     gc_agreement_deployment,
 ):
@@ -128,13 +119,7 @@ def test_check_gc_agreement_deployments_no_authorization_id(
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
 
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_authorizations_by_currency_and_seller_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_authorizations_by_currency_and_seller_id",
         return_value=[],
@@ -153,7 +138,7 @@ def test_check_gc_agreement_deployments_no_authorization_id(
 
 
 def test_check_gc_agreement_deployments_get_authorization_error(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -161,12 +146,6 @@ def test_check_gc_agreement_deployments_get_authorization_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     error_data = mpt_error_factory(
         400,
@@ -189,12 +168,13 @@ def test_check_gc_agreement_deployments_get_authorization_error(
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_authorizations_by_currency_and_seller_id.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_get_authorization_more_than_one(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -202,14 +182,7 @@ def test_check_gc_agreement_deployments_get_authorization_more_than_one(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_authorizations_by_currency_and_seller_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_authorizations_by_currency_and_seller_id",
         return_value=[mocker.MagicMock(), mocker.MagicMock()],
@@ -218,18 +191,18 @@ def test_check_gc_agreement_deployments_get_authorization_more_than_one(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.authorization_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_authorizations_by_currency_and_seller_id.assert_called_once()
     gc_agreement_deployment.save.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_get_price_list_error(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -237,11 +210,6 @@ def test_check_gc_agreement_deployments_get_price_list_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     error_data = mpt_error_factory(
         400,
@@ -263,20 +231,19 @@ def test_check_gc_agreement_deployments_get_price_list_error(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.authorization_id = None
     gc_agreement_deployment.price_list_id = None
-
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_authorizations_by_currency_and_seller_id.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_no_price_list(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -284,34 +251,26 @@ def test_check_gc_agreement_deployments_no_price_list(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_gc_price_list_by_currency = mocker.patch(
         "adobe_vipm.flows.global_customer.get_gc_price_list_by_currency",
         return_value=[],
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.price_list_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_get_price_more_than_one(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -319,34 +278,26 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_gc_price_list_by_currency = mocker.patch(
         "adobe_vipm.flows.global_customer.get_gc_price_list_by_currency",
         return_value=[mocker.MagicMock(), mocker.MagicMock()],
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.price_list_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_get_listing_error(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -354,14 +305,7 @@ def test_check_gc_agreement_deployments_get_listing_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     price_list = mocker.MagicMock()
     price_list.externalIds = "price_list_global"
     mocked_get_gc_price_list_by_currency = mocker.patch(
@@ -380,17 +324,16 @@ def test_check_gc_agreement_deployments_get_listing_error(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         side_effect=error,
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.price_list_id = None
     gc_agreement_deployment.listing_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
@@ -398,6 +341,7 @@ def test_check_gc_agreement_deployments_get_listing_error(
 
 def test_check_gc_agreement_deployments_create_listing(
     mocker,
+    mock_adobe_client,
     settings,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -410,91 +354,67 @@ def test_check_gc_agreement_deployments_create_listing(
     template,
 ):
     agreement = agreement_factory()
-
     expected_created_agreement_arg = created_agreement_factory(
         deployments="", is_profile_address_exists=True
     )
-
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[],
     )
-
     mocked_create_listing = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_listing",
-        return_value=listing,
+        "adobe_vipm.flows.global_customer.create_listing", return_value=listing
     )
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=licensee,
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
     )
-
     mocked_get_product_template_or_default = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_product_template_or_default",
-        return_value=template,
+        "adobe_vipm.flows.global_customer.get_product_template_or_default", return_value=template
     )
-
     mocked_create_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_agreement",
-        return_value=agreement,
+        "adobe_vipm.flows.global_customer.create_agreement", return_value=agreement
     )
-
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=agreement,
+        "adobe_vipm.flows.global_customer.update_agreement", return_value=agreement
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     adobe_customer = adobe_customer_factory(company_profile_address_exists=True)
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
-
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
     gc_agreement_deployment.listing_id = None
     gc_agreement_deployment.agreement_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
     mocked_get_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=provisioning_agreement,
+        "adobe_vipm.flows.global_customer.get_agreement", return_value=provisioning_agreement
     )
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
-
     assert mocked_create_agreement.call_args_list[0].args[1] == expected_created_agreement_arg
-
     mocked_get_agreement.assert_called_once()
-
     mocked_update_agreement.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_create_listing_with_no_address(
     mocker,
+    mock_adobe_client,
     settings,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -509,68 +429,45 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
     template,
 ):
     agreement = agreement_factory()
-
     expected_created_agreement_arg = created_agreement_factory(
-        deployments=mock_adobe_customer_deployments_external_ids,
-        is_profile_address_exists=False,
+        deployments=mock_adobe_customer_deployments_external_ids, is_profile_address_exists=False
     )
-
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
         "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[],
     )
-
     mocked_create_listing = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_listing",
-        return_value=listing,
+        "adobe_vipm.flows.global_customer.create_listing", return_value=listing
     )
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=licensee,
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
     )
-
     mocked_get_product_template_or_default = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_product_template_or_default",
-        return_value=template,
+        "adobe_vipm.flows.global_customer.get_product_template_or_default", return_value=template
     )
-
     mocked_create_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_agreement",
-        return_value=agreement,
+        "adobe_vipm.flows.global_customer.create_agreement", return_value=agreement
     )
-
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=agreement,
+        "adobe_vipm.flows.global_customer.update_agreement", return_value=agreement
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     adobe_customer = adobe_customer_factory(company_profile_address_exists=False)
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = (
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = (
         mock_adobe_customer_deployments_items
     )
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
-
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
     gc_agreement_deployment.listing_id = None
     gc_agreement_deployment.agreement_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
@@ -580,12 +477,13 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
     )
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
 
     assert mocked_create_agreement.call_args_list[0].args[1] == expected_created_agreement_arg
@@ -596,7 +494,7 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
 
 
 def test_check_gc_agreement_deployments_get_listing_more_than_one(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -604,13 +502,7 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[mocker.MagicMock(), mocker.MagicMock()],
@@ -619,17 +511,17 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.listing_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_create_listing_error(
-    mocker, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -637,14 +529,7 @@ def test_check_gc_agreement_deployments_create_listing_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[],
@@ -662,14 +547,13 @@ def test_check_gc_agreement_deployments_create_listing_error(
     )
     error = MPTAPIError(400, error_data)
     mocked_create_listing = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_listing",
-        side_effect=error,
+        "adobe_vipm.flows.global_customer.create_listing", side_effect=error
     )
-
     gc_agreement_deployment.listing_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
@@ -677,6 +561,7 @@ def test_check_gc_agreement_deployments_create_listing_error(
 
 def test_check_gc_agreement_deployments_create_agreement_error(
     mocker,
+    mock_adobe_client,
     settings,
     mpt_error_factory,
     adobe_customer_factory,
@@ -693,27 +578,16 @@ def test_check_gc_agreement_deployments_create_agreement_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[mocker.MagicMock()],
     )
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=licensee,
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
     )
-
     mocked_get_product_template_or_default = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_product_template_or_default",
-        return_value=template,
+        "adobe_vipm.flows.global_customer.get_product_template_or_default", return_value=template
     )
     error_data = mpt_error_factory(
         400,
@@ -724,20 +598,17 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     )
     error = MPTAPIError(400, error_data)
     mocked_create_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_agreement",
-        side_effect=error,
+        "adobe_vipm.flows.global_customer.create_agreement", side_effect=error
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
 
     adobe_customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
-
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
     gc_agreement_deployment.listing_id = None
     gc_agreement_deployment.agreement_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
@@ -747,11 +618,12 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     )
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
     mocked_create_agreement.assert_called_once()
     mocked_get_agreement.assert_called_once()
@@ -759,6 +631,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
 
 def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     mocker,
+    mock_adobe_client,
     settings,
     mpt_error_factory,
     adobe_customer_factory,
@@ -777,65 +650,40 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
         return_value=[],
     )
-
     mocked_create_listing = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_listing",
-        return_value=listing,
+        "adobe_vipm.flows.global_customer.create_listing", return_value=listing
     )
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=licensee,
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
     )
-
     mocked_get_product_template_or_default = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_product_template_or_default",
-        return_value=template,
+        "adobe_vipm.flows.global_customer.get_product_template_or_default", return_value=template
     )
-
     mocked_create_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_agreement",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.create_agreement", return_value=mocker.MagicMock()
     )
-
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.update_agreement", return_value=mocker.MagicMock()
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
         return_value=provisioning_agreement,
     )
-
     adobe_customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.side_effect = AdobeAPIError(
-        400,
-        adobe_api_error_factory(
-            "1000",
-            "Error updating autorenewal quantity",
-        ),
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mock_adobe_client.get_subscriptions.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("1000", "Error updating autorenewal quantity")
     )
-
     gc_agreement_deployment.listing_id = None
     gc_agreement_deployment.agreement_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
@@ -845,17 +693,17 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
     mocked_create_agreement.assert_called_once()
     mocked_get_agreement.assert_called_once()
-
     mocked_update_agreement.assert_called_once()
 
 
 def test_check_gc_agreement_deployments_create_agreement_subscription(
     mocker,
+    mock_adobe_client,
     settings,
     mpt_error_factory,
     adobe_customer_factory,
@@ -872,43 +720,28 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=licensee,
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
     )
-
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.update_agreement", return_value=mocker.MagicMock()
     )
-
     mocked_get_listing_by_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listing_by_id",
-        return_value=listing,
+        "adobe_vipm.flows.global_customer.get_listing_by_id", return_value=listing
     )
     mocked_get_subscription_by_external_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement_subscription_by_external_id",
         return_value=[],
     )
-
     mocked_create_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.global_customer.create_agreement_subscription",
         return_value=mocker.MagicMock(),
     )
-
     mocked_get_sku_price = mocker.patch(
         "adobe_vipm.flows.global_customer.get_sku_price",
         return_value={"65304578CA01A12": 100.0},
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -919,9 +752,9 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
         return_value=product_items,
     )
     adobe_customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
@@ -930,19 +763,18 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
             ),
         ]
     }
-
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
-
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
         return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
 
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
@@ -955,6 +787,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
 
 def test_check_gc_agreement_deployments_create_agreement_subscription_already_created(
     mocker,
+    mock_adobe_client,
     settings,
     mpt_error_factory,
     adobe_customer_factory,
@@ -971,27 +804,15 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=licensee,
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
     )
-
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.update_agreement", return_value=mocker.MagicMock()
     )
-
     mocked_get_listing_by_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listing_by_id",
-        return_value=listing,
+        "adobe_vipm.flows.global_customer.get_listing_by_id", return_value=listing
     )
     mocked_get_subscription_by_external_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement_subscription_by_external_id",
@@ -1001,7 +822,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
         "adobe_vipm.flows.global_customer.create_agreement_subscription",
         return_value=mocker.MagicMock(),
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -1012,25 +832,23 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
         return_value=product_items,
     )
     adobe_customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
-
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
-
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
         return_value=provisioning_agreement,
     )
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
-
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
     mocked_get_listing_by_id.assert_called_once()
@@ -1041,6 +859,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
 
 def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     mocker,
+    mock_adobe_client,
     settings,
     mpt_error_factory,
     adobe_customer_factory,
@@ -1055,24 +874,13 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=mocker.MagicMock()
     )
-
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.update_agreement", return_value=mocker.MagicMock()
     )
-
     mocked_get_listing_by_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listing_by_id",
         return_value=mocker.MagicMock(),
@@ -1093,12 +901,10 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
         "adobe_vipm.flows.global_customer.create_agreement_subscription",
         side_effect=error,
     )
-
     mocked_get_sku_price = mocker.patch(
         "adobe_vipm.flows.global_customer.get_sku_price",
         return_value={"65304578CA01A12": 100.0},
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -1109,12 +915,11 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
         return_value=product_items,
     )
     adobe_customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
-
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
     mocked_get_agreement = mocker.patch(
@@ -1125,9 +930,8 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     check_gc_agreement_deployments()
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
-
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
     mocked_get_listing_by_id.assert_called_once()
@@ -1139,6 +943,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
 
 def test_check_gc_agreement_deployments_create_agreement_subscription_enable_auto_renew(
     mocker,
+    mock_adobe_client,
     settings,
     mpt_error_factory,
     adobe_customer_factory,
@@ -1153,45 +958,30 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
     }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-
     mocked_get_licensee = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_licensee",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.get_licensee", return_value=mocker.MagicMock()
     )
-
     mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.update_agreement",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.update_agreement", return_value=mocker.MagicMock()
     )
-
     mocked_get_listing_by_id = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_listing_by_id",
-        return_value=mocker.MagicMock(),
+        "adobe_vipm.flows.global_customer.get_listing_by_id", return_value=mocker.MagicMock()
     )
     mocked_get_subscription_by_external_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement_subscription_by_external_id",
         return_value=[],
     )
-
     mocked_create_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.global_customer.create_agreement_subscription",
         return_value=mocker.MagicMock(),
     )
-
     mocked_get_sku_price = mocker.patch(
         "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[
             {"65304578CA01A12": 1234.55, "77777777CA01A12": 100},
         ],
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -1202,14 +992,13 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         return_value=product_items,
     )
     adobe_customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = adobe_customer
-    mocked_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
-    mocked_adobe_client.get_subscriptions.return_value = {
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
+    mock_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(deployment_id="deployment_id", autorenewal_enabled=False)
         ]
     }
-
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement",
@@ -1217,12 +1006,12 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     )
 
     check_gc_agreement_deployments()
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
-    mocked_adobe_client.get_customer.assert_called_once()
-    mocked_adobe_client.get_customer_deployments_active_status.assert_called_once()
-    mocked_adobe_client.update_subscription.assert_called_once()
-
+    mock_adobe_client.get_customer.assert_called_once()
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
+    mock_adobe_client.update_subscription.assert_called_once()
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
     mocked_get_listing_by_id.assert_called_once()

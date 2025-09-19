@@ -152,16 +152,18 @@ def test_start_processing_attempt_other_attempts(
 
 
 def test_set_customer_coterm_date_if_null(
-    mocker, mock_mpt_client, order_factory, adobe_customer_factory, fulfillment_parameters_factory
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_customer_factory,
+    fulfillment_parameters_factory,
 ):
-    mocked_adobe_client = mocker.MagicMock()
     customer = adobe_customer_factory()
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
+    mock_adobe_client.get_customer.return_value = customer
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     order = order_factory()
-    order = set_customer_coterm_date_if_null(mock_mpt_client, mocked_adobe_client, order)
+    order = set_customer_coterm_date_if_null(mock_mpt_client, mock_adobe_client, order)
     assert get_coterm_date(order) == customer["cotermDate"]
     mocked_update_order.assert_called_once_with(
         mock_mpt_client,
@@ -176,19 +178,17 @@ def test_set_customer_coterm_date_if_null(
 
 
 def test_set_customer_coterm_date_if_null_already_set(
-    mocker, mock_mpt_client, order_factory, fulfillment_parameters_factory
+    mocker, mock_adobe_client, mock_mpt_client, order_factory, fulfillment_parameters_factory
 ):
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters_factory(coterm_date="whatever")
     )
-    assert set_customer_coterm_date_if_null(mock_mpt_client, mocked_adobe_client, order) == order
+    order_updated = set_customer_coterm_date_if_null(mock_mpt_client, mock_adobe_client, order)
 
+    assert order_updated == order
     mocked_update_order.assert_not_called()
-    mocked_adobe_client.get_customer_assert_not_called()
+    mock_adobe_client.assert_not_called()
 
 
 @freeze_time("2024-01-01")
@@ -596,6 +596,7 @@ def test_set_or_update_coterm_date_step_with_3yc(
 
 def test_submit_return_orders_step(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -619,14 +620,8 @@ def test_submit_return_orders_step(
         adobe_order_1["lineItems"][0]["quantity"],
     )
     sku = adobe_order_1["lineItems"][0]["offerId"][:10]
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
-        order_type="RETURN",
-        status=AdobeStatus.PENDING.value,
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN", status=AdobeStatus.PENDING.value
     )
     order = order_factory()
     context = Context(
@@ -643,7 +638,7 @@ def test_submit_return_orders_step(
     step = SubmitReturnOrders()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_return_order.assert_called_once_with(
+    mock_adobe_client.create_return_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         ret_info_1.order,
@@ -657,6 +652,7 @@ def test_submit_return_orders_step(
 
 def test_submit_return_orders_step_with_deployment_id(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -686,19 +682,9 @@ def test_submit_return_orders_step_with_deployment_id(
         adobe_order_1["lineItems"][0]["quantity"],
     )
     sku = adobe_order_1["lineItems"][0]["offerId"][:10]
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
-        order_type="RETURN",
-        status=AdobeStatus.PENDING.value,
-        deployment_id=deployment_id,
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN", status=AdobeStatus.PENDING.value, deployment_id=deployment_id
     )
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
     order = order_factory(deployment_id=deployment_id)
     context = Context(
         order=order,
@@ -714,7 +700,7 @@ def test_submit_return_orders_step_with_deployment_id(
     step = SubmitReturnOrders()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_return_order.assert_called_once_with(
+    mock_adobe_client.create_return_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         ret_info_1.order,
@@ -722,12 +708,12 @@ def test_submit_return_orders_step_with_deployment_id(
         context.order["id"],
         deployment_id,
     )
-
     mocked_next_step.assert_not_called()
 
 
 def test_submit_return_orders_step_with_only_main_deployment_id(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -753,16 +739,9 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
         adobe_order_1["lineItems"][0]["quantity"],
     )
     sku = adobe_order_1["lineItems"][0]["offerId"][:10]
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_return_order.return_value = adobe_order_factory(
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
         status=AdobeStatus.PENDING.value,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
     )
 
     order = order_factory(deployment_id="deployment-id_return")
@@ -780,11 +759,12 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     step = SubmitReturnOrders()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_return_order.assert_not_called()
+    mock_adobe_client.create_return_order.assert_not_called()
 
 
 def test_submit_return_orders_step_order_processed(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -812,13 +792,6 @@ def test_submit_return_orders_step_order_processed(
         status=AdobeStatus.PROCESSED.value,
         reference_order_id=adobe_order_1["orderId"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     order = order_factory()
     context = Context(
         order=order,
@@ -834,30 +807,19 @@ def test_submit_return_orders_step_order_processed(
     step = SubmitReturnOrders()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_return_order.assert_not_called()
-
+    mock_adobe_client.create_return_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
+def test_submit_new_order_step(
+    mocker, mock_adobe_client, mock_mpt_client, order_factory, adobe_order_factory
+):
     order = order_factory(deployment_id=None)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
     new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.PENDING.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_new_order.return_value = new_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_update = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    mock_adobe_client.create_new_order.return_value = new_order
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -869,29 +831,25 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
     )
 
     step = SubmitNewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_new_order.assert_called_once_with(
+    mock_adobe_client.create_new_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         preview_order,
         deployment_id=None,
     )
-
     mocked_update.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        externalIds=context.order["externalIds"],
+        mock_mpt_client, context.order_id, externalIds=context.order["externalIds"]
     )
     assert get_adobe_order_id(context.order) == new_order["orderId"]
     mocked_next_step.assert_not_called()
 
 
 def test_submit_new_order_step_with_deployment_id(
-    mocker, order_factory, adobe_order_factory, settings
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, settings
 ):
     deployment_id = "deployment-id"
-
     order = order_factory(deployment_id=deployment_id)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
     new_order = adobe_order_factory(
@@ -899,21 +857,10 @@ def test_submit_new_order_step_with_deployment_id(
         status=AdobeStatus.PENDING.value,
         deployment_id=deployment_id,
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_new_order.return_value = new_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_update = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-
+    mock_adobe_client.create_new_order.return_value = new_order
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -927,7 +874,7 @@ def test_submit_new_order_step_with_deployment_id(
     step = SubmitNewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_new_order.assert_called_once_with(
+    mock_adobe_client.create_new_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         preview_order,
@@ -945,6 +892,7 @@ def test_submit_new_order_step_with_deployment_id(
 
 def test_submit_new_order_step_order_created_and_processed(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
 ):
@@ -953,21 +901,10 @@ def test_submit_new_order_step_order_created_and_processed(
         status=AdobeStatus.PROCESSED.value,
     )
     order = order_factory(external_ids={"vendor": new_order["orderId"]})
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_order.return_value = new_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_update = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-
+    mock_adobe_client.get_order.return_value = new_order
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         adobe_new_order_id=new_order["orderId"],
@@ -980,13 +917,13 @@ def test_submit_new_order_step_order_created_and_processed(
     step = SubmitNewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_order.assert_called_once_with(
+    mock_adobe_client.get_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         context.adobe_new_order_id,
     )
-    mocked_adobe_client.create_preview_order.assert_not_called()
-    mocked_adobe_client.create_new_order.assert_not_called()
+    mock_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_new_order.assert_not_called()
     mocked_update.assert_not_called()
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -994,31 +931,20 @@ def test_submit_new_order_step_order_created_and_processed(
 
 def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
 ):
     deployment_id = "deployment-id"
-
     new_order = adobe_order_factory(
         order_type="NEW",
         status=AdobeStatus.PROCESSED.value,
     )
     order = order_factory(external_ids={"vendor": new_order["orderId"]})
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_order.return_value = new_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_update = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
-
+    mock_adobe_client.get_order.return_value = new_order
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         adobe_new_order_id=new_order["orderId"],
@@ -1031,13 +957,13 @@ def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
     step = SubmitNewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_order.assert_called_once_with(
+    mock_adobe_client.get_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         context.adobe_new_order_id,
     )
-    mocked_adobe_client.create_preview_order.assert_not_called()
-    mocked_adobe_client.create_new_order.assert_not_called()
+    mock_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_new_order.assert_not_called()
     mocked_update.assert_not_called()
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -1045,22 +971,13 @@ def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
 
 def test_submit_new_order_step_order_no_upsize_lines(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(quantity=10, old_quantity=12),
-    )
-    mocked_adobe_client = mocker.MagicMock()
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    order = order_factory(lines=lines_factory(quantity=10, old_quantity=12))
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1072,10 +989,9 @@ def test_submit_new_order_step_order_no_upsize_lines(
     step = SubmitNewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_order.assert_not_called()
-    mocked_adobe_client.create_preview_order.assert_not_called()
-    mocked_adobe_client.create_new_order.assert_not_called()
-
+    mock_adobe_client.get_order.assert_not_called()
+    mock_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_new_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -1085,6 +1001,7 @@ def test_submit_new_order_step_order_no_upsize_lines(
 )
 def test_submit_new_order_step_order_created_unrecoverable_status(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
     processing_status,
@@ -1095,24 +1012,13 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
         order_id="adobe-order-id",
     )
     order = order_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_order.return_value = new_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_update = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
+    mock_adobe_client.get_order.return_value = new_order
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1125,7 +1031,7 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
     step = SubmitNewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_order.assert_called_once_with(
+    mock_adobe_client.get_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         context.adobe_new_order_id,
@@ -1137,14 +1043,15 @@ def test_submit_new_order_step_order_created_unrecoverable_status(
             description=ORDER_STATUS_DESCRIPTION[processing_status],
         ),
     )
-    mocked_adobe_client.create_preview_order.assert_not_called()
-    mocked_adobe_client.create_new_order.assert_not_called()
+    mock_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_new_order.assert_not_called()
     mocked_update.assert_not_called()
     mocked_next_step.assert_not_called()
 
 
 def test_submit_new_order_step_order_created_unexpected_status(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_order_factory,
 ):
@@ -1154,24 +1061,13 @@ def test_submit_new_order_step_order_created_unexpected_status(
         status="9999",
     )
     order = order_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_order.return_value = new_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_update = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order",
-    )
+    mock_adobe_client.get_order.return_value = new_order
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1184,7 +1080,7 @@ def test_submit_new_order_step_order_created_unexpected_status(
     step = SubmitNewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_order.assert_called_once_with(
+    mock_adobe_client.get_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         context.adobe_new_order_id,
@@ -1194,29 +1090,21 @@ def test_submit_new_order_step_order_created_unexpected_status(
         context.order,
         ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status="9999"),
     )
-    mocked_adobe_client.create_preview_order.assert_not_called()
-    mocked_adobe_client.create_new_order.assert_not_called()
+    mock_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_new_order.assert_not_called()
     mocked_update.assert_not_called()
     mocked_next_step.assert_not_called()
 
 
-def test_get_return_orders_step(mocker, order_factory, adobe_order_factory):
+def test_get_return_orders_step(mocker, mock_adobe_client, order_factory, adobe_order_factory):
     return_order = adobe_order_factory(
         order_type="RETURN",
         status=AdobeStatus.PROCESSED.value,
         reference_order_id="new-order-id",
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_return_orders_by_external_reference.return_value = {
+    mock_adobe_client.get_return_orders_by_external_reference.return_value = {
         "sku": [return_order],
     }
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
     order = order_factory()
     context = Context(
         order=order,
@@ -1224,7 +1112,6 @@ def test_get_return_orders_step(mocker, order_factory, adobe_order_factory):
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -1232,7 +1119,7 @@ def test_get_return_orders_step(mocker, order_factory, adobe_order_factory):
     step(mocked_client, context, mocked_next_step)
 
     assert context.adobe_return_orders == {"sku": [return_order]}
-    mocked_adobe_client.get_return_orders_by_external_reference.assert_called_once_with(
+    mock_adobe_client.get_return_orders_by_external_reference.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         context.order_id,
@@ -1242,6 +1129,8 @@ def test_get_return_orders_step(mocker, order_factory, adobe_order_factory):
 
 def test_create_or_update_asset_step(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -1253,12 +1142,7 @@ def test_create_or_update_asset_step(
         order_type=ORDER_TYPE_NEW, items=adobe_items_factory(subscription_id="adobe-sub-id")
     )
     adobe_subscription = adobe_subscription_factory()
-    mocked_adobe_client = mocker.MagicMock(
-        get_subscription=mocker.MagicMock(return_value=adobe_subscription)
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[items_factory()[0]["externalIds"]["vendor"]],
@@ -1267,7 +1151,6 @@ def test_create_or_update_asset_step(
         "adobe_vipm.flows.fulfillment.shared.create_asset",
         return_value=subscriptions_factory()[0],
     )
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     order = order_factory()
     context = Context(
@@ -1280,15 +1163,15 @@ def test_create_or_update_asset_step(
     )
     step = CreateOrUpdateAssets()
 
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
     mocked_create_asset.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         {
             "name": f"Asset for {order['lines'][0]['item']['name']}",
@@ -1312,11 +1195,13 @@ def test_create_or_update_asset_step(
             "lines": [{"id": order["lines"][0]["id"]}],
         },
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_or_update_assets_exists(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     adobe_order_factory,
     adobe_items_factory,
@@ -1328,18 +1213,12 @@ def test_create_or_update_assets_exists(
         order_type=ORDER_TYPE_NEW, items=adobe_items_factory(subscription_id="adobe-sub-id")
     )
     adobe_subscription = adobe_subscription_factory()
-    mocked_adobe_client = mocker.MagicMock(
-        get_subscription=mocker.MagicMock(return_value=adobe_subscription)
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[items_factory()[0]["externalIds"]["vendor"]],
     )
     mocked_update_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_asset")
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     assets = assets_factory()
     order = order_factory(assets=assets)
@@ -1353,15 +1232,15 @@ def test_create_or_update_assets_exists(
     )
     step = CreateOrUpdateAssets()
 
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
     mocked_update_asset.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         assets[0]["id"],
         parameters={
@@ -1381,11 +1260,13 @@ def test_create_or_update_assets_exists(
             ]
         },
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_or_update_asset_step_subscription_not_processed(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -1397,18 +1278,12 @@ def test_create_or_update_asset_step_subscription_not_processed(
         order_type=ORDER_TYPE_NEW, items=adobe_items_factory(subscription_id="adobe-sub-id")
     )
     adobe_subscription = adobe_subscription_factory(status=AdobeStatus.PENDING.value)
-    mocked_adobe_client = mocker.MagicMock(
-        get_subscription=mocker.MagicMock(return_value=adobe_subscription)
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client", return_value=mocked_adobe_client
-    )
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[items_factory()[0]["externalIds"]["vendor"]],
     )
     mocked_create_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.create_asset")
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     order = order_factory()
     context = Context(
@@ -1421,29 +1296,30 @@ def test_create_or_update_asset_step_subscription_not_processed(
     )
     step = CreateOrUpdateAssets()
 
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
     mocked_create_asset.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
-def test_create_or_update_asset_step_no_adobe_new_order(mocker, order_factory):
-    mocked_adobe_client = mocker.patch("adobe_vipm.flows.fulfillment.shared.get_adobe_client")
+def test_create_or_update_asset_step_no_adobe_new_order(mocker, mock_adobe_client, order_factory):
     context = Context(adobe_new_order_id=None, order=order_factory())
     step = CreateOrUpdateAssets()
 
     step(mocker.MagicMock(), context, mocker.MagicMock())
 
-    mocked_adobe_client.assert_not_called()
+    mock_adobe_client.assert_not_called()
 
 
 def test_create_or_update_subscriptions_step(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -1455,35 +1331,18 @@ def test_create_or_update_subscriptions_step(
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
     )
     adobe_subscription = adobe_subscription_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
-        return_value=[],
-    )
-
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.get_one_time_skus", return_value=[])
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscriptions_factory()[0],
     )
-
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_template_by_name",
         return_value={"id": "TPL-6095-3767-0032", "name": "Renewing"},
     )
-
     order = order_factory()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1493,16 +1352,16 @@ def test_create_or_update_subscriptions_step(
     )
 
     step = CreateOrUpdateSubscriptions()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
 
     mocked_create_subscription.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         {
             "name": f"Subscription for {order['lines'][0]['item']['name']}",
@@ -1536,11 +1395,13 @@ def test_create_or_update_subscriptions_step(
             "template": {"id": "TPL-6095-3767-0032", "name": "Renewing"},
         },
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_or_update_subscriptions_step_subscription_exists(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -1552,31 +1413,16 @@ def test_create_or_update_subscriptions_step_subscription_exists(
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
     )
     adobe_subscription = adobe_subscription_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[],
     )
-
     mocked_set_sku = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_subscription_actual_sku",
     )
-
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
-    order = order_factory(
-        subscriptions=subscriptions_factory(),
-    )
-
+    order = order_factory(subscriptions=subscriptions_factory())
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1586,45 +1432,27 @@ def test_create_or_update_subscriptions_step_subscription_exists(
     )
 
     step = CreateOrUpdateSubscriptions()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_not_called()
-
+    mock_adobe_client.get_subscription.assert_not_called()
     mocked_set_sku.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order,
         order["subscriptions"][0],
         adobe_order["lineItems"][0]["offerId"],
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_or_update_subscriptions_step_no_adobe_new_order(
-    mocker,
-    order_factory,
-    subscriptions_factory,
+    mocker, mock_adobe_client, mock_mpt_client, order_factory, subscriptions_factory
 ):
-    mocked_adobe_client = mocker.MagicMock()
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_create_sub = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.create_subscription",
-    )
-
+    mocked_create_sub = mocker.patch("adobe_vipm.flows.fulfillment.shared.create_subscription")
     mocked_set_sku = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_subscription_actual_sku",
     )
-
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
-    order = order_factory(
-        subscriptions=subscriptions_factory(),
-    )
-
+    order = order_factory(subscriptions=subscriptions_factory())
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1634,16 +1462,18 @@ def test_create_or_update_subscriptions_step_no_adobe_new_order(
     )
 
     step = CreateOrUpdateSubscriptions()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_not_called()
+    mock_adobe_client.get_subscription.assert_not_called()
     mocked_create_sub.assert_not_called()
     mocked_set_sku.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_or_update_subscriptions_step_sub_expired(
     mocker,
+    mock_adobe_client,
+    mock_mpt_client,
     order_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -1657,29 +1487,13 @@ def test_create_or_update_subscriptions_step_sub_expired(
     adobe_subscription = adobe_subscription_factory(
         status=AdobeStatus.ORDER_CANCELLED.value,
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
-        return_value=[],
-    )
-
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.get_one_time_skus", return_value=[])
     mocked_create_subscription = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.create_subscription",
+        "adobe_vipm.flows.fulfillment.shared.create_subscription"
     )
-
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     order = order_factory()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1689,20 +1503,20 @@ def test_create_or_update_subscriptions_step_sub_expired(
     )
 
     step = CreateOrUpdateSubscriptions()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
-
     mocked_create_subscription.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_or_update_subscriptions_step_update_existing_subscription(
     mocker,
+    mock_mpt_client,
     order_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -1712,28 +1526,19 @@ def test_create_or_update_subscriptions_step_update_existing_subscription(
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
     )
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
         return_value=mocker.MagicMock(),
     )
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[],
     )
-
     mocked_set_sku = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_subscription_actual_sku",
     )
-
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
-    order = order_factory(
-        subscriptions=subscriptions_factory(),
-    )
-
+    order = order_factory(subscriptions=subscriptions_factory())
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1741,16 +1546,17 @@ def test_create_or_update_subscriptions_step_update_existing_subscription(
         adobe_customer_id="adobe-customer-id",
         adobe_new_order=adobe_order,
     )
+
     step = CreateOrUpdateSubscriptions()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     mocked_set_sku.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order,
         order["subscriptions"][0],
         adobe_order["lineItems"][0]["offerId"],
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 @freeze_time("2024-01-01")
@@ -1953,23 +1759,13 @@ def test_validate_duplicate_lines_step_no_duplicates(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
+def test_get_preview_order_step(mocker, mock_adobe_client, order_factory, adobe_order_factory):
     deployment_id = "deployment-id"
-
     order = order_factory(deployment_id=deployment_id)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = preview_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.create_preview_order.return_value = preview_order
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1984,8 +1780,7 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
     step(mocked_client, context, mocked_next_step)
 
     assert context.adobe_preview_order == preview_order
-
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
+    mock_adobe_client.create_preview_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         context.order_id,
@@ -1996,23 +1791,11 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
 
 
 def test_get_preview_order_step_order_no_upsize_lines(
-    mocker,
-    order_factory,
-    lines_factory,
+    mocker, mock_adobe_client, order_factory, lines_factory
 ):
-    order = order_factory(
-        lines=lines_factory(quantity=10, old_quantity=12),
-    )
-    mocked_adobe_client = mocker.MagicMock()
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    order = order_factory(lines=lines_factory(quantity=10, old_quantity=12))
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -2024,29 +1807,19 @@ def test_get_preview_order_step_order_no_upsize_lines(
     step = GetPreviewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_preview_order.assert_not_called()
-
+    mock_adobe_client.create_preview_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_get_preview_order_step_order_new_order_created(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(quantity=12, old_quantity=10),
-    )
-    mocked_adobe_client = mocker.MagicMock()
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    order = order_factory(lines=lines_factory(quantity=12, old_quantity=10))
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -2059,39 +1832,26 @@ def test_get_preview_order_step_order_new_order_created(
     step = GetPreviewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_preview_order.assert_not_called()
-
+    mock_adobe_client.create_preview_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_get_preview_order_step_adobe_error(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     adobe_api_error_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(quantity=12, old_quantity=10),
-    )
-
+    order = order_factory(lines=lines_factory(quantity=12, old_quantity=10))
     error_data = adobe_api_error_factory("1234", "error message")
     error = AdobeAPIError(400, error_data)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.create_preview_order.side_effect = error
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -2215,6 +1975,8 @@ def test_validate_renewal_window_creation_window_non_validation_mode(
 
 def test_create_or_update_subscriptions_step_without_template(
     mocker,
+    mock_mpt_client,
+    mock_adobe_client,
     order_factory,
     subscriptions_factory,
     adobe_order_factory,
@@ -2226,35 +1988,21 @@ def test_create_or_update_subscriptions_step_without_template(
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
     )
     adobe_subscription = adobe_subscription_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_subscription
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[],
     )
-
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription",
         return_value=subscriptions_factory()[0],
     )
-
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_template_by_name",
         return_value=None,
     )
-
     order = order_factory()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -2264,16 +2012,15 @@ def test_create_or_update_subscriptions_step_without_template(
     )
 
     step = CreateOrUpdateSubscriptions()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
-
     mocked_create_subscription.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         {
             "name": f"Subscription for {order['lines'][0]['item']['name']}",
@@ -2307,4 +2054,4 @@ def test_create_or_update_subscriptions_step_without_template(
             "template": None,
         },
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)

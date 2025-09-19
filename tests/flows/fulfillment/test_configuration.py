@@ -11,43 +11,32 @@ from adobe_vipm.flows.pipeline import Step
 
 def test_subscription_update_auto_renewal_step(
     mocker,
+    mock_adobe_client,
     order_factory,
     subscriptions_factory,
     adobe_subscription_factory,
 ):
     subscriptions = subscriptions_factory()
-    order = order_factory(
-        subscriptions=subscriptions,
-    )
-
+    order = order_factory(subscriptions=subscriptions)
     adobe_sub = adobe_subscription_factory(
         subscription_id=subscriptions[0]["externalIds"]["vendor"],
         renewal_quantity=10,
         autorenewal_enabled=False,
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.get_subscription.return_value = adobe_sub
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=order, adobe_customer_id="adobe-customer-id")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
         context.adobe_customer_id,
         subscriptions[0]["externalIds"]["vendor"],
     )
-
-    mocked_adobe_client.update_subscription.assert_called_once_with(
+    mock_adobe_client.update_subscription.assert_called_once_with(
         order["authorization"]["id"],
         context.adobe_customer_id,
         adobe_sub["subscriptionId"],
@@ -59,31 +48,21 @@ def test_subscription_update_auto_renewal_step(
 
 def test_subscription_update_auto_renewal_step_no_matching_subscription(
     mocker,
+    mock_adobe_client,
     order_factory,
     subscriptions_factory,
 ):
     subscriptions = subscriptions_factory()
-    order = order_factory(
-        subscriptions=subscriptions,
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = None
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    order = order_factory(subscriptions=subscriptions)
+    mock_adobe_client.get_subscription.return_value = None
     mocked_notify = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.notify_not_updated_subscriptions"
     )
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.switch_order_to_failed"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
     )
@@ -91,15 +70,13 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
         context.adobe_customer_id,
         subscriptions[0]["externalIds"]["vendor"],
     )
-    mocked_adobe_client.update_subscription.assert_not_called()
-
+    mock_adobe_client.update_subscription.assert_not_called()
     error_message = f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}"
-
     mocked_notify.assert_called_once_with(
         order["id"],
         f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}",
@@ -116,81 +93,60 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
 
 def test_subscription_update_auto_renewal_step_already_updated(
     mocker,
+    mock_adobe_client,
     order_factory,
     subscriptions_factory,
     adobe_subscription_factory,
 ):
     subscriptions = subscriptions_factory()
-    order = order_factory(
-        subscriptions=subscriptions,
-    )
-
+    order = order_factory(subscriptions=subscriptions)
     adobe_sub = adobe_subscription_factory(
         subscription_id=subscriptions[0]["externalIds"]["vendor"],
         renewal_quantity=subscriptions[0]["lines"][0]["quantity"],
         autorenewal_enabled=subscriptions[0]["autoRenew"],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.get_subscription.return_value = adobe_sub
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=order, adobe_customer_id="adobe-customer-id")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
         context.adobe_customer_id,
         subscriptions[0]["externalIds"]["vendor"],
     )
-    mocked_adobe_client.update_subscription.assert_not_called()
+    mock_adobe_client.update_subscription.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_subscription_update_auto_renewal_step_error(
     mocker,
+    mock_adobe_client,
     order_factory,
     subscriptions_factory,
     adobe_subscription_factory,
 ):
     subscriptions = subscriptions_factory()
-    order = order_factory(
-        subscriptions=subscriptions,
-    )
-
+    order = order_factory(subscriptions=subscriptions)
     adobe_sub = adobe_subscription_factory(
         subscription_id=subscriptions[0]["externalIds"]["vendor"],
         renewal_quantity=10,
         autorenewal_enabled=False,
     )
     error = AdobeError("Update error")
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocked_adobe_client.update_subscription.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mock_adobe_client.update_subscription.side_effect = error
     mocked_notify = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.notify_not_updated_subscriptions"
     )
-
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.switch_order_to_failed"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
     )
@@ -198,19 +154,18 @@ def test_subscription_update_auto_renewal_step_error(
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
         context.adobe_customer_id,
         subscriptions[0]["externalIds"]["vendor"],
     )
-    mocked_adobe_client.update_subscription.assert_called_once_with(
+    mock_adobe_client.update_subscription.assert_called_once_with(
         order["authorization"]["id"],
         context.adobe_customer_id,
         adobe_sub["subscriptionId"],
         auto_renewal=subscriptions[0]["autoRenew"],
         quantity=subscriptions[0]["lines"][0]["quantity"],
     )
-
     assert mocked_notify.call_count == 1
     call_args = mocked_notify.call_args[0]
     assert call_args[0] == order["id"]
@@ -226,31 +181,21 @@ def test_subscription_update_auto_renewal_step_error(
 
 def test_subscription_update_auto_renewal_step_all_failed(
     mocker,
+    mock_adobe_client,
     order_factory,
     subscriptions_factory,
 ):
     subscriptions = subscriptions_factory()
-    order = order_factory(
-        subscriptions=subscriptions,
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = None
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    order = order_factory(subscriptions=subscriptions)
+    mock_adobe_client.get_subscription.return_value = None
     mocked_notify = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.notify_not_updated_subscriptions"
     )
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.switch_order_to_failed"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
     )
@@ -258,15 +203,13 @@ def test_subscription_update_auto_renewal_step_all_failed(
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
         context.adobe_customer_id,
         subscriptions[0]["externalIds"]["vendor"],
     )
-    mocked_adobe_client.update_subscription.assert_not_called()
-
+    mock_adobe_client.update_subscription.assert_not_called()
     error_message = f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}"
-
     mocked_notify.assert_called_once_with(
         order["id"],
         f"No Adobe subscription for vendor {subscriptions[0]['externalIds']['vendor']}",
@@ -278,12 +221,12 @@ def test_subscription_update_auto_renewal_step_all_failed(
         order,
         ERR_ADOBE_SUBSCRIPTION_UPDATE_ERROR.to_dict(error=error_message),
     )
-
     mocked_next_step.assert_not_called()
 
 
 def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
     mocker,
+    mock_adobe_client,
     order_factory,
     subscriptions_factory,
     adobe_subscription_factory,
@@ -293,56 +236,34 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
     subscriptions1[0]["externalIds"]["vendor"] = "a-sub-id_1"
     subscriptions2[0]["externalIds"]["vendor"] = "a-sub-id_2"
     subscriptions = [subscriptions1[0], subscriptions2[0]]
-
     order = order_factory(subscriptions=subscriptions)
-
     adobe_sub_1 = adobe_subscription_factory(
-        subscription_id="a-sub-id_1",
-        renewal_quantity=10,
-        autorenewal_enabled=False,
+        subscription_id="a-sub-id_1", renewal_quantity=10, autorenewal_enabled=False
     )
     adobe_sub_2 = adobe_subscription_factory(
-        subscription_id="a-sub-id_2",
-        renewal_quantity=5,
-        autorenewal_enabled=False,
+        subscription_id="a-sub-id_2", renewal_quantity=5, autorenewal_enabled=False
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-
-    mocked_adobe_client.get_subscription.side_effect = [
-        adobe_sub_1,
-        adobe_sub_2,
-    ]
-
-    mocked_adobe_client.update_subscription.side_effect = [
+    mock_adobe_client.get_subscription.side_effect = [adobe_sub_1, adobe_sub_2]
+    mock_adobe_client.update_subscription.side_effect = [
         None,
         AdobeError("Update error on second subscription"),
         None,
     ]
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
     mocked_notify = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.notify_not_updated_subscriptions"
     )
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.switch_order_to_failed"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=order, product_id="PRD-1111-1111")
 
     step = SubscriptionUpdateAutoRenewal()
     step(mocked_client, context, mocked_next_step)
 
-    assert mocked_adobe_client.update_subscription.call_count == 3  # 2 updates + 1 rollback
-
-    first_update_call = mocked_adobe_client.update_subscription.call_args_list[0]
+    assert mock_adobe_client.update_subscription.call_count == 3  # 2 updates + 1 rollback
+    first_update_call = mock_adobe_client.update_subscription.call_args_list[0]
     assert first_update_call == mocker.call(
         order["authorization"]["id"],
         context.adobe_customer_id,
@@ -350,8 +271,7 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
         auto_renewal=subscriptions[0]["autoRenew"],
         quantity=subscriptions[0]["lines"][0]["quantity"],
     )
-
-    second_update_call = mocked_adobe_client.update_subscription.call_args_list[1]
+    second_update_call = mock_adobe_client.update_subscription.call_args_list[1]
     assert second_update_call == mocker.call(
         order["authorization"]["id"],
         context.adobe_customer_id,
@@ -359,8 +279,7 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
         auto_renewal=subscriptions[1]["autoRenew"],
         quantity=subscriptions[1]["lines"][0]["quantity"],
     )
-
-    rollback_call = mocked_adobe_client.update_subscription.call_args_list[2]
+    rollback_call = mock_adobe_client.update_subscription.call_args_list[2]
     assert rollback_call == mocker.call(
         order["authorization"]["id"],
         context.adobe_customer_id,

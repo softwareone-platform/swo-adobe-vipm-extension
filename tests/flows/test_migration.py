@@ -36,41 +36,30 @@ def mock_transfer(mocker):
 
 def test_start_transfers_for_product(
     mocker,
+    mock_adobe_client,
     adobe_preview_transfer_factory,
     adobe_transfer_factory,
     adobe_items_factory,
     mock_transfer,
 ):
     mocked_get_transfer_to_process = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_process",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_process", return_value=[mock_transfer]
     )
-
     mocked_get_offer_ids_by_membership_id = mocker.patch(
-        "adobe_vipm.flows.migration.get_offer_ids_by_membership_id",
-        return_value=[],
+        "adobe_vipm.flows.migration.get_offer_ids_by_membership_id", return_value=[]
     )
-    mocked_create_offers = mocker.patch(
-        "adobe_vipm.flows.migration.create_offers",
-    )
-
+    mocked_create_offers = mocker.patch("adobe_vipm.flows.migration.create_offers")
     adobe_preview_transfer = adobe_preview_transfer_factory(
-        items=adobe_items_factory(renewal_date="2022-10-11"),
+        items=adobe_items_factory(renewal_date="2022-10-11")
     )
     adobe_transfer = adobe_transfer_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
-    mocked_adobe_client.create_transfer.return_value = adobe_transfer
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mock_adobe_client.create_transfer.return_value = adobe_transfer
 
     start_transfers_for_product("product-id")
 
     mocked_get_transfer_to_process.assert_called_once_with("product-id")
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
+    mock_adobe_client.preview_transfer.assert_called_once_with(
         mock_transfer.authorization_uk,
         mock_transfer.membership_id,
     )
@@ -98,39 +87,31 @@ def test_start_transfers_for_product(
 
 def test_start_transfers_for_product_preview_already_transferred(
     mocker,
+    mock_adobe_client,
     adobe_api_error_factory,
     adobe_transfer_factory,
     mock_transfer,
 ):
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_process",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_process", return_value=[mock_transfer]
     )
-
     mocked_populate_offers_for_transfer = mocker.patch(
         "adobe_vipm.flows.migration.populate_offers_for_transfer",
     )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.side_effect = AdobeAPIError(
+    mock_adobe_client.preview_transfer.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
             code=AdobeStatus.TRANSFER_ALREADY_TRANSFERRED.value,
             message="Already transferred",
         ),
     )
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
 
     start_transfers_for_product("product-id")
 
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
+    mock_adobe_client.preview_transfer.assert_called_once_with(
         mock_transfer.authorization_uk,
         mock_transfer.membership_id,
     )
-
     mock_transfer.save.assert_not_called()
     mocked_populate_offers_for_transfer.assert_not_called()
 
@@ -146,6 +127,7 @@ def test_start_transfers_for_product_preview_already_transferred(
 )
 def test_start_transfers_for_product_preview_recoverable_error(
     mocker,
+    mock_adobe_client,
     adobe_api_error_factory,
     reason,
     mock_transfer,
@@ -155,8 +137,6 @@ def test_start_transfers_for_product_preview_recoverable_error(
         "adobe_vipm.flows.migration.get_transfers_to_process",
         return_value=[mock_transfer],
     )
-
-    mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
@@ -165,20 +145,14 @@ def test_start_transfers_for_product_preview_recoverable_error(
             details=[f"Reason: {reason}"],
         ),
     )
-    mocked_adobe_client.preview_transfer.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.preview_transfer.side_effect = error
 
     start_transfers_for_product("product-id")
 
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
+    mock_adobe_client.preview_transfer.assert_called_once_with(
         mock_transfer.authorization_uk,
         mock_transfer.membership_id,
     )
-
     mock_transfer.save.assert_called_once()
     assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
@@ -190,6 +164,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
 
 def test_start_transfers_for_product_preview_unrecoverable_error(
     mocker,
+    mock_adobe_client,
     adobe_api_error_factory,
     mock_transfer,
 ):
@@ -197,16 +172,10 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
         "adobe_vipm.flows.migration.get_transfers_to_process",
         return_value=[mock_transfer],
     )
-
-    mocked_send_exception = mocker.patch(
-        "adobe_vipm.flows.migration.send_exception",
-    )
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.migration.send_exception")
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link",
-        return_value="https://link.to.transfer",
+        "adobe_vipm.flows.migration.get_transfer_link", return_value="https://link.to.transfer"
     )
-
-    mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
@@ -215,20 +184,13 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
             details=["Reason: BAD_MARKET_SEGMENT"],
         ),
     )
-    mocked_adobe_client.preview_transfer.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.preview_transfer.side_effect = error
 
     start_transfers_for_product("product-id")
 
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
-        mock_transfer.authorization_uk,
-        mock_transfer.membership_id,
+    mock_adobe_client.preview_transfer.assert_called_once_with(
+        mock_transfer.authorization_uk, mock_transfer.membership_id
     )
-
     mock_transfer.save.assert_called_once()
     assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
@@ -251,56 +213,34 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
 
 def test_start_transfers_for_product_error(
     mocker,
+    mock_adobe_client,
     adobe_preview_transfer_factory,
     adobe_api_error_factory,
     adobe_items_factory,
     mock_transfer,
 ):
     mocked_get_transfer_to_process = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_process",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_process", return_value=[mock_transfer]
     )
-
-    mocked_send_exception = mocker.patch(
-        "adobe_vipm.flows.migration.send_exception",
-    )
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.migration.send_exception")
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link",
-        return_value="https://link.to.transfer",
+        "adobe_vipm.flows.migration.get_transfer_link", return_value="https://link.to.transfer"
     )
-
     mocked_get_offer_ids_by_membership_id = mocker.patch(
-        "adobe_vipm.flows.migration.get_offer_ids_by_membership_id",
-        return_value=[],
+        "adobe_vipm.flows.migration.get_offer_ids_by_membership_id", return_value=[]
     )
-    mocked_create_offers = mocker.patch(
-        "adobe_vipm.flows.migration.create_offers",
-    )
-
+    mocked_create_offers = mocker.patch("adobe_vipm.flows.migration.create_offers")
     adobe_preview_transfer = adobe_preview_transfer_factory(
-        items=adobe_items_factory(renewal_date="2022-10-11"),
+        items=adobe_items_factory(renewal_date="2022-10-11")
     )
-    error = AdobeAPIError(
-        400,
-        adobe_api_error_factory(
-            code="9999",
-            message="Unexpected error",
-        ),
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
-
-    mocked_adobe_client.create_transfer.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    error = AdobeAPIError(400, adobe_api_error_factory(code="9999", message="Unexpected error"))
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mock_adobe_client.create_transfer.side_effect = error
 
     start_transfers_for_product("product-id")
 
     mocked_get_transfer_to_process.assert_called_once_with("product-id")
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
+    mock_adobe_client.preview_transfer.assert_called_once_with(
         mock_transfer.authorization_uk,
         mock_transfer.membership_id,
     )
@@ -341,39 +281,24 @@ def test_start_transfers_for_product_error(
 
 
 def test_start_transfers_for_product_no_authorization_found_error(
-    mocker,
-    adobe_api_error_factory,
-    mock_transfer,
+    mocker, mock_adobe_client, adobe_api_error_factory, mock_transfer
 ):
     mocked_get_transfer_to_process = mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_process",
         return_value=[mock_transfer],
     )
-
-    mocked_send_exception = mocker.patch(
-        "adobe_vipm.flows.migration.send_exception",
-    )
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.migration.send_exception")
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link",
-        return_value="https://link.to.transfer",
+        "adobe_vipm.flows.migration.get_transfer_link", return_value="https://link.to.transfer"
     )
-
     error = AuthorizationNotFoundError("Authorization is not found")
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.preview_transfer.side_effect = error
 
     start_transfers_for_product("product-id")
 
     mocked_get_transfer_to_process.assert_called_once_with("product-id")
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
-        mock_transfer.authorization_uk,
-        mock_transfer.membership_id,
+    mock_adobe_client.preview_transfer.assert_called_once_with(
+        mock_transfer.authorization_uk, mock_transfer.membership_id
     )
     mock_transfer.save.assert_called_once()
     assert mock_transfer.status == "failed"
@@ -391,56 +316,34 @@ def test_start_transfers_for_product_no_authorization_found_error(
 
 
 def test_start_transfers_for_product_reseller_not_found_error(
-    mocker,
-    adobe_preview_transfer_factory,
-    adobe_items_factory,
-    mock_transfer,
+    mocker, mock_adobe_client, adobe_preview_transfer_factory, adobe_items_factory, mock_transfer
 ):
     mocked_get_transfer_to_process = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_process",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_process", return_value=[mock_transfer]
     )
-
-    mocked_send_exception = mocker.patch(
-        "adobe_vipm.flows.migration.send_exception",
-    )
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.migration.send_exception")
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link",
-        return_value="https://link.to.transfer",
+        "adobe_vipm.flows.migration.get_transfer_link", return_value="https://link.to.transfer"
     )
-
     mocked_get_offer_ids_by_membership_id = mocker.patch(
-        "adobe_vipm.flows.migration.get_offer_ids_by_membership_id",
-        return_value=[],
+        "adobe_vipm.flows.migration.get_offer_ids_by_membership_id", return_value=[]
     )
-    mocked_create_offers = mocker.patch(
-        "adobe_vipm.flows.migration.create_offers",
-    )
-
+    mocked_create_offers = mocker.patch("adobe_vipm.flows.migration.create_offers")
     adobe_preview_transfer = adobe_preview_transfer_factory(
-        items=adobe_items_factory(renewal_date="2022-10-11"),
+        items=adobe_items_factory(renewal_date="2022-10-11")
     )
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
     error = ResellerNotFoundError("Reseller is not found")
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.preview_transfer.return_value = adobe_preview_transfer
-
-    mocked_adobe_client.create_transfer.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.create_transfer.side_effect = error
 
     start_transfers_for_product("product-id")
 
     mocked_get_transfer_to_process.assert_called_once_with("product-id")
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
-        mock_transfer.authorization_uk,
-        mock_transfer.membership_id,
+    mock_adobe_client.preview_transfer.assert_called_once_with(
+        mock_transfer.authorization_uk, mock_transfer.membership_id
     )
     mocked_get_offer_ids_by_membership_id.assert_called_once_with(
-        "product-id",
-        mock_transfer.membership_id,
+        "product-id", mock_transfer.membership_id
     )
     mocked_create_offers.assert_called_once_with(
         "product-id",
@@ -458,7 +361,6 @@ def test_start_transfers_for_product_reseller_not_found_error(
     mock_transfer.save.assert_called_once()
     assert mock_transfer.status == "failed"
     assert mock_transfer.migration_error_description == str(error)
-
     mocked_send_exception.assert_called_once_with(
         "Marketplace Platform configuration error during transfer.",
         "Reseller is not found",
@@ -472,6 +374,7 @@ def test_start_transfers_for_product_reseller_not_found_error(
 
 def test_checking_running_transfers_for_product(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     mock_transfer,
@@ -481,21 +384,16 @@ def test_checking_running_transfers_for_product(
     mock_transfer.status = "running"
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -519,24 +417,17 @@ def test_checking_running_transfers_for_product(
             ],
         }
     }
-
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
 
     with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
-        mocked_adobe_client.get_transfer.assert_called_once_with(
+        mock_adobe_client.get_transfer.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.membership_id,
             mock_transfer.transfer_id,
@@ -548,7 +439,6 @@ def test_checking_running_transfers_for_product(
             mock_transfer.customer_preferred_language
             == customer["companyProfile"]["preferredLanguage"]
         )
-
         address = customer["companyProfile"]["address"]
         assert mock_transfer.customer_address_address_line_1 == address["addressLine1"]
         assert mock_transfer.customer_address_address_line_2 == address["addressLine2"]
@@ -571,7 +461,7 @@ def test_checking_running_transfers_for_product(
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -581,6 +471,7 @@ def test_checking_running_transfers_for_product(
 
 def test_checking_running_transfers_for_product_with_no_profile_address(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     mock_transfer,
@@ -590,21 +481,16 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
     mock_transfer.status = "running"
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -619,27 +505,18 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
             ],
         }
     }
-
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
 
     with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
-        mocked_adobe_client.get_transfer.assert_called_once_with(
-            mock_transfer.authorization_uk,
-            mock_transfer.membership_id,
-            mock_transfer.transfer_id,
+        mock_adobe_client.get_transfer.assert_called_once_with(
+            mock_transfer.authorization_uk, mock_transfer.membership_id, mock_transfer.transfer_id
         )
         mock_transfer.save.assert_called_once()
 
@@ -670,7 +547,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -680,6 +557,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
 
 def test_checking_running_transfers_for_product_3yc(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
@@ -687,30 +565,15 @@ def test_checking_running_transfers_for_product_3yc(
 ):
     mock_transfer.transfer_id = "transfer-id"
     mock_transfer.status = "running"
-    mocker.patch(
-        "adobe_vipm.flows.migration.terminate_contract",
-        return_value=(True, ""),
-    )
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
-    )
-
+    mocker.patch("adobe_vipm.flows.migration.terminate_contract", return_value=(True, ""))
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     commitment = adobe_commitment_factory(licenses=10, consumables=30)
     customer = adobe_customer_factory(commitment=commitment)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
 
     check_running_transfers_for_product("product-id")
 
@@ -723,12 +586,12 @@ def test_checking_running_transfers_for_product_3yc(
     assert mock_transfer.customer_benefits_3yc_status == commitment["status"]
     assert mock_transfer.customer_benefits_3yc_minimum_quantity_license == 10
     assert mock_transfer.customer_benefits_3yc_minimum_quantity_consumables == 30
-
-    mocked_adobe_client.update_subscription.assert_not_called()
+    mock_adobe_client.update_subscription.assert_not_called()
 
 
 def test_checking_running_transfers_for_product_error_retry(
     mocker,
+    mock_adobe_client,
     adobe_api_error_factory,
     mock_transfer,
 ):
@@ -736,27 +599,9 @@ def test_checking_running_transfers_for_product_error_retry(
     mock_transfer.status = "running"
     mock_transfer.retry_count = 0
     mock_transfer.reschedule_count = 0
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
-    )
-
-    error = AdobeAPIError(
-        400,
-        adobe_api_error_factory(
-            code="9999",
-            message="Unexpected error",
-        ),
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
+    error = AdobeAPIError(400, adobe_api_error_factory(code="9999", message="Unexpected error"))
+    mock_adobe_client.get_transfer.side_effect = error
 
     check_running_transfers_for_product("product-id")
 
@@ -769,6 +614,7 @@ def test_checking_running_transfers_for_product_error_retry(
 
 def test_checking_running_transfers_for_product_get_customer_error_retry(
     mocker,
+    mock_adobe_client,
     adobe_api_error_factory,
     adobe_transfer_factory,
     mock_transfer,
@@ -777,33 +623,13 @@ def test_checking_running_transfers_for_product_get_customer_error_retry(
     mock_transfer.status = "running"
     mock_transfer.retry_count = 0
     mock_transfer.reschedule_count = 0
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
-    )
-
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
-    error = AdobeAPIError(
-        400,
-        adobe_api_error_factory(
-            code="9999",
-            message="Unexpected error",
-        ),
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    error = AdobeAPIError(400, adobe_api_error_factory(code="9999", message="Unexpected error"))
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.side_effect = error
 
     check_running_transfers_for_product("product-id")
 
@@ -816,6 +642,7 @@ def test_checking_running_transfers_for_product_get_customer_error_retry(
 
 def test_checking_running_transfers_for_product_update_subs_error_retry(
     mocker,
+    mock_adobe_client,
     adobe_api_error_factory,
     adobe_transfer_factory,
     adobe_subscription_factory,
@@ -826,25 +653,11 @@ def test_checking_running_transfers_for_product_update_subs_error_retry(
     mock_transfer.retry_count = 0
     mock_transfer.reschedule_count = 0
     mock_transfer.customer_benefits_3yc_status = None
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
-    )
-
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
-    error = AdobeAPIError(
-        400,
-        adobe_api_error_factory(
-            code="9999",
-            message="Unexpected error",
-        ),
-    )
-
+    error = AdobeAPIError(400, adobe_api_error_factory(code="9999", message="Unexpected error"))
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -868,16 +681,10 @@ def test_checking_running_transfers_for_product_update_subs_error_retry(
             ],
         }
     }
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
-    mocked_adobe_client.update_subscription.side_effect = error
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
+    mock_adobe_client.update_subscription.side_effect = error
 
     check_running_transfers_for_product("product-id")
 
@@ -890,6 +697,7 @@ def test_checking_running_transfers_for_product_update_subs_error_retry(
 
 def test_checking_running_transfers_for_product_error_max_retries_exceeded(
     mocker,
+    mock_adobe_client,
     settings,
     adobe_api_error_factory,
     mock_transfer,
@@ -899,34 +707,13 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
     mock_transfer.status = "running"
     mock_transfer.retry_count = 14
     mock_transfer.reschedule_count = 0
-
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
+    mocked_send_error = mocker.patch("adobe_vipm.flows.migration.send_error")
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfer_link", return_value="https://link.to.transfer"
     )
-    mocked_send_error = mocker.patch(
-        "adobe_vipm.flows.migration.send_error",
-    )
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link",
-        return_value="https://link.to.transfer",
-    )
-
-    error = AdobeAPIError(
-        400,
-        adobe_api_error_factory(
-            code="9999",
-            message="Unexpected error",
-        ),
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    error = AdobeAPIError(400, adobe_api_error_factory(code="9999", message="Unexpected error"))
+    mock_adobe_client.get_transfer.side_effect = error
 
     check_running_transfers_for_product("product-id")
 
@@ -935,7 +722,6 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
     assert mock_transfer.adobe_error_code == error.code
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.retry_count == 15
-
     mocked_send_error.assert_called_once_with(
         "Migration max retries exceeded.",
         "The maximum amount of retries (15) has been exceeded for "
@@ -947,6 +733,7 @@ def test_checking_running_transfers_for_product_error_max_retries_exceeded(
 
 def test_checking_running_transfers_for_product_pending_retry(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     mock_transfer,
 ):
@@ -954,20 +741,9 @@ def test_checking_running_transfers_for_product_pending_retry(
     mock_transfer.status = "running"
     mock_transfer.retry_count = 0
     mock_transfer.reschedule_count = 0
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer_factory(
-        status=AdobeStatus.PENDING.value,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
+    mock_adobe_client.get_transfer.return_value = adobe_transfer_factory(
+        status=AdobeStatus.PENDING.value
     )
 
     check_running_transfers_for_product("product-id")
@@ -978,9 +754,7 @@ def test_checking_running_transfers_for_product_pending_retry(
 
 
 def test_checking_running_transfers_for_product_unexpected_status(
-    mocker,
-    adobe_transfer_factory,
-    mock_transfer,
+    mocker, mock_adobe_client, adobe_transfer_factory, mock_transfer
 ):
     mock_transfer.transfer_id = "transfer-id"
     mock_transfer.status = "running"
@@ -988,30 +762,13 @@ def test_checking_running_transfers_for_product_unexpected_status(
     mock_transfer.reschedule_count = 0
     mock_transfer.adobe_error_code = "code"
     mock_transfer.adobe_error_description = "message"
-
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.migration.send_exception")
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfer_link", return_value="https://link.to.transfer"
     )
-    mocked_send_exception = mocker.patch(
-        "adobe_vipm.flows.migration.send_exception",
-    )
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link",
-        return_value="https://link.to.transfer",
-    )
-
-    adobe_transfer = adobe_transfer_factory(
-        status="9999",
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    adobe_transfer = adobe_transfer_factory(status="9999")
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
 
     check_running_transfers_for_product("product-id")
 
@@ -1031,22 +788,15 @@ def test_checking_running_transfers_for_product_unexpected_status(
 
 
 @freeze_time("2025-04-06 12:30:00")
-def test_checking_running_transfers_for_product_authorization_not_found(mocker, mock_transfer):
+def test_checking_running_transfers_for_product_authorization_not_found(
+    mocker, mock_adobe_client, mock_transfer
+):
     mock_transfer.status = (STATUS_RUNNING,)
     mock_transfer.updated_at = (None,)
     mock_transfer.migration_error_description = (None,)
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
-    )
-    mocked_adobe_client = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     message_error = f"Authorization with uk/id {mock_transfer.authorization_uk} not found."
-    mocked_adobe_client.get_transfer.side_effect = [AuthorizationNotFoundError(message_error)]
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_transfer.side_effect = [AuthorizationNotFoundError(message_error)]
 
     check_running_transfers_for_product("product-id")
 
@@ -1058,6 +808,7 @@ def test_checking_running_transfers_for_product_authorization_not_found(mocker, 
 
 def test_checking_running_transfers_with_gc_exists_for_product(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     mock_transfer,
@@ -1067,21 +818,16 @@ def test_checking_running_transfers_with_gc_exists_for_product(
     mock_transfer.status = "running"
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -1106,7 +852,6 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         },
         "globalSalesEnabled": True,
     }
-
     mocked_gc_main_agreement = {
         "membership_id": "membership-id",
         "main_agreement_id": "main-agreement-id",
@@ -1117,21 +862,12 @@ def test_checking_running_transfers_with_gc_exists_for_product(
 
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
+        "adobe_vipm.flows.migration.get_gc_main_agreement", return_value=mocked_gc_main_agreement
     )
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_gc_main_agreement",
-        return_value=mocked_gc_main_agreement,
-    )
-
     mocked_create_gc_main_agreement = mocker.patch(
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
@@ -1140,7 +876,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
-        mocked_adobe_client.get_transfer.assert_called_once_with(
+        mock_adobe_client.get_transfer.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.membership_id,
             mock_transfer.transfer_id,
@@ -1175,7 +911,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -1187,6 +923,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
 
 def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_address(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     mock_transfer,
@@ -1196,21 +933,16 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
     mock_transfer.status = "running"
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -1226,7 +958,6 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         },
         "globalSalesEnabled": True,
     }
-
     mocked_gc_main_agreement = {
         "membership_id": "membership-id",
         "main_agreement_id": "main-agreement-id",
@@ -1234,22 +965,13 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         "status": STATUS_GC_PENDING,
         "error_description": "",
     }
-
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
     mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_gc_main_agreement",
-        return_value=mocked_gc_main_agreement,
+        "adobe_vipm.flows.migration.get_gc_main_agreement", return_value=mocked_gc_main_agreement
     )
 
     mocked_create_gc_main_agreement = mocker.patch(
@@ -1260,7 +982,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         check_running_transfers_for_product("product-id")
 
         mocked_get_transfer_to_check.assert_called_once_with("product-id")
-        mocked_adobe_client.get_transfer.assert_called_once_with(
+        mock_adobe_client.get_transfer.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.membership_id,
             mock_transfer.transfer_id,
@@ -1294,7 +1016,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -1306,6 +1028,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
 
 def test_checking_running_transfers_with_gc_not_exists_for_product(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     mock_transfer,
@@ -1317,21 +1040,16 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
     mock_transfer.customer_id = ""
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -1356,7 +1074,6 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         },
         "globalSalesEnabled": True,
     }
-
     mocked_gc_main_agreement_data = {
         "authorization_uk": mock_transfer.authorization_uk,
         "membership_id": mock_transfer.membership_id,
@@ -1364,24 +1081,12 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         "customer_id": "customer-id",
         "status": STATUS_GC_PENDING,
     }
-
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_gc_main_agreement",
-        return_value=None,
-    )
-
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
+    mocker.patch("adobe_vipm.flows.migration.get_gc_main_agreement", return_value=None)
     mocked_create_gc_main_agreement = mocker.patch(
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
@@ -1390,7 +1095,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
-        mocked_adobe_client.get_transfer.assert_called_once_with(
+        mock_adobe_client.get_transfer.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.membership_id,
             mock_transfer.transfer_id,
@@ -1425,7 +1130,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -1440,6 +1145,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
 
 def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profile_address(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     mock_transfer,
@@ -1451,21 +1157,16 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
     mock_transfer.customer_id = ""
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -1481,7 +1182,6 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         },
         "globalSalesEnabled": True,
     }
-
     mocked_gc_main_agreement_data = {
         "authorization_uk": mock_transfer.authorization_uk,
         "membership_id": mock_transfer.membership_id,
@@ -1489,24 +1189,12 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         "customer_id": "customer-id",
         "status": STATUS_GC_PENDING,
     }
-
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_gc_main_agreement",
-        return_value=None,
-    )
-
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
+    mocker.patch("adobe_vipm.flows.migration.get_gc_main_agreement", return_value=None)
     mocked_create_gc_main_agreement = mocker.patch(
         "adobe_vipm.flows.migration.create_gc_main_agreement"
     )
@@ -1515,7 +1203,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
-        mocked_adobe_client.get_transfer.assert_called_once_with(
+        mock_adobe_client.get_transfer.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.membership_id,
             mock_transfer.transfer_id,
@@ -1549,7 +1237,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -1564,6 +1252,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
 
 def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_product(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     airtable_error_factory,
@@ -1576,31 +1265,19 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
     mock_transfer.customer_id = ""
-
-    error = AirTableAPIError(
-        400,
-        airtable_error_factory(
-            "Bad Request",
-            "BAD_REQUEST",
-        ),
-    )
+    error = AirTableAPIError(400, airtable_error_factory("Bad Request", "BAD_REQUEST"))
 
     mocked_send_error = mocker.patch("adobe_vipm.flows.migration.send_error")
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -1625,7 +1302,6 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         },
         "globalSalesEnabled": True,
     }
-
     mocked_gc_main_agreement_data = {
         "authorization_uk": mock_transfer.authorization_uk,
         "membership_id": mock_transfer.membership_id,
@@ -1636,31 +1312,20 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
 
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_gc_main_agreement",
-        return_value=None,
-    )
-
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
+    mocker.patch("adobe_vipm.flows.migration.get_adobe_client", return_value=mock_adobe_client)
+    mocker.patch("adobe_vipm.flows.migration.get_gc_main_agreement", return_value=None)
     mocked_create_gc_main_agreement = mocker.patch(
-        "adobe_vipm.flows.migration.create_gc_main_agreement",
-        side_effect=error,
+        "adobe_vipm.flows.migration.create_gc_main_agreement", side_effect=error
     )
 
     with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
-        mocked_adobe_client.get_transfer.assert_called_once_with(
+        mock_adobe_client.get_transfer.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.membership_id,
             mock_transfer.transfer_id,
@@ -1695,7 +1360,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -1720,6 +1385,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
 
 def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_error_for_product(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_subscription_factory,
     airtable_error_factory,
@@ -1732,31 +1398,18 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
     mock_transfer.nav_error = None
     mock_transfer.customer_benefits_3yc_status = None
     mock_transfer.customer_id = ""
-
-    error = AirTableAPIError(
-        400,
-        airtable_error_factory(
-            "Bad Request",
-            "BAD_REQUEST",
-        ),
-    )
-
+    error = AirTableAPIError(400, airtable_error_factory("Bad Request", "BAD_REQUEST"))
     mocked_send_error = mocker.patch("adobe_vipm.flows.migration.send_error")
-
     mocked_get_transfer_to_check = mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_check",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer]
     )
     mocked_terminate_contract = mocker.patch(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(True, '200 - {"id": "whatever"}'),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = {
         "companyProfile": {
             "companyName": "Migrated Company",
@@ -1772,7 +1425,6 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         },
         "globalSalesEnabled": True,
     }
-
     mocked_gc_main_agreement_data = {
         "authorization_uk": mock_transfer.authorization_uk,
         "membership_id": mock_transfer.membership_id,
@@ -1780,34 +1432,21 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         "customer_id": "customer-id",
         "status": STATUS_GC_PENDING,
     }
-
     sub_active = adobe_subscription_factory()
     sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocked_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_gc_main_agreement",
-        return_value=None,
-    )
-
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
+    mocker.patch("adobe_vipm.flows.migration.get_gc_main_agreement", return_value=None)
     mocked_create_gc_main_agreement = mocker.patch(
-        "adobe_vipm.flows.migration.create_gc_main_agreement",
-        side_effect=error,
+        "adobe_vipm.flows.migration.create_gc_main_agreement", side_effect=error
     )
 
     with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product(mocked_product_id)
 
         mocked_get_transfer_to_check.assert_called_once_with(mocked_product_id)
-        mocked_adobe_client.get_transfer.assert_called_once_with(
+        mock_adobe_client.get_transfer.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.membership_id,
             mock_transfer.transfer_id,
@@ -1841,7 +1480,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         assert mock_transfer.status == "completed"
         assert mock_transfer.completed_at == dt.datetime.now(tz=dt.UTC)
 
-        mocked_adobe_client.update_subscription.assert_called_once_with(
+        mock_adobe_client.update_subscription.assert_called_once_with(
             mock_transfer.authorization_uk,
             mock_transfer.customer_id,
             sub_active["subscriptionId"],
@@ -1867,8 +1506,9 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
 def test_process_transfers(mocker, settings):
     settings.MPT_PRODUCTS_IDS = ["PRD-1111", "PRD-2222"]
     mocked_start_transfers_for_product = mocker.patch(
-        "adobe_vipm.flows.migration.start_transfers_for_product",
+        "adobe_vipm.flows.migration.start_transfers_for_product"
     )
+
     process_transfers()
 
     assert mocked_start_transfers_for_product.mock_calls[0].args == ("PRD-1111",)
@@ -1880,6 +1520,7 @@ def test_check_running_transfers(mocker, settings):
     mocked_check_running_transfers_for_product = mocker.patch(
         "adobe_vipm.flows.migration.check_running_transfers_for_product",
     )
+
     check_running_transfers()
 
     assert mocked_check_running_transfers_for_product.mock_calls[0].args == ("PRD-1111",)
@@ -1888,27 +1529,20 @@ def test_check_running_transfers(mocker, settings):
 
 def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_exceeded(
     mocker,
+    mock_adobe_client,
     settings,
     adobe_api_error_factory,
     mock_transfer,
 ):
     settings.EXTENSION_CONFIG = {"MIGRATION_RESCHEDULE_MAX_RETRIES": 15}
     mock_transfer.reschedule_count = 14
-
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfers_to_process",
-        return_value=[mock_transfer],
+        "adobe_vipm.flows.migration.get_transfers_to_process", return_value=[mock_transfer]
     )
-
-    mocked_send_warning = mocker.patch(
-        "adobe_vipm.flows.migration.send_warning",
-    )
+    mocked_send_warning = mocker.patch("adobe_vipm.flows.migration.send_warning")
     mocker.patch(
-        "adobe_vipm.flows.migration.get_transfer_link",
-        return_value="https://link.to.transfer",
+        "adobe_vipm.flows.migration.get_transfer_link", return_value="https://link.to.transfer"
     )
-
-    mocked_adobe_client = mocker.MagicMock()
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
@@ -1917,20 +1551,13 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
             details=["Reason: RETURNABLE_PURCHASE"],
         ),
     )
-    mocked_adobe_client.preview_transfer.side_effect = error
-
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.preview_transfer.side_effect = error
 
     start_transfers_for_product("product-id")
 
-    mocked_adobe_client.preview_transfer.assert_called_once_with(
-        mock_transfer.authorization_uk,
-        mock_transfer.membership_id,
+    mock_adobe_client.preview_transfer.assert_called_once_with(
+        mock_transfer.authorization_uk, mock_transfer.membership_id
     )
-
     mock_transfer.save.assert_called_once()
     assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
     assert mock_transfer.adobe_error_description == str(error)
@@ -1951,6 +1578,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
 
 def test_checking_running_transfers_for_product_terminate_contract_error(
     mocker,
+    mock_adobe_client,
     adobe_transfer_factory,
     adobe_customer_factory,
     mock_transfer,
@@ -1959,7 +1587,6 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
     mock_transfer.transfer_id = "transfer-id"
     mock_transfer.status = "running"
     mock_transfer.nav_error = None
-
     mocker.patch(
         "adobe_vipm.flows.migration.get_transfers_to_check",
         return_value=[mock_transfer],
@@ -1968,21 +1595,12 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
         "adobe_vipm.flows.migration.terminate_contract",
         return_value=(False, "internal server error"),
     )
-
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value,
-        customer_id="customer-id",
+        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
     )
-
     customer = adobe_customer_factory()
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_transfer.return_value = adobe_transfer
-    mocked_adobe_client.get_customer.return_value = customer
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = customer
 
     with freeze_time("2024-01-01 12:00:00", tz_offset=0):
         check_running_transfers_for_product("product-id")

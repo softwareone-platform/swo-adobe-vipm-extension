@@ -50,6 +50,7 @@ from adobe_vipm.flows.helpers import (
 @freeze_time("2024-11-09 12:30:00")
 def test_get_returnable_orders_step(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     adobe_customer_factory,
@@ -57,12 +58,7 @@ def test_get_returnable_orders_step(
     adobe_items_factory,
     return_orders,
 ):
-    order = order_factory(
-        lines=lines_factory(
-            quantity=3,
-            old_quantity=7,
-        )
-    )
+    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
@@ -87,37 +83,22 @@ def test_get_returnable_orders_step(
     )
 
     ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1,
-        adobe_order_1["lineItems"][0],
-        adobe_order_1["lineItems"][0]["quantity"],
+        adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
     )
     ret_info_2 = ReturnableOrderInfo(
-        adobe_order_2,
-        adobe_order_2["lineItems"][0],
-        adobe_order_2["lineItems"][0]["quantity"],
+        adobe_order_2, adobe_order_2["lineItems"][0], adobe_order_2["lineItems"][0]["quantity"]
     )
     ret_info_3 = ReturnableOrderInfo(
-        adobe_order_3,
-        adobe_order_3["lineItems"][0],
-        adobe_order_3["lineItems"][0]["quantity"],
+        adobe_order_3, adobe_order_3["lineItems"][0], adobe_order_3["lineItems"][0]["quantity"]
     )
-
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
+    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
         ret_info_3,
     ]
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         authorization_id=order["authorization"]["id"],
@@ -131,7 +112,7 @@ def test_get_returnable_orders_step(
     step(mocked_client, context, mocked_next_step)
 
     assert context.adobe_returnable_orders[sku] == (ret_info_3,)
-    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
+    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         "6158e1cf0e4414a9b3a06d123969fdNA",
@@ -144,29 +125,17 @@ def test_get_returnable_orders_step(
 @freeze_time("2024-11-09 12:30:00")
 def test_get_returnable_orders_step_no_returnable_order(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     adobe_customer_factory,
     adobe_order_factory,
     adobe_items_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(
-            quantity=3,
-            old_quantity=7,
-        )
-    )
+    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
-
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
+    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -183,7 +152,7 @@ def test_get_returnable_orders_step_no_returnable_order(
     step(mocked_client, context, mocked_next_step)
 
     assert sku not in context.adobe_returnable_orders
-    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
+    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         "6158e1cf0e4414a9b3a06d123969fdNA",
@@ -196,18 +165,14 @@ def test_get_returnable_orders_step_no_returnable_order(
 @freeze_time("2024-11-09 12:30:00")
 def test_get_returnable_orders_step_quantity_mismatch(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     adobe_customer_factory,
     adobe_order_factory,
     adobe_items_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(
-            quantity=7,
-            old_quantity=16,
-        )
-    )
+    order = order_factory(lines=lines_factory(quantity=7, old_quantity=16))
     adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
@@ -230,39 +195,23 @@ def test_get_returnable_orders_step_quantity_mismatch(
             subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
         ),
     )
-
     ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1,
-        adobe_order_1["lineItems"][0],
-        adobe_order_1["lineItems"][0]["quantity"],
+        adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
     )
     ret_info_2 = ReturnableOrderInfo(
-        adobe_order_2,
-        adobe_order_2["lineItems"][0],
-        adobe_order_2["lineItems"][0]["quantity"],
+        adobe_order_2, adobe_order_2["lineItems"][0], adobe_order_2["lineItems"][0]["quantity"]
     )
     ret_info_3 = ReturnableOrderInfo(
-        adobe_order_3,
-        adobe_order_3["lineItems"][0],
-        adobe_order_3["lineItems"][0]["quantity"],
+        adobe_order_3, adobe_order_3["lineItems"][0], adobe_order_3["lineItems"][0]["quantity"]
     )
-
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
+    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
         ret_info_2,
         ret_info_3,
     ]
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         authorization_id=order["authorization"]["id"],
@@ -276,7 +225,7 @@ def test_get_returnable_orders_step_quantity_mismatch(
     step(mocked_client, context, mocked_next_step)
 
     assert context.adobe_returnable_orders[sku] is None
-    mocked_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
+    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         "6158e1cf0e4414a9b3a06d123969fdNA",
@@ -289,30 +238,17 @@ def test_get_returnable_orders_step_quantity_mismatch(
 @freeze_time("2025-02-14 12:30:00")
 def test_get_returnable_orders_step_last_two_weeks(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     adobe_customer_factory,
     adobe_order_factory,
     adobe_items_factory,
 ):
-    order = order_factory(
-        lines=lines_factory(
-            quantity=3,
-            old_quantity=7,
-        )
-    )
+    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
     adobe_customer = adobe_customer_factory(coterm_date="2025-02-20")
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_returnable_orders_by_sku.return_value = []
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         authorization_id=order["authorization"]["id"],
@@ -326,7 +262,7 @@ def test_get_returnable_orders_step_last_two_weeks(
     step(mocked_client, context, mocked_next_step)
 
     assert context.adobe_returnable_orders == {}
-    mocked_adobe_client.get_returnable_orders_by_sku.assert_not_called()
+    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -334,7 +270,6 @@ def test_validate_returnable_orders_step(mocker, order_factory):
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
     )
-
     context = Context(
         order=order_factory(),
         adobe_returnable_orders={
@@ -356,7 +291,6 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
     )
-
     context = Context(
         order=order_factory(),
         adobe_returnable_orders={
@@ -382,6 +316,7 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
 
 def test_update_renewal_quantities_step(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     subscriptions_factory,
@@ -393,18 +328,8 @@ def test_update_renewal_quantities_step(
         + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
         subscriptions=subscriptions,
     )
-
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
+    mock_adobe_client.get_subscription.return_value = adobe_sub
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -420,28 +345,23 @@ def test_update_renewal_quantities_step(
     step = UpdateRenewalQuantities()
     step(mocked_client, context, mocked_next_step)
 
-    assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-        )
-    ])
-    assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-            quantity=5,
-        )
-    ])
+    mock_adobe_client.get_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_sub["subscriptionId"],
+    )
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_sub["subscriptionId"],
+        quantity=5,
+    )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_update_renewal_quantities_downsize_step(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     subscriptions_factory,
@@ -453,18 +373,8 @@ def test_update_renewal_quantities_downsize_step(
         + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
         subscriptions=subscriptions,
     )
-
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
+    mock_adobe_client.get_subscription.return_value = adobe_sub
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -480,53 +390,31 @@ def test_update_renewal_quantities_downsize_step(
     step = UpdateRenewalQuantitiesDownsizes()
     step(mocked_client, context, mocked_next_step)
 
-    assert mocked_adobe_client.get_subscription.call_count == 1
-    mocked_adobe_client.get_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-        )
-    ])
-    assert mocked_adobe_client.update_subscription.call_count == 1
-    mocked_adobe_client.update_subscription.assert_has_calls([
-        mocker.call(
-            context.authorization_id,
-            context.adobe_customer_id,
-            adobe_sub["subscriptionId"],
-            quantity=5,
-        )
-    ])
+    mock_adobe_client.get_subscription.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        adobe_sub["subscriptionId"],
+    )
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        context.authorization_id, context.adobe_customer_id, adobe_sub["subscriptionId"], quantity=5
+    )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_update_renewal_quantities_step_quantity_match(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     subscriptions_factory,
     adobe_subscription_factory,
 ):
     subscriptions = subscriptions_factory()
-    order = order_factory(
-        lines=lines_factory(quantity=10),
-        subscriptions=subscriptions,
-    )
-
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
+    order = order_factory(lines=lines_factory(quantity=10), subscriptions=subscriptions)
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
+    mock_adobe_client.get_subscription.return_value = adobe_sub
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -538,18 +426,17 @@ def test_update_renewal_quantities_step_quantity_match(
     step = UpdateRenewalQuantities()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_adobe_client.get_subscription.assert_called_once_with(
+    mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_sub["subscriptionId"],
     )
-    mocked_adobe_client.update_subscription.assert_not_called()
+    mock_adobe_client.update_subscription.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_fulfill_change_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
-
     mocked_pipeline_ctor = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.Pipeline",
         return_value=mocked_pipeline_instance,
@@ -808,6 +695,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_failed(
 
 def test_validate_update_renewal_quantity_error(
     mocker,
+    mock_adobe_client,
     order_factory,
     adobe_subscription_factory,
     adobe_api_error_factory,
@@ -835,22 +723,10 @@ def test_validate_update_renewal_quantity_error(
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-    mocked_adobe_client.get_subscription.return_value = adobe_sub
-    mocked_adobe_client.update_subscription.side_effect = AdobeAPIError(
-        400,
-        adobe_api_error_factory(
-            "1000",
-            "Error updating autorenewal quantity",
-        ),
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("1000", "Error updating autorenewal quantity")
     )
 
     step = UpdateRenewalQuantities()
@@ -863,6 +739,7 @@ def test_validate_update_renewal_quantity_error(
 
 def test_rollback_updated_subscriptions_error(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     subscriptions_factory,
@@ -875,47 +752,25 @@ def test_rollback_updated_subscriptions_error(
     subscriptions2[0]["externalIds"]["vendor"] = "sub-2-id"
     subscriptions2[0]["lines"][0]["item"]["id"] = "ITM-1234-1234-1234-0002"
     subscriptions2[0]["lines"][0]["id"] = "ALI-2119-4550-8674-5962-0002"
-
     order = order_factory(
         lines=lines_factory(quantity=5)
         + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
         subscriptions=subscriptions + subscriptions2,
     )
-
-    adobe_sub = adobe_subscription_factory(
-        subscription_id="sub-1-id",
-        renewal_quantity=10,
-    )
-    adobe_sub2 = adobe_subscription_factory(
-        subscription_id="sub-2-id",
-        renewal_quantity=15,
-    )
-
-    adobe_order = adobe_order_factory(
-        order_type="NEW",
-        status="PROCESSED",
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.side_effect = [adobe_sub, adobe_sub2]
-
-    mocked_adobe_client.update_subscription.side_effect = [
+    adobe_sub = adobe_subscription_factory(subscription_id="sub-1-id", renewal_quantity=10)
+    adobe_sub2 = adobe_subscription_factory(subscription_id="sub-2-id", renewal_quantity=15)
+    adobe_order = adobe_order_factory(order_type="NEW", status="PROCESSED")
+    mock_adobe_client.get_subscription.side_effect = [adobe_sub, adobe_sub2]
+    mock_adobe_client.update_subscription.side_effect = [
         None,
         AdobeAPIError(400, {"code": "1000", "message": "Error during rollback"}),
         None,
     ]
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
     mocked_notify = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -932,47 +787,42 @@ def test_rollback_updated_subscriptions_error(
     step = UpdateRenewalQuantities()
     step(mocked_client, context, mocked_next_step)
 
-    assert mocked_adobe_client.update_subscription.call_count == 3
-
-    mocked_adobe_client.update_subscription.assert_any_call(
+    assert mock_adobe_client.update_subscription.call_count == 3
+    mock_adobe_client.update_subscription.assert_any_call(
         context.authorization_id,
         context.adobe_customer_id,
         "a-sub-id",
         quantity=5,
     )
-
-    mocked_adobe_client.update_subscription.assert_any_call(
+    mock_adobe_client.update_subscription.assert_any_call(
         context.authorization_id,
         context.adobe_customer_id,
         "a-sub-id",
         quantity=5,
     )
-
-    mocked_adobe_client.update_subscription.assert_any_call(
+    mock_adobe_client.update_subscription.assert_any_call(
         context.authorization_id,
         context.adobe_customer_id,
         "a-sub-id",
         quantity=10,
     )
-
-    mocked_adobe_client.create_return_order_by_adobe_order.assert_called_once_with(
+    mock_adobe_client.create_return_order_by_adobe_order.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order,
     )
-
     mocked_notify.assert_called_with(
         context.order["id"],
         "Error updating subscription sub-2, 1000 - Error during rollback",
         [],
         context.product_id,
     )
-
     mocked_next_step.assert_not_called()
 
 
 def test_rollback_updated_subscriptions_error_during_rollback(
     mocker,
+    mock_adobe_client,
     order_factory,
     lines_factory,
     subscriptions_factory,
@@ -985,46 +835,25 @@ def test_rollback_updated_subscriptions_error_during_rollback(
     subscriptions2[0]["externalIds"]["vendor"] = "sub-2-id"
     subscriptions2[0]["lines"][0]["item"]["id"] = "ITM-1234-1234-1234-0002"
     subscriptions2[0]["lines"][0]["id"] = "ALI-2119-4550-8674-5962-0002"
-
     order = order_factory(
         lines=lines_factory(quantity=5)
         + lines_factory(line_id=2, item_id=2, external_vendor_id="99999999CA"),
         subscriptions=subscriptions + subscriptions2,
     )
-
-    adobe_sub = adobe_subscription_factory(
-        subscription_id="sub-1-id",
-        renewal_quantity=10,
-    )
-    adobe_sub2 = adobe_subscription_factory(
-        subscription_id="sub-2-id",
-        renewal_quantity=15,
-    )
-
-    adobe_order = adobe_order_factory(
-        order_type="NEW",
-        status="PROCESSED",
-    )
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.get_subscription.side_effect = [adobe_sub, adobe_sub2]
-    mocked_adobe_client.update_subscription.side_effect = [
+    adobe_sub = adobe_subscription_factory(subscription_id="sub-1-id", renewal_quantity=10)
+    adobe_sub2 = adobe_subscription_factory(subscription_id="sub-2-id", renewal_quantity=15)
+    adobe_order = adobe_order_factory(order_type="NEW", status="PROCESSED")
+    mock_adobe_client.get_subscription.side_effect = [adobe_sub, adobe_sub2]
+    mock_adobe_client.update_subscription.side_effect = [
         None,
         AdobeAPIError(400, {"code": "1000", "message": "Error during rollback"}),
         AdobeAPIError(400, {"code": "1000", "message": "Error during rollback"}),
     ]
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
     mocked_notify = mocker.patch(
         "adobe_vipm.flows.fulfillment.change.notify_not_updated_subscriptions"
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -1042,21 +871,20 @@ def test_rollback_updated_subscriptions_error_during_rollback(
     step = UpdateRenewalQuantities()
     step(mocked_client, context, mocked_next_step)
 
-    assert mocked_adobe_client.update_subscription.call_count == 3
-
-    mocked_adobe_client.update_subscription.assert_any_call(
+    assert mock_adobe_client.update_subscription.call_count == 3
+    mock_adobe_client.update_subscription.assert_any_call(
         context.authorization_id,
         context.adobe_customer_id,
         "a-sub-id",
         quantity=5,
     )
-    mocked_adobe_client.update_subscription.assert_any_call(
+    mock_adobe_client.update_subscription.assert_any_call(
         context.authorization_id,
         context.adobe_customer_id,
         "a-sub-id",
         quantity=5,
     )
-    mocked_adobe_client.update_subscription.assert_any_call(
+    mock_adobe_client.update_subscription.assert_any_call(
         context.authorization_id,
         context.adobe_customer_id,
         "a-sub-id",
