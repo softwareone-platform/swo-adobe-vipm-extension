@@ -11,6 +11,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     create_asset,
     create_subscription,
     fail_order,
+    get_order_asset_by_external_id,
     get_order_subscription_by_external_id,
     get_product_template_or_default,
     get_rendered_template,
@@ -318,9 +319,82 @@ def switch_order_to_completed(client, order, template_name):
     logger.info("Order %s has been completed successfully", order["id"])
 
 
+def add_asset(client, adobe_subscription, order, line):
+    """
+    Adds an asset to the corresponding MPT order based on the provided parameters.
+
+    Args:
+        client (MPTClient): An instance of the Marketplace platform client.
+        adobe_subscription (dict): A subscription object retrieved from the Adobe API.
+        order (dict): The MPT order to which the subscription will be added.
+        line (dict): The order line.
+
+    """
+    asset = get_order_asset_by_external_id(client, order["id"], line["subscriptionId"])
+    if asset:
+        logger.info(
+            "Asset with external id %s already exists (%s)",
+            adobe_subscription["subscriptionId"],
+            asset["id"],
+        )
+        return asset
+
+    order_line = get_order_line_by_sku(order, line["offerId"])
+    asset = create_asset(
+        client, order["id"], create_asset_payload(adobe_subscription, order_line, line)
+    )
+    logger.info(
+        "Asset %s (%s) created for order %s",
+        line["subscriptionId"],
+        asset["id"],
+        order["id"],
+    )
+    return asset
+
+
+def create_asset_payload(adobe_subscription, order_line, item):
+    """Create an asset payload.
+
+    Args:
+        adobe_subscription (dict): the adobe subscription
+        order_line (dict): the order line.
+        item (dict) : the item.
+
+    Returns: A dict with the asset payload
+
+    """
+    return {
+        "name": f"Asset for {order_line['item']['name']}",
+        "parameters": {
+            "fulfillment": [
+                {
+                    "externalId": Param.ADOBE_SKU.value,
+                    "value": item["offerId"],
+                },
+                {
+                    "externalId": Param.CURRENT_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY]),
+                },
+                {
+                    "externalId": Param.USED_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                },
+            ]
+        },
+        "externalIds": {
+            "vendor": item["subscriptionId"],
+        },
+        "lines": [
+            {
+                "id": order_line["id"],
+            },
+        ],
+    }
+
+
 def add_subscription(client, adobe_subscription, order, line):
     """
-    Adds a subscription to the correspoding MPT order based on the provided parameters.
+    Adds a subscription to the corresponding MPT order based on the provided parameters.
 
     Args:
         client (MPTClient): An instance of the Marketplace platform client.
@@ -383,14 +457,9 @@ def add_subscription(client, adobe_subscription, order, line):
     return subscription
 
 
-def set_subscription_actual_sku(
-    client,
-    order,
-    subscription,
-    sku,
-):
+def set_subscription_actual_sku(client, order, subscription, sku):
     """
-    Set the subscription fullfilment parameter to store the actual SKU.
+    Set the subscription fulfillment parameter to store the actual SKU.
 
     Adobe SKU with discount level.
 
@@ -953,7 +1022,7 @@ class CreateOrUpdateAssets(Step):
                 continue
 
             asset = order_line.get("asset")
-            asset_data = self._create_asset_data(adobe_subscription, order_line, line)
+            asset_data = create_asset_payload(adobe_subscription, order_line, line)
             if asset:
                 update_asset(
                     client, context.order_id, asset["id"], parameters=asset_data["parameters"]
@@ -968,35 +1037,6 @@ class CreateOrUpdateAssets(Step):
                 )
 
         next_step(client, context)
-
-    def _create_asset_data(self, adobe_subscription, order_line, line):
-        return {
-            "name": f"Asset for {order_line['item']['name']}",
-            "parameters": {
-                "fulfillment": [
-                    {
-                        "externalId": Param.ADOBE_SKU.value,
-                        "value": line["offerId"],
-                    },
-                    {
-                        "externalId": Param.CURRENT_QUANTITY.value,
-                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY]),
-                    },
-                    {
-                        "externalId": Param.USED_QUANTITY.value,
-                        "value": str(adobe_subscription[Param.USED_QUANTITY]),
-                    },
-                ]
-            },
-            "externalIds": {
-                "vendor": line["subscriptionId"],
-            },
-            "lines": [
-                {
-                    "id": order_line["id"],
-                },
-            ],
-        }
 
 
 class CreateOrUpdateSubscriptions(Step):

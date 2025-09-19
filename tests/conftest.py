@@ -771,6 +771,7 @@ def items_factory():
         name="Awesome product",
         external_vendor_id="65304578CA",
         term_period="1y",
+        term_model="quantity",
     ):
         return [
             {
@@ -779,7 +780,7 @@ def items_factory():
                 "externalIds": {
                     "vendor": external_vendor_id,
                 },
-                "terms": {"period": term_period},
+                "terms": {"period": term_period, "model": term_model},
             },
         ]
 
