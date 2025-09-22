@@ -16,6 +16,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
+    ERR_CUSTOMER_LOST_EXCEPTION,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -26,6 +27,7 @@ from adobe_vipm.flows.helpers import (
     UpdatePrices,
     Validate3YCCommitment,
     ValidateResellerChange,
+    ValidateSkuAvailability,
 )
 from adobe_vipm.flows.utils import get_customer_data
 
@@ -283,6 +285,87 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     mocked_get_licensee.assert_called_once_with(
         mocked_client,
         order["agreement"]["licensee"]["id"],
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
+    mocker,
+    requests_mocker,
+    settings,
+    agreement,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_api_error_factory,
+    adobe_authorizations_file,
+    adobe_client_factory,
+):
+    customer_id = "adobe-customer-id"
+    adobe_client, _, _ = adobe_client_factory()
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    adobe_api_error = adobe_api_error_factory(
+        code=AdobeStatus.INVALID_CUSTOMER.value,
+        message="Invalid Customer",
+    )
+
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}",
+        ),
+        status=400,
+        json=adobe_api_error,
+    )
+
+    with pytest.raises(AdobeError):
+        adobe_client.get_customer(authorization_uk, customer_id)
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=adobe_client,
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"])
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_failed",
+    )
+    mocked_send_notification = mocker.patch(
+        "adobe_vipm.flows.helpers.send_notification",
+    )
+
+    mocker.patch(
+        "adobe_vipm.flows.helpers.sync_agreements_by_agreement_ids",
+    )
+
+    fulfillment_parameters = fulfillment_parameters_factory(
+        customer_id=customer_id,
+    )
+
+    external_ids = {"vendor": customer_id}
+
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters,
+        external_ids=external_ids,
+    )
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order)
+
+    step = SetupContext()
+    step(mocked_client, context, mocked_next_step)
+
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mocked_client,
+        context.order,
+        ERR_CUSTOMER_LOST_EXCEPTION.to_dict(
+            error=f"Received Adobe error {adobe_api_error['code']} - {adobe_api_error['message']}"
+        ),
+    )
+    mocked_send_notification.assert_called_once_with(
+        "Lost customer adobe-customer-id.",
+        f"Received Adobe error {adobe_api_error['code']} - {adobe_api_error['message']}",
+        "FFA500",
     )
     mocked_next_step.assert_not_called()
 
@@ -2187,3 +2270,330 @@ def test_validate_reseller_change_expired_code_fulfillment_mode(
     error_data = call_args[0][2]  # Third argument is error_data
     assert error_data["id"] == ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.id
     assert "Reseller change code has expired" in error_data["message"]
+
+
+@freeze_time("2024-01-01")
+def test_validate_sku_availability_with_valid_3yc_commitment_skips_validation(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    lines_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    """Test that validation is skipped when 3YC commitment is valid for more than 365 days."""
+    # Mock 3YC commitment that expires in more than 365 days
+    commitment = {
+        "endDate": "2026-01-01",  # More than 365 days from 2024-01-01
+    }
+
+    mocked_get_3yc_commitment = mocker.patch(
+        "adobe_vipm.flows.helpers.get_3yc_commitment", return_value=commitment
+    )
+
+    # Create order with lines
+    lines = lines_factory(
+        line_id=1,
+        item_id=1,
+        external_vendor_id="65304578CA",
+        quantity=10,
+    )
+
+    order = order_factory(lines=lines)
+    adobe_customer = adobe_customer_factory()
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        new_lines=lines,
+        upsize_lines=[],
+        downsize_lines=[],
+        product_id="PRD-123",
+        currency="USD",
+    )
+
+    step = ValidateSkuAvailability(is_validation=True)
+    step(mock_mpt_client, context, mock_next_step)
+
+    # Should call next_step without doing SKU validation
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+    mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
+
+
+@freeze_time("2024-01-01")
+def test_validate_sku_availability_with_expired_3yc_commitment_continues_validation(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    lines_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    """Test that validation continues when 3YC commitment expires within 365 days."""
+    # Mock 3YC commitment that expires in less than 365 days
+    commitment = {
+        "endDate": "2024-06-01",  # Less than 365 days from 2024-01-01
+    }
+
+    mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=commitment)
+
+    mocked_get_adobe_product = mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        return_value=mocker.MagicMock(sku="65304578CA01A12"),
+    )
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={"65304578CA01A12": 637.32},
+    )
+
+    lines = lines_factory(
+        line_id=1,
+        item_id=1,
+        external_vendor_id="65304578CA",
+        quantity=10,
+    )
+
+    order = order_factory(lines=lines)
+    adobe_customer = adobe_customer_factory()
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        new_lines=lines,
+        upsize_lines=[],
+        downsize_lines=[],
+        product_id="PRD-123",
+        currency="USD",
+    )
+
+    step = ValidateSkuAvailability(is_validation=True)
+    step(mock_mpt_client, context, mock_next_step)
+
+    # Should continue with SKU validation
+    mocked_get_adobe_product.assert_called_once_with("65304578CA")
+    mocked_get_prices.assert_called_once_with("PRD-123", "USD", ["65304578CA01A12"])
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_validate_sku_availability_success_all_skus_available(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    lines_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    """Test successful validation when all SKUs are available."""
+    mocked_get_3yc_commitment = mocker.patch(
+        "adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None
+    )
+
+    mocked_get_adobe_product = mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=[
+            mocker.MagicMock(sku="65304578CA01A12"),
+            mocker.MagicMock(sku="77777777CA01A12"),
+            mocker.MagicMock(sku="88888888CA01A12"),
+        ],
+    )
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={
+            "65304578CA01A12": 637.32,
+            "77777777CA01A12": 637.32,
+            "88888888CA01A12": 637.32,
+        },
+    )
+
+    # Create order with mixed line types
+    new_lines = lines_factory(
+        line_id=1,
+        item_id=1,
+        external_vendor_id="65304578CA",
+        quantity=10,
+    )
+    upsize_lines = lines_factory(
+        line_id=2,
+        item_id=2,
+        external_vendor_id="77777777CA",
+        quantity=5,
+    )
+    downsize_lines = lines_factory(
+        line_id=3,
+        item_id=3,
+        external_vendor_id="88888888CA",
+        quantity=3,
+    )
+
+    order = order_factory(lines=new_lines + upsize_lines + downsize_lines)
+    adobe_customer = adobe_customer_factory()
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        new_lines=new_lines,
+        upsize_lines=upsize_lines,
+        downsize_lines=downsize_lines,
+        product_id="PRD-123",
+        currency="USD",
+    )
+
+    step = ValidateSkuAvailability(is_validation=True)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
+    assert mocked_get_adobe_product.call_count == 3
+
+    mocked_get_prices.assert_called_once_with(
+        "PRD-123", "USD", ["65304578CA01A12", "77777777CA01A12", "88888888CA01A12"]
+    )
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+    assert context.validation_succeeded is True
+
+
+def test_validate_sku_availability_missing_skus_validation_mode(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    lines_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    """Test validation mode when some SKUs are missing."""
+    mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None)
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=[
+            mocker.MagicMock(sku="65304578CA01A12"),
+            mocker.MagicMock(sku="77777777CA01A12"),
+        ],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={"65304578CA01A12": 637.32},
+    )
+    mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
+    new_lines = lines_factory(
+        line_id=1,
+        item_id=1,
+        external_vendor_id="65304578CA",
+        quantity=10,
+    )
+    upsize_lines = lines_factory(
+        line_id=2,
+        item_id=2,
+        external_vendor_id="77777777CA",
+        quantity=5,
+    )
+
+    order = order_factory(lines=new_lines + upsize_lines)
+    adobe_customer = adobe_customer_factory()
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        new_lines=new_lines,
+        upsize_lines=upsize_lines,
+        downsize_lines=[],
+        product_id="PRD-123",
+        currency="USD",
+    )
+
+    step = ValidateSkuAvailability(is_validation=True)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_next_step.assert_not_called()
+    assert context.validation_succeeded is False
+    mocked_set_order_error.assert_called_once()
+
+
+def test_validate_sku_availability_missing_skus_validation_mode_false(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    lines_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    """Test validation mode when some SKUs are missing."""
+    mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None)
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=[
+            mocker.MagicMock(sku="65304578CA01A12"),
+            mocker.MagicMock(sku="77777777CA01A12"),
+        ],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus",
+        return_value={"65304578CA01A12": 637.32},
+    )
+    mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
+    new_lines = lines_factory(
+        line_id=1,
+        item_id=1,
+        external_vendor_id="65304578CA",
+        quantity=10,
+    )
+    upsize_lines = lines_factory(
+        line_id=2,
+        item_id=2,
+        external_vendor_id="77777777CA",
+        quantity=5,
+    )
+
+    order = order_factory(lines=new_lines + upsize_lines)
+    adobe_customer = adobe_customer_factory()
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        new_lines=new_lines,
+        upsize_lines=upsize_lines,
+        downsize_lines=[],
+        product_id="PRD-123",
+        currency="USD",
+    )
+
+    step = ValidateSkuAvailability(is_validation=False)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_next_step.assert_not_called()
+    assert context.validation_succeeded is False
+    mocked_set_order_error.assert_called_once()
+
+
+def test_validate_sku_availability_empty_sku_lists(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    """Test validation with empty SKU lists."""
+    mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None)
+
+    mocked_get_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_prices_for_skus", return_value={}
+    )
+
+    order = order_factory(lines=[])
+    adobe_customer = adobe_customer_factory()
+
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        new_lines=[],
+        upsize_lines=[],
+        downsize_lines=[],
+        product_id="PRD-123",
+        currency="USD",
+    )
+
+    step = ValidateSkuAvailability(is_validation=True)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+    mocked_get_prices.assert_called_once_with("PRD-123", "USD", [])

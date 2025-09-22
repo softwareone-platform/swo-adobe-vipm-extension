@@ -259,6 +259,14 @@ def _fulfill_transfer_migrated(  # noqa: C901
         switch_order_to_failed(mpt_client, order, ERR_UPDATING_TRANSFER_ITEMS.to_dict())
         return
 
+    customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
+    order = save_adobe_order_id_and_customer_data(
+        mpt_client,
+        order,
+        transfer.transfer_id,
+        customer,
+    )
+
     commitment_date = None
     if not adobe_items:
         error = "No subscriptions found without deployment ID to be added to the main agreement"
@@ -300,15 +308,6 @@ def _fulfill_transfer_migrated(  # noqa: C901
 
     if commitment_date:  # pragma: no branch
         order = save_coterm_dates(mpt_client, order, commitment_date)
-
-    # Fulfills order with active items
-    customer = adobe_client.get_customer(authorization_id, transfer.customer_id)
-    order = save_adobe_order_id_and_customer_data(
-        mpt_client,
-        order,
-        transfer.transfer_id,
-        customer,
-    )
 
     switch_order_to_completed(mpt_client, order, TEMPLATE_NAME_BULK_MIGRATE)
     transfer.status = "synchronized"
@@ -1165,6 +1164,14 @@ class GetAdobeCustomer(Step):
         context.adobe_customer = adobe_client.get_customer(
             context.authorization_id, context.customer_id
         )
+
+        context.order = save_adobe_order_id_and_customer_data(
+            client,
+            context.order,
+            context.adobe_order_id,
+            context.adobe_customer,
+        )
+
         next_step(client, context)
 
 

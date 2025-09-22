@@ -513,7 +513,7 @@ def test_sync_agreements_by_3yc_enroll_status_status(
 ):
     agreement = agreement_factory()
     mock_get_agreements_by_query = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_commitment_request_invitation",
         return_value=[agreement],
         autospec=True,
     )
@@ -555,8 +555,8 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     status,
 ):
     agreement = agreement_factory()
-    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+    mock_get_agreements_by_3yc_commitment_request_invitation = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_commitment_request_invitation",
         return_value=[agreement],
         autospec=True,
     )
@@ -568,7 +568,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
 
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
-    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+    mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
@@ -590,7 +590,7 @@ def test_sync_agreements_by_3yc_enroll_status_status_error(
     caplog,
 ):
     mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_commitment_request_invitation",
         side_effect=MPTAPIError(400, {"rql_validation": ["Value has to be a non empty array."]}),
         autospec=True,
     )
@@ -618,8 +618,8 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     caplog,
 ):
     agreement = agreement_factory()
-    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+    mock_get_agreements_by_3yc_commitment_request_invitation = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_commitment_request_invitation",
         return_value=[agreement],
         autospec=True,
     )
@@ -635,7 +635,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
 
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
-    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+    mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
@@ -658,8 +658,8 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     caplog,
 ):
     agreement = agreement_factory()
-    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+    mock_get_agreements_by_3yc_commitment_request_invitation = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_commitment_request_invitation",
         return_value=[agreement, agreement],
         autospec=True,
     )
@@ -675,7 +675,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
 
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
-    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+    mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
@@ -703,8 +703,8 @@ def test_sync_agreements_by_3yc_enroll_status_no_cust(
     mock_get_customer_or_process_lost_customer,
 ):
     agreement = agreement_factory()
-    mock_get_agreements_by_3yc_enroll_status = mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_3yc_enroll_status",
+    mock_get_agreements_by_3yc_commitment_request_invitation = mocker.patch(
+        "adobe_vipm.flows.sync.get_agreements_by_3yc_commitment_request_invitation",
         return_value=[agreement],
         autospec=True,
     )
@@ -718,7 +718,7 @@ def test_sync_agreements_by_3yc_enroll_status_no_cust(
 
     sync_agreements_by_3yc_enroll_status(mock_mpt_client, dry_run=False)
 
-    mock_get_agreements_by_3yc_enroll_status.assert_called_once_with(
+    mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_get_customer_or_process_lost_customer.assert_called_once_with(
