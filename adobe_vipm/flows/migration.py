@@ -169,7 +169,7 @@ def handle_preview_error(transfer, api_err):
     transfer.adobe_error_code = api_err.code
     transfer.adobe_error_description = str(api_err)
 
-    if any(x in str(api_err) for x in RECOVERABLE_TRANSFER_ERRORS):
+    if any(error in str(api_err) for error in RECOVERABLE_TRANSFER_ERRORS):
         transfer.status = "rescheduled"
         transfer.migration_error_description = (
             "Adobe transient error received during transfer preview."
@@ -208,20 +208,20 @@ def handle_transfer_error(transfer, title, description, facts, adobe_api_error=N
     )
 
 
-def handle_preview_authorization_error(transfer, e):
+def handle_preview_authorization_error(transfer, error):
     """Handle authorization errors during transfer preview."""
     handle_transfer_error(
         transfer=transfer,
         title="Marketplace Platform configuration error during transfer.",
-        description=str(e),
+        description=str(error),
         facts=FactsSection(
             "Transfer error",
-            {"AuthorizationNotFoundError": str(e)},
+            {"AuthorizationNotFoundError": str(error)},
         ),
     )
 
 
-def handle_transfer_creation_error(transfer, e):
+def handle_transfer_creation_error(transfer, error):
     """Handle Adobe API errors during transfer creation."""
     handle_transfer_error(
         transfer=transfer,
@@ -230,21 +230,21 @@ def handle_transfer_creation_error(transfer, e):
         f"transfer for Membership **{transfer.membership_id}**.",
         facts=FactsSection(
             "Last error from Adobe",
-            {e.code: str(e)},
+            {error.code: str(error)},
         ),
-        adobe_api_error=e,
+        adobe_api_error=error,
     )
 
 
-def handle_transfer_reseller_error(transfer, e):
+def handle_transfer_reseller_error(transfer, error):
     """Handle reseller errors during transfer creation."""
     handle_transfer_error(
         transfer=transfer,
         title="Marketplace Platform configuration error during transfer.",
-        description=str(e),
+        description=str(error),
         facts=FactsSection(
             "Transfer error",
-            {"ResellerNotFoundError": str(e)},
+            {"ResellerNotFoundError": str(error)},
         ),
     )
 
@@ -259,8 +259,8 @@ def process_transfer_preview(client, transfer):
     except AdobeAPIError as api_err:
         handle_preview_error(transfer, api_err)
         return None
-    except AuthorizationNotFoundError as e:
-        handle_preview_authorization_error(transfer, e)
+    except AuthorizationNotFoundError as error:
+        handle_preview_authorization_error(transfer, error)
         return None
 
 
@@ -276,8 +276,8 @@ def process_transfer_creation(client, transfer):
     except AdobeAPIError as api_err:
         handle_transfer_creation_error(transfer, api_err)
         return None
-    except ResellerNotFoundError as e:
-        handle_transfer_reseller_error(transfer, e)
+    except ResellerNotFoundError as error:
+        handle_transfer_reseller_error(transfer, error)
         return None
 
 
@@ -383,14 +383,14 @@ def check_running_transfers_for_product(product_id):  # noqa: C901
                 }
                 try:
                     create_gc_main_agreement(product_id, gc_main_agreement_data)
-                except AirTableHttpError as e:
+                except AirTableHttpError as error:
                     send_error(
                         "Error saving Global Customer Main Agreement",
                         "An error occurred while saving the Global Customer Main Agreement.",
                         button=get_transfer_link_button(filled_tranfer),
                         facts=FactsSection(
                             "Error from checking running transfers",
-                            str(e),
+                            str(error),
                         ),
                     )
         if filled_tranfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:

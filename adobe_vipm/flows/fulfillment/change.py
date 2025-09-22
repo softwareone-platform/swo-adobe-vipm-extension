@@ -98,8 +98,8 @@ class GetReturnableOrders(Step):
                 continue
             returnable_orders_count += len(returnable_orders)
             returnable_by_quantity = {}
-            for r in range(len(returnable_orders), 0, -1):
-                for sub in itertools.combinations(returnable_orders, r):
+            for order in range(len(returnable_orders), 0, -1):
+                for sub in itertools.combinations(returnable_orders, order):
                     returnable_by_quantity[sum(line_item.quantity for line_item in sub)] = sub
 
             delta = line["oldQuantity"] - line["quantity"]
@@ -133,7 +133,9 @@ class ValidateReturnableOrders(Step):
             and not context.adobe_return_orders
         ):
             non_returnable_skus = [
-                k for k, v in context.adobe_returnable_orders.items() if v is None
+                key
+                for key, ord_value in context.adobe_returnable_orders.items()
+                if ord_value is None
             ]
             error = ERR_NO_RETURABLE_ERRORS_FOUND.to_dict(
                 non_returnable_skus=", ".join(non_returnable_skus),
@@ -272,16 +274,16 @@ class UpdateRenewalQuantities(Step):
                 "new_quantity": qty,
             })
 
-    def _handle_subscription_update_error(self, adobe_client, client, context, e):
+    def _handle_subscription_update_error(self, adobe_client, client, context, error):
         self._rollback_updated_subscriptions(adobe_client, context)
-        if e.code in {
+        if error.code in {
             AdobeStatus.INVALID_RENEWAL_STATE,
             AdobeStatus.SUBSCRIPTION_INACTIVE,
         }:
             switch_order_to_failed(
                 client,
                 context.order,
-                ERR_INVALID_RENEWAL_STATE.to_dict(error=e.message),
+                ERR_INVALID_RENEWAL_STATE.to_dict(error=error.message),
             )
 
     def _rollback_updated_subscriptions(self, adobe_client, context):
@@ -299,10 +301,10 @@ class UpdateRenewalQuantities(Step):
                     context.adobe_customer_id,
                     context.adobe_new_order,
                 )
-        except Exception as e:
+        except Exception as error:
             notify_not_updated_subscriptions(
                 context.order["id"],
-                f"Error rolling back updated subscriptions: {e}",
+                f"Error rolling back updated subscriptions: {error}",
                 context.updated,
                 context.product_id,
             )

@@ -215,7 +215,7 @@ class CreateCustomer(Step):
                 )
             if list(
                 filter(
-                    lambda x: x.startswith("companyProfile.contacts[0]"),
+                    lambda err_detail: err_detail.startswith("companyProfile.contacts[0]"),
                     error.details,
                 )
             ):
@@ -262,9 +262,9 @@ class CreateCustomer(Step):
                 context,
             )
             next_step(client, context)
-        except AdobeError as e:
+        except AdobeError as error:
             logger.exception("Create Customer failed")
-            self.handle_error(client, context, e)
+            self.handle_error(client, context, error)
 
 
 def fulfill_purchase_order(client, order):

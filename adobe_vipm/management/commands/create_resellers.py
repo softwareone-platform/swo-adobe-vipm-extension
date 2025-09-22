@@ -226,13 +226,13 @@ class Command(AdobeBaseCommand):
                     seller_uk,
                     reseller_data,
                 )
-            except AdobeAPIError as e:
+            except AdobeAPIError as error:
                 sheet[f"O{idx}"].value = "KO"
-                sheet[f"P{idx}"].value = str(e)
+                sheet[f"P{idx}"].value = str(error)
                 workbook.save(excel_file)
                 self.error(
                     f"Error creating {row_data['seller_uk']} - "
-                    f"{row_data['company_name']} ({row_data['authorization_uk']}): {e}.",
+                    f"{row_data['company_name']} ({row_data['authorization_uk']}): {error}.",
                 )
                 continue
 

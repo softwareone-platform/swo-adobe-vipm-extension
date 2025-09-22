@@ -26,7 +26,7 @@ def get_parameter(parameter_phase: str, source: str, param_external_id: str) -> 
         The parameter object or an empty dictionary if not found.
     """
     return find_first(
-        lambda x: x["externalId"] == param_external_id,
+        lambda phase: phase["externalId"] == param_external_id,
         source["parameters"][parameter_phase],
         default={},
     )
@@ -308,7 +308,7 @@ def get_retry_count(order: dict) -> str | None:
         Retry count. None if parameter doesn't exist
     """
     param = find_first(
-        lambda x: x["externalId"] == Param.RETRY_COUNT.value,
+        lambda fulfillment: fulfillment["externalId"] == Param.RETRY_COUNT.value,
         order["parameters"]["fulfillment"],
     )
 

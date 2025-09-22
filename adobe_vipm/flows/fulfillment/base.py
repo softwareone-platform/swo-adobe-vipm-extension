@@ -7,13 +7,8 @@ from adobe_vipm.flows.fulfillment.configuration import fulfill_configuration_ord
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
 from adobe_vipm.flows.fulfillment.reseller_transfer import fulfill_reseller_change_order
 from adobe_vipm.flows.fulfillment.termination import fulfill_termination_order
-from adobe_vipm.flows.fulfillment.transfer import (
-    fulfill_transfer_order,
-)
-from adobe_vipm.flows.utils import (
-    notify_unhandled_exception_in_teams,
-    strip_trace_id,
-)
+from adobe_vipm.flows.fulfillment.transfer import fulfill_transfer_order
+from adobe_vipm.flows.utils import notify_unhandled_exception_in_teams, strip_trace_id
 from adobe_vipm.flows.utils.validation import is_migrate_customer, is_reseller_change
 
 logger = logging.getLogger(__name__)

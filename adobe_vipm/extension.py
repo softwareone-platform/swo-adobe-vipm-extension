@@ -54,11 +54,11 @@ def process_order_validation(request, order: Annotated[dict | None, Body()] = No
     """API handler to process order validation http query."""
     try:
         validated_order = validate_order(request.client, order)
-    except Exception as e:
+    except Exception as error:
         logger.exception("Unexpected error during validation")
         return 400, Error(
             id="VIPMG001",
-            message=f"Unexpected error during validation: {e}.",
+            message=f"Unexpected error during validation: {error}.",
         )
     else:
         logger.debug("Validated order: %s", pformat(validated_order))

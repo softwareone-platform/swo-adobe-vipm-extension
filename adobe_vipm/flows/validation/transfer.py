@@ -285,12 +285,12 @@ def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]
             authorization_id,
             membership_id,
         )
-    except AdobeAPIError as e:
+    except AdobeAPIError as error:
         param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
         order = set_ordering_parameter_error(
             order,
             Param.MEMBERSHIP_ID.value,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(e)),
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(error)),
         )
         return True, order
     except AdobeHttpError as he:
@@ -390,13 +390,13 @@ class FetchTransferData(Step):
                 context.transfer.membership_id,
                 context.transfer.transfer_id,
             )
-        except AdobeError as e:
+        except AdobeError as error:
             context.order = set_ordering_parameter_error(
                 context.order,
                 Param.MEMBERSHIP_ID.value,
                 ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
                     membership_id=context.transfer.membership_id,
-                    error=str(e),
+                    error=str(error),
                 ),
             )
             context.validation_succeeded = False

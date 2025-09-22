@@ -145,9 +145,9 @@ def _check_transfer(mpt_client, order, membership_id):
     transfer_preview = None
     try:
         transfer_preview = adobe_client.preview_transfer(authorization_id, membership_id)
-    except AdobeError as e:
-        _handle_transfer_preview_error(mpt_client, order, e)
-        logger.warning("Transfer order %s has been failed: %s.", order["id"], str(e))
+    except AdobeError as error:
+        _handle_transfer_preview_error(mpt_client, order, error)
+        logger.warning("Transfer order %s has been failed: %s.", order["id"], str(error))
         return False
 
     adobe_lines = sorted(
@@ -194,8 +194,8 @@ def _submit_transfer_order(mpt_client, order, membership_id):
         adobe_transfer_order = adobe_client.create_transfer(
             authorization_id, seller_id, order["id"], membership_id
         )
-    except AdobeError as e:
-        error = ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(e))
+    except AdobeError as error:
+        error = ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error))
         switch_order_to_failed(mpt_client, order, error)
         logger.warning("Transfer %s has been failed: %s.", order["id"], error["message"])
         return None

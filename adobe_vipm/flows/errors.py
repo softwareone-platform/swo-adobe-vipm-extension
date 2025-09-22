@@ -47,11 +47,11 @@ def wrap_http_error(func):
     def _wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except HTTPError as e:
+        except HTTPError as error:
             try:
-                raise MPTAPIError(e.response.status_code, e.response.json())
+                raise MPTAPIError(error.response.status_code, error.response.json())
             except JSONDecodeError:
-                raise MPTHttpError(e.response.status_code, e.response.content.decode())
+                raise MPTHttpError(error.response.status_code, error.response.content.decode())
 
     return _wrapper
 
@@ -108,10 +108,10 @@ def wrap_airtable_http_error(func):
     def _wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except HTTPError as e:
+        except HTTPError as error:
             try:
-                raise AirTableAPIError(e.response.status_code, e.response.json())
+                raise AirTableAPIError(error.response.status_code, error.response.json())
             except JSONDecodeError:
-                raise AirTableHttpError(e.response.status_code, e.response.content.decode())
+                raise AirTableHttpError(error.response.status_code, error.response.content.decode())
 
     return _wrapper

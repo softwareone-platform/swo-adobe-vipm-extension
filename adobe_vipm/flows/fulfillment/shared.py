@@ -664,7 +664,7 @@ class SetOrUpdateCotermDate(Step):
                 "3yc_end_date": commitment["endDate"],
                 "3yc": None,
             })
-        params_str = ", ".join(f"{k}={v}" for k, v in updated_params.items())
+        params_str = ", ".join(f"{key}={value}" for key, value in updated_params.items())
         logger.info("%s: Updated parameters: %s", context, params_str)
 
 
@@ -743,7 +743,7 @@ class GetReturnOrders(Step):
             context.adobe_customer_id,
             context.order_id,
         )
-        return_orders_count = sum(len(x) for x in context.adobe_return_orders.values())
+        return_orders_count = sum(len(value) for value in context.adobe_return_orders.values())
         logger.info("%s: found %s return order", context, return_orders_count)
         next_step(client, context)
 
@@ -844,11 +844,11 @@ class GetPreviewOrder(Step):
                     context.new_lines,
                     deployment_id=deployment_id,
                 )
-            except AdobeError as e:
+            except AdobeError as error:
                 switch_order_to_failed(
                     client,
                     context.order,
-                    ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(e)),
+                    ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
                 )
                 return
 
@@ -934,7 +934,7 @@ class CreateOrUpdateAssets(Step):
         adobe_client = get_adobe_client()
         one_time_skus = get_one_time_skus(client, context.order)
         for line in filter(
-            lambda x: get_partial_sku(x["offerId"]) in one_time_skus,
+            lambda line_item: get_partial_sku(line_item["offerId"]) in one_time_skus,
             context.adobe_new_order["lineItems"],
         ):
             order_line = get_order_line_by_sku(context.order, line["offerId"])
@@ -1012,7 +1012,7 @@ class CreateOrUpdateSubscriptions(Step):
         one_time_skus = get_one_time_skus(client, context.order)
 
         lines = filter(
-            lambda x: get_partial_sku(x["offerId"]) not in one_time_skus,
+            lambda line_item: get_partial_sku(line_item["offerId"]) not in one_time_skus,
             context.adobe_new_order["lineItems"],
         )
 

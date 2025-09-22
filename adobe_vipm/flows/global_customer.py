@@ -65,10 +65,10 @@ def get_adobe_subscriptions_by_deployment(adobe_client, authorization_id, agreem
         adobe_subscriptions = adobe_client.get_subscriptions(
             authorization_id, agreement_deployment.customer_id
         )
-    except Exception as e:
+    except Exception as error:
         logger.exception("Error getting Adobe transfer order.")
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = f"Error getting Adobe transfer order: {e}"
+        agreement_deployment.error_description = f"Error getting Adobe transfer order: {error}"
         agreement_deployment.save()
         return None
 
@@ -100,10 +100,10 @@ def get_authorization(mpt_client, agreement_deployment):
             agreement_deployment.deployment_currency,
             agreement_deployment.seller_id,
         )
-    except Exception as e:
+    except Exception as error:
         logger.exception("Error getting authorization.")
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = f"Error getting authorization: {e}"
+        agreement_deployment.error_description = f"Error getting authorization: {error}"
         agreement_deployment.save()
         return None
 
@@ -163,10 +163,10 @@ def get_price_list_id(mpt_client, agreement_deployment):
             agreement_deployment.product_id,
             agreement_deployment.deployment_currency,
         )
-    except Exception as e:
+    except Exception as error:
         logger.exception("Error getting price list.")
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = f"Error getting price list: {e}"
+        agreement_deployment.error_description = f"Error getting price list: {error}"
         agreement_deployment.save()
         return None
 
@@ -239,10 +239,10 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             agreement_deployment.seller_id,
             authorization_id,
         )
-    except Exception as e:
+    except Exception as error:
         logger.exception("Error getting listings.")
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = f"Error getting listings: {e}"
+        agreement_deployment.error_description = f"Error getting listings: {error}"
         agreement_deployment.save()
         return None
 
@@ -278,10 +278,10 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
         try:
             listing = create_listing(mpt_client, listing)
             logger.info("New listing created %s", listing["id"])
-        except Exception as e:
+        except Exception as error:
             logger.exception("Error creating listing: %s", listing)
             agreement_deployment.status = STATUS_GC_ERROR
-            agreement_deployment.error_description = f"Error creating listing: {e}"
+            agreement_deployment.error_description = f"Error creating listing: {error}"
             agreement_deployment.save()
             return None
     else:
@@ -407,10 +407,10 @@ def create_gc_agreement_deployment(
         agreement_deployment.save()
 
         return agreement["id"]
-    except Exception as e:
+    except Exception as error:
         logger.exception("Error creating agreement deployment.")
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = f"Error creating agreement deployment: {e}"
+        agreement_deployment.error_description = f"Error creating agreement deployment: {error}"
         agreement_deployment.save()
         return None
 
@@ -647,13 +647,13 @@ def process_agreement_deployment(  # noqa: C901
         agreement_deployment.error_description = ""
         agreement_deployment.save()
 
-    except Exception as e:
+    except Exception as error:
         logger.exception(
             "Error processing agreement deployment %s.",
             agreement_deployment.deployment_id,
         )
         agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = f"Error processing agreement deployment: {e}"
+        agreement_deployment.error_description = f"Error processing agreement deployment: {error}"
         agreement_deployment.save()
 
 

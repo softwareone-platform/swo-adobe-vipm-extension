@@ -68,8 +68,8 @@ class SubscriptionUpdateAutoRenewal(Step):
         for subscription in context.order["subscriptions"]:
             try:
                 self._process_subscription(adobe_client, context, subscription)
-            except SubscriptionUpdateError as e:
-                self._handle_subscription_error(client, adobe_client, context, str(e))
+            except SubscriptionUpdateError as error:
+                self._handle_subscription_error(client, adobe_client, context, str(error))
                 return
 
         next_step(client, context)
@@ -105,9 +105,9 @@ class SubscriptionUpdateAutoRenewal(Step):
                 auto_renewal=desired,
                 quantity=qty,
             )
-        except AdobeError as e:
+        except AdobeError as error:
             raise SubscriptionUpdateError(
-                f"Error updating the subscription {subscription_vendor_id}: {e}"
+                f"Error updating the subscription {subscription_vendor_id}: {error}"
             )
 
         context.updated.append({
