@@ -77,7 +77,9 @@ def test_transfer(
     adobe_items_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    assets_factory,
     items_factory,
+    lines_factory,
     subscriptions_factory,
 ):
     mocked_get_template = mocker.patch(
@@ -103,26 +105,41 @@ def test_transfer(
             line_number=3, offer_id="99999999CA01A12", subscription_id="one-time-sub-id"
         ),
     )
-    adobe_transfer_preview = adobe_preview_transfer_factory()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
     adobe_customer = adobe_customer_factory()
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
         subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
-    adobe_one_time_subscription = adobe_subscription_factory(subscription_id="one-time-sub-id")
+    adobe_one_time_subscription = adobe_subscription_factory(
+        offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
     mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_subscription.side_effect = [
+        adobe_one_time_subscription,
         adobe_subscription,
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
     mock_adobe_client.update_subscription.return_value = adobe_subscription
-    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    order = order_factory(
+        lines=[lines_factory()[0], lines_factory(external_vendor_id="99999999CA")[0]],
+        order_parameters=transfer_order_parameters_factory(),
+    )
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement")
+    asset = assets_factory(adobe_sku="99999999CA01A12")[0]
+    mocked_add_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_asset", return_value=asset
+    )
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription", return_value=subscription
@@ -131,7 +148,6 @@ def test_transfer(
         "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
         return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
     )
-
     mocked_process_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_processing_template"
     )
@@ -258,7 +274,6 @@ def test_transfer(
             ),
         },
     }
-
     mocked_update_agreement.assert_has_calls([
         mocker.call(
             mock_mpt_client,
@@ -271,7 +286,9 @@ def test_transfer(
             externalIds={"vendor": "a-client-id"},
         ),
     ])
-
+    mocked_add_asset.assert_called_once_with(
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+    )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -347,6 +364,7 @@ def test_transfer(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
     mock_adobe_client.get_subscription.assert_has_calls([
+        call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
@@ -388,7 +406,9 @@ def test_transfer_with_no_profile_address(
     adobe_items_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    assets_factory,
     items_factory,
+    lines_factory,
     subscriptions_factory,
 ):
     mocked_get_template = mocker.patch(
@@ -417,30 +437,40 @@ def test_transfer_with_no_profile_address(
             line_number=3, offer_id="99999999CA01A12", subscription_id="one-time-sub-id"
         ),
     )
-
-    adobe_transfer_preview = adobe_preview_transfer_factory()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
     adobe_customer = adobe_customer_factory(company_profile_address_exists=False)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
         subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
-    adobe_one_time_subscription = adobe_subscription_factory(subscription_id="one-time-sub-id")
+    adobe_one_time_subscription = adobe_subscription_factory(
+        offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
     mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_subscription.side_effect = [
+        adobe_one_time_subscription,
         adobe_subscription,
         adobe_inactive_subscription,
         adobe_one_time_subscription,
     ]
     mock_adobe_client.update_subscription.return_value = adobe_subscription
     order = order_factory(
+        lines=[lines_factory()[0], lines_factory(external_vendor_id="99999999CA")[0]],
         order_parameters=transfer_order_parameters_factory(),
     )
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
-    mocked_update_agreement = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_agreement",
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement")
+    asset = assets_factory(adobe_sku="99999999CA01A12")[0]
+    mocked_add_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_asset", return_value=asset
     )
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
@@ -565,7 +595,9 @@ def test_transfer_with_no_profile_address(
             externalIds={"vendor": "a-client-id"},
         ),
     ])
-
+    mocked_add_asset.assert_called_once_with(
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+    )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -633,6 +665,7 @@ def test_transfer_with_no_profile_address(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
     mock_adobe_client.get_subscription.assert_has_calls([
+        call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
@@ -1443,7 +1476,6 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         return_value=None,
     )
     order_params = transfer_order_parameters_factory()
-
     order = order_factory(order_parameters=order_params)
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -1494,12 +1526,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
 
     fulfill_order(mock_mpt_client, order)
 
-    mocked_process_order.assert_called_once_with(
-        mock_mpt_client,
-        order["id"],
-        {"id": "TPL-0000"},
-    )
-
+    mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
     mocked_fail_order.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -1651,11 +1678,7 @@ def test_fulfill_transfer_order_already_migrated_3yc(
         },
     }
 
-    assert mocked_update_order.mock_calls[2].args == (
-        mock_mpt_client,
-        order["id"],
-    )
-
+    assert mocked_update_order.mock_calls[2].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[1].kwargs == {
         "externalIds": updated_order["externalIds"],
         "parameters": {
@@ -2352,11 +2375,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
             ),
         },
     }
-
-    assert mocked_update_order.mock_calls[3].args == (
-        mock_mpt_client,
-        order["id"],
-    )
+    assert mocked_update_order.mock_calls[3].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[3].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
@@ -2818,7 +2837,9 @@ def test_transfer_gc_account_all_deployments_created(
     adobe_items_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    assets_factory,
     items_factory,
+    lines_factory,
     subscriptions_factory,
 ):
     mocked_get_template = mocker.patch(
@@ -2857,19 +2878,26 @@ def test_transfer_gc_account_all_deployments_created(
             line_number=3, offer_id="99999999CA01A12", subscription_id="one-time-sub-id"
         ),
     )
-
-    adobe_transfer_preview = adobe_preview_transfer_factory()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
         subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
-    adobe_one_time_subscription = adobe_subscription_factory(subscription_id="one-time-sub-id")
+    adobe_one_time_subscription = adobe_subscription_factory(
+        offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
     mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_subscription.side_effect = [
+        adobe_one_time_subscription,
         adobe_subscription,
         adobe_inactive_subscription,
         adobe_one_time_subscription,
@@ -2886,13 +2914,19 @@ def test_transfer_gc_account_all_deployments_created(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
         return_value=mock_adobe_client,
     )
-
-    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    order = order_factory(
+        lines=[lines_factory()[0], lines_factory(external_vendor_id="99999999CA")[0]],
+        order_parameters=transfer_order_parameters_factory(),
+    )
     mocked_update_order = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.update_agreement",
+    )
+    asset = assets_factory(adobe_sku="99999999CA01A12")[0]
+    mocked_add_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_asset", return_value=asset
     )
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
@@ -2963,11 +2997,7 @@ def test_transfer_gc_account_all_deployments_created(
             ),
         },
     }
-
-    assert mocked_update_order.mock_calls[4].args == (
-        mock_mpt_client,
-        order["id"],
-    )
+    assert mocked_update_order.mock_calls[4].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[4].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
@@ -3011,7 +3041,9 @@ def test_transfer_gc_account_all_deployments_created(
             externalIds={"vendor": "a-client-id"},
         ),
     ])
-
+    mocked_add_asset.assert_called_once_with(
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+    )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -3089,6 +3121,7 @@ def test_transfer_gc_account_all_deployments_created(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
     mock_adobe_client.get_subscription.assert_has_calls([
+        call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
@@ -3137,7 +3170,9 @@ def test_transfer_gc_account_no_deployments(
     adobe_items_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    assets_factory,
     items_factory,
+    lines_factory,
     subscriptions_factory,
 ):
     mocked_get_template = mocker.patch(
@@ -3174,18 +3209,26 @@ def test_transfer_gc_account_no_deployments(
         ),
     )
 
-    adobe_transfer_preview = adobe_preview_transfer_factory()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
         subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
-    adobe_one_time_subscription = adobe_subscription_factory(subscription_id="one-time-sub-id")
+    adobe_one_time_subscription = adobe_subscription_factory(
+        offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
     mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_subscription.side_effect = [
+        adobe_one_time_subscription,
         adobe_subscription,
         adobe_inactive_subscription,
         adobe_one_time_subscription,
@@ -3196,9 +3239,16 @@ def test_transfer_gc_account_no_deployments(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client", return_value=mock_adobe_client
     )
 
-    order = order_factory(order_parameters=transfer_order_parameters_factory())
+    order = order_factory(
+        lines=[lines_factory()[0], lines_factory(external_vendor_id="99999999CA")[0]],
+        order_parameters=transfer_order_parameters_factory(),
+    )
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement")
+    asset = assets_factory(adobe_sku="99999999CA01A12")[0]
+    mocked_add_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_asset", return_value=asset
+    )
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription", return_value=subscription
@@ -3322,7 +3372,9 @@ def test_transfer_gc_account_no_deployments(
             externalIds={"vendor": "a-client-id"},
         ),
     ])
-
+    mocked_add_asset.assert_called_once_with(
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+    )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -3400,6 +3452,7 @@ def test_transfer_gc_account_no_deployments(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
     mock_adobe_client.get_subscription.assert_has_calls([
+        call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
@@ -3985,12 +4038,12 @@ def test_transfer_gc_account_no_items_error_main_agreement(
             externalIds={"vendor": "a-client-id"},
         ),
     ])
-
     mocked_process_order.assert_called_once_with(
         mock_mpt_client,
         order["id"],
         {"id": "TPL-0000"},
     )
+    mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
     mock_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
@@ -4772,7 +4825,9 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     adobe_items_factory,
     adobe_subscription_factory,
     adobe_customer_factory,
+    assets_factory,
     items_factory,
+    lines_factory,
     subscriptions_factory,
 ):
     mocked_get_template = mocker.patch(
@@ -4805,19 +4860,26 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
             line_number=3, offer_id="99999999CA01A12", subscription_id="one-time-sub-id"
         ),
     )
-
-    adobe_transfer_preview = adobe_preview_transfer_factory()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
     adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     adobe_subscription = adobe_subscription_factory()
     adobe_inactive_subscription = adobe_subscription_factory(
         subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
     )
-    adobe_one_time_subscription = adobe_subscription_factory(subscription_id="one-time-sub-id")
+    adobe_one_time_subscription = adobe_subscription_factory(
+        offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
     mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_subscription.side_effect = [
+        adobe_one_time_subscription,
         adobe_subscription,
         adobe_inactive_subscription,
         adobe_one_time_subscription,
@@ -4828,6 +4890,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client", return_value=mock_adobe_client
     )
     order = order_factory(
+        lines=[lines_factory()[0], lines_factory(external_vendor_id="99999999CA")[0]],
         order_parameters=transfer_order_parameters_factory(),
         fulfillment_parameters=fulfillment_parameters_factory(
             global_customer="Yes", deployments=""
@@ -4835,6 +4898,10 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     )
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement")
+    asset = assets_factory(adobe_sku="99999999CA01A12")[0]
+    mocked_add_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_asset", return_value=asset
+    )
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
     mocked_create_subscription = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_subscription", return_value=subscription
@@ -4975,7 +5042,6 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
             ),
         },
     }
-
     mocked_update_agreement.assert_has_calls([
         mocker.call(
             mock_mpt_client,
@@ -4988,7 +5054,9 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
             externalIds={"vendor": "a-client-id"},
         ),
     ])
-
+    mocked_add_asset.assert_called_once_with(
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+    )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -5066,6 +5134,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
     mock_adobe_client.get_subscription.assert_has_calls([
+        call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
@@ -5377,13 +5446,8 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
 
     mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
 
-    assert mocked_update_order.mock_calls[0].args == (
-        mock_mpt_client,
-        order["id"],
-    )
-    assert mocked_update_order.mock_calls[0].kwargs == {
-        "parameters": order["parameters"],
-    }
+    assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
+    assert mocked_update_order.mock_calls[0].kwargs == {"parameters": order["parameters"]}
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
         mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
