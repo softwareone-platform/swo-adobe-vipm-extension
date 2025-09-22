@@ -654,10 +654,10 @@ class SetOrUpdateCotermDate(Step):
         ) or get_3yc_commitment(context.adobe_customer)
         if commitment:
             updated_params.update({
-                "3yc_enroll_status": commitment["status"],
+                "3yc_enroll_status": commitment.get("status"),
                 "3yc_commitment_request_status": None,
-                "3yc_start_date": commitment["startDate"],
-                "3yc_end_date": commitment["endDate"],
+                "3yc_start_date": commitment.get("startDate"),
+                "3yc_end_date": commitment.get("endDate"),
                 "3yc": None,
             })
         params_str = ", ".join(f"{k}={v}" for k, v in updated_params.items())
