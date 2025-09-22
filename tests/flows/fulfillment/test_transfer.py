@@ -198,6 +198,41 @@ def test_transfer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
+                due_date="2024-01-31",
+                coterm_date="",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+            ),
+        },
+        "externalIds": {"vendor": "a-transfer-id"},
+    }
+
+    assert mocked_update_order.mock_calls[4].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[4].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
                 due_date=None,
                 coterm_date="2024-01-01",
             ),
@@ -224,9 +259,19 @@ def test_transfer(
         },
     }
 
-    mocked_update_agreement.assert_called_once_with(
-        mock_mpt_client, order["agreement"]["id"], externalIds={"vendor": "a-client-id"}
-    )
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+    ])
+
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -465,6 +510,31 @@ def test_transfer_with_no_profile_address(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
+                due_date="2024-01-31",
+                coterm_date="",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        "",
+                    ),
+                },
+            ),
+        },
+        "externalIds": {
+            "vendor": adobe_transfer["transferId"],
+        },
+    }
+
+    assert mocked_update_order.mock_calls[4].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
                 due_date=None,
                 coterm_date="2024-01-01",
             ),
@@ -482,9 +552,20 @@ def test_transfer_with_no_profile_address(
             ),
         },
     }
-    mocked_update_agreement.assert_called_once_with(
-        mock_mpt_client, order["agreement"]["id"], externalIds={"vendor": "a-client-id"}
-    )
+
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+    ])
+
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -1362,6 +1443,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
         return_value=None,
     )
     order_params = transfer_order_parameters_factory()
+
     order = order_factory(order_parameters=order_params)
 
     mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
@@ -1412,7 +1494,12 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
 
     fulfill_order(mock_mpt_client, order)
 
-    mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
+    mocked_process_order.assert_called_once_with(
+        mock_mpt_client,
+        order["id"],
+        {"id": "TPL-0000"},
+    )
+
     mocked_fail_order.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -1563,14 +1650,19 @@ def test_fulfill_transfer_order_already_migrated_3yc(
             "ordering": order["parameters"]["ordering"],
         },
     }
-    assert mocked_update_order.mock_calls[1].args == (mock_mpt_client, order["id"])
-    assert mocked_update_order.mock_calls[2].kwargs == {
+
+    assert mocked_update_order.mock_calls[2].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+
+    assert mocked_update_order.mock_calls[1].kwargs == {
         "externalIds": updated_order["externalIds"],
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                due_date=None,
-                coterm_date="2024-08-04",
+                due_date="2012-02-13",
+                coterm_date="",
             ),
             "ordering": updated_order["parameters"]["ordering"],
         },
@@ -1976,6 +2068,47 @@ def test_transfer_3yc_customer(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
+                due_date="2024-01-31",
+                p3yc_enroll_status=adobe_3yc_commitment["status"],
+                p3yc_start_date=adobe_3yc_commitment["startDate"],
+                p3yc_end_date=adobe_3yc_commitment["endDate"],
+                coterm_date="",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+                p3yc=None,
+                p3yc_licenses="15",
+                p3yc_consumables="37",
+            ),
+        },
+        "externalIds": {"vendor": "a-transfer-id"},
+    }
+
+    assert mocked_update_order.mock_calls[4].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[4].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
                 due_date=None,
                 p3yc_enroll_status=adobe_3yc_commitment["status"],
                 p3yc_start_date=adobe_3yc_commitment["startDate"],
@@ -2220,8 +2353,44 @@ def test_transfer_3yc_customer_with_no_profile_address(
         },
     }
 
-    assert mocked_update_order.mock_calls[3].args == (mock_mpt_client, order["id"])
+    assert mocked_update_order.mock_calls[3].args == (
+        mock_mpt_client,
+        order["id"],
+    )
     assert mocked_update_order.mock_calls[3].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                due_date="2024-01-31",
+                p3yc_enroll_status=adobe_3yc_commitment["status"],
+                p3yc_start_date=adobe_3yc_commitment["startDate"],
+                p3yc_end_date=adobe_3yc_commitment["endDate"],
+                coterm_date="",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        "",
+                    ),
+                },
+                p3yc=None,
+                p3yc_licenses="15",
+                p3yc_consumables="37",
+            ),
+        },
+        "externalIds": {"vendor": "a-transfer-id"},
+    }
+
+    assert mocked_update_order.mock_calls[4].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[4].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -2794,8 +2963,12 @@ def test_transfer_gc_account_all_deployments_created(
             ),
         },
     }
-    assert mocked_update_order.mock_calls[3].args == (mock_mpt_client, order["id"])
-    assert mocked_update_order.mock_calls[3].kwargs == {
+
+    assert mocked_update_order.mock_calls[4].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[4].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
@@ -2826,9 +2999,19 @@ def test_transfer_gc_account_all_deployments_created(
         },
     }
 
-    mocked_update_agreement.assert_called_once_with(
-        mock_mpt_client, order["agreement"]["id"], externalIds={"vendor": "a-client-id"}
-    )
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+    ])
+
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -3095,8 +3278,9 @@ def test_transfer_gc_account_no_deployments(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
-                coterm_date="2024-01-01",
+                coterm_date="",
                 global_customer="Yes",
+                due_date="2024-01-31",
             ),
             "ordering": transfer_order_parameters_factory(
                 company_name=adobe_customer["companyProfile"]["companyName"],
@@ -3125,9 +3309,20 @@ def test_transfer_gc_account_no_deployments(
     assert mocked_update_order.mock_calls[3].kwargs.get("parameters") == order_result.get(
         "parameters"
     )
-    mocked_update_agreement.assert_called_once_with(
-        mock_mpt_client, order["agreement"]["id"], externalIds={"vendor": "a-client-id"}
-    )
+
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+    ])
+
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -3778,12 +3973,24 @@ def test_transfer_gc_account_no_items_error_main_agreement(
         },
     }
 
-    mocked_update_agreement.assert_called_once_with(
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+    ])
+
+    mocked_process_order.assert_called_once_with(
         mock_mpt_client,
-        order["agreement"]["id"],
-        externalIds={"vendor": "a-client-id"},
+        order["id"],
+        {"id": "TPL-0000"},
     )
-    mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
     mock_adobe_client.get_transfer.assert_called_once_with(
         authorization_id, "a-membership-id", adobe_transfer["transferId"]
     )
@@ -4705,6 +4912,44 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 customer_id="a-client-id",
+                coterm_date="",
+                global_customer="Yes",
+                due_date="2024-01-31",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+            ),
+        },
+        "externalIds": {
+            "vendor": adobe_transfer["transferId"],
+        },
+    }
+
+    assert mocked_update_order.mock_calls[4].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[4].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
                 coterm_date="2024-01-01",
                 global_customer="Yes",
             ),
@@ -4730,9 +4975,20 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
             ),
         },
     }
-    mocked_update_agreement.assert_called_once_with(
-        mock_mpt_client, order["agreement"]["id"], externalIds={"vendor": "a-client-id"}
-    )
+
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+    ])
+
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
         order["id"],
@@ -5121,8 +5377,13 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
 
     mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
 
-    assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
-    assert mocked_update_order.mock_calls[0].kwargs == {"parameters": order["parameters"]}
+    assert mocked_update_order.mock_calls[0].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": order["parameters"],
+    }
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
         mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
