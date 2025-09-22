@@ -1,26 +1,6 @@
 import functools
 
-from adobe_vipm.flows.constants import Param
-from adobe_vipm.flows.utils.parameter import get_ordering_parameter
 from adobe_vipm.notifications import send_exception
-
-
-def get_notifications_recipient(order: dict) -> str | None:
-    """
-    Retrieves notification recipiend from MPT order.
-
-    It can be either email from contact parameter or buyer contact email.
-
-    Args:
-        order: MPT order.
-
-    Returns:
-        Either contact parameter or buyer contact emails.
-    """
-    contact = get_ordering_parameter(order, Param.CONTACT.value).get("value", {}) or {}
-    buyer = order["agreement"]["buyer"].get("contact", {}) or {}
-
-    return (contact or buyer).get("email")
 
 
 @functools.cache
