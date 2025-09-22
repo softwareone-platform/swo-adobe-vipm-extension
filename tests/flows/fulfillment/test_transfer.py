@@ -6245,7 +6245,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": order["parameters"],
     }
-    
+
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
         mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
