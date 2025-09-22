@@ -37,7 +37,6 @@ from .market_segment import (
     set_market_segment_eligibility_status_pending,
 )
 from .notification import (
-    get_notifications_recipient,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
     notify_not_updated_subscriptions,
