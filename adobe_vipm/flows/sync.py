@@ -33,7 +33,7 @@ from adobe_vipm.adobe.errors import (
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus, TeamsColorCode
-from adobe_vipm.flows.mpt import get_agreements_by_3yc_enroll_status
+from adobe_vipm.flows.mpt import get_agreements_by_3yc_commitment_request_status
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
@@ -581,7 +581,9 @@ def sync_agreements_by_3yc_enroll_status(mpt_client: MPTClient, *, dry_run: bool
         dry_run: if True, it just simulate parameters update.
     """
     try:
-        agreements = get_agreements_by_3yc_enroll_status(mpt_client, THREE_YC_TEMP_3YC_STATUSES)
+        agreements = get_agreements_by_3yc_commitment_request_status(
+            mpt_client, THREE_YC_TEMP_3YC_STATUSES
+        )
     except Exception:
         logger.exception("Unknown exception getting agreements by 3YC enroll status.")
         raise

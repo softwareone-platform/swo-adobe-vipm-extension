@@ -6,7 +6,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.mpt import (
     get_agreements_by_3yc_commitment_request_status,
-    get_agreements_by_3yc_enroll_status,
+    get_agreements_by_3yc_commitment_request_status,
 )
 
 
@@ -58,13 +58,17 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_re
 
 
 @pytest.mark.parametrize("status", ["Active", "processing"])
-def test_get_agreements_by_3yc_enroll_status(mock_mpt_client, mock_get_agreements_by_query, status):
+def test_get_agreements_by_3yc_commitment_request_status(
+    mock_mpt_client, mock_get_agreements_by_query, status
+):
     rql_query = (
-        f"and(eq(status,{status}),any(parameters.fulfillment,and(eq(externalId,3YCEnrollStatus),"
+        f"and(eq(status,{status}),any(parameters.fulfillment,and(eq(externalId,3YCCommitmentRequestStatus),"
         "in(displayValue,(REQUESTED,ACCEPTED)))))"
         "&select=lines,parameters,subscriptions,product,listing"
     )
 
-    get_agreements_by_3yc_enroll_status(mock_mpt_client, ("REQUESTED", "ACCEPTED"), status=status)
+    get_agreements_by_3yc_commitment_request_status(
+        mock_mpt_client, ("REQUESTED", "ACCEPTED"), status=status
+    )
 
     mock_get_agreements_by_query.assert_called_once_with(mock_mpt_client, rql_query)

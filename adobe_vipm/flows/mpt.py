@@ -63,7 +63,7 @@ def get_agreements_by_3yc_commitment_request_status(
     return get_agreements_by_query(mpt_client, rql_query)
 
 
-def get_agreements_by_3yc_enroll_status(
+def get_agreements_by_3yc_commitment_request_status(
     mpt_client: MPTClient, enroll_statuses: list[str], status: str = "Active"
 ) -> list[str]:
     """
@@ -79,7 +79,7 @@ def get_agreements_by_3yc_enroll_status(
     """
     param_condition = (
         f"any(parameters.fulfillment,"
-        f"and(eq(externalId,3YCEnrollStatus),in(displayValue,({','.join(enroll_statuses)}))))"
+        f"and(eq(externalId,3YCCommitmentRequestStatus),in(displayValue,({','.join(enroll_statuses)}))))"
     )
     status_condition = f"eq(status,{status})"
 
