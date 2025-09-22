@@ -18,10 +18,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    AdobeStatus,
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
@@ -54,11 +51,13 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
+    CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     SetOrUpdateCotermDate,
     SetupDueDate,
     SubmitNewOrder,
+    add_asset,
     add_subscription,
     check_processing_template,
     handle_retries,
@@ -70,10 +69,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_failed,
     switch_order_to_query,
 )
-from adobe_vipm.flows.helpers import (
-    SetupContext,
-    UpdatePrices,
-)
+from adobe_vipm.flows.helpers import SetupContext, UpdatePrices
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
@@ -98,6 +94,9 @@ from adobe_vipm.notifications import Button, FactsSection, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
+
+
+SUBSCRIPTION_SKIP_LOG = "Subscription %s for customer %s is in status %s, skip it"
 
 
 def _handle_transfer_preview_error(client, order, error):
@@ -145,9 +144,9 @@ def _check_transfer(mpt_client, order, membership_id):
     transfer_preview = None
     try:
         transfer_preview = adobe_client.preview_transfer(authorization_id, membership_id)
-    except AdobeError as e:
-        _handle_transfer_preview_error(mpt_client, order, e)
-        logger.warning("Transfer order %s has been failed: %s.", order["id"], str(e))
+    except AdobeError as error:
+        _handle_transfer_preview_error(mpt_client, order, error)
+        logger.warning("Transfer order %s has been failed: %s.", order["id"], str(error))
         return False
 
     adobe_lines = sorted(
@@ -194,8 +193,8 @@ def _submit_transfer_order(mpt_client, order, membership_id):
         adobe_transfer_order = adobe_client.create_transfer(
             authorization_id, seller_id, order["id"], membership_id
         )
-    except AdobeError as e:
-        error = ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(e))
+    except AdobeError as error:
+        error = ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error))
         switch_order_to_failed(mpt_client, order, error)
         logger.warning("Transfer %s has been failed: %s.", order["id"], error["message"])
         return None
@@ -250,8 +249,7 @@ def _fulfill_transfer_migrated(  # noqa: C901
     adobe_items = [
         item
         for item in adobe_subscriptions["items"]
-        if not is_transferring_item_expired(item)
-        and get_partial_sku(item["offerId"]) not in one_time_skus
+        if not is_transferring_item_expired(item) and get_partial_sku(item["offerId"])
     ]
     # If the order items has been updated, the validation order will fail
     if has_order_line_updated(order["lines"], adobe_items, Param.CURRENT_QUANTITY.value):
@@ -279,34 +277,34 @@ def _fulfill_transfer_migrated(  # noqa: C901
             error,
         )
         return
+
     for line in adobe_items:
         adobe_subscription = adobe_client.get_subscription(
-            authorization_id,
-            transfer.customer_id,
-            line["subscriptionId"],
+            authorization_id, transfer.customer_id, line["subscriptionId"]
         )
         if adobe_subscription["status"] != AdobeStatus.PROCESSED:
-            logger.warning(
-                "Subscription %s for customer %s is in status %s, skip it",
+            logger.info(
+                SUBSCRIPTION_SKIP_LOG,
                 adobe_subscription["subscriptionId"],
                 transfer.customer_id,
                 adobe_subscription["status"],
             )
             continue
 
-        subscription = _sync_subscription_order(
-                adobe_client,
-                mpt_client,
-                adobe_subscription,
-                authorization_id,
-                transfer.customer_benefits_3yc_status,
-                transfer.customer_id,
-                order,
-                line,
-            )
-        if subscription and not commitment_date:  # pragma: no branch
-            # subscription are cotermed so it's ok to take the first created
-            commitment_date = subscription["commitmentDate"]
+        if get_partial_sku(line["offerId"]) in one_time_skus:  # pragma: no cover
+            add_asset(mpt_client, adobe_subscription, order, line)
+        else:
+            if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
+                adobe_subscription = adobe_client.update_subscription(
+                    authorization_id,
+                    transfer.customer_id,
+                    line["subscriptionId"],
+                    auto_renewal=True,
+                )
+            subscription = add_subscription(mpt_client, adobe_subscription, order, line)
+            if subscription and not commitment_date:  # pragma: no branch
+                # subscription are cotermed so it's ok to take the first created
+                commitment_date = subscription["commitmentDate"]
 
     if commitment_date:  # pragma: no branch
         order = save_coterm_dates(mpt_client, order, commitment_date)
@@ -428,6 +426,7 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
         SaveCustomerData(),
         GetPreviewOrder(),
         SubmitNewOrder(),
+        CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),
         SetOrUpdateCotermDate(),
         UpdatePrices(),
@@ -877,8 +876,8 @@ def create_agreement_subscriptions(adobe_transfer_order, mpt_client, order, adob
             item["subscriptionId"],
         )
         if adobe_subscription["status"] != AdobeStatus.PROCESSED:
-            logger.warning(
-                "Subscription %s for customer %s is in status %s, skip it",
+            logger.info(
+                SUBSCRIPTION_SKIP_LOG,
                 adobe_subscription["subscriptionId"],
                 customer_id,
                 adobe_subscription["status"],
@@ -1261,6 +1260,38 @@ class ProcessTransferOrder(Step):
         next_step(client, context)
 
 
+class CreateTransferAssets(Step):
+    """Create assets for the transfer order."""
+
+    def __call__(self, client, context, next_step):
+        """Create transfer assets."""
+        adobe_client = get_adobe_client()
+        adobe_transfer_order = context.adobe_transfer_order
+        customer_id = adobe_transfer_order["customerId"]
+        one_time_skus = get_one_time_skus(client, context.order)
+        assets = []
+        for item in adobe_transfer_order["lineItems"]:
+            if get_partial_sku(item["offerId"]) not in one_time_skus:
+                continue
+
+            adobe_subscription = adobe_client.get_subscription(
+                context.order["authorization"]["id"], customer_id, item["subscriptionId"]
+            )
+            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+                logger.info(
+                    SUBSCRIPTION_SKIP_LOG,
+                    adobe_subscription["subscriptionId"],
+                    customer_id,
+                    adobe_subscription["status"],
+                )
+                continue
+
+            assets.append(add_asset(client, adobe_subscription, context.order, item))
+
+        context.assets = assets
+        next_step(client, context)
+
+
 class CreateTransferSubscriptions(Step):
     """Creates subscriptions for the transfer order."""
 
@@ -1349,6 +1380,7 @@ def fulfill_transfer_order(mpt_client, order):
         GetAdobeCustomer(),
         ValidateAgreementDeployments(),
         ProcessTransferOrder(),
+        CreateTransferAssets(),
         CreateTransferSubscriptions(),
         SetCommitmentDates(),
         CompleteTransferOrder(),
