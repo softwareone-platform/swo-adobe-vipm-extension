@@ -89,12 +89,11 @@ class GetPreviewOrder(Step):
                 context.new_lines,
                 deployment_id=deployment_id,
             )
-        except AdobeAPIError as e:
+        except (AdobeAPIError, AdobeProductNotFoundError) as error:
             context.validation_succeeded = False
-            context.order = set_order_error(context.order, ERR_ADOBE_ERROR.to_dict(details=str(e)))
+            context.order = set_order_error(
+                context.order, ERR_ADOBE_ERROR.to_dict(details=str(error))
+            )
             return
-        except AdobeProductNotFoundError as e:
-            context.validation_succeeded = False
-            context.order = set_order_error(context.order, ERR_ADOBE_ERROR.to_dict(details=str(e)))
-            return
+
         next_step(client, context)

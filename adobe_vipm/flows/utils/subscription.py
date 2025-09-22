@@ -28,7 +28,7 @@ def get_subscription_by_line_and_item_id(
     """
     for subscription in subscriptions:
         item = find_first(
-            lambda x: x["id"] == line_id and x["item"]["id"] == item_id,
+            lambda line: line["id"] == line_id and line["item"]["id"] == item_id,
             subscription["lines"],
         )
 
@@ -109,10 +109,7 @@ def get_transfer_item_sku_by_subscription(trf: dict, sub_id: str) -> str | None:
     Returns:
         Adobe offer id
     """
-    item = find_first(
-        lambda x: x["subscriptionId"] == sub_id,
-        trf["lineItems"],
-    )
+    item = find_first(lambda sub: sub["subscriptionId"] == sub_id, trf["lineItems"])
     return item.get("offerId") if item else None
 
 

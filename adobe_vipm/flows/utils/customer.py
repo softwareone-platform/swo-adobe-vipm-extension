@@ -125,7 +125,7 @@ def get_customer_licenses_discount_level(customer: dict) -> int:
         Adobe discount level for licensees.
     """
     licenses_discount = find_first(
-        lambda x: x["offerType"] == OfferType.LICENSE, customer["discounts"]
+        lambda discount: discount["offerType"] == OfferType.LICENSE, customer["discounts"]
     )
     return licenses_discount["level"]
 
@@ -141,7 +141,7 @@ def get_customer_consumables_discount_level(customer: dict) -> int:
         Adobe discount level for consumables.
     """
     licenses_discount = find_first(
-        lambda x: x["offerType"] == OfferType.CONSUMABLES, customer["discounts"]
+        lambda discount: discount["offerType"] == OfferType.CONSUMABLES, customer["discounts"]
     )
     return licenses_discount["level"]
 

@@ -38,8 +38,8 @@ class ValidateDownsizes(Step):
 
     def _get_returnable_by_quantity_map(self, returnable_orders):
         returnable_by_quantity = {}
-        for r in range(len(returnable_orders), 0, -1):
-            for sub in itertools.combinations(returnable_orders, r):
+        for order in range(len(returnable_orders), 0, -1):
+            for sub in itertools.combinations(returnable_orders, order):
                 returnable_by_quantity[sum(line_item.quantity for line_item in sub)] = sub
         return returnable_by_quantity
 

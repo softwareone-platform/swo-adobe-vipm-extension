@@ -68,7 +68,9 @@ class GetReturnableOrders(Step):
 
             context.adobe_returnable_orders[sku] = returnable_orders
 
-        returnable_orders_count = sum(len(v) for v in context.adobe_returnable_orders.values())
+        returnable_orders_count = sum(
+            len(order_value) for order_value in context.adobe_returnable_orders.values()
+        )
         logger.info("%s: found %s returnable orders.", context, returnable_orders_count)
         next_step(client, context)
 
@@ -105,18 +107,18 @@ class SwitchAutoRenewalOff(Step):
                         subscription["id"],
                         adobe_subscription["subscriptionId"],
                     )
-                except AdobeAPIError as e:
+                except AdobeAPIError as error:
                     logger.exception(
                         "%s: failed to switch off autorenewal for %s (%s)",
                         context,
                         subscription["id"],
                         adobe_subscription["subscriptionId"],
                     )
-                    if e.code == AdobeStatus.INVALID_RENEWAL_STATE:
+                    if error.code == AdobeStatus.INVALID_RENEWAL_STATE:
                         switch_order_to_failed(
                             client,
                             context.order,
-                            ERR_INVALID_RENEWAL_STATE.to_dict(error=e.message),
+                            ERR_INVALID_RENEWAL_STATE.to_dict(error=error.message),
                         )
                     return
         next_step(client, context)

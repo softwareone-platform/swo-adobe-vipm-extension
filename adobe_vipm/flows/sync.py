@@ -532,8 +532,8 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, *, dry_run: bool) -> 
     today_plus_1_year = dt.datetime.now(tz=dt.UTC).date() + relativedelta(years=1)
     today_iso = dt.datetime.now(tz=dt.UTC).date().isoformat()
     yesterday_every_month = (
-        (today_plus_1_year - dt.timedelta(days=1) - relativedelta(months=m)).isoformat()
-        for m in range(24)
+        (today_plus_1_year - dt.timedelta(days=1) - relativedelta(months=month)).isoformat()
+        for month in range(24)
     )
 
     rql_query = (
@@ -779,14 +779,14 @@ def process_lost_customer(  # noqa: C901
                 subscription_id,
                 "Suspected Lost Customer",
             )
-        except Exception as e:
+        except Exception as error:
             logger.exception(
                 "> Suspected Lost Customer: Error terminating subscription %s.",
                 subscription_id,
             )
             send_exception(
                 f"> Suspected Lost Customer: Error terminating subscription {subscription_id}",
-                f"{e}",
+                f"{error}",
             )
 
     adobe_deployments = adobe_client.get_customer_deployments_active_status(
@@ -807,7 +807,7 @@ def process_lost_customer(  # noqa: C901
             ]:
                 try:
                     terminate_subscription(mpt_client, subscription_id, "Suspected Lost Customer")
-                except Exception as e:
+                except Exception as error:
                     logger.exception(
                         "> Suspected Lost Customer: Error terminating subscription %s.",
                         subscription_id,
@@ -815,7 +815,7 @@ def process_lost_customer(  # noqa: C901
                     send_exception(
                         "> Suspected Lost Customer: Error terminating subscription"
                         f" {subscription_id}",
-                        f"{e}",
+                        f"{error}",
                     )
 
 
@@ -931,17 +931,17 @@ def sync_agreement(  # noqa: C901
 def _get_customer_or_process_lost_customer(mpt_client, adobe_client, agreement, customer_id):
     try:
         return adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
-    except AdobeAPIError as e:
-        if e.code == AdobeStatus.INVALID_CUSTOMER:
+    except AdobeAPIError as error:
+        if error.code == AdobeStatus.INVALID_CUSTOMER:
             logger.info(
                 "Received Adobe error %s - %s, assuming lost customer "
                 "and proceeding with lost customer procedure.",
-                e.code,
-                e.message,
+                error.code,
+                error.message,
             )
             send_notification(
                 "Executing Lost Customer Procedure.",
-                f"Received Adobe error {e.code} - {e.message},"
+                f"Received Adobe error {error.code} - {error.message},"
                 " assuming lost customer and proceeding with lost customer procedure.",
                 TeamsColorCode.ORANGE.value,
             )
@@ -1001,11 +1001,11 @@ def _process_orphaned_deployment_subscriptions(
                 subscription["subscriptionId"],
                 auto_renewal=False,
             )
-        except Exception as e:
+        except Exception as error:
             send_exception(
                 "Error disabling auto-renewal for orphaned Adobe subscription"
                 f" {subscription['subscriptionId']}.",
-                f"{e}",
+                f"{error}",
             )
 
 
