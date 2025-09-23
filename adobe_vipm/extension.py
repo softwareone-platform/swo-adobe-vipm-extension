@@ -39,7 +39,7 @@ def jwt_secret_callback(client: MPTClient, claims: Mapping[str, Any]) -> str:
 @ext.events.listener("orders")
 def process_order_fulfillment(client: MPTClient, event) -> None:
     """Hook to process fulfillment order."""
-    fulfill_order(client, event.data)
+    fulfill_order(client, event.data.order)
 
 
 @ext.api.post(
