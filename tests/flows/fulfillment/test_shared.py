@@ -562,6 +562,54 @@ def test_set_or_update_coterm_date_step_with_3yc(
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
+def test_set_or_update_coterm_date_step_with_3yc_without_dates(
+    mocker,
+    mock_mpt_client,
+    mock_order,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    commitment = {
+        "status": "REQUESTED",
+        "minimumQuantities": [],
+    }
+
+    customer = adobe_customer_factory(coterm_date="2025-01-01", commitment_request=commitment)
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        adobe_customer_id=customer["customerId"],
+        adobe_customer=customer,
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    step = SetOrUpdateCotermDate()
+    step(mock_mpt_client, context, mocked_next_step)
+
+    mocked_update.assert_called_once_with(
+        mock_mpt_client, context.order_id, parameters=context.order["parameters"]
+    )
+    parameter_list = [
+        get_fulfillment_parameter(context.order, Param.THREE_YC_ENROLL_STATUS.value)["value"],
+        get_fulfillment_parameter(context.order, Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value)[
+            "value"
+        ],
+        get_fulfillment_parameter(context.order, Param.THREE_YC_START_DATE.value)["value"],
+        get_fulfillment_parameter(context.order, Param.THREE_YC_END_DATE.value)["value"],
+        get_fulfillment_parameter(context.order, Param.THREE_YC.value),
+    ]
+    assert parameter_list == [
+        commitment["status"],
+        None,
+        None,
+        None,
+        {},
+    ]
+    assert get_coterm_date(context.order) == "2025-01-01"
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
 def test_submit_return_orders_step(
     mocker,
     mock_adobe_client,
