@@ -5451,3 +5451,105 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
         mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
+
+
+@freeze_time("2012-01-14 12:00:01")
+def test_fulfill_transfer_migrated_order_offer_id_expired(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    subscriptions_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
+    adobe_authorizations_file,
+    adobe_customer_factory,
+    adobe_order_factory,
+    adobe_subscription_factory,
+    agreement,
+    mock_sync_agreements_by_agreement_ids,
+    mock_mpt_client,
+):
+    order_params = transfer_order_parameters_factory()
+    order = order_factory(order_parameters=order_params)
+
+    mocked_transfer = mocker.MagicMock(
+        membership_id="membership-id",
+        customer_id="customer-id",
+        transfer_id="transfer-id",
+        customer_benefits_3yc_status=None,
+    )
+
+    adobe_customer = adobe_customer_factory()
+    updated_order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            due_date="2012-02-13",
+        ),
+        order_parameters=transfer_order_parameters_factory(
+            company_name=None,
+            address=None,
+            contact=None,
+        ),
+        external_ids={"vendor": "transfer-id"},
+    )
+
+    product_items = items_factory()
+    transfer_items = adobe_items_factory(subscription_id="inactive-sub-id", offer_id="65304999CA")
+    adobe_subscription = adobe_subscription_factory(offer_id="65304578CA2", current_quantity=170)
+    adobe_transfer = adobe_transfer_factory(items=transfer_items)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.PENDING.value)
+    adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW)
+
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_subscription",
+        return_value=subscriptions_factory(commitment_date="2024-08-04")[0],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=mocked_transfer,
+    )
+    mocker.patch("adobe_vipm.flows.fulfillment.transfer.get_gc_main_agreement", return_value=None)
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
+        return_value=None,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
+    )
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.set_processing_template")
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+    mock_sync_main_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.sync_main_agreement"
+    )
+
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.get_subscription.return_value = adobe_subscription
+    mock_adobe_client.create_preview_order.return_value = adobe_preview_order
+    mock_adobe_client.create_new_order.return_value = new_order
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400, {"error": "Error updating subscription"}
+    )
+
+    fulfill_order(mock_mpt_client, order)
+
+    mocked_update_order.assert_has_calls([
+        mocker.call(mock_mpt_client, order["id"], parameters=updated_order["parameters"])
+    ])
+
+    mock_sync_main_agreement.assert_called_once_with(
+        None, "PRD-1111-1111", "AUT-1234-4567", "customer-id"
+    )
