@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "common.fullname" . }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+data:
+  APPLICATIONINSIGHTS_CONNECTION_STRING: {{ .Values.global.AppInsightsConnectionString | quote }}
+  OTEL_SERVICE_NAME: {{ .Values.global.OTELServiceName | quote }}
+  MPT_PORTAL_BASE_URL: {{ .Values.global.MpPortalBaseUrl | quote }}
+  MPT_API_BASE_URL: {{ .Values.global.MpBaseUrl | quote }}
+  MPT_API_TOKEN: {{ .Values.global.MpApiToken | quote }}
+  MPT_PRODUCTS_IDS: {{ .Values.global.MpProductsIds | quote }}
+  EXT_ADOBE_API_BASE_URL: {{ .Values.global.AdobeApiEndpoint | quote }}
+  EXT_ADOBE_AUTH_ENDPOINT_URL: {{ .Values.global.AdobeAuthEndpoint | quote }}
+  EXT_MIGRATION_RUNNING_MAX_RETRIES: {{ .Values.global.MigrationRunningMaxRetries | quote }}
+  EXT_AIRTABLE_BASES: {{ .Values.global.AirTableBases | quote }}
+  EXT_AIRTABLE_SKU_MAPPING_BASE: {{ .Values.global.AirTableSkuMappingBase | quote }}
+  EXT_AIRTABLE_PRICING_BASES: {{ .Values.global.AirTablePricingBases | quote }}
+  EXT_NAV_API_BASE_URL: {{ .Values.global.NavApiBaseUrl | quote }}
+  EXT_NAV_AUTH_ENDPOINT_URL: {{ .Values.global.NavAuthEndpointUrl | quote }}
+  EXT_NAV_AUTH_AUDIENCE: {{ .Values.global.NavAuthAudience | quote }}
+  EXT_EMAIL_NOTIFICATIONS_SENDER: {{ .Values.global.EmailNotificationsSender | quote }}
+  EXT_EMAIL_NOTIFICATIONS_ENABLED: {{ .Values.global.EmailNotificationsEnabled | quote }}
+  EXT_AWS_SES_REGION: {{ .Values.global.AwsSesRegion | quote }}
+  EXT_PRODUCT_SEGMENT: {{ .Values.global.ProductSegments | quote }}
+  EXT_GC_EMAIL_NOTIFICATIONS_RECIPIENT: {{ .Values.global.GCemailNotificationRecipients | quote }}
+  EXT_ORDER_CREATION_WINDOW_HOURS: {{ .Values.global.OrderCreationWindowHours | quote }}
