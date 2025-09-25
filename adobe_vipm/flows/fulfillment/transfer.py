@@ -294,14 +294,16 @@ def _fulfill_transfer_migrated(  # noqa: C901
             )
             continue
 
-        if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
-            adobe_subscription = adobe_client.update_subscription(
+        subscription = _sync_subscription_order(
+                adobe_client,
+                mpt_client,
+                adobe_subscription,
                 authorization_id,
+                transfer.customer_benefits_3yc_status,
                 transfer.customer_id,
-                line["subscriptionId"],
-                auto_renewal=True,
+                order,
+                line,
             )
-        subscription = add_subscription(mpt_client, adobe_subscription, order, line)
         if subscription and not commitment_date:  # pragma: no branch
             # subscription are cotermed so it's ok to take the first created
             commitment_date = subscription["commitmentDate"]
@@ -320,6 +322,49 @@ def _fulfill_transfer_migrated(  # noqa: C901
         authorization_id,
         transfer.customer_id,
     )
+
+
+def _sync_subscription_order(
+    adobe_client,
+    mpt_client,
+    adobe_subscription,
+    authorization_id,
+    status,
+    customer_id,
+    order,
+    line,
+):
+    """
+    Updates subscription auto-renewal if needed and adds it to the order.
+
+    Args:
+        adobe_client: The Adobe client instance
+        mpt_client: The MPT client instance
+        adobe_subscription: The Adobe subscription object
+        authorization_id (str): The authorization ID
+        status (str): The status of the customer benefits 3YC
+        customer_id (str): The customer ID
+        order (dict): The MPT order
+        line (dict): The subscription line item
+
+    Returns:
+        dict or None: The added subscription if successful, None otherwise
+    """
+    if status != ThreeYearCommitmentStatus.COMMITTED:
+        try:
+            adobe_subscription = adobe_client.update_subscription(
+                authorization_id,
+                customer_id,
+                line["subscriptionId"],
+                auto_renewal=True,
+            )
+        except AdobeAPIError:
+            logger.exception(
+                "Error updating subscription agreement transferred %s",
+                line["subscriptionId"],
+            )
+
+    return add_subscription(mpt_client, adobe_subscription, order, line)
 
 
 class UpdateTransferStatus(Step):
@@ -841,15 +886,18 @@ def create_agreement_subscriptions(adobe_transfer_order, mpt_client, order, adob
             continue
 
         commitment = get_3yc_commitment(customer)
-        if commitment.get("status", "") != ThreeYearCommitmentStatus.COMMITTED:
-            adobe_subscription = adobe_client.update_subscription(
-                authorization_id,
-                customer_id,
-                item["subscriptionId"],
-                auto_renewal=True,
-            )
 
-        subscriptions.append(add_subscription(mpt_client, adobe_subscription, order, item))
+        subscription = _sync_subscription_order(
+            adobe_client,
+            mpt_client,
+            adobe_subscription,
+            authorization_id,
+            commitment.get("status", ""),
+            customer_id,
+            order,
+            item,
+        )
+        subscriptions.append(subscription)
 
     return subscriptions
 
