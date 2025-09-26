@@ -1148,8 +1148,8 @@ def test_add_asset(mocker, order_factory, adobe_subscription_factory, assets_fac
         "adobe_vipm.flows.fulfillment.shared.get_order_asset_by_external_id", return_value=None
     )
     asset = assets_factory()[0]
-    mocked_create_asset = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.create_asset", return_value=asset
+    mocked_create_order_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_order_asset", return_value=asset
     )
 
     add_asset(client, adobe_subscription, order, adobe_subscription)
@@ -1184,7 +1184,9 @@ def test_add_asset(mocker, order_factory, adobe_subscription_factory, assets_fac
             },
         ],
     }
-    mocked_create_asset.assert_called_once_with(client, "ORD-0792-5000-2253-4210", expected_payload)
+    mocked_create_order_asset.assert_called_once_with(
+        client, "ORD-0792-5000-2253-4210", expected_payload
+    )
 
 
 def test_add_asset_exists(mocker, order_factory, adobe_subscription_factory, assets_factory):
@@ -1197,14 +1199,16 @@ def test_add_asset_exists(mocker, order_factory, adobe_subscription_factory, ass
     mocked_get_order_asset_by_external_id = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_order_asset_by_external_id", return_value=asset
     )
-    mocked_create_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.create_asset")
+    mocked_create_order_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_order_asset"
+    )
 
     add_asset(client, adobe_subscription, order, adobe_subscription)
 
     mocked_get_order_asset_by_external_id.assert_called_once_with(
         client, "ORD-0792-5000-2253-4210", "one-time-sub-id"
     )
-    mocked_create_asset.assert_not_called()
+    mocked_create_order_asset.assert_not_called()
 
 
 def test_create_or_update_asset_step(
@@ -1228,8 +1232,8 @@ def test_create_or_update_asset_step(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[items_factory()[0]["externalIds"]["vendor"]],
     )
-    mocked_create_asset = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.create_asset",
+    mocked_create_order_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_order_asset",
         return_value=subscriptions_factory()[0],
     )
     mocked_next_step = mocker.MagicMock()
@@ -1250,7 +1254,7 @@ def test_create_or_update_asset_step(
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
-    mocked_create_asset.assert_called_once_with(
+    mocked_create_order_asset.assert_called_once_with(
         mock_mpt_client,
         context.order_id,
         {
@@ -1298,7 +1302,9 @@ def test_create_or_update_assets_exists(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[items_factory()[0]["externalIds"]["vendor"]],
     )
-    mocked_update_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_asset")
+    mocked_update_order_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_order_asset"
+    )
     mocked_next_step = mocker.MagicMock()
     assets = assets_factory()
     order = order_factory(assets=assets)
@@ -1319,7 +1325,7 @@ def test_create_or_update_assets_exists(
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
-    mocked_update_asset.assert_called_once_with(
+    mocked_update_order_asset.assert_called_once_with(
         mock_mpt_client,
         context.order_id,
         assets[0]["id"],
@@ -1364,7 +1370,9 @@ def test_create_or_update_asset_step_subscription_not_processed(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[items_factory()[0]["externalIds"]["vendor"]],
     )
-    mocked_create_asset = mocker.patch("adobe_vipm.flows.fulfillment.shared.create_asset")
+    mocked_create_order_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_order_asset"
+    )
     mocked_next_step = mocker.MagicMock()
     context = Context(
         order=mock_order,
@@ -1383,7 +1391,7 @@ def test_create_or_update_asset_step_subscription_not_processed(
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
     )
-    mocked_create_asset.assert_not_called()
+    mocked_create_order_asset.assert_not_called()
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
