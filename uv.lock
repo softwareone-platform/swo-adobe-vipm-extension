@@ -679,7 +679,7 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "5.11.0"
+version = "5.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -710,9 +710,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/01/3df31545f1c878bdf088c9f205d84b8fb0db4862d9e135b6610fb6da3905/mpt_extension_sdk-5.11.0.tar.gz", hash = "sha256:90c34781e00511dcd26437ad48ea2c6dc428ac3c9ba133e0965f969d0b719ac1", size = 30148, upload-time = "2025-09-17T15:25:55.921Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9b/58/4ccf64e02d3b76f680b9c292426722d983ed1acc5729b07d4d66d8c5980e/mpt_extension_sdk-5.12.0.tar.gz", hash = "sha256:57a30a8589fb80fbe2df729411124d5b11455b69488a0d01efc830e7a044266a", size = 30152, upload-time = "2025-09-26T15:50:56.565Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/87/a7a0d7969fbf9407df05947f668b6f8bb75d53aea436d3461937c7a43a4a/mpt_extension_sdk-5.11.0-py3-none-any.whl", hash = "sha256:9d01606abba2a6881e42041dcf0c87160d00cc4b84043876365f68985eeb69f3", size = 41972, upload-time = "2025-09-17T15:25:55.121Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/d4/da0c8215143fef059a6953a08d036230e258149296a2d8f21da25a2aed79/mpt_extension_sdk-5.12.0-py3-none-any.whl", hash = "sha256:3298bca5a9b7cdd6e14921960943d3d26621fc35b93f56fe461d9b71a70ced12", size = 41973, upload-time = "2025-09-26T15:50:55.687Z" },
 ]
 
 [[package]]
@@ -1542,7 +1542,7 @@ requires-dist = [
     { name = "django", specifier = "==4.2.*" },
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "markdown-it-py", specifier = "==3.0.*" },
-    { name = "mpt-extension-sdk", specifier = "==5.11.*" },
+    { name = "mpt-extension-sdk", specifier = "==5.12.*" },
     { name = "openpyxl", specifier = "==3.1.*" },
     { name = "phonenumbers", specifier = "==8.13.*" },
     { name = "pyairtable", specifier = "==2.3.*" },

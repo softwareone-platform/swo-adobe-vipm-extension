@@ -8,7 +8,7 @@ from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     complete_order,
-    create_asset,
+    create_order_asset,
     create_subscription,
     fail_order,
     get_order_asset_by_external_id,
@@ -19,8 +19,8 @@ from mpt_extension_sdk.mpt_http.mpt import (
     query_order,
     set_processing_template,
     update_agreement,
-    update_asset,
     update_order,
+    update_order_asset,
     update_subscription,
 )
 
@@ -340,14 +340,11 @@ def add_asset(client, adobe_subscription, order, line):
         return asset
 
     order_line = get_order_line_by_sku(order, line["offerId"])
-    asset = create_asset(
+    asset = create_order_asset(
         client, order["id"], create_asset_payload(adobe_subscription, order_line, line)
     )
     logger.info(
-        "Asset %s (%s) created for order %s",
-        line["subscriptionId"],
-        asset["id"],
-        order["id"],
+        "Asset %s (%s) created for order %s", line["subscriptionId"], asset["id"], order["id"]
     )
     return asset
 
@@ -1024,14 +1021,14 @@ class CreateOrUpdateAssets(Step):
             asset = order_line.get("asset")
             asset_data = create_asset_payload(adobe_subscription, order_line, line)
             if asset:
-                update_asset(
+                update_order_asset(
                     client, context.order_id, asset["id"], parameters=asset_data["parameters"]
                 )
                 logger.info(
                     "%s: asset %s (%s) updated.", context, line["subscriptionId"], asset["id"]
                 )
             else:
-                asset = create_asset(client, context.order_id, asset_data)
+                asset = create_order_asset(client, context.order_id, asset_data)
                 logger.info(
                     "%s: asset %s (%s) created", context, line["subscriptionId"], asset["id"]
                 )

@@ -4,8 +4,8 @@ from django.conf import settings
 from mpt_extension_sdk.core.utils import setup_client, setup_operations_client
 from mpt_extension_sdk.mpt_http.mpt import (
     create_agreement,
-    create_agreement_asset,
     create_agreement_subscription,
+    create_asset,
     create_listing,
     get_agreement,
     get_agreement_asset_by_external_id,
@@ -472,7 +472,7 @@ def create_gc_agreement_asset(
         "licensee": {"id": agreement_deployment.licensee_id},
         "seller": {"id": agreement_deployment.seller_id},
     }
-    asset = create_agreement_asset(mpt_client, asset)
+    asset = create_asset(mpt_client, asset)
     logger.info("Created GC agreement asset %s", asset["id"])
 
 

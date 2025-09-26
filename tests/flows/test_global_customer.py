@@ -701,7 +701,7 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     mocked_update_agreement.assert_called_once()
 
 
-def test_check_gc_agreement_deployments_create_agreement_asset(
+def test_check_gc_agreement_deployments_create_asset(
     mocker,
     mock_adobe_client,
     settings,
@@ -738,9 +738,7 @@ def test_check_gc_agreement_deployments_create_agreement_asset(
         "adobe_vipm.flows.global_customer.get_agreement_subscription_by_external_id",
         return_value=[],
     )
-    mocked_create_agreement_asset = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_agreement_asset",
-    )
+    mocked_create_asset = mocker.patch("adobe_vipm.flows.global_customer.create_asset")
     mocked_create_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.global_customer.create_agreement_subscription"
     )
@@ -786,7 +784,7 @@ def test_check_gc_agreement_deployments_create_agreement_asset(
     mocked_get_listing_by_id.assert_called_once()
     mocked_get_asset_by_external_id.assert_called_once()
     mocked_get_subscription_by_external_id.assert_not_called()
-    mocked_create_agreement_asset.assert_called_once()
+    mocked_create_asset.assert_called_once()
     mocked_create_agreement_subscription.assert_not_called()
     mocked_get_agreement.assert_called_once()
     mocked_get_sku_price.assert_called_once()
@@ -830,9 +828,7 @@ def test_check_gc_agreement_deployments_agreement_asset_exists(
     mocked_get_subscription_by_external_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_agreement_subscription_by_external_id"
     )
-    mocked_create_agreement_asset = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_agreement_asset"
-    )
+    mocked_create_asset = mocker.patch("adobe_vipm.flows.global_customer.create_asset")
     mocked_create_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.global_customer.create_agreement_subscription"
     )
@@ -872,7 +868,7 @@ def test_check_gc_agreement_deployments_agreement_asset_exists(
     mocked_get_listing_by_id.assert_called_once()
     mocked_get_asset_by_external_id.assert_called_once()
     mocked_get_subscription_by_external_id.assert_not_called()
-    mocked_create_agreement_asset.assert_not_called()
+    mocked_create_asset.assert_not_called()
     mocked_create_agreement_subscription.assert_not_called()
     mocked_get_agreement.assert_called_once()
 
@@ -1307,9 +1303,7 @@ def test_create_gc_agreement_asset(
     adobe_subscription_factory,
     items_factory,
 ):
-    mocked_create_agreement_asset = mocker.patch(
-        "adobe_vipm.flows.global_customer.create_agreement_asset"
-    )
+    mocked_create_asset = mocker.patch("adobe_vipm.flows.global_customer.create_asset")
     adobe_one_time_subscription = adobe_subscription_factory(
         offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
     )
@@ -1363,5 +1357,4 @@ def test_create_gc_agreement_asset(
         "licensee": {"id": "LC-321-321-321"},
         "seller": {"id": "SEL-321-321"},
     }
-
-    mocked_create_agreement_asset.assert_called_once_with(mock_mpt_client, expected_asset)
+    mocked_create_asset.assert_called_once_with(mock_mpt_client, expected_asset)
