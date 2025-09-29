@@ -46,6 +46,7 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_COMMERCIAL,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
+    ItemTermsModel,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -532,7 +533,9 @@ def _transfer_migrated(  # noqa: C901
         )
 
     one_time_skus = [
-        item["externalIds"]["vendor"] for item in items if item["terms"]["period"] == "one-time"
+        item["externalIds"]["vendor"]
+        for item in items
+        if item["terms"]["period"] == ItemTermsModel.ONE_TIME
     ]
     adobe_items_without_one_time_offers = [
         item

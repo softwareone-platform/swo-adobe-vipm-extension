@@ -5,7 +5,7 @@ import pytest
 from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_sku_price
-from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.constants import ItemTermsModel, Param
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
 from adobe_vipm.flows.global_customer import (
     check_gc_agreement_deployments,
@@ -752,7 +752,9 @@ def test_check_gc_agreement_deployments_create_asset(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-    product_items = items_factory(term_period="one-time", term_model="one-time")
+    product_items = items_factory(
+        term_period=ItemTermsModel.ONE_TIME.value, term_model=ItemTermsModel.ONE_TIME.value
+    )
     mocked_get_product_items_by_skus = mocker.patch(
         "adobe_vipm.flows.global_customer.get_product_items_by_skus", return_value=product_items
     )
@@ -836,7 +838,9 @@ def test_check_gc_agreement_deployments_agreement_asset_exists(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-    product_items = items_factory(term_period="one-time", term_model="one-time")
+    product_items = items_factory(
+        term_period=ItemTermsModel.ONE_TIME.value, term_model=ItemTermsModel.ONE_TIME.value
+    )
     mocked_get_product_items_by_skus = mocker.patch(
         "adobe_vipm.flows.global_customer.get_product_items_by_skus", return_value=product_items
     )
@@ -1308,7 +1312,9 @@ def test_create_gc_agreement_asset(
         offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
     )
     item = items_factory(
-        external_vendor_id="99999999CA01A12", term_model="one-time", term_period="one-time"
+        external_vendor_id="99999999CA01A12",
+        term_model=ItemTermsModel.ONE_TIME.value,
+        term_period=ItemTermsModel.ONE_TIME.value,
     )[0]
     agreement_id = "AGR-0123"
     buyer_id = "buyer_id"

@@ -18,6 +18,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_PROCESSING,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_UPDATING_TRANSFER_ITEMS,
+    ItemTermsModel,
     Param,
 )
 from adobe_vipm.flows.utils import get_ordering_parameter
@@ -496,7 +497,9 @@ def test_validate_transfer_already_migrated_all_items_expired(
     )
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
-    ) + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
+    ) + items_factory(
+        item_id=2, external_vendor_id="99999999CA", term_period=ItemTermsModel.ONE_TIME.value
+    )
 
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
@@ -564,7 +567,9 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
-    ) + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
+    ) + items_factory(
+        item_id=2, external_vendor_id="99999999CA", term_period=ItemTermsModel.ONE_TIME.value
+    )
     mocked_get_transfer = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=mocked_transfer,
@@ -965,7 +970,9 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
-    ) + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
+    ) + items_factory(
+        item_id=2, external_vendor_id="99999999CA", term_period=ItemTermsModel.ONE_TIME.value
+    )
     product_items.extend(
         items_factory(
             item_id=2,
@@ -1229,7 +1236,9 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
     )
     product_items.extend(
         items_factory(item_id=2, name="Awesome Expired product 2", external_vendor_id="65304991CA")
-        + items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
+        + items_factory(
+            item_id=2, external_vendor_id="99999999CA", term_period=ItemTermsModel.ONE_TIME.value
+        )
     )
     mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
@@ -1440,7 +1449,9 @@ def test_validate_transfer_with_one_line_items(
     order = order_factory(order_parameters=transfer_order_parameters_factory(), lines=[])
     product_items = items_factory()
     product_items.extend(
-        items_factory(item_id=2, external_vendor_id="99999999CA", term_period="one-time")
+        items_factory(
+            item_id=2, external_vendor_id="99999999CA", term_period=ItemTermsModel.ONE_TIME.value
+        )
     )
     valid_items = adobe_items_factory(renewal_date=today.isoformat())
     one_time_item = adobe_items_factory(
@@ -1486,7 +1497,7 @@ def test_validate_transfer_with_one_line_items(
                 "externalIds": {"vendor": "99999999CA"},
                 "id": "ITM-1234-1234-1234-0002",
                 "name": "Awesome product",
-                "terms": {"model": "quantity", "period": "one-time"},
+                "terms": {"model": "quantity", "period": ItemTermsModel.ONE_TIME.value},
             },
             "oldQuantity": 0,
             "price": {"unitPP": 0},
