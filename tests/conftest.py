@@ -1,17 +1,12 @@
 import copy
 import datetime as dt
-import json
-import signal
 from collections import defaultdict
 
 import jwt
 import pytest
 import responses
-from django.conf import settings
-from mpt_extension_sdk.core.events.dataclasses import Event
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
-from rich.highlighter import ReprHighlighter as _ReprHighlighter
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
@@ -788,29 +783,6 @@ def items_factory():
 
 
 @pytest.fixture
-def pricelist_items_factory():
-    def _items(
-        item_id=1,
-        external_vendor_id="65304578CA",
-        unit_purchase_price=1234.55,
-    ):
-        return [
-            {
-                "id": f"PRI-1234-1234-1234-{item_id:04d}",
-                "item": {
-                    "id": f"ITM-1234-1234-1234-{item_id:04d}",
-                    "externalIds": {
-                        "vendor": external_vendor_id,
-                    },
-                },
-                "unitPP": unit_purchase_price,
-            },
-        ]
-
-    return _items
-
-
-@pytest.fixture
 def lines_factory(agreement, deployment_id=None):
     agreement_id = agreement["id"].split("-", 1)[1]
 
@@ -1317,33 +1289,6 @@ def buyer():
 
 
 @pytest.fixture
-def seller():
-    return {
-        "id": "SEL-9121-8944",
-        "href": "/accounts/sellers/SEL-9121-8944",
-        "name": "SWO US",
-        "icon": "/static/SEL-9121-8944/icon.png",
-        "address": {
-            "country": "US",
-            "region": "CA",
-            "city": "San Jose",
-            "addressLine1": "3601 Lyon St",
-            "addressLine2": "",
-            "postCode": "94123",
-        },
-        "contact": {
-            "firstName": "Francesco",
-            "lastName": "Faraone",
-            "email": "francesco.faraone@softwareone.com",
-            "phone": {
-                "prefix": "+1",
-                "number": "4082954078",
-            },
-        },
-    }
-
-
-@pytest.fixture
 def webhook(settings):
     return {
         "id": "WH-123-123",
@@ -1695,16 +1640,6 @@ def airtable_error_factory():
 
 
 @pytest.fixture
-def mpt_list_response():
-    def _wrap_response(objects_list):
-        return {
-            "data": objects_list,
-        }
-
-    return _wrap_response
-
-
-@pytest.fixture
 def jwt_token(settings):
     iat = nbf = int(dt.datetime.now(tz=dt.UTC).timestamp())
     exp = nbf + 300
@@ -1720,13 +1655,6 @@ def jwt_token(settings):
         get_for_product(settings, "WEBHOOKS_SECRETS", "PRD-1111-1111"),
         algorithm="HS256",
     )
-
-
-@pytest.fixture
-def extension_settings(settings):
-    current_extension_config = copy.copy(settings.EXTENSION_CONFIG)
-    yield settings
-    settings.EXTENSION_CONFIG = current_extension_config
 
 
 @pytest.fixture
@@ -1874,64 +1802,11 @@ def mocked_pricelist_cache(mock_pricelist_cache_factory):
 
 
 @pytest.fixture
-def mocked_setup_master_signal_handler():
-    signal_handler = signal.getsignal(signal.SIGINT)
-
-    def handler(signum, frame):
-        print("Signal handler called with signal", signum)
-        signal.signal(signal.SIGINT, signal_handler)
-
-    signal.signal(signal.SIGINT, handler)
-
-
-@pytest.fixture
-def mock_gradient_result():
-    return [
-        "#00C9CD",
-        "#07B7D2",
-        "#0FA5D8",
-        "#1794DD",
-        "#1F82E3",
-        "#2770E8",
-        "#2F5FEE",
-        "#374DF3",
-        "#3F3BF9",
-        "#472AFF",
-    ]
-
-
-@pytest.fixture
 def mock_runtime_master_options():
     return {
         "color": True,
         "debug": False,
         "reload": True,
-        "component": "all",
-    }
-
-
-@pytest.fixture
-def mock_swoext_commands():
-    return (
-        "mpt_extension_sdk.runtime.commands.run.run",
-        "mpt_extension_sdk.runtime.commands.django.django",
-    )
-
-
-@pytest.fixture
-def mock_dispatcher_event():
-    return {
-        "type": "event",
-        "id": "event-id",
-    }
-
-
-@pytest.fixture
-def mock_workers_options():
-    return {
-        "color": False,
-        "debug": False,
-        "reload": False,
         "component": "all",
     }
 
@@ -1979,193 +1854,6 @@ def mock_gunicorn_logging_config():
                 "propagate": False,
             },
             "swo.mpt": {},
-        },
-    }
-
-
-@pytest.fixture
-def mock_wrap_event():
-    return Event("evt-id", "orders", {"id": "ORD-1111-1111"})
-
-
-@pytest.fixture
-def mock_meta_with_pagination_has_more_pages():
-    return {
-        "$meta": {
-            "pagination": {
-                "offset": 0,
-                "limit": 10,
-                "total": 12,
-            },
-        },
-    }
-
-
-@pytest.fixture
-def mock_meta_with_pagination_has_no_more_pages():
-    return {
-        "$meta": {
-            "pagination": {
-                "offset": 0,
-                "limit": 10,
-                "total": 4,
-            },
-        },
-    }
-
-
-@pytest.fixture
-def mock_logging_account_prefixes():
-    return ("ACC", "BUY", "LCE", "MOD", "SEL", "USR", "AUSR", "UGR")
-
-
-@pytest.fixture
-def mock_logging_catalog_prefixes():
-    return (
-        "PRD",
-        "ITM",
-        "IGR",
-        "PGR",
-        "MED",
-        "DOC",
-        "TCS",
-        "TPL",
-        "WHO",
-        "PRC",
-        "LST",
-        "AUT",
-        "UNT",
-    )
-
-
-@pytest.fixture
-def mock_logging_commerce_prefixes():
-    return ("AGR", "ORD", "SUB", "REQ")
-
-
-@pytest.fixture
-def mock_logging_aux_prefixes():
-    return ("FIL", "MSG")
-
-
-@pytest.fixture
-def mock_logging_all_prefixes(
-    mock_logging_account_prefixes,
-    mock_logging_catalog_prefixes,
-    mock_logging_commerce_prefixes,
-    mock_logging_aux_prefixes,
-):
-    return (
-        *mock_logging_account_prefixes,
-        *mock_logging_catalog_prefixes,
-        *mock_logging_commerce_prefixes,
-        *mock_logging_aux_prefixes,
-    )
-
-
-@pytest.fixture
-def mock_highlights(mock_logging_all_prefixes):
-    return [
-        *_ReprHighlighter.highlights,
-        rf"(?P<mpt_id>(?:{'|'.join(mock_logging_all_prefixes)})(?:-\d{{4}})*)",
-    ]
-
-
-@pytest.fixture
-def mock_settings_product_ids():
-    return ",".join(settings.MPT_PRODUCTS_IDS)
-
-
-@pytest.fixture
-def mock_ext_expected_environment_values(
-    mock_env_webhook_secret,
-    mock_env_airtable_base,
-    mock_env_airtable_pricing_base,
-    mock_env_product_segment,
-):
-    return {
-        "WEBHOOKS_SECRETS": json.loads(mock_env_webhook_secret),
-        "AIRTABLE_BASES": json.loads(mock_env_airtable_base),
-        "AIRTABLE_PRICING_BASES": json.loads(mock_env_airtable_pricing_base),
-        "PRODUCT_SEGMENT": json.loads(mock_env_product_segment),
-    }
-
-
-@pytest.fixture
-def mock_env_webhook_secret():
-    return '{ "webhook_secret": "WEBHOOK_SECRET" }'
-
-
-@pytest.fixture
-def mock_env_airtable_base():
-    return '{ "airtable_base": "AIRTABLE_BASE" }'
-
-
-@pytest.fixture
-def mock_env_airtable_pricing_base():
-    return '{ "airtable_pricing_base": "AIRTABLE_PRICING_BASE" }'
-
-
-@pytest.fixture
-def mock_env_product_segment():
-    return '{ "product_segment": "PRODUCT_SEGMENT" }'
-
-
-@pytest.fixture
-def mock_env_invalid_product_segment():
-    return '{ "field_1": , , "field2": "very bad json"}'
-
-
-@pytest.fixture
-def mock_valid_env_values(
-    mock_env_webhook_secret,
-    mock_env_airtable_base,
-    mock_env_airtable_pricing_base,
-    mock_env_product_segment,
-):
-    return {
-        "EXT_WEBHOOKS_SECRETS": mock_env_webhook_secret,
-        "EXT_AIRTABLE_BASES": mock_env_airtable_base,
-        "EXT_AIRTABLE_PRICING_BASES": mock_env_airtable_pricing_base,
-        "EXT_PRODUCT_SEGMENT": mock_env_product_segment,
-    }
-
-
-@pytest.fixture
-def mock_invalid_env_values(
-    mock_env_webhook_secret,
-    mock_env_airtable_base,
-    mock_env_airtable_pricing_base,
-    mock_env_invalid_product_segment,
-):
-    return {
-        "EXT_WEBHOOKS_SECRETS": mock_env_webhook_secret,
-        "EXT_AIRTABLE_BASES": mock_env_airtable_base,
-        "EXT_AIRTABLE_PRICING_BASES": mock_env_airtable_pricing_base,
-        "EXT_PRODUCT_SEGMENT": mock_env_invalid_product_segment,
-    }
-
-
-@pytest.fixture
-def mock_worker_initialize(mocker):
-    return mocker.patch("mpt_extension_sdk.runtime.workers.initialize")
-
-
-@pytest.fixture
-def mock_worker_call_command(mocker):
-    return mocker.patch("mpt_extension_sdk.runtime.workers.call_command")
-
-
-@pytest.fixture
-def mock_get_order_for_producer(mock_order):
-    return {
-        "data": [mock_order],
-        "$meta": {
-            "pagination": {
-                "offset": 0,
-                "limit": 10,
-                "total": 1,
-            },
         },
     }
 
@@ -2224,11 +1912,6 @@ def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
         new=get_adobe_product_by_marketplace_sku,
         spec=True,
     )
-
-
-@pytest.fixture
-def mock_notify_processing_lost_customer(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.notify_processing_lost_customer", autospec=True)
 
 
 @pytest.fixture
