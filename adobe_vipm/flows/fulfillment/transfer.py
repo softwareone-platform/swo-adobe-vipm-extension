@@ -46,6 +46,7 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_COMMERCIAL,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
+    ItemTermsModel,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -294,14 +295,16 @@ def _fulfill_transfer_migrated(  # noqa: C901
         if get_partial_sku(line["offerId"]) in one_time_skus:  # pragma: no cover
             add_asset(mpt_client, adobe_subscription, order, line)
         else:
-            if transfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
-                adobe_subscription = adobe_client.update_subscription(
-                    authorization_id,
-                    transfer.customer_id,
-                    line["subscriptionId"],
-                    auto_renewal=True,
-                )
-            subscription = add_subscription(mpt_client, adobe_subscription, order, line)
+            subscription = _sync_subscription_order(
+                adobe_client,
+                mpt_client,
+                adobe_subscription,
+                authorization_id,
+                transfer.customer_benefits_3yc_status,
+                transfer.customer_id,
+                order,
+                line,
+            )
             if subscription and not commitment_date:  # pragma: no branch
                 # subscription are cotermed so it's ok to take the first created
                 commitment_date = subscription["commitmentDate"]
@@ -530,7 +533,9 @@ def _transfer_migrated(  # noqa: C901
         )
 
     one_time_skus = [
-        item["externalIds"]["vendor"] for item in items if item["terms"]["period"] == "one-time"
+        item["externalIds"]["vendor"]
+        for item in items
+        if item["terms"]["period"] == ItemTermsModel.ONE_TIME
     ]
     adobe_items_without_one_time_offers = [
         item
