@@ -532,9 +532,9 @@ def get_prices_for_3yc_skus(  # noqa: C901
 
 def get_sku_price(
     adobe_customer: dict, offer_ids: list[str], product_id: str, deployment_currency: str
-) -> float | None:
+) -> dict[str, float]:
     """
-    Get the SKU price considering the level dicount and the 3YC commitment.
+    Get the SKU price considering the level discount and the 3YC commitment.
 
     Args:
         adobe_customer: Adobe customer
@@ -543,7 +543,7 @@ def get_sku_price(
         deployment_currency: deployment currency
 
     Returns:
-        float or None: Sku price if is available, None in other case
+        dict: Sku price if is available, empty dict otherwise.
     """
     commitment_start_date = get_commitment_start_date(adobe_customer)
 

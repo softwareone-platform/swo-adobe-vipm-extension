@@ -22,7 +22,7 @@ from adobe_vipm.airtable.models import (
     AirTableBaseInfo,
     get_sku_adobe_mapping_model,
 )
-from adobe_vipm.flows.constants import AgreementStatus, Param
+from adobe_vipm.flows.constants import AgreementStatus, AssetStatus, ItemTermsModel, Param
 
 
 @pytest.fixture()
@@ -862,13 +862,14 @@ def assets_factory(lines_factory):
         asset_id="AST-1000-2000-3000",
         product_name="Awesome product",
         adobe_subscription_id="a-sub-id",
-        adobe_sku="65304578CA01A12",
+        adobe_sku="65327701CA01A12",
         lines=None,
     ):
         lines = lines_factory() if lines is None else lines
         return [
             {
                 "id": asset_id,
+                "status": AssetStatus.ACTIVE.value,
                 "name": f"Asset for {product_name}",
                 "price": {"PPx1": 12595.2, "currency": "USD"},
                 "parameters": {
@@ -906,7 +907,10 @@ def assets_factory(lines_factory):
                     "vendor": adobe_subscription_id,
                 },
                 "lines": lines,
-                "terms": {"model": "one-time", "period": "one-time"},
+                "terms": {
+                    "model": ItemTermsModel.ONE_TIME.value,
+                    "period": ItemTermsModel.ONE_TIME.value,
+                },
             }
         ]
 
@@ -978,18 +982,23 @@ def subscriptions_factory(lines_factory, subscription_price_factory):
 
 
 @pytest.fixture()
-def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_factory):
+def agreement_factory(
+    assets_factory, buyer, order_parameters_factory, fulfillment_parameters_factory
+):
     def _agreement(
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
         use_buyer_address=False,  # noqa: FBT002
+        assets=None,
         subscriptions=None,
         fulfillment_parameters=None,
         ordering_parameters=None,
         lines=None,
         status=AgreementStatus.ACTIVE.value,
     ):
+        if assets is None:
+            assets = assets_factory()
         if not subscriptions:
             subscriptions = [
                 {
@@ -1077,6 +1086,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             },
             "authorization": {"id": "AUT-1234-5678"},
             "lines": lines or [],
+            "assets": assets,
             "subscriptions": subscriptions,
             "parameters": {
                 "ordering": ordering_parameters or order_parameters_factory(),

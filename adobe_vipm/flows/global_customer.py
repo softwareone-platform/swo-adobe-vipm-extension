@@ -37,6 +37,7 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_COMMERCIAL,
     MPT_ORDER_STATUS_COMPLETED,
     TEMPLATE_NAME_TRANSFER,
+    ItemTermsModel,
     Param,
 )
 from adobe_vipm.flows.utils import (
@@ -461,7 +462,7 @@ def create_gc_agreement_asset(
         "externalIds": {"vendor": adobe_subscription_id},
         "lines": [
             {
-                "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
+                "quantity": adobe_subscription[Param.CURRENT_QUANTITY],
                 "item": item,
                 **unit_price,
             }
@@ -524,7 +525,7 @@ def create_gc_agreement_subscription(
         "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
         "lines": [
             {
-                "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
+                "quantity": adobe_subscription[Param.CURRENT_QUANTITY],
                 "item": item,
                 **unit_price,
             }
@@ -719,7 +720,7 @@ def process_adobe_subscriptions_from_agreement(
             continue
 
         item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
-        if item["terms"]["model"] == "one-time":
+        if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
             asset = get_agreement_asset_by_external_id(
                 mpt_client, gc_agreement_id, adobe_subscription_id
             )
