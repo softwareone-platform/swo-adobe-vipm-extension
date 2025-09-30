@@ -13,21 +13,18 @@ class SubscriptionClientMixin:
 
     @wrap_http_error
     def get_subscription(
-        self,
-        authorization_id: str,
-        customer_id: str,
-        subscription_id: str,
+        self, authorization_id: str, customer_id: str, subscription_id: str
     ) -> dict:
         """
         Retrieve a subscription by its identifier.
 
         Args:
             authorization_id: Id of the authorization to use.
-            customer_id: Identifier of the customer to which the subscriptions belongs to.
+            customer_id: Identifier of the customer to which the subscriptions belong to.
             subscription_id: List of base parts of whole Adobe Offer Ids
 
         Returns:
-            dict: The retrieved subscriptions.
+           The retrieved subscriptions.
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
@@ -43,33 +40,53 @@ class SubscriptionClientMixin:
         return response.json()
 
     @wrap_http_error
-    def get_subscriptions(
-        self,
-        authorization_id: str,
-        customer_id: str,
-    ) -> dict:
+    def get_subscriptions(self, authorization_id: str, customer_id: str) -> dict:
         """
         Retrieve all the subscriptions of the given customer.
 
         Args:
-            authorization_id: Id of the authorization to use.
-            customer_id: Identifier of the customer to which the subscriptions belongs to.
+            authorization_id: ID of the authorization to use.
+            customer_id: Identifier of the customer to which the subscriptions belong to.
 
         Returns:
-            dict: The retrieved subscriptions.
+            The retrieved subscriptions.
         """
         authorization = self._config.get_authorization(authorization_id)
-        headers = self._get_headers(authorization)
         response = requests.get(
-            urljoin(
-                self._config.api_base_url,
-                f"/v3/customers/{customer_id}/subscriptions",
-            ),
-            headers=headers,
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/subscriptions"),
+            headers=self._get_headers(authorization),
             timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
+
+    # TODO: Merge this method with get_subscriptions in a separate PR. Created to prevent
+    # breaking existing code.
+    @wrap_http_error
+    def get_subscriptions_by_deployment(
+        self, authorization_id: str, customer_id: str, deployment_id: str | None = None
+    ):
+        """Retrieve all the subscriptions of the given customer and deployment ID.
+
+        Args:
+            authorization_id: ID of the authorization to use.
+            customer_id: Identifier of the customer to which the subscriptions belong to.
+            deployment_id: Identifier of the deployment to which the subscriptions belong to.
+
+        Returns:
+            The retrieved subscriptions.
+        """
+        subscriptions = self.get_subscriptions(
+            authorization_id=authorization_id, customer_id=customer_id
+        )
+        filtered_items = [
+            sub for sub in subscriptions["items"] if sub.get(Param.DEPLOYMENT_ID) == deployment_id
+        ]
+        return {
+            "items": filtered_items,
+            "links": subscriptions["links"],
+            "totalCount": len(filtered_items),
+        }
 
     @wrap_http_error
     def get_subscriptions_for_offers(
@@ -89,7 +106,7 @@ class SubscriptionClientMixin:
             base_offer_ids: List of base parts of whole Adobe Offer Ids
 
         Returns:
-            dict: The retrieved subscriptions.
+            The retrieved subscriptions.
         """
         subscriptions = self.get_subscriptions(authorization_id, customer_id)["items"]
         active_subscriptions = filter(
@@ -150,6 +167,6 @@ class SubscriptionClientMixin:
             timeout=self._TIMEOUT,
         )
         response.raise_for_status()
-        # patch doesn't return half of the fields in subscriptions representaion
+        # patch doesn't return half of the fields in subscriptions representation
         # missed fields are offerId, usedQuantity
         return self.get_subscription(authorization_id, customer_id, subscription_id)

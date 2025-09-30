@@ -1,5 +1,6 @@
 import copy
 import functools
+from typing import Any
 
 from mpt_extension_sdk.mpt_http.utils import find_first
 
@@ -11,7 +12,7 @@ from adobe_vipm.flows.constants import (
 )
 
 
-def get_parameter(parameter_phase: str, source: str, param_external_id: str) -> dict:
+def get_parameter(parameter_phase: str, source: dict[str, Any], param_external_id: str) -> dict:
     """
     Returns a parameter of a given phase by its external identifier.
 
