@@ -390,6 +390,13 @@ ERR_SKU_AVAILABILITY = ValidationError(
 )
 
 
+class AssetStatus(StrEnum):
+    """MPT asset statuses."""
+
+    ACTIVE = "Active"
+    TERMINATED = "Terminated"
+
+
 class SubscriptionStatus(StrEnum):
     """MPT subscription statuses."""
 
@@ -416,3 +423,11 @@ class TeamsColorCode(StrEnum):
 
     # TODO: add all used colors
     ORANGE = "FFA500"
+
+
+class ItemTermsModel(StrEnum):
+    """MPT item terms model."""
+
+    ONE_TIME = "one-time"
+    USAGE = "usage"
+    QUANTITY = "quantity"
