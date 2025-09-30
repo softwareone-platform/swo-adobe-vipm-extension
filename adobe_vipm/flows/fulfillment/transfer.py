@@ -1155,8 +1155,8 @@ class ValidateTransfer(Step):
 
     def __call__(self, client, context, next_step):
         """Validates the transfer order by checking membership and items."""
-        context.adobe_order_id = get_adobe_order_id(context.order)
-        if context.adobe_order_id:
+        context.adobe_new_order_id = get_adobe_order_id(context.order)
+        if context.adobe_new_order_id:
             next_step(client, context)
             return
 
@@ -1167,7 +1167,7 @@ class ValidateTransfer(Step):
         if not context.order:
             return
 
-        context.adobe_order_id = context.order["externalIds"]["vendor"]
+        context.adobe_new_order_id = context.order["externalIds"]["vendor"]
         next_step(client, context)
 
 
@@ -1177,7 +1177,7 @@ class CheckAdobeTransferOrder(Step):
     def __call__(self, client, context, next_step):
         """Checks if the Adobe transfer order has been fulfilled."""
         context.adobe_transfer_order = _check_adobe_transfer_order_fulfilled(
-            client, context.order, context.membership_id, context.adobe_order_id
+            client, context.order, context.membership_id, context.adobe_new_order_id
         )
         if not context.adobe_transfer_order:
             return
@@ -1220,7 +1220,7 @@ class GetAdobeCustomer(Step):
         context.order = save_adobe_order_id_and_customer_data(
             client,
             context.order,
-            context.adobe_order_id,
+            context.adobe_new_order_id,
             context.adobe_customer,
         )
 
@@ -1259,7 +1259,7 @@ class ProcessTransferOrder(Step):
         context.order = save_adobe_order_id_and_customer_data(
             client,
             context.order,
-            context.adobe_order_id,
+            context.adobe_new_order_id,
             context.adobe_customer,
         )
         next_step(client, context)
