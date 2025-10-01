@@ -50,9 +50,7 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_QUERYING,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
-    TEMPLATE_SUBSCRIPTION_AUTORENEWAL_DISABLE,
     TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
-    TEMPLATE_SUBSCRIPTION_EXPIRED,
     Param,
 )
 from adobe_vipm.flows.pipeline import Step
@@ -85,6 +83,9 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date
 from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
+from adobe_vipm.flows.utils.subscription import (
+    get_template_name_by_subscription,
+)
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
 from adobe_vipm.notifications import mpt_notify
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
@@ -1219,17 +1220,22 @@ class SetSubscriptionTemplate(Step):
             context.authorization_id,
             context.adobe_customer_id,
         )
+
+        adobe_subscriptions_map = {
+            item["subscriptionId"]: item for item in adobe_subscriptions["items"]
+        }
+
         for subscription in context.order["agreement"]["subscriptions"]:
             subscription_id = subscription["externalIds"]["vendor"]
-            adobe_subscription = [
-                item
-                for item in adobe_subscriptions["items"]
-                if item["subscriptionId"] == subscription_id
-            ]
+            adobe_subscription = adobe_subscriptions_map.get(subscription_id)
+
             if not adobe_subscription:
+                logger.warning(
+                    "%s: Adobe subscription %s not found, skipping", context, subscription_id
+                )
                 continue
 
-            template_name = self._get_template_name(adobe_subscription[0])
+            template_name = get_template_name_by_subscription(adobe_subscription)
             template = get_template_by_name(
                 client,
                 context.order["agreement"]["product"]["id"],
@@ -1245,14 +1251,6 @@ class SetSubscriptionTemplate(Step):
             )
 
         next_step(client, context)
-
-    def _get_template_name(self, adobe_subscription):
-        if adobe_subscription.get("status") == AdobeStatus.SUBSCRIPTION_TERMINATED:
-            return TEMPLATE_SUBSCRIPTION_EXPIRED
-
-        if adobe_subscription.get("autoRenewal", {}).get("enabled"):
-            return TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE
-        return TEMPLATE_SUBSCRIPTION_AUTORENEWAL_DISABLE
 
 
 class SyncAgreement(Step):
