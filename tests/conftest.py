@@ -2063,11 +2063,29 @@ def mock_worker_initialize(mocker):
 
 @pytest.fixture()
 def mock_adobe_client(mocker):
-    m = mocker.MagicMock(spec=AdobeClient)
-    mocker.patch("adobe_vipm.flows.benefits.get_adobe_client", return_value=m)
-    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", return_value=m)
-    return m
+    adobe_client = mocker.MagicMock(spec=AdobeClient)
+    paths = [
+        "adobe_vipm.flows.benefits.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        "adobe_vipm.flows.global_customer.get_adobe_client",
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        "adobe_vipm.flows.migration.get_adobe_client",
+        "adobe_vipm.flows.sync.get_adobe_client",
+        "adobe_vipm.flows.validation.termination.get_adobe_client",
+        "adobe_vipm.flows.validation.change.get_adobe_client",
+        "adobe_vipm.flows.validation.shared.get_adobe_client",
+        "adobe_vipm.flows.validation.transfer.get_adobe_client",
+        "adobe_vipm.management.commands.create_resellers.get_adobe_client",
+    ]
+    for path in paths:
+        mocker.patch(path, return_value=adobe_client)
 
+    return adobe_client
 
 @pytest.fixture()
 def mock_worker_call_command(mocker):

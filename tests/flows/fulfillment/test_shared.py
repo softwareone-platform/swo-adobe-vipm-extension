@@ -2107,7 +2107,7 @@ def test_create_or_update_subscriptions_step_without_template(
             "template": None,
         },
     )
-    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_set_subscription_template_step(

@@ -164,7 +164,7 @@ def _add_missing_subscriptions(
                 {
                     "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
                     "item": item,
-                    **unit_price,
+                    **price_component,
                 }
             ],
             "name": f"Subscription for {item.get('name')}",

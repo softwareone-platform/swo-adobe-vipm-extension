@@ -46,7 +46,7 @@ def mock_create_agreement_subscription(mocker):
     return mocker.patch("adobe_vipm.flows.sync.create_agreement_subscription", spec=True)
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_get_template_by_name(mocker):
     return mocker.patch("adobe_vipm.flows.sync.get_template_by_name", spec=True)
 
@@ -65,7 +65,6 @@ def test_sync_agreement_prices(
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
     mock_mpt_client,
-    mock_update_agreement,
     mock_get_template_by_name,
 ):
     agreement = agreement_factory(
@@ -754,7 +753,6 @@ def test_sync_agreement_prices_with_3yc(
     mock_mpt_client,
     mock_update_agreement_subscription,
     mock_get_agreement_subscription,
-    mock_update_agreement,
     mock_get_template_by_name,
 ):
     agreement = agreement_factory(
@@ -1190,7 +1188,6 @@ def test_sync_global_customer_update_adobe_error(
     mock_adobe_client,
     mock_get_adobe_client,
     mock_mpt_client,
-    mock_update_agreement,
     mock_update_agreement_subscription,
     mock_get_agreement_subscription,
     mock_get_template_by_name,
@@ -1569,7 +1566,6 @@ def test_sync_agreement_prices_with_missing_prices(
     caplog,
     mock_update_agreement_subscription,
     mock_get_agreement_subscription,
-    mock_update_agreement,
     mock_get_template_by_name,
 ):
     agreement = agreement_factory(
