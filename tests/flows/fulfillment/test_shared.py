@@ -2376,4 +2376,5 @@ def test_set_subscription_template_step_subscription_not_found(
 
     mocked_get_template.assert_not_called()
     mocked_update_agreement_subscription.assert_not_called()
+
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)

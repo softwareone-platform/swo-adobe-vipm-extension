@@ -82,6 +82,7 @@ from .subscription import (
     get_price_item_by_line_sku,
     get_sku_with_discount_level,
     get_subscription_by_line_and_item_id,
+    get_template_name_by_subscription,
     get_transfer_item_sku_by_subscription,
     is_consumables_sku,
     is_line_item_active_subscription,
