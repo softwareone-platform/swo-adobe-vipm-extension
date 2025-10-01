@@ -6,7 +6,7 @@ from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 def mock_get_agreements_by_query(mocker):
     mock = mocker.MagicMock(spec=get_agreements_by_query)
     mocker.patch("adobe_vipm.flows.mpt.get_agreements_by_query", new=mock)
-    mocker.patch("adobe_vipm.flows.sync.get_agreements_by_query", new=mock)
+    mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_agreements_by_query", new=mock)
     return mock
 
 
@@ -26,7 +26,7 @@ def mock_get_agreements_by_customer_deployments(
     ]
 
     return mocker.patch(
-        "adobe_vipm.flows.sync.get_agreements_by_customer_deployments",
+        "mpt_extension_sdk.mpt_http.mpt.get_agreements_by_customer_deployments",
         spec=True,
         return_value=deployment_agreements,
     )
@@ -34,7 +34,7 @@ def mock_get_agreements_by_customer_deployments(
 
 @pytest.fixture
 def mock_terminate_subscription(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.terminate_subscription", spec=True)
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.terminate_subscription", spec=True)
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def mock_get_adobe_client(mocker, mock_adobe_client):
 @pytest.fixture
 def mock_get_agreement_subscription(mocker, subscriptions_factory):
     return mocker.patch(
-        "adobe_vipm.flows.sync.get_agreement_subscription",
+        "mpt_extension_sdk.mpt_http.mpt.get_agreement_subscription",
         return_value=subscriptions_factory()[0],
         spec=True,
     )
@@ -68,7 +68,7 @@ def mock_get_agreement_subscription(mocker, subscriptions_factory):
 
 @pytest.fixture
 def mock_update_agreement_subscription(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.update_agreement_subscription", spec=True)
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement_subscription", spec=True)
 
 
 @pytest.fixture
@@ -177,6 +177,6 @@ def mock_update_subscriptions(mocker):
 @pytest.fixture
 def mock_get_product_items_by_period(mocker):
     return mocker.patch(
-        "adobe_vipm.flows.sync.get_product_items_by_period",
+        "mpt_extension_sdk.mpt_http.mpt.get_product_items_by_period",
         spec=True,
     )

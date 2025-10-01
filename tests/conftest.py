@@ -1927,7 +1927,7 @@ def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
 @pytest.fixture
 def mock_get_product_items_by_skus(mocker, items_factory):
     return mocker.patch(
-        "adobe_vipm.flows.sync.get_product_items_by_skus",
+        "mpt_extension_sdk.mpt_http.mpt.get_product_items_by_skus",
         return_value=items_factory(),
         autospec=True,
     )
@@ -1980,4 +1980,9 @@ def mock_settings(settings):
 
 @pytest.fixture
 def mock_pymsteams(mocker):
-    mocker.patch("pymsteams.connectorcard", autospec=True)
+    return mocker.patch("pymsteams.connectorcard", autospec=True)
+
+
+@pytest.fixture
+def mock_update_agreement(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement", autospec=True)
