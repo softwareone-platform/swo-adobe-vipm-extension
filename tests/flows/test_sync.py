@@ -46,6 +46,11 @@ def mock_create_agreement_subscription(mocker):
     return mocker.patch("adobe_vipm.flows.sync.create_agreement_subscription", spec=True)
 
 
+@pytest.fixture()
+def mock_get_template_by_name(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.get_template_by_name", spec=True)
+
+
 @freeze_time("2025-06-23")
 def test_sync_agreement_prices(
     mocker,
@@ -60,6 +65,7 @@ def test_sync_agreement_prices(
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
     mock_mpt_client,
+    mock_get_template_by_name,
 ):
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
@@ -98,6 +104,7 @@ def test_sync_agreement_prices(
     )
 
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
@@ -135,6 +142,7 @@ def test_sync_agreement_prices(
             },
             commitmentDate="2025-04-04",
             autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+            template={"id": "TPL-1234", "name": "Renewing"},
         ),
         mocker.call(
             mock_mpt_client,
@@ -167,6 +175,7 @@ def test_sync_agreement_prices(
             },
             commitmentDate="2025-04-04",
             autoRenew=another_adobe_subscription["autoRenewal"]["enabled"],
+            template={"id": "TPL-1234", "name": "Renewing"},
         ),
     ]
 
@@ -743,6 +752,8 @@ def test_sync_agreement_prices_with_3yc(
     mock_get_adobe_client,
     mock_mpt_client,
     mock_update_agreement_subscription,
+    mock_get_agreement_subscription,
+    mock_get_template_by_name,
 ):
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11)
@@ -765,6 +776,8 @@ def test_sync_agreement_prices_with_3yc(
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
     )
+
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
@@ -798,6 +811,7 @@ def test_sync_agreement_prices_with_3yc(
         },
         commitmentDate="2025-04-04",
         autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+        template={"id": "TPL-1234", "name": "Renewing"},
     )
 
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
@@ -1174,6 +1188,9 @@ def test_sync_global_customer_update_adobe_error(
     mock_adobe_client,
     mock_get_adobe_client,
     mock_mpt_client,
+    mock_update_agreement_subscription,
+    mock_get_agreement_subscription,
+    mock_get_template_by_name,
 ):
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
@@ -1230,6 +1247,7 @@ def test_sync_global_customer_update_adobe_error(
     mocked_notifier = mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
     )
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
@@ -1267,6 +1285,7 @@ def test_sync_global_customer_update_adobe_error(
             },
             commitmentDate="2025-04-04",
             autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+            template={"id": "TPL-1234", "name": "Renewing"},
         ),
         mocker.call(
             mock_mpt_client,
@@ -1296,6 +1315,7 @@ def test_sync_global_customer_update_adobe_error(
             },
             commitmentDate="2025-04-04",
             autoRenew=another_adobe_subscription["autoRenewal"]["enabled"],
+            template={"id": "TPL-1234", "name": "Renewing"},
         ),
     ]
 
@@ -1544,6 +1564,9 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_mpt_client,
     mock_adobe_client,
     caplog,
+    mock_update_agreement_subscription,
+    mock_get_agreement_subscription,
+    mock_get_template_by_name,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -1642,6 +1665,7 @@ def test_sync_agreement_prices_with_missing_prices(
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
     )
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
     with caplog.at_level(logging.ERROR):
         sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
@@ -1689,6 +1713,7 @@ def test_sync_agreement_prices_with_missing_prices(
             },
             commitmentDate="2025-04-04",
             autoRenew=True,
+            template={"id": "TPL-1234", "name": "Renewing"},
         ),
     ]
     mock_terminate_subscription.assert_called_once_with(
@@ -1938,6 +1963,7 @@ def test_add_missing_subscriptions(
     mock_get_product_items_by_skus,
     mock_get_product_items_by_period,
     mock_create_agreement_subscription,
+    mock_get_template_by_name,
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(
@@ -1997,6 +2023,8 @@ def test_add_missing_subscriptions(
             },
         }
     ]
+
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
     _add_missing_subscriptions(
         mock_mpt_client,
@@ -2073,6 +2101,7 @@ def test_add_missing_subscriptions(
                 "externalIds": {"vendor": "2e5b9c974c4ea1bcabdb0fe697a2f1NA"},
                 "product": {"id": "PRD-1111-1111"},
                 "autoRenew": True,
+                "template": {"id": "TPL-1234", "name": "Renewing"},
             },
         ),
     ]
@@ -2093,6 +2122,7 @@ def test_add_missing_subscriptions_deployment(
     fulfillment_parameters_factory,
     mock_get_product_items_by_period,
     mock_create_agreement_subscription,
+    mock_get_template_by_name,
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(
@@ -2161,6 +2191,8 @@ def test_add_missing_subscriptions_deployment(
     agreement = agreement_factory(
         fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
     )
+
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
     _add_missing_subscriptions(
         mock_mpt_client,
@@ -2237,6 +2269,7 @@ def test_add_missing_subscriptions_deployment(
                 "externalIds": {"vendor": "2e5b9c974c4ea1bcabdb0fe697a2f1NA"},
                 "product": {"id": "PRD-1111-1111"},
                 "autoRenew": True,
+                "template": {"id": "TPL-1234", "name": "Renewing"},
             },
         ),
     ]
