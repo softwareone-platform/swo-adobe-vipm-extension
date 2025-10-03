@@ -2457,6 +2457,7 @@ def test_check_update_airtable_missing_deployments_none(
     mock_send_notification.assert_not_called()
 
 
+@freeze_time("2025-10-02")
 def test_update_subscription_dry_run(
     mock_mpt_client,
     adobe_subscription_factory,
