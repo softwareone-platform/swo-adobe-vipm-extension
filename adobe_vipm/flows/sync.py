@@ -209,13 +209,14 @@ def _add_missing_subscriptions(
             mpt.create_agreement_subscription(mpt_client, subscription)
 
 
-def sync_agreement_prices(
+def _update_subscriptions(
     mpt_client: MPTClient,
     agreement: dict,
     customer: dict,
     subscriptions_for_update: list[tuple[dict, dict, str]],
     *,
     dry_run: bool,
+    sync_prices: bool,
 ) -> None:
     """
     Updates the purchase prices of an Agreement (subscriptions and One-Time items).
@@ -223,28 +224,148 @@ def sync_agreement_prices(
     Based on the customer discount level and customer benefits (3yc).
 
     Args:
+        sync_prices: sync prices
         subscriptions_for_update: subscriptions for update
         mpt_client: MPT API client.
         agreement: MPT agreement.
         customer: Adobe customer.
         dry_run: Run command in a dry run mode
     """
-    commitment_start_date = get_commitment_start_date(customer)
-
     product_id = agreement["product"]["id"]
     currency = agreement["listing"]["priceList"]["currency"]
-    _update_subscriptions(
-        mpt_client,
-        customer,
-        currency,
-        product_id,
-        agreement_id=agreement["id"],
-        commitment_start_date=commitment_start_date,
-        subscriptions_for_update=subscriptions_for_update,
-        dry_run=dry_run,
-    )
+
+    agreement_id = agreement["id"]
+    skus = [item[2] for item in subscriptions_for_update]
+    prices = models.get_sku_price(customer, skus, product_id, currency)
+    missing_prices_skus = []
+    coterm_date = customer["cotermDate"]
+    for subscription, adobe_subscription, actual_sku in subscriptions_for_update:
+        if actual_sku not in prices:
+            logger.error(
+                "Skipping subscription %s because the sku %s is not in the prices",
+                subscription["id"],
+                actual_sku,
+            )
+            missing_prices_skus.append(actual_sku)
+            continue
+
+        _update_subscription(
+            mpt_client,
+            actual_sku,
+            product_id,
+            adobe_subscription,
+            coterm_date,
+            prices,
+            subscription,
+            dry_run=dry_run,
+            sync_prices=sync_prices,
+        )
+    if missing_prices_skus:
+        notify_missing_prices(
+            agreement_id,
+            missing_prices_skus,
+            product_id,
+            currency,
+            get_commitment_start_date(customer),
+        )
 
     _log_agreement_lines(agreement, currency, customer, product_id, dry_run=dry_run)
+
+
+def _update_subscription(
+    mpt_client: MPTClient,
+    actual_sku: str,
+    product_id: str,
+    adobe_subscription: dict,
+    coterm_date: str,
+    prices: dict,
+    subscription: dict,
+    *,
+    dry_run: bool,
+    sync_prices: bool,
+) -> None:
+    line_id = subscription["lines"][0]["id"]
+    # A business requirement for Adobeis is that that subscription has 1-1 relation with item.
+
+    if not dry_run:
+        logger.info(
+            "Updating subscription: %s (%s): sku=%s",
+            subscription["id"],
+            line_id,
+            actual_sku,
+        )
+        parameters = {
+            "fulfillment": [
+                {"externalId": Param.ADOBE_SKU.value, "value": actual_sku},
+                {
+                    "externalId": Param.CURRENT_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                },
+                {
+                    "externalId": Param.RENEWAL_QUANTITY.value,
+                    "value": str(adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]),
+                },
+                {
+                    "externalId": Param.RENEWAL_DATE.value,
+                    "value": str(adobe_subscription["renewalDate"]),
+                },
+                {
+                    "externalId": Param.LAST_SYNC_DATE.value,
+                    "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
+                },
+            ],
+        }
+        lines = [
+            {
+                "id": line_id,
+                "quantity": adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value],
+            }
+        ]
+        if sync_prices:
+            lines[0]["price"] = {"unitPP": prices[actual_sku]}
+        else:
+            logger.info("Skipping price sync - sync_prices %s.", sync_prices)
+
+        template_name = get_template_name_by_subscription(adobe_subscription)
+        template = mpt.get_template_by_name(mpt_client, product_id, template_name)
+
+        mpt.update_agreement_subscription(
+            mpt_client,
+            subscription["id"],
+            lines=lines,
+            parameters=parameters,
+            commitmentDate=coterm_date,
+            autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+            template={
+                "id": template.get("id"),
+                "name": template.get("name"),
+            },
+        )
+
+    else:
+        logger.info(
+            "NOT updating subscription due to dry_run=%s: "
+            "Subscription: %s (%s), "
+            "sku=%s, "
+            "current_price=%s, "
+            "new_price=%s, "
+            "auto_renew=%s, "
+            "current_quantity=%s, "
+            "renewal_quantity=%s, "
+            "renewal_date=%s, "
+            "commitment_date=%s",
+            dry_run,
+            subscription["id"],
+            line_id,
+            actual_sku,
+            subscription["lines"][0]["price"]["unitPP"],
+            prices[actual_sku],
+            adobe_subscription["autoRenewal"]["enabled"],
+            adobe_subscription["currentQuantity"],
+            adobe_subscription["autoRenewal"]["renewalQuantity"],
+            adobe_subscription["renewalDate"],
+            coterm_date,
+        )
 
 
 def _update_agreement(
@@ -396,109 +517,6 @@ def _update_assets(
                 f"current used quantity={current_quantity}, "
                 f"new used quantity={adobe_subscription['usedQuantity']}"
             )
-
-
-def _update_subscriptions(
-    mpt_client: MPTClient,
-    customer: dict,
-    currency: str,
-    product_id: str,
-    agreement_id: str,
-    commitment_start_date: dt.date,
-    subscriptions_for_update: list[tuple[dict, dict, str]],
-    *,
-    dry_run: bool,
-) -> None:
-    skus = [item[2] for item in subscriptions_for_update]
-    prices = models.get_sku_price(customer, skus, product_id, currency)
-    missing_prices_skus = []
-    coterm_date = customer["cotermDate"]
-
-    for subscription, adobe_subscription, actual_sku in subscriptions_for_update:
-        if actual_sku not in prices:
-            logger.error(
-                "Skipping subscription %s because the sku %s is not in the prices",
-                subscription["id"],
-                actual_sku,
-            )
-            missing_prices_skus.append(actual_sku)
-            continue
-
-        line_id = subscription["lines"][0]["id"]
-        lines = [
-            {
-                "price": {"unitPP": prices[actual_sku]},
-                "id": line_id,
-                "quantity": adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value],
-            }
-        ]
-
-        template_name = get_template_name_by_subscription(adobe_subscription)
-        template = mpt.get_template_by_name(mpt_client, product_id, template_name)
-
-        parameters = {
-            "fulfillment": [
-                {"externalId": Param.ADOBE_SKU.value, "value": actual_sku},
-                {
-                    "externalId": Param.CURRENT_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
-                },
-                {
-                    "externalId": Param.RENEWAL_QUANTITY.value,
-                    "value": str(adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]),
-                },
-                {
-                    "externalId": Param.RENEWAL_DATE.value,
-                    "value": str(adobe_subscription["renewalDate"]),
-                },
-                {
-                    "externalId": Param.LAST_SYNC_DATE.value,
-                    "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
-                },
-            ],
-        }
-
-        if not dry_run:
-            logger.info(
-                "Updating subscription: %s (%s): sku=%s",
-                subscription["id"],
-                line_id,
-                actual_sku,
-            )
-            mpt.update_agreement_subscription(
-                mpt_client,
-                subscription["id"],
-                lines=lines,
-                parameters=parameters,
-                commitmentDate=coterm_date,
-                autoRenew=adobe_subscription["autoRenewal"]["enabled"],
-                template={
-                    "id": template.get("id"),
-                    "name": template.get("name"),
-                },
-            )
-        else:
-            current_price = subscription["lines"][0]["price"]["unitPP"]
-            sys.stdout.write(
-                f"Subscription: {subscription['id']} ({line_id}): "
-                f"sku={actual_sku}, "
-                f"current_price={current_price}, "
-                f"new_price={prices[actual_sku]}, "
-                f"auto_renew={adobe_subscription['autoRenewal']['enabled']}, "
-                f"current_quantity={adobe_subscription['currentQuantity']}, "
-                f"renewal_quantity={adobe_subscription['autoRenewal']['renewalQuantity']}, "
-                f"renewal_date={adobe_subscription['renewalDate']}, "
-                f"commitment_date={coterm_date}\n"
-            )
-
-    if missing_prices_skus:
-        notify_missing_prices(
-            agreement_id,
-            missing_prices_skus,
-            product_id,
-            currency,
-            commitment_start_date,
-        )
 
 
 def _check_adobe_subscription_id(subscription_id, adobe_subscription):
@@ -989,20 +1007,18 @@ def sync_agreement(  # noqa: C901
             mpt_client, agreement, customer, adobe_subscriptions
         )
         _update_assets(mpt_client, assets_for_update, dry_run=dry_run)
-
-        if sync_prices:
-            subscriptions_for_update = _get_subscriptions_for_update(
-                mpt_client, agreement, customer, adobe_subscriptions
-            )
-            sync_agreement_prices(
+        subscriptions_for_update = _get_subscriptions_for_update(
+            mpt_client, agreement, customer, adobe_subscriptions
+        )
+        if subscriptions_for_update:
+            _update_subscriptions(
                 mpt_client,
                 agreement,
                 customer,
                 subscriptions_for_update,
                 dry_run=dry_run,
+                sync_prices=sync_prices,
             )
-        else:
-            logger.info("Skipping price sync - sync_prices %s.", sync_prices)
 
         _update_agreement(mpt_client, customer, agreement, dry_run=dry_run)
 
@@ -1158,19 +1174,18 @@ def sync_deployments_prices(
     )
 
     for deployment_agreement in deployment_agreements:
-        if sync_prices:
-            subscriptions_for_update = _get_subscriptions_for_update(
-                mpt_client, deployment_agreement, customer, adobe_subscriptions
-            )
-            sync_agreement_prices(
+        subscriptions_for_update = _get_subscriptions_for_update(
+            mpt_client, deployment_agreement, customer, adobe_subscriptions
+        )
+        if subscriptions_for_update:
+            _update_subscriptions(
                 mpt_client,
                 deployment_agreement,
                 customer,
                 subscriptions_for_update,
                 dry_run=dry_run,
+                sync_prices=sync_prices,
             )
-        else:
-            logger.info("Skipping price sync - sync_prices %s.", sync_prices)
 
         _update_agreement(mpt_client, customer, deployment_agreement, dry_run=dry_run)
 
@@ -1222,23 +1237,3 @@ def sync_all_agreements(mpt_client: MPTClient, *, dry_run: bool) -> None:
     agreements = mpt.get_all_agreements(mpt_client)
     for agreement in agreements:
         sync_agreement(mpt_client, agreement, dry_run=dry_run, sync_prices=False)
-
-
-def get_one_time_skus(mpt_client: MPTClient, product_id: str, vendor_external_ids) -> set[str]:
-    """
-    Returns all one-time SKUs associated with a specific product.
-
-    Args:
-        vendor_external_ids: vendors to filter
-        mpt_client: An instance of MPTClient.
-        product_id: product id.
-
-    Returns:
-        A tuple of product ids.
-    """
-    return {
-        item["externalIds"]["vendor"]
-        for item in mpt.get_product_items_by_period(
-            mpt_client, product_id, ItemTermsModel.ONE_TIME.value, vendor_external_ids
-        )
-    }
