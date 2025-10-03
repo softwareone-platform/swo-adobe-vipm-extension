@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "common.fullname" . }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.global.replicaCountAPI }}
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.pyracloud.com/access-policy: {{.Values.accessPolicy}} 
+        app.pyracloud.com/access-policy-audience: {{.Values.accessPolicyAudience}} 
+        {{- include "common.labels" . | nindent 8 }}
+    spec:
+      volumes:
+        - name: file-mount
+          secret:
+            secretName: {{ include "common.fullname" . }}.files
+      containers:
+        - name: main
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.global.repositoryUrl }}{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          command:
+            - swoext
+          args:
+            - run
+            - api
+            - --no-color
+            - --reload
+          volumeMounts:
+            - name: file-mount
+              mountPath: /extension/adobe_vipm/config
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: EXT_ADOBE_CREDENTIALS_FILE
+              value: /extension/adobe_vipm/config/adobe_credentials.json
+            - name: EXT_ADOBE_AUTHORIZATIONS_FILE
+              value: /extension/adobe_vipm/config/adobe_authorizations.json
+          envFrom:
+            - configMapRef:
+                name: ops-pyc-cluster-teamsetup-default-env-variables
+            # - secretRef:
+            #     name: ops-pyc-cluster-teamsetup-pyra-xcluster-credentials
+            - configMapRef:
+                name: {{ include "common.fullname" . }}
+            - secretRef:
+                name: {{ include "common.fullname" . }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: healthcheck
+              containerPort: 8800
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /live
+          #     port: healthcheck
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 30
+          #   timeoutSeconds: 5
+          # readinessProbe:
+          #   httpGet:
+          #     path: /ready
+          #     port: healthcheck
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 5
+          #   timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        # Default affinity is set to ensure all pods are not located on the same node.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name 
+                  operator: In
+                  values:
+                  - {{ include "common.name" . }} 
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                  - {{ .Release.Name }} 
+              topologyKey: "kubernetes.io/hostname"
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
