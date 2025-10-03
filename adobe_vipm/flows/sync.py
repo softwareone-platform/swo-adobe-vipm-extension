@@ -158,6 +158,15 @@ def _add_missing_subscriptions(
             template = mpt.get_template_by_name(
                 mpt_client, agreement["product"]["id"], template_name
             )
+            if not template:
+                logger.warning(
+                    "%s: Template %s not found for product %s",
+                    agreement["id"],
+                    template_name,
+                    agreement["product"]["id"],
+                )
+                template = {}
+
             subscription = {
                 "status": SubscriptionStatus.ACTIVE.value,
                 "commitmentDate": adobe_subscription["renewalDate"],
