@@ -76,13 +76,10 @@ def get_deployment_id(source: dict) -> str | None:
     Get the deploymentId parameter from the source.
 
     Args:
-        source (dict): MPT order or agreement.
+        source: MPT order or agreement.
 
     Returns:
         The value of the deploymentId parameter.
     """
-    param = get_fulfillment_parameter(
-        source,
-        "deploymentId",
-    )
+    param = get_fulfillment_parameter(source, "deploymentId")
     return param.get("value")
