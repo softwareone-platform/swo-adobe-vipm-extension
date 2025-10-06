@@ -1574,11 +1574,11 @@ def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_conf
 
     client = adobe_client.AdobeClient()
     with freeze_time("2024-01-01 12:00:00"):
-        token = client._get_auth_token(authorization)  # noqa: SLF001
+        token = client._get_auth_token(authorization)
         assert isinstance(token, APIToken)
         assert token.token == "an-access-token"
         assert token.expires == dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=83000 - 180)
-        assert client._token_cache[authorization] == token  # noqa: SLF001
+        assert client._token_cache[authorization] == token
 
 
 def test_get_auth_token_error(requests_mocker, settings, mock_adobe_config, adobe_config_file):
@@ -1599,11 +1599,11 @@ def test_get_auth_token_error(requests_mocker, settings, mock_adobe_config, adob
 
     client = adobe_client.AdobeClient()
     with pytest.raises(requests.HTTPError):
-        client._get_auth_token(authorization)  # noqa: SLF001
+        client._get_auth_token(authorization)
 
 
 def test_get_adobe_client(mocker):
-    adobe_client._ADOBE_CLIENT = None  # noqa: SLF001
+    adobe_client._ADOBE_CLIENT = None
 
     mocked_client = mocker.MagicMock()
     mocked_client_constructor = mocker.patch(

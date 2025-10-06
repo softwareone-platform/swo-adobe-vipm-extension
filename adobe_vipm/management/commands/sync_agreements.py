@@ -1,6 +1,7 @@
 from mpt_extension_sdk.core.utils import setup_client
 
-from adobe_vipm.flows.sync import (
+from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.flows.sync.helper import (
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_agreement_ids,
     sync_agreements_by_coterm_date,
@@ -48,18 +49,20 @@ class Command(AdobeBaseCommand):
     def handle(self, *args, **options):
         """Run sync agreement command."""
         self.info("Start processing agreements...")
-        client = setup_client()
+        mpt_client = setup_client()
+        adobe_client = get_adobe_client()
         if options["agreements"]:
             sync_agreements_by_agreement_ids(
-                client,
+                mpt_client,
+                adobe_client,
                 options["agreements"],
                 dry_run=options["dry_run"],
                 sync_prices=options["sync_prices"],
             )
         elif options["all"]:
-            sync_all_agreements(client, dry_run=options["dry_run"])
+            sync_all_agreements(mpt_client, adobe_client, dry_run=options["dry_run"])
         else:
-            sync_agreements_by_3yc_end_date(client, dry_run=options["dry_run"])
-            sync_agreements_by_coterm_date(client, dry_run=options["dry_run"])
-            sync_agreements_by_renewal_date(client, dry_run=options["dry_run"])
+            sync_agreements_by_3yc_end_date(mpt_client, adobe_client, dry_run=options["dry_run"])
+            sync_agreements_by_coterm_date(mpt_client, adobe_client, dry_run=options["dry_run"])
+            sync_agreements_by_renewal_date(mpt_client, adobe_client, dry_run=options["dry_run"])
         self.success("Processing agreements completed.")

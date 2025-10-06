@@ -40,7 +40,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.fulfillment.shared import handle_error, switch_order_to_failed
 from adobe_vipm.flows.pipeline import Step
-from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.sync.helper import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
@@ -214,7 +214,11 @@ class SetupContext(Step):
                         ERR_CUSTOMER_LOST_EXCEPTION.to_dict(error=error),
                     )
                     sync_agreements_by_agreement_ids(
-                        client, [context.agreement_id], dry_run=False, sync_prices=False
+                        client,
+                        adobe_client,
+                        [context.agreement_id],
+                        dry_run=False,
+                        sync_prices=False,
                     )
                     return
                 logger.exception("%s: failed to retrieve Adobe customer.", context)

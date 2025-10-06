@@ -181,6 +181,7 @@ pydocstyle.convention = "google"
   "S404", # subprocess calls are for tests
   "S603", # do not require `shell=True`
   "S607", # partial executable paths
+  "SLF001",  # Private member accessed
 ]
 
 [tool.ruff.lint.isort]
