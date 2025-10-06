@@ -1,6 +1,8 @@
 import pytest
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
+from adobe_vipm.flows.sync.agreement import AgreementSyncer
+
 
 @pytest.fixture
 def mock_get_agreements_by_query(mocker):
@@ -39,8 +41,8 @@ def mock_terminate_subscription(mocker):
 
 @pytest.fixture
 def mock_send_notification(mocker):
-    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.send_notification")
-    mocker.patch("adobe_vipm.flows.sync.send_notification", new=mock)
+    mock = mocker.MagicMock(spec="adobe_vipm.notifications.send_notification")
+    mocker.patch("adobe_vipm.flows.sync.agreement.send_notification", new=mock)
     mocker.patch("adobe_vipm.notifications.send_notification", new=mock)
 
     return mock
@@ -51,7 +53,6 @@ def mock_get_adobe_client(mocker, mock_adobe_client):
     mock = mocker.MagicMock(
         return_value=mock_adobe_client, spec="adobe_vipm.adobe.client.get_adobe_client"
     )
-    mocker.patch("adobe_vipm.flows.sync.get_adobe_client", new=mock)
     mocker.patch("adobe_vipm.flows.fulfillment.change.get_adobe_client", new=mock)
 
     return mock
@@ -73,7 +74,7 @@ def mock_update_agreement_subscription(mocker):
 
 @pytest.fixture
 def mock_send_exception(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.send_exception", spec=True)
+    return mocker.patch("adobe_vipm.flows.sync.agreement.send_exception", spec=True)
 
 
 @pytest.fixture
@@ -83,22 +84,15 @@ def mock_get_prices_for_skus(mocker):
 
 @pytest.fixture
 def mock_sync_agreements_by_agreement_ids(mocker):
-    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.sync_agreements_by_agreement_ids")
+    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.helper.sync_agreements_by_agreement_ids")
     return mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids", new=mock
     )
 
 
 @pytest.fixture
-def mock_get_customer_or_process_lost_customer(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.sync._get_customer_or_process_lost_customer", autospec=True
-    )
-
-
-@pytest.fixture
-def mock_update_last_sync_date(mocker):
-    return mocker.patch("adobe_vipm.flows.sync._update_last_sync_date", spec=True)
+def mock_update_last_sync_date(mocker, mocked_agreement_syncer):
+    return mocker.patch.object(mocked_agreement_syncer, "_update_last_sync_date", spec=True)
 
 
 @pytest.fixture
@@ -151,32 +145,96 @@ def mock_get_gc_agreement_deployment_model(mocker):
 
 
 @pytest.fixture
-def mock_get_subscriptions_for_update(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.sync._get_subscriptions_for_update",
-        spec=True,
-    )
+def mock_get_subscriptions_for_update(mocker, mocked_agreement_syncer):
+    return mocker.patch.object(mocked_agreement_syncer, "_get_subscriptions_for_update", spec=True)
 
 
 @pytest.fixture
-def mock_sync_deployments_prices(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.sync.sync_deployments_prices",
-        spec=True,
-    )
+def mock_sync_deployments_prices(mocker, mocked_agreement_syncer):
+    return mocker.patch.object(mocked_agreement_syncer, "_sync_deployments_prices", spec=True)
 
 
 @pytest.fixture
-def mock_update_subscriptions(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.sync._update_subscriptions",
-        spec=True,
+def mock_update_subscriptions(mocker, mocked_agreement_syncer):
+    return mocker.patch.object(mocked_agreement_syncer, "_update_subscriptions", spec=True)
+
+
+@pytest.fixture
+def mock_add_missing_subscriptions(mocker, mocked_agreement_syncer):
+    return mocker.patch.object(mocked_agreement_syncer, "_add_missing_subscriptions", spec=True)
+
+
+@pytest.fixture
+def mock_check_update_airtable_missing_deployments(mocker, mocked_agreement_syncer):
+    return mocker.patch.object(
+        mocked_agreement_syncer, "_check_update_airtable_missing_deployments", spec=True
     )
 
 
 @pytest.fixture
 def mock_get_product_items_by_period(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_product_items_by_period", spec=True)
+
+
+@pytest.fixture
+def mock_agreement(agreement_factory):
+    return agreement_factory()
+
+
+@pytest.fixture
+def mock_agreement_syncer(mocker):
+    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.agreement.AgreementSyncer")
+    mocker.patch("adobe_vipm.flows.sync.agreement.AgreementSyncer", new=mock)
+    mocker.patch("adobe_vipm.flows.sync.helper.AgreementSyncer", new=mock)
+    return mock
+
+
+@pytest.fixture
+def mocked_agreement_syncer(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+):
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
+            adobe_subscription_factory(
+                subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
+            ),
+            adobe_subscription_factory(
+                subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
+            ),
+        ]
+    }
+    return AgreementSyncer(mock_mpt_client, mock_adobe_client, agreement_factory())
+
+
+@pytest.fixture
+def mock_notify_agreement_unhandled_exception_in_teams(mocker):
     return mocker.patch(
-        "mpt_extension_sdk.mpt_http.mpt.get_product_items_by_period",
-        spec=True,
+        "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams", spec=True
+    )
+
+
+@pytest.fixture
+def mock_update_asset(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_asset", autospec=True)
+
+
+@pytest.fixture
+def mock_get_agreement(mocker, mock_agreement):
+    return mocker.patch(
+        "mpt_extension_sdk.mpt_http.mpt.get_agreement", return_value=mock_agreement, autospec=True
+    )
+
+
+@pytest.fixture
+def mock_get_agreements_by_3yc_commitment_request_invitation(mocker, mock_agreement):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.helper.get_agreements_by_3yc_commitment_request_invitation",
+        return_value=[mock_agreement],
+        autospec=True,
     )

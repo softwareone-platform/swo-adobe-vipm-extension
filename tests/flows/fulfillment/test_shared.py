@@ -1733,7 +1733,7 @@ def test_complete_configuration_order_selects_template(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_sync_agreement_step(mocker, mock_mpt_client, mock_order):
+def test_sync_agreement_step(mocker, mock_mpt_client, mock_adobe_client, mock_order):
     mocked_sync = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids",
     )
@@ -1748,7 +1748,7 @@ def test_sync_agreement_step(mocker, mock_mpt_client, mock_order):
     step(mock_mpt_client, context, mocked_next_step)
 
     mocked_sync.assert_called_once_with(
-        mock_mpt_client, [context.agreement_id], dry_run=False, sync_prices=True
+        mock_mpt_client, mock_adobe_client, [context.agreement_id], dry_run=False, sync_prices=True
     )
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 

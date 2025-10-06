@@ -65,7 +65,7 @@ def get_agreements_by_3yc_commitment_request_status(
 
 def get_agreements_by_3yc_commitment_request_invitation(
     mpt_client: MPTClient, enroll_statuses: list[str], status: str = "Active"
-) -> list[str]:
+) -> list[dict]:
     """
     Retrieves active agreements having 3YC parameter enabled with provided 3YC statuses.
 

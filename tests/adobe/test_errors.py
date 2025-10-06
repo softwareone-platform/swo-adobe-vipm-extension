@@ -32,7 +32,7 @@ def test_wrap_http_error(adobe_api_error_factory):
         response = Response()
         response.status_code = 400
         response.headers["Content-Type"] = "application/json"
-        response._content = json.dumps(  # noqa: SLF001
+        response._content = json.dumps(
             adobe_api_error_factory(
                 "5678", "error message with details", details=["detail1", "detail2"]
             ),
@@ -56,7 +56,7 @@ def test_wrap_http_error_504_error_code():
         response = Response()
         response.status_code = 504
         response.headers["Content-Type"] = "application/json"
-        response._content = json.dumps({  # noqa: SLF001
+        response._content = json.dumps({
             "error_code": "504001",
             "message": "Gateway Timeout",
         }).encode("utf-8")
@@ -76,7 +76,7 @@ def test_wrap_http_error_json_decode_error(mocker):
     def func():
         response = Response()
         response.status_code = 500
-        response._content = "Internal Server Error".encode("utf-8")  # noqa: SLF001 UP012
+        response._content = b"Internal Server Error"
 
         raise HTTPError(response=response)
 
