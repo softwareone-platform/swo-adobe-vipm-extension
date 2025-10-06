@@ -21,6 +21,7 @@ from adobe_vipm.adobe.errors import (
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
+    TEMPLATE_SUBSCRIPTION_EXPIRED,
     AgreementStatus,
     AssetStatus,
     ItemTermsModel,
@@ -577,6 +578,20 @@ def _get_subscriptions_for_update(
 
         if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
             logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
+            template = mpt.get_template_by_name(
+                mpt_client,
+                agreement["product"]["id"],
+                TEMPLATE_SUBSCRIPTION_EXPIRED,
+            )
+            if template:
+                mpt.update_agreement_subscription(
+                    mpt_client,
+                    mpt_subscription["id"],
+                    template={
+                        "id": template.get("id"),
+                        "name": template.get("name"),
+                    },
+                )
             mpt.terminate_subscription(
                 mpt_client,
                 mpt_subscription["id"],

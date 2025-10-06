@@ -1668,7 +1668,10 @@ def test_sync_agreement_prices_with_missing_prices(
         "adobe_vipm.flows.sync.notify_missing_prices",
     )
 
-    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
+    mock_get_template_by_name.side_effect = [
+        {"id": "TPL-2345", "name": "Expired"},
+        {"id": "TPL-1234", "name": "Renewing"},
+    ]
 
     with caplog.at_level(logging.ERROR):
         sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
@@ -1699,6 +1702,11 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_adobe_client.get_subscriptions.assert_called_once_with("AUT-1234-5678", "a-client-id")
 
     assert mock_update_agreement_subscription.mock_calls == [
+        mocker.call(
+            mock_mpt_client,
+            terminated_mpt_subscription["id"],
+            template={"id": "TPL-2345", "name": "Expired"},
+        ),
         mocker.call(
             mock_mpt_client,
             another_mpt_subscription["id"],
@@ -1882,10 +1890,51 @@ def test_get_subscriptions_for_update_terminated(
     mock_terminate_subscription,
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
+    mock_get_template_by_name,
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
     ]
+
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
+
+    _get_subscriptions_for_update(
+        mock_mpt_client, agreement_factory(), adobe_customer_factory(), adobe_subscriptions
+    )
+
+    mock_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    )
+    mock_terminate_subscription.assert_called_once_with(
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        "Adobe subscription status 1004.",
+    )
+    mock_update_agreement_subscription.assert_called_once_with(
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        template={"id": "TPL-1234", "name": "Expired"},
+    )
+
+
+@freeze_time("2025-07-23")
+def test_get_subscriptions_for_update_terminated_withoud_template(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_terminate_subscription,
+    mock_get_agreement_subscription,
+    mock_update_agreement_subscription,
+    mock_get_template_by_name,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
+    ]
+
+    mock_get_template_by_name.return_value = None
 
     _get_subscriptions_for_update(
         mock_mpt_client, agreement_factory(), adobe_customer_factory(), adobe_subscriptions
@@ -2477,7 +2526,7 @@ def test_update_subscription_dry_run(
         sync_prices=False,
     )
     assert caplog.text == (
-        "INFO     adobe_vipm.flows.sync:sync.py:346 NOT updating subscription due to "
+        "INFO     adobe_vipm.flows.sync:sync.py:347 NOT updating subscription due to "
         "dry_run=True: Subscription: SUB-1000-2000-3000 "
         "(ALI-2119-4550-8674-5962-0001), sku=65304578CA01A12, current_price=1234.55, "
         "new_price=1234.55, auto_renew=True, current_quantity=10, "
