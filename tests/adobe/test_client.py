@@ -2092,9 +2092,7 @@ def test_get_returnable_orders_by_subscription_id(
         order_id="order_ko_0",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-06T00:00:00Z",
@@ -2103,9 +2101,7 @@ def test_get_returnable_orders_by_subscription_id(
         order_id="order_ok_1",
         order_type=ORDER_TYPE_RENEWAL,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-07T00:00:00Z",
@@ -2114,9 +2110,7 @@ def test_get_returnable_orders_by_subscription_id(
         order_id="order_ok_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-08T00:00:00Z",
@@ -2125,9 +2119,7 @@ def test_get_returnable_orders_by_subscription_id(
         order_id="order_ko_1",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001",
-            status=AdobeStatus.ORDER_CANCELLED
-        .value
+            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.ORDER_CANCELLED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-09T00:00:00Z",
@@ -2136,9 +2128,7 @@ def test_get_returnable_orders_by_subscription_id(
         order_id="order_ko_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.ORDER_CANCELLED.value,
     )
@@ -2149,8 +2139,7 @@ def test_get_returnable_orders_by_subscription_id(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3002",
             offer_id="99999999CA01A12",
-            status=AdobeStatus.PROCESSED
-        .value
+            status=AdobeStatus.PROCESSED.value,
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-10T00:00:00Z",
@@ -2214,9 +2203,7 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_id="order_ko_0",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-06T00:00:00Z",
@@ -2225,9 +2212,7 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_id="order_ok_1",
         order_type=ORDER_TYPE_RENEWAL,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-07T00:00:00Z",
@@ -2236,9 +2221,7 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_id="order_ok_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-08T00:00:00Z",
@@ -2247,9 +2230,7 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_id="order_ok_3",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.ORDER_CANCELLED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.ORDER_CANCELLED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-09T00:00:00Z",
@@ -2258,9 +2239,7 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_id="order_ok_4",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.ORDER_CANCELLED.value,
         creation_date="2024-01-10T00:00:00Z",
@@ -2271,8 +2250,7 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3002",
             offer_id="99999999CA01A12",
-            status=AdobeStatus.PROCESSED
-        .value
+            status=AdobeStatus.PROCESSED.value,
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-11T00:00:00Z",
@@ -2412,9 +2390,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_id="order_ko_0",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-06T00:00:00Z",
@@ -2423,9 +2399,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_id="order_ok_1",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-07T00:00:00Z",
@@ -2434,9 +2408,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_id="order_ok_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-08T00:00:00Z",
@@ -2445,9 +2417,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_id="order_ko_1",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001",
-            status=AdobeStatus.ORDER_CANCELLED
-        .value
+            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.ORDER_CANCELLED.value
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-09T00:00:00Z",
@@ -2456,9 +2426,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_id="order_ko_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3002",
-            status=AdobeStatus.PROCESSED
-        .value
+            subscription_id="SUB-1000-2000-3002", status=AdobeStatus.PROCESSED.value
         ),
         status=AdobeStatus.ORDER_CANCELLED.value,
     )
@@ -2469,8 +2437,7 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3003",
             offer_id="99999999CA01A12",
-            status=AdobeStatus.PROCESSED
-        .value
+            status=AdobeStatus.PROCESSED.value,
         ),
         status=AdobeStatus.PROCESSED.value,
         creation_date="2024-01-10T00:00:00Z",

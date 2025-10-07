@@ -688,10 +688,12 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_sync_agreement.assert_has_calls([
-        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=True),
-        mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=True),
-    ])
+    mock_sync_agreement.assert_has_calls(
+        [
+            mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=True),
+            mocker.call(mock_mpt_client, agreement, dry_run=False, sync_prices=True),
+        ]
+    )
     assert caplog.messages == [
         "Checking 3YC enroll status for agreement AGR-2119-4550-8674-5962",
         "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962",
@@ -1665,7 +1667,10 @@ def test_sync_agreement_prices_with_missing_prices(
     mocked_update_agreement = mocker.patch(
         "adobe_vipm.flows.sync.update_agreement",
     )
-    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
+    mock_get_template_by_name.side_effect = [
+        {"id": "TPL-2345", "name": "Expired"},
+        {"id": "TPL-1234", "name": "Renewing"},
+    ]
 
     with caplog.at_level(logging.ERROR):
         sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
@@ -1696,6 +1701,11 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_adobe_client.get_subscriptions.assert_called_once_with("AUT-1234-5678", "a-client-id")
 
     assert mocked_update_agreement_subscription.mock_calls == [
+        mocker.call(
+            mock_mpt_client,
+            terminated_mpt_subscription["id"],
+            template={"id": "TPL-2345", "name": "Expired"},
+        ),
         mocker.call(
             mock_mpt_client,
             another_mpt_subscription["id"],
@@ -1879,10 +1889,51 @@ def test_get_subscriptions_for_update_terminated(
     mock_terminate_subscription,
     mock_get_agreement_subscription,
     mock_update_agreement_subscription,
+    mock_get_template_by_name,
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
     ]
+
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
+
+    _get_subscriptions_for_update(
+        mock_mpt_client, agreement_factory(), adobe_customer_factory(), adobe_subscriptions
+    )
+
+    mock_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    )
+    mock_terminate_subscription.assert_called_once_with(
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        "Adobe subscription status 1004.",
+    )
+    mock_update_agreement_subscription.assert_called_once_with(
+        mock_mpt_client,
+        mock_get_agreement_subscription.return_value["id"],
+        template={"id": "TPL-1234", "name": "Expired"},
+    )
+
+
+@freeze_time("2025-07-23")
+def test_get_subscriptions_for_update_terminated_withoud_template(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_terminate_subscription,
+    mock_get_agreement_subscription,
+    mock_update_agreement_subscription,
+    mock_get_template_by_name,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
+    ]
+
+    mock_get_template_by_name.return_value = None
 
     _get_subscriptions_for_update(
         mock_mpt_client, agreement_factory(), adobe_customer_factory(), adobe_subscriptions

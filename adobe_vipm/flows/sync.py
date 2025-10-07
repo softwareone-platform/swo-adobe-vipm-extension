@@ -33,7 +33,13 @@ from adobe_vipm.adobe.errors import (
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
-from adobe_vipm.flows.constants import AgreementStatus, Param, SubscriptionStatus, TeamsColorCode
+from adobe_vipm.flows.constants import (
+    TEMPLATE_SUBSCRIPTION_EXPIRED,
+    AgreementStatus,
+    Param,
+    SubscriptionStatus,
+    TeamsColorCode,
+)
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_commitment_request_invitation
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
@@ -127,9 +133,7 @@ def _add_missing_subscriptions(
         sku_discount_level = get_sku_with_discount_level(adobe_subscription["offerId"], customer)
         price_component = {"price": {"unitPP": prices[sku_discount_level]}}
         template_name = get_template_name_by_subscription(adobe_subscription)
-        template = get_template_by_name(
-            mpt_client, agreement["product"]["id"], template_name
-        )
+        template = get_template_by_name(mpt_client, agreement["product"]["id"], template_name)
         subscription = {
             "status": SubscriptionStatus.ACTIVE.value,
             "commitmentDate": adobe_subscription["renewalDate"],
@@ -236,22 +240,28 @@ def _update_agreement(
         for mq in commitment_info.get("minimumQuantities", ()):
             if mq["offerType"] == "LICENSE":
                 parameters.setdefault(Param.PHASE_ORDERING.value, [])
-                parameters[Param.PHASE_ORDERING.value].append({
-                    "externalId": Param.THREE_YC_LICENSES.value,
-                    "value": str(mq.get("quantity")),
-                })
+                parameters[Param.PHASE_ORDERING.value].append(
+                    {
+                        "externalId": Param.THREE_YC_LICENSES.value,
+                        "value": str(mq.get("quantity")),
+                    }
+                )
             if mq["offerType"] == "CONSUMABLES":
                 parameters.setdefault(Param.PHASE_ORDERING.value, [])
-                parameters[Param.PHASE_ORDERING.value].append({
-                    "externalId": Param.THREE_YC_CONSUMABLES.value,
-                    "value": str(mq.get("quantity")),
-                })
+                parameters[Param.PHASE_ORDERING.value].append(
+                    {
+                        "externalId": Param.THREE_YC_CONSUMABLES.value,
+                        "value": str(mq.get("quantity")),
+                    }
+                )
 
     parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
-    parameters[Param.PHASE_FULFILLMENT.value].append({
-        "externalId": Param.COTERM_DATE.value,
-        "value": customer.get("cotermDate", ""),
-    })
+    parameters[Param.PHASE_FULFILLMENT.value].append(
+        {
+            "externalId": Param.COTERM_DATE.value,
+            "value": customer.get("cotermDate", ""),
+        }
+    )
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -286,10 +296,12 @@ def _add_3yc_fulfillment_params(
         Param.PHASE_ORDERING.value if not is_recommitment else Param.PHASE_FULFILLMENT.value
     )
     request_info = get_3yc_commitment_request(customer, is_recommitment=is_recommitment)
-    new_parameters[Param.PHASE_FULFILLMENT.value].append({
-        "externalId": status_param_ext_id,
-        "value": request_info.get("status"),
-    })
+    new_parameters[Param.PHASE_FULFILLMENT.value].append(
+        {
+            "externalId": status_param_ext_id,
+            "value": request_info.get("status"),
+        }
+    )
     new_parameters.setdefault(request_type_param_phase, [])
     new_parameters[request_type_param_phase].append(
         {"externalId": request_type_param_ext_id, "value": None},
@@ -474,6 +486,20 @@ def _get_subscriptions_for_update(
 
         if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
             logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
+            template = get_template_by_name(
+                mpt_client,
+                agreement["product"]["id"],
+                TEMPLATE_SUBSCRIPTION_EXPIRED,
+            )
+            if template:
+                update_agreement_subscription(
+                    mpt_client,
+                    mpt_subscription["id"],
+                    template={
+                        "id": template.get("id"),
+                        "name": template.get("name"),
+                    },
+                )
             terminate_subscription(
                 mpt_client,
                 mpt_subscription["id"],
@@ -481,11 +507,13 @@ def _get_subscriptions_for_update(
             )
             continue
 
-        for_update.append((
-            mpt_subscription,
-            adobe_subscription,
-            get_sku_with_discount_level(actual_sku, customer),
-        ))
+        for_update.append(
+            (
+                mpt_subscription,
+                adobe_subscription,
+                get_sku_with_discount_level(actual_sku, customer),
+            )
+        )
 
     return for_update
 
@@ -673,13 +701,15 @@ def _check_update_airtable_missing_deployments(
         deployment_currency = (find_first(is_deployment_matched, adobe_subscriptions, {})).get(
             "currency"
         )
-        missing_deployments_data.append({
-            "deployment": find_first(
-                partial(_check_adobe_deployment_id, missing_deployment_id), adobe_deployments
-            ),
-            "transfer": transfer,
-            "deployment_currency": deployment_currency,
-        })
+        missing_deployments_data.append(
+            {
+                "deployment": find_first(
+                    partial(_check_adobe_deployment_id, missing_deployment_id), adobe_deployments
+                ),
+                "transfer": transfer,
+                "deployment_currency": deployment_currency,
+            }
+        )
 
     if missing_deployments_data:
         deployment_model = models.get_gc_agreement_deployment_model(
@@ -737,10 +767,12 @@ def sync_global_customer_parameters(
         global_customer_enabled = get_global_customer(agreement)
         if global_customer_enabled != ["Yes"]:
             logger.info("Setting global customer for agreement %s", agreement["id"])
-            parameters[Param.PHASE_FULFILLMENT.value].append({
-                "externalId": "globalCustomer",
-                "value": ["Yes"],
-            })
+            parameters[Param.PHASE_FULFILLMENT.value].append(
+                {
+                    "externalId": "globalCustomer",
+                    "value": ["Yes"],
+                }
+            )
 
         deployments = [
             f"{deployment['deploymentId']} - {deployment['companyProfile']['address']['country']}"
@@ -749,10 +781,12 @@ def sync_global_customer_parameters(
         agreement_deployments = get_deployments(agreement)
         if deployments != agreement_deployments:
             logger.info("Setting deployments for agreement %s", agreement["id"])
-            parameters[Param.PHASE_FULFILLMENT.value].append({
-                "externalId": "deployments",
-                "value": ",".join(deployments),
-            })
+            parameters[Param.PHASE_FULFILLMENT.value].append(
+                {
+                    "externalId": "deployments",
+                    "value": ",".join(deployments),
+                }
+            )
             _check_update_airtable_missing_deployments(
                 agreement, adobe_deployments, adobe_subscriptions
             )
