@@ -54,7 +54,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.pipeline import Step
-from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.sync.helper import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_address,
     get_adobe_customer_id,
@@ -174,12 +174,12 @@ def save_adobe_order_id(client, order, order_id):
     return order
 
 
-def switch_order_to_failed(client, order, error):
+def switch_order_to_failed(mpt_client, order, error):
     """
     Marks an MPT order as failed by resetting due date and updating its status.
 
     Args:
-        client (MPTClient): An instance of the Marketplace platform client.
+        mpt_client (MPTClient): An instance of the Marketplace platform client.
         order (dict): The MPT order to be marked as failed.
         error (dict): Additional notes or context related to the failure.
 
@@ -189,14 +189,17 @@ def switch_order_to_failed(client, order, error):
     order = reset_due_date(order)
     agreement = order["agreement"]
     order = fail_order(
-        client,
+        mpt_client,
         order["id"],
         error,
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
-    send_mpt_notification(client, order)
-    sync_agreements_by_agreement_ids(client, [agreement["id"]], dry_run=False, sync_prices=False)
+    send_mpt_notification(mpt_client, order)
+    adobe_client = get_adobe_client()
+    sync_agreements_by_agreement_ids(
+        mpt_client, adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
+    )
     return order
 
 
@@ -1256,13 +1259,14 @@ class SetSubscriptionTemplate(Step):
 class SyncAgreement(Step):
     """Sync agreement."""
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, mpt_client, context, next_step):
         """Sync agreement."""
+        adobe_client = get_adobe_client()
         sync_agreements_by_agreement_ids(
-            client, [context.agreement_id], dry_run=False, sync_prices=True
+            mpt_client, adobe_client, [context.agreement_id], dry_run=False, sync_prices=True
         )
         logger.info("%s: agreement synchronized", context)
-        next_step(client, context)
+        next_step(mpt_client, context)
 
 
 class ValidateDuplicateLines(Step):

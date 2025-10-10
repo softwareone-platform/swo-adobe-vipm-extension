@@ -72,7 +72,7 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.sync.helper import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
     exclude_items_with_deployment_id,
@@ -1346,11 +1346,13 @@ class SetCommitmentDates(Step):
 class CompleteTransferOrder(Step):
     """Completes the transfer order processing."""
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, mpt_client, context, next_step):
         """Completes transfer order with TEMPLATE_NAME_TRANSFER or default Transfer template."""
-        switch_order_to_completed(client, context.order, TEMPLATE_NAME_TRANSFER)
+        switch_order_to_completed(mpt_client, context.order, TEMPLATE_NAME_TRANSFER)
+        adobe_client = get_adobe_client()
         sync_agreements_by_agreement_ids(
-            client,
+            mpt_client,
+            adobe_client,
             [context.order["agreement"]["id"]],
             dry_run=False,
             sync_prices=False,
@@ -1361,7 +1363,7 @@ class CompleteTransferOrder(Step):
             context.authorization_id,
             context.customer_id,
         )
-        next_step(client, context)
+        next_step(mpt_client, context)
 
 
 def fulfill_transfer_order(mpt_client, order):

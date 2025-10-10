@@ -388,7 +388,11 @@ def test_transfer(
         [line["item"]["id"] for line in order["lines"]],
     )
     mocked_sync_agreement.assert_called_once_with(
-        mock_mpt_client, [order["agreement"]["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client,
+        mock_adobe_client,
+        [order["agreement"]["id"]],
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -689,7 +693,11 @@ def test_transfer_with_no_profile_address(
         [line["item"]["id"] for line in order["lines"]],
     )
     mocked_sync_agreement.assert_called_once_with(
-        mock_mpt_client, [order["agreement"]["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client,
+        mock_adobe_client,
+        [order["agreement"]["id"]],
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -858,7 +866,7 @@ def test_transfer_unexpected_status(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client, mock_adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -917,7 +925,7 @@ def test_transfer_items_mismatch(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client, mock_adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -1085,7 +1093,7 @@ def test_transfer_unrecoverable_status(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client, mock_adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -1128,7 +1136,7 @@ def test_create_transfer_fail(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client, mock_adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -1536,7 +1544,7 @@ def test_fulfill_transfer_order_already_migrated_error_order_line_updated(
     assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[0].kwargs == {"parameters": order["parameters"]}
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client, mock_adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -1845,6 +1853,7 @@ def test_fulfill_transfer_order_migration_running(
     transfer_order_parameters_factory,
     adobe_authorizations_file,
     agreement,
+    mock_adobe_client,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -1902,6 +1911,7 @@ def test_fulfill_transfer_order_migration_synchronized(
     adobe_authorizations_file,
     agreement,
     mock_sync_agreements_by_agreement_ids,
+    mock_adobe_client,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -1947,7 +1957,7 @@ def test_fulfill_transfer_order_migration_synchronized(
         parameters=order["parameters"],
     )
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client, mock_adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
@@ -2248,7 +2258,11 @@ def test_transfer_3yc_customer(
         adobe_subscription["subscriptionId"],
     )
     mocked_sync_agreement.assert_called_once_with(
-        mock_mpt_client, [order["agreement"]["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client,
+        mock_adobe_client,
+        [order["agreement"]["id"]],
+        dry_run=False,
+        sync_prices=False,
     )
 
 
@@ -2514,6 +2528,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
     )
     mocked_sync_agreement.assert_called_once_with(
         mock_mpt_client,
+        mock_adobe_client,
         [order["agreement"]["id"]],
         dry_run=False,
         sync_prices=False,
@@ -3145,7 +3160,11 @@ def test_transfer_gc_account_all_deployments_created(
         [line["item"]["id"] for line in order["lines"]],
     )
     mocked_sync_agreement.assert_called_once_with(
-        mock_mpt_client, [order["agreement"]["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client,
+        mock_adobe_client,
+        [order["agreement"]["id"]],
+        dry_run=False,
+        sync_prices=False,
     )
     mocked_get_gc_agreement_deployments_by_main_agreement()
     assert mocked_get_gc_main_agreement.call_count == 1
@@ -3476,7 +3495,11 @@ def test_transfer_gc_account_no_deployments(
         [line["item"]["id"] for line in order["lines"]],
     )
     mocked_sync_agreement.assert_called_once_with(
-        mock_mpt_client, [order["agreement"]["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client,
+        mock_adobe_client,
+        [order["agreement"]["id"]],
+        dry_run=False,
+        sync_prices=False,
     )
     assert mocked_get_gc_main_agreement.mock_calls[0].args == (
         "PRD-1111-1111",
@@ -5158,7 +5181,11 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         [line["item"]["id"] for line in order["lines"]],
     )
     mocked_sync_agreement.assert_called_once_with(
-        mock_mpt_client, [order["agreement"]["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client,
+        mock_adobe_client,
+        [order["agreement"]["id"]],
+        dry_run=False,
+        sync_prices=False,
     )
     mocked_get_gc_main_agreement.assert_has_calls([
         call("PRD-1111-1111", "AUT-1234-4567", "a-membership-id")
@@ -5449,7 +5476,7 @@ def test_fulfill_transfer_migrated_order_all_items_expired_add_new_item(
     assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[0].kwargs == {"parameters": order["parameters"]}
     mock_sync_agreements_by_agreement_ids.assert_called_once_with(
-        mock_mpt_client, [agreement["id"]], dry_run=False, sync_prices=False
+        mock_mpt_client, mock_adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
 
 
