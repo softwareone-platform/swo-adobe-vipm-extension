@@ -509,6 +509,7 @@ def check_processing_template(client, order, template_name):
         MPT_ORDER_STATUS_PROCESSING,
         template_name,
     )
+    # TODO: define the expected behavior when both template and order.get("template") are None
     if template != order.get("template"):
         set_processing_template(client, order["id"], template)
 
@@ -745,7 +746,7 @@ class StartOrderProcessing(Step):
     """
     Set the template for the processing status.
 
-    Or the delayed one if the processing is delated due to the renewal window open.
+    Or the delayed one if the processing is delayed due to the renewal window open.
     """
 
     def __init__(self, template_name):
@@ -753,12 +754,14 @@ class StartOrderProcessing(Step):
 
     def __call__(self, client, context, next_step):
         """Set the template for the processing status."""
+        product_id = context.order["agreement"]["product"]["id"]
         template = get_product_template_or_default(
             client,
-            context.order["agreement"]["product"]["id"],
+            product_id,
             MPT_ORDER_STATUS_PROCESSING,
             self.template_name,
         )
+        # TODO: define the expected behavior when both template and order.get("template") are None
         current_template_id = context.order.get("template", {}).get("id")
         if template["id"] != current_template_id:
             context.order = set_template(context.order, template)
@@ -1236,11 +1239,18 @@ class SetSubscriptionTemplate(Step):
                 continue
 
             template_name = get_template_name_by_subscription(adobe_subscription)
+            product_id = context.order["agreement"]["product"]["id"]
             template = get_template_by_name(
                 client,
-                context.order["agreement"]["product"]["id"],
+                product_id,
                 template_name,
             )
+            if not template:
+                logger.warning(
+                    "%s: Template %s not found for product %s", context, template_name, product_id
+                )
+                template = {}
+
             update_agreement_subscription(
                 client,
                 subscription["id"],
