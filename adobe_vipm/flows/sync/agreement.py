@@ -12,7 +12,6 @@ from mpt_extension_sdk.mpt_http.utils import find_first
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import (
-    AdobeAPIError,
     AuthorizationNotFoundError,
     CustomerDiscountsNotFoundError,
 )
@@ -54,16 +53,23 @@ class AgreementSyncer:  # noqa: WPS214
         _adobe_client (AdobeClient): The Adobe client used for interacting with Adobe API.
     """
 
-    def __init__(self, _mpt_client: MPTClient, _adobe_client: AdobeClient, _agreement: dict):
+    def __init__(
+        self,
+        _mpt_client: MPTClient,
+        _adobe_client: AdobeClient,
+        _agreement: dict,
+        _customer: dict,
+        _adobe_subscriptions: list[dict],
+    ):
         self._mpt_client = _mpt_client
         self._adobe_client = _adobe_client
         self._agreement = _agreement
+        self._customer = _customer
+        self._adobe_subscriptions = _adobe_subscriptions
         self._authorization_id: str = _agreement["authorization"]["id"]
         self._seller_id: str = _agreement["seller"]["id"]
         self._licensee_id: str = _agreement["licensee"]["id"]
         self._adobe_customer_id: str = get_adobe_customer_id(self._agreement)
-        self._customer: dict | None = None
-        self._adobe_subscriptions: list[dict] | None = None
 
     def sync(self, *, dry_run: bool, sync_prices: bool) -> None:  # noqa: C901
         """
@@ -74,12 +80,6 @@ class AgreementSyncer:  # noqa: WPS214
             sync_prices: If true sync prices. Keep in mind dry_run parameter.
         """
         logger.info("Synchronizing agreement %s", self._agreement["id"])
-        self._customer = self._get_customer_or_process_lost_customer()
-        if not self._customer:
-            return
-        self._adobe_subscriptions = self._adobe_client.get_subscriptions(
-            self._authorization_id, self._adobe_customer_id
-        )["items"]
         if self._agreement["status"] != AgreementStatus.ACTIVE:
             logger.info(
                 "Skipping agreement %s because it is not in Active status", self._agreement["id"]
@@ -897,62 +897,6 @@ class AgreementSyncer:  # noqa: WPS214
                 ]
             },
         )
-
-    def _get_customer_or_process_lost_customer(self) -> dict | None:
-        try:
-            customer = self._adobe_client.get_customer(
-                self._authorization_id, self._adobe_customer_id
-            )
-            logger.info("Retrieved customer %s", customer["customerId"])
-        except AdobeAPIError as error:
-            if error.code == AdobeStatus.INVALID_CUSTOMER:
-                logger.info(
-                    "Received Adobe error %s - %s, assuming lost customer "
-                    "and proceeding with lost customer procedure.",
-                    error.code,
-                    error.message,
-                )
-                send_notification(
-                    "Executing Lost Customer Procedure.",
-                    f"Received Adobe error {error.code} - {error.message},"
-                    " assuming lost customer and proceeding with lost customer procedure.",
-                    TeamsColorCode.ORANGE.value,
-                )
-                self._process_lost_customer()
-                return None
-            raise
-        else:
-            return customer
-
-    def _process_lost_customer(self) -> None:
-        """Process lost customer exception from Adobe API."""
-        for subscription_id in [
-            sub["id"]
-            for sub in self._agreement["subscriptions"]
-            if sub["status"] != SubscriptionStatus.TERMINATED
-        ]:
-            logger.info("> Suspected Lost Customer: Terminating subscription %s.", subscription_id)
-            try:
-                mpt.terminate_subscription(
-                    self._mpt_client,
-                    subscription_id,
-                    "Suspected Lost Customer",
-                )
-            except Exception as error:
-                logger.exception(
-                    "> Suspected Lost Customer: Error terminating subscription %s.",
-                    subscription_id,
-                )
-                send_exception(
-                    f"> Suspected Lost Customer: Error terminating subscription {subscription_id}",
-                    f"{error}",
-                )
-
-        adobe_deployments = self._adobe_client.get_customer_deployments_active_status(
-            self._authorization_id, self._adobe_customer_id
-        )
-        if adobe_deployments:
-            self._terminate_deployment_sybscriptions(adobe_deployments)
 
     def _terminate_deployment_sybscriptions(self, adobe_deployments: list[dict]):
         deployment_agreements = mpt.get_agreements_by_customer_deployments(

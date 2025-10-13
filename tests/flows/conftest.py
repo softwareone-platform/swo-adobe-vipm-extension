@@ -42,6 +42,7 @@ def mock_terminate_subscription(mocker):
 @pytest.fixture
 def mock_send_notification(mocker):
     mock = mocker.MagicMock(spec="adobe_vipm.notifications.send_notification")
+    mocker.patch("adobe_vipm.flows.sync.helper.send_notification", new=mock)
     mocker.patch("adobe_vipm.flows.sync.agreement.send_notification", new=mock)
     mocker.patch("adobe_vipm.notifications.send_notification", new=mock)
 
@@ -146,28 +147,23 @@ def mock_get_gc_agreement_deployment_model(mocker):
 
 @pytest.fixture
 def mock_get_subscriptions_for_update(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(mocked_agreement_syncer, "_get_subscriptions_for_update", spec=True)
-
-
-@pytest.fixture
-def mock_sync_deployments_prices(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(mocked_agreement_syncer, "_sync_deployments_prices", spec=True)
+    return mocker.patch.object(AgreementSyncer, "_get_subscriptions_for_update", spec=True)
 
 
 @pytest.fixture
 def mock_update_subscriptions(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(mocked_agreement_syncer, "_update_subscriptions", spec=True)
+    return mocker.patch.object(AgreementSyncer, "_update_subscriptions", spec=True)
 
 
 @pytest.fixture
-def mock_add_missing_subscriptions(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(mocked_agreement_syncer, "_add_missing_subscriptions", spec=True)
+def mock_add_missing_subscriptions(mocker):
+    return mocker.patch.object(AgreementSyncer, "_add_missing_subscriptions", spec=True)
 
 
 @pytest.fixture
 def mock_check_update_airtable_missing_deployments(mocker, mocked_agreement_syncer):
     return mocker.patch.object(
-        mocked_agreement_syncer, "_check_update_airtable_missing_deployments", spec=True
+        AgreementSyncer, "_check_update_airtable_missing_deployments", spec=True
     )
 
 
@@ -182,11 +178,8 @@ def mock_agreement(agreement_factory):
 
 
 @pytest.fixture
-def mock_agreement_syncer(mocker):
-    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.agreement.AgreementSyncer")
-    mocker.patch("adobe_vipm.flows.sync.agreement.AgreementSyncer", new=mock)
-    mocker.patch("adobe_vipm.flows.sync.helper.AgreementSyncer", new=mock)
-    return mock
+def mock_sync_agreement(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.helper.sync_agreement", spec=True)
 
 
 @pytest.fixture
@@ -197,19 +190,22 @@ def mocked_agreement_syncer(
     adobe_customer_factory,
     adobe_subscription_factory,
 ):
-    mock_adobe_client.get_customer.return_value = adobe_customer_factory()
-    mock_adobe_client.get_subscriptions.return_value = {
-        "items": [
-            adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
-            adobe_subscription_factory(
-                subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
-            ),
-            adobe_subscription_factory(
-                subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
-            ),
-        ]
-    }
-    return AgreementSyncer(mock_mpt_client, mock_adobe_client, agreement_factory())
+    adobe_subscriptions = [
+        adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
+        adobe_subscription_factory(
+            subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
+        ),
+        adobe_subscription_factory(
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
+        ),
+    ]
+    return AgreementSyncer(
+        mock_mpt_client,
+        mock_adobe_client,
+        agreement_factory(),
+        adobe_customer_factory(),
+        adobe_subscriptions,
+    )
 
 
 @pytest.fixture

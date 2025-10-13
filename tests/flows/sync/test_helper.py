@@ -18,12 +18,11 @@ from adobe_vipm.flows.sync.helper import (
 @freeze_time("2024-11-09")
 @pytest.mark.parametrize("dry_run", [True, False])
 def test_sync_agreements_by_3yc_end_date(
-    mocker,
     mock_mpt_client,
     agreement_factory,
     dry_run,
     mock_get_agreements_by_query,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_agreement,
     mock_adobe_client,
 ):
@@ -31,11 +30,8 @@ def test_sync_agreements_by_3yc_end_date(
 
     sync_agreements_by_3yc_end_date(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
 
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
-    )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(
-        dry_run=dry_run, sync_prices=True
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=True
     )
     mock_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
@@ -54,7 +50,7 @@ def test_sync_agreements_by_coterm_date(
     agreement_factory,
     dry_run,
     mock_get_agreements_by_query,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_agreement,
     mock_adobe_client,
 ):
@@ -62,11 +58,8 @@ def test_sync_agreements_by_coterm_date(
 
     sync_agreements_by_coterm_date(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
 
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
-    )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(
-        dry_run=dry_run, sync_prices=True
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=True
     )
     mock_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
@@ -80,12 +73,11 @@ def test_sync_agreements_by_coterm_date(
 @freeze_time("2025-07-16")
 @pytest.mark.parametrize("dry_run", [True, False])
 def test_sync_agreements_by_renewal_date(
-    mocker,
     mock_mpt_client,
     agreement_factory,
     dry_run,
     mock_get_agreements_by_query,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_adobe_client,
     mock_agreement,
 ):
@@ -93,11 +85,8 @@ def test_sync_agreements_by_renewal_date(
 
     sync_agreements_by_renewal_date(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
 
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
-    )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(
-        dry_run=dry_run, sync_prices=True
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=True
     )
     mock_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
@@ -116,14 +105,13 @@ def test_sync_agreements_by_renewal_date(
     ],
 )
 def test_sync_agreements_by_3yc_enroll_status_status(
-    mocker,
     mock_mpt_client,
     mock_adobe_client,
     adobe_customer_factory,
     adobe_commitment_factory,
     agreement_factory,
     status,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_agreement,
     mock_get_agreements_by_3yc_commitment_request_invitation,
 ):
@@ -136,10 +124,9 @@ def test_sync_agreements_by_3yc_enroll_status_status(
     mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
     )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(dry_run=False, sync_prices=True)
 
 
 @pytest.mark.parametrize(
@@ -161,7 +148,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     agreement_factory,
     status,
     mock_update_agreement,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_agreement,
     mock_get_agreements_by_3yc_commitment_request_invitation,
 ):
@@ -176,10 +163,9 @@ def test_sync_agreements_by_3yc_enroll_status_full(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
     )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(dry_run=False, sync_prices=True)
 
 
 def test_sync_agreements_by_3yc_enroll_status_status_error(
@@ -190,7 +176,7 @@ def test_sync_agreements_by_3yc_enroll_status_status_error(
     adobe_commitment_factory,
     agreement_factory,
     caplog,
-    mock_agreement_syncer,
+    mock_sync_agreement,
 ):
     mocker.patch(
         "adobe_vipm.flows.sync.helper.get_agreements_by_3yc_commitment_request_invitation",
@@ -205,11 +191,10 @@ def test_sync_agreements_by_3yc_enroll_status_status_error(
         sync_agreements_by_3yc_enroll_status(mock_mpt_client, mock_adobe_client, dry_run=False)
 
     assert "Unknown exception getting agreements by 3YC enroll status" in caplog.text
-    mock_agreement_syncer.assert_not_called()
+    mock_sync_agreement.assert_not_called()
 
 
 def test_sync_agreements_by_3yc_enroll_status_error_sync(
-    mocker,
     mock_mpt_client,
     mock_adobe_client,
     adobe_customer_factory,
@@ -217,7 +202,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     agreement_factory,
     caplog,
     mock_update_agreement,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_agreement,
     mock_get_agreements_by_3yc_commitment_request_invitation,
 ):
@@ -225,7 +210,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
         commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED)
     )
-    mock_agreement_syncer.return_value.sync.side_effect = AuthorizationNotFoundError(
+    mock_sync_agreement.side_effect = AuthorizationNotFoundError(
         "Authorization with uk/id ID not found."
     )
 
@@ -235,10 +220,9 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
     )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(dry_run=False, sync_prices=True)
     assert "Authorization with uk/id ID not found." in caplog.text
 
 
@@ -251,7 +235,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     agreement_factory,
     caplog,
     mock_update_agreement,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_agreement,
     mock_get_agreements_by_3yc_commitment_request_invitation,
 ):
@@ -262,7 +246,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
         commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED)
     )
-    mock_agreement_syncer.return_value.sync.side_effect = Exception(
+    mock_sync_agreement.side_effect = Exception(
         "Unknown exception getting agreements by 3YC enroll status"
     )
 
@@ -272,11 +256,13 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_update_agreement.assert_not_called()
-    mock_agreement_syncer.assert_has_calls([
-        mocker.call(mock_mpt_client, mock_adobe_client, mock_agreement),
-        mocker.call().sync(dry_run=False, sync_prices=True),
-        mocker.call(mock_mpt_client, mock_adobe_client, mock_agreement),
-        mocker.call().sync(dry_run=False, sync_prices=True),
+    mock_sync_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
+        ),
+        mocker.call(
+            mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
+        ),
     ])
     assert (
         "Unknown exception synchronizing 3YC enroll status for agreement AGR-2119-4550-8674-5962"
@@ -294,7 +280,7 @@ def test_sync_agreements_by_agreement_ids(
     mock_mpt_client,
     agreement_factory,
     dry_run,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_agreement,
     mock_adobe_client,
 ):
@@ -310,11 +296,8 @@ def test_sync_agreements_by_agreement_ids(
         sync_prices=False,
     )
 
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
-    )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(
-        dry_run=dry_run, sync_prices=False
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=False
     )
 
 
@@ -323,7 +306,7 @@ def test_sync_all_agreements(
     mocker,
     mock_mpt_client,
     agreement_factory,
-    mock_agreement_syncer,
+    mock_sync_agreement,
     mock_adobe_client,
     mock_agreement,
     dry_run,
@@ -332,9 +315,6 @@ def test_sync_all_agreements(
 
     sync_all_agreements(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
 
-    mock_agreement_syncer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement
-    )
-    mock_agreement_syncer.return_value.sync.assert_called_once_with(
-        dry_run=dry_run, sync_prices=False
+    mock_sync_agreement.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=False
     )
