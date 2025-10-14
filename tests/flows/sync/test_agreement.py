@@ -900,6 +900,7 @@ def test_sync_agreement_empty_discounts(
     agreement_factory,
     subscriptions_factory,
     adobe_customer_factory,
+    mock_send_notification,
     caplog,
 ):
     agreement = agreement_factory(
@@ -916,15 +917,16 @@ def test_sync_agreement_empty_discounts(
     customer = adobe_customer_factory()
     customer["discounts"] = []
     mock_adobe_client.get_customer.return_value = customer
-    mocked_notifier = mocker.patch(
-        "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams"
-    )
 
     sync_agreement(mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False)
 
-    mocked_notifier.assert_called_once()
-    assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
-    assert "does not have discounts information" in mocked_notifier.call_args_list[0].args[1]
+    mock_send_notification.assert_called_once_with(
+        "Customer does not have discounts information",
+        "Error synchronizing agreement self._agreement['id']. Customer a-client-id "
+        "does not have discounts information. Cannot proceed with price "
+        "synchronization.",
+        "FFA500",
+    )
 
 
 @freeze_time("2025-06-19")

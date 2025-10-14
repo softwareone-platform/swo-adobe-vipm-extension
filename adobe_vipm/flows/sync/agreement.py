@@ -13,7 +13,6 @@ from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import (
     AuthorizationNotFoundError,
-    CustomerDiscountsNotFoundError,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
@@ -86,32 +85,8 @@ class AgreementSyncer:  # noqa: WPS214
             )
             return
         try:
-            processing_subscriptions = list(
-                filter(
-                    lambda sub: sub["status"] in {"Updating", "Terminating"},
-                    self._agreement["subscriptions"],
-                ),
-            )
-
-            if len(processing_subscriptions) > 0:
-                logger.info(
-                    "Agreement %s has processing subscriptions, skip it", self._agreement["id"]
-                )
+            if not self._is_sync_possible():
                 return
-
-            if not self._adobe_subscriptions:
-                logger.info(
-                    "Skipping price sync - no subscriptions found for the customer %s",
-                    self._adobe_customer_id,
-                )
-                return
-
-            if not self._customer.get("discounts", []):
-                raise CustomerDiscountsNotFoundError(  # noqa: TRY301
-                    f"Customer {self._adobe_customer_id} does not have discounts information."
-                    " Cannot proceed with price synchronization for the agreement"
-                    f" {self._agreement['id']}."
-                )
 
             self._add_missing_subscriptions()
 
@@ -150,6 +125,39 @@ class AgreementSyncer:  # noqa: WPS214
             if not dry_run:
                 self._update_last_sync_date()
                 self._agreement = mpt.get_agreement(self._mpt_client, self._agreement["id"])
+
+    def _is_sync_possible(self):
+        if any(
+            filter(
+                lambda sub: sub["status"] in {"Updating", "Terminating"},
+                self._agreement["subscriptions"],
+            ),
+        ):
+            logger.info("Agreement %s has processing subscriptions, skip it", self._agreement["id"])
+            return False
+
+        if not self._adobe_subscriptions:
+            logger.info(
+                "Skipping price sync - no subscriptions found for the customer %s",
+                self._adobe_customer_id,
+            )
+            return False
+
+        if not self._customer.get("discounts", []):
+            msg = (
+                "Error synchronizing agreement self._agreement['id']. Customer "
+                f"{self._adobe_customer_id} does not have discounts information."
+                f" Cannot proceed with price synchronization."
+            )
+            logger.error(msg)
+            send_notification(
+                "Customer does not have discounts information",
+                msg,
+                TeamsColorCode.ORANGE.value,
+            )
+            return False
+
+        return True
 
     def _add_missing_subscriptions(self) -> None:
         buyer_id = self._agreement["buyer"]["id"]
