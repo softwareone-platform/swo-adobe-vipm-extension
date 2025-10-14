@@ -646,7 +646,7 @@ def reseller_change_order_parameters_factory():
 @pytest.fixture
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
-        customer_id="",
+        customer_id="a-client-id",
         due_date=None,
         p3yc_recommitment=None,
         p3yc_enroll_status="",
@@ -1376,13 +1376,14 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.global_customer",
         "adobe_vipm.flows.helpers",
         "adobe_vipm.flows.migration",
-        "adobe_vipm.flows.sync",
         "adobe_vipm.flows.validation.termination",
         "adobe_vipm.flows.validation.change",
         "adobe_vipm.flows.validation.shared",
         "adobe_vipm.flows.validation.transfer",
         "adobe_vipm.management.commands.create_resellers",
         "adobe_vipm.management.commands.migrate_mpt_assets",
+        "adobe_vipm.management.commands.sync_3yc_enrol",
+        "adobe_vipm.management.commands.sync_agreements",
     ]
     for path in paths:
         mocker.patch(f"{path}.get_adobe_client", return_value=adobe_client)
@@ -1476,7 +1477,7 @@ def adobe_subscription_factory():
         status=AdobeStatus.PROCESSED.value,
         renewal_date=None,
     ):
-        default_renewal_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=366)
+        default_renewal_date = dt.date.fromisoformat("2025-10-10") + dt.timedelta(days=366)
 
         return {
             "subscriptionId": subscription_id or "a-sub-id",
@@ -1577,7 +1578,7 @@ def adobe_client_factory(
             expires=dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=86000),
         )
         client = AdobeClient()
-        client._token_cache[authorization] = api_token  # noqa: SLF001
+        client._token_cache[authorization] = api_token
 
         return client, authorization, api_token
 
@@ -1604,6 +1605,7 @@ def mock_setup_client(mocker, mock_mpt_client):
     paths = [
         "adobe_vipm.management.commands.sync_3yc_enrol",
         "adobe_vipm.management.commands.migrate_mpt_assets",
+        "adobe_vipm.management.commands.sync_agreements",
     ]
     for path in paths:
         mocker.patch(f"{path}.setup_client", return_value=mock_mpt_client)
