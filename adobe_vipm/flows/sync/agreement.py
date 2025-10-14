@@ -54,20 +54,20 @@ class AgreementSyncer:  # noqa: WPS214
 
     def __init__(
         self,
-        _mpt_client: MPTClient,
-        _adobe_client: AdobeClient,
-        _agreement: dict,
-        _customer: dict,
-        _adobe_subscriptions: list[dict],
+        mpt_client: MPTClient,
+        adobe_client: AdobeClient,
+        agreement: dict,
+        customer: dict,
+        adobe_subscriptions: list[dict],
     ):
-        self._mpt_client = _mpt_client
-        self._adobe_client = _adobe_client
-        self._agreement = _agreement
-        self._customer = _customer
-        self._adobe_subscriptions = _adobe_subscriptions
-        self._authorization_id: str = _agreement["authorization"]["id"]
-        self._seller_id: str = _agreement["seller"]["id"]
-        self._licensee_id: str = _agreement["licensee"]["id"]
+        self._mpt_client = mpt_client
+        self._adobe_client = adobe_client
+        self._agreement = agreement
+        self._customer = customer
+        self._adobe_subscriptions = adobe_subscriptions
+        self._authorization_id: str = agreement["authorization"]["id"]
+        self._seller_id: str = agreement["seller"]["id"]
+        self._licensee_id: str = agreement["licensee"]["id"]
         self._adobe_customer_id: str = get_adobe_customer_id(self._agreement)
 
     def sync(self, *, dry_run: bool, sync_prices: bool) -> None:  # noqa: C901
