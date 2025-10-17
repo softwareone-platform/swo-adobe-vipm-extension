@@ -43,7 +43,7 @@ from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_
 logger = logging.getLogger(__name__)
 
 
-class AgreementSyncer:  # noqa: WPS214
+class AgreementsSyncer:  # noqa: WPS214
     """
     Sync agreement.
 
