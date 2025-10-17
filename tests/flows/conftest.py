@@ -234,3 +234,18 @@ def mock_get_agreements_by_3yc_commitment_request_invitation(mocker, mock_agreem
         return_value=[mock_agreement],
         autospec=True,
     )
+
+
+@pytest.fixture
+def mock_create_asset(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_asset", spec=True)
+
+
+@pytest.fixture
+def mock_create_agreement_subscription(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_agreement_subscription", spec=True)
+
+
+@pytest.fixture
+def mock_get_template_by_name(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_template_by_name", spec=True)
