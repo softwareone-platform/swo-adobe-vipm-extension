@@ -82,17 +82,17 @@ def test_sync_agreement_update_asset_dry_run(
     asset_id = "AST-1111-2222-3333"
     mock_asset = assets_factory(asset_id=asset_id, adobe_subscription_id="sub-one-time-id")[0]
     mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_asset_by_id", return_value=mock_asset)
-    mock_lines = lines_factory(external_vendor_id="65327701CA")
-    mocked_agreement_syncer._agreement = agreement_factory(
-        lines=mock_lines, assets=[mock_asset], subscriptions=[]
-    )
+    mock_lines = lines_factory(external_vendor_id="65304578CA")
+    agreement = agreement_factory(lines=mock_lines, assets=[mock_asset], subscriptions=[])
+    mocked_agreement_syncer._agreement = agreement
     adobe_subscription = adobe_subscription_factory(
         subscription_id="sub-one-time-id",
-        offer_id="65327701CA01A12",
+        offer_id="65304578CA01A12",
         used_quantity=6,
     )
+    mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
     mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
-    mock_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
+    mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
     mock_get_subscriptions_for_update.return_value = []
 
     mocked_agreement_syncer.sync(dry_run=True, sync_prices=False)
