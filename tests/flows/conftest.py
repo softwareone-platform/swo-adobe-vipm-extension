@@ -1,7 +1,7 @@
 import pytest
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
-from adobe_vipm.flows.sync.agreement import AgreementSyncer
+from adobe_vipm.flows.sync.agreement import AgreementsSyncer
 
 
 @pytest.fixture
@@ -147,23 +147,23 @@ def mock_get_gc_agreement_deployment_model(mocker):
 
 @pytest.fixture
 def mock_get_subscriptions_for_update(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(AgreementSyncer, "_get_subscriptions_for_update", spec=True)
+    return mocker.patch.object(AgreementsSyncer, "_get_subscriptions_for_update", spec=True)
 
 
 @pytest.fixture
 def mock_update_subscriptions(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(AgreementSyncer, "_update_subscriptions", spec=True)
+    return mocker.patch.object(AgreementsSyncer, "_update_subscriptions", spec=True)
 
 
 @pytest.fixture
 def mock_add_missing_subscriptions(mocker):
-    return mocker.patch.object(AgreementSyncer, "_add_missing_subscriptions", spec=True)
+    return mocker.patch.object(AgreementsSyncer, "_add_missing_subscriptions", spec=True)
 
 
 @pytest.fixture
 def mock_check_update_airtable_missing_deployments(mocker, mocked_agreement_syncer):
     return mocker.patch.object(
-        AgreementSyncer, "_check_update_airtable_missing_deployments", spec=True
+        AgreementsSyncer, "_check_update_airtable_missing_deployments", spec=True
     )
 
 
@@ -199,7 +199,7 @@ def mocked_agreement_syncer(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
         ),
     ]
-    return AgreementSyncer(
+    return AgreementsSyncer(
         mock_mpt_client,
         mock_adobe_client,
         agreement_factory(),
