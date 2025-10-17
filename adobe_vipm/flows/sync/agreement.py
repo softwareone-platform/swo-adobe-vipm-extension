@@ -19,12 +19,13 @@ from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     AgreementStatus,
-    AssetStatus,
     ItemTermsModel,
     Param,
     SubscriptionStatus,
     TeamsColorCode,
 )
+from adobe_vipm.flows.sync.asset import AssetsSyncer
+from adobe_vipm.flows.sync.util import _check_adobe_subscription_id
 from adobe_vipm.flows.utils import (
     get_3yc_fulfillment_parameters,
     get_adobe_customer_id,
@@ -88,10 +89,16 @@ class AgreementsSyncer:  # noqa: WPS214
             if not self._is_sync_possible():
                 return
 
-            self._add_missing_subscriptions_and_assets()
+            self._add_missing_subscriptions_and_assets()  # TODO: move asset part to asset classes
 
-            assets_for_update = self._get_assets_for_update()
-            self._update_assets(assets_for_update, dry_run=dry_run)
+            AssetsSyncer(
+                self._mpt_client,
+                self._agreement["id"],
+                self._agreement["assets"],
+                self._customer,
+                self._adobe_subscriptions,
+            ).sync(dry_run=dry_run)
+
             subscriptions_for_update = self._get_subscriptions_for_update(self._agreement)
             if subscriptions_for_update:
                 self._update_subscriptions(
@@ -576,60 +583,6 @@ class AgreementsSyncer:  # noqa: WPS214
             else:
                 logger.info("OneTime item: %s: sku=%s\n", line["id"], actual_sku)
 
-    def _update_assets(
-        self, assets_for_update: list[tuple[dict, dict, str]], *, dry_run: bool
-    ) -> None:
-        for asset, adobe_subscription, actual_sku in assets_for_update:
-            parameters = {
-                "fulfillment": [
-                    {
-                        "externalId": Param.USED_QUANTITY.value,
-                        "value": str(adobe_subscription[Param.USED_QUANTITY]),
-                    },
-                    {
-                        "externalId": Param.LAST_SYNC_DATE.value,
-                        "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
-                    },
-                ],
-            }
-
-            if not dry_run:
-                logger.info("Updating asset: %s: sku=%s", asset["id"], actual_sku)
-                mpt.update_asset(self._mpt_client, asset["id"], parameters=parameters)
-            else:
-                current_quantity = get_parameter("fulfillment", asset, "usedQuantity")["value"]
-                sys.stdout.write(
-                    f"Asset: {asset['id']}: sku={actual_sku}, "
-                    f"current used quantity={current_quantity}, "
-                    f"new used quantity={adobe_subscription['usedQuantity']}"
-                )
-
-    def _get_assets_for_update(self) -> list[tuple[dict, dict, str]]:
-        logger.info("Getting assets for update for agreement %s", self._agreement["id"])
-
-        for_update = []
-        for asset in self._agreement["assets"]:
-            if asset["status"] == AssetStatus.TERMINATED:
-                continue
-
-            mpt_asset = mpt.get_asset_by_id(self._mpt_client, asset["id"])
-            adobe_subscription_id = mpt_asset["externalIds"]["vendor"]
-            adobe_subscription = find_first(
-                partial(_check_adobe_subscription_id, adobe_subscription_id),
-                self._adobe_subscriptions,
-            )
-            if not adobe_subscription:
-                logger.error("No subscription found in Adobe customer data!")
-                continue
-
-            for_update.append((
-                mpt_asset,
-                adobe_subscription,
-                get_sku_with_discount_level(adobe_subscription["offerId"], self._customer),
-            ))
-
-        return for_update
-
     def _get_subscriptions_for_update(self, agreement: dict) -> list[tuple[dict, dict, str]]:
         logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
         for_update = []
@@ -905,10 +858,6 @@ class AgreementsSyncer:  # noqa: WPS214
                 ]
             },
         )
-
-
-def _check_adobe_subscription_id(subscription_id, adobe_subscription):
-    return adobe_subscription.get("subscriptionId", "") == subscription_id
 
 
 def _is_deployment_matched(missing_deployment_id: str, subscription: dict) -> bool:
