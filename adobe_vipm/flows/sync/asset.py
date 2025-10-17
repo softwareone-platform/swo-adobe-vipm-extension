@@ -92,10 +92,7 @@ class AssetsSyncer:
                 ],
             }
 
-            if not dry_run:
-                logger.info("Updating asset: %s: sku=%s", asset["id"], actual_sku)
-                mpt.update_asset(self._mpt_client, asset["id"], parameters=asset_params)
-            else:
+            if dry_run:
                 current_quantity = get_parameter("fulfillment", asset, "usedQuantity")["value"]
                 logger.info(
                     "Updating asset: %s: sku=%s, current used quantity=%s, new used quantity=%s",
@@ -104,3 +101,6 @@ class AssetsSyncer:
                     current_quantity,
                     adobe_subscription["usedQuantity"],
                 )
+            else:
+                logger.info("Updating asset: %s: sku=%s", asset["id"], actual_sku)
+                mpt.update_asset(self._mpt_client, asset["id"], parameters=asset_params)
