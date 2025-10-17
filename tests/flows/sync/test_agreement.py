@@ -13,21 +13,6 @@ from adobe_vipm.flows.sync.helper import sync_agreement
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
-@pytest.fixture
-def mock_create_asset(mocker):
-    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_asset", spec=True)
-
-
-@pytest.fixture
-def mock_create_agreement_subscription(mocker):
-    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_agreement_subscription", spec=True)
-
-
-@pytest.fixture
-def mock_get_template_by_name(mocker):
-    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_template_by_name", spec=True)
-
-
 @freeze_time("2025-06-23")
 def test_sync_agreement_prices(
     mocker,
@@ -197,105 +182,6 @@ def test_sync_agreement_update_agrement(
     mock_get_agreement.assert_called_once_with(
         mock_mpt_client, mocked_agreement_syncer._agreement["id"]
     )
-
-
-@freeze_time("2025-06-23")
-def test_sync_agreement_update_asset(
-    mocker,
-    agreement_factory,
-    assets_factory,
-    lines_factory,
-    adobe_subscription_factory,
-    adobe_customer_factory,
-    mock_get_adobe_product_by_marketplace_sku,
-    mock_adobe_client,
-    mock_get_adobe_client,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
-    mock_mpt_client,
-    mock_update_agreement,
-    mock_get_subscriptions_for_update,
-    mocked_agreement_syncer,
-    mock_update_asset,
-):
-    asset_id = "AST-1111-2222-3333"
-    mock_asset = assets_factory(asset_id=asset_id, adobe_subscription_id="sub-one-time-id")[0]
-    mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_asset_by_id", return_value=mock_asset)
-    mock_lines = lines_factory(external_vendor_id="65304578CA")
-    agreement = agreement_factory(lines=mock_lines, assets=[mock_asset], subscriptions=[])
-    mocked_agreement_syncer._agreement = agreement
-    adobe_subscription = adobe_subscription_factory(
-        subscription_id="sub-one-time-id",
-        offer_id="65304578CA01A12",
-        used_quantity=6,
-    )
-    mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
-    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
-    mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
-    mock_get_subscriptions_for_update.return_value = []
-
-    mocked_agreement_syncer.sync(dry_run=False, sync_prices=False)
-
-    mock_update_asset.assert_called_once_with(
-        mock_mpt_client,
-        asset_id,
-        parameters={
-            "fulfillment": [
-                {"externalId": "usedQuantity", "value": "6"},
-                {"externalId": "lastSyncDate", "value": "2025-06-23"},
-            ]
-        },
-    )
-    mock_update_agreement.assert_has_calls([
-        mocker.call(
-            mock_mpt_client,
-            agreement["id"],
-            lines=mock_lines,
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
-        ),
-        mocker.call(
-            mock_mpt_client,
-            agreement["id"],
-            parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
-        ),
-    ])
-    mock_adobe_client.get_subscription.assert_not_called()
-
-
-@freeze_time("2025-06-23")
-def test_sync_agreement_update_asset_dry_run(
-    mocker,
-    mock_mpt_client,
-    mock_adobe_client,
-    agreement_factory,
-    assets_factory,
-    lines_factory,
-    adobe_subscription_factory,
-    adobe_customer_factory,
-    mock_get_subscriptions_for_update,
-    mocked_agreement_syncer,
-    mock_update_asset,
-    mock_add_missing_subscriptions,
-):
-    asset_id = "AST-1111-2222-3333"
-    mock_asset = assets_factory(asset_id=asset_id, adobe_subscription_id="sub-one-time-id")[0]
-    mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_asset_by_id", return_value=mock_asset)
-    mock_lines = lines_factory(external_vendor_id="65327701CA")
-    mocked_agreement_syncer._agreement = agreement_factory(
-        lines=mock_lines, assets=[mock_asset], subscriptions=[]
-    )
-    adobe_subscription = adobe_subscription_factory(
-        subscription_id="sub-one-time-id",
-        offer_id="65327701CA01A12",
-        used_quantity=6,
-    )
-    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
-    mock_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
-    mock_get_subscriptions_for_update.return_value = []
-
-    mocked_agreement_syncer.sync(dry_run=True, sync_prices=False)
-
-    mock_update_asset.assert_not_called()
 
 
 @freeze_time("2025-06-23")
@@ -1337,7 +1223,7 @@ def test_add_missing_subscriptions_none(
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
     mock_get_product_items_by_period.return_value = []
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_period.assert_not_called()
     mock_create_asset.assert_not_called()
@@ -1396,7 +1282,7 @@ def test_add_missing_subscriptions(
 
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
@@ -1526,7 +1412,7 @@ def test_add_missing_subscriptions_deployment(
     mocked_agreement_syncer._agreement = agreement
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
@@ -1620,7 +1506,7 @@ def test_add_missing_subscriptions_wrong_currency(
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
     mocked_agreement_syncer._customer = adobe_customer_factory()
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA"}
