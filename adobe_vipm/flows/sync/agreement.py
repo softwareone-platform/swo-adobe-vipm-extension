@@ -22,6 +22,7 @@ from adobe_vipm.flows.constants import (
     AssetStatus,
     ItemTermsModel,
     Param,
+    SubscriptionStatus,
     TeamsColorCode,
 )
 from adobe_vipm.flows.utils import (
@@ -87,7 +88,7 @@ class AgreementsSyncer:  # noqa: WPS214
             if not self._is_sync_possible():
                 return
 
-            self._add_missing_subscriptions()
+            self._add_missing_subscriptions_and_assets()
 
             assets_for_update = self._get_assets_for_update()
             self._update_assets(assets_for_update, dry_run=dry_run)
@@ -158,7 +159,7 @@ class AgreementsSyncer:  # noqa: WPS214
 
         return True
 
-    def _add_missing_subscriptions(self) -> None:
+    def _add_missing_subscriptions_and_assets(self) -> None:
         buyer_id = self._agreement["buyer"]["id"]
         product_id = self._agreement["product"]["id"]
         currency = self._agreement["listing"]["priceList"]["currency"]

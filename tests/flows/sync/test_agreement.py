@@ -1337,7 +1337,7 @@ def test_add_missing_subscriptions_none(
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
     mock_get_product_items_by_period.return_value = []
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_period.assert_not_called()
     mock_create_asset.assert_not_called()
@@ -1396,7 +1396,7 @@ def test_add_missing_subscriptions(
 
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
@@ -1526,7 +1526,7 @@ def test_add_missing_subscriptions_deployment(
     mocked_agreement_syncer._agreement = agreement
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
@@ -1620,7 +1620,7 @@ def test_add_missing_subscriptions_wrong_currency(
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
     mocked_agreement_syncer._customer = adobe_customer_factory()
 
-    mocked_agreement_syncer._add_missing_subscriptions()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA"}
