@@ -22,7 +22,6 @@ from adobe_vipm.flows.constants import (
     AssetStatus,
     ItemTermsModel,
     Param,
-    SubscriptionStatus,
     TeamsColorCode,
 )
 from adobe_vipm.flows.utils import (
@@ -905,34 +904,6 @@ class AgreementsSyncer:  # noqa: WPS214
                 ]
             },
         )
-
-    def _terminate_deployment_sybscriptions(self, adobe_deployments: list[dict]):
-        deployment_agreements = mpt.get_agreements_by_customer_deployments(
-            self._mpt_client,
-            Param.DEPLOYMENT_ID.value,
-            [deployment["deploymentId"] for deployment in adobe_deployments],
-        )
-
-        for deployment_agreement in deployment_agreements:
-            for subscription_id in [
-                sub["id"]
-                for sub in deployment_agreement["subscriptions"]
-                if sub["status"] != SubscriptionStatus.TERMINATED
-            ]:
-                try:
-                    mpt.terminate_subscription(
-                        self._mpt_client, subscription_id, "Suspected Lost Customer"
-                    )
-                except Exception as error:
-                    logger.exception(
-                        "> Suspected Lost Customer: Error terminating subscription %s.",
-                        subscription_id,
-                    )
-                    send_exception(
-                        "> Suspected Lost Customer: Error terminating subscription"
-                        f" {subscription_id}",
-                        f"{error}",
-                    )
 
 
 def _check_adobe_subscription_id(subscription_id, adobe_subscription):
