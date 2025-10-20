@@ -526,3 +526,22 @@ class OrderClientMixin:
         return (
             order["status"] == AdobeStatus.PROCESSED and mpt_item["status"] == AdobeStatus.PROCESSED
         )
+
+    @wrap_http_error
+    def _get_flex_discounts(
+        self, authorization_id: str, segment: str, country: str, offer_ids: tuple[str]
+    ) -> dict:
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
+        offer_ids = ",".join(offer_ids)
+        response = requests.get(
+            urljoin(
+                self._config.api_base_url,
+                f"v3/flex-discounts?market-segment={segment}&country={country}&"
+                f"offer-ids={offer_ids}",
+            ),
+            headers=headers,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()["flexDiscounts"]
