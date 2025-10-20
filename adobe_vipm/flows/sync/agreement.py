@@ -181,10 +181,9 @@ class AgreementsSyncer:  # noqa: WPS214
             a_s for a_s in self._adobe_subscriptions if a_s.get("deploymentId", "") == deployment_id
         )
         skus = {get_partial_sku(item["offerId"]) for item in adobe_subscriptions}
-        mpt_entitlements_external_ids = {
-            subscription["externalIds"]["vendor"]
-            for subscription in self._agreement["subscriptions"] + self._agreement["assets"]
-        }
+
+        mpt_entitlements_external_ids = self._extract_mpt_entitlements_external_ids()
+
         missing_adobe_subscriptions = tuple(
             subsc
             for subsc in adobe_subscriptions
@@ -326,6 +325,34 @@ class AgreementsSyncer:  # noqa: WPS214
                         "name": template.get("name"),
                     }
                 mpt.create_agreement_subscription(self._mpt_client, subscription)
+
+    def _extract_mpt_entitlements_external_ids(self) -> set[str]:
+        """
+        Extract external IDs from MPT entitlements (subscriptions and assets).
+
+        Returns:
+            Set of external IDs from entitlements
+
+        Raises:
+            Logs exception and sends notification if external IDs are missing
+        """
+        mpt_entitlements_external_ids = set()
+        for entitlement in self._agreement["subscriptions"] + self._agreement["assets"]:
+            try:
+                mpt_entitlements_external_ids.add(entitlement["externalIds"]["vendor"])
+            except KeyError:
+                logger.exception(
+                    "Missing external IDs for subscriptions or assets in the agreement: %s",
+                    self._agreement["id"],
+                )
+                send_notification(
+                    "Missing external IDs",
+                    f"Missing external IDs for entitlement with id {entitlement['id']} "
+                    f"in the agreement: {self._agreement['id']}",
+                    TeamsColorCode.ORANGE.value,
+                )
+
+        return mpt_entitlements_external_ids
 
     def _update_subscriptions(
         self,
@@ -604,7 +631,7 @@ class AgreementsSyncer:  # noqa: WPS214
                 continue
 
             mpt_subscription = mpt.get_agreement_subscription(self._mpt_client, subscription["id"])
-            adobe_subscription_id = mpt_subscription["externalIds"]["vendor"]
+            adobe_subscription_id = mpt_subscription.get("externalIds", {}).get("vendor")
 
             adobe_subscription = find_first(
                 partial(_check_adobe_subscription_id, adobe_subscription_id),
@@ -773,7 +800,7 @@ class AgreementsSyncer:  # noqa: WPS214
         logger.info("Looking for orphaned deployment subscriptions in Adobe.")
 
         mpt_subscription_ids = {
-            subscription["externalIds"]["vendor"]
+            subscription.get("externalIds", {}).get("vendor")
             for agreement in deployment_agreements
             for subscription in agreement["subscriptions"]
         }
