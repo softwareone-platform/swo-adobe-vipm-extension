@@ -6,7 +6,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
-from adobe_vipm.flows.constants import AgreementStatus, ItemTermsModel, Param
+from adobe_vipm.flows.constants import AgreementStatus, ItemTermsModel, Param, TeamsColorCode
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync.helper import sync_agreement
 
@@ -1334,6 +1334,53 @@ def test_add_missing_subscriptions_none(
 
     mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
+    mock_get_product_items_by_period.assert_not_called()
+    mock_create_asset.assert_not_called()
+    mock_create_agreement_subscription.assert_not_called()
+
+
+def test_add_missing_subscriptions_without_vendor_id(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement,
+    agreement_factory,
+    assets_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_get_product_items_by_period,
+    mock_create_asset,
+    mock_create_agreement_subscription,
+    mocked_agreement_syncer,
+    mock_send_notification,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
+        adobe_subscription_factory(
+            subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
+        ),
+        adobe_subscription_factory(
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
+        ),
+    ]
+
+    agreement = agreement_factory()
+    agreement["subscriptions"].append({
+        "id": "SUB-1234-5678",
+        "status": "1004",
+    })
+
+    mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
+    mocked_agreement_syncer._agreement = agreement
+    mock_get_product_items_by_period.return_value = []
+
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()
+
+    mock_send_notification.assert_called_once_with(
+        "Missing external IDs",
+        "Missing external IDs for entitlement with id SUB-1234-5678 "
+        "in the agreement: AGR-2119-4550-8674-5962",
+        TeamsColorCode.ORANGE.value,
+    )
     mock_get_product_items_by_period.assert_not_called()
     mock_create_asset.assert_not_called()
     mock_create_agreement_subscription.assert_not_called()
