@@ -35,6 +35,7 @@ from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
     TEMPLATE_SUBSCRIPTION_EXPIRED,
+    TEMPLATE_SUBSCRIPTION_TERMINATION,
     AgreementStatus,
     Param,
     SubscriptionStatus,
@@ -468,6 +469,13 @@ def _get_subscriptions_for_update(
 
     for subscription in agreement["subscriptions"]:
         if subscription["status"] in {SubscriptionStatus.TERMINATED, SubscriptionStatus.EXPIRED}:
+            if not _is_subscription_template_final(subscription):
+                template_name = (
+                    TEMPLATE_SUBSCRIPTION_EXPIRED
+                    if subscription["status"] == SubscriptionStatus.EXPIRED
+                    else TEMPLATE_SUBSCRIPTION_TERMINATION
+                )
+                _update_subscription_template(mpt_client, agreement, subscription, template_name)
             continue
 
         mpt_subscription = get_agreement_subscription(mpt_client, subscription["id"])
@@ -486,20 +494,7 @@ def _get_subscriptions_for_update(
 
         if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
             logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
-            template = get_template_by_name(
-                mpt_client,
-                agreement["product"]["id"],
-                TEMPLATE_SUBSCRIPTION_EXPIRED,
-            )
-            if template:
-                update_agreement_subscription(
-                    mpt_client,
-                    mpt_subscription["id"],
-                    template={
-                        "id": template.get("id"),
-                        "name": template.get("name"),
-                    },
-                )
+            _update_subscription_template(mpt_client, agreement, mpt_subscription, TEMPLATE_SUBSCRIPTION_EXPIRED)
             terminate_subscription(
                 mpt_client,
                 mpt_subscription["id"],
@@ -516,6 +511,25 @@ def _get_subscriptions_for_update(
         )
 
     return for_update
+
+
+def _is_subscription_template_final(subscription: dict) -> bool:
+    template_name = subscription.get("template", {}).get("name")
+    return template_name in {TEMPLATE_SUBSCRIPTION_EXPIRED, TEMPLATE_SUBSCRIPTION_TERMINATION}
+
+def _update_subscription_template(mpt_client, agreement, subscription: dict, template_name: str) -> None:
+    template = get_template_by_name(
+        mpt_client, agreement["product"]["id"], template_name
+    )
+    if template:
+        update_agreement_subscription(
+            mpt_client,
+            subscription["id"],
+            template={
+                "id": template.get("id"),
+                "name": template.get("name"),
+            },
+        )
 
 
 def sync_agreements_by_3yc_end_date(mpt_client: MPTClient, *, dry_run: bool) -> None:
