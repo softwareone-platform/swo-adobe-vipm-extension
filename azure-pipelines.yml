@@ -59,6 +59,24 @@ stages:
                   repository: $(appName)
                   workingDirectory: helm/$(appName)
                   skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
+  - stage: sbom
+    displayName: SBOM
+    dependsOn: [prepare, build]
+    # condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
+    variables:
+      - group: marketplace.dtrack
+      - name: buildVersion
+        value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+      - name: majorVersion
+        value: $[ split(variables.buildVersion, '.')[0] ]
+    jobs:
+      - template: aks-tests-templates/jobs/dtrack-python-sbom-job.yaml@templates
+        parameters:
+          pythonVersion: "3.x"
+          projectName: $(appName)
+          projectVersion: $(majorVersion)
+          dtrackAPIKey: $(dtrackAPIKey)
+          dtrackURI: $(dtrackURI)
 
   - stage: publish
     displayName: Publish
