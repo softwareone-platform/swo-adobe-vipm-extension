@@ -16,7 +16,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_RETURN,
     AdobeStatus,
 )
-from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
+from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError, wrap_http_error
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
@@ -530,9 +530,8 @@ class OrderClientMixin:
 
     @wrap_http_error
     def _get_flex_discounts(
-        self, authorization_id: str, segment: str, country: str, offer_ids: tuple[str]
+        self, authorization: Authorization, segment: str, country: str, offer_ids: tuple[str, ...]
     ) -> dict:
-        authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
         offer_ids = ",".join(offer_ids)
         response = requests.get(
