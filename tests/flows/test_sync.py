@@ -7,7 +7,7 @@ from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
-from adobe_vipm.flows.constants import AgreementStatus, Param
+from adobe_vipm.flows.constants import AgreementStatus, Param, TeamsColorCode
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _add_missing_subscriptions,  # noqa: PLC2701
@@ -274,7 +274,7 @@ def test_sync_agreement_prices_dry_run(
         mocked_mpt_client,
         "SUB-1234-5678",
         template={"id": "TPL-1234", "name": "Expired"},
-    )    
+    )
     mocked_update_agreement.assert_not_called()
 
 
@@ -2036,6 +2036,53 @@ def test_add_missing_subscriptions_none(
 
     mock_get_product_items_by_period.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", "one-time", {"65322572CA"}
+    )
+    mock_create_agreement_subscription.assert_not_called()
+
+
+def test_add_missing_subscriptions_without_vendor_id(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_get_product_items_by_period,
+    mock_get_product_items_by_skus,
+    mock_create_agreement_subscription,
+    mock_send_notification,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
+        ),
+        adobe_subscription_factory(
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
+        ),
+    ]
+
+    agreement = agreement_factory()
+    agreement["subscriptions"].append({
+        "id": "SUB-1234-5678",
+        "status": "1004",
+    })
+
+    mock_get_product_items_by_skus.return_value = []
+    mock_get_product_items_by_period.return_value = []
+
+    _add_missing_subscriptions(
+        mock_mpt_client,
+        mock_adobe_client,
+        adobe_customer_factory(),
+        agreement,
+        adobe_subscriptions=adobe_subscriptions,
+    )
+
+    mock_send_notification.assert_called_once_with(
+        "Missing external IDs",
+        "Missing external IDs for entitlement with id SUB-1234-5678 "
+        "in the agreement: AGR-2119-4550-8674-5962",
+        TeamsColorCode.ORANGE.value,
     )
     mock_create_agreement_subscription.assert_not_called()
 
