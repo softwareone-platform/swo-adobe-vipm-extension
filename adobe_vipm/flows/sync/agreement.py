@@ -18,6 +18,7 @@ from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
     TEMPLATE_SUBSCRIPTION_EXPIRED,
+    TEMPLATE_SUBSCRIPTION_TERMINATION,
     AgreementStatus,
     ItemTermsModel,
     Param,
@@ -592,6 +593,14 @@ class AgreementsSyncer:  # noqa: WPS214
                 SubscriptionStatus.TERMINATED,
                 SubscriptionStatus.EXPIRED,
             }:
+                if not self._is_subscription_template_final(subscription):
+                    template_name = (
+                        TEMPLATE_SUBSCRIPTION_EXPIRED
+                        if subscription["status"] == SubscriptionStatus.EXPIRED
+                        else TEMPLATE_SUBSCRIPTION_TERMINATION
+                    )
+                    self._update_subscription_template(subscription, template_name)
+
                 continue
 
             mpt_subscription = mpt.get_agreement_subscription(self._mpt_client, subscription["id"])
@@ -610,20 +619,7 @@ class AgreementsSyncer:  # noqa: WPS214
 
             if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
                 logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
-                template = mpt.get_template_by_name(
-                    self._mpt_client,
-                    agreement["product"]["id"],
-                    TEMPLATE_SUBSCRIPTION_EXPIRED,
-                )
-                if template:
-                    mpt.update_agreement_subscription(
-                        self._mpt_client,
-                        mpt_subscription["id"],
-                        template={
-                            "id": template.get("id"),
-                            "name": template.get("name"),
-                        },
-                    )
+                self._update_subscription_template(mpt_subscription, TEMPLATE_SUBSCRIPTION_EXPIRED)
                 mpt.terminate_subscription(
                     self._mpt_client,
                     mpt_subscription["id"],
@@ -638,6 +634,24 @@ class AgreementsSyncer:  # noqa: WPS214
             ))
 
         return for_update
+
+    def _is_subscription_template_final(self, subscription: dict) -> bool:
+        template_name = subscription.get("template", {}).get("name")
+        return template_name in {TEMPLATE_SUBSCRIPTION_EXPIRED, TEMPLATE_SUBSCRIPTION_TERMINATION}
+
+    def _update_subscription_template(self, subscription: dict, template_name: str) -> None:
+        template = mpt.get_template_by_name(
+            self._mpt_client, self._agreement["product"]["id"], template_name
+        )
+        if template:
+            mpt.update_agreement_subscription(
+                self._mpt_client,
+                subscription["id"],
+                template={
+                    "id": template.get("id"),
+                    "name": template.get("name"),
+                },
+            )
 
     def _check_update_airtable_missing_deployments(self, adobe_deployments: list[dict]) -> None:
         agreement_id = self._agreement["id"]
