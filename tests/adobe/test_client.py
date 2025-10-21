@@ -2754,10 +2754,7 @@ def test_commit_reseller_change(
     assert result == expected_response
 
 
-def test_get_flex_discounts(
-    requests_mocker, adobe_client_factory, settings, adobe_authorizations_file
-):
-    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+def test_get_flex_discounts(requests_mocker, adobe_client_factory, settings):
     client, authorization, api_token = adobe_client_factory()
     requests_mocker.get(
         urljoin(
@@ -2808,7 +2805,7 @@ def test_get_flex_discounts(
     )
 
     assert client._get_flex_discounts(
-        authorization_uk, "COM", "US", ("65304768CA01A12", "65304768CA01A12")
+        authorization, "COM", "US", ("65304768CA01A12", "65304768CA01A12")
     ) == [
         {
             "id": "55555555-8768-4e8a-9a2f-fb6a6b08f563",
