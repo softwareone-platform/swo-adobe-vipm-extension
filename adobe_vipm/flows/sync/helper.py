@@ -17,7 +17,7 @@ from adobe_vipm.flows.constants import (
     TeamsColorCode,
 )
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_commitment_request_invitation
-from adobe_vipm.flows.sync.agreement import AgreementSyncer
+from adobe_vipm.flows.sync.agreement import AgreementsSyncer
 from adobe_vipm.flows.utils import get_adobe_customer_id
 from adobe_vipm.notifications import send_exception, send_notification
 
@@ -264,7 +264,7 @@ def sync_agreement(
         "items"
     ]
 
-    AgreementSyncer(mpt_client, adobe_client, agreement, customer, adobe_subscriptions).sync(
+    AgreementsSyncer(mpt_client, adobe_client, agreement, customer, adobe_subscriptions).sync(
         dry_run=dry_run,
         sync_prices=sync_prices,
     )
