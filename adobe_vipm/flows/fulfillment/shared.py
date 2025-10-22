@@ -847,6 +847,9 @@ class GetPreviewOrder(Step):
                     context.new_lines,
                     deployment_id=deployment_id,
                 )
+                logger.info(
+                    "Created preview order %s", context.adobe_preview_order["externalReferenceId"]
+                )
             except AdobeError as e:
                 switch_order_to_failed(
                     client,

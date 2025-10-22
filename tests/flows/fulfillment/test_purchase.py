@@ -750,11 +750,11 @@ def test_fulfill_purchase_order(mocker):
         CreateCustomer,
         Validate3YCCommitment,
         GetPreviewOrder,
+        UpdatePrices,
         SubmitNewOrder,
         CreateOrUpdateSubscriptions,
         RefreshCustomer,
         SetOrUpdateCotermDate,
-        UpdatePrices,
         CompleteOrder,
         SyncAgreement,
     ]

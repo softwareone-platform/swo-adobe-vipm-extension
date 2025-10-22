@@ -284,11 +284,11 @@ def fulfill_purchase_order(client, order):
         CreateCustomer(),
         Validate3YCCommitment(),
         GetPreviewOrder(),
+        UpdatePrices(),
         SubmitNewOrder(),
         CreateOrUpdateSubscriptions(),
         RefreshCustomer(),
         SetOrUpdateCotermDate(),
-        UpdatePrices(),
         CompleteOrder(TEMPLATE_NAME_PURCHASE),
         SyncAgreement(),
     )

@@ -179,10 +179,12 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     fulfillment_parameters = fulfillment_parameters_factory(
         customer_id="adobe-customer-id",
     )
-    fulfillment_parameters.append({
-        "externalId": Param.RETRY_COUNT.value,
-        "value": "1",
-    })
+    fulfillment_parameters.append(
+        {
+            "externalId": Param.RETRY_COUNT.value,
+            "value": "1",
+        }
+    )
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters,
         external_ids={"vendor": "adobe-order-id"},
@@ -513,8 +515,14 @@ def test_update_prices_step_no_orders(mocker, order_factory):
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_update_prices_step_with_new_order(mocker, order_factory, adobe_order_factory):
-    order = order_factory()
+def test_update_prices_step_with_new_order(
+    mocker,
+    mock_mpt_client,
+    mock_order,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_pricing_factory,
+):
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
     sku = adobe_order["lineItems"][0]["offerId"]
 
@@ -526,36 +534,26 @@ def test_update_prices_step_with_new_order(mocker, order_factory, adobe_order_fa
         "adobe_vipm.flows.helpers.update_order",
     )
 
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
-        order=order,
-        order_id=order["id"],
-        product_id=order["agreement"]["product"]["id"],
-        currency=order["agreement"]["listing"]["priceList"]["currency"],
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
         adobe_new_order=adobe_order,
+        adobe_preview_order=adobe_order_factory(
+            order_type=ORDER_TYPE_PREVIEW,
+            items=adobe_items_factory(pricing=adobe_pricing_factory()),
+        ),
     )
 
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
-    mocked_update_order.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        lines=[
-            {
-                "id": order["lines"][0]["id"],
-                "price": {"unitPP": 121.36},
-            },
-        ],
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_get_prices.assert_not_called()
+    mocked_update_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_update_prices_step_with_preview_order(mocker, order_factory, adobe_order_factory):
@@ -585,18 +583,14 @@ def test_update_prices_step_with_preview_order(mocker, order_factory, adobe_orde
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
+    mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
         lines=[
             {
                 "id": order["lines"][0]["id"],
-                "price": {"unitPP": 121.36},
+                "price": {"unitPP": 875.16},
             },
         ],
     )
@@ -610,6 +604,9 @@ def test_update_prices_step_with_3yc_commitment(
     adobe_order_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
+    adobe_items_factory,
+    adobe_pricing_factory,
+    mock_mpt_client,
 ):
     order = order_factory()
     commitment = adobe_commitment_factory(
@@ -617,22 +614,8 @@ def test_update_prices_step_with_3yc_commitment(
         start_date="2024-01-01",
         end_date="2025-01-01",
     )
-    adobe_customer = adobe_customer_factory(
-        commitment=commitment,
-        commitment_request=commitment,
-    )
-    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
-    sku = adobe_order["lineItems"][0]["offerId"]
-
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_3yc_skus",
-        return_value={sku: 121.36},
-    )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    adobe_customer = adobe_customer_factory(commitment=commitment, commitment_request=commitment)
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
@@ -641,28 +624,25 @@ def test_update_prices_step_with_3yc_commitment(
         product_id=order["agreement"]["product"]["id"],
         currency=order["agreement"]["listing"]["priceList"]["currency"],
         adobe_customer=adobe_customer,
-        adobe_new_order=adobe_order,
+        adobe_preview_order=adobe_order_factory(
+            order_type=ORDER_TYPE_PREVIEW,
+            items=adobe_items_factory(pricing=adobe_pricing_factory()),
+        ),
     )
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        dt.date.fromisoformat(commitment["startDate"]),
-        [sku],
-    )
     mocked_update_order.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         lines=[
             {
                 "id": order["lines"][0]["id"],
-                "price": {"unitPP": 121.36},
+                "price": {"unitPP": 875.16},
             },
         ],
     )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_update_prices_step_with_expired_3yc_commitment(
@@ -671,6 +651,8 @@ def test_update_prices_step_with_expired_3yc_commitment(
     adobe_order_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
+    adobe_items_factory,
+    adobe_pricing_factory,
 ):
     order = order_factory()
     commitment = adobe_commitment_factory(
@@ -699,24 +681,23 @@ def test_update_prices_step_with_expired_3yc_commitment(
         product_id=order["agreement"]["product"]["id"],
         currency=order["agreement"]["listing"]["priceList"]["currency"],
         adobe_customer=adobe_customer,
-        adobe_new_order=adobe_order,
+        adobe_preview_order=adobe_order_factory(
+            order_type=ORDER_TYPE_PREVIEW,
+            items=adobe_items_factory(pricing=adobe_pricing_factory()),
+        ),
     )
 
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
+    mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
         lines=[
             {
                 "id": order["lines"][0]["id"],
-                "price": {"unitPP": 121.36},
+                "price": {"unitPP": 875.16},
             },
         ],
     )
@@ -728,6 +709,8 @@ def test_update_prices_step_with_multiple_lines(
     order_factory,
     lines_factory,
     adobe_order_factory,
+    adobe_items_factory,
+    adobe_pricing_factory,
 ):
     line_1 = lines_factory()[0]
     line_2 = lines_factory(line_id=2, item_id=2)[0]
@@ -752,24 +735,23 @@ def test_update_prices_step_with_multiple_lines(
         order_id=order["id"],
         product_id=order["agreement"]["product"]["id"],
         currency=order["agreement"]["listing"]["priceList"]["currency"],
-        adobe_new_order=adobe_order,
+        adobe_preview_order=adobe_order_factory(
+            order_type=ORDER_TYPE_PREVIEW,
+            items=adobe_items_factory(pricing=adobe_pricing_factory()),
+        ),
     )
 
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_called_once_with(
-        context.product_id,
-        context.currency,
-        [sku],
-    )
+    mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
         lines=[
             {
                 "id": line_1["id"],
-                "price": {"unitPP": 121.36},
+                "price": {"unitPP": 875.16},
             },
             {
                 "id": line_2["id"],
@@ -2048,9 +2030,9 @@ def test_validate_3yc_commitment_sku_not_found(
         "of 10 licenses or 5 consumables for the three-year commitment."
     )
 
-    mocked_send_notification.assert_has_calls([
-        mock.call("Adobe product not found in airtable for SKU: %s", "65304578CA")
-    ])
+    mocked_send_notification.assert_has_calls(
+        [mock.call("Adobe product not found in airtable for SKU: %s", "65304578CA")]
+    )
 
 
 def test_fetch_reseller_change_data_success(
@@ -2060,7 +2042,7 @@ def test_fetch_reseller_change_data_success(
     adobe_reseller_change_preview_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     adobe_transfer = adobe_reseller_change_preview_factory()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
@@ -2099,7 +2081,7 @@ def test_fetch_reseller_change_data_already_has_customer_id(
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
 
@@ -2126,7 +2108,7 @@ def test_fetch_reseller_change_data_adobe_api_error_fulfillment_mode(
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
@@ -2169,7 +2151,7 @@ def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
-    mock_adobe_client
+    mock_adobe_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})

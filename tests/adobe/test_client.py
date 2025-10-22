@@ -320,6 +320,7 @@ def test_create_preview_order_upsize(
                     ],
                 },
             ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
 
@@ -513,6 +514,7 @@ def test_create_preview_newlines(
                     ],
                 },
             ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
 
@@ -592,6 +594,7 @@ def test_create_preview_newlines_wo_deployment(
                     "currencyCode": "USD",
                 },
             ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
 
@@ -614,7 +617,7 @@ def test_create_preview_order_bad_request(
     adobe_authorizations_file,
     adobe_api_error_factory,
     adobe_client_factory,
-    order,
+    mock_order,
     mock_get_adobe_product_by_marketplace_sku,
 ):
     mocker.patch(
@@ -622,7 +625,7 @@ def test_create_preview_order_bad_request(
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
 
-    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+    mock_order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
     deployment_id = "a_deployment_id"
@@ -644,9 +647,9 @@ def test_create_preview_order_bad_request(
         client.create_preview_order(
             authorization_uk,
             customer_id,
-            order["id"],
+            mock_order["id"],
             [],
-            order["lines"],
+            mock_order["lines"],
             deployment_id=deployment_id,
         )
 
@@ -2638,15 +2641,17 @@ def test_preview_reseller_change(
                     "Content-Type": "application/json",
                 },
             ),
-            matchers.json_params_matcher({
-                "type": "RESELLER_CHANGE",
-                "action": "PREVIEW",
-                "approvalCode": change_code,
-                "resellerId": (
-                    adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
-                ),
-                "requestedBy": admin_email,
-            }),
+            matchers.json_params_matcher(
+                {
+                    "type": "RESELLER_CHANGE",
+                    "action": "PREVIEW",
+                    "approvalCode": change_code,
+                    "resellerId": (
+                        adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+                    ),
+                    "requestedBy": admin_email,
+                }
+            ),
         ],
     )
 
