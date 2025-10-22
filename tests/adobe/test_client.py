@@ -320,6 +320,7 @@ def test_create_preview_order_upsize(
                     ],
                 },
             ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
 
@@ -513,6 +514,7 @@ def test_create_preview_newlines(
                     ],
                 },
             ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
 
@@ -592,6 +594,7 @@ def test_create_preview_newlines_wo_deployment(
                     "currencyCode": "USD",
                 },
             ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
 

@@ -579,12 +579,12 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
         CreateCustomer,
         Validate3YCCommitment,
         GetPreviewOrder,
+        UpdatePrices,
         SubmitNewOrder,
         CreateOrUpdateAssets,
         CreateOrUpdateSubscriptions,
         RefreshCustomer,
         SetOrUpdateCotermDate,
-        UpdatePrices,
         CompleteOrder,
         SyncAgreement,
     ]
