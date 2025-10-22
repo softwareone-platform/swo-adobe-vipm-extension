@@ -63,23 +63,6 @@ from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 logger = logging.getLogger(__name__)
 
 
-def populate_order_info(client, order: dict) -> dict:
-    """
-    Enrich the order with the full representation of the agreement object.
-
-    Args:
-        client (MPTClient): an instance of the Marketplace platform client.
-        order: the order that is being processed.
-
-    Returns:
-        The enriched order.
-    """
-    order["agreement"] = get_agreement(client, order["agreement"]["id"])
-    order["agreement"]["licensee"] = get_licensee(client, order["agreement"]["licensee"]["id"])
-
-    return order
-
-
 def manage_order_error(client, context, error_data, *, is_validation=False) -> None:
     """Set order error if is_validation flag is set, otherwise fail order."""
     if is_validation:
