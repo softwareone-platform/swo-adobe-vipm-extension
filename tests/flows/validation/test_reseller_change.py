@@ -77,6 +77,7 @@ def test_validate_reseller_change_success_adding_line(
             "item": {
                 "id": "ITM-1234-1234-1234-0001",
                 "name": "Awesome product",
+                "status": "Published",
                 "externalIds": {"vendor": "65304578CA"},
                 "terms": {"model": "quantity", "period": "1y"},
             },
@@ -136,6 +137,7 @@ def test_validate_reseller_change_success_adding_additional_licenses(
             "item": {
                 "id": "ITM-1234-1234-1234-0001",
                 "name": "Awesome product",
+                "status": "Published",
                 "externalIds": {"vendor": "65304578CA"},
                 "terms": {"model": "quantity", "period": "1y"},
             },
