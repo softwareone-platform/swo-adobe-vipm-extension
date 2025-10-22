@@ -1905,7 +1905,31 @@ def test_get_preview_order_step_order_new_order_created(
     step = GetPreviewOrder()
     step(mocked_client, context, mocked_next_step)
 
-    mock_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_preview_order.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        "ORD-0792-5000-2253-4210",
+        [
+            {
+                "id": "ALI-2119-4550-8674-5962-0001",
+                "item": {
+                    "externalIds": {"vendor": "65304578CA"},
+                    "id": "ITM-1234-1234-1234-0001",
+                    "name": "Awesome product",
+                },
+                "oldQuantity": 10,
+                "price": {"unitPP": 1234.55},
+                "quantity": 12,
+                "subscription": {
+                    "id": "SUB-1000-2000-3000",
+                    "name": "Subscription for Acrobat Pro for Teams; Multi Language",
+                    "status": "Active",
+                },
+            }
+        ],
+        [],
+        deployment_id="",
+    )
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 

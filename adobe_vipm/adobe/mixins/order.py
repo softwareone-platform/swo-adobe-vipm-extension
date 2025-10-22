@@ -240,6 +240,7 @@ class OrderClientMixin:
         headers = self._get_headers(authorization)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            params={"fetch-price": "true"},
             headers=headers,
             json=payload,
             timeout=self._TIMEOUT,
