@@ -7,7 +7,7 @@ from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
-from adobe_vipm.flows.constants import AgreementStatus, Param
+from adobe_vipm.flows.constants import AgreementStatus, Param, TeamsColorCode
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _add_missing_subscriptions,  # noqa: PLC2701
@@ -116,6 +116,11 @@ def test_sync_agreement_prices(
     assert mock_update_agreement_subscription.call_args_list == [
         mocker.call(
             mock_mpt_client,
+            "SUB-1234-5678",
+            template={"id": "TPL-1234", "name": "Renewing"},
+        ),
+        mocker.call(
+            mock_mpt_client,
             mpt_subscription["id"],
             lines=[
                 {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}, "quantity": 10}
@@ -219,6 +224,7 @@ def test_sync_agreement_prices_dry_run(
     adobe_subscription_factory,
     adobe_customer_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    mock_get_template_by_name
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -233,6 +239,7 @@ def test_sync_agreement_prices_dry_run(
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_subscription.return_value = adobe_subscription
     mocked_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
 
     mocker.patch(
         "adobe_vipm.flows.sync.get_adobe_client",
@@ -263,7 +270,11 @@ def test_sync_agreement_prices_dry_run(
         mpt_subscription["id"],
     )
 
-    mocked_update_agreement_subscription.assert_not_called()
+    mocked_update_agreement_subscription.assert_called_once_with(
+        mocked_mpt_client,
+        "SUB-1234-5678",
+        template={"id": "TPL-1234", "name": "Expired"},
+    )
     mocked_update_agreement.assert_not_called()
 
 
@@ -274,6 +285,7 @@ def test_sync_agreement_prices_exception(
     adobe_api_error_factory,
     adobe_customer_factory,
     caplog,
+    mock_get_template_by_name
 ):
     agreement = agreement_factory()
     mpt_subscription = subscriptions_factory()[0]
@@ -286,6 +298,7 @@ def test_sync_agreement_prices_exception(
         400,
         adobe_api_error_factory(code="9999", message="Error from Adobe."),
     )
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
 
     mocker.patch(
         "adobe_vipm.flows.sync.get_adobe_client",
@@ -319,7 +332,11 @@ def test_sync_agreement_prices_exception(
         mpt_subscription["id"],
     )
 
-    mocked_update_agreement_subscription.assert_not_called()
+    mocked_update_agreement_subscription.assert_called_once_with(
+        mocked_mpt_client,
+        "SUB-1234-5678",
+        template={"id": "TPL-1234", "name": "Expired"},
+    )
     mocked_update_agreement.assert_not_called()
     mocked_notifier.assert_called_once()
     assert mocked_notifier.call_args_list[0].args[0] == agreement["id"]
@@ -787,34 +804,43 @@ def test_sync_agreement_prices_with_3yc(
         mock_mpt_client,
         mpt_subscription["id"],
     )
-    mock_update_agreement_subscription.assert_called_once_with(
-        mock_mpt_client,
-        mpt_subscription["id"],
-        lines=[
-            {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}, "quantity": 10}
-        ],
-        parameters={
-            "fulfillment": [
-                {"externalId": "adobeSKU", "value": "65304578CA01A12"},
-                {
-                    "externalId": Param.CURRENT_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
-                },
-                {
-                    "externalId": Param.RENEWAL_QUANTITY.value,
-                    "value": str(adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]),
-                },
-                {
-                    "externalId": "renewalDate",
-                    "value": adobe_subscription["renewalDate"],
-                },
-                {"externalId": "lastSyncDate", "value": "2024-11-09"},
-            ]
-        },
-        commitmentDate="2025-04-04",
-        autoRenew=adobe_subscription["autoRenewal"]["enabled"],
-        template={"id": "TPL-1234", "name": "Renewing"},
-    )
+    mock_update_agreement_subscription.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            "SUB-1234-5678",
+            template={"id": "TPL-1234", "name": "Renewing"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            mpt_subscription["id"],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}, "quantity": 10}
+            ],
+            parameters={
+                "fulfillment": [
+                    {"externalId": "adobeSKU", "value": "65304578CA01A12"},
+                    {
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                    },
+                    {
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
+                    },
+                    {
+                        "externalId": "renewalDate",
+                        "value": adobe_subscription["renewalDate"],
+                    },
+                    {"externalId": "lastSyncDate", "value": "2024-11-09"},
+                ]
+            },
+            commitmentDate="2025-04-04",
+            autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+            template={"id": "TPL-1234", "name": "Renewing"},
+        ),
+    ])
 
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
 
@@ -1259,6 +1285,11 @@ def test_sync_global_customer_update_adobe_error(
     ]
 
     assert mocked_update_agreement_subscription.call_args_list == [
+        mocker.call(
+            mock_mpt_client,
+            "SUB-1234-5678",
+            template={"id": "TPL-1234", "name": "Renewing"},
+        ),
         mocker.call(
             mock_mpt_client,
             mpt_subscription["id"],
@@ -1880,6 +1911,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
 
 @freeze_time("2025-07-23")
 def test_get_subscriptions_for_update_terminated(
+    mocker,
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
@@ -1909,11 +1941,19 @@ def test_get_subscriptions_for_update_terminated(
         mock_get_agreement_subscription.return_value["id"],
         "Adobe subscription status 1004.",
     )
-    mock_update_agreement_subscription.assert_called_once_with(
-        mock_mpt_client,
-        mock_get_agreement_subscription.return_value["id"],
-        template={"id": "TPL-1234", "name": "Expired"},
-    )
+
+    mock_update_agreement_subscription.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            mock_get_agreement_subscription.return_value["id"],
+            template={"id": "TPL-1234", "name": "Expired"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            "SUB-1234-5678",
+            template={"id": "TPL-1234", "name": "Expired"},
+        ),
+    ])
 
 
 @freeze_time("2025-07-23")
@@ -1996,6 +2036,53 @@ def test_add_missing_subscriptions_none(
 
     mock_get_product_items_by_period.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", "one-time", {"65322572CA"}
+    )
+    mock_create_agreement_subscription.assert_not_called()
+
+
+def test_add_missing_subscriptions_without_vendor_id(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_get_product_items_by_period,
+    mock_get_product_items_by_skus,
+    mock_create_agreement_subscription,
+    mock_send_notification,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
+        ),
+        adobe_subscription_factory(
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
+        ),
+    ]
+
+    agreement = agreement_factory()
+    agreement["subscriptions"].append({
+        "id": "SUB-1234-5678",
+        "status": "1004",
+    })
+
+    mock_get_product_items_by_skus.return_value = []
+    mock_get_product_items_by_period.return_value = []
+
+    _add_missing_subscriptions(
+        mock_mpt_client,
+        mock_adobe_client,
+        adobe_customer_factory(),
+        agreement,
+        adobe_subscriptions=adobe_subscriptions,
+    )
+
+    mock_send_notification.assert_called_once_with(
+        "Missing external IDs",
+        "Missing external IDs for entitlement with id SUB-1234-5678 "
+        "in the agreement: AGR-2119-4550-8674-5962",
+        TeamsColorCode.ORANGE.value,
     )
     mock_create_agreement_subscription.assert_not_called()
 
