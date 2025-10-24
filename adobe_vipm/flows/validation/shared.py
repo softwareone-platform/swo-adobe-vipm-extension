@@ -7,11 +7,9 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
-    FAKE_CUSTOMERS_IDS,
 )
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.utils import (
-    get_deployment_id,
     set_order_error,
 )
 
@@ -77,18 +75,10 @@ class GetPreviewOrder(Step):
             next_step(client, context)
             return
 
-        customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
+        # customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]  # TODO: may we need this for some reason?
         adobe_client = get_adobe_client()
         try:
-            deployment_id = get_deployment_id(context.order)
-            context.adobe_preview_order = adobe_client.create_preview_order(
-                context.authorization_id,
-                customer_id,
-                context.order_id,
-                context.upsize_lines,
-                context.new_lines,
-                deployment_id=deployment_id,
-            )
+            context.adobe_preview_order = adobe_client.create_preview_order(context)
         except (AdobeAPIError, AdobeProductNotFoundError) as error:
             context.validation_succeeded = False
             context.order = set_order_error(

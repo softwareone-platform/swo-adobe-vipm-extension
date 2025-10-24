@@ -6,7 +6,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
-    FAKE_CUSTOMERS_IDS,
     MARKET_SEGMENT_COMMERCIAL,
     MARKET_SEGMENT_EDUCATION,
     MARKET_SEGMENT_GOVERNMENT,
@@ -94,6 +93,7 @@ def test_get_preview_order_step(
         market_segment=segment,
         product_id="PRD-1234",
         currency="EUR",
+        deployment_id=deployment_id,
     )
 
     step = GetPreviewOrder()
@@ -101,14 +101,7 @@ def test_get_preview_order_step(
 
     assert context.validation_succeeded is True
     assert context.adobe_preview_order == adobe_preview_order
-    mock_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        FAKE_CUSTOMERS_IDS[segment],
-        context.order_id,
-        context.upsize_lines,
-        context.new_lines,
-        deployment_id=deployment_id,
-    )
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -133,6 +126,7 @@ def test_get_preview_order_step_no_deployment(
         market_segment=segment,
         product_id="PRD-1234",
         currency="EUR",
+        deployment_id=deployment_id,
     )
 
     step = GetPreviewOrder()
@@ -140,14 +134,7 @@ def test_get_preview_order_step_no_deployment(
 
     assert context.validation_succeeded is True
     assert context.adobe_preview_order == adobe_preview_order
-    mock_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        FAKE_CUSTOMERS_IDS[segment],
-        context.order_id,
-        context.upsize_lines,
-        context.new_lines,
-        deployment_id=deployment_id,
-    )
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 

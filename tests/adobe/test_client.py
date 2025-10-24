@@ -24,6 +24,8 @@ from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrde
 from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
 from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.utils import get_customer_data
 
 
 def test_create_reseller_account(
@@ -252,6 +254,7 @@ def test_create_preview_order_upsize(
     current_quantity,
     renewal_quantity,
     expected_quantity,
+    flex_discounts_factory,
 ):
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
@@ -275,7 +278,6 @@ def test_create_preview_order_upsize(
         current_quantity=current_quantity,
         renewal_quantity=renewal_quantity,
     )
-
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -284,7 +286,14 @@ def test_create_preview_order_upsize(
         status=200,
         json={"items": [adobe_subscription]},
     )
-
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/flex-discounts?market-segment=MARKET_SEGMENT_COMMERCIAL&country=US&offer-ids=65304578CA",
+        ),
+        status=200,
+        json=flex_discounts_factory(),
+    )
     requests_mocker.post(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -323,15 +332,20 @@ def test_create_preview_order_upsize(
             matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
-
-    preview_order = client.create_preview_order(
-        authorization_uk,
-        customer_id,
-        order["id"],
-        order["lines"],
-        [],
-        deployment_id,
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=order["lines"],
+        customer_data=get_customer_data(order),
+        adobe_customer_id=customer_id,
+        deployment_id=deployment_id,
     )
+
+    preview_order = client.create_preview_order(context)
     assert preview_order == {
         "orderId": "adobe-order-id",
     }
@@ -348,6 +362,7 @@ def test_create_preview_order_upsize_product_not_found(
     lines_factory,
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    flex_discounts_factory,
 ):
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
@@ -377,16 +392,30 @@ def test_create_preview_order_upsize_product_not_found(
         status=200,
         json={"items": []},
     )
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/flex-discounts?market-segment=MARKET_SEGMENT_COMMERCIAL&country=US&offer-ids=NONEXISTENT-SKU",
+        ),
+        status=200,
+        json=flex_discounts_factory(),
+    )
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=order["lines"],
+        customer_data=get_customer_data(order),
+        deployment_id=deployment_id,
+        adobe_customer_id=customer_id,
+    )
 
     with pytest.raises(AdobeProductNotFoundError) as exc_info:
-        client.create_preview_order(
-            authorization_uk,
-            customer_id,
-            order["id"],
-            order["lines"],
-            [],
-            deployment_id,
-        )
+        client.create_preview_order(context)
 
     assert str(exc_info.value) == (
         "Product NONEXISTENT-SKU not found in Adobe to make the upsize."
@@ -406,6 +435,7 @@ def test_create_preview_order_upsize_after_downsize_lower(
     lines_factory,
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    flex_discounts_factory,
 ):
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
@@ -428,7 +458,6 @@ def test_create_preview_order_upsize_after_downsize_lower(
         current_quantity=10,
         renewal_quantity=8,
     )
-
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -437,15 +466,28 @@ def test_create_preview_order_upsize_after_downsize_lower(
         status=200,
         json={"items": [adobe_subscription]},
     )
-
-    preview_order = client.create_preview_order(
-        authorization_uk,
-        customer_id,
-        order["id"],
-        order["lines"],
-        [],
-        deployment_id,
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/flex-discounts?market-segment=MARKET_SEGMENT_COMMERCIAL&country=US&offer-ids=65304578CA",
+        ),
+        status=200,
+        json=flex_discounts_factory(),
     )
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=order["lines"],
+        customer_data=get_customer_data(order),
+        deployment_id=deployment_id,
+        adobe_customer_id=customer_id,
+    )
+
+    preview_order = client.create_preview_order(context)
     assert preview_order is None
 
 
@@ -459,12 +501,12 @@ def test_create_preview_newlines(
     lines_factory,
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    flex_discounts_factory,
 ):
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_adobe_product_by_marketplace_sku,
     )
-
     mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
         side_effect=["uuid-1", "uuid-2"],
@@ -517,15 +559,28 @@ def test_create_preview_newlines(
             matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
-
-    preview_order = client.create_preview_order(
-        authorization_uk,
-        customer_id,
-        order["id"],
-        [],
-        order["lines"],
-        deployment_id,
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/flex-discounts?market-segment=MARKET_SEGMENT_COMMERCIAL&country=US&offer-ids=65304578CA",
+        ),
+        status=200,
+        json=flex_discounts_factory(),
     )
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=order["lines"],
+        customer_data=get_customer_data(order),
+        deployment_id=deployment_id,
+        adobe_customer_id=customer_id,
+    )
+
+    preview_order = client.create_preview_order(context)
     assert preview_order == {
         "orderId": "adobe-order-id",
     }
@@ -541,6 +596,7 @@ def test_create_preview_newlines_wo_deployment(
     lines_factory,
     adobe_client_factory,
     mock_get_adobe_product_by_marketplace_sku,
+    flex_discounts_factory,
 ):
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
@@ -597,14 +653,28 @@ def test_create_preview_newlines_wo_deployment(
             matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
-
-    preview_order = client.create_preview_order(
-        authorization_uk,
-        customer_id,
-        order["id"],
-        [],
-        order["lines"],
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/flex-discounts?market-segment=MARKET_SEGMENT_COMMERCIAL&country=US&offer-ids=65304578CA",
+        ),
+        status=200,
+        json=flex_discounts_factory(),
     )
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=order["lines"],
+        customer_data=get_customer_data(order),
+        deployment_id=None,  # TODO
+        adobe_customer_id=customer_id,
+    )
+
+    preview_order = client.create_preview_order(context)
     assert preview_order == {
         "orderId": "adobe-order-id",
     }
@@ -619,6 +689,7 @@ def test_create_preview_order_bad_request(
     adobe_client_factory,
     mock_order,
     mock_get_adobe_product_by_marketplace_sku,
+    flex_discounts_factory,
 ):
     mocker.patch(
         "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
@@ -638,16 +709,29 @@ def test_create_preview_order_bad_request(
         status=400,
         json=error,
     )
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/flex-discounts?market-segment=MARKET_SEGMENT_COMMERCIAL&country=US&offer-ids=65304578CA",
+        ),
+        status=200,
+        json=flex_discounts_factory(),
+    )
+    context = Context(
+        order=mock_order,
+        order_id="order-id",
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=mock_order["lines"],
+        customer_data=get_customer_data(mock_order),
+        deployment_id=deployment_id,
+        adobe_customer_id=customer_id,
+    )
 
     with pytest.raises(AdobeError) as cv:
-        client.create_preview_order(
-            authorization_uk,
-            customer_id,
-            mock_order["id"],
-            [],
-            mock_order["lines"],
-            deployment_id=deployment_id,
-        )
+        client.create_preview_order(context)
     assert repr(cv.value) == str(error)
 
 
@@ -2747,44 +2831,17 @@ def test_commit_reseller_change(
     assert result == expected_response
 
 
-def test_get_flex_discounts(requests_mocker, adobe_client_factory, settings):
+def test_get_flex_discounts(
+    requests_mocker, adobe_client_factory, settings, flex_discounts_factory
+):
     client, authorization, api_token = adobe_client_factory()
+    flex_discount_resp = flex_discounts_factory()
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             "v3/flex-discounts?market-segment=COM&country=US&offer-ids=65304768CA01A12,65304768CA01A12",
         ),
-        json={
-            "limit": 20,
-            "offset": 0,
-            "count": 1,
-            "totalCount": 1,
-            "flexDiscounts": [
-                {
-                    "id": "55555555-8768-4e8a-9a2f-fb6a6b08f563",
-                    "name": "Easter Flexible Discount",
-                    "description": "Exclusive 26 fixed off on Adobe Technical Communication Suite",
-                    "code": "EASTER_26",
-                    "startDate": "2025-06-12T10:00:48Z",
-                    "endDate": "2026-03-07T10:16Z",
-                    "status": "ACTIVE",
-                    "qualification": {"baseOfferIds": ["65304768CA01A12"]},
-                    "outcomes": [
-                        {
-                            "type": "FIXED_DISCOUNT",
-                            "discountValues": [{"country": "US", "currency": "USD", "value": 26.0}],
-                        }
-                    ],
-                }
-            ],
-            "links": {
-                "self": {
-                    "uri": "/v3/flex-discounts?market-segment=COM&country=US&offer-ids=65304768CA0",
-                    "method": "GET",
-                    "headers": [],
-                }
-            },
-        },
+        json=flex_discount_resp,
         match=[
             matchers.header_matcher(
                 {
@@ -2797,23 +2854,9 @@ def test_get_flex_discounts(requests_mocker, adobe_client_factory, settings):
         ],
     )
 
-    assert client._get_flex_discounts(
-        authorization, "COM", "US", ("65304768CA01A12", "65304768CA01A12")
-    ) == [
-        {
-            "id": "55555555-8768-4e8a-9a2f-fb6a6b08f563",
-            "name": "Easter Flexible Discount",
-            "description": "Exclusive 26 fixed off on Adobe Technical Communication Suite",
-            "code": "EASTER_26",
-            "startDate": "2025-06-12T10:00:48Z",
-            "endDate": "2026-03-07T10:16Z",
-            "status": "ACTIVE",
-            "qualification": {"baseOfferIds": ["65304768CA01A12"]},
-            "outcomes": [
-                {
-                    "type": "FIXED_DISCOUNT",
-                    "discountValues": [{"country": "US", "currency": "USD", "value": 26.0}],
-                }
-            ],
-        }
-    ]
+    assert (
+        client._get_flex_discounts(
+            authorization, "COM", "US", ("65304768CA01A12", "65304768CA01A12")
+        )
+        == flex_discount_resp["flexDiscounts"]
+    )

@@ -911,15 +911,7 @@ class GetPreviewOrder(Step):
         adobe_client = get_adobe_client()
         if context.upsize_lines or context.new_lines:
             try:
-                deployment_id = get_deployment_id(context.order)
-                context.adobe_preview_order = adobe_client.create_preview_order(
-                    context.authorization_id,
-                    context.adobe_customer_id,
-                    context.order_id,
-                    context.upsize_lines,
-                    context.new_lines,
-                    deployment_id=deployment_id,
-                )
+                context.adobe_preview_order = adobe_client.create_preview_order(context)
                 logger.info(
                     "Created preview order %s", context.adobe_preview_order["externalReferenceId"]
                 )
