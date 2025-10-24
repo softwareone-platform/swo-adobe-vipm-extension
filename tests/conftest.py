@@ -10,7 +10,7 @@ from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
-from adobe_vipm.adobe.constants import AdobeStatus, OfferType
+from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus, OfferType
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
     AdobeProductNotFoundError,
@@ -1395,7 +1395,7 @@ def mock_adobe_client(mocker):
 
 @pytest.fixture
 def adobe_items_factory():  # noqa: C901
-    def _items(
+    def _items(  # noqa: C901
         line_number=1,
         offer_id="65304578CA01A12",
         quantity=170,
@@ -1405,6 +1405,7 @@ def adobe_items_factory():  # noqa: C901
         deployment_id=None,
         currency_code=None,
         deployment_currency_code=None,
+        pricing=None,
     ):
         item = {
             "extLineItemNumber": line_number,
@@ -1422,13 +1423,28 @@ def adobe_items_factory():  # noqa: C901
             item["subscriptionId"] = subscription_id
         if status:
             item["status"] = status
+        if pricing:
+            item["pricing"] = pricing
         return [item]
 
     return _items
 
 
 @pytest.fixture
-def adobe_order_factory(adobe_items_factory):  # noqa: C901
+def adobe_pricing_factory():
+    def _pricing():
+        return {
+            "partnerPrice": 875.16,
+            "discountedPartnerPrice": 849.16,
+            "netPartnerPrice": 846.83,
+            "lineItemPartnerPrice": 846.83,
+        }
+
+    return _pricing
+
+
+@pytest.fixture
+def adobe_order_factory(adobe_items_factory, adobe_pricing_factory):  # noqa: C901
     def _order(
         order_type,
         currency_code="USD",
@@ -1444,8 +1460,16 @@ def adobe_order_factory(adobe_items_factory):  # noqa: C901
             "externalReferenceId": external_id,
             "orderType": order_type,
             "lineItems": items
-            or adobe_items_factory(
-                deployment_id=deployment_id, deployment_currency_code=currency_code
+            or (
+                adobe_items_factory(
+                    deployment_id=deployment_id,
+                    deployment_currency_code=currency_code,
+                    pricing=adobe_pricing_factory(),
+                )
+                if order_type == ORDER_TYPE_PREVIEW
+                else adobe_items_factory(
+                    deployment_id=deployment_id, deployment_currency_code=currency_code
+                )
             ),
         }
 

@@ -909,7 +909,7 @@ class GetPreviewOrder(Step):
     def __call__(self, client, context, next_step):
         """Retrieve a preview order for the upsize/new lines."""
         adobe_client = get_adobe_client()
-        if (context.upsize_lines or context.new_lines) and not context.adobe_new_order_id:
+        if context.upsize_lines or context.new_lines:
             try:
                 deployment_id = get_deployment_id(context.order)
                 context.adobe_preview_order = adobe_client.create_preview_order(
@@ -919,6 +919,9 @@ class GetPreviewOrder(Step):
                     context.upsize_lines,
                     context.new_lines,
                     deployment_id=deployment_id,
+                )
+                logger.info(
+                    "Created preview order %s", context.adobe_preview_order["externalReferenceId"]
                 )
             except AdobeError as error:
                 switch_order_to_failed(
