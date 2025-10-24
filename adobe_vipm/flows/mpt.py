@@ -4,9 +4,7 @@ from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
-from adobe_vipm.adobe.constants import (
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
 from adobe_vipm.flows.constants import Param
 
 logger = logging.getLogger(__name__)
@@ -64,8 +62,8 @@ def get_agreements_by_3yc_commitment_request_status(
 
 
 def get_agreements_by_3yc_commitment_request_invitation(
-    mpt_client: MPTClient, enroll_statuses: list[str], status: str = "Active"
-) -> list[str]:
+    mpt_client: MPTClient, enroll_statuses: tuple[str, ...], status: str = "Active"
+) -> list[dict]:
     """
     Retrieves active agreements having 3YC parameter enabled with provided 3YC statuses.
 
@@ -85,6 +83,6 @@ def get_agreements_by_3yc_commitment_request_invitation(
 
     rql_query = (
         f"and({status_condition},{param_condition})"
-        "&select=lines,parameters,subscriptions,product,listing"
+        "&select=lines,parameters,assets,subscriptions,product,listing"
     )
     return get_agreements_by_query(mpt_client, rql_query)

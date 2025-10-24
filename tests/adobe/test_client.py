@@ -1574,11 +1574,11 @@ def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_conf
 
     client = adobe_client.AdobeClient()
     with freeze_time("2024-01-01 12:00:00"):
-        token = client._get_auth_token(authorization)  # noqa: SLF001
+        token = client._get_auth_token(authorization)
         assert isinstance(token, APIToken)
         assert token.token == "an-access-token"
         assert token.expires == dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=83000 - 180)
-        assert client._token_cache[authorization] == token  # noqa: SLF001
+        assert client._token_cache[authorization] == token
 
 
 def test_get_auth_token_error(requests_mocker, settings, mock_adobe_config, adobe_config_file):
@@ -1599,11 +1599,11 @@ def test_get_auth_token_error(requests_mocker, settings, mock_adobe_config, adob
 
     client = adobe_client.AdobeClient()
     with pytest.raises(requests.HTTPError):
-        client._get_auth_token(authorization)  # noqa: SLF001
+        client._get_auth_token(authorization)
 
 
 def test_get_adobe_client(mocker):
-    adobe_client._ADOBE_CLIENT = None  # noqa: SLF001
+    adobe_client._ADOBE_CLIENT = None
 
     mocked_client = mocker.MagicMock()
     mocked_client_constructor = mocker.patch(
@@ -2742,3 +2742,78 @@ def test_commit_reseller_change(
 
     result = client.get_reseller_transfer(authorization_uk, transfer_id)
     assert result == expected_response
+
+
+def test_get_flex_discounts(
+    requests_mocker, adobe_client_factory, settings, adobe_authorizations_file
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    client, authorization, api_token = adobe_client_factory()
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "v3/flex-discounts?market-segment=COM&country=US&offer-ids=65304768CA01A12,65304768CA01A12",
+        ),
+        json={
+            "limit": 20,
+            "offset": 0,
+            "count": 1,
+            "totalCount": 1,
+            "flexDiscounts": [
+                {
+                    "id": "55555555-8768-4e8a-9a2f-fb6a6b08f563",
+                    "name": "Easter Flexible Discount",
+                    "description": "Exclusive 26 fixed off on Adobe Technical Communication Suite",
+                    "code": "EASTER_26",
+                    "startDate": "2025-06-12T10:00:48Z",
+                    "endDate": "2026-03-07T10:16Z",
+                    "status": "ACTIVE",
+                    "qualification": {"baseOfferIds": ["65304768CA01A12"]},
+                    "outcomes": [
+                        {
+                            "type": "FIXED_DISCOUNT",
+                            "discountValues": [{"country": "US", "currency": "USD", "value": 26.0}],
+                        }
+                    ],
+                }
+            ],
+            "links": {
+                "self": {
+                    "uri": "/v3/flex-discounts?market-segment=COM&country=US&offer-ids=65304768CA0",
+                    "method": "GET",
+                    "headers": [],
+                }
+            },
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+        ],
+    )
+
+    assert client._get_flex_discounts(
+        authorization_uk, "COM", "US", ("65304768CA01A12", "65304768CA01A12")
+    ) == [
+        {
+            "id": "55555555-8768-4e8a-9a2f-fb6a6b08f563",
+            "name": "Easter Flexible Discount",
+            "description": "Exclusive 26 fixed off on Adobe Technical Communication Suite",
+            "code": "EASTER_26",
+            "startDate": "2025-06-12T10:00:48Z",
+            "endDate": "2026-03-07T10:16Z",
+            "status": "ACTIVE",
+            "qualification": {"baseOfferIds": ["65304768CA01A12"]},
+            "outcomes": [
+                {
+                    "type": "FIXED_DISCOUNT",
+                    "discountValues": [{"country": "US", "currency": "USD", "value": 26.0}],
+                }
+            ],
+        }
+    ]

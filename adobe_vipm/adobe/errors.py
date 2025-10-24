@@ -32,10 +32,6 @@ class CountryNotFoundError(AdobeError):
     """Country is not found."""
 
 
-class CustomerDiscountsNotFoundError(AdobeError):
-    """Customer benefits are not found for the customer."""
-
-
 class SubscriptionNotFoundError(AdobeError):
     """Subscription not found."""
 

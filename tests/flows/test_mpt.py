@@ -64,7 +64,7 @@ def test_get_agreements_by_3yc_commitment_request_invitation(
     rql_query = (
         f"and(eq(status,{status}),any(parameters.fulfillment,and(eq(externalId,3YCCommitmentRequestStatus),"
         "in(displayValue,(REQUESTED,ACCEPTED)))))"
-        "&select=lines,parameters,subscriptions,product,listing"
+        "&select=lines,parameters,assets,subscriptions,product,listing"
     )
 
     get_agreements_by_3yc_commitment_request_invitation(

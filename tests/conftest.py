@@ -646,7 +646,7 @@ def reseller_change_order_parameters_factory():
 @pytest.fixture
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
-        customer_id="",
+        customer_id="a-client-id",
         due_date=None,
         p3yc_recommitment=None,
         p3yc_enroll_status="",
@@ -776,6 +776,7 @@ def items_factory():
                     "vendor": external_vendor_id,
                 },
                 "terms": {"period": term_period, "model": term_model},
+                "status": "Published",
             },
         ]
 
@@ -1376,13 +1377,15 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.global_customer",
         "adobe_vipm.flows.helpers",
         "adobe_vipm.flows.migration",
-        "adobe_vipm.flows.sync",
         "adobe_vipm.flows.validation.termination",
         "adobe_vipm.flows.validation.change",
         "adobe_vipm.flows.validation.shared",
         "adobe_vipm.flows.validation.transfer",
         "adobe_vipm.management.commands.create_resellers",
+        "adobe_vipm.management.commands.migrate_assets_to_non_renewal_subs",
         "adobe_vipm.management.commands.migrate_mpt_assets",
+        "adobe_vipm.management.commands.sync_3yc_enrol",
+        "adobe_vipm.management.commands.sync_agreements",
     ]
     for path in paths:
         mocker.patch(f"{path}.get_adobe_client", return_value=adobe_client)
@@ -1476,7 +1479,7 @@ def adobe_subscription_factory():
         status=AdobeStatus.PROCESSED.value,
         renewal_date=None,
     ):
-        default_renewal_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=366)
+        default_renewal_date = dt.date.fromisoformat("2025-10-10") + dt.timedelta(days=366)
 
         return {
             "subscriptionId": subscription_id or "a-sub-id",
@@ -1577,7 +1580,7 @@ def adobe_client_factory(
             expires=dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=86000),
         )
         client = AdobeClient()
-        client._token_cache[authorization] = api_token  # noqa: SLF001
+        client._token_cache[authorization] = api_token
 
         return client, authorization, api_token
 
@@ -1595,15 +1598,23 @@ def mpt_client(settings):
 
 @pytest.fixture
 def mock_mpt_client(mocker):
-    return mocker.MagicMock(spec=MPTClient)
+    mock = mocker.MagicMock(spec=MPTClient)
+    paths = [
+        "adobe_vipm.management.commands.migrate_assets_to_non_renewal_subs",
+    ]
+    for path in paths:
+        mocker.patch(f"{path}.mpt_client", mock)
+    return mock
 
 
 # TODO: join mock_setup_client with mock_mpt_client
+# ???: why are not we using mpt_client from shared?
 @pytest.fixture
 def mock_setup_client(mocker, mock_mpt_client):
     paths = [
         "adobe_vipm.management.commands.sync_3yc_enrol",
         "adobe_vipm.management.commands.migrate_mpt_assets",
+        "adobe_vipm.management.commands.sync_agreements",
     ]
     for path in paths:
         mocker.patch(f"{path}.setup_client", return_value=mock_mpt_client)
@@ -1870,63 +1881,6 @@ def mock_pricelist_cache_factory(mocker):
 @pytest.fixture
 def mocked_pricelist_cache(mock_pricelist_cache_factory):
     return mock_pricelist_cache_factory()
-
-
-@pytest.fixture
-def mock_runtime_master_options():
-    return {
-        "color": True,
-        "debug": False,
-        "reload": True,
-        "component": "all",
-    }
-
-
-@pytest.fixture
-def mock_gunicorn_logging_config():
-    return {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "verbose": {
-                "format": "{asctime} {name} {levelname} (pid: {process}, thread: {thread})"
-                " {message}",
-                "style": "{",
-            },
-            "rich": {
-                "format": "%(message)s",
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "verbose",
-            },
-            "rich": {
-                "class": "rich.logging.RichHandler",
-                "formatter": "rich",
-                "log_time_format": lambda x: x.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
-                "rich_tracebacks": True,
-            },
-        },
-        "root": {
-            "handlers": ["rich"],
-            "level": "INFO",
-        },
-        "loggers": {
-            "gunicorn.access": {
-                "handlers": ["rich"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            "gunicorn.error": {
-                "handlers": ["rich"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            "swo.mpt": {},
-        },
-    }
 
 
 @pytest.fixture
