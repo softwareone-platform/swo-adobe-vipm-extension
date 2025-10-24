@@ -1884,63 +1884,6 @@ def mocked_pricelist_cache(mock_pricelist_cache_factory):
 
 
 @pytest.fixture
-def mock_runtime_master_options():
-    return {
-        "color": True,
-        "debug": False,
-        "reload": True,
-        "component": "all",
-    }
-
-
-@pytest.fixture
-def mock_gunicorn_logging_config():
-    return {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "verbose": {
-                "format": "{asctime} {name} {levelname} (pid: {process}, thread: {thread})"
-                " {message}",
-                "style": "{",
-            },
-            "rich": {
-                "format": "%(message)s",
-            },
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "verbose",
-            },
-            "rich": {
-                "class": "rich.logging.RichHandler",
-                "formatter": "rich",
-                "log_time_format": lambda x: x.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
-                "rich_tracebacks": True,
-            },
-        },
-        "root": {
-            "handlers": ["rich"],
-            "level": "INFO",
-        },
-        "loggers": {
-            "gunicorn.access": {
-                "handlers": ["rich"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            "gunicorn.error": {
-                "handlers": ["rich"],
-                "level": "INFO",
-                "propagate": False,
-            },
-            "swo.mpt": {},
-        },
-    }
-
-
-@pytest.fixture
 def mock_sku_mapping_data():
     return [
         {
