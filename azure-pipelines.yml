@@ -1,0 +1,99 @@
+trigger:
+- main
+- azure-pipelines
+
+pool:
+  name: "Standard-Linux"
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: MPT/ops-build-templates-aks-releases
+      ref: releases/v15
+      
+variables:
+  - name: appName
+    value: swo-extension-adobe
+
+stages:
+  - stage: prepare
+    displayName: "Prerequisites"
+    jobs:
+      - template: aks-docker-templates/build_prerequisites.yaml@templates
+      - template: aks-docker-templates/build_artifacts.yaml@templates
+        parameters:
+          application: $(appName)
+
+  - stage: build
+    displayName: "Build"
+    dependsOn: prepare
+    variables:
+      - template: aks-docker-templates/acr-creds-group.yaml@templates
+      - group: swo.platform-build
+    jobs:
+      - job: build_image
+        displayName: Build image
+        variables:
+          - name: buildVersion
+            value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+          - name: majorVersion
+            value: $[ split(variables.buildVersion, '.')[0] ]
+        steps:
+          - template: aks-docker-templates/docker-build-steps.yaml@templates
+            parameters:
+              repository: $(appName)
+              sourceBuild: $(buildVersion)
+              Dockerfile: prod.Dockerfile 
+              skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
+
+      - job: BuildHelmChart
+        displayName: Build Helm Chart
+        variables:
+              - template: aks-docker-templates/acr-creds-group.yaml@templates
+              - name: buildVersion
+                value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+        steps:
+              - template: aks-docker-templates/helm-build-steps.yaml@templates
+                parameters:
+                  buildNumber: $(buildVersion)
+                  repository: $(appName)
+                  workingDirectory: helm/$(appName)
+                  skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
+  - stage: sbom
+    displayName: SBOM
+    dependsOn: [prepare, build]
+    # condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
+    variables:
+      - group: marketplace.dtrack
+      - name: buildVersion
+        value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+      - name: majorVersion
+        value: $[ split(variables.buildVersion, '.')[0] ]
+    jobs:
+      - template: aks-tests-templates/jobs/dtrack-python-sbom-job.yaml@templates
+        parameters:
+          pythonVersion: "3.x"
+          projectName: $(appName)
+          projectVersion: $(majorVersion)
+          dtrackAPIKey: $(dtrackAPIKey)
+          dtrackURI: $(dtrackURI)
+
+  - stage: publish
+    displayName: Publish
+    dependsOn:
+      - prepare
+      - build
+    jobs:
+      - job: publish
+        displayName: Publish
+#        condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.SourceBranch'], 'refs/heads/release/4'), eq(variables['System.Debug'], true))
+        variables:
+          - template: aks-docker-templates/acr-creds-group.yaml@templates
+          - name: buildVersion
+            value: $[ stageDependencies.prepare.build_prerequisites.outputs['vars.BUILD_VERSION'] ]
+        steps:
+          - template: aks-docker-templates/publish-steps.yaml@templates
+            parameters:
+              repository: $(appName)
+              buildNumber: $(buildVersion)
+              components: []

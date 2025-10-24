@@ -1,0 +1,57 @@
+global:
+  AppInsightsConnectionString: ZGVmYXVsdA==
+  ServiceName: default
+  MpPortalBaseUrl: default
+  MpBaseUrl: default
+  MpApiToken: default
+  MptOperationApiToken: ZGVmYXVsdA==
+  ConfigJson: ZGVmYXVsdA==
+  CredentialsJson: ZGVmYXVsdA==
+  AuthorizationsJson: ZGVmYXVsdA==
+  DjangoSecretKey: ZGVmYXVsdA==
+  AdobeAuthEndpoint: default
+  AdobeApiEndpoint: default
+  MpProductsIds: default
+  WebhookSecretKeys: ZGVmYXVsdA==
+  AirTableApiToken: ZGVmYXVsdA==
+  NavAuthClientSecret: ZGVmYXVsdA==
+  AirTableBases: '{}'
+  AirTablePricingBases: '{}'
+  AirTableSkuMappingBase: ''
+  MigrationRunningMaxRetries: 10
+  NavApiBaseUrl: default
+  NavAuthEndpointUrl: default
+  NavAuthAudience: procops-contracts-test
+  MsTeamsWebhookUrl: ZGVmYXVsdA==
+  EmailNotificationsSender: default
+  EmailNotificationsEnabled: default
+  AwsSesCredentials: ZGVmYXVsdA==
+  AwsSesRegion: default
+  ProductSegments: default
+  MpNotifyCategories: '{}'
+  OrderCreationWindowHours: 24
+  repositoryUrl: ""
+
+
+  replicaCountAPI: 1
+  replicaCountWorker: 1
+
+  cronjobs:
+    - name: proc-trfs
+      schedule: ""
+      command: process_transfers
+    - name: chk-trfs
+      schedule: ""
+      command: check_running_transfers
+    - name: agr-sync
+      schedule: ""
+      command: sync_agreements
+    - name: proc-3yc
+      schedule: ""
+      command: process_3yc
+    - name: gc-agr
+      schedule: ""
+      command: check_gc_agreement_deployments
+    - name: sync-3yc-enrol
+      schedule: ""
+      command: sync_3yc_enrol

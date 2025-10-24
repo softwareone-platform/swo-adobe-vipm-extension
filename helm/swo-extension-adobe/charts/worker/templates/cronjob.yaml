@@ -1,0 +1,59 @@
+{{- range .Values.global.cronjobs }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ include "common.fullname" $ }}-cronjob-{{ .name }}
+  labels:
+    {{- include "common.labels" $ | nindent 4 }}
+spec:
+  schedule: "{{ .schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600
+  suspend: false
+  jobTemplate:
+    spec:
+      parallelism: 1
+      completions: 1
+      backoffLimit: 3
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          volumes:
+            - name: file-mount
+              secret:
+                secretName: {{ include "common.fullname" $ }}.files
+          containers:
+            - name: {{ .name }}
+              securityContext:
+                {{- toYaml $.Values.securityContext | nindent 16 }}
+              image: "{{ .Values.global.repositoryUrl }}{{ $.Values.image.repository }}:{{ $.Chart.AppVersion }}"
+              command:
+                - swoext
+              args:
+                - django
+                - {{ .command }}
+              volumeMounts:
+                - name: file-mount
+                  mountPath: /extension/adobe_vipm/config
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              env:
+                - name: EXT_ADOBE_CREDENTIALS_FILE
+                  value: /extension/adobe_vipm/config/adobe_credentials.json
+                - name: EXT_ADOBE_AUTHORIZATIONS_FILE
+                  value: /extension/adobe_vipm/config/adobe_authorizations.json
+              envFrom:
+                - configMapRef:
+                    name: ops-pyc-cluster-teamsetup-default-env-variables
+                - configMapRef:
+                    name: {{ include "common.fullname" $ }}
+                - secretRef:
+                    name: {{ include "common.fullname" $ }}
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+---
+{{- end }}
