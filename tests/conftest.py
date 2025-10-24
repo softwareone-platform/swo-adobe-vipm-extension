@@ -776,6 +776,7 @@ def items_factory():
                     "vendor": external_vendor_id,
                 },
                 "terms": {"period": term_period, "model": term_model},
+                "status": "Published",
             },
         ]
 
@@ -1381,6 +1382,7 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.validation.shared",
         "adobe_vipm.flows.validation.transfer",
         "adobe_vipm.management.commands.create_resellers",
+        "adobe_vipm.management.commands.migrate_assets_to_non_renewal_subs",
         "adobe_vipm.management.commands.migrate_mpt_assets",
         "adobe_vipm.management.commands.sync_3yc_enrol",
         "adobe_vipm.management.commands.sync_agreements",
@@ -1596,10 +1598,17 @@ def mpt_client(settings):
 
 @pytest.fixture
 def mock_mpt_client(mocker):
-    return mocker.MagicMock(spec=MPTClient)
+    mock = mocker.MagicMock(spec=MPTClient)
+    paths = [
+        "adobe_vipm.management.commands.migrate_assets_to_non_renewal_subs",
+    ]
+    for path in paths:
+        mocker.patch(f"{path}.mpt_client", mock)
+    return mock
 
 
 # TODO: join mock_setup_client with mock_mpt_client
+# ???: why are not we using mpt_client from shared?
 @pytest.fixture
 def mock_setup_client(mocker, mock_mpt_client):
     paths = [
