@@ -467,6 +467,10 @@ class AgreementsSyncer:  # noqa: WPS214
 
             template_name = get_template_name_by_subscription(adobe_subscription)
             template = mpt.get_template_by_name(self._mpt_client, product_id, template_name)
+            # ???: should we send the template data as None if template wasn't found?
+            if not template:
+                logger.warning("%Template %s not found for product %s", template_name, product_id)
+                template = {}
 
             mpt.update_agreement_subscription(
                 self._mpt_client,
