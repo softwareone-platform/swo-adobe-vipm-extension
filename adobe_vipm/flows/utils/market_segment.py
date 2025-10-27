@@ -43,6 +43,20 @@ def is_large_government_agency_type(product_id: str) -> bool:
     )
 
 
+def has_large_goverment_agency_type(order: dict, product_id: str) -> bool:
+    """
+    Checks if the product is a LGA product.
+
+    Args:
+        order: MPT order.
+        product_id: MPT product id.
+
+    Returns:
+        True if the product is a LGA product, False otherwise.
+    """
+    return bool(settings.EXTENSION_CONFIG["PRODUCT_SEGMENT"].get("LGA"))
+
+
 def get_market_segment_eligibility_status(order: dict) -> str | None:
     """
     Retrieves eligibility status parameter value from order.
