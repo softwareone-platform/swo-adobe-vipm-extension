@@ -8,6 +8,7 @@ from adobe_vipm.adobe.constants import OfferType
 from adobe_vipm.adobe.dataclasses import Reseller
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.adobe.utils import join_phone_number
+from adobe_vipm.flows.constants import Param
 
 
 class CustomerClientMixin:
@@ -38,64 +39,51 @@ class CustomerClientMixin:
         authorization = self._config.get_authorization(authorization_id)
         reseller: Reseller = self._config.get_reseller(authorization, seller_id)
         company_name: str = f"{customer_data['companyName']} ({agreement_id})"
-        payload = {
-            "resellerId": reseller.id,
-            "externalReferenceId": agreement_id,
-            "companyProfile": {
-                "companyName": company_name,
-                "preferredLanguage": self._config.get_preferred_language(
-                    customer_data["address"]["country"],
-                ),
-                "marketSegment": market_segment,
-                "address": self._get_address(customer_data["address"], customer_data["contact"]),
-                "contacts": [self._get_contact(customer_data["contact"])],
-            },
-        }
-        if customer_data["3YC"] == ["Yes"]:
-            quantities = []
-            if customer_data["3YCLicenses"]:
-                quantities.append(
-                    {
-                        "offerType": OfferType.LICENSE,
-                        "quantity": int(customer_data["3YCLicenses"]),
-                    },
-                )
-            if customer_data["3YCConsumables"]:
-                quantities.append(
-                    {
-                        "offerType": OfferType.CONSUMABLES,
-                        "quantity": int(customer_data["3YCConsumables"]),
-                    },
-                )
-            payload["benefits"] = [
-                {
-                    "type": "THREE_YEAR_COMMIT",
-                    "commitmentRequest": {
-                        "minimumQuantities": quantities,
-                    },
-                },
-            ]
 
-        response = requests.post(
-            urljoin(self._config.api_base_url, "/v3/customers"),
-            headers=self._get_headers(
-                authorization,
-                correlation_id=sha256(json.dumps(payload).encode()).hexdigest(),
-            ),
-            json=payload,
-            timeout=self._TIMEOUT,
+        payload = self._build_base_customer_payload(
+            reseller, agreement_id, company_name, market_segment, customer_data
         )
 
-        response.raise_for_status()
+        if customer_data.get("3YC") == ["Yes"]:
+            self._add_3yc_benefits(payload, customer_data)
 
-        created_customer = response.json()
-        self._logger.info(
-            "Customer %s created successfully for reseller %s: %s",
-            company_name,
-            reseller.id,
-            created_customer["customerId"],
+        return self._create_adobe_customer(authorization, payload, company_name, reseller.id)
+
+    @wrap_http_error
+    def create_customer_account_lga(
+        self,
+        authorization_id: str,
+        seller_id: str,
+        agreement_id: str,
+        market_segment: str,
+        customer_data: dict,
+    ) -> dict:
+        """
+        Create customer account for Large Government Agency.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            seller_id: MPT Seller ID.
+            agreement_id: MPT Agreement ID what belongs to customer
+            market_segment: Adobe Customer segment
+            customer_data: Customer data including companyName, address, contact, 3YCLicensees
+
+        Returns:
+            dict: Customer.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        reseller: Reseller = self._config.get_reseller(authorization, seller_id)
+        company_name: str = f"{customer_data['companyName']} ({agreement_id})"
+
+        payload = self._build_base_customer_payload(
+            reseller, agreement_id, company_name, market_segment, customer_data
         )
-        return created_customer
+        payload["companyProfile"]["marketSubSegments"] = [
+            customer_data.get(Param.AGENCY_TYPE.value)
+        ]
+        payload["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY"}]
+
+        return self._create_adobe_customer(authorization, payload, company_name, reseller.id)
 
     @wrap_http_error
     def get_customer(
@@ -186,6 +174,84 @@ class CustomerClientMixin:
         )
         response.raise_for_status()
         return response.json()
+
+    def _add_3yc_benefits(self, payload: dict, customer_data: dict) -> None:
+        """Add Three Year Commit benefits to the payload."""
+        quantities = []
+        if customer_data.get("3YCLicenses"):
+            quantities.append(
+                {
+                    "offerType": OfferType.LICENSE,
+                    "quantity": int(customer_data["3YCLicenses"]),
+                },
+            )
+        if customer_data.get("3YCConsumables"):
+            quantities.append(
+                {
+                    "offerType": OfferType.CONSUMABLES,
+                    "quantity": int(customer_data["3YCConsumables"]),
+                },
+            )
+        payload["benefits"] = [
+            {
+                "type": "THREE_YEAR_COMMIT",
+                "commitmentRequest": {
+                    "minimumQuantities": quantities,
+                },
+            },
+        ]
+
+    def _build_base_customer_payload(
+        self,
+        reseller: Reseller,
+        agreement_id: str,
+        company_name: str,
+        market_segment: str,
+        customer_data: dict,
+    ) -> dict:
+        """Build the base customer payload structure."""
+        return {
+            "resellerId": reseller.id,
+            "externalReferenceId": agreement_id,
+            "companyProfile": {
+                "companyName": company_name,
+                "preferredLanguage": self._config.get_preferred_language(
+                    customer_data["address"]["country"],
+                ),
+                "marketSegment": market_segment,
+                "address": self._get_address(customer_data["address"], customer_data["contact"]),
+                "contacts": [self._get_contact(customer_data["contact"])],
+            },
+        }
+
+    def _create_adobe_customer(
+        self,
+        authorization,
+        payload: dict,
+        company_name: str,
+        reseller_id: str,
+    ) -> dict:
+        """Create customer via API and return the created customer."""
+        response = requests.post(
+            urljoin(self._config.api_base_url, "/v3/customers"),
+            headers=self._get_headers(
+                authorization,
+                correlation_id=sha256(json.dumps(payload).encode()).hexdigest(),
+            ),
+            json=payload,
+            timeout=self._TIMEOUT,
+        )
+
+        response.raise_for_status()
+
+        created_customer = response.json()
+        self._logger.info(
+            "Customer %s created successfully for reseller %s: %s",
+            company_name,
+            reseller_id,
+            created_customer["customerId"],
+        )
+        return created_customer
 
     def _get_contact(self, contact: dict) -> dict:
         return {

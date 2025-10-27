@@ -15,6 +15,7 @@ from adobe_vipm.flows.constants import (
     ERR_EMAIL_FORMAT,
     ERR_FIRST_NAME_FORMAT,
     ERR_LAST_NAME_FORMAT,
+    ERR_LGA_QUANTITIES,
     ERR_PHONE_NUMBER_LENGTH,
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
@@ -28,6 +29,7 @@ from adobe_vipm.flows.validation.purchase import (
     CheckPurchaseValidationEnabled,
     UpdatePrices,
     ValidateCustomerData,
+    ValidateQuantitiesLGA,
     validate_purchase_order,
 )
 from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
@@ -754,13 +756,14 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
 
     validate_purchase_order(mock_mpt_client, mock_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 9
     expected_steps = [
         SetupContext,
         PrepareCustomerData,
         CheckPurchaseValidationEnabled,
         ValidateCustomerData,
         ValidateDuplicateLines,
+        ValidateQuantitiesLGA,
         Validate3YCCommitment,
         GetPreviewOrder,
         UpdatePrices,
@@ -770,3 +773,43 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
     assert actual_steps == expected_steps
     mocked_context_ctor.assert_called_once_with(order=mock_order)
     mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)
+
+
+def test_validate_quantities_lga_invalid_quantities(mock_order, mock_mpt_client, mock_next_step):
+    customer_data = get_customer_data(mock_order)
+
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 50}])
+
+    step = ValidateQuantitiesLGA()
+    step(mock_mpt_client, context, mock_next_step)
+
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_LGA_QUANTITIES.to_dict()
+
+
+def test_validate_quantities_lga_valid_quantities(mock_order, mock_mpt_client, mock_next_step):
+    customer_data = get_customer_data(mock_order)
+
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 101}])
+
+    step = ValidateQuantitiesLGA()
+    step(mock_mpt_client, context, mock_next_step)
+
+    assert context.validation_succeeded is True
+    assert context.order["error"] is None
+
+
+def test_validate_quantities_not_lga(mock_order, mock_mpt_client, mock_next_step):
+    customer_data = get_customer_data(mock_order)
+
+    mock_order["product"]["id"] = "PRD-1111-1111"
+    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 101}])
+
+    step = ValidateQuantitiesLGA()
+    step(mock_mpt_client, context, mock_next_step)
+
+    assert context.validation_succeeded is True
+    assert context.order["error"] is None
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)

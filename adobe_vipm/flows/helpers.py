@@ -164,6 +164,7 @@ class SetupContext(Step):
         context.currency = context.order["agreement"]["listing"]["priceList"]["currency"]
         context.customer_data = get_customer_data(context.order)
         context.market_segment = get_market_segment(context.product_id)
+
         context.adobe_customer_id = get_adobe_customer_id(context.order)
         if context.adobe_customer_id:
             try:
