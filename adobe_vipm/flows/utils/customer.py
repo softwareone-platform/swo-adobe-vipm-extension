@@ -5,7 +5,7 @@ from mpt_extension_sdk.mpt_http.utils import find_first
 from adobe_vipm.adobe.constants import (
     OfferType,
 )
-from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.constants import MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY, Param
 from adobe_vipm.flows.utils.date import is_within_last_two_weeks
 from adobe_vipm.flows.utils.market_segment import is_large_government_agency_type
 from adobe_vipm.flows.utils.parameter import (
