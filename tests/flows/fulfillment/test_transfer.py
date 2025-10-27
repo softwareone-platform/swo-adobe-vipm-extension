@@ -50,7 +50,7 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
     split_phone_number,
 )
-from adobe_vipm.flows.utils.date import reset_due_date
+from adobe_vipm.flows.utils.date import reset_due_date, set_due_date
 from adobe_vipm.flows.utils.order import reset_order_error
 from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 
