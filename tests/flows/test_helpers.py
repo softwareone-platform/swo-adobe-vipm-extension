@@ -15,17 +15,22 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_CUSTOMER_LOST_EXCEPTION,
+    MARKET_SEGMENT_GOVERNMENT,
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
     PrepareCustomerData,
     SetupContext,
     UpdatePrices,
     Validate3YCCommitment,
+    ValidateGovernmentTransfer,
     ValidateResellerChange,
     ValidateSkuAvailability,
 )
@@ -2303,3 +2308,268 @@ def test_validate_sku_availability_empty_sku_lists(
 
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
     mocked_get_prices.assert_called_once_with("PRD-123", "USD", [])
+
+
+def test_validate_government_transfer_skips_when_not_government_segment(
+    mocker,
+    order_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    mocked_get_market_segment = mocker.patch(
+        "adobe_vipm.flows.helpers.get_market_segment",
+        return_value="COMMERCIAL",
+    )
+
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id="AUT-1234-4567",
+    )
+
+    step = ValidateGovernmentTransfer(is_validation=False)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_get_market_segment.assert_called_once_with(order["product"]["id"])
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_validate_government_transfer_success_when_validation_passes(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    mocked_get_market_segment = mocker.patch(
+        "adobe_vipm.flows.helpers.get_market_segment",
+        return_value=MARKET_SEGMENT_GOVERNMENT,
+    )
+    mocked_get_adobe_client = mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    mocked_validate_government_lga_data = mocker.patch(
+        "adobe_vipm.flows.helpers.validate_government_lga_data",
+    )
+
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id="AUT-1234-4567",
+    )
+    context.customer_id = "customer-id"
+
+    step = ValidateGovernmentTransfer(is_validation=False)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_get_market_segment.assert_called_once_with(order["product"]["id"])
+    mocked_get_adobe_client.assert_called_once()
+    mock_adobe_client.get_customer.assert_called_once_with(
+        context.authorization_id,
+        context.customer_id,
+    )
+    mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_validate_government_transfer_government_lga_error_fulfillment_mode(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_market_segment",
+        return_value=MARKET_SEGMENT_GOVERNMENT,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    mocked_validate_government_lga_data = mocker.patch(
+        "adobe_vipm.flows.helpers.validate_government_lga_data",
+        side_effect=GovernmentLGANotValidOrderError(),
+    )
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id="AUT-1234-4567",
+    )
+    context.customer_id = "customer-id"
+
+    step = ValidateGovernmentTransfer(is_validation=False)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mock_mpt_client,
+        context.order,
+        ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict(),
+    )
+    mock_next_step.assert_not_called()
+
+
+def test_validate_government_transfer_government_lga_error_validation_mode(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_market_segment",
+        return_value=MARKET_SEGMENT_GOVERNMENT,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    mocked_validate_government_lga_data = mocker.patch(
+        "adobe_vipm.flows.helpers.validate_government_lga_data",
+        side_effect=GovernmentLGANotValidOrderError(),
+    )
+    mocked_set_ordering_parameter_error = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_ordering_parameter_error",
+    )
+
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id="AUT-1234-4567",
+    )
+    context.customer_id = "customer-id"
+
+    step = ValidateGovernmentTransfer(is_validation=True)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
+    mocked_set_ordering_parameter_error.assert_called_once_with(
+        order,
+        Param.MEMBERSHIP_ID,
+        ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict(),
+    )
+    assert context.validation_succeeded is False
+    mock_next_step.assert_not_called()
+
+
+def test_validate_government_transfer_government_error_fulfillment_mode(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_market_segment",
+        return_value=MARKET_SEGMENT_GOVERNMENT,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    mocked_validate_government_lga_data = mocker.patch(
+        "adobe_vipm.flows.helpers.validate_government_lga_data",
+        side_effect=GovernmentNotValidOrderError(),
+    )
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id="AUT-1234-4567",
+    )
+    context.customer_id = "customer-id"
+
+    step = ValidateGovernmentTransfer(is_validation=False)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mock_mpt_client,
+        context.order,
+        ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict(),
+    )
+    mock_next_step.assert_not_called()
+
+
+def test_validate_government_transfer_government_error_validation_mode(
+    mocker,
+    order_factory,
+    adobe_customer_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_market_segment",
+        return_value=MARKET_SEGMENT_GOVERNMENT,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    mocked_validate_government_lga_data = mocker.patch(
+        "adobe_vipm.flows.helpers.validate_government_lga_data",
+        side_effect=GovernmentNotValidOrderError(),
+    )
+    mocked_set_ordering_parameter_error = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_ordering_parameter_error",
+    )
+
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+
+    order = order_factory()
+
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id="AUT-1234-4567",
+    )
+    context.customer_id = "customer-id"
+
+    step = ValidateGovernmentTransfer(is_validation=True)
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
+    mocked_set_ordering_parameter_error.assert_called_once_with(
+        order,
+        Param.MEMBERSHIP_ID,
+        ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict(),
+    )
+    assert context.validation_succeeded is False
+    mock_next_step.assert_not_called()

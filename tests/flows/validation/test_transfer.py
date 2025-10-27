@@ -10,6 +10,8 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
@@ -21,8 +23,9 @@ from adobe_vipm.flows.constants import (
     ItemTermsModel,
     Param,
 )
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.utils import get_ordering_parameter
-from adobe_vipm.flows.validation.transfer import get_prices, validate_transfer
+from adobe_vipm.flows.validation.transfer import FetchTransferData, get_prices, validate_transfer
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -170,8 +173,9 @@ def test_validate_transfer_membership_error(
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
+
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
-        title=param["name"], details=str(api_error)
+        title=param["name"], details=str(api_error.message)
     )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -1563,4 +1567,142 @@ def test_validate_transfer_adobe_errors(
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_PROCESSING.to_dict(
         membership_id=mocked_transfer.membership_id,
         error=expected_error_message,
+    )
+
+
+def test_fetch_transfer_data_not_lga_product_with_lga_agency_type(
+    mocker,
+    mock_order,
+    mock_adobe_client,
+    mock_mpt_client,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+):
+    mock_order["product"]["id"] = "PRD-2222-2222"
+    context = Context(
+        order=mock_order,
+        agreement_id="agreement-id",
+        authorization_id="auth-id",
+        seller_id="seller-id",
+        market_segment="market-segment",
+        membership_id="membership-id",
+    )
+    context.transfer = None
+    mock_next_step = mocker.Mock()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
+    adobe_transfer_preview["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
+    mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
+
+    step = FetchTransferData()
+    step(mock_mpt_client, context, mock_next_step)
+
+    assert context.validation_succeeded is False
+    param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID.value)
+    assert param["error"] == ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict()
+
+
+def test_fetch_transfer_data_lga_product_with_not_lga_agency_type(
+    mocker,
+    mock_order,
+    mock_adobe_client,
+    mock_mpt_client,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+):
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(
+        order=mock_order,
+        agreement_id="agreement-id",
+        authorization_id="auth-id",
+        seller_id="seller-id",
+        market_segment="market-segment",
+        membership_id="membership-id",
+    )
+    context.transfer = None
+    mock_next_step = mocker.Mock()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
+    mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
+
+    step = FetchTransferData()
+    step(mock_mpt_client, context, mock_next_step)
+
+    assert context.validation_succeeded is False
+    param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID.value)
+    assert param["error"] == ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict()
+
+
+def test_validate_transfer_government_transfer_lga_product_with_lga_agency_type(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    items_factory,
+    transfer_order_parameters_factory,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+    lines_factory,
+):
+    today = dt.datetime.now(tz=dt.UTC).date()
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    order = order_factory(
+        order_parameters=transfer_order_parameters_factory(),
+        lines=[],
+    )
+    order["product"]["id"] = "PRD-3333-3333"
+    order["parameters"]["ordering"].append({
+        "id": "PAR-1164-2550-0043",
+        "externalId": "companyAgencyType",
+        "name": "Agency type",
+        "type": "DropDown",
+        "phase": "Order",
+        "error": None,
+    })
+    product_items = items_factory()
+    valid_items = adobe_items_factory(renewal_date=today.isoformat())
+    expired_items = adobe_items_factory(
+        offer_id="65304999CA01A12",
+        line_number=2,
+        renewal_date=(today - dt.timedelta(days=5)).isoformat(),
+    )
+    items = valid_items + expired_items
+    adobe_preview_transfer = adobe_preview_transfer_factory(items=items)
+    adobe_preview_transfer["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
+    mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
+        return_value={
+            valid_items[0]["offerId"]: 12.14,
+            expired_items[0]["offerId"]: 33.04,
+        },
+    )
+    mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
+    mocked_get_product_items_by_skus = mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_product_items_by_skus",
+        return_value=product_items,
+    )
+
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+
+    lines = lines_factory(line_id=None, unit_purchase_price=12.14)
+    assert has_errors is False
+    assert len(validated_order["lines"]) == len(lines)
+    mocked_get_product_items_by_skus.assert_called_once_with(
+        mock_mpt_client,
+        ANY,
+        [
+            adobe_preview_transfer["items"][0]["offerId"][:10],
+            adobe_preview_transfer["items"][1]["offerId"][:10],
+        ],
     )

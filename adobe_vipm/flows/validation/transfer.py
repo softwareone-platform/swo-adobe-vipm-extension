@@ -17,6 +17,8 @@ from adobe_vipm.airtable.models import (
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
@@ -31,7 +33,12 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.helpers import FetchResellerChangeData, ValidateResellerChange
+from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
+from adobe_vipm.flows.helpers import (
+    FetchResellerChangeData,
+    ValidateGovernmentTransfer,
+    ValidateResellerChange,
+)
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
@@ -47,6 +54,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_ordering_parameter_error,
 )
+from adobe_vipm.flows.utils.validation import validate_government_lga_data
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -290,7 +298,7 @@ def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]
         order = set_ordering_parameter_error(
             order,
             Param.MEMBERSHIP_ID.value,
-            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(error)),
+            ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=str(error.message)),
         )
         return True, order
     except AdobeHttpError as he:
@@ -304,6 +312,24 @@ def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]
             ERR_ADOBE_MEMBERSHIP_ID.to_dict(title=param["name"], details=err_msg),
         )
         return True, order
+
+    try:
+        validate_government_lga_data(order, transfer_preview)
+    except GovernmentLGANotValidOrderError:
+        order = set_ordering_parameter_error(
+            order,
+            Param.MEMBERSHIP_ID.value,
+            ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict(),
+        )
+        return True, order
+    except GovernmentNotValidOrderError:
+        order = set_ordering_parameter_error(
+            order,
+            Param.MEMBERSHIP_ID.value,
+            ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict(),
+        )
+        return True, order
+
     commitment = get_3yc_commitment(transfer_preview)
     return add_lines_to_order(mpt_client, order, transfer_preview["items"], commitment, "quantity")
 
@@ -390,6 +416,7 @@ class FetchTransferData(Step):
                 context.transfer.membership_id,
                 context.transfer.transfer_id,
             )
+            context.customer_id = adobe_transfer["customerId"]
         except AdobeError as error:
             context.order = set_ordering_parameter_error(
                 context.order,
@@ -475,6 +502,7 @@ def validate_transfer(mpt_client, order):
     pipeline = Pipeline(
         SetupTransferContext(),
         FetchTransferData(),
+        ValidateGovernmentTransfer(is_validation=True),
         ValidateTransferStatus(),
         UpdateSubscriptionSkus(),
         FetchCustomerAndValidateEmptySubscriptions(),

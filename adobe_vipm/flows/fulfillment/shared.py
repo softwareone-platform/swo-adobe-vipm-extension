@@ -82,7 +82,7 @@ from adobe_vipm.flows.utils import (
     set_template,
     split_phone_number,
 )
-from adobe_vipm.flows.utils.customer import has_coterm_date
+from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
 from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
@@ -112,6 +112,8 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     # transfer module.
     order = set_adobe_order_id(order, order_id)
     order = set_adobe_customer_id(order, customer["customerId"])
+
+    order = set_agency_type(order, customer)
 
     address = customer["companyProfile"].get("address", {})
     contact = customer["companyProfile"]["contacts"][0]

@@ -30,6 +30,7 @@ class Param(StrEnum):
 
     ADDRESS = "address"
     ADOBE_SKU = "adobeSKU"
+    AGENCY_TYPE = "companyAgencyType"
     COMPANY_NAME = "companyName"
     CONTACT = "contact"
     CUSTOMER_ID = "customerId"
@@ -206,6 +207,7 @@ ERR_ADOBE_RESSELLER_CHANGE_PREVIEW = ValidationError(
     "VIPM0036", "Error processing the reseller change code {reseller_change_code}: {error}"
 )
 
+
 ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
     "VIPM0036",
     (
@@ -220,6 +222,22 @@ ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(
     (
         "The adobe reseller change product is not configured for this product and "
         "cannot be added to the order."
+    ),
+)
+
+ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA = ValidationError(
+    "VIPM0038",
+    (
+        "This Adobe account is for a Large Government Agency. "
+        "Please use the Adobe VIP Marketplace for Large Government Agencies product."
+    ),
+)
+
+ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA = ValidationError(
+    "VIPM0039",
+    (
+        "This Adobe account is a Government account. "
+        "Please use the Adobe VIP Marketplace for Government product."
     ),
 )
 
@@ -247,6 +265,14 @@ TEMPLATE_SUBSCRIPTION_TERMINATION = "Terminated"
 MARKET_SEGMENT_COMMERCIAL = "COM"
 MARKET_SEGMENT_EDUCATION = "EDU"
 MARKET_SEGMENT_GOVERNMENT = "GOV"
+MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY = "GOV_LGA"
+
+MARKET_SEGMENTS = {
+    MARKET_SEGMENT_COMMERCIAL: "COM",
+    MARKET_SEGMENT_GOVERNMENT: "GOV",
+    MARKET_SEGMENT_EDUCATION: "EDU",
+    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY: "GOV",
+}
 
 FAKE_CUSTOMERS_IDS = {
     MARKET_SEGMENT_COMMERCIAL: "1234567890",

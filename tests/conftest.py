@@ -515,6 +515,18 @@ def transfer_order_parameters_factory():
                 },
                 "error": None,
             },
+            {
+                "id": "PAR-0000-0009",
+                "name": "Agency type",
+                "externalId": Param.AGENCY_TYPE.value,
+                "type": "SingleLineText",
+                "value": "STATE",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+                "error": None,
+            },
         ]
 
     return _order_parameters
@@ -1318,6 +1330,9 @@ def order_factory(
                     "by": {"id": "USR-0000-0001"},
                 },
                 "updated": None,
+            },
+            "product": {
+                "id": "PRD-1111-1111",
             },
         }
         if external_ids:
