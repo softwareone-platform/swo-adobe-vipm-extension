@@ -23,9 +23,8 @@ def test_sync_agreement_prices(
     adobe_customer_factory,
     mock_get_adobe_product_by_marketplace_sku,
     mock_adobe_client,
-    mock_get_adobe_client,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
     mock_mpt_client,
     mock_update_agreement,
     mock_get_template_by_name,
@@ -74,7 +73,7 @@ def test_sync_agreement_prices(
         "items": [adobe_subscription, another_adobe_subscription]
     }
     mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
-    mock_get_agreement_subscription.side_effect = [mpt_subscription, another_mpt_subscription]
+    mock_mpt_get_agreement_subscription.side_effect = [mpt_subscription, another_mpt_subscription]
     mocker.patch(
         "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[
@@ -86,11 +85,11 @@ def test_sync_agreement_prices(
 
     mocked_agreement_syncer.sync(dry_run=False, sync_prices=True)
 
-    mock_get_agreement_subscription.assert_has_calls([
+    mock_mpt_get_agreement_subscription.assert_has_calls([
         mocker.call(mock_mpt_client, mpt_subscription["id"]),
         mocker.call(mock_mpt_client, another_mpt_subscription["id"]),
     ])
-    mock_update_agreement_subscription.assert_has_calls([
+    mock_mpt_update_agreement_subscription.assert_has_calls([
         mocker.call(
             mock_mpt_client,
             mpt_subscription["id"],
@@ -172,10 +171,8 @@ def test_sync_agreement_prices(
 
 
 @freeze_time("2025-06-23")
-def test_sync_agreement_update_agrement(
-    mock_mpt_client,
-    mocked_agreement_syncer,
-    mock_get_agreement,
+def test_sync_agreement_update_agreement(
+    mock_mpt_client, mocked_agreement_syncer, mock_get_agreement
 ):
     mocked_agreement_syncer.sync(dry_run=False, sync_prices=True)
 
@@ -186,7 +183,6 @@ def test_sync_agreement_update_agrement(
 
 @freeze_time("2025-06-23")
 def test_sync_agreement_not_prices(
-    mocker,
     lines_factory,
     mock_mpt_client,
     mock_adobe_client,
@@ -196,8 +192,8 @@ def test_sync_agreement_not_prices(
     mock_get_prices_for_skus,
     mock_get_template_by_name,
     adobe_subscription_factory,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
     mocked_agreement_syncer,
     mock_get_product_items_by_skus,
 ):
@@ -218,12 +214,12 @@ def test_sync_agreement_not_prices(
             )
         ]
     }
-    mock_get_agreement_subscription.return_value = agreement["subscriptions"][0]
+    mock_mpt_get_agreement_subscription.return_value = agreement["subscriptions"][0]
     mocked_agreement_syncer._agreement = agreement
 
     mocked_agreement_syncer.sync(dry_run=False, sync_prices=False)
 
-    mock_update_agreement_subscription.assert_called_once_with(
+    mock_mpt_update_agreement_subscription.assert_called_once_with(
         mock_mpt_client,
         "SUB-1000-2000-3000",
         autoRenew=True,
@@ -253,8 +249,8 @@ def test_sync_agreement_prices_dry_run(
     adobe_customer_factory,
     mock_get_adobe_product_by_marketplace_sku,
     mock_update_agreement,
-    mock_update_agreement_subscription,
-    mock_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
     mocked_agreement_syncer,
     mock_get_template_by_name,
 ):
@@ -263,7 +259,7 @@ def test_sync_agreement_prices_dry_run(
     )
     mpt_subscription = subscriptions_factory()[0]
     mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
-    mock_get_agreement_subscription.return_value = mpt_subscription
+    mock_mpt_get_agreement_subscription.return_value = mpt_subscription
     mocker.patch(
         "adobe_vipm.airtable.models.get_prices_for_skus",
         side_effect=[{"65327701CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
@@ -272,8 +268,10 @@ def test_sync_agreement_prices_dry_run(
 
     mocked_agreement_syncer.sync(dry_run=True, sync_prices=True)
 
-    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
-    mock_update_agreement_subscription.assert_called_once_with(
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mpt_subscription["id"]
+    )
+    mock_mpt_update_agreement_subscription.assert_called_once_with(
         mock_mpt_client,
         "SUB-1234-5678",
         template={"id": "TPL-1234", "name": "Expired"},
@@ -291,8 +289,8 @@ def test_sync_agreement_prices_exception(
     adobe_customer_factory,
     caplog,
     mock_update_agreement,
-    mock_update_agreement_subscription,
-    mock_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
     lines_factory,
     adobe_subscription_factory,
     mocked_agreement_syncer,
@@ -314,11 +312,11 @@ def test_sync_agreement_prices_exception(
     }
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
 
-    mock_update_agreement_subscription.side_effect = AdobeAPIError(
+    mock_mpt_update_agreement_subscription.side_effect = AdobeAPIError(
         400, adobe_api_error_factory(code="9999", message="Error from Adobe.")
     )
     mpt_subscription = mpt_subscriptions[0]
-    mock_get_agreement_subscription.return_value = mpt_subscription
+    mock_mpt_get_agreement_subscription.return_value = mpt_subscription
     mocked_notifier = mocker.patch(
         "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams",
     )
@@ -327,9 +325,11 @@ def test_sync_agreement_prices_exception(
         mocked_agreement_syncer.sync(dry_run=False, sync_prices=True)
 
     assert f"Error synchronizing agreement {agreement['id']}" in caplog.text
-    mock_get_agreement_subscription.assert_called_once_with(mock_mpt_client, mpt_subscription["id"])
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mpt_subscription["id"]
+    )
 
-    mock_update_agreement_subscription.assert_called_once_with(
+    mock_mpt_update_agreement_subscription.assert_called_once_with(
         mock_mpt_client,
         "SUB-1234-5678",
         template={"id": "TPL-1234", "name": "Expired"},
@@ -341,7 +341,6 @@ def test_sync_agreement_prices_exception(
 
 
 def test_sync_agreement_prices_skip_processing(
-    mocker,
     mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
@@ -383,10 +382,9 @@ def test_sync_agreement_prices_with_3yc(
     adobe_commitment_factory,
     mock_get_adobe_product_by_marketplace_sku,
     mock_adobe_client,
-    mock_get_adobe_client,
     mock_mpt_client,
-    mock_update_agreement_subscription,
-    mock_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
     mock_update_agreement,
     mock_get_template_by_name,
 ):
@@ -401,7 +399,7 @@ def test_sync_agreement_prices_with_3yc(
         recommitment_request=adobe_commitment_factory(status="ACCEPTED"),
     )
     mpt_subscription = subscriptions_factory()[0]
-    mock_get_agreement_subscription.return_value = mpt_subscription
+    mock_mpt_get_agreement_subscription.return_value = mpt_subscription
     mocker.patch(
         "adobe_vipm.airtable.models.get_prices_for_3yc_skus",
         side_effect=[{"65304578CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
@@ -411,11 +409,11 @@ def test_sync_agreement_prices_with_3yc(
 
     sync_agreement(mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=True)
 
-    mock_get_agreement_subscription.assert_called_once_with(
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
         mock_mpt_client,
         mpt_subscription["id"],
     )
-    mock_update_agreement_subscription.assert_has_calls([
+    mock_mpt_update_agreement_subscription.assert_has_calls([
         mocker.call(
             mock_mpt_client,
             "SUB-1234-5678",
@@ -493,7 +491,6 @@ def test_sync_global_customer_parameter(
     mock_adobe_client,
     agreement_factory,
     mock_update_agreement,
-    mock_get_adobe_client,
     subscriptions_factory,
     adobe_customer_factory,
     mock_get_prices_for_skus,
@@ -745,7 +742,7 @@ def test_sync_global_customer_no_active_deployments(
 def test_sync_global_customer_update_adobe_error(
     adobe_api_error_factory,
     mock_adobe_client,
-    mock_get_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
     mocked_agreement_syncer,
     mock_notify_agreement_unhandled_exception_in_teams,
 ):
@@ -763,7 +760,6 @@ def test_sync_global_customer_update_adobe_error(
 
 
 def test_sync_global_customer_parameters_error(
-    mocker,
     caplog,
     mock_update_agreement,
     mocked_agreement_syncer,
@@ -847,12 +843,12 @@ def test_sync_agreement_prices_with_missing_prices(
     adobe_subscription_factory,
     adobe_customer_factory,
     mock_get_adobe_product_by_marketplace_sku,
-    mock_terminate_subscription,
+    mock_mpt_terminate_subscription,
     mock_mpt_client,
     mock_adobe_client,
     caplog,
-    mock_update_agreement_subscription,
-    mock_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
     mock_update_agreement,
     mock_get_template_by_name,
     mocked_agreement_syncer,
@@ -924,7 +920,7 @@ def test_sync_agreement_prices_with_missing_prices(
         terminated_adobe_subscription,
     ]
     mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
-    mock_get_agreement_subscription.side_effect = [
+    mock_mpt_get_agreement_subscription.side_effect = [
         mpt_subscription,
         another_mpt_subscription,
         terminated_mpt_subscription,
@@ -970,7 +966,7 @@ def test_sync_agreement_prices_with_missing_prices(
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-19"}]},
         ),
     ]
-    assert mock_update_agreement_subscription.mock_calls == [
+    assert mock_mpt_update_agreement_subscription.mock_calls == [
         mocker.call(
             mock_mpt_client,
             terminated_mpt_subscription["id"],
@@ -996,7 +992,7 @@ def test_sync_agreement_prices_with_missing_prices(
             template={"id": "TPL-1234", "name": "Renewing"},
         ),
     ]
-    mock_terminate_subscription.assert_called_once_with(
+    mock_mpt_terminate_subscription.assert_called_once_with(
         mock_mpt_client, "SUB-1000-2000-6000", "Adobe subscription status 1004."
     )
 
@@ -1008,7 +1004,7 @@ def test_sync_agreement_lost_customer(
     mock_adobe_client,
     agreement_factory,
     mock_send_notification,
-    mock_terminate_subscription,
+    mock_mpt_terminate_subscription,
     mocked_agreement_syncer,
     caplog,
 ):
@@ -1021,7 +1017,7 @@ def test_sync_agreement_lost_customer(
         mock_mpt_client, mock_adobe_client, agreement_factory(), dry_run=False, sync_prices=True
     )
 
-    assert mock_terminate_subscription.mock_calls == [
+    assert mock_mpt_terminate_subscription.mock_calls == [
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
@@ -1049,7 +1045,7 @@ def test_sync_agreement_lost_customer_error(
     mpt_error_factory,
     agreement_factory,
     mock_send_notification,
-    mock_terminate_subscription,
+    mock_mpt_terminate_subscription,
     mocked_agreement_syncer,
     caplog,
 ):
@@ -1057,7 +1053,7 @@ def test_sync_agreement_lost_customer_error(
         status_code=int(AdobeStatus.INVALID_CUSTOMER.value),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
-    mock_terminate_subscription.side_effect = MPTAPIError(
+    mock_mpt_terminate_subscription.side_effect = MPTAPIError(
         500, mpt_error_factory(500, "Internal Server Error", "Oops!")
     )
 
@@ -1065,7 +1061,7 @@ def test_sync_agreement_lost_customer_error(
         mock_mpt_client, mock_adobe_client, agreement_factory(), dry_run=False, sync_prices=True
     )
 
-    assert mock_terminate_subscription.mock_calls == [
+    assert mock_mpt_terminate_subscription.mock_calls == [
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
@@ -1119,7 +1115,7 @@ def test_sync_agreement_lost_customer_error(
 )
 def test_sync_agreement_skips_inactive_agreement(
     mock_mpt_client,
-    mock_get_adobe_client,
+    mock_adobe_client,
     mock_update_last_sync_date,
     mocked_agreement_syncer,
     status,
@@ -1137,7 +1133,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     adobe_customer_factory,
     agreement_factory,
     adobe_subscription_factory,
-    mock_get_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
     mocked_agreement_syncer,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
@@ -1156,9 +1152,9 @@ def test_get_subscriptions_for_update_terminated(
     subscriptions_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
-    mock_terminate_subscription,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
+    mock_mpt_terminate_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
     mock_get_template_by_name,
     mocked_agreement_syncer,
 ):
@@ -1170,19 +1166,19 @@ def test_get_subscriptions_for_update_terminated(
 
     mocked_agreement_syncer._get_subscriptions_for_update(agreement_factory())
 
-    mock_get_agreement_subscription.assert_called_once_with(
-        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_mpt_get_agreement_subscription.return_value["id"]
     )
-    mock_terminate_subscription.assert_called_once_with(
+    mock_mpt_terminate_subscription.assert_called_once_with(
         mock_mpt_client,
-        mock_get_agreement_subscription.return_value["id"],
+        mock_mpt_get_agreement_subscription.return_value["id"],
         "Adobe subscription status 1004.",
     )
 
-    mock_update_agreement_subscription.assert_has_calls([
+    mock_mpt_update_agreement_subscription.assert_has_calls([
         mocker.call(
             mock_mpt_client,
-            mock_get_agreement_subscription.return_value["id"],
+            mock_mpt_get_agreement_subscription.return_value["id"],
             template={"id": "TPL-1234", "name": "Expired"},
         ),
         mocker.call(
@@ -1202,32 +1198,33 @@ def test_get_subscriptions_for_update_terminated_with_expired_template(
     subscriptions_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
-    mock_terminate_subscription,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
+    mock_mpt_terminate_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
     mock_get_template_by_name,
     mocked_agreement_syncer,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
         adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
     ]
+    # ???
     mock_get_template_by_name.return_value = None
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
 
     mocked_agreement_syncer._get_subscriptions_for_update(agreement_factory())
 
-    mock_get_agreement_subscription.assert_called_once_with(
-        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_mpt_get_agreement_subscription.return_value["id"]
     )
-    mock_terminate_subscription.assert_called_once_with(
+    mock_mpt_terminate_subscription.assert_called_once_with(
         mock_mpt_client,
-        mock_get_agreement_subscription.return_value["id"],
+        mock_mpt_get_agreement_subscription.return_value["id"],
         "Adobe subscription status 1004.",
     )
-    mock_update_agreement_subscription.assert_has_calls([
+    mock_mpt_update_agreement_subscription.assert_has_calls([
         mocker.call(
             mock_mpt_client,
-            mock_get_agreement_subscription.return_value["id"],
+            mock_mpt_get_agreement_subscription.return_value["id"],
             template={"id": "TPL-1234", "name": "Expired"},
         ),
         mocker.call(
@@ -1247,9 +1244,9 @@ def test_get_subscriptions_for_update_terminated_without_template(
     subscriptions_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
-    mock_terminate_subscription,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
+    mock_mpt_terminate_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
     mock_get_template_by_name,
     mocked_agreement_syncer,
 ):
@@ -1260,18 +1257,18 @@ def test_get_subscriptions_for_update_terminated_without_template(
 
     mocked_agreement_syncer._get_subscriptions_for_update(agreement_factory())
 
-    mock_get_agreement_subscription.assert_called_once_with(
-        mock_mpt_client, mock_get_agreement_subscription.return_value["id"]
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mock_mpt_get_agreement_subscription.return_value["id"]
     )
-    mock_terminate_subscription.assert_called_once_with(
+    mock_mpt_terminate_subscription.assert_called_once_with(
         mock_mpt_client,
-        mock_get_agreement_subscription.return_value["id"],
+        mock_mpt_get_agreement_subscription.return_value["id"],
         "Adobe subscription status 1004.",
     )
-    mock_update_agreement_subscription.assert_has_calls([
+    mock_mpt_update_agreement_subscription.assert_has_calls([
         mocker.call(
             mock_mpt_client,
-            mock_get_agreement_subscription.return_value["id"],
+            mock_mpt_get_agreement_subscription.return_value["id"],
             template={"id": "TPL-1234", "name": "Expired"},
         )
     ])
@@ -1279,16 +1276,15 @@ def test_get_subscriptions_for_update_terminated_without_template(
 
 @freeze_time("2025-07-23")
 def test_get_subscriptions_for_update_terminated_with_assigned_template(
-    mocker,
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
     subscriptions_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
-    mock_terminate_subscription,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
+    mock_mpt_terminate_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
     mock_get_template_by_name,
     mocked_agreement_syncer,
 ):
@@ -1303,8 +1299,8 @@ def test_get_subscriptions_for_update_terminated_with_assigned_template(
 
     mocked_agreement_syncer._get_subscriptions_for_update(agreement)
 
-    mock_get_agreement_subscription.assert_not_called()
-    mock_update_agreement_subscription.assert_not_called()
+    mock_mpt_get_agreement_subscription.assert_not_called()
+    mock_mpt_update_agreement_subscription.assert_not_called()
 
 
 def test_add_missing_subscriptions_none(
