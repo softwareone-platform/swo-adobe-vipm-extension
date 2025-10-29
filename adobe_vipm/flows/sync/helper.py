@@ -188,11 +188,14 @@ def sync_all_agreements(mpt_client: MPTClient, adobe_client: AdobeClient, *, dry
         sync_agreement(mpt_client, adobe_client, agreement, dry_run=dry_run, sync_prices=False)
 
 
+# REFACTOR: Split this method to separate the get and process responsibilities.
 def get_customer_or_process_lost_customer(
     mpt_client: MPTClient,
     adobe_client: AdobeClient,
     agreement: dict,
     customer_id: str,
+    *,
+    dry_run: bool,
 ) -> dict | None:
     """
     Attempts to retrieve the customer using Adobe Client.
@@ -203,6 +206,7 @@ def get_customer_or_process_lost_customer(
         agreement: A dictionary containing the agreement details, including authorization
             information necessary for fetching customer data.
         customer_id: The unique identifier of the customer to be retrieved.
+        dry_run: if True, it just simulates the process
 
     Returns:
         dict | None: Returns the customer details as a dictionary if successful. Returns
@@ -215,6 +219,7 @@ def get_customer_or_process_lost_customer(
     """
     try:
         return adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
+    # TODO: add AuthorizationNotFoundError error
     except AdobeAPIError as error:
         if error.code == AdobeStatus.INVALID_CUSTOMER:
             logger.info(
@@ -223,6 +228,10 @@ def get_customer_or_process_lost_customer(
                 error.code,
                 error.message,
             )
+            if dry_run:
+                logger.info("Dry run mode: skipping processing lost customer %s.", customer_id)
+                return None
+
             send_notification(
                 "Executing Lost Customer Procedure.",
                 f"Received Adobe error {error.code} - {error.message},"
@@ -254,7 +263,7 @@ def sync_agreement(
     """
     adobe_customer_id = get_adobe_customer_id(agreement)
     customer = get_customer_or_process_lost_customer(
-        mpt_client, adobe_client, agreement, adobe_customer_id
+        mpt_client, adobe_client, agreement, adobe_customer_id, dry_run=dry_run
     )
     if not customer:
         return
@@ -264,10 +273,9 @@ def sync_agreement(
         "items"
     ]
 
-    AgreementsSyncer(mpt_client, adobe_client, agreement, customer, adobe_subscriptions).sync(
-        dry_run=dry_run,
-        sync_prices=sync_prices,
-    )
+    AgreementsSyncer(
+        mpt_client, adobe_client, agreement, customer, adobe_subscriptions, dry_run=dry_run
+    ).sync(sync_prices=sync_prices)
 
 
 def _process_lost_customer(  # noqa: C901

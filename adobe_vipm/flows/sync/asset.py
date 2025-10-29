@@ -31,7 +31,7 @@ class AssetsSyncer:
     def __init__(
         self,
         mpt_client: MPTClient,
-        agreement_id: dict,
+        agreement_id: str,
         assets: list[dict],
         customer: dict,
         adobe_subscriptions: list[dict],

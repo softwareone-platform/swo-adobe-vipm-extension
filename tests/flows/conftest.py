@@ -195,6 +195,7 @@ def mocked_agreement_syncer(
         agreement_factory(),
         adobe_customer_factory(),
         adobe_subscriptions,
+        dry_run=False,
     )
 
 
@@ -206,7 +207,7 @@ def mock_notify_agreement_unhandled_exception_in_teams(mocker):
 
 
 @pytest.fixture
-def mock_update_asset(mocker):
+def mock_mpt_update_asset(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_asset", autospec=True)
 
 
@@ -227,12 +228,12 @@ def mock_get_agreements_by_3yc_commitment_request_invitation(mocker, mock_agreem
 
 
 @pytest.fixture
-def mock_create_asset(mocker):
+def mock_mpt_create_asset(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_asset", spec=True)
 
 
 @pytest.fixture
-def mock_create_agreement_subscription(mocker):
+def mock_mpt_create_agreement_subscription(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_agreement_subscription", spec=True)
 
 
