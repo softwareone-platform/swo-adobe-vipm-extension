@@ -57,6 +57,7 @@ class Param(StrEnum):
     ADOBE_CUSTOMER_ADMIN_EMAIL = "adobeCustomerAdminEmail"
     PHASE_ORDERING = "ordering"
     PHASE_FULFILLMENT = "fulfillment"
+    FLEXIBLE_DISCOUNTS = "flexibleDiscounts"
 
 
 PARAM_REQUIRED_CUSTOMER_ORDER = (
