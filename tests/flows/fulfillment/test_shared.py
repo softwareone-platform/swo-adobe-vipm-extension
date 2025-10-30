@@ -1832,12 +1832,13 @@ def test_validate_duplicate_lines_step_no_duplicates(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_get_preview_order_step(mocker, mock_adobe_client, order_factory, adobe_order_factory):
+def test_get_preview_order_step(
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, mock_mpt_client
+):
     deployment_id = "deployment-id"
     order = order_factory(deployment_id=deployment_id)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
     mock_adobe_client.create_preview_order.return_value = preview_order
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
         order=order,
@@ -1850,17 +1851,10 @@ def test_get_preview_order_step(mocker, mock_adobe_client, order_factory, adobe_
     )
 
     step = GetPreviewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     assert context.adobe_preview_order == preview_order
-    mock_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        context.order_id,
-        context.upsize_lines,
-        context.new_lines,
-        deployment_id=deployment_id,
-    )
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
 
 
 def test_get_preview_order_step_order_no_upsize_lines(
@@ -1885,13 +1879,9 @@ def test_get_preview_order_step_order_no_upsize_lines(
 
 
 def test_get_preview_order_step_order_new_order_created(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
+    mocker, mock_adobe_client, order_factory, lines_factory, mock_mpt_client
 ):
     order = order_factory(lines=lines_factory(quantity=12, old_quantity=10))
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
         order=order,
@@ -1902,34 +1892,10 @@ def test_get_preview_order_step_order_new_order_created(
     )
 
     step = GetPreviewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mock_adobe_client.create_preview_order.assert_called_once_with(
-        "authorization-id",
-        "customer-id",
-        "ORD-0792-5000-2253-4210",
-        [
-            {
-                "id": "ALI-2119-4550-8674-5962-0001",
-                "item": {
-                    "externalIds": {"vendor": "65304578CA"},
-                    "id": "ITM-1234-1234-1234-0001",
-                    "name": "Awesome product",
-                },
-                "oldQuantity": 10,
-                "price": {"unitPP": 1234.55},
-                "quantity": 12,
-                "subscription": {
-                    "id": "SUB-1000-2000-3000",
-                    "name": "Subscription for Acrobat Pro for Teams; Multi Language",
-                    "status": "Active",
-                },
-            }
-        ],
-        [],
-        deployment_id="",
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_get_preview_order_step_adobe_error(

@@ -7,11 +7,9 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
-    FAKE_CUSTOMERS_IDS,
 )
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.utils import (
-    get_deployment_id,
     set_order_error,
 )
 
@@ -71,24 +69,15 @@ class GetPreviewOrder(Step):
     pipeline will continue.
     """
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, mpt_client, context, next_step):
         """Retrieve a preview order for the upsize/new lines."""
         if not (context.upsize_lines or context.new_lines):
-            next_step(client, context)
+            next_step(mpt_client, context)
             return
 
-        customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
         adobe_client = get_adobe_client()
         try:
-            deployment_id = get_deployment_id(context.order)
-            context.adobe_preview_order = adobe_client.create_preview_order(
-                context.authorization_id,
-                customer_id,
-                context.order_id,
-                context.upsize_lines,
-                context.new_lines,
-                deployment_id=deployment_id,
-            )
+            context.adobe_preview_order = adobe_client.create_preview_order(context)
         except (AdobeAPIError, AdobeProductNotFoundError) as error:
             context.validation_succeeded = False
             context.order = set_order_error(
@@ -96,4 +85,4 @@ class GetPreviewOrder(Step):
             )
             return
 
-        next_step(client, context)
+        next_step(mpt_client, context)

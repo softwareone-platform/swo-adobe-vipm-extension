@@ -906,32 +906,24 @@ class GetPreviewOrder(Step):
     skipped and the order processing pipeline will continue.
     """
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, mpt_client, context, next_step):
         """Retrieve a preview order for the upsize/new lines."""
         adobe_client = get_adobe_client()
         if (context.upsize_lines or context.new_lines) and not context.adobe_new_order_id:
             try:
-                deployment_id = get_deployment_id(context.order)
-                context.adobe_preview_order = adobe_client.create_preview_order(
-                    context.authorization_id,
-                    context.adobe_customer_id,
-                    context.order_id,
-                    context.upsize_lines,
-                    context.new_lines,
-                    deployment_id=deployment_id,
-                )
+                context.adobe_preview_order = adobe_client.create_preview_order(context)
                 logger.info(
                     "Created preview order %s", context.adobe_preview_order["externalReferenceId"]
                 )
             except AdobeError as error:
                 switch_order_to_failed(
-                    client,
+                    mpt_client,
                     context.order,
                     ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
                 )
                 return
 
-        next_step(client, context)
+        next_step(mpt_client, context)
 
 
 class SubmitNewOrder(Step):
