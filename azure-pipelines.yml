@@ -56,6 +56,7 @@ stages:
               - template: aks-docker-templates/helm-build-steps.yaml@templates
                 parameters:
                   buildNumber: $(buildVersion)
+                  gitRepositoryName: github--swo-adobe-vipm-extension
                   repository: $(appName)
                   workingDirectory: helm/$(appName)
                   skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
