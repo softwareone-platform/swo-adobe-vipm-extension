@@ -83,9 +83,7 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date
 from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
-from adobe_vipm.flows.utils.subscription import (
-    get_template_name_by_subscription,
-)
+from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
 from adobe_vipm.notifications import mpt_notify
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
@@ -506,12 +504,14 @@ def check_processing_template(client, order, template_name):
         order (dict): The order to check.
         template_name (str): Name of the template that must be used.
     """
+    product_id = order["agreement"]["product"]["id"]
     template = get_product_template_or_default(
-        client,
-        order["agreement"]["product"]["id"],
-        MPT_ORDER_STATUS_PROCESSING,
-        template_name,
+        client, product_id, MPT_ORDER_STATUS_PROCESSING, template_name
     )
+    if not template:
+        logger.warning("Template %s not found for product %s", template_name, product_id)
+        return
+
     if template != order.get("template"):
         set_processing_template(client, order["id"], template)
 
@@ -748,7 +748,7 @@ class StartOrderProcessing(Step):
     """
     Set the template for the processing status.
 
-    Or the delayed one if the processing is delated due to the renewal window open.
+    Or the delayed one if the processing is delayed due to the renewal window open.
     """
 
     def __init__(self, template_name):
@@ -756,14 +756,17 @@ class StartOrderProcessing(Step):
 
     def __call__(self, client, context, next_step):
         """Set the template for the processing status."""
+        product_id = context.order["agreement"]["product"]["id"]
         template = get_product_template_or_default(
-            client,
-            context.order["agreement"]["product"]["id"],
-            MPT_ORDER_STATUS_PROCESSING,
-            self.template_name,
+            client, product_id, MPT_ORDER_STATUS_PROCESSING, self.template_name
         )
+        if not template:
+            logger.warning(
+                "%s: Template %s not found for product %s", context, self.template_name, product_id
+            )
+
         current_template_id = context.order.get("template", {}).get("id")
-        if template["id"] != current_template_id:
+        if template and template["id"] != current_template_id:
             context.order = set_template(context.order, template)
             update_order(client, context.order_id, template=context.order["template"])
             logger.info(
@@ -772,7 +775,8 @@ class StartOrderProcessing(Step):
                 self.template_name,
                 template["id"],
             )
-        logger.info("%s: processing template is ok, continue", context)
+            logger.info("%s: processing template is ok, continue", context)
+
         if not context.due_date:
             send_mpt_notification(client, context.order)
         next_step(client, context)
@@ -1211,7 +1215,7 @@ class CompleteOrder(Step):
 class SetSubscriptionTemplate(Step):
     """Set subscription template."""
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, mpt_client, context, next_step):
         """Set subscription template."""
         adobe_client = get_adobe_client()
         adobe_subscriptions = adobe_client.get_subscriptions(
@@ -1233,22 +1237,11 @@ class SetSubscriptionTemplate(Step):
                 )
                 continue
 
-            template_name = get_template_name_by_subscription(adobe_subscription)
-            template = get_template_by_name(
-                client,
-                context.order["agreement"]["product"]["id"],
-                template_name,
-            )
-            update_agreement_subscription(
-                client,
-                subscription["id"],
-                template={
-                    "id": template.get("id"),
-                    "name": template.get("name"),
-                },
-            )
+            product_id = context.order["agreement"]["product"]["id"]
+            template_data = get_template_data_by_adobe_subscription(adobe_subscription, product_id)
+            update_agreement_subscription(mpt_client, subscription["id"], template=template_data)
 
-        next_step(client, context)
+        next_step(mpt_client, context)
 
 
 class SyncAgreement(Step):

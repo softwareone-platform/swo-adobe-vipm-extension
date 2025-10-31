@@ -238,5 +238,5 @@ def mock_mpt_create_agreement_subscription(mocker):
 
 
 @pytest.fixture
-def mock_get_template_by_name(mocker):
+def mock_mpt_get_template_by_name(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_template_by_name", spec=True)

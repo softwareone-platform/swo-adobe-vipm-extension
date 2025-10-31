@@ -45,9 +45,6 @@ class ValidateDownsizes(Step):
 
     def __call__(self, client, context, next_step):  # noqa: C901
         """Validates downsize items in order. Checks if it is possible to return them."""
-        adobe_client = get_adobe_client()
-        errors = []
-
         if is_within_coterm_window(context.adobe_customer):
             logger.info(
                 "Downsize occurs in the last two weeks before the anniversary date. "
@@ -57,6 +54,8 @@ class ValidateDownsizes(Step):
             next_step(client, context)
             return
 
+        adobe_client = get_adobe_client()
+        errors = []
         for line in context.downsize_lines:
             subscription_id = get_subscription_by_line_subs_id(
                 context.order["agreement"]["subscriptions"], line
