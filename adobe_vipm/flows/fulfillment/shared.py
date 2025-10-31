@@ -1,6 +1,7 @@
 """This module contains shared functions used by the different fulfillment flows."""
 
 import datetime as dt
+import json
 import logging
 from collections import Counter
 
@@ -945,7 +946,6 @@ class SubmitNewOrder(Step):
             next_step(client, context)
             return
         adobe_client = get_adobe_client()
-        adobe_order = None
 
         if not context.adobe_new_order_id and context.adobe_preview_order:
             deployment_id = get_deployment_id(context.order)
@@ -957,7 +957,20 @@ class SubmitNewOrder(Step):
             )
             logger.info("%s: new adobe order created: %s", context, adobe_order["orderId"])
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
-            update_order(client, context.order_id, externalIds=context.order["externalIds"])
+            flex_discounts = _get_flex_discounts(adobe_order)
+            update_order(
+                client,
+                context.order_id,
+                externalIds=context.order["externalIds"],
+                parameters={
+                    Param.PHASE_FULFILLMENT.value: [
+                        {
+                            "externalId": Param.FLEXIBLE_DISCOUNTS,
+                            "value": flex_discounts,
+                        },
+                    ]
+                },
+            )
         elif not context.adobe_new_order_id and not context.adobe_preview_order:
             logger.info(
                 "%s: skip creating Adobe Order, preview order creation was skipped",
@@ -995,6 +1008,20 @@ class SubmitNewOrder(Step):
             logger.warning("%s: the order has been failed due to %s.", context, error["message"])
             return
         next_step(client, context)
+
+
+def _get_flex_discounts(adobe_order: dict) -> str | None:
+    flex_discounts = [
+        {
+            "extLineItemNumber": line.get("extLineItemNumber"),
+            "offerId": line.get("offerId"),
+            "subscriptionId": line.get("subscriptionId"),
+            "flexDiscountCode": [flex_discount["code"] for flex_discount in line["flexDiscounts"]],
+        }
+        for line in adobe_order["lineItems"]
+        if line.get("flexDiscounts")
+    ]
+    return json.dumps(flex_discounts) if flex_discounts else None
 
 
 class CreateOrUpdateAssets(Step):
@@ -1327,3 +1354,36 @@ def send_gc_mpt_notification(mpt_client, order: dict, items_with_deployment: lis
         "notification",
         context,
     )
+
+
+class NullifyFlexDiscountParam(Step):
+    """Handles the nullification of flex discounts on an agreement."""
+
+    def __call__(self, mpt_client, context, next_step):
+        """
+        Nullifies flex discounts on the specified agreement.
+
+        Args:
+            mpt_client: The client used to interact with the MPT API.
+            context: The operational context containing details like agreement ID.
+            next_step: The next processing step after nullifying discounts.
+
+        """
+        logger.info("Nullifying flex discounts on the agreement %s", context.agreement_id)
+        try:
+            update_agreement(
+                mpt_client,
+                context.agreement_id,
+                parameters={
+                    Param.PHASE_FULFILLMENT.value: [
+                        {
+                            "externalId": Param.FLEXIBLE_DISCOUNTS,
+                            "value": None,
+                            #  The Prop is a JSON type, but MPT API accepts only string here
+                        },
+                    ]
+                },
+            )
+        except Exception:
+            logger.exception("%s: failed to nullify flex discounts.", context)
+        next_step(mpt_client, context)

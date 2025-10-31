@@ -32,6 +32,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
+    NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
@@ -568,7 +569,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
 
     fulfill_purchase_order(mock_mpt_client, mock_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 17
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 18
     expected_steps = [
         SetupContext,
         StartOrderProcessing,
@@ -586,6 +587,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
         RefreshCustomer,
         SetOrUpdateCotermDate,
         CompleteOrder,
+        NullifyFlexDiscountParam,
         SyncAgreement,
     ]
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
