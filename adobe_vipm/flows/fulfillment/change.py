@@ -26,6 +26,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
+    NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -350,6 +351,7 @@ def fulfill_change_order(client, order):
         CreateOrUpdateSubscriptions(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
         SetSubscriptionTemplate(),
+        NullifyFlexDiscountParam(),
         SyncAgreement(),
     )
     context = Context(order=order)

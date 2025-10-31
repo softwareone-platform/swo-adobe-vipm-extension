@@ -23,6 +23,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
+    NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -584,6 +585,7 @@ def test_fulfill_change_order(mocker):
         CreateOrUpdateSubscriptions,
         CompleteOrder,
         SetSubscriptionTemplate,
+        NullifyFlexDiscountParam,
         SyncAgreement,
     ]
 

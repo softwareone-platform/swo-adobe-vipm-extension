@@ -77,8 +77,3 @@ def mock_uuid4(mocker):
         "adobe_vipm.adobe.client.uuid4",
         return_value=uuid.UUID("a21beee6-c07e-43e1-b5b7-fbef9644dbbb"),
     )
-
-
-@pytest.fixture
-def mock_update_order(mocker):
-    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_order", spec=True)
