@@ -30,7 +30,7 @@ global:
   ProductSegments: default
   MpNotifyCategories: '{}'
   OrderCreationWindowHours: 24
-  repositoryUrl: ""
+  registryUrl: ""
 
 
   replicaCountAPI: 1
