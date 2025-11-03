@@ -200,6 +200,28 @@ def test_validate_market_segment_eligibility_step_status_eligible(
     mocked_next_step.assert_not_called()
 
 
+def test_validate_market_segment_eligibility_lga_agency_type_not_federal_or_state(
+    mocker,
+    mock_order,
+):
+    mocked_switch_to_query = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=mock_order)
+
+    step = ValidateMarketSegmentEligibility()
+    step(mocked_client, context, mocked_next_step)
+    mocked_switch_to_query.assert_called_once_with(
+        mocked_client,
+        context.order,
+        template_name=TEMPLATE_NAME_PURCHASE,
+    )
+    mocked_next_step.assert_not_called()
+
+
 def test_create_customer_step(
     mocker, mock_adobe_client, mock_order, customer_data, adobe_customer_factory
 ):

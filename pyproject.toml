@@ -75,7 +75,7 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 testpaths = "tests"
 pythonpath = "."
-#addopts = "--cov=adobe_vipm --cov-report=term-missing --cov-report=html --cov-report=xml  --import-mode=importlib"
+addopts = "--cov=adobe_vipm --cov-report=term-missing --cov-report=html --cov-report=xml  --import-mode=importlib"
 DJANGO_SETTINGS_MODULE = "tests.django.settings"
 log_cli = false
 filterwarnings = [

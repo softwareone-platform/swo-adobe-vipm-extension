@@ -8,6 +8,7 @@ from adobe_vipm.adobe.constants import OfferType
 from adobe_vipm.adobe.dataclasses import Reseller
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.adobe.utils import join_phone_number
+from adobe_vipm.flows.constants import Param
 
 
 class CustomerClientMixin:
@@ -51,6 +52,13 @@ class CustomerClientMixin:
                 "contacts": [self._get_contact(customer_data["contact"])],
             },
         }
+        agency_type = customer_data.get(Param.AGENCY_TYPE.value)
+        if agency_type:
+            payload["companyProfile"]["marketSubSegments"] = [
+                customer_data[Param.AGENCY_TYPE.value]
+            ]
+            payload["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY"}]
+
         if customer_data["3YC"] == ["Yes"]:
             quantities = []
             if customer_data["3YCLicenses"]:

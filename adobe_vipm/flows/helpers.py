@@ -50,6 +50,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
+from adobe_vipm.flows.utils.market_segment import get_agency_type, is_large_government_agency_type
 from adobe_vipm.flows.utils.validation import validate_government_lga_data
 from adobe_vipm.notifications import send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
@@ -164,6 +165,9 @@ class SetupContext(Step):
         context.currency = context.order["agreement"]["listing"]["priceList"]["currency"]
         context.customer_data = get_customer_data(context.order)
         context.market_segment = get_market_segment(context.product_id)
+        if is_large_government_agency_type(context.product_id):
+            context.customer_data[Param.AGENCY_TYPE.value] = get_agency_type(context.order)
+
         context.adobe_customer_id = get_adobe_customer_id(context.order)
         if context.adobe_customer_id:
             try:

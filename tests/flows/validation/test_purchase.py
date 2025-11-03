@@ -15,6 +15,7 @@ from adobe_vipm.flows.constants import (
     ERR_EMAIL_FORMAT,
     ERR_FIRST_NAME_FORMAT,
     ERR_LAST_NAME_FORMAT,
+    ERR_LGA_QUANTITIES,
     ERR_PHONE_NUMBER_LENGTH,
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
@@ -27,7 +28,7 @@ from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
 from adobe_vipm.flows.validation.purchase import (
     CheckPurchaseValidationEnabled,
     UpdatePrices,
-    ValidateCustomerData,
+    ValidateOrderData,
     validate_purchase_order,
 )
 from adobe_vipm.flows.validation.shared import GetPreviewOrder, ValidateDuplicateLines
@@ -56,7 +57,7 @@ def test_validate_company_name(order_factory, order_parameters_factory, company_
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_company_name(context)
 
     assert context.validation_succeeded is True
@@ -83,7 +84,7 @@ def test_validate_company_name_invalid_length(
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_company_name(context)
 
     assert context.validation_succeeded is False
@@ -111,7 +112,7 @@ def test_validate_company_name_invalid_chars(order_factory, order_parameters_fac
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_company_name(context)
 
     assert context.validation_succeeded is False
@@ -130,7 +131,7 @@ def test_validate_address(mock_order, address_line_2, state_or_province):
     customer_data[Param.ADDRESS.value]["state"] = state_or_province
     context = Context(order=mock_order, customer_data=customer_data)
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_address(context)
 
     assert context.validation_succeeded is True
@@ -158,7 +159,7 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_address(context)
 
     assert context.validation_succeeded is False
@@ -195,7 +196,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_address(context)
 
     assert context.validation_succeeded is False
@@ -232,7 +233,7 @@ def test_validate_address_invalid_state_did_u_mean(order_factory, order_paramete
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_address(context)
 
     assert context.validation_succeeded is False
@@ -270,7 +271,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_address(context)
 
     assert context.validation_succeeded is False
@@ -307,7 +308,7 @@ def test_validate_address_invalid_postal_code_length(order_factory, order_parame
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_address(context)
 
     assert context.validation_succeeded is False
@@ -344,7 +345,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_address(context)
 
     assert context.validation_succeeded is False
@@ -367,7 +368,7 @@ def test_validate_contact(mock_order):
     customer_data = get_customer_data(mock_order)
     context = Context(order=mock_order, customer_data=customer_data)
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_contact(context)
 
     assert context.validation_succeeded is True
@@ -388,7 +389,7 @@ def test_validate_contact_mandatory(order_factory, order_parameters_factory):
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_contact(context)
 
     assert context.validation_succeeded is False
@@ -422,7 +423,7 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_contact(context)
 
     assert context.validation_succeeded is False
@@ -456,7 +457,7 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_contact(context)
 
     assert context.validation_succeeded is False
@@ -490,7 +491,7 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_contact(context)
 
     assert context.validation_succeeded is False
@@ -528,7 +529,7 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_contact(context)
 
     assert context.validation_succeeded is False
@@ -547,20 +548,24 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
 
 def test_validate_customer_data_step(mocker):
     mocked_validate_company_name = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_company_name",
     )
     mocked_validate_address = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_address",
     )
     mocked_validate_contact = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_contact",
     )
     mocked_validate_3yc = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_3yc",
+    )
+    mocked_validate_government_transfer = mocker.patch.object(
+        ValidateOrderData,
+        "validate_quantities_lga",
     )
 
     mocked_client = mocker.MagicMock()
@@ -568,32 +573,37 @@ def test_validate_customer_data_step(mocker):
 
     context = Context(order=mocker.MagicMock())
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step(mocked_client, context, mocked_next_step)
 
     mocked_validate_company_name.assert_called_once_with(context)
     mocked_validate_address.assert_called_once_with(context)
     mocked_validate_contact.assert_called_once_with(context)
     mocked_validate_3yc.assert_called_once_with(context)
+    mocked_validate_government_transfer.assert_called_once_with(context)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_validate_customer_data_step_no_validate(mocker):
     mocked_validate_company_name = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_company_name",
     )
     mocked_validate_address = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_address",
     )
     mocked_validate_contact = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_contact",
     )
     mocked_validate_3yc = mocker.patch.object(
-        ValidateCustomerData,
+        ValidateOrderData,
         "validate_3yc",
+    )
+    mocked_validate_government_transfer = mocker.patch.object(
+        ValidateOrderData,
+        "validate_quantities_lga",
     )
 
     mocked_client = mocker.MagicMock()
@@ -601,13 +611,14 @@ def test_validate_customer_data_step_no_validate(mocker):
 
     context = Context(order=mocker.MagicMock(), validation_succeeded=False)
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step(mocked_client, context, mocked_next_step)
 
     mocked_validate_company_name.assert_called_once_with(context)
     mocked_validate_address.assert_called_once_with(context)
     mocked_validate_contact.assert_called_once_with(context)
     mocked_validate_3yc.assert_called_once_with(context)
+    mocked_validate_government_transfer.assert_called_once_with(context)
     mocked_next_step.assert_not_called()
 
 
@@ -633,7 +644,7 @@ def test_validate_3yc(order_factory, order_parameters_factory, quantities):
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_3yc(context)
 
     assert context.validation_succeeded is True
@@ -667,7 +678,7 @@ def test_validate_3yc_invalid(
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_3yc(context)
 
     assert context.validation_succeeded is False
@@ -692,7 +703,7 @@ def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_3yc(context)
 
     assert context.validation_succeeded is True
@@ -707,7 +718,7 @@ def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
         customer_data=customer_data,
     )
 
-    step = ValidateCustomerData()
+    step = ValidateOrderData()
     step.validate_3yc(context)
 
     assert context.validation_succeeded is False
@@ -759,7 +770,7 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
         SetupContext,
         PrepareCustomerData,
         CheckPurchaseValidationEnabled,
-        ValidateCustomerData,
+        ValidateOrderData,
         ValidateDuplicateLines,
         Validate3YCCommitment,
         GetPreviewOrder,
@@ -770,3 +781,29 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
     assert actual_steps == expected_steps
     mocked_context_ctor.assert_called_once_with(order=mock_order)
     mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)
+
+
+def test_validate_quantities_lga_invalid_quantities(mock_order):
+    customer_data = get_customer_data(mock_order)
+
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 50}])
+
+    step = ValidateOrderData()
+    step.validate_quantities_lga(context)
+
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_LGA_QUANTITIES.to_dict()
+
+
+def test_validate_quantities_lga_valid_quantities(mock_order):
+    customer_data = get_customer_data(mock_order)
+
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 101}])
+
+    step = ValidateOrderData()
+    step.validate_quantities_lga(context)
+
+    assert context.validation_succeeded is True
+    assert context.order["error"] is None

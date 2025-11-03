@@ -34,6 +34,7 @@ from adobe_vipm.flows.constants import (
     ERR_EMAIL_FORMAT,
     ERR_FIRST_NAME_FORMAT,
     ERR_LAST_NAME_FORMAT,
+    ERR_LGA_QUANTITIES,
     ERR_PHONE_NUMBER_LENGTH,
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
@@ -56,6 +57,9 @@ from adobe_vipm.flows.utils import (
     set_ordering_parameter_error,
     update_ordering_parameter_value,
 )
+from adobe_vipm.flows.utils.market_segment import (
+    is_large_government_agency_type,
+)
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
@@ -74,7 +78,7 @@ class CheckPurchaseValidationEnabled(Step):
         next_step(client, context)
 
 
-class ValidateCustomerData(Step):
+class ValidateOrderData(Step):
     """Validates provided customer data from the MPT order."""
 
     def validate_3yc(self, context):
@@ -281,12 +285,26 @@ class ValidateCustomerData(Step):
                 ),
             )
 
+    def validate_quantities_lga(self, context):
+        """
+        Validates the quantities of the LGA product.
+
+        Modifies context.order and context.validation_succeeded with errors in
+        case if validation is failed.
+        """
+        if is_large_government_agency_type(context.order["product"]["id"]) and context.new_lines:
+            count_licenses = sum(line["quantity"] for line in context.new_lines)
+            if count_licenses < 100:
+                context.order = set_order_error(context.order, ERR_LGA_QUANTITIES.to_dict())
+                context.validation_succeeded = False
+
     def __call__(self, client, context, next_step):
         """Validates provided customer data from the MPT order."""
         self.validate_company_name(context)
         self.validate_address(context)
         self.validate_contact(context)
         self.validate_3yc(context)
+        self.validate_quantities_lga(context)
 
         if not context.validation_succeeded:
             return
@@ -300,7 +318,7 @@ def validate_purchase_order(client, order):
         SetupContext(),
         PrepareCustomerData(),
         CheckPurchaseValidationEnabled(),
-        ValidateCustomerData(),
+        ValidateOrderData(),
         ValidateDuplicateLines(),
         Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),

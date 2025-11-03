@@ -19,6 +19,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_CUSTOMER_LOST_EXCEPTION,
+    GOVERNMENT_AGENCY_TYPE_FEDERAL,
     MARKET_SEGMENT_GOVERNMENT,
     Param,
 )
@@ -327,6 +328,75 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
         f"Received Adobe error {adobe_api_error['code']} - {adobe_api_error['message']}",
     )
     mocked_next_step.assert_not_called()
+
+
+@freeze_time("2024-01-01")
+def test_setup_context_step_with_government_agency_type(
+    mocker, agreement, order_factory, lines_factory, fulfillment_parameters_factory
+):
+    mocked_get_agreement = mocker.patch(
+        "adobe_vipm.flows.helpers.get_agreement", return_value=agreement
+    )
+    mocked_get_licensee = mocker.patch(
+        "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
+    )
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_client",
+    )
+
+    downsizing_items = lines_factory(
+        line_id=1,
+        item_id=1,
+        old_quantity=10,
+        quantity=8,
+    )
+    upsizing_items = lines_factory(
+        line_id=2,
+        item_id=2,
+        old_quantity=10,
+        quantity=12,
+    )
+
+    order = order_factory(
+        lines=downsizing_items + upsizing_items,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            due_date="2025-01-01",
+        ),
+    )
+    order["agreement"]["product"]["id"] = "PRD-3333-3333"
+    order["parameters"]["ordering"].append({
+        "id": "PAR-1164-2550-0043",
+        "externalId": "companyAgencyType",
+        "name": "Agency type",
+        "type": "DropDown",
+        "phase": "Order",
+        "error": None,
+        "value": GOVERNMENT_AGENCY_TYPE_FEDERAL,
+    })
+
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(order=order)
+
+    step = SetupContext()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.order["agreement"] == agreement
+    assert context.order["agreement"]["licensee"] == agreement["licensee"]
+    assert context.due_date.strftime("%Y-%m-%d") == "2025-01-01"
+    assert context.downsize_lines == downsizing_items
+    assert context.upsize_lines == upsizing_items
+    assert context.customer_data[Param.AGENCY_TYPE.value] == GOVERNMENT_AGENCY_TYPE_FEDERAL
+    mocked_get_agreement.assert_called_once_with(
+        mocked_client,
+        order["agreement"]["id"],
+    )
+    mocked_get_licensee.assert_called_once_with(
+        mocked_client,
+        order["agreement"]["licensee"]["id"],
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_prepare_customer_data_step(mocker, mock_order, customer_data):

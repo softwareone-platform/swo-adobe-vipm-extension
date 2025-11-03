@@ -9,7 +9,7 @@ from adobe_vipm.flows.constants import (
     STATUS_MARKET_SEGMENT_PENDING,
     Param,
 )
-from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
+from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
 
 
 def get_market_segment(product_id: str) -> str:
@@ -41,20 +41,6 @@ def is_large_government_agency_type(product_id: str) -> bool:
         get_for_product(settings, "PRODUCT_SEGMENT", product_id)
         == MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY
     )
-
-
-def has_large_goverment_agency_type(order: dict, product_id: str) -> bool:
-    """
-    Checks if the product is a LGA product.
-
-    Args:
-        order: MPT order.
-        product_id: MPT product id.
-
-    Returns:
-        True if the product is a LGA product, False otherwise.
-    """
-    return bool(settings.EXTENSION_CONFIG["PRODUCT_SEGMENT"].get("LGA"))
 
 
 def get_market_segment_eligibility_status(order: dict) -> str | None:
@@ -90,3 +76,16 @@ def set_market_segment_eligibility_status_pending(order: dict) -> dict:
     )
     ff_param["value"] = STATUS_MARKET_SEGMENT_PENDING
     return updated_order
+
+
+def get_agency_type(order) -> str:
+    """
+    Retrieves market sub segments based on provided order.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        Market sub segments.
+    """
+    return get_ordering_parameter(order, Param.AGENCY_TYPE.value).get("value")
