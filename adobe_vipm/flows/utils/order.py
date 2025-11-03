@@ -4,12 +4,7 @@ import functools
 from mpt_extension_sdk.mpt_http.mpt import get_product_onetime_items_by_ids
 from mpt_extension_sdk.mpt_http.utils import find_first
 
-from adobe_vipm.flows.constants import (
-    ORDER_TYPE_CHANGE,
-    ORDER_TYPE_CONFIGURATION,
-    ORDER_TYPE_PURCHASE,
-    ORDER_TYPE_TERMINATION,
-)
+from adobe_vipm.flows.constants import OrderType
 from adobe_vipm.flows.utils.customer import is_new_customer
 from adobe_vipm.utils import get_partial_sku
 
@@ -53,7 +48,7 @@ def is_purchase_order(order: dict) -> bool:
     Returns:
         True if it is a real purchase order, False otherwise.
     """
-    return order["type"] == ORDER_TYPE_PURCHASE and is_new_customer(order)
+    return order["type"] == OrderType.PURCHASE and is_new_customer(order)
 
 
 def is_transfer_order(order: dict) -> bool:
@@ -66,7 +61,7 @@ def is_transfer_order(order: dict) -> bool:
     Returns:
         True if it is a subscriptions transfer order, False otherwise.
     """
-    return order["type"] == ORDER_TYPE_PURCHASE and not is_new_customer(order)
+    return order["type"] == OrderType.PURCHASE and not is_new_customer(order)
 
 
 def is_change_order(order: dict) -> bool:
@@ -79,7 +74,7 @@ def is_change_order(order: dict) -> bool:
     Returns:
         True if MPT order has type Change.
     """
-    return order["type"] == ORDER_TYPE_CHANGE
+    return order["type"] == OrderType.CHANGE
 
 
 def is_termination_order(order: dict) -> bool:
@@ -92,7 +87,7 @@ def is_termination_order(order: dict) -> bool:
     Returns:
         True if MPT order has type Terminate.
     """
-    return order["type"] == ORDER_TYPE_TERMINATION
+    return order["type"] == OrderType.TERMINATION
 
 
 def is_configuration_order(order: dict) -> bool:
@@ -105,7 +100,7 @@ def is_configuration_order(order: dict) -> bool:
     Returns:
         True if MPT order has type Configuration.
     """
-    return order["type"] == ORDER_TYPE_CONFIGURATION
+    return order["type"] == OrderType.CONFIGURATION
 
 
 def split_downsizes_upsizes_new(order: dict) -> tuple[list[dict], list[dict], list[dict]]:

@@ -1262,10 +1262,11 @@ def order_factory(
     lines_factory,
     status="Processing",
     deployment_id="",
+    order_type="Purchase",
 ):
     def _order(
         order_id="ORD-0792-5000-2253-4210",
-        order_type="Purchase",
+        order_type=order_type,
         order_parameters=None,
         fulfillment_parameters=None,
         lines=None,
