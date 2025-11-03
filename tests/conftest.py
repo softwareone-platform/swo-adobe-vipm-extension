@@ -2036,4 +2036,14 @@ def mock_pymsteams(mocker):
 
 @pytest.fixture
 def mock_mpt_update_agreement(mocker):
-    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement", autospec=True)
+    mock = mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement", autospec=True)
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement", new=mock)
+    return mock
+
+
+@pytest.fixture
+def mock_update_order(mocker):
+    mock = mocker.MagicMock(spec="mpt_extension_sdk.mpt_http.mpt.update_order")
+    mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_order", new=mock)
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order", new=mock)
+    return mock
