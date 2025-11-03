@@ -12,9 +12,7 @@ from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.constants import AdobeStatus
-from adobe_vipm.adobe.errors import (
-    AuthorizationNotFoundError,
-)
+from adobe_vipm.adobe.errors import AuthorizationNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
@@ -36,10 +34,10 @@ from adobe_vipm.flows.utils import (
     get_global_customer,
     get_parameter,
     get_sku_with_discount_level,
-    get_template_name_by_subscription,
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.notifications import send_exception, send_notification
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
@@ -309,8 +307,6 @@ class AgreementsSyncer:  # noqa: WPS214
         prices: dict[str, Any],
         unit_price: dict[str, Any],
     ) -> None:
-        template_name = get_template_name_by_subscription(adobe_subscription)
-        template = mpt.get_template_by_name(self._mpt_client, self.product_id, template_name)
         subscription_payload = {
             "status": SubscriptionStatus.ACTIVE.value,
             "commitmentDate": adobe_subscription["renewalDate"],
@@ -354,10 +350,11 @@ class AgreementsSyncer:  # noqa: WPS214
             "product": {"id": self.product_id},
             "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
         }
-        if template:
+        template_data = get_template_data_by_adobe_subscription(adobe_subscription, self.product_id)
+        if template_data:
             subscription_payload["template"] = {
-                "id": template.get("id"),
-                "name": template.get("name"),
+                "id": template_data["id"],
+                "name": template_data["name"],
             }
         if self._dry_run:
             logger.info(
@@ -496,12 +493,7 @@ class AgreementsSyncer:  # noqa: WPS214
         else:
             logger.info("Skipping price sync - sync_prices %s.", sync_prices)
 
-        template_name = get_template_name_by_subscription(adobe_subscription)
-        template = mpt.get_template_by_name(self._mpt_client, product_id, template_name)
-        template_data = {
-            "id": template.get("id"),
-            "name": template.get("name"),
-        }
+        template_data = get_template_data_by_adobe_subscription(adobe_subscription, product_id)
         auto_renewal_enabled = adobe_subscription["autoRenewal"]["enabled"]
         if self._dry_run:
             logger.info(

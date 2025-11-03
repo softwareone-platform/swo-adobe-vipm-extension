@@ -1630,6 +1630,7 @@ def mock_mpt_client(mocker):
     mock = mocker.MagicMock(spec=MPTClient)
     paths = [
         "adobe_vipm.management.commands.migrate_assets_to_non_renewal_subs",
+        "adobe_vipm.flows.utils.template",
     ]
     for path in paths:
         mocker.patch(f"{path}.mpt_client", mock)
