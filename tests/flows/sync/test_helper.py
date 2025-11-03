@@ -2,10 +2,11 @@ import pytest
 from freezegun import freeze_time
 
 from adobe_vipm.adobe import constants
-from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES
-from adobe_vipm.adobe.errors import AuthorizationNotFoundError
+from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
+from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync.helper import (
+    get_customer_or_process_lost_customer,
     sync_agreements_by_3yc_end_date,
     sync_agreements_by_3yc_enroll_status,
     sync_agreements_by_agreement_ids,
@@ -21,19 +22,19 @@ def test_sync_agreements_by_3yc_end_date(
     mock_mpt_client,
     agreement_factory,
     dry_run,
-    mock_get_agreements_by_query,
+    mock_mpt_get_agreements_by_query,
     mock_sync_agreement,
     mock_agreement,
     mock_adobe_client,
 ):
-    mock_get_agreements_by_query.return_value = [mock_agreement]
+    mock_mpt_get_agreements_by_query.return_value = [mock_agreement]
 
     sync_agreements_by_3yc_end_date(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
 
     mock_sync_agreement.assert_called_once_with(
         mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=True
     )
-    mock_get_agreements_by_query.assert_called_once_with(
+    mock_mpt_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,3YCEndDate),eq(displayValue,2024-11-08)))&"
@@ -49,19 +50,19 @@ def test_sync_agreements_by_coterm_date(
     mock_mpt_client,
     agreement_factory,
     dry_run,
-    mock_get_agreements_by_query,
+    mock_mpt_get_agreements_by_query,
     mock_sync_agreement,
     mock_agreement,
     mock_adobe_client,
 ):
-    mock_get_agreements_by_query.return_value = [mock_agreement]
+    mock_mpt_get_agreements_by_query.return_value = [mock_agreement]
 
     sync_agreements_by_coterm_date(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
 
     mock_sync_agreement.assert_called_once_with(
         mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=True
     )
-    mock_get_agreements_by_query.assert_called_once_with(
+    mock_mpt_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
         "eq(status,Active)&"
         "any(parameters.fulfillment,and(eq(externalId,cotermDate),eq(displayValue,2025-06-15)))&"
@@ -76,19 +77,19 @@ def test_sync_agreements_by_renewal_date(
     mock_mpt_client,
     agreement_factory,
     dry_run,
-    mock_get_agreements_by_query,
+    mock_mpt_get_agreements_by_query,
     mock_sync_agreement,
     mock_adobe_client,
     mock_agreement,
 ):
-    mock_get_agreements_by_query.return_value = [mock_agreement]
+    mock_mpt_get_agreements_by_query.return_value = [mock_agreement]
 
     sync_agreements_by_renewal_date(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
 
     mock_sync_agreement.assert_called_once_with(
         mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=True
     )
-    mock_get_agreements_by_query.assert_called_once_with(
+    mock_mpt_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
         "eq(status,Active)&"
         "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2026-07-15,2026-06-15,2026-05-15,2026-04-15,2026-03-15,2026-02-15,2026-01-15,2025-12-15,2025-11-15,2025-10-15,2025-09-15,2025-08-15,2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15))))&"
@@ -147,7 +148,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     adobe_commitment_factory,
     agreement_factory,
     status,
-    mock_update_agreement,
+    mock_mpt_update_agreement,
     mock_sync_agreement,
     mock_agreement,
     mock_get_agreements_by_3yc_commitment_request_invitation,
@@ -162,7 +163,7 @@ def test_sync_agreements_by_3yc_enroll_status_full(
     mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
-    mock_update_agreement.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
     mock_sync_agreement.assert_called_once_with(
         mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
     )
@@ -201,7 +202,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     adobe_commitment_factory,
     agreement_factory,
     caplog,
-    mock_update_agreement,
+    mock_mpt_update_agreement,
     mock_sync_agreement,
     mock_agreement,
     mock_get_agreements_by_3yc_commitment_request_invitation,
@@ -219,7 +220,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
     mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
-    mock_update_agreement.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
     mock_sync_agreement.assert_called_once_with(
         mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
     )
@@ -234,7 +235,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     adobe_commitment_factory,
     agreement_factory,
     caplog,
-    mock_update_agreement,
+    mock_mpt_update_agreement,
     mock_sync_agreement,
     mock_agreement,
     mock_get_agreements_by_3yc_commitment_request_invitation,
@@ -255,7 +256,7 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
     mock_get_agreements_by_3yc_commitment_request_invitation.assert_called_once_with(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
-    mock_update_agreement.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
     mock_sync_agreement.assert_has_calls([
         mocker.call(
             mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=False, sync_prices=True
@@ -318,3 +319,84 @@ def test_sync_all_agreements(
     mock_sync_agreement.assert_called_once_with(
         mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=False
     )
+
+
+def test_get_customer_or_process_lost_customer(
+    mock_mpt_client, mock_adobe_client, agreement, adobe_customer_factory
+):
+    mock_adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = mock_adobe_customer
+
+    result = get_customer_or_process_lost_customer(
+        mock_mpt_client, mock_adobe_client, agreement, "fake_customer_id", dry_run=False
+    )
+
+    assert result == mock_adobe_customer
+    mock_adobe_client.get_customer.assert_called_once_with("AUT-4785-7184", "fake_customer_id")
+
+
+def test_get_customer_or_process_lost_customer_error(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_send_notification,
+    mock_mpt_terminate_subscription,
+    mock_get_agreements_by_customer_deployments,
+    agreement,
+    adobe_customer_factory,
+):
+    mock_adobe_client.get_customer.side_effect = [
+        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER, "message": "Test error"})
+    ]
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+
+    result = get_customer_or_process_lost_customer(
+        mock_mpt_client, mock_adobe_client, agreement, "fake_customer_id", dry_run=False
+    )
+
+    assert result is None
+    mock_adobe_client.get_customer.assert_called_once_with("AUT-4785-7184", "fake_customer_id")
+    mock_send_notification.assert_called_once()
+    mock_mpt_terminate_subscription.assert_has_calls([
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+        mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
+    ])
+    mock_get_agreements_by_customer_deployments.assert_called_once()
+
+
+def test_get_customer_or_process_lost_customer_dry_run(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_send_notification,
+    mock_mpt_terminate_subscription,
+    mock_get_agreements_by_customer_deployments,
+    agreement,
+    adobe_customer_factory,
+):
+    mock_adobe_client.get_customer.side_effect = [
+        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER, "message": "Test error"})
+    ]
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+
+    result = get_customer_or_process_lost_customer(
+        mock_mpt_client, mock_adobe_client, agreement, "fake_customer_id", dry_run=True
+    )
+
+    assert result is None
+
+    mock_adobe_client.get_customer.assert_called_once_with("AUT-4785-7184", "fake_customer_id")
+    mock_send_notification.assert_not_called()
+    mock_mpt_terminate_subscription.assert_not_called()

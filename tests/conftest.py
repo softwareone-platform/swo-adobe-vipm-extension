@@ -987,6 +987,7 @@ def agreement_factory(
                         ]
                     },
                     "externalIds": {"vendor": "1e5b9c974c4ea1bcabdb0fe697a2f1NA"},
+                    "lines": [{"id": "ALI-1111-1111-0001"}],
                 },
                 {
                     "id": "SUB-1234-5678",
@@ -1000,6 +1001,7 @@ def agreement_factory(
                         ]
                     },
                     "externalIds": {"vendor": "55feb5038045e0b1ebf026e7522e17NA"},
+                    "lines": [{"id": "ALI-1111-1111-0002"}],
                 },
             ]
 
@@ -1388,6 +1390,9 @@ def mock_adobe_client(mocker):
         "adobe_vipm.management.commands.sync_agreements",
     ]
     for path in paths:
+        # TODO: replace with -> mocker.patch(
+        #  "adobe_vipm.adobe.client.AdobeClient", return_value=adobe_client)
+        # This change requires updating some tests, so it'll be done in a separate PR
         mocker.patch(f"{path}.get_adobe_client", return_value=adobe_client)
 
     return adobe_client
@@ -2029,5 +2034,5 @@ def mock_pymsteams(mocker):
 
 
 @pytest.fixture
-def mock_update_agreement(mocker):
+def mock_mpt_update_agreement(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement", autospec=True)

@@ -5,7 +5,7 @@ from adobe_vipm.flows.sync.agreement import AgreementsSyncer
 
 
 @pytest.fixture
-def mock_get_agreements_by_query(mocker):
+def mock_mpt_get_agreements_by_query(mocker):
     mock = mocker.MagicMock(spec=get_agreements_by_query)
     mocker.patch("adobe_vipm.flows.mpt.get_agreements_by_query", new=mock)
     mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_agreements_by_query", new=mock)
@@ -35,7 +35,7 @@ def mock_get_agreements_by_customer_deployments(
 
 
 @pytest.fixture
-def mock_terminate_subscription(mocker):
+def mock_mpt_terminate_subscription(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.terminate_subscription", spec=True)
 
 
@@ -50,17 +50,7 @@ def mock_send_notification(mocker):
 
 
 @pytest.fixture
-def mock_get_adobe_client(mocker, mock_adobe_client):
-    mock = mocker.MagicMock(
-        return_value=mock_adobe_client, spec="adobe_vipm.adobe.client.get_adobe_client"
-    )
-    mocker.patch("adobe_vipm.flows.fulfillment.change.get_adobe_client", new=mock)
-
-    return mock
-
-
-@pytest.fixture
-def mock_get_agreement_subscription(mocker, subscriptions_factory):
+def mock_mpt_get_agreement_subscription(mocker, subscriptions_factory):
     return mocker.patch(
         "mpt_extension_sdk.mpt_http.mpt.get_agreement_subscription",
         return_value=subscriptions_factory()[0],
@@ -69,7 +59,7 @@ def mock_get_agreement_subscription(mocker, subscriptions_factory):
 
 
 @pytest.fixture
-def mock_update_agreement_subscription(mocker):
+def mock_mpt_update_agreement_subscription(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement_subscription", spec=True)
 
 
@@ -205,6 +195,7 @@ def mocked_agreement_syncer(
         agreement_factory(),
         adobe_customer_factory(),
         adobe_subscriptions,
+        dry_run=False,
     )
 
 
@@ -216,7 +207,7 @@ def mock_notify_agreement_unhandled_exception_in_teams(mocker):
 
 
 @pytest.fixture
-def mock_update_asset(mocker):
+def mock_mpt_update_asset(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_asset", autospec=True)
 
 
@@ -237,12 +228,12 @@ def mock_get_agreements_by_3yc_commitment_request_invitation(mocker, mock_agreem
 
 
 @pytest.fixture
-def mock_create_asset(mocker):
+def mock_mpt_create_asset(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_asset", spec=True)
 
 
 @pytest.fixture
-def mock_create_agreement_subscription(mocker):
+def mock_mpt_create_agreement_subscription(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_agreement_subscription", spec=True)
 
 

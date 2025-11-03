@@ -11,14 +11,13 @@ def test_sync_agreement_update_asset(
     adobe_customer_factory,
     mock_get_adobe_product_by_marketplace_sku,
     mock_adobe_client,
-    mock_get_adobe_client,
-    mock_get_agreement_subscription,
-    mock_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
     mock_mpt_client,
-    mock_update_agreement,
+    mock_mpt_update_agreement,
     mock_get_subscriptions_for_update,
     mocked_agreement_syncer,
-    mock_update_asset,
+    mock_mpt_update_asset,
 ):
     asset_id = "AST-1111-2222-3333"
     mock_asset = assets_factory(asset_id=asset_id, adobe_subscription_id="sub-one-time-id")[0]
@@ -36,9 +35,10 @@ def test_sync_agreement_update_asset(
     mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
     mock_get_subscriptions_for_update.return_value = []
 
-    mocked_agreement_syncer.sync(dry_run=False, sync_prices=False)
+    # ???: why are we testing the agreement syncer here?
+    mocked_agreement_syncer.sync(sync_prices=False)
 
-    mock_update_asset.assert_called_once_with(
+    mock_mpt_update_asset.assert_called_once_with(
         mock_mpt_client,
         asset_id,
         parameters={
@@ -48,7 +48,7 @@ def test_sync_agreement_update_asset(
             ]
         },
     )
-    mock_update_agreement.assert_has_calls([
+    mock_mpt_update_agreement.assert_has_calls([
         mocker.call(
             mock_mpt_client,
             agreement["id"],
@@ -76,7 +76,7 @@ def test_sync_agreement_update_asset_dry_run(
     adobe_customer_factory,
     mock_get_subscriptions_for_update,
     mocked_agreement_syncer,
-    mock_update_asset,
+    mock_mpt_update_asset,
     mock_add_missing_subscriptions,
 ):
     asset_id = "AST-1111-2222-3333"
@@ -85,6 +85,7 @@ def test_sync_agreement_update_asset_dry_run(
     mock_lines = lines_factory(external_vendor_id="65304578CA")
     agreement = agreement_factory(lines=mock_lines, assets=[mock_asset], subscriptions=[])
     mocked_agreement_syncer._agreement = agreement
+    mocked_agreement_syncer._dry_run = True
     adobe_subscription = adobe_subscription_factory(
         subscription_id="sub-one-time-id",
         offer_id="65304578CA01A12",
@@ -95,6 +96,7 @@ def test_sync_agreement_update_asset_dry_run(
     mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
     mock_get_subscriptions_for_update.return_value = []
 
-    mocked_agreement_syncer.sync(dry_run=True, sync_prices=False)
+    # ???: Why are we testing the agreement sync here?
+    mocked_agreement_syncer.sync(sync_prices=False)
 
-    mock_update_asset.assert_not_called()
+    mock_mpt_update_asset.assert_not_called()
