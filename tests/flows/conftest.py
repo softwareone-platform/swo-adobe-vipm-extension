@@ -64,11 +64,6 @@ def mock_mpt_update_agreement_subscription(mocker):
 
 
 @pytest.fixture
-def mock_send_exception(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.agreement.send_exception", spec=True)
-
-
-@pytest.fixture
 def mock_get_prices_for_skus(mocker):
     return mocker.patch("adobe_vipm.airtable.models.get_prices_for_skus", spec=True)
 
