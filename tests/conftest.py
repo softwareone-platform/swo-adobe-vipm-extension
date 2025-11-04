@@ -1385,7 +1385,6 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.validation.shared",
         "adobe_vipm.flows.validation.transfer",
         "adobe_vipm.management.commands.create_resellers",
-        "adobe_vipm.management.commands.migrate_assets_to_non_renewal_subs",
         "adobe_vipm.management.commands.migrate_mpt_assets",
         "adobe_vipm.management.commands.sync_3yc_enrol",
         "adobe_vipm.management.commands.sync_agreements",
@@ -1630,7 +1629,6 @@ def mpt_client(settings):
 def mock_mpt_client(mocker):
     mock = mocker.MagicMock(spec=MPTClient)
     paths = [
-        "adobe_vipm.management.commands.migrate_assets_to_non_renewal_subs",
         "adobe_vipm.flows.utils.template",
     ]
     for path in paths:
