@@ -3,8 +3,8 @@ from urllib.parse import urljoin
 import pytest
 from responses import matchers
 
-from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
-from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.utils import to_adobe_line_id
 
 
@@ -54,7 +54,9 @@ def test_get_preview_order(
         ],
     )
 
-    assert mocked_client._get_preview_order(authorization, adobe_customer_id, payload) == {
+    assert mocked_client.get_preview_order(
+        authorization, adobe_customer_id, payload, all_discount_codes={}
+    ) == {
         "currencyCode": "USD",
         "externalReferenceId": "external_id",
         "lineItems": [
@@ -110,7 +112,14 @@ def test_get_preview_order_discounts(
             ],
         )
 
-    assert mocked_client._get_preview_order(authorization, adobe_customer_id, payload) == {
+    assert mocked_client.get_preview_order(
+        authorization,
+        adobe_customer_id,
+        payload,
+        all_discount_codes={
+            fd for li in payload["lineItems"] for fd in li.get("flexDiscountCodes", ())
+        },
+    ) == {
         "creationDate": "2025-09-30T11:01:45Z",
         "currencyCode": "USD",
         "customerId": "P1005267002",
@@ -200,7 +209,64 @@ def test_get_preview_order_too_many_failed_discounts(
     )
 
     with pytest.raises(AdobeError):
-        mocked_client._get_preview_order(authorization, adobe_customer_id, payload)
+        mocked_client.get_preview_order(
+            authorization,
+            adobe_customer_id,
+            payload,
+            all_discount_codes={},
+        )
+
+
+def test_get_preview_order_not_qualified(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    order_preview_discounts_resp_factory,
+    preview_discounts_payload_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    adobe_customer_id = "test-customer"
+    payload = preview_discounts_payload_factory()
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/test-customer/orders",
+        ),
+        body=AdobeAPIError(
+            status_code=int(AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT.value),
+            payload={
+                "code": "2141",
+                "message": "Customer is not qualified for the Flexible Discount",
+                "additionalDetails": ["Line Item: 1, Reason: Invalid Flexible Discount"],
+            },
+        ),
+        status=400,
+        match=[
+            matchers.query_param_matcher({"fetch-price": "true"}),
+        ],
+    )
+    discounts_resp_ok = order_preview_discounts_resp_factory()
+    del discounts_resp_ok["lineItems"][1]["flexDiscounts"]
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/test-customer/orders",
+        ),
+        json=discounts_resp_ok,
+        status=200,
+        match=[
+            matchers.query_param_matcher({"fetch-price": "true"}),
+        ],
+    )
+
+    mocked_client.get_preview_order(
+        authorization,
+        adobe_customer_id,
+        payload,
+        all_discount_codes={
+            fd for li in payload["lineItems"] for fd in li.get("flexDiscountCodes", ())
+        },
+    )
 
 
 def test_get_preview_order_line_item(

@@ -203,7 +203,9 @@ class OrderClientMixin:
             return None
 
         customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
-        return self._get_preview_order(authorization, customer_id, payload)
+        return self.get_preview_order(
+            authorization, customer_id, payload, set(flex_discounts.values())
+        )
 
     @wrap_http_error
     def create_preview_renewal(
@@ -426,6 +428,54 @@ class OrderClientMixin:
         }
         return self._create_return_order_base(authorization_id, customer_id, payload)
 
+    def get_preview_order(  # noqa: WPS231
+        self,
+        authorization: Authorization,
+        adobe_customer_id,
+        payload: dict,
+        all_discount_codes: set[str],
+    ) -> dict | None:
+        """
+        Gets a preview of an order based on the provided payload.
+
+        Args:
+            all_discount_codes: All discount codes
+            authorization: Authorization object containing authentication credentials.
+            adobe_customer_id: Unique identifier of the Adobe customer.
+            payload: Dictionary containing order details required for preview.
+
+        Returns:
+            A dictionary containing the response with order details, including computed
+            pricing, after eliminating any failed discount codes.
+
+        Raises:
+            AdobeError: If all retries fail to handle the failed discount codes
+            successfully.
+        """
+        response_json = None
+        for attempt_no in range(1, 6):
+            failed_discount_codes = ()
+            try:  # noqa: WPS229
+                response_json = self._get_preview_order(authorization, adobe_customer_id, payload)
+                failed_discount_codes = _get_failed_discount_codes(response_json)
+            except AdobeError as ex:
+                if ex.code == AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
+                    logger.warning("%s", ex)
+                    failed_discount_codes = all_discount_codes
+                else:
+                    raise
+            if not failed_discount_codes:
+                break
+            logger.warning("Found failed flex discounts: %s", failed_discount_codes)
+            if failed_discount_codes and attempt_no >= 5:
+                raise AdobeError(
+                    f"After {attempt_no} attempts still finding failed discount codes:"
+                    f" {failed_discount_codes}."
+                )
+            _remove_failed_discount_codes(failed_discount_codes, payload)
+
+        return response_json
+
     def _process_new_lines(self, context: Context, flex_discounts: dict, payload: dict):
         for line in context.new_lines:
             adobe_base_sku = line["item"]["externalIds"]["vendor"]
@@ -550,35 +600,23 @@ class OrderClientMixin:
         response.raise_for_status()
         return response.json()
 
+    @wrap_http_error
     def _get_preview_order(
-        self, authorization: Authorization, adobe_customer_id, payload: dict
+        self, authorization: Authorization, adobe_customer_id: str, payload: dict
     ) -> dict:
-        for attempt_no in range(1, 6):
-            headers = self._get_headers(authorization)
-            response = requests.post(
-                urljoin(
-                    self._config.api_base_url,
-                    f"/v3/customers/{adobe_customer_id}/orders",
-                ),
-                params={"fetch-price": "true"},
-                headers=headers,
-                json=payload,
-                timeout=self._TIMEOUT,
-            )
-            response.raise_for_status()
-            response_json = response.json()
-            failed_discount_codes = _get_failed_discount_codes(response_json)
-            if not failed_discount_codes:
-                break
-            logger.warning("Found failed flex discounts: %s", failed_discount_codes)
-            if failed_discount_codes and attempt_no >= 5:
-                raise AdobeError(
-                    f"After {attempt_no} attempts still finding failed discount codes:"
-                    f" {failed_discount_codes}."
-                )
-            _remove_failed_discount_codes(failed_discount_codes, payload)
-
-        return response_json
+        headers = self._get_headers(authorization)
+        response = requests.post(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/customers/{adobe_customer_id}/orders",
+            ),
+            params={"fetch-price": "true"},
+            headers=headers,
+            json=payload,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
 
     def _get_preview_order_line_item(
         self, line: dict, adobe_base_sku, quantity: int, discount_code
