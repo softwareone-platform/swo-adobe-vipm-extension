@@ -37,6 +37,7 @@ class AdobeStatus(StrEnum):
     SUBSCRIPTION_TERMINATED = "1004"
     SUBSCRIPTION_ACTIVE = "1000"
     INVALID_CUSTOMER = "1116"
+    CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT = "2141"
 
 
 class ResellerChangeAction(StrEnum):
