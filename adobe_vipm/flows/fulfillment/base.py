@@ -1,7 +1,7 @@
 import logging
 import traceback
 
-from adobe_vipm.flows import constants
+from adobe_vipm.flows.constants import OrderType
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.configuration import fulfill_configuration_order
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
@@ -36,10 +36,10 @@ def fulfill_order(client, order):
     logger.info("Start processing %s order %s", order["type"], order["id"])
 
     validators = {
-        constants.ORDER_TYPE_PURCHASE: _fulfill_purchase_order_router,
-        constants.ORDER_TYPE_CHANGE: fulfill_change_order,
-        constants.ORDER_TYPE_TERMINATION: fulfill_termination_order,
-        constants.ORDER_TYPE_CONFIGURATION: fulfill_configuration_order,
+        OrderType.PURCHASE: _fulfill_purchase_order_router,
+        OrderType.CHANGE: fulfill_change_order,
+        OrderType.TERMINATION: fulfill_termination_order,
+        OrderType.CONFIGURATION: fulfill_configuration_order,
     }
 
     try:

@@ -13,13 +13,16 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.flows.errors import ValidationError
 
-ORDER_TYPE_PURCHASE = "Purchase"
-ORDER_TYPE_CHANGE = "Change"
-ORDER_TYPE_TERMINATION = "Termination"
-ORDER_TYPE_CONFIGURATION = "Configuration"
-
-
 TRANSFER_RESELLER_PRODUCT_ID = "adobe-reseller-transfer"
+
+
+class OrderType(StrEnum):
+    """Order types."""
+
+    PURCHASE = "Purchase"
+    CHANGE = "Change"
+    TERMINATION = "Termination"
+    CONFIGURATION = "Configuration"
 
 
 class Param(StrEnum):
