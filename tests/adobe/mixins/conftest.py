@@ -1,7 +1,7 @@
 import pytest
 
 
-@pytest.fixture
+@pytest.fixture()
 def preview_discounts_payload_factory():
     def _func():
         return {
@@ -37,7 +37,7 @@ def preview_discounts_payload_factory():
     return _func
 
 
-@pytest.fixture
+@pytest.fixture()
 def order_preview_discounts_resp_factory(mock_uuid4):
     def _func():
         return {

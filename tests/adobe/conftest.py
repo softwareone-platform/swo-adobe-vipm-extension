@@ -3,7 +3,7 @@ import uuid
 import pytest
 
 
-@pytest.fixture
+@pytest.fixture()
 def flex_discounts_factory():
     def _flex_discounts():
         return {
@@ -71,7 +71,7 @@ def flex_discounts_factory():
     return _flex_discounts
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_uuid4(mocker):
     return mocker.patch(
         "adobe_vipm.adobe.client.uuid4",
