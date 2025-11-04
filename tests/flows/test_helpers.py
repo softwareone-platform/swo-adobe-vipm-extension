@@ -532,7 +532,7 @@ def test_update_prices_step_with_preview_order(
         lines=[
             {
                 "id": mock_order["lines"][0]["id"],
-                "price": {"unitPP": 875.16},
+                "price": {"unitPP": 849.16},
             },
         ],
     )
@@ -579,7 +579,7 @@ def test_update_prices_step_with_3yc_commitment(
         lines=[
             {
                 "id": mock_order["lines"][0]["id"],
-                "price": {"unitPP": 875.16},
+                "price": {"unitPP": 849.16},
             },
         ],
     )
@@ -631,7 +631,7 @@ def test_update_prices_step_with_expired_3yc_commitment(
         lines=[
             {
                 "id": mock_order["lines"][0]["id"],
-                "price": {"unitPP": 875.16},
+                "price": {"unitPP": 849.16},
             },
         ],
     )
@@ -685,7 +685,7 @@ def test_update_prices_step_with_multiple_lines(
         lines=[
             {
                 "id": line_1["id"],
-                "price": {"unitPP": 875.16},
+                "price": {"unitPP": 849.16},
             },
             {
                 "id": line_2["id"],

@@ -592,7 +592,7 @@ class UpdatePrices(Step):
     def _get_prices_for_skus(self):
         """Get prices for SKUs."""
         preview_prices = {
-            line_items["offerId"]: line_items["pricing"]["partnerPrice"]
+            line_items["offerId"]: line_items["pricing"]["discountedPartnerPrice"]
             for line_items in self._context.adobe_preview_order["lineItems"]
         }
         logger.info("Preview prices: %s", preview_prices)
