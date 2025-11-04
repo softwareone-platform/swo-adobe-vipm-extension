@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import logging
+import re
 from collections import defaultdict
 from hashlib import sha256
 from operator import itemgetter
@@ -8,15 +9,7 @@ from urllib.parse import urljoin
 
 import requests
 
-from adobe_vipm.adobe.constants import (
-    CANCELLATION_WINDOW_DAYS,
-    ORDER_TYPE_NEW,
-    ORDER_TYPE_PREVIEW,
-    ORDER_TYPE_PREVIEW_RENEWAL,
-    ORDER_TYPE_RENEWAL,
-    ORDER_TYPE_RETURN,
-    AdobeStatus,
-)
+from adobe_vipm.adobe import constants as adobe_constants
 from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeError, wrap_http_error
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
@@ -27,6 +20,7 @@ from adobe_vipm.adobe.utils import (  # noqa: WPS347
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
 from adobe_vipm.flows.constants import FAKE_CUSTOMERS_IDS, Param
 from adobe_vipm.flows.context import Context
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_partial_sku, map_by
 
 logger = logging.getLogger(__name__)
@@ -52,6 +46,8 @@ def _remove_failed_discount_codes(failed_discount_codes: set, payload: dict):
 
 class OrderClientMixin:
     """Adobe Client Mixin to manage Orders flows of Adobe VIPM."""
+
+    flex_discount_not_qualify_re = re.compile(r"Line Item: ?(\d+)", re.IGNORECASE)
 
     @wrap_http_error
     def get_orders(self, authorization_id: str, customer_id: str, filters: dict | None = None):
@@ -142,7 +138,7 @@ class OrderClientMixin:
 
         payload = {
             "externalReferenceId": adobe_preview_order["externalReferenceId"],
-            "orderType": ORDER_TYPE_NEW,
+            "orderType": adobe_constants.ORDER_TYPE_NEW,
             "lineItems": line_items,
         }
         if not deployment_id:
@@ -183,7 +179,7 @@ class OrderClientMixin:
             logger.info("Found flex discounts for base SKUs: %s", flex_discounts)
         payload = {
             "externalReferenceId": context.order_id,
-            "orderType": ORDER_TYPE_PREVIEW,
+            "orderType": adobe_constants.ORDER_TYPE_PREVIEW,
             "lineItems": [],
         }
         self._process_new_lines(context, flex_discounts, payload)
@@ -203,9 +199,7 @@ class OrderClientMixin:
             return None
 
         customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
-        return self.get_preview_order(
-            authorization, customer_id, payload, set(flex_discounts.values())
-        )
+        return self.get_preview_order(authorization, customer_id, payload)
 
     @wrap_http_error
     def create_preview_renewal(
@@ -224,7 +218,7 @@ class OrderClientMixin:
             dict: The Preview Renewal order.
         """
         authorization = self._config.get_authorization(authorization_id)
-        payload = {"orderType": ORDER_TYPE_PREVIEW_RENEWAL}
+        payload = {"orderType": adobe_constants.ORDER_TYPE_PREVIEW_RENEWAL}
         headers = self._get_headers(authorization)
         response = requests.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
@@ -258,7 +252,7 @@ class OrderClientMixin:
             list(dict): The RETURN order.
         """
         current_date = dt.datetime.now(tz=dt.UTC).date()
-        start_date = current_date - dt.timedelta(days=CANCELLATION_WINDOW_DAYS)
+        start_date = current_date - dt.timedelta(days=adobe_constants.CANCELLATION_WINDOW_DAYS)
 
         returning_order_ids = [order["referenceOrderId"] for order in (return_orders or [])]
 
@@ -266,7 +260,7 @@ class OrderClientMixin:
             authorization_id,
             customer_id,
             filters={
-                "order-type": [ORDER_TYPE_NEW, ORDER_TYPE_RENEWAL],
+                "order-type": [adobe_constants.ORDER_TYPE_NEW, adobe_constants.ORDER_TYPE_RENEWAL],
                 "start-date": start_date.isoformat(),
                 "end-date": customer_coterm_date,
             },
@@ -290,7 +284,7 @@ class OrderClientMixin:
             )
         )
         renewal_order_item = find_first(
-            lambda order_item: order_item[0]["orderType"] == ORDER_TYPE_RENEWAL,
+            lambda order_item: order_item[0]["orderType"] == adobe_constants.ORDER_TYPE_RENEWAL,
             order_items,
         )
         if renewal_order_item:
@@ -333,8 +327,11 @@ class OrderClientMixin:
             authorization_id,
             customer_id,
             filters={
-                "order-type": ORDER_TYPE_RETURN,
-                "status": [AdobeStatus.PROCESSED, AdobeStatus.PENDING],
+                "order-type": adobe_constants.ORDER_TYPE_RETURN,
+                "status": [
+                    adobe_constants.AdobeStatus.PROCESSED,
+                    adobe_constants.AdobeStatus.PENDING,
+                ],
             },
         )
         return_orders = defaultdict(list)
@@ -377,7 +374,7 @@ class OrderClientMixin:
         payload = {
             "externalReferenceId": external_id,
             "referenceOrderId": returning_order["orderId"],
-            "orderType": ORDER_TYPE_RETURN,
+            "orderType": adobe_constants.ORDER_TYPE_RETURN,
             "lineItems": [],
         }
 
@@ -422,24 +419,19 @@ class OrderClientMixin:
         payload = {
             "externalReferenceId": external_reference_id,
             "referenceOrderId": adobe_order_id,
-            "orderType": ORDER_TYPE_RETURN,
+            "orderType": adobe_constants.ORDER_TYPE_RETURN,
             "currencyCode": currency_code,
             "lineItems": adobe_line_items,
         }
         return self._create_return_order_base(authorization_id, customer_id, payload)
 
     def get_preview_order(  # noqa: WPS231
-        self,
-        authorization: Authorization,
-        adobe_customer_id,
-        payload: dict,
-        all_discount_codes: set[str],
+        self, authorization: Authorization, adobe_customer_id, payload: dict
     ) -> dict | None:
         """
         Gets a preview of an order based on the provided payload.
 
         Args:
-            all_discount_codes: All discount codes
             authorization: Authorization object containing authentication credentials.
             adobe_customer_id: Unique identifier of the Adobe customer.
             payload: Dictionary containing order details required for preview.
@@ -453,28 +445,36 @@ class OrderClientMixin:
             successfully.
         """
         response_json = None
-        for attempt_no in range(1, 6):
-            failed_discount_codes = ()
-            try:  # noqa: WPS229
+        for _ in range(1, 6):
+            try:
                 response_json = self._get_preview_order(authorization, adobe_customer_id, payload)
-                failed_discount_codes = _get_failed_discount_codes(response_json)
             except AdobeError as ex:
-                if ex.code == AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
-                    logger.warning("%s", ex)
-                    failed_discount_codes = all_discount_codes
-                else:
-                    raise
+                failed_discount_codes = self._get_fail_discounts_for_cust_not_qualified(ex, payload)
+            else:
+                failed_discount_codes = _get_failed_discount_codes(response_json)
             if not failed_discount_codes:
                 break
             logger.warning("Found failed flex discounts: %s", failed_discount_codes)
-            if failed_discount_codes and attempt_no >= 5:
-                raise AdobeError(
-                    f"After {attempt_no} attempts still finding failed discount codes:"
-                    f" {failed_discount_codes}."
-                )
             _remove_failed_discount_codes(failed_discount_codes, payload)
+        else:
+            msg = f"After 5 attempts still finding failed discount codes: {failed_discount_codes}."
+            send_exception("Failed applying discount codes", msg)
+            raise AdobeError(msg)
 
         return response_json
+
+    def _get_fail_discounts_for_cust_not_qualified(self, ex: AdobeError, payload: dict) -> set:
+        if ex.code == adobe_constants.AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
+            logger.warning("%s", ex)
+            matched = self.flex_discount_not_qualify_re.match(ex.details[0])
+            if not matched:
+                raise AdobeError(
+                    f"Can't parse Adobe error message: '{ex.details}'. Expected format example:"
+                    f" 'Line Item: 2, Reason: Invalid Flexible Discount'"
+                )
+            item_no = int(matched.group(1)) - 1
+            return set(payload["lineItems"][item_no]["flexDiscountCodes"])
+        raise ex
 
     def _process_new_lines(self, context: Context, flex_discounts: dict, payload: dict):
         for line in context.new_lines:
@@ -635,7 +635,8 @@ class OrderClientMixin:
         order, mpt_item = order_item
 
         return (
-            order["status"] == AdobeStatus.PROCESSED and mpt_item["status"] == AdobeStatus.PROCESSED
+            order["status"] == adobe_constants.AdobeStatus.PROCESSED
+            and mpt_item["status"] == adobe_constants.AdobeStatus.PROCESSED
         )
 
     @wrap_http_error

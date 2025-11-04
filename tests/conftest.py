@@ -2270,3 +2270,11 @@ def mock_update_order(mocker):
     mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_order", new=mock)
     mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order", new=mock)
     return mock
+
+
+@pytest.fixture()
+def mock_send_exception(mocker):
+    mock = mocker.MagicMock(spec="adobe_vipm.notifications.send_exception")
+    mocker.patch("adobe_vipm.flows.sync.send_exception", new=mock)
+    mocker.patch("adobe_vipm.adobe.mixins.order.send_exception", new=mock)
+    return mock
