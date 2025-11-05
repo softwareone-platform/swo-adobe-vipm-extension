@@ -37,21 +37,21 @@ global:
   replicaCountWorker: 1
 
   cronjobs:
-    - name: proc-trfs
+    proc-trfs:
       schedule: ""
       command: process_transfers
-    - name: chk-trfs
+    chk-trfs:
       schedule: ""
       command: check_running_transfers
-    - name: agr-sync
+    agr-sync:
       schedule: ""
       command: sync_agreements
-    - name: proc-3yc
+    proc-3yc:
       schedule: ""
       command: process_3yc
-    - name: gc-agr
+    gc-agr:
       schedule: ""
       command: check_gc_agreement_deployments
-    - name: sync-3yc-enrol
+    sync-3yc-enrol:
       schedule: ""
       command: sync_3yc_enrol

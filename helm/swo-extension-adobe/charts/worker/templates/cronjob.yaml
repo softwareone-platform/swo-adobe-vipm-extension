@@ -1,13 +1,13 @@
-{{- range .Values.global.cronjobs }}
+{{- range $name, $cronjob := .Values.global.cronjobs }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: {{ include "common.fullname" $ }}-cronjob-{{ .name }}
+  name: {{ include "common.fullname" $ }}-cronjob-{{ $name }}
   labels:
     {{- include "common.labels" $ | nindent 4 }}
 spec:
-  schedule: "{{ .schedule }}"
+  schedule: "{{ $cronjob.schedule }}"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
@@ -28,7 +28,7 @@ spec:
               secret:
                 secretName: {{ include "common.fullname" $ }}.files
           containers:
-            - name: {{ .name }}
+            - name: {{ $name }}
               securityContext:
                 {{- toYaml $.Values.securityContext | nindent 16 }}
               image: "{{ $.Values.global.registryUrl }}/{{ $.Values.image.repository }}:{{ $.Chart.AppVersion }}"
@@ -36,7 +36,7 @@ spec:
                 - swoext
               args:
                 - django
-                - {{ .command }}
+                - {{ $cronjob.command }}
               volumeMounts:
                 - name: file-mount
                   mountPath: /extension/adobe_vipm/config
