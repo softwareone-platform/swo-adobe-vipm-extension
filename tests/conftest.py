@@ -15,7 +15,7 @@ from rich.highlighter import ReprHighlighter as _ReprHighlighter
 
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.config import Config
-from adobe_vipm.adobe.constants import AdobeStatus, OfferType
+from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus, OfferType
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
     AdobeProductNotFoundError,
@@ -1112,9 +1112,7 @@ def agreement(buyer, licensee, listing):
                         "quantity": 10,
                     }
                 ],
-                "externalIds": {
-                    "vendor": "6158e1cf0e4414a9b3a06d123969fdNA"
-                },
+                "externalIds": {"vendor": "6158e1cf0e4414a9b3a06d123969fdNA"},
             },
             {
                 "id": "SUB-1234-5678",
@@ -1132,9 +1130,7 @@ def agreement(buyer, licensee, listing):
                         "quantity": 4,
                     }
                 ],
-                "externalIds": {
-                    "vendor": "6158e1cf0e4414a9b3a06d1239611111"
-                },
+                "externalIds": {"vendor": "6158e1cf0e4414a9b3a06d1239611111"},
             },
         ],
         "listing": listing,
@@ -1224,7 +1220,7 @@ def order_factory(
 
 
 @pytest.fixture()
-def order(order_factory):
+def mock_order(order_factory):
     return order_factory()
 
 
@@ -1292,7 +1288,7 @@ def webhook(settings):
 
 @pytest.fixture()
 def adobe_items_factory():  # noqa: C901
-    def _items(
+    def _items(  # noqa: C901
         line_number=1,
         offer_id="65304578CA01A12",
         quantity=170,
@@ -1302,6 +1298,7 @@ def adobe_items_factory():  # noqa: C901
         deployment_id=None,
         currency_code=None,
         deployment_currency_code=None,
+        pricing=None,
     ):
         item = {
             "extLineItemNumber": line_number,
@@ -1319,13 +1316,28 @@ def adobe_items_factory():  # noqa: C901
             item["subscriptionId"] = subscription_id
         if status:
             item["status"] = status
+        if pricing:
+            item["pricing"] = pricing
         return [item]
 
     return _items
 
 
 @pytest.fixture()
-def adobe_order_factory(adobe_items_factory):  # noqa: C901
+def adobe_pricing_factory():
+    def _pricing():
+        return {
+            "partnerPrice": 875.16,
+            "discountedPartnerPrice": 849.16,
+            "netPartnerPrice": 846.83,
+            "lineItemPartnerPrice": 846.83,
+        }
+
+    return _pricing
+
+
+@pytest.fixture()
+def adobe_order_factory(adobe_items_factory, adobe_pricing_factory):  # noqa: C901
     def _order(
         order_type,
         currency_code="USD",
@@ -1341,8 +1353,16 @@ def adobe_order_factory(adobe_items_factory):  # noqa: C901
             "externalReferenceId": external_id,
             "orderType": order_type,
             "lineItems": items
-            or adobe_items_factory(
-                deployment_id=deployment_id, deployment_currency_code=currency_code
+            or (
+                adobe_items_factory(
+                    deployment_id=deployment_id,
+                    deployment_currency_code=currency_code,
+                    pricing=adobe_pricing_factory(),
+                )
+                if order_type == ORDER_TYPE_PREVIEW
+                else adobe_items_factory(
+                    deployment_id=deployment_id, deployment_currency_code=currency_code
+                )
             ),
         }
 
@@ -1549,17 +1569,19 @@ def created_agreement_factory():
             "termsAndConditions": [],
         }
         if is_profile_address_exists:
-            created_agreement["parameters"]["ordering"].append({
-                "externalId": "address",
-                "value": {
-                    "addressLine1": "addressLine1",
-                    "addressLine2": "addressLine2",
-                    "city": "city",
-                    "country": "US",
-                    "postCode": "postalCode",
-                    "state": "region",
-                },
-            })
+            created_agreement["parameters"]["ordering"].append(
+                {
+                    "externalId": "address",
+                    "value": {
+                        "addressLine1": "addressLine1",
+                        "addressLine2": "addressLine2",
+                        "city": "city",
+                        "country": "US",
+                        "postCode": "postalCode",
+                        "state": "region",
+                    },
+                }
+            )
         return created_agreement
 
     return _created_agreement
@@ -2087,6 +2109,7 @@ def mock_adobe_client(mocker):
 
     return adobe_client
 
+
 @pytest.fixture()
 def mock_worker_call_command(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.call_command")
@@ -2157,11 +2180,17 @@ def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     def get_adobe_product_by_marketplace_sku(sku):
         return mock_get_sku_adobe_mapping_model.from_short_id(sku)
 
-    return mocker.patch(
+    mocker.patch(
         "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",
         new=get_adobe_product_by_marketplace_sku,
         spec=True,
     )
+    mocker.patch(
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
+        new=get_adobe_product_by_marketplace_sku,
+        spec=True,
+    )
+    return get_adobe_product_by_marketplace_sku
 
 
 @pytest.fixture()
@@ -2225,4 +2254,27 @@ def mock_settings(settings):
 
 @pytest.fixture()
 def mock_pymsteams(mocker):
-    mocker.patch("pymsteams.connectorcard", autospec=True)
+    return mocker.patch("pymsteams.connectorcard", autospec=True)
+
+
+@pytest.fixture()
+def mock_mpt_update_agreement(mocker):
+    mock = mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement", autospec=True)
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement", new=mock)
+    return mock
+
+
+@pytest.fixture()
+def mock_update_order(mocker):
+    mock = mocker.MagicMock(spec="mpt_extension_sdk.mpt_http.mpt.update_order")
+    mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_order", new=mock)
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order", new=mock)
+    return mock
+
+
+@pytest.fixture()
+def mock_send_exception(mocker):
+    mock = mocker.MagicMock(spec="adobe_vipm.notifications.send_exception")
+    mocker.patch("adobe_vipm.flows.sync.send_exception", new=mock)
+    mocker.patch("adobe_vipm.adobe.mixins.order.send_exception", new=mock)
+    return mock

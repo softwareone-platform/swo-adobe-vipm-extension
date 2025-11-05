@@ -3050,7 +3050,10 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
         order["id"],
     )
     assert mocked_update_order.mock_calls[2].kwargs == {
-        "externalIds": {"vendor": new_order["orderId"]}
+        "externalIds": {"vendor": new_order["orderId"]},
+        "parameters": {
+            "fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]
+        },
     }
 
 
@@ -3209,7 +3212,10 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
         order["id"],
     )
     assert mocked_update_order.mock_calls[2].kwargs == {
-        "externalIds": {"vendor": new_order["orderId"]}
+        "externalIds": {"vendor": new_order["orderId"]},
+        "parameters": {
+            "fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]
+        },
     }
 
 

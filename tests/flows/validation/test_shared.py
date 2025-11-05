@@ -6,7 +6,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
-    FAKE_CUSTOMERS_IDS,
     MARKET_SEGMENT_COMMERCIAL,
     MARKET_SEGMENT_EDUCATION,
     MARKET_SEGMENT_GOVERNMENT,
@@ -83,21 +82,13 @@ def test_validate_duplicate_lines_step_no_lines(mocker, order_factory):
     "segment",
     [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
 )
-def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segment):
+def test_get_preview_order_step(
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, segment, mock_mpt_client
+):
     deployment_id = "deployment-id"
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    order = order_factory(
-        deployment_id=deployment_id,
-    )
-
-    mocked_client = mocker.MagicMock()
+    mock_adobe_client.create_preview_order.return_value = adobe_preview_order
+    order = order_factory(deployment_id=deployment_id)
     mocked_next_step = mocker.MagicMock()
     context = Context(
         order=order,
@@ -107,44 +98,30 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory, segm
         market_segment=segment,
         product_id="PRD-1234",
         currency="EUR",
+        deployment_id=deployment_id,
     )
 
     step = GetPreviewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     assert context.validation_succeeded is True
     assert context.adobe_preview_order == adobe_preview_order
 
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        FAKE_CUSTOMERS_IDS[segment],
-        context.order_id,
-        context.upsize_lines,
-        context.new_lines,
-        deployment_id=deployment_id,
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 @pytest.mark.parametrize(
     "segment",
     [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
 )
-def test_get_preview_order_step_no_deployment(mocker, order_factory, adobe_order_factory, segment):
+def test_get_preview_order_step_no_deployment(
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, mock_mpt_client, segment
+):
     deployment_id = None
     adobe_preview_order = adobe_order_factory(ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = adobe_preview_order
-    mocker.patch(
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    order = order_factory(
-        deployment_id=deployment_id,
-    )
-
-    mocked_client = mocker.MagicMock()
+    mock_adobe_client.create_preview_order.return_value = adobe_preview_order
+    order = order_factory(deployment_id=deployment_id)
     mocked_next_step = mocker.MagicMock()
     context = Context(
         order=order,
@@ -154,23 +131,17 @@ def test_get_preview_order_step_no_deployment(mocker, order_factory, adobe_order
         market_segment=segment,
         product_id="PRD-1234",
         currency="EUR",
+        deployment_id=deployment_id,
     )
 
     step = GetPreviewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     assert context.validation_succeeded is True
     assert context.adobe_preview_order == adobe_preview_order
 
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        FAKE_CUSTOMERS_IDS[segment],
-        context.order_id,
-        context.upsize_lines,
-        context.new_lines,
-        deployment_id=deployment_id,
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_get_preview_order_step_no_lines(mocker, order_factory):

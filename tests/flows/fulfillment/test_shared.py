@@ -30,6 +30,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     GetReturnOrders,
+    NullifyFlexDiscountParam,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -841,7 +842,9 @@ def test_submit_return_orders_step_order_processed(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
+def test_submit_new_order_step(
+    mocker, mock_adobe_client, mock_mpt_client, order_factory, adobe_order_factory
+):
     order = order_factory(deployment_id=None)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
     new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.PENDING.value)
@@ -857,7 +860,6 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
         "adobe_vipm.flows.fulfillment.shared.update_order",
     )
 
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
@@ -871,7 +873,7 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
     )
 
     step = SubmitNewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     mocked_adobe_client.create_new_order.assert_called_once_with(
         context.authorization_id,
@@ -881,12 +883,65 @@ def test_submit_new_order_step(mocker, order_factory, adobe_order_factory):
     )
 
     mocked_update.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order_id,
         externalIds=context.order["externalIds"],
+        parameters={"fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]},
     )
     assert get_adobe_order_id(context.order) == new_order["orderId"]
     mocked_next_step.assert_not_called()
+
+
+def test_submit_new_order_step_flex_discount(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_order_factory,
+    mock_update_order,
+):
+    order = order_factory(deployment_id=None)
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.PROCESSED.value)
+    new_order["lineItems"][0].update({"flexDiscounts": [{"code": "BLACK"}]})
+    mock_adobe_client.create_new_order.return_value = new_order
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+        adobe_preview_order=preview_order,
+        deployment_id=None,
+    )
+
+    step = SubmitNewOrder()
+    step(mock_mpt_client, context, mocked_next_step)
+
+    mock_adobe_client.create_new_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        preview_order,
+        deployment_id=None,
+    )
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        externalIds=context.order["externalIds"],
+        parameters={
+            "fulfillment": [
+                {
+                    "externalId": Param.FLEXIBLE_DISCOUNTS.value,
+                    "value": '[{"extLineItemNumber": 1, '
+                    '"offerId": "65304578CA01A12", '
+                    '"subscriptionId": null, '
+                    '"flexDiscountCode": ["BLACK"]}]',
+                }
+            ]
+        },
+    )
+    assert get_adobe_order_id(context.order) == new_order["orderId"]
 
 
 def test_submit_new_order_step_with_deployment_id(
@@ -940,6 +995,7 @@ def test_submit_new_order_step_with_deployment_id(
         mocked_client,
         context.order_id,
         externalIds=context.order["externalIds"],
+        parameters={"fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]},
     )
     assert get_adobe_order_id(context.order) == new_order["orderId"]
     mocked_next_step.assert_not_called()
@@ -1753,21 +1809,14 @@ def test_validate_duplicate_lines_step_no_duplicates(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
+def test_get_preview_order_step(
+    mocker, order_factory, adobe_order_factory, mock_mpt_client, mock_adobe_client
+):
     deployment_id = "deployment-id"
 
     order = order_factory(deployment_id=deployment_id)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
-
-    mocked_adobe_client = mocker.MagicMock()
-    mocked_adobe_client.create_preview_order.return_value = preview_order
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocked_client = mocker.MagicMock()
+    mock_adobe_client.create_preview_order.return_value = preview_order
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
@@ -1781,18 +1830,11 @@ def test_get_preview_order_step(mocker, order_factory, adobe_order_factory):
     )
 
     step = GetPreviewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     assert context.adobe_preview_order == preview_order
 
-    mocked_adobe_client.create_preview_order.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        context.order_id,
-        context.upsize_lines,
-        context.new_lines,
-        deployment_id=deployment_id,
-    )
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
 
 
 def test_get_preview_order_step_order_no_upsize_lines(
@@ -1830,21 +1872,9 @@ def test_get_preview_order_step_order_no_upsize_lines(
 
 
 def test_get_preview_order_step_order_new_order_created(
-    mocker,
-    order_factory,
-    lines_factory,
+    mocker, mock_adobe_client, order_factory, lines_factory, mock_mpt_client
 ):
-    order = order_factory(
-        lines=lines_factory(quantity=12, old_quantity=10),
-    )
-    mocked_adobe_client = mocker.MagicMock()
-
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        return_value=mocked_adobe_client,
-    )
-
-    mocked_client = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=12, old_quantity=10))
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
@@ -1853,15 +1883,13 @@ def test_get_preview_order_step_order_new_order_created(
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
-        adobe_new_order_id="new-order-id",
     )
 
     step = GetPreviewOrder()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_adobe_client.create_preview_order.assert_not_called()
-
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_get_preview_order_step_adobe_error(
@@ -2378,3 +2406,35 @@ def test_set_subscription_template_step_subscription_not_found(
     mocked_update_agreement_subscription.assert_not_called()
 
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_nullify_flex_discount_param(
+    mocker, order_factory, mock_mpt_client, mock_mpt_update_agreement
+):
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order_factory(), agreement_id="agreement_id")
+
+    NullifyFlexDiscountParam()(mock_mpt_client, context, mocked_next_step)
+
+    mock_mpt_update_agreement.assert_called_once_with(
+        mock_mpt_client,
+        "agreement_id",
+        parameters={"fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]},
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_nullify_flex_discount_param_error(
+    mocker, order_factory, mock_mpt_client, mock_mpt_update_agreement, caplog
+):
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order_factory(), agreement_id="agreement_id")
+    mock_mpt_update_agreement.side_effect = Exception()
+
+    NullifyFlexDiscountParam()(mock_mpt_client, context, mocked_next_step)
+
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+    assert caplog.messages == [
+        "Nullifying flex discounts on the agreement agreement_id",
+        "None - agreement_id None None - - -: failed to nullify flex discounts.",
+    ]

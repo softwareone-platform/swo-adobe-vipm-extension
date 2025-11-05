@@ -1,6 +1,7 @@
 """This module contains shared functions used by the different fulfillment flows."""
 
 import datetime as dt
+import json
 import logging
 from collections import Counter
 
@@ -659,16 +660,17 @@ class SetOrUpdateCotermDate(Step):
             is_recommitment=False,
         ) or get_3yc_commitment(context.adobe_customer)
         if commitment:
-            updated_params.update({
-                "3yc_enroll_status": commitment.get("status"),
-                "3yc_commitment_request_status": None,
-                "3yc_start_date": commitment.get("startDate"),
-                "3yc_end_date": commitment.get("endDate"),
-                "3yc": None,
-            })
+            updated_params.update(
+                {
+                    "3yc_enroll_status": commitment.get("status"),
+                    "3yc_commitment_request_status": None,
+                    "3yc_start_date": commitment.get("startDate"),
+                    "3yc_end_date": commitment.get("endDate"),
+                    "3yc": None,
+                }
+            )
         params_str = ", ".join(f"{k}={v}" for k, v in updated_params.items())
         logger.info("%s: Updated parameters: %s", context, params_str)
-
 
 
 class StartOrderProcessing(Step):
@@ -833,29 +835,24 @@ class GetPreviewOrder(Step):
     skipped and the order processing pipeline will continue.
     """
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, mpt_client, context, next_step):
         """Retrieve a preview order for the upsize/new lines."""
         adobe_client = get_adobe_client()
         if (context.upsize_lines or context.new_lines) and not context.adobe_new_order_id:
             try:
-                deployment_id = get_deployment_id(context.order)
-                context.adobe_preview_order = adobe_client.create_preview_order(
-                    context.authorization_id,
-                    context.adobe_customer_id,
-                    context.order_id,
-                    context.upsize_lines,
-                    context.new_lines,
-                    deployment_id=deployment_id,
+                context.adobe_preview_order = adobe_client.create_preview_order(context)
+                logger.info(
+                    "Created preview order %s", context.adobe_preview_order["externalReferenceId"]
                 )
             except AdobeError as e:
                 switch_order_to_failed(
-                    client,
+                    mpt_client,
                     context.order,
                     ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(e)),
                 )
                 return
 
-        next_step(client, context)
+        next_step(mpt_client, context)
 
 
 class SubmitNewOrder(Step):
@@ -873,7 +870,6 @@ class SubmitNewOrder(Step):
             next_step(client, context)
             return
         adobe_client = get_adobe_client()
-        adobe_order = None
 
         if not context.adobe_new_order_id and context.adobe_preview_order:
             deployment_id = get_deployment_id(context.order)
@@ -885,7 +881,20 @@ class SubmitNewOrder(Step):
             )
             logger.info("%s: new adobe order created: %s", context, adobe_order["orderId"])
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
-            update_order(client, context.order_id, externalIds=context.order["externalIds"])
+            flex_discounts = _get_flex_discounts(adobe_order)
+            update_order(
+                client,
+                context.order_id,
+                externalIds=context.order["externalIds"],
+                parameters={
+                    Param.PHASE_FULFILLMENT.value: [
+                        {
+                            "externalId": Param.FLEXIBLE_DISCOUNTS,
+                            "value": flex_discounts,
+                        },
+                    ]
+                },
+            )
         elif not context.adobe_new_order_id and not context.adobe_preview_order:
             logger.info(
                 "%s: skip creating Adobe Order, preview order creation was skipped",
@@ -923,6 +932,20 @@ class SubmitNewOrder(Step):
             logger.warning("%s: the order has been failed due to %s.", context, error["message"])
             return
         next_step(client, context)
+
+
+def _get_flex_discounts(adobe_order: dict) -> str | None:
+    flex_discounts = [
+        {
+            "extLineItemNumber": line.get("extLineItemNumber"),
+            "offerId": line.get("offerId"),
+            "subscriptionId": line.get("subscriptionId"),
+            "flexDiscountCode": [flex_discount["code"] for flex_discount in line["flexDiscounts"]],
+        }
+        for line in adobe_order["lineItems"]
+        if line.get("flexDiscounts")
+    ]
+    return json.dumps(flex_discounts) if flex_discounts else None
 
 
 class CreateOrUpdateSubscriptions(Step):
@@ -1167,9 +1190,9 @@ class ValidateDuplicateLines(Step):
             for line in subscription["lines"]:
                 items.append(line["item"]["id"])
 
-        items.extend([
-            line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0
-        ])
+        items.extend(
+            [line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0]
+        )
         duplicates = [item for item, count in Counter(items).items() if count > 1]
         if duplicates:
             switch_order_to_failed(
@@ -1217,3 +1240,36 @@ def send_gc_mpt_notification(mpt_client, order: dict, items_with_deployment: lis
         "notification",
         context,
     )
+
+
+class NullifyFlexDiscountParam(Step):
+    """Handles the nullification of flex discounts on an agreement."""
+
+    def __call__(self, mpt_client, context, next_step):
+        """
+        Nullifies flex discounts on the specified agreement.
+
+        Args:
+            mpt_client: The client used to interact with the MPT API.
+            context: The operational context containing details like agreement ID.
+            next_step: The next processing step after nullifying discounts.
+
+        """
+        logger.info("Nullifying flex discounts on the agreement %s", context.agreement_id)
+        try:
+            update_agreement(
+                mpt_client,
+                context.agreement_id,
+                parameters={
+                    Param.PHASE_FULFILLMENT.value: [
+                        {
+                            "externalId": Param.FLEXIBLE_DISCOUNTS,
+                            "value": None,
+                            #  The Prop is a JSON type, but MPT API accepts only string here
+                        },
+                    ]
+                },
+            )
+        except Exception:
+            logger.exception("%s: failed to nullify flex discounts.", context)
+        next_step(mpt_client, context)
