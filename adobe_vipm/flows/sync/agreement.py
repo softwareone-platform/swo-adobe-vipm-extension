@@ -376,20 +376,27 @@ class AgreementsSyncer:  # noqa: WPS214
             Logs exception and sends notification if external IDs are missing
         """
         mpt_entitlements_external_ids = set()
+        entitlements_without_external_ids = set()
         for entitlement in self._agreement["subscriptions"] + self._agreement["assets"]:
+            if entitlement["status"] == SubscriptionStatus.TERMINATED:
+                continue
+
             try:
-                mpt_entitlements_external_ids.add(entitlement["externalIds"]["vendor"])
+                external_id = entitlement["externalIds"]["vendor"]
             except KeyError:
-                logger.exception(
-                    "Missing external IDs for subscriptions or assets in the agreement: %s",
-                    self.agreement_id,
-                )
-                send_notification(
-                    "Missing external IDs",
-                    f"Missing external IDs for entitlement with id {entitlement['id']} "
-                    f"in the agreement: {self.agreement_id}",
-                    TeamsColorCode.ORANGE.value,
-                )
+                entitlements_without_external_ids.add(entitlement["id"])
+                continue
+
+            mpt_entitlements_external_ids.add(external_id)
+
+        if entitlements_without_external_ids:
+            entitlements_to_notify = ", ".join(entitlements_without_external_ids)
+            message = (
+                f"Missing external IDs for entitlements: {entitlements_to_notify} in the "
+                f"agreement {self.agreement_id}"
+            )
+            logger.error(message)
+            send_notification("Missing external IDs", message, TeamsColorCode.ORANGE.value)
 
         return mpt_entitlements_external_ids
 

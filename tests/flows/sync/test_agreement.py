@@ -24,7 +24,7 @@ def mock_get_template_data_by_adobe_subscription(mocker):
     return mocker.patch("adobe_vipm.flows.sync.agreement.get_template_data_by_adobe_subscription")
 
 
-def test_agreement_syncer_dry_run(
+def test_agreement_syncer_sync_dry_run(
     mock_mpt_client,
     mock_adobe_client,
     adobe_customer_factory,
@@ -1494,7 +1494,9 @@ def test_add_missing_subscriptions_none(
     adobe_subscriptions = [
         adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
         adobe_subscription_factory(
-            subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
+            subscription_id="55feb5038045e0b1ebf026e7522e17NA",
+            offer_id="65304578CA01A12",
+            status=AdobeStatus.SUBSCRIPTION_TERMINATED,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -1527,7 +1529,9 @@ def test_add_missing_subscriptions_without_vendor_id(
     adobe_subscriptions = [
         adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
         adobe_subscription_factory(
-            subscription_id="55feb5038045e0b1ebf026e7522e17NA", offer_id="65304578CA01A12"
+            subscription_id="55feb5038045e0b1ebf026e7522e17NA",
+            offer_id="65304578CA01A12",
+            status=AdobeStatus.SUBSCRIPTION_TERMINATED,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -1548,8 +1552,8 @@ def test_add_missing_subscriptions_without_vendor_id(
 
     mock_send_notification.assert_called_once_with(
         "Missing external IDs",
-        "Missing external IDs for entitlement with id SUB-1234-5678 "
-        "in the agreement: AGR-2119-4550-8674-5962",
+        "Missing external IDs for entitlements: SUB-1234-5678 "
+        "in the agreement AGR-2119-4550-8674-5962",
         TeamsColorCode.ORANGE.value,
     )
     mock_get_product_items_by_period.assert_not_called()
