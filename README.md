@@ -168,5 +168,3 @@ $ docker-compose run --service-ports app
 | Environment Variable                   | Default | Example | Description                                                          |
 |----------------------------------------|---------|---------|----------------------------------------------------------------------|
 | `MPT_ORDERS_API_POLLING_INTERVAL_SECS` | 120     | 60      | Orders polling interval from the Software Marketplace API in seconds |
-
-Testing
