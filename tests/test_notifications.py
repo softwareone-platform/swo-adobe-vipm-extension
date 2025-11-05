@@ -117,17 +117,14 @@ def test_send_notification_exception(mocker, settings, caplog):
         (send_exception, "#541c2e", "\U0001f525"),
     ],
 )
-def test_send_others(mocker, function, color, icon):
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.notifications.send_notification",
-    )
-
+def test_send_others(function, color, icon, mocker):
+    mock_send_notification = mocker.patch("adobe_vipm.notifications.send_notification")
     mocked_button = mocker.MagicMock()
     mocked_facts_section = mocker.MagicMock()
 
     function("title", "text", button=mocked_button, facts=mocked_facts_section)
 
-    mocked_send_notification.assert_called_once_with(
+    mock_send_notification.assert_called_once_with(
         f"{icon} title",
         "text",
         color,

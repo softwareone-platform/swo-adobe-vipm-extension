@@ -3533,6 +3533,7 @@ def test_transfer_gc_account_create_deployments(
     adobe_customer_factory,
     items_factory,
     subscriptions_factory,
+    mock_send_warning,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
@@ -3559,7 +3560,6 @@ def test_transfer_gc_account_create_deployments(
         "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployment_view_link",
         return_value="link",
     )
-    mocker.patch("adobe_vipm.flows.fulfillment.transfer.send_warning", return_value=None)
     adobe_transfer = adobe_transfer_factory(
         status=AdobeStatus.PROCESSED.value,
         customer_id="a-client-id",
@@ -3645,7 +3645,6 @@ def test_transfer_gc_account_create_deployments(
             "deployment_country": "DE",
         }
     ]
-
     mocked_create_gc_agreement_deployments.assert_called_once_with(
         "PRD-1111-1111", gc_agreement_deployments
     )
@@ -3667,6 +3666,7 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
     adobe_customer_factory,
     items_factory,
     subscriptions_factory,
+    mock_send_warning,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
@@ -3692,7 +3692,6 @@ def test_transfer_gc_account_create_deployments_bulk_migrated_agreement(
         "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployment_view_link",
         return_value="link",
     )
-    mocker.patch("adobe_vipm.flows.fulfillment.transfer.send_warning", return_value=None)
     adobe_transfer = adobe_transfer_factory(
         status=AdobeStatus.PROCESSED.value,
         customer_id="a-client-id",
@@ -4098,6 +4097,7 @@ def test_transfer_gc_account_some_deployments_not_created(
     adobe_customer_factory,
     items_factory,
     subscriptions_factory,
+    mock_send_warning,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
@@ -4126,7 +4126,6 @@ def test_transfer_gc_account_some_deployments_not_created(
         "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployment_view_link",
         return_value="link",
     )
-    mocker.patch("adobe_vipm.flows.fulfillment.transfer.send_warning", return_value=None)
     adobe_transfer = adobe_transfer_factory(
         status=AdobeStatus.PROCESSED.value,
         customer_id="a-client-id",
@@ -4260,6 +4259,7 @@ def test_fulfill_transfer_gc_order_already_migrated_(
     adobe_customer_factory,
     agreement,
     adobe_subscription_factory,
+    mock_send_warning,
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -4287,10 +4287,6 @@ def test_fulfill_transfer_gc_order_already_migrated_(
     mocked_get_agreement_deployment_view_link = mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployment_view_link",
         return_value="link",
-    )
-    mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.send_warning",
-        return_value=None,
     )
     mocked_transfer = mocker.MagicMock(
         customer_id="customer-id",
@@ -4415,6 +4411,7 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
     agreement,
     adobe_subscription_factory,
     items_factory,
+    mock_send_warning,
 ):
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
@@ -4439,7 +4436,6 @@ def test_fulfill_transfer_gc_order_already_migrated_no_items_without_deployment(
         "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployment_view_link",
         return_value="link",
     )
-    mocker.patch("adobe_vipm.flows.fulfillment.transfer.send_warning", return_value=None)
     product_items = items_factory()
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_product_items_by_skus",

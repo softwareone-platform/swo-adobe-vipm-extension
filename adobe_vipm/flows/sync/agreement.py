@@ -22,7 +22,6 @@ from adobe_vipm.flows.constants import (
     ItemTermsModel,
     Param,
     SubscriptionStatus,
-    TeamsColorCode,
 )
 from adobe_vipm.flows.sync.asset import AssetsSyncer
 from adobe_vipm.flows.sync.util import _check_adobe_subscription_id
@@ -38,7 +37,7 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
-from adobe_vipm.notifications import send_exception, send_notification
+from adobe_vipm.notifications import send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -168,11 +167,7 @@ class AgreementsSyncer:  # noqa: WPS214
             # TODO: Move to the validate method or raise an error and send the notification from
             # the main method.
             logger.error(msg)
-            send_notification(
-                "Customer does not have discounts information",
-                msg,
-                TeamsColorCode.ORANGE.value,
-            )
+            send_warning("Customer does not have discounts information", msg)
             return False
 
         return True
@@ -396,7 +391,7 @@ class AgreementsSyncer:  # noqa: WPS214
                 f"agreement {self.agreement_id}"
             )
             logger.error(message)
-            send_notification("Missing external IDs", message, TeamsColorCode.ORANGE.value)
+            send_warning("Missing external IDs", message)
 
         return mpt_entitlements_external_ids
 
@@ -782,10 +777,9 @@ class AgreementsSyncer:  # noqa: WPS214
                     )
                 )
             models.create_gc_agreement_deployments(self.product_id, missing_deployments)
-            send_notification(
+            send_warning(
                 "Missing deployments added to Airtable",
                 f"agreement {self.agreement_id}, deployments: {missing_deployment_ids}.",
-                TeamsColorCode.ORANGE.value,
             )
 
     def _sync_global_customer_parameters(self, adobe_deployments: list[dict]) -> None:

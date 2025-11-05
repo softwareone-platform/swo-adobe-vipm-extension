@@ -12,7 +12,6 @@ from adobe_vipm.flows.constants import (
     AgreementStatus,
     ItemTermsModel,
     Param,
-    TeamsColorCode,
 )
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync.agreement import AgreementsSyncer
@@ -978,13 +977,12 @@ def test_sync_agreement_notify_exception(
 
 
 def test_sync_agreement_empty_discounts(
-    mocker,
     mock_adobe_client,
     mock_mpt_client,
     agreement_factory,
     subscriptions_factory,
     adobe_customer_factory,
-    mock_send_notification,
+    mock_send_warning,
     caplog,
 ):
     agreement = agreement_factory(
@@ -1004,12 +1002,11 @@ def test_sync_agreement_empty_discounts(
 
     sync_agreement(mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False)
 
-    mock_send_notification.assert_called_once_with(
+    mock_send_warning.assert_called_once_with(
         "Customer does not have discounts information",
         "Error synchronizing agreement AGR-2119-4550-8674-5962. Customer a-client-id "
         "does not have discounts information. Cannot proceed with price "
         "synchronization.",
-        "FFA500",
     )
 
 
@@ -1179,7 +1176,7 @@ def test_sync_agreement_lost_customer(
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
-    mock_send_notification,
+    mock_send_warning,
     mock_mpt_terminate_subscription,
     mocked_agreement_syncer,
     caplog,
@@ -1198,14 +1195,11 @@ def test_sync_agreement_lost_customer(
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
     ]
-    assert mock_send_notification.mock_calls == [
-        mocker.call(
-            "Executing Lost Customer Procedure.",
-            "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
-            " with lost customer procedure.",
-            "FFA500",
-        )
-    ]
+    mock_send_warning.assert_called_once_with(
+        "Executing Lost Customer Procedure.",
+        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
+        " with lost customer procedure.",
+    )
     assert caplog.messages == [
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
@@ -1220,7 +1214,8 @@ def test_sync_agreement_lost_customer_error(
     mock_adobe_client,
     mpt_error_factory,
     agreement_factory,
-    mock_send_notification,
+    mock_send_exception,
+    mock_send_warning,
     mock_mpt_terminate_subscription,
     mocked_agreement_syncer,
     caplog,
@@ -1237,44 +1232,33 @@ def test_sync_agreement_lost_customer_error(
         mock_mpt_client, mock_adobe_client, agreement_factory(), dry_run=False, sync_prices=True
     )
 
-    assert mock_mpt_terminate_subscription.mock_calls == [
+    mock_mpt_terminate_subscription.assert_has_calls([
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
-    ]
-    assert mock_send_notification.mock_calls == [
+    ])
+    mock_send_exception.assert_has_calls([
         mocker.call(
-            "Executing Lost Customer Procedure.",
-            "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
-            " with lost customer procedure.",
-            "FFA500",
-        ),
-        mocker.call(
-            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
             "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-            "#541c2e",
-            button=None,
-            facts=None,
         ),
         mocker.call(
-            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
             "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-            "#541c2e",
-            button=None,
-            facts=None,
         ),
         mocker.call(
-            "🔥 > Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
+            "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000",
             "500 Internal Server Error - Oops!"
             " (00-27cdbfa231ecb356ab32c11b22fd5f3c-721db10d009dfa2a-00)",
-            "#541c2e",
-            button=None,
-            facts=None,
         ),
-    ]
-
+    ])
+    mock_send_warning.assert_called_once_with(
+        "Executing Lost Customer Procedure.",
+        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and proceeding"
+        " with lost customer procedure.",
+    )
     assert [rec.message for rec in caplog.records] == [
         "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
         " proceeding with lost customer procedure.",
@@ -1524,7 +1508,7 @@ def test_add_missing_subscriptions_without_vendor_id(
     mock_mpt_create_asset,
     mock_mpt_create_agreement_subscription,
     mocked_agreement_syncer,
-    mock_send_notification,
+    mock_send_warning,
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
@@ -1550,11 +1534,10 @@ def test_add_missing_subscriptions_without_vendor_id(
 
     mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
-    mock_send_notification.assert_called_once_with(
+    mock_send_warning.assert_called_once_with(
         "Missing external IDs",
         "Missing external IDs for entitlements: SUB-1234-5678 "
         "in the agreement AGR-2119-4550-8674-5962",
-        TeamsColorCode.ORANGE.value,
     )
     mock_get_product_items_by_period.assert_not_called()
     mock_mpt_create_asset.assert_not_called()
@@ -1568,7 +1551,7 @@ def test_add_missing_subscriptions(
     mock_adobe_client,
     agreement_factory,
     adobe_customer_factory,
-    mock_send_notification,
+    mock_send_warning,
     mock_get_prices_for_skus,
     adobe_subscription_factory,
     mock_get_product_items_by_skus,
@@ -1692,7 +1675,7 @@ def test_add_missing_subscriptions_deployment(
     mock_adobe_client,
     agreement_factory,
     adobe_customer_factory,
-    mock_send_notification,
+    mock_send_warning,
     mock_get_prices_for_skus,
     adobe_subscription_factory,
     mock_get_product_items_by_skus,
@@ -1824,7 +1807,7 @@ def test_add_missing_subscriptions_wrong_currency(
     agreement_factory,
     mock_send_exception,
     adobe_customer_factory,
-    mock_send_notification,
+    mock_send_warning,
     adobe_subscription_factory,
     mock_get_product_items_by_skus,
     mock_get_product_items_by_period,
@@ -1929,7 +1912,7 @@ def test_check_update_airtable_missing_deployments(
     mock_settings,
     mock_pymsteams,
     agreement_factory,
-    mock_send_notification,
+    mock_send_warning,
     mock_airtable_base_info,
     adobe_deployment_factory,
     adobe_subscription_factory,
@@ -2014,12 +1997,12 @@ def test_check_update_airtable_missing_deployments(
         ),
         any_order=True,
     )
-    mock_send_notification.assert_called_once()
+    mock_send_warning.assert_called_once()
 
 
 def test_check_update_airtable_missing_deployments_none(
     agreement_factory,
-    mock_send_notification,
+    mock_send_warning,
     mock_airtable_base_info,
     adobe_subscription_factory,
     mock_create_gc_agreement_deployments,
@@ -2044,4 +2027,4 @@ def test_check_update_airtable_missing_deployments_none(
     ])
 
     mock_create_gc_agreement_deployments.assert_not_called()
-    mock_send_notification.assert_not_called()
+    mock_send_warning.assert_not_called()

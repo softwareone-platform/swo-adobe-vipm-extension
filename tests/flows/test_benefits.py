@@ -117,6 +117,7 @@ def test_check_3yc_commitment_request_declined(
     mocker,
     mock_adobe_client,
     mock_mpt_client,
+    mock_send_warning,
     settings,
     agreement_factory,
     adobe_customer_factory,
@@ -137,7 +138,6 @@ def test_check_3yc_commitment_request_declined(
         return_value=[agreement],
     )
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.benefits.update_agreement")
-    mocked_send_warning = mocker.patch("adobe_vipm.flows.benefits.send_warning")
 
     check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)
 
@@ -156,7 +156,7 @@ def test_check_3yc_commitment_request_declined(
         settings.MPT_PORTAL_BASE_URL, f"/commerce/agreements/{agreement['id']}"
     )
     request_type_title = "commitment" if not is_recommitment else "recommitment"
-    mocked_send_warning.assert_called_once_with(
+    mock_send_warning.assert_called_once_with(
         f"3YC {request_type_title.capitalize()} Request {request_status}",
         f"The 3-year {request_type_title} request for agreement {agreement['id']} "
         f"**{agreement['name']}** of the customer **{get_company_name(agreement)}** "

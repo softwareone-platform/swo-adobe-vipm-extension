@@ -258,6 +258,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
 
 def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
     mocker,
+    mock_mpt_client,
     requests_mocker,
     settings,
     agreement,
@@ -266,6 +267,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
     adobe_api_error_factory,
     adobe_authorizations_file,
     adobe_client_factory,
+    mock_send_warning,
 ):
     customer_id = "adobe-customer-id"
     adobe_client, _, _ = adobe_client_factory()
@@ -274,7 +276,6 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
         code=AdobeStatus.INVALID_CUSTOMER.value,
         message="Invalid Customer",
     )
-
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -283,7 +284,6 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
         status=400,
         json=adobe_api_error,
     )
-
     with pytest.raises(AdobeError):
         adobe_client.get_customer(authorization_uk, customer_id)
     mocker.patch(
@@ -295,44 +295,31 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.helpers.switch_order_to_failed",
     )
-    mocked_send_notification = mocker.patch(
-        "adobe_vipm.flows.helpers.send_notification",
-    )
-
-    mocker.patch(
-        "adobe_vipm.flows.helpers.sync_agreements_by_agreement_ids",
-    )
-
+    mocker.patch("adobe_vipm.flows.helpers.sync_agreements_by_agreement_ids")
     fulfillment_parameters = fulfillment_parameters_factory(
         customer_id=customer_id,
     )
-
     external_ids = {"vendor": customer_id}
-
     order = order_factory(
         fulfillment_parameters=fulfillment_parameters,
         external_ids=external_ids,
     )
-
-    mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=order)
 
     step = SetupContext()
-    step(mocked_client, context, mocked_next_step)
+    step(mock_mpt_client, context, mocked_next_step)
 
     mocked_switch_order_to_failed.assert_called_once_with(
-        mocked_client,
+        mock_mpt_client,
         context.order,
         ERR_CUSTOMER_LOST_EXCEPTION.to_dict(
             error=f"Received Adobe error {adobe_api_error['code']} - {adobe_api_error['message']}"
         ),
     )
-    mocked_send_notification.assert_called_once_with(
+    mock_send_warning.assert_called_once_with(
         "Lost customer adobe-customer-id.",
         f"Received Adobe error {adobe_api_error['code']} - {adobe_api_error['message']}",
-        "FFA500",
     )
     mocked_next_step.assert_not_called()
 
