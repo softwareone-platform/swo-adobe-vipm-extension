@@ -224,7 +224,7 @@ def test_reseller_create_ok(
             ws[f"{letter}2"].value = authorization_uk
             continue
         if column == "seller_uk":
-            ws[f"{letter}2"].value = "another_seller_uk"
+            ws[f"{letter}2"].value = "seller_uk"
             continue
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"

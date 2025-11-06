@@ -8,8 +8,8 @@ import responses
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
+from adobe_vipm.adobe import config
 from adobe_vipm.adobe.client import AdobeClient
-from adobe_vipm.adobe.config import Config
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus, OfferType
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
@@ -238,9 +238,12 @@ def adobe_authorizations_file():
 
 @pytest.fixture
 def mock_adobe_config(mocker, adobe_credentials_file, adobe_authorizations_file, adobe_config_file):
-    mocker.patch.object(Config, "_load_credentials", return_value=adobe_credentials_file)
-    mocker.patch.object(Config, "_load_authorizations", return_value=adobe_authorizations_file)
-    mocker.patch.object(Config, "_load_config", return_value=adobe_config_file)
+    config._CONFIG = None
+    mocker.patch.object(config.Config, "_load_credentials", return_value=adobe_credentials_file)
+    mocker.patch.object(
+        config.Config, "_load_authorizations", return_value=adobe_authorizations_file
+    )
+    mocker.patch.object(config.Config, "_load_config", return_value=adobe_config_file)
 
 
 @pytest.fixture
