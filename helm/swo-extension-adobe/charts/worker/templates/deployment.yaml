@@ -15,8 +15,8 @@ spec:
   template:
     metadata:
       labels:
-        app.pyracloud.com/access-policy: {{.Values.accessPolicy}} 
-        app.pyracloud.com/access-policy-audience: {{.Values.accessPolicyAudience}} 
+        app.pyracloud.com/access-policy: {{ .Values.accessPolicy }} 
+        app.pyracloud.com/access-policy-audience: {{ .Values.accessPolicyAudience }} 
         {{- include "common.labels" . | nindent 8 }}
     spec:
       volumes:
@@ -27,7 +27,7 @@ spec:
         - name: main
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.global.registryUrl }}/{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          image: "{{ .Values.global.registryUrl }}{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
           command:
             - swoext
           args:

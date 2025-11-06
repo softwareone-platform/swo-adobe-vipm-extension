@@ -6,7 +6,7 @@ owner: turing
 git:
   repository: swo-extension-adobe
 image:
-  repository: swo-extensions-vipm
+  repository: /swo-extensions-vipm
   pullPolicy: IfNotPresent
 
 nameOverride: ""

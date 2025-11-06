@@ -31,7 +31,7 @@ spec:
             - name: {{ $name }}
               securityContext:
                 {{- toYaml $.Values.securityContext | nindent 16 }}
-              image: "{{ $.Values.global.registryUrl }}/{{ $.Values.image.repository }}:{{ $.Chart.AppVersion }}"
+              image: "{{ $.Values.global.registryUrl }}{{ $.Values.image.repository }}:{{ $.Chart.AppVersion }}"
               command:
                 - swoext
               args:
