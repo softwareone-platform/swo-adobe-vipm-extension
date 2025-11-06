@@ -41,16 +41,6 @@ def mock_mpt_terminate_subscription(mocker):
 
 
 @pytest.fixture
-def mock_send_notification(mocker):
-    mock = mocker.MagicMock(spec="adobe_vipm.notifications.send_notification")
-    mocker.patch("adobe_vipm.flows.sync.helper.send_notification", new=mock)
-    mocker.patch("adobe_vipm.flows.sync.agreement.send_notification", new=mock)
-    mocker.patch("adobe_vipm.notifications.send_notification", new=mock)
-
-    return mock
-
-
-@pytest.fixture
 def mock_mpt_get_agreement_subscription(mocker, subscriptions_factory):
     return mocker.patch(
         "mpt_extension_sdk.mpt_http.mpt.get_agreement_subscription",

@@ -339,7 +339,7 @@ def test_get_customer_or_process_lost_customer_error(
     mocker,
     mock_mpt_client,
     mock_adobe_client,
-    mock_send_notification,
+    mock_send_warning,
     mock_mpt_terminate_subscription,
     mock_get_agreements_by_customer_deployments,
     agreement,
@@ -362,7 +362,7 @@ def test_get_customer_or_process_lost_customer_error(
 
     assert result is None
     mock_adobe_client.get_customer.assert_called_once_with("AUT-4785-7184", "fake_customer_id")
-    mock_send_notification.assert_called_once()
+    mock_send_warning.assert_called_once()
     mock_mpt_terminate_subscription.assert_has_calls([
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
         mocker.call(mock_mpt_client, "SUB-1000-2000-3000", "Suspected Lost Customer"),
@@ -371,10 +371,9 @@ def test_get_customer_or_process_lost_customer_error(
 
 
 def test_get_customer_or_process_lost_customer_dry_run(
-    mocker,
     mock_mpt_client,
     mock_adobe_client,
-    mock_send_notification,
+    mock_send_exception,
     mock_mpt_terminate_subscription,
     mock_get_agreements_by_customer_deployments,
     agreement,
@@ -398,5 +397,5 @@ def test_get_customer_or_process_lost_customer_dry_run(
     assert result is None
 
     mock_adobe_client.get_customer.assert_called_once_with("AUT-4785-7184", "fake_customer_id")
-    mock_send_notification.assert_not_called()
+    mock_send_exception.assert_not_called()
     mock_mpt_terminate_subscription.assert_not_called()
