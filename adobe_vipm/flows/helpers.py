@@ -24,6 +24,8 @@ from adobe_vipm.airtable.models import (
     get_prices_for_skus,
 )
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_COMMITMENT_3YC_CONSUMABLES,
     ERR_COMMITMENT_3YC_EXPIRED_REJECTED_NO_COMPLIANT,
@@ -33,10 +35,13 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_SKU_AVAILABILITY,
+    MARKET_SEGMENT_GOVERNMENT,
+    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC,
     Param,
     TeamsColorCode,
 )
+from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.fulfillment.shared import handle_error, switch_order_to_failed
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync import sync_agreements_by_agreement_ids
@@ -56,6 +61,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_downsizes_upsizes_new,
 )
+from adobe_vipm.flows.utils.validation import validate_government_lga_data
 from adobe_vipm.notifications import send_exception, send_notification
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
@@ -776,4 +782,46 @@ class ValidateSkuAvailability(Step):
             return
 
         logger.info("SKU availability validation passed. All SKUs found in pricing.")
+        next_step(mpt_client, context)
+
+
+class ValidateGovernmentTransfer(Step):
+    """Validate the government transfer."""
+
+    def __init__(self, *, is_validation: bool) -> None:
+        self.is_validation = is_validation
+
+    def __call__(self, mpt_client, context, next_step):
+        """Validate the government transfer."""
+        if get_market_segment(context.order["product"]["id"]) not in {
+            MARKET_SEGMENT_GOVERNMENT,
+            MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
+        }:
+            next_step(mpt_client, context)
+            return
+        adobe_client = get_adobe_client()
+        adobe_customer = adobe_client.get_customer(
+            context.order["authorization"]["id"], context.customer_id
+        )
+        try:
+            validate_government_lga_data(context.order, adobe_customer)
+        except GovernmentLGANotValidOrderError:
+            handle_error(
+                mpt_client,
+                context,
+                ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict(),
+                is_validation=self.is_validation,
+                parameter=Param.MEMBERSHIP_ID,
+            )
+            return
+        except GovernmentNotValidOrderError:
+            handle_error(
+                mpt_client,
+                context,
+                ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict(),
+                is_validation=self.is_validation,
+                parameter=Param.MEMBERSHIP_ID,
+            )
+            return
+
         next_step(mpt_client, context)
