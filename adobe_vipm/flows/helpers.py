@@ -689,6 +689,9 @@ class ValidateResellerChange(Step):
             next_step(mpt_client, context)
             return
 
+        if not self._validate_government_reseller_change(mpt_client, context):
+            return
+
         expiry_date = context.adobe_transfer["approval"]["expiry"]
         reseller_change_code = get_ordering_parameter(context.order, Param.CHANGE_RESELLER_CODE)[
             "value"
@@ -709,6 +712,33 @@ class ValidateResellerChange(Step):
             return
 
         next_step(mpt_client, context)
+
+    def _validate_government_reseller_change(self, mpt_client, context):
+        if get_market_segment(context.order["product"]["id"]) in {
+            MARKET_SEGMENT_GOVERNMENT,
+            MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
+        }:
+            try:
+                validate_government_lga_data(context.order, context.adobe_transfer)
+            except GovernmentLGANotValidOrderError:
+                handle_error(
+                    mpt_client,
+                    context,
+                    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict(),
+                    is_validation=self.is_validation,
+                    parameter=Param.CHANGE_RESELLER_CODE,
+                )
+                return False
+            except GovernmentNotValidOrderError:
+                handle_error(
+                    mpt_client,
+                    context,
+                    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict(),
+                    is_validation=self.is_validation,
+                    parameter=Param.CHANGE_RESELLER_CODE,
+                )
+                return False
+        return True
 
 
 class ValidateSkuAvailability(Step):
