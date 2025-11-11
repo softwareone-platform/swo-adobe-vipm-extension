@@ -5,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http import mpt
 from mpt_extension_sdk.mpt_http.base import MPTClient
 
+from adobe_vipm import notifications
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
@@ -12,7 +13,6 @@ from adobe_vipm.flows.constants import Param, SubscriptionStatus
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_commitment_request_invitation
 from adobe_vipm.flows.sync.agreement import AgreementsSyncer
 from adobe_vipm.flows.utils import get_adobe_customer_id
-from adobe_vipm.notifications import send_exception, send_warning
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ def get_customer_or_process_lost_customer(
                 logger.info("Dry run mode: skipping processing lost customer %s.", customer_id)
                 return None
 
-            send_warning(
+            notifications.send_warning(
                 "Executing Lost Customer Procedure.",
                 f"Received Adobe error {error.code} - {error.message},"
                 " assuming lost customer and proceeding with lost customer procedure.",
@@ -306,7 +306,7 @@ def _process_lost_customer(  # noqa: C901
                 "> Suspected Lost Customer: Error terminating subscription %s.",
                 subscription_id,
             )
-            send_exception(
+            notifications.send_exception(
                 f"> Suspected Lost Customer: Error terminating subscription {subscription_id}",
                 f"{error}",
             )
@@ -336,7 +336,7 @@ def _process_lost_customer(  # noqa: C901
                         "> Suspected Lost Customer: Error terminating subscription %s.",
                         subscription_id,
                     )
-                    send_exception(
+                    notifications.send_exception(
                         "> Suspected Lost Customer: Error terminating subscription"
                         f" {subscription_id}",
                         f"{error}",

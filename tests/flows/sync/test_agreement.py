@@ -1807,7 +1807,6 @@ def test_add_missing_subscriptions_wrong_currency(
     agreement_factory,
     mock_send_exception,
     adobe_customer_factory,
-    mock_send_warning,
     adobe_subscription_factory,
     mock_get_product_items_by_skus,
     mock_get_product_items_by_period,
@@ -1846,7 +1845,11 @@ def test_add_missing_subscriptions_wrong_currency(
 
 
 def test_process_orphaned_deployment_subscriptions(
-    agreement_factory, adobe_subscription_factory, mock_adobe_client, mocked_agreement_syncer
+    agreement_factory,
+    adobe_subscription_factory,
+    mock_adobe_client,
+    mocked_agreement_syncer,
+    mock_send_warning,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
         adobe_subscription_factory(subscription_id="a-sub-id", deployment_id="deployment_id"),
@@ -1855,8 +1858,14 @@ def test_process_orphaned_deployment_subscriptions(
 
     mocked_agreement_syncer._process_orphaned_deployment_subscriptions([agreement_factory()])
 
-    mock_adobe_client.update_subscription.assert_called_once_with(
-        "AUT-1234-5678", "a-client-id", "a-sub-id", auto_renewal=False
+    # TODO: revert after fixing
+    # mock_adobe_client.update_subscription.assert_called_once_with(
+    #     "AUT-1234-5678", "a-client-id", "a-sub-id", auto_renewal=False
+    # )  noqa: ERA001
+    mock_adobe_client.update_subscription.assert_not_called()
+    mock_send_warning.assert_called_once_with(
+        "Orphaned Adobe Subscription",
+        "Found Orphaned Adobe Subscription: a-sub-id, Agreement: AGR-2119-4550-8674-5962",
     )
 
 
@@ -1880,6 +1889,7 @@ def test_process_orphaned_deployment_subscriptions_error(
     mock_adobe_client,
     mock_send_exception,
     mocked_agreement_syncer,
+    mock_send_warning,
 ):
     mock_adobe_client.update_subscription.side_effect = Exception("Boom!")
     mocked_agreement_syncer._adobe_subscriptions = [
@@ -1889,8 +1899,13 @@ def test_process_orphaned_deployment_subscriptions_error(
 
     mocked_agreement_syncer._process_orphaned_deployment_subscriptions([agreement_factory()])
 
-    mock_send_exception.assert_called_once_with(
-        "Error disabling auto-renewal for orphaned Adobe subscription a-sub-id.", "Boom!"
+    # TODO: revert after fixing
+    # mock_send_exception.assert_called_once_with(
+    #     "Error disabling auto-renewal for orphaned Adobe subscription a-sub-id.", "Boom!"
+    # )  noqa: ERA001
+    mock_send_warning.assert_called_once_with(
+        "Orphaned Adobe Subscription",
+        "Found Orphaned Adobe Subscription: a-sub-id, Agreement: AGR-2119-4550-8674-5962",
     )
 
 

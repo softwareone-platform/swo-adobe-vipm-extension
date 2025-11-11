@@ -10,6 +10,7 @@ from mpt_extension_sdk.mpt_http import mpt
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.utils import find_first
 
+from adobe_vipm import notifications
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AuthorizationNotFoundError
@@ -37,7 +38,6 @@ from adobe_vipm.flows.utils import (
     notify_missing_prices,
 )
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
-from adobe_vipm.notifications import send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -167,7 +167,7 @@ class AgreementsSyncer:  # noqa: WPS214
             # TODO: Move to the validate method or raise an error and send the notification from
             # the main method.
             logger.error(msg)
-            send_warning("Customer does not have discounts information", msg)
+            notifications.send_warning("Customer does not have discounts information", msg)
             return False
 
         return True
@@ -229,7 +229,7 @@ class AgreementsSyncer:  # noqa: WPS214
                         auto_renewal=False,
                     )
 
-                    send_exception(
+                    notifications.send_exception(
                         title="Price currency mismatch detected!", text=f"{adobe_subscription}"
                     )
                 continue
@@ -391,7 +391,7 @@ class AgreementsSyncer:  # noqa: WPS214
                 f"agreement {self.agreement_id}"
             )
             logger.error(message)
-            send_warning("Missing external IDs", message)
+            notifications.send_warning("Missing external IDs", message)
 
         return mpt_entitlements_external_ids
 
@@ -777,7 +777,7 @@ class AgreementsSyncer:  # noqa: WPS214
                     )
                 )
             models.create_gc_agreement_deployments(self.product_id, missing_deployments)
-            send_warning(
+            notifications.send_warning(
                 "Missing deployments added to Airtable",
                 f"agreement {self.agreement_id}, deployments: {missing_deployment_ids}.",
             )
@@ -848,23 +848,30 @@ class AgreementsSyncer:  # noqa: WPS214
         for subscription in filter(
             partial(_is_subscription_in_set, orphaned_subscription_ids), self._adobe_subscriptions
         ):
-            logger.warning("> Disabling auto-renewal for orphaned subscription %s", subscription)
             try:
-                if self._dry_run:
+                notifications.send_warning(
+                    "Orphaned Adobe Subscription",
+                    f"Found Orphaned Adobe Subscription: {subscription['subscriptionId']},"
+                    f" Agreement: {self.agreement_id}",
+                )
+                if True:  # TODO: self._dry_run:  # revert after fixing # noqa: WPS314 # NOSONAR
                     logger.info(
-                        "Dry run mode: skipping update orphaned subscription %s with:\n "
-                        "auto_renewal False",
+                        "Dry run mode: skip disabling auto-renewal for orphaned subscription"
+                        " %s with:\n ",
                         subscription["subscriptionId"],
                     )
                 else:
+                    logger.warning(
+                        "Disabling auto-renewal for orphaned subscription %s", subscription
+                    )
                     self._adobe_client.update_subscription(
                         self._authorization_id,
                         self._adobe_customer_id,
                         subscription["subscriptionId"],
                         auto_renewal=False,
                     )
-            except Exception as error:
-                send_exception(
+            except Exception as error:  # TODO: revert after fixing  # pragma: no cover
+                notifications.send_exception(
                     "Error disabling auto-renewal for orphaned Adobe subscription"
                     f" {subscription['subscriptionId']}.",
                     f"{error}",
