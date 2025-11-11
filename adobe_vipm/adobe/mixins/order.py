@@ -201,7 +201,9 @@ class OrderClientMixin:
             return None
 
         customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
-        return self.get_preview_order(authorization, customer_id, payload)
+        preview_order = self.get_preview_order(authorization, customer_id, payload)
+        logger.info("Created preview order %s", preview_order["externalReferenceId"])
+        return preview_order
 
     @wrap_http_error
     def create_preview_renewal(
