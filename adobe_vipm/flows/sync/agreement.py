@@ -1,7 +1,6 @@
 import copy
 import datetime as dt
 import logging
-import sys
 import traceback
 from functools import partial
 from typing import Any
@@ -76,6 +75,7 @@ class AgreementsSyncer:  # noqa: WPS214
         self._seller_id: str = agreement["seller"]["id"]
         self._licensee_id: str = agreement["licensee"]["id"]
         self._adobe_customer_id: str = get_adobe_customer_id(self._agreement)
+        self._currency = agreement["listing"]["priceList"]["currency"]
 
     @property
     def agreement_id(self) -> str:
@@ -120,6 +120,8 @@ class AgreementsSyncer:  # noqa: WPS214
                 self._update_subscriptions(
                     self._agreement, subscriptions_for_update, sync_prices=sync_prices
                 )
+
+            self._prepare_agreement_line_prices(self._agreement, self._currency, self.product_id)
 
             self._update_agreement(self._agreement)
 
@@ -445,8 +447,6 @@ class AgreementsSyncer:  # noqa: WPS214
                 get_commitment_start_date(self._customer),
             )
 
-        self._log_agreement_lines(agreement, currency, product_id)
-
     def _update_subscription(
         self,
         actual_sku: str,
@@ -605,7 +605,9 @@ class AgreementsSyncer:  # noqa: WPS214
 
         return new_parameters
 
-    def _log_agreement_lines(self, agreement: dict, currency: str, product_id: str) -> None:
+    def _prepare_agreement_line_prices(
+        self, agreement: dict, currency: str, product_id: str
+    ) -> None:
         agreement_lines = []
         for line in agreement["lines"]:
             if line["item"]["externalIds"]["vendor"] != "adobe-reseller-transfer":
@@ -620,15 +622,13 @@ class AgreementsSyncer:  # noqa: WPS214
         for line, actual_sku in agreement_lines:
             current_price = line["price"]["unitPP"]
             line["price"]["unitPP"] = prices[actual_sku]
-
-            # ???: why don't use the same log here?
-            if self._dry_run:
-                sys.stdout.write(
-                    f"OneTime item: {line['id']}: sku={actual_sku}, current_price={current_price}, "
-                    f"new_price={prices[actual_sku]}\n",
-                )
-            else:
-                logger.info("OneTime item: %s: sku=%s\n", line["id"], actual_sku)
+            logger.info(
+                "OneTime item: %s: sku=%s, current_price=%s, new_price=%s",
+                line["id"],
+                actual_sku,
+                current_price,
+                prices[actual_sku],
+            )
 
     # REFACTOR: get method must not update subscriptions in mpt or terminate a subscription
     def _get_subscriptions_for_update(self, agreement: dict) -> list[tuple[dict, dict, str]]:  # noqa: C901

@@ -265,7 +265,7 @@ def test_sync_agreement_prices(
 
 @freeze_time("2025-06-23")
 def test_sync_agreement_update_agreement(
-    mock_mpt_client, mocked_agreement_syncer, mock_get_agreement
+    mock_mpt_client, mocked_agreement_syncer, mock_get_agreement, mock_get_prices_for_skus
 ):
     mocked_agreement_syncer.sync(sync_prices=True)
 
@@ -845,6 +845,7 @@ def test_sync_global_customer_update_not_required(
     mock_get_subscriptions_for_update,
     mock_get_agreements_by_customer_deployments,
     mock_check_update_airtable_missing_deployments,
+    mock_get_prices_for_skus,
 ):
     mock_get_subscriptions_for_update.return_value = []
     mock_get_agreements_by_customer_deployments.return_value = []
@@ -894,6 +895,7 @@ def test_sync_global_customer_no_active_deployments(
     mock_add_missing_subscriptions,
     mock_get_subscriptions_for_update,
     mock_get_agreements_by_customer_deployments,
+    mock_get_prices_for_skus,
 ):
     mock_adobe_client.get_customer_deployments_active_status.return_value = []
     mock_get_subscriptions_for_update.return_value = []
