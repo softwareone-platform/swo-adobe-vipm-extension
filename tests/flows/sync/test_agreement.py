@@ -1850,6 +1850,9 @@ def test_process_orphaned_deployment_subscriptions(
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
         adobe_subscription_factory(subscription_id="a-sub-id", deployment_id="deployment_id"),
+        adobe_subscription_factory(
+            subscription_id="c-sub-id", deployment_id="deployment_id", autorenewal_enabled=False
+        ),
         adobe_subscription_factory(subscription_id="b-sub-id", deployment_id=""),
     ]
 
