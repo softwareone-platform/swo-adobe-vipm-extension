@@ -848,6 +848,8 @@ class AgreementsSyncer:  # noqa: WPS214
         for subscription in filter(
             partial(_is_subscription_in_set, orphaned_subscription_ids), self._adobe_subscriptions
         ):
+            if subscription["autoRenewal"]["enabled"] is False:
+                continue
             logger.warning("> Disabling auto-renewal for orphaned subscription %s", subscription)
             try:
                 if self._dry_run:
