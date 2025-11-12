@@ -274,7 +274,10 @@ def test_create_preview_order_upsize(
 
     client, authorization, api_token = adobe_client_factory()
 
-    order = order_factory(lines=lines_factory(old_quantity=old_quantity, quantity=quantity))
+    order = order_factory(
+        lines=lines_factory(old_quantity=old_quantity, quantity=quantity),
+        deployment_id=deployment_id,
+    )
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     adobe_subscription = adobe_subscription_factory(
         current_quantity=current_quantity,
@@ -351,7 +354,6 @@ def test_create_preview_order_upsize(
         new_lines=[],
         customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
-        deployment_id=deployment_id,
     )
 
     preview_order = client.create_preview_order(context)
@@ -405,7 +407,9 @@ def test_create_preview_order_upsize_product_not_found(
     client, _, _ = adobe_client_factory()
 
     # Create an order with a non-existent product SKU
-    order = order_factory(lines=lines_factory(old_quantity=5, quantity=10))
+    order = order_factory(
+        lines=lines_factory(old_quantity=5, quantity=10), deployment_id=deployment_id
+    )
     order["lines"][0]["item"]["externalIds"] = {"vendor": "NONEXISTENT-SKU"}
     context = Context(
         order=order,
@@ -417,7 +421,6 @@ def test_create_preview_order_upsize_product_not_found(
         upsize_lines=order["lines"],
         new_lines=[],
         customer_data=get_customer_data(order),
-        deployment_id=deployment_id,
         adobe_customer_id=customer_id,
     )
 
@@ -454,7 +457,9 @@ def test_create_preview_order_upsize_after_downsize_lower(
 
     client, _, _ = adobe_client_factory()
 
-    order = order_factory(lines=lines_factory(old_quantity=8, quantity=9))
+    order = order_factory(
+        lines=lines_factory(old_quantity=8, quantity=9), deployment_id=deployment_id
+    )
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     adobe_subscription = adobe_subscription_factory(
         current_quantity=10,
@@ -493,7 +498,6 @@ def test_create_preview_order_upsize_after_downsize_lower(
         currency="EUR",
         upsize_lines=order["lines"],
         customer_data=get_customer_data(order),
-        deployment_id=deployment_id,
         adobe_customer_id=customer_id,
     )
 
@@ -527,7 +531,9 @@ def test_create_preview_newlines(
 
     client, authorization, api_token = adobe_client_factory()
 
-    order = order_factory(lines=lines_factory(old_quantity=0, quantity=5))
+    order = order_factory(
+        lines=lines_factory(old_quantity=0, quantity=5), deployment_id=deployment_id
+    )
     order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
 
     requests_mocker.post(
@@ -589,7 +595,6 @@ def test_create_preview_newlines(
         upsize_lines=[],
         new_lines=order["lines"],
         customer_data=get_customer_data(order),
-        deployment_id=deployment_id,
         adobe_customer_id=customer_id,
     )
 
@@ -707,7 +712,6 @@ def test_create_preview_newlines_wo_deployment(
         new_lines=order["lines"],
         upsize_lines=[],
         customer_data=get_customer_data(order),
-        deployment_id=None,
         adobe_customer_id=customer_id,
     )
 
@@ -751,7 +755,6 @@ def test_create_preview_order_bad_request(
     mock_order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
-    deployment_id = "a_deployment_id"
     client, _, _ = adobe_client_factory()
     error = adobe_api_error_factory("1234", "An error")
     requests_mocker.post(
@@ -787,7 +790,6 @@ def test_create_preview_order_bad_request(
         new_lines=mock_order["lines"],
         upsize_lines=[],
         customer_data=get_customer_data(mock_order),
-        deployment_id=deployment_id,
         adobe_customer_id=customer_id,
     )
 
