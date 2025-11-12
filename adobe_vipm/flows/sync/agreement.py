@@ -390,7 +390,7 @@ class AgreementsSyncer:  # noqa: WPS214
                 f"Missing external IDs for entitlements: {entitlements_to_notify} in the "
                 f"agreement {self.agreement_id}"
             )
-            logger.error(message)
+            logger.warning(message)
             send_warning("Missing external IDs", message)
 
         return mpt_entitlements_external_ids
