@@ -891,7 +891,12 @@ class AgreementsSyncer:  # noqa: WPS214
 
         self._process_orphaned_deployment_subscriptions(deployment_agreements)
 
-        for deployment_agreement in deployment_agreements:
+        active_deployment_agreements = [
+            agreement
+            for agreement in deployment_agreements
+            if agreement["status"] == AgreementStatus.ACTIVE
+        ]
+        for deployment_agreement in active_deployment_agreements:
             subscriptions_for_update = self._get_subscriptions_for_update(deployment_agreement)
             if subscriptions_for_update:
                 self._update_subscriptions(
