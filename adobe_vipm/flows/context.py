@@ -28,7 +28,7 @@ class Context:
     adobe_new_order: dict | None = None
     adobe_returnable_orders: dict = field(default_factory=dict)
     adobe_return_orders: dict = field(default_factory=dict)
-    deployment_id: str | None = None
+    membership_id: str | None = None
 
     def __str__(self):
         due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else "-"

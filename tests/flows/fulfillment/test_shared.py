@@ -869,7 +869,6 @@ def test_submit_new_order_step(
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
         adobe_preview_order=preview_order,
-        deployment_id=None,
     )
 
     step = SubmitNewOrder()
@@ -913,7 +912,6 @@ def test_submit_new_order_step_flex_discount(
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
         adobe_preview_order=preview_order,
-        deployment_id=None,
     )
 
     step = SubmitNewOrder()
@@ -978,7 +976,6 @@ def test_submit_new_order_step_with_deployment_id(
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
         adobe_preview_order=preview_order,
-        deployment_id=deployment_id,
     )
 
     step = SubmitNewOrder()
@@ -1032,7 +1029,6 @@ def test_submit_new_order_step_order_created_and_processed(
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
-        deployment_id="",
     )
 
     step = SubmitNewOrder()
@@ -1061,7 +1057,9 @@ def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
         order_type="NEW",
         status=AdobeStatus.PROCESSED.value,
     )
-    order = order_factory(external_ids={"vendor": new_order["orderId"]})
+    order = order_factory(
+        external_ids={"vendor": new_order["orderId"]}, deployment_id=deployment_id
+    )
 
     mocked_adobe_client = mocker.MagicMock()
     mocked_adobe_client.get_order.return_value = new_order
@@ -1083,7 +1081,6 @@ def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
         upsize_lines=order["lines"],
-        deployment_id=deployment_id,
     )
 
     step = SubmitNewOrder()
@@ -1826,7 +1823,6 @@ def test_get_preview_order_step(
         adobe_customer_id="customer-id",
         new_lines=order["lines"],
         upsize_lines=[],
-        deployment_id=deployment_id,
     )
 
     step = GetPreviewOrder()
