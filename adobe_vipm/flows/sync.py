@@ -1237,7 +1237,12 @@ def sync_deployments_prices(
         adobe_subscriptions,
     )
 
-    for deployment_agreement in deployment_agreements:
+    active_deployment_agreements = [
+        agreement
+        for agreement in deployment_agreements
+        if agreement["status"] == AgreementStatus.ACTIVE
+    ]
+    for deployment_agreement in active_deployment_agreements:
         if sync_prices:
             subscriptions_for_update = _get_subscriptions_for_update(
                 mpt_client, deployment_agreement, customer, adobe_subscriptions

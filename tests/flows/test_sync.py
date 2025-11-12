@@ -918,6 +918,7 @@ def test_sync_global_customer_parameter(
     mock_add_missing_subscriptions,
     mock_get_adobe_product_by_marketplace_sku,
     dry_run,
+    caplog,
 ):
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
@@ -960,11 +961,19 @@ def test_sync_global_customer_parameter(
     ]
     deployment_agreements = [
         agreement_factory(
+            agreement_id="AGR-deployment-1",
             fulfillment_parameters=fulfillment_parameters_factory(
                 global_customer="", deployment_id="deployment-1", deployments=""
             ),
             lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
-        )
+        ),
+        agreement_factory(
+            agreement_id="AGR-deployment-2",
+            status=AgreementStatus.TERMINATED,
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="", deployment_id="deployment-2", deployments=""
+            ),
+        ),
     ]
     mocker.patch(
         "adobe_vipm.flows.sync.get_agreements_by_customer_deployments",
@@ -1033,7 +1042,7 @@ def test_sync_global_customer_parameter(
             ),
             mocker.call(
                 mock_mpt_client,
-                deployment_agreements[0]["id"],
+                agreement["id"],
                 parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-19"}]},
             ),
         ]
@@ -1050,7 +1059,8 @@ def test_sync_global_customer_parameter(
                 },
             )
         ]
-
+    assert "Getting subscriptions for update for agreement AGR-deployment-1" in caplog.messages
+    assert "Getting subscriptions for update for agreement AGR-deployment-2" not in caplog.messages
 
 @freeze_time("2025-06-19")
 def test_sync_global_customer_parameter_not_prices(
