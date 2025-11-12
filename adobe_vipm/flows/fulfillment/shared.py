@@ -919,9 +919,6 @@ class GetPreviewOrder(Step):
         if (context.upsize_lines or context.new_lines) and not context.adobe_new_order_id:
             try:
                 context.adobe_preview_order = adobe_client.create_preview_order(context)
-                logger.info(
-                    "Created preview order %s", context.adobe_preview_order["externalReferenceId"]
-                )
             except AdobeError as error:
                 switch_order_to_failed(
                     mpt_client,
