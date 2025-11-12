@@ -98,7 +98,6 @@ def test_get_preview_order_step(
         market_segment=segment,
         product_id="PRD-1234",
         currency="EUR",
-        deployment_id=deployment_id,
     )
 
     step = GetPreviewOrder()
@@ -131,7 +130,6 @@ def test_get_preview_order_step_no_deployment(
         market_segment=segment,
         product_id="PRD-1234",
         currency="EUR",
-        deployment_id=deployment_id,
     )
 
     step = GetPreviewOrder()

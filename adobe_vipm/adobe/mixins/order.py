@@ -20,6 +20,7 @@ from adobe_vipm.adobe.utils import (  # noqa: WPS347
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
 from adobe_vipm.flows.constants import FAKE_CUSTOMERS_IDS, Param
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.utils.deployment import get_deployment_id
 from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_partial_sku, map_by
 
@@ -184,9 +185,10 @@ class OrderClientMixin:
         }
         self._process_new_lines(context, flex_discounts, payload)
         self._process_upsize_lines(context, flex_discounts, payload)
-        if context.deployment_id:
+        deployment_id = get_deployment_id(context.order)
+        if deployment_id:
             for line_item in payload["lineItems"]:
-                line_item["deploymentId"] = context.deployment_id
+                line_item["deploymentId"] = deployment_id
                 line_item["currencyCode"] = authorization.currency
         else:
             payload["currencyCode"] = authorization.currency
@@ -199,7 +201,9 @@ class OrderClientMixin:
             return None
 
         customer_id = context.adobe_customer_id or FAKE_CUSTOMERS_IDS[context.market_segment]
-        return self.get_preview_order(authorization, customer_id, payload)
+        preview_order = self.get_preview_order(authorization, customer_id, payload)
+        logger.info("Created preview order %s", preview_order["externalReferenceId"])
+        return preview_order
 
     @wrap_http_error
     def create_preview_renewal(
