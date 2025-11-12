@@ -250,7 +250,7 @@ def extract_mpt_entitlements_external_ids(agreement) -> set[str]:
                 f"Missing external IDs for entitlements: {entitlements_to_notify} in the "
                 f"agreement {agreement["id"]}"
             )
-            logger.error(message)
+            logger.warning(message)
             send_notification("Missing external IDs", message, TeamsColorCode.ORANGE.value)
 
     return mpt_entitlements_external_ids
