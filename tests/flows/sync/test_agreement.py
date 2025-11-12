@@ -17,7 +17,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync.agreement import (
-    AgreementsSyncer,
+    AgreementSyncer,
     get_customer_or_process_lost_customer,
     sync_agreement,
     sync_agreements_by_3yc_end_date,
@@ -27,11 +27,6 @@ from adobe_vipm.flows.sync.agreement import (
     sync_agreements_by_renewal_date,
     sync_all_agreements,
 )
-
-
-@pytest.fixture
-def mock_get_template_data_by_adobe_subscription(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.agreement.get_template_data_by_adobe_subscription")
 
 
 def test_agreement_syncer_sync_dry_run(
@@ -79,7 +74,7 @@ def test_agreement_syncer_sync_dry_run(
     mock_mpt_get_agreement_subscription.return_value = mock_agreement["subscriptions"][0]
     mock_mpt_get_asset_template_by_name.return_value = None
 
-    AgreementsSyncer(
+    AgreementSyncer(
         mock_mpt_client,
         mock_adobe_client,
         mock_agreement,
@@ -407,6 +402,7 @@ def test_sync_agreement_prices_exception(
     adobe_subscription_factory,
     mocked_agreement_syncer,
     mock_mpt_get_template_by_name,
+    mock_notify_agreement_unhandled_exception_in_teams,
 ):
     mpt_subscriptions = subscriptions_factory(
         adobe_subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA",
@@ -428,9 +424,6 @@ def test_sync_agreement_prices_exception(
     )
     mpt_subscription = mpt_subscriptions[0]
     mock_mpt_get_agreement_subscription.return_value = mpt_subscription
-    mock_notifier = mocker.patch(
-        "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams",
-    )
 
     with caplog.at_level(logging.ERROR):
         mocked_agreement_syncer.sync(sync_prices=True)
@@ -445,7 +438,9 @@ def test_sync_agreement_prices_exception(
         template={"id": "TPL-1234", "name": "Expired"},
     )
     mock_mpt_update_agreement.assert_not_called()
-    mock_notifier.assert_called_once_with(agreement["id"], mocker.ANY)
+    mock_notify_agreement_unhandled_exception_in_teams.assert_called_once_with(
+        agreement["id"], mocker.ANY
+    )
 
 
 def test_sync_agreement_prices_skip_processing(
@@ -952,6 +947,8 @@ def test_sync_global_customer_update_adobe_error(
     mocked_agreement_syncer,
     mock_notify_agreement_unhandled_exception_in_teams,
 ):
+    mocked_agreement_syncer._customer["globalSalesEnabled"] = True
+    mocked_agreement_syncer._agreement["subscriptions"] = []
     mock_adobe_client.get_customer_deployments_active_status.side_effect = AdobeAPIError(
         400, adobe_api_error_factory("9999", "some error")
     )
@@ -1058,6 +1055,7 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_get_template_data_by_adobe_subscription,
     mocked_agreement_syncer,
     mock_add_missing_subscriptions,
+    mock_notify_missing_prices,
 ):
     agreement = agreement_factory(
         lines=lines_factory(
@@ -1136,9 +1134,6 @@ def test_sync_agreement_prices_with_missing_prices(
             {"77777777CA01A12": 20.22},
         ],
     )
-    mocked_notify_missing_prices = mocker.patch(
-        "adobe_vipm.flows.sync.agreement.notify_missing_prices"
-    )
     mock_mpt_get_template_by_name.side_effect = [
         {"id": "TPL-2345", "name": "Expired"},
     ]
@@ -1152,7 +1147,7 @@ def test_sync_agreement_prices_with_missing_prices(
 
     assert "Skipping subscription" in caplog.text
     assert "65304578CA01A12" in caplog.text
-    mocked_notify_missing_prices.assert_called_once_with(
+    mock_notify_missing_prices.assert_called_once_with(
         "AGR-2119-4550-8674-5962", ["65304578CA01A12"], "PRD-1111-1111", "USD", None
     )
     mock_mpt_update_agreement.call_args_list = [
@@ -1177,7 +1172,7 @@ def test_sync_agreement_prices_with_missing_prices(
             mock_mpt_client,
             another_mpt_subscription["id"],
             lines=[
-                {"price": {"unitPP": 20.22}, "id": "ALI-2119-4550-8674-5962-0001", "quantity": 15}
+                {"id": "ALI-2119-4550-8674-5962-0001", "quantity": 15, "price": {"unitPP": 20.22}}
             ],
             parameters={
                 "fulfillment": [
@@ -2240,7 +2235,7 @@ def test_sync_agreements_by_3yc_enroll_status_status_error(
     mock_sync_agreement,
 ):
     mocker.patch(
-        "adobe_vipm.flows.sync.helper.get_agreements_by_3yc_commitment_request_invitation",
+        "adobe_vipm.flows.sync.agreement.get_agreements_by_3yc_commitment_request_invitation",
         side_effect=MPTAPIError(400, {"rql_validation": ["Value has to be a non empty array."]}),
         autospec=True,
     )

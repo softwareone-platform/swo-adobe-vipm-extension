@@ -2084,7 +2084,6 @@ def mock_update_order(mocker):
 def mock_send_exception(mocker):
     mock = mocker.Mock()
     mocker.patch("adobe_vipm.flows.sync.agreement.send_exception", new=mock)
-    mocker.patch("adobe_vipm.flows.sync.helper.send_exception", new=mock)
     mocker.patch("adobe_vipm.adobe.mixins.order.send_exception", new=mock)
     return mock
 
@@ -2096,5 +2095,4 @@ def mock_send_warning(mocker):
     mocker.patch("adobe_vipm.flows.fulfillment.transfer.send_warning", new=mock)
     mocker.patch("adobe_vipm.flows.helpers.send_warning", new=mock)
     mocker.patch("adobe_vipm.flows.sync.agreement.send_warning", new=mock)
-    mocker.patch("adobe_vipm.flows.sync.helper.send_warning", new=mock)
     return mock

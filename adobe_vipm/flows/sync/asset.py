@@ -13,7 +13,7 @@ from adobe_vipm.flows.utils import get_parameter, get_sku_with_discount_level
 logger = logging.getLogger(__name__)
 
 
-class AssetsSyncer:
+class AssetSyncer:
     """
     Handles the synchronization of assets.
 
