@@ -18,6 +18,7 @@ def test_sync_agreement_update_asset(
     mock_get_subscriptions_for_update,
     mocked_agreement_syncer,
     mock_mpt_update_asset,
+    mock_get_prices_for_skus,
 ):
     asset_id = "AST-1111-2222-3333"
     mock_asset = assets_factory(asset_id=asset_id, adobe_subscription_id="sub-one-time-id")[0]
@@ -78,6 +79,8 @@ def test_sync_agreement_update_asset_dry_run(
     mocked_agreement_syncer,
     mock_mpt_update_asset,
     mock_add_missing_subscriptions,
+    mock_get_adobe_product_by_marketplace_sku,
+    mock_get_prices_for_skus,
 ):
     asset_id = "AST-1111-2222-3333"
     mock_asset = assets_factory(asset_id=asset_id, adobe_subscription_id="sub-one-time-id")[0]
