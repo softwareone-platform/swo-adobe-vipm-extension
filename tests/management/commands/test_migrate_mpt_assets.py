@@ -168,6 +168,33 @@ def test_handle_no_agreements(mocker, mock_adobe_client, mock_setup_client):
     mock_adobe_client.assert_not_called()
 
 
+def test_handle_agreement_without_external_id(
+    mocker,
+    mock_adobe_client,
+    mock_setup_client,
+    mock_agreement_missing_asset_external_id,
+    mock_adobe_subscriptions,
+    capsys,
+):
+    mock_get_agreements_by_query = mocker.patch(
+        "adobe_vipm.management.commands.migrate_mpt_assets.get_agreements_by_query",
+        return_value=[mock_agreement_missing_asset_external_id],
+    )
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = mock_adobe_subscriptions
+    mock_update_asset = mocker.patch(
+        "adobe_vipm.management.commands.migrate_mpt_assets.update_asset"
+    )
+    mock_agreement_missing_asset_external_id["externalIds"] = {}
+
+    call_command("migrate_mpt_assets", agreements=[mock_agreement_missing_asset_external_id["id"]])
+
+    mock_get_agreements_by_query.assert_called_once()
+    mock_adobe_client.get_subscriptions_by_deployment.assert_not_called()
+    err_log = capsys.readouterr().err
+    assert "Error getting customer_id for agreement AGR-2119-4550-8674-5962" in err_log
+    mock_update_asset.assert_not_called()
+
+
 def test_handle_no_assets(
     mocker, mock_adobe_client, mock_setup_client, agreement, mock_adobe_subscriptions
 ):
