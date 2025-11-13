@@ -2,7 +2,11 @@ from typing import Any
 
 from django.conf import settings
 from mpt_extension_sdk.core.utils import setup_client
-from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query, update_asset
+from mpt_extension_sdk.mpt_http.mpt import (
+    get_agreements_by_query,
+    get_asset_template_by_name,
+    update_asset,
+)
 from mpt_extension_sdk.mpt_http.wrap_http_error import MPTAPIError
 from mpt_extension_sdk.runtime.tracer import dynamic_trace_span
 
@@ -10,8 +14,9 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.errors import MPTHttpError
-from adobe_vipm.flows.utils import get_deployment_id, get_parameter
+from adobe_vipm.flows.utils import get_deployment_id
 from adobe_vipm.management.commands.base import AdobeBaseCommand
+from adobe_vipm.utils import get_partial_sku
 
 
 class Command(AdobeBaseCommand):  # noqa: WPS214
@@ -42,19 +47,24 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
         subscriptions = self._get_subscriptions_from_adobe(agreement)
         for asset in self._get_assets_no_subscription_id(agreement["assets"]):
             self.info(f"Start updating asset {asset['id']}.")
-            adobe_subscription = self._find_subscription(subscriptions, asset)
+            adobe_subscription = self._find_subscription(subscriptions, asset["lines"])
             if not adobe_subscription:
                 self.error(f"Error updating asset {asset['id']}: subscription not found in Adobe")
                 continue
 
-            self._update_mpt_asset(asset, adobe_subscription, dry_run=dry_run)
+            self._update_mpt_asset(
+                asset, adobe_subscription, agreement["product"]["id"], dry_run=dry_run
+            )
             self.info(f"Asset {asset['id']} has been updated.")
 
         self.success(f"Agreement {agreement['id']} has been updated.")
 
     def _get_agreements(self, agreements: list[str]) -> list[dict[str, Any]]:
         mpt_client = setup_client()
-        select_fields = "-*,id,externalIds,authorization.id,assets,assets.parameters,parameters"  # noqa: WPS237
+        select_fields = (
+            "-*,id,externalIds,authorization.id,assets,assets.lines,assets.parameters,"
+            "parameters,product.id"
+        )  # noqa: WPS237
         rql_query = (
             f"select={select_fields}&in(product.id,({settings.MPT_PRODUCTS_IDS}))&eq(status,Active)"  # noqa: WPS237
         )
@@ -99,15 +109,16 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
     def _find_subscription(
         self,
         subscriptions: list[dict[str, Any]],
-        asset: dict[str, Any],  # noqa: WPS221
+        asset_lines: list[dict[str, Any]],  # noqa: WPS221
     ) -> dict[str, Any]:
-        adobe_sku = get_parameter(Param.PHASE_FULFILLMENT, asset, Param.ADOBE_SKU).get("value")
-        current_quantity = get_parameter(
-            Param.PHASE_FULFILLMENT, asset, Param.CURRENT_QUANTITY
-        ).get("value")
+        # assets have only 1 quantity by Adobe design
+        first_line_item = asset_lines[0]
+        partial_adobe_sku = first_line_item["item"]["externalIds"]["vendor"]
+        # quantity is string in Adobe and int in MPT
+        current_quantity = str(first_line_item["quantity"])
         return next(
             filter(
-                lambda sub: sub[Param.ADOBE_SKU] == adobe_sku
+                lambda sub: get_partial_sku(sub[Param.ADOBE_SKU]) == partial_adobe_sku
                 and sub[Param.CURRENT_QUANTITY] == current_quantity
                 and sub["processed"] is False,
                 subscriptions,
@@ -119,9 +130,13 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
         self,
         asset: dict[str, Any],
         adobe_subscription: dict[str, Any],
+        product_id: str,
         *,
         dry_run: bool = False,  # noqa: WPS221
     ) -> None:
+        mpt_client = setup_client()
+        template = get_asset_template_by_name(mpt_client, product_id, "Default")
+        template_data = {"id": template["id"], "name": template["name"]} if template else None
         parameters_data = {
             "fulfillment": [
                 {
@@ -144,15 +159,16 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
                 f"Dry run mode - Asset {asset['id']} updated with: \n"
                 f"parameters: {parameters_data} \n"
                 f"externalIds: {external_ids_data} \n"
+                f"template: {template_data}"
             )
         else:
-            mpt_client = setup_client()
             try:
                 update_asset(
                     mpt_client,
                     asset["id"],
                     parameters=parameters_data,
                     externalIds=external_ids_data,
+                    template=template,
                 )
             except (MPTHttpError, MPTAPIError) as error:
                 self.error(f"Error updating asset {asset['id']}: {error}")
@@ -161,6 +177,7 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
                     f"Asset {asset['id']} updated with: \n"
                     f"parameters: {parameters_data} \n"
                     f"externalIds: {external_ids_data} \n"
+                    f"template: {template_data}"
                 )
 
         adobe_subscription["processed"] = True
