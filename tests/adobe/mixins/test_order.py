@@ -231,7 +231,7 @@ def test_get_preview_order_not_qualified(
                     payload={
                         "code": "2141",
                         "message": "Customer is not qualified for the Flexible Discount",
-                        "additionalDetails": ["Line Item: 2, Reason: Invalid Flexible Discount"],
+                        "additionalDetails": ["Line Item: 3, Reason: Invalid Flexible Discount"],
                     },
                 )
             },

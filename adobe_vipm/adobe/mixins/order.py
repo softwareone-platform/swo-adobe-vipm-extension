@@ -476,8 +476,12 @@ class OrderClientMixin:
                     f"Can't parse Adobe error message: '{ex.details}'. Expected format example:"
                     f" 'Line Item: 2, Reason: Invalid Flexible Discount'"
                 )
-            item_no = int(matched.group(1)) - 1
-            return set(payload["lineItems"][item_no]["flexDiscountCodes"])
+            item_no = int(matched.group(1))
+            return set(
+                find_first(lambda line: line["extLineItemNumber"] == item_no, payload["lineItems"])[
+                    "flexDiscountCodes"
+                ]
+            )
         raise ex
 
     def _process_new_lines(self, context: Context, flex_discounts: dict, payload: dict):
