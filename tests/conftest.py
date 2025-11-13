@@ -1154,7 +1154,7 @@ def template():
 
 
 @pytest.fixture()
-def agreement(buyer, licensee, listing):
+def agreement(buyer, licensee, listing, fulfillment_parameters_factory):
     return {
         "id": "AGR-2119-4550-8674-5962",
         "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
@@ -1167,6 +1167,59 @@ def agreement(buyer, licensee, listing):
             },
             "updated": None,
         },
+        "authorization": {
+            "id": "AUT-4785-7184",
+        },
+        "assets": [
+            {
+                "id": "AST-0535-8763-6274",
+                "name": "Asset for Stock Credit Pack for Teams (500 credits pack); Multi Language"
+                " - North America; Multi",
+                "externalIds": {"vendor": "22414976d94999ab2c976bdd52b779NA"},
+                "status": "Active",
+                "price": {"PPx1": 41359.56000, "currency": "USD"},
+                "parameters": {
+                    "fulfillment": [
+                        {
+                            "id": "PAR-2119-4550-0027",
+                            "externalId": "currentQuantity",
+                            "name": "Current quantity",
+                            "type": "SingleLineText",
+                            "phase": "Fulfillment",
+                            "displayValue": "222",
+                            "value": "222",
+                        },
+                        {
+                            "id": "PAR-2119-4550-0028",
+                            "externalId": "adobeSKU",
+                            "name": "Asset SKU",
+                            "type": "SingleLineText",
+                            "phase": "Fulfillment",
+                            "displayValue": "65327701CA01A12",
+                            "value": "65327701CA01A12",
+                        },
+                        {
+                            "id": "PAR-2119-4550-0029",
+                            "externalId": "usedQuantity",
+                            "name": "Used quantity",
+                            "type": "SingleLineText",
+                            "phase": "Fulfillment",
+                            "displayValue": "23",
+                            "value": "23",
+                        },
+                        {
+                            "id": "PAR-2119-4550-0031",
+                            "externalId": "lastSyncDate",
+                            "name": "Last Synchronisation Date",
+                            "type": "Date",
+                            "phase": "Fulfillment",
+                            "displayValue": "2025-09-30",
+                            "value": "2025-09-30",
+                        },
+                    ]
+                },
+            },
+        ],
         "subscriptions": [
             {
                 "id": "SUB-1000-2000-3000",
@@ -1205,6 +1258,8 @@ def agreement(buyer, licensee, listing):
                 "externalIds": {"vendor": "6158e1cf0e4414a9b3a06d1239611111"},
             },
         ],
+        "externalIds": {"client": "", "vendor": "P1005259806"},
+        "parameters": {"fulfillment": fulfillment_parameters_factory()},
         "listing": listing,
         "licensee": licensee,
         "buyer": buyer,
@@ -1362,8 +1417,36 @@ def webhook(settings):
 
 
 @pytest.fixture()
+def mock_adobe_client(mocker):
+    adobe_client = mocker.MagicMock(spec=AdobeClient)
+    paths = [
+        "adobe_vipm.flows.benefits",
+        "adobe_vipm.flows.fulfillment.change",
+        "adobe_vipm.flows.fulfillment.purchase",
+        "adobe_vipm.flows.fulfillment.shared",
+        "adobe_vipm.flows.fulfillment.configuration",
+        "adobe_vipm.flows.fulfillment.termination",
+        "adobe_vipm.flows.fulfillment.transfer",
+        "adobe_vipm.flows.global_customer",
+        "adobe_vipm.flows.helpers",
+        "adobe_vipm.flows.migration",
+        "adobe_vipm.flows.sync",
+        "adobe_vipm.flows.validation.termination",
+        "adobe_vipm.flows.validation.change",
+        "adobe_vipm.flows.validation.shared",
+        "adobe_vipm.flows.validation.transfer",
+        "adobe_vipm.management.commands.create_resellers",
+        "adobe_vipm.management.commands.migrate_mpt_assets",
+    ]
+    for path in paths:
+        mocker.patch(f"{path}.get_adobe_client", return_value=adobe_client)
+
+    return adobe_client
+
+
+@pytest.fixture()
 def adobe_items_factory():  # noqa: C901
-    def _items(  # noqa: C901
+    def _items(
         line_number=1,
         offer_id="65304578CA01A12",
         quantity=170,
@@ -1595,10 +1678,13 @@ def mock_mpt_client(mocker):
 
 @pytest.fixture()
 def mock_setup_client(mocker, mock_mpt_client):
-    mocker.patch(
-        "adobe_vipm.management.commands.sync_3yc_enrol.setup_client",
-        return_value=mock_mpt_client,
-    )
+    paths = [
+        "adobe_vipm.management.commands.sync_3yc_enrol",
+        "adobe_vipm.management.commands.migrate_mpt_assets",
+    ]
+    for path in paths:
+        mocker.patch(f"{path}.setup_client", return_value=mock_mpt_client)
+
     return mock_mpt_client
 
 
@@ -2158,33 +2244,6 @@ def mock_invalid_env_values(
 @pytest.fixture()
 def mock_worker_initialize(mocker):
     return mocker.patch("mpt_extension_sdk.runtime.workers.initialize")
-
-
-@pytest.fixture()
-def mock_adobe_client(mocker):
-    adobe_client = mocker.MagicMock(spec=AdobeClient)
-    paths = [
-        "adobe_vipm.flows.benefits.get_adobe_client",
-        "adobe_vipm.flows.fulfillment.change.get_adobe_client",
-        "adobe_vipm.flows.fulfillment.purchase.get_adobe_client",
-        "adobe_vipm.flows.fulfillment.shared.get_adobe_client",
-        "adobe_vipm.flows.fulfillment.configuration.get_adobe_client",
-        "adobe_vipm.flows.fulfillment.termination.get_adobe_client",
-        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
-        "adobe_vipm.flows.global_customer.get_adobe_client",
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        "adobe_vipm.flows.migration.get_adobe_client",
-        "adobe_vipm.flows.sync.get_adobe_client",
-        "adobe_vipm.flows.validation.termination.get_adobe_client",
-        "adobe_vipm.flows.validation.change.get_adobe_client",
-        "adobe_vipm.flows.validation.shared.get_adobe_client",
-        "adobe_vipm.flows.validation.transfer.get_adobe_client",
-        "adobe_vipm.management.commands.create_resellers.get_adobe_client",
-    ]
-    for path in paths:
-        mocker.patch(path, return_value=adobe_client)
-
-    return adobe_client
 
 
 @pytest.fixture()
