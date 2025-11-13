@@ -22,7 +22,7 @@ from adobe_vipm.airtable.models import (
     AirTableBaseInfo,
     get_sku_adobe_mapping_model,
 )
-from adobe_vipm.flows.constants import AgreementStatus, Param
+from adobe_vipm.flows.constants import AgreementStatus, AssetStatus, ItemTermsModel, Param
 
 
 @pytest.fixture()
@@ -771,6 +771,7 @@ def items_factory():
         name="Awesome product",
         external_vendor_id="65304578CA",
         term_period="1y",
+        term_model="quantity",
     ):
         return [
             {
@@ -779,7 +780,7 @@ def items_factory():
                 "externalIds": {
                     "vendor": external_vendor_id,
                 },
-                "terms": {"period": term_period},
+                "terms": {"period": term_period, "model": term_model},
             },
         ]
 
@@ -822,6 +823,7 @@ def lines_factory(agreement, deployment_id=None):
         external_vendor_id="65304578CA",
         unit_purchase_price=1234.55,
         deployment_id=deployment_id,
+        asset=None,
     ):
         line = {
             "item": {
@@ -846,9 +848,73 @@ def lines_factory(agreement, deployment_id=None):
             line["id"] = f"ALI-{agreement_id}-{line_id:04d}"
         if deployment_id:
             line["deploymentId"] = deployment_id
+        if asset is not None:
+            line["asset"] = asset
+
         return [line]
 
     return _items
+
+
+@pytest.fixture()
+def assets_factory(lines_factory):
+    def _assets(
+        asset_id="AST-1000-2000-3000",
+        product_name="Awesome product",
+        adobe_subscription_id="a-sub-id",
+        adobe_sku="65327701CA01A12",
+        lines=None,
+    ):
+        lines = lines_factory() if lines is None else lines
+        return [
+            {
+                "id": asset_id,
+                "status": AssetStatus.ACTIVE.value,
+                "name": f"Asset for {product_name}",
+                "price": {"PPx1": 12595.2, "currency": "USD"},
+                "parameters": {
+                    "fulfillment": [
+                        {
+                            "id": "PAR-5516-5707-0027",
+                            "externalId": Param.CURRENT_QUANTITY.value,
+                            "name": Param.CURRENT_QUANTITY.value,
+                            "type": "SingleLineText",
+                            "phase": "Fulfillment",
+                            "displayValue": "20",
+                            "value": "20",
+                        },
+                        {
+                            "id": "PAR-5516-5707-0028",
+                            "externalId": Param.ADOBE_SKU.value,
+                            "name": Param.ADOBE_SKU.value,
+                            "type": "SingleLineText",
+                            "phase": "Fulfillment",
+                            "displayValue": adobe_sku,
+                            "value": adobe_sku,
+                        },
+                        {
+                            "id": "PAR-5516-5707-0029",
+                            "externalId": Param.USED_QUANTITY.value,
+                            "name": Param.USED_QUANTITY.value,
+                            "type": "SingleLineText",
+                            "phase": "Fulfillment",
+                            "displayValue": "16",
+                            "value": "16",
+                        },
+                    ]
+                },
+                "externalIds": {
+                    "vendor": adobe_subscription_id,
+                },
+                "lines": lines,
+                "terms": {
+                    "model": ItemTermsModel.ONE_TIME.value,
+                    "period": ItemTermsModel.ONE_TIME.value,
+                },
+            }
+        ]
+
+    return _assets
 
 
 @pytest.fixture()
@@ -916,18 +982,23 @@ def subscriptions_factory(lines_factory, subscription_price_factory):
 
 
 @pytest.fixture()
-def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_factory):
+def agreement_factory(
+    assets_factory, buyer, order_parameters_factory, fulfillment_parameters_factory
+):
     def _agreement(
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
         use_buyer_address=False,  # noqa: FBT002
+        assets=None,
         subscriptions=None,
         fulfillment_parameters=None,
         ordering_parameters=None,
         lines=None,
         status=AgreementStatus.ACTIVE.value,
     ):
+        if assets is None:
+            assets = assets_factory()
         if not subscriptions:
             subscriptions = [
                 {
@@ -1015,6 +1086,7 @@ def agreement_factory(buyer, order_parameters_factory, fulfillment_parameters_fa
             },
             "authorization": {"id": "AUT-1234-5678"},
             "lines": lines or [],
+            "assets": assets,
             "subscriptions": subscriptions,
             "parameters": {
                 "ordering": ordering_parameters or order_parameters_factory(),
@@ -1166,6 +1238,7 @@ def order_factory(
         order_parameters=None,
         fulfillment_parameters=None,
         lines=None,
+        assets=None,
         subscriptions=None,
         external_ids=None,
         status=status,
@@ -1181,7 +1254,8 @@ def order_factory(
             else fulfillment_parameters
         )
 
-        lines = lines_factory(deployment_id=deployment_id) if lines is None else lines
+        asset = assets[0] if assets is not None else None
+        lines = lines_factory(deployment_id=deployment_id, asset=asset) if lines is None else lines
         subscriptions = [] if subscriptions is None else subscriptions
 
         order = {
@@ -1197,6 +1271,7 @@ def order_factory(
             "clientReferenceNumber": None,
             "notes": "First order to try",
             "lines": lines,
+            "assets": assets or [],
             "subscriptions": subscriptions,
             "parameters": {
                 "fulfillment": fulfillment_parameters,
@@ -1388,6 +1463,7 @@ def adobe_subscription_factory():
         subscription_id=None,
         offer_id=None,
         current_quantity=10,
+        used_quantity=10,
         renewal_quantity=10,
         currency_code="USD",
         autorenewal_enabled=True,  # noqa: FBT002
@@ -1401,6 +1477,7 @@ def adobe_subscription_factory():
             "subscriptionId": subscription_id or "a-sub-id",
             "offerId": offer_id or "65304578CA01A12",
             Param.CURRENT_QUANTITY.value: current_quantity,
+            Param.USED_QUANTITY.value: used_quantity,
             "currencyCode": currency_code,
             "autoRenewal": {
                 "enabled": autorenewal_enabled,

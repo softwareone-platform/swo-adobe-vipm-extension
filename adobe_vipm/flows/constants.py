@@ -44,6 +44,7 @@ class Param(StrEnum):
     THREE_YC_END_DATE = "3YCEndDate"
     MARKET_SEGMENT_ELIGIBILITY_STATUS = "marketSegmentEligibilityStatus"
     CURRENT_QUANTITY = "currentQuantity"
+    USED_QUANTITY = "usedQuantity"
     RENEWAL_QUANTITY = "renewalQuantity"
     RENEWAL_DATE = "renewalDate"
     DUE_DATE = "dueDate"
@@ -390,6 +391,13 @@ ERR_SKU_AVAILABILITY = ValidationError(
 )
 
 
+class AssetStatus(StrEnum):
+    """MPT asset statuses."""
+
+    ACTIVE = "Active"
+    TERMINATED = "Terminated"
+
+
 class SubscriptionStatus(StrEnum):
     """MPT subscription statuses."""
 
@@ -416,3 +424,11 @@ class TeamsColorCode(StrEnum):
 
     # TODO: add all used colors
     ORANGE = "FFA500"
+
+
+class ItemTermsModel(StrEnum):
+    """MPT item terms model."""
+
+    ONE_TIME = "one-time"
+    USAGE = "usage"
+    QUANTITY = "quantity"

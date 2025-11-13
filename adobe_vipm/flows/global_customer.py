@@ -5,8 +5,10 @@ from mpt_extension_sdk.core.utils import setup_client, setup_operations_client
 from mpt_extension_sdk.mpt_http.mpt import (
     create_agreement,
     create_agreement_subscription,
+    create_asset,
     create_listing,
     get_agreement,
+    get_agreement_asset_by_external_id,
     get_agreement_subscription_by_external_id,
     get_authorizations_by_currency_and_seller_id,
     get_gc_price_list_by_currency,
@@ -35,6 +37,7 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_COMMERCIAL,
     MPT_ORDER_STATUS_COMPLETED,
     TEMPLATE_NAME_TRANSFER,
+    ItemTermsModel,
     Param,
 )
 from adobe_vipm.flows.utils import (
@@ -415,8 +418,67 @@ def create_gc_agreement_deployment(
         return None
 
 
+def create_gc_agreement_asset(
+    mpt_client, agreement_deployment, adobe_subscription, gc_agreement_id, buyer_id, item, price
+):
+    """Create a global customer agreement asset.
+
+    Args:
+        mpt_client (MPTClient): The MPT client instance.
+        agreement_deployment (AgreementDeployment): The agreement deployment instance.
+        adobe_subscription (dict): The Adobe subscription data.
+        gc_agreement_id (str): The global customer agreement ID.
+        buyer_id (str): The buyer ID.
+        item (dict): The item data.
+        price (float | None): price.
+    """
+    adobe_subscription_id = adobe_subscription["subscriptionId"]
+    logger.info("Creating GC agreement asset for %s", adobe_subscription_id)
+
+    unit_price = {}
+    if price is not None:
+        unit_price = {"price": {"unitPP": price}}
+
+    asset = {
+        "status": "Active",
+        "name": f"Asset for {item['name']}",
+        "agreement": {"id": gc_agreement_id},
+        "parameters": {
+            "fulfillment": [
+                {
+                    "externalId": Param.ADOBE_SKU.value,
+                    "value": adobe_subscription["offerId"],
+                },
+                {
+                    "externalId": Param.CURRENT_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.CURRENT_QUANTITY]),
+                },
+                {
+                    "externalId": Param.USED_QUANTITY.value,
+                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                },
+            ]
+        },
+        "externalIds": {"vendor": adobe_subscription_id},
+        "lines": [
+            {
+                "quantity": adobe_subscription[Param.CURRENT_QUANTITY],
+                "item": item,
+                **unit_price,
+            }
+        ],
+        "startDate": adobe_subscription["creationDate"],
+        "product": {"id": agreement_deployment.product_id},
+        "buyer": {"id": buyer_id},
+        "licensee": {"id": agreement_deployment.licensee_id},
+        "seller": {"id": agreement_deployment.seller_id},
+    }
+    asset = create_asset(mpt_client, asset)
+    logger.info("Created GC agreement asset %s", asset["id"])
+
+
 def create_gc_agreement_subscription(
-    mpt_client, agreement_deployment, adobe_subscription, gc_agreement_id, buyer_id, item, prices
+    mpt_client, agreement_deployment, adobe_subscription, gc_agreement_id, buyer_id, item, price
 ):
     """
     Create a global customer agreement subscription.
@@ -428,16 +490,16 @@ def create_gc_agreement_subscription(
         gc_agreement_id (str): The global customer agreement ID.
         buyer_id (str): The buyer ID.
         item (dict): The item data.
-        prices (float): price.
+        price (float): price.
 
     Returns:
         None
     """
     logger.info("Creating GC agreement subscription for %s", adobe_subscription["subscriptionId"])
 
-    price_component = {}
-    if prices is not None:
-        price_component = {"price": {"unitPP": prices}}
+    unit_price = {}
+    if price is not None:
+        unit_price = {"price": {"unitPP": price}}
 
     subscription = {
         "status": "Active",
@@ -463,9 +525,9 @@ def create_gc_agreement_subscription(
         "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
         "lines": [
             {
-                "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
+                "quantity": adobe_subscription[Param.CURRENT_QUANTITY],
                 "item": item,
-                **price_component,
+                **unit_price,
             }
         ],
         "startDate": adobe_subscription["creationDate"],
@@ -586,35 +648,112 @@ def process_agreement_deployment(  # noqa: C901
         )
         if not adobe_subscriptions:
             return
-        returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_subscriptions]
 
-        items_map = {
-            item["externalIds"]["vendor"]: item
-            for item in get_product_items_by_skus(mpt_client, product_id, returned_skus)
-        }
+        process_adobe_subscriptions_from_agreement(
+            mpt_client,
+            adobe_client,
+            adobe_subscriptions,
+            adobe_customer,
+            gc_agreement_id,
+            agreement_deployment,
+            licensee["buyer"]["id"],
+            product_id,
+            authorization_id,
+        )
 
-        offer_ids = [
-            get_sku_with_discount_level(adobe_subscription["offerId"], adobe_customer)
-            for adobe_subscription in adobe_subscriptions
-        ]
+        agreement_deployment.status = STATUS_GC_CREATED
+        agreement_deployment.error_description = ""
+        agreement_deployment.save()
 
-        for adobe_subscription in adobe_subscriptions:
-            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
-                logger.warning(
-                    "Subscription %s is in status %s, skip it",
-                    adobe_subscription["subscriptionId"],
-                    adobe_subscription["status"],
+    except Exception as error:
+        logger.exception(
+            "Error processing agreement deployment %s.",
+            agreement_deployment.deployment_id,
+        )
+        agreement_deployment.status = STATUS_GC_ERROR
+        agreement_deployment.error_description = f"Error processing agreement deployment: {error}"
+        agreement_deployment.save()
+
+
+def process_adobe_subscriptions_from_agreement(
+    mpt_client,
+    adobe_client,
+    adobe_subscriptions,
+    adobe_customer,
+    gc_agreement_id,
+    agreement_deployment,
+    buyer_id,
+    product_id,
+    authorization_id,
+):
+    """Process Adobe subscriptions from agreement deployment.
+
+    Args:
+        mpt_client (MPTClient): The MPT client instance.
+        adobe_client (AdobeClient): The Adobe client instance.
+        adobe_subscriptions (list): List of Adobe subscriptions to process.
+        adobe_customer (dict): The Adobe customer data.
+        gc_agreement_id (str): The global customer agreement ID.
+        agreement_deployment (AgreementDeployment): The agreement deployment instance.
+        buyer_id (str): The buyer ID.
+        product_id (str): The product ID.
+        authorization_id(str): The authorization ID.
+
+    """
+    returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_subscriptions]
+    items_map = {
+        item["externalIds"]["vendor"]: item
+        for item in get_product_items_by_skus(mpt_client, product_id, returned_skus)
+    }
+    offer_ids = [
+        get_sku_with_discount_level(adobe_subscription["offerId"], adobe_customer)
+        for adobe_subscription in adobe_subscriptions
+    ]
+    for adobe_subscription in adobe_subscriptions:
+        adobe_subscription_id = adobe_subscription["subscriptionId"]
+        if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+            logger.warning(
+                "Subscription %s is in status %s, skip it",
+                adobe_subscription_id,
+                adobe_subscription["status"],
+            )
+            continue
+
+        item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
+        if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
+            asset = get_agreement_asset_by_external_id(
+                mpt_client, gc_agreement_id, adobe_subscription_id
+            )
+            if asset:
+                logger.info(
+                    "Asset with external id %s already exists (%s)",
+                    adobe_subscription_id,
+                    asset["id"],
                 )
-                continue
-
-            item = items_map.get(get_partial_sku(adobe_subscription["offerId"]))
+            else:
+                prices = get_sku_price(
+                    adobe_customer, offer_ids, product_id, agreement_deployment.deployment_currency
+                )
+                sku_discount_level = get_sku_with_discount_level(
+                    adobe_subscription["offerId"], adobe_customer
+                )
+                create_gc_agreement_asset(
+                    mpt_client,
+                    agreement_deployment,
+                    adobe_subscription,
+                    gc_agreement_id,
+                    buyer_id,
+                    item,
+                    prices.get(sku_discount_level),
+                )
+        else:
             subscription = get_agreement_subscription_by_external_id(
-                mpt_client, gc_agreement_id, adobe_subscription["subscriptionId"]
+                mpt_client, gc_agreement_id, adobe_subscription_id
             )
             if subscription:
                 logger.info(
                     "Subscription with external id %s already exists (%s)",
-                    adobe_subscription["subscriptionId"],
+                    adobe_subscription_id,
                     subscription["id"],
                 )
             else:
@@ -634,7 +773,7 @@ def process_agreement_deployment(  # noqa: C901
                     agreement_deployment,
                     updated_subscription,
                     gc_agreement_id,
-                    licensee["buyer"]["id"],
+                    buyer_id,
                     item,
                     prices.get(sku_discount_level),
                 )
@@ -642,19 +781,6 @@ def process_agreement_deployment(  # noqa: C901
                     "GC agreement subscription created for %s",
                     updated_subscription["subscriptionId"],
                 )
-
-        agreement_deployment.status = STATUS_GC_CREATED
-        agreement_deployment.error_description = ""
-        agreement_deployment.save()
-
-    except Exception as e:
-        logger.exception(
-            "Error processing agreement deployment %s.",
-            agreement_deployment.deployment_id,
-        )
-        agreement_deployment.status = STATUS_GC_ERROR
-        agreement_deployment.error_description = f"Error processing agreement deployment: {e}"
-        agreement_deployment.save()
 
 
 def check_gc_agreement_deployments():
