@@ -2300,7 +2300,8 @@ def test_add_missing_subscriptions_deployment(
         fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
     )
     mock_mpt_get_asset_template_by_name = mocker.patch(
-    "adobe_vipm.flows.sync.get_asset_template_by_name", return_value=None
+        "adobe_vipm.flows.sync.get_asset_template_by_name",
+        return_value={"id": "fake_id", "name": "fake_name"}
     )
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
