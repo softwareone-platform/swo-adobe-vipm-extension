@@ -2,7 +2,7 @@ from typing import Any
 
 from django.conf import settings
 from mpt_extension_sdk.core.utils import setup_client
-from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query, update_asset
+from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query, update_asset, get_asset_by_id
 from mpt_extension_sdk.mpt_http.wrap_http_error import MPTAPIError
 from mpt_extension_sdk.runtime.tracer import dynamic_trace_span
 
@@ -12,6 +12,7 @@ from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.errors import MPTHttpError
 from adobe_vipm.flows.utils import get_deployment_id, get_parameter
 from adobe_vipm.management.commands.base import AdobeBaseCommand
+from adobe_vipm.utils import get_partial_sku
 
 
 class Command(AdobeBaseCommand):  # noqa: WPS214
@@ -96,13 +97,17 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
         subscriptions: list[dict[str, Any]],
         asset: dict[str, Any],  # noqa: WPS221
     ) -> dict[str, Any]:
-        adobe_sku = get_parameter(Param.PHASE_FULFILLMENT, asset, Param.ADOBE_SKU).get("value")
-        current_quantity = get_parameter(
-            Param.PHASE_FULFILLMENT, asset, Param.CURRENT_QUANTITY
-        ).get("value")
+        mpt_client = setup_client()
+        asset_with_lines = get_asset_by_id(mpt_client, asset["id"])
+
+        # assets have only 1 quantity by Adobe design
+        first_line_item = asset_with_lines["lines"][0]
+        partial_adobe_sku = first_line_item["item"]["externalIds"]["vendor"]
+        # quantity is string in Adobe and int in MPT
+        current_quantity = str(first_line_item["quantity"])
         return next(
             filter(
-                lambda sub: sub[Param.ADOBE_SKU] == adobe_sku
+                lambda sub: get_partial_sku(sub[Param.ADOBE_SKU]) == partial_adobe_sku
                 and sub[Param.CURRENT_QUANTITY] == current_quantity
                 and sub["processed"] is False,
                 subscriptions,
