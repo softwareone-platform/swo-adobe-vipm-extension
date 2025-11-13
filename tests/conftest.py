@@ -975,6 +975,7 @@ def agreement_factory(
     assets_factory, buyer, order_parameters_factory, fulfillment_parameters_factory
 ):
     def _agreement(
+        agreement_id="AGR-2119-4550-8674-5962",
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
@@ -1030,7 +1031,7 @@ def agreement_factory(
             licensee["contact"] = licensee_contact
 
         return {
-            "id": "AGR-2119-4550-8674-5962",
+            "id": agreement_id,
             "status": status,
             "href": "/commerce/agreements/AGR-2119-4550-8674-5962",
             "icon": None,
