@@ -170,8 +170,8 @@ def test_handle_no_agreements(mocker, mock_adobe_client, mock_setup_client):
     call_command("migrate_mpt_assets")
 
     expected_select_rql = (
-        "select=-*,id,externalIds,authorization.id,assets,assets.lines,assets.parameters,parameters"
-        ",product.id&in(product.id,(['PRD-1111-1111']))&eq(status,Active)"
+        "select=-*,id,externalIds,authorization.id,assets,assets.lines,parameters,product.id"
+        "&in(product.id,(['PRD-1111-1111']))&eq(status,Active)"
     )
     mock_get_agreements_by_query.assert_called_once_with(
         mock_setup_client, expected_select_rql, limit=100

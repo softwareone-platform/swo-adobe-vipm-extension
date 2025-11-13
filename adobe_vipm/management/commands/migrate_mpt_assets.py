@@ -62,9 +62,8 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
     def _get_agreements(self, agreements: list[str]) -> list[dict[str, Any]]:
         mpt_client = setup_client()
         select_fields = (
-            "-*,id,externalIds,authorization.id,assets,assets.lines,assets.parameters,"
-            "parameters,product.id"
-        )  # noqa: WPS237
+            "-*,id,externalIds,authorization.id,assets,assets.lines,parameters,product.id"  # noqa: WPS237
+        )
         rql_query = (
             f"select={select_fields}&in(product.id,({settings.MPT_PRODUCTS_IDS}))&eq(status,Active)"  # noqa: WPS237
         )
