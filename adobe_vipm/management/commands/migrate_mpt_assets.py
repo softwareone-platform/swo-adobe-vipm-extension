@@ -68,10 +68,15 @@ class Command(AdobeBaseCommand):  # noqa: WPS214
 
     def _get_subscriptions_from_adobe(self, agreement: dict[str, Any]) -> list[dict[str, Any]]:
         adobe_client = get_adobe_client()
+        customer_id = agreement["externalIds"].get("vendor")
+        if customer_id is None:
+            self.error(f"Error getting customer_id for agreement {agreement['id']}")
+            return []
+
         try:
             subscriptions = adobe_client.get_subscriptions_by_deployment(
                 agreement["authorization"]["id"],
-                customer_id=agreement["externalIds"]["vendor"],
+                customer_id=customer_id,
                 deployment_id=get_deployment_id(agreement),
             )
         except AdobeAPIError as error:
