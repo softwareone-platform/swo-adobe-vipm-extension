@@ -1,6 +1,7 @@
 import datetime as dt
 import logging
 from functools import partial
+from typing import Any
 
 from mpt_extension_sdk.mpt_http import mpt
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -14,19 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class AssetsSyncer:
-    """
-    Handles the synchronization of assets.
-
-    Attributes:
-        mpt_client (MptClient): The client interface used to interact with the
-            MPT system for fetching and updating asset data.
-        agreement (dict): The agreement object containing assets and related
-            information for the current customer.
-        customer (dict): Customer information used to determine the appropriate
-            SKU with discount levels.
-        adobe_subscriptions (list[dict]): A list of subscriptions associated with
-            the Adobe customer's account.
-    """
+    """Handles the synchronization of assets."""
 
     def __init__(
         self,
@@ -62,11 +51,7 @@ class AssetsSyncer:
                 continue
 
             mpt_asset = mpt.get_asset_by_id(self._mpt_client, asset["id"])
-            adobe_subscription_id = mpt_asset["externalIds"]["vendor"]
-            adobe_subscription = find_first(
-                partial(_check_adobe_subscription_id, adobe_subscription_id),
-                self._adobe_subscriptions,
-            )
+            adobe_subscription = self._get_adobe_subscription(mpt_asset)
             if not adobe_subscription:
                 logger.error("No subscription found in Adobe customer data!")
                 continue
@@ -78,6 +63,20 @@ class AssetsSyncer:
             ))
 
         return for_update
+
+    def _get_adobe_subscription(self, asset: dict[str, Any]) -> dict[str, Any] | None:
+        adobe_subscription_id = asset["externalIds"].get("vendor")
+        if not adobe_subscription_id:
+            logger.warning(
+                "No vendor subscription found for asset %s: asset.externalIds.vendor is empty",
+                asset["id"],
+            )
+            return None
+
+        return find_first(
+            partial(_check_adobe_subscription_id, adobe_subscription_id),
+            self._adobe_subscriptions,
+        )
 
     def _update_assets(self, assets_for_update: list[dict], *, dry_run: bool) -> None:
         for asset, adobe_subscription, actual_sku in assets_for_update:
