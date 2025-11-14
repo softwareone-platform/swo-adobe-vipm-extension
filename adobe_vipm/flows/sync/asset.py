@@ -7,13 +7,13 @@ from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.flows.constants import AssetStatus, Param
-from adobe_vipm.flows.sync.util import _check_adobe_subscription_id
+from adobe_vipm.flows.sync.helper import _check_adobe_subscription_id
 from adobe_vipm.flows.utils import get_parameter, get_sku_with_discount_level
 
 logger = logging.getLogger(__name__)
 
 
-class AssetsSyncer:
+class AssetSyncer:
     """
     Handles the synchronization of assets.
 
