@@ -28,6 +28,7 @@ def mock_adobe_subscriptions(adobe_subscription_factory):
 
 @pytest.fixture
 def mock_agreement_missing_asset_external_id(agreement):
+    agreement["assets"][0]["parameters"] = {}
     agreement["assets"][0]["externalIds"] = {}
     return agreement
 
@@ -59,6 +60,11 @@ def test_handle(
         return_value=[mock_agreement_missing_asset_external_id],
     )
     mock_adobe_client.get_subscriptions_by_deployment.return_value = mock_adobe_subscriptions
+    template = {"id": "fake_id", "name": "fake_name"}
+    mock_get_asset_template_by_name = mocker.patch(
+        "adobe_vipm.management.commands.migrate_mpt_assets.get_asset_template_by_name",
+        return_value=template,
+    )
     mock_update_asset = mocker.patch(
         "adobe_vipm.management.commands.migrate_mpt_assets.update_asset"
     )
@@ -85,17 +91,22 @@ def test_handle(
         ]
     }
     expected_external_id_data = {"vendor": "22414976d94999ab2c976bdd52b779NA"}
+    mock_get_asset_template_by_name.assert_called_once_with(
+        mock_setup_client, "PRD-1111-1111", "Default"
+    )
     mock_update_asset.assert_called_once_with(
         mock_setup_client,
         asset["id"],
         parameters=expected_parameters_data,
         externalIds=expected_external_id_data,
+        template=template,
     )
     out_log = capsys.readouterr().out
     assert (
         f"Asset AST-0535-8763-6274 updated with: \n"
         f"parameters: {expected_parameters_data} \n"
-        f"externalIds: {expected_external_id_data} \n" in out_log
+        f"externalIds: {expected_external_id_data} \n"
+        f"template: {template}" in out_log
     )
 
 
@@ -159,7 +170,7 @@ def test_handle_no_agreements(mocker, mock_adobe_client, mock_setup_client):
     call_command("migrate_mpt_assets")
 
     expected_select_rql = (
-        "select=-*,id,externalIds,authorization.id,assets,assets.parameters,parameters"
+        "select=-*,id,externalIds,authorization.id,assets,assets.lines,parameters,product.id"
         "&in(product.id,(['PRD-1111-1111']))&eq(status,Active)"
     )
     mock_get_agreements_by_query.assert_called_once_with(
@@ -223,10 +234,6 @@ def test_handle_no_adobe_subscriptions(
         return_value=[mock_agreement_missing_asset_external_id],
     )
     mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": []}
-    mock_get_parameter = mocker.patch(
-        "adobe_vipm.management.commands.migrate_mpt_assets.get_parameter",
-        return_value={"value": "fake_value"},
-    )
     mock_update_asset = mocker.patch(
         "adobe_vipm.management.commands.migrate_mpt_assets.update_asset"
     )
@@ -235,11 +242,6 @@ def test_handle_no_adobe_subscriptions(
 
     mock_get_agreement_by_query.assert_called_once()
     mock_adobe_client.get_subscriptions_by_deployment.assert_called_once()
-    asset = mock_agreement_missing_asset_external_id["assets"][0]
-    mock_get_parameter.assert_has_calls([
-        mocker.call(Param.PHASE_FULFILLMENT, asset, Param.ADOBE_SKU),
-        mocker.call(Param.PHASE_FULFILLMENT, asset, Param.CURRENT_QUANTITY),
-    ])
     mock_update_asset.assert_not_called()
     err_log = capsys.readouterr().err
     assert "Error updating asset AST-0535-8763-6274: subscription not found in Adobe" in err_log
