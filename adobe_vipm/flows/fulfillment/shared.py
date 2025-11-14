@@ -57,7 +57,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.pipeline import Step
-from adobe_vipm.flows.sync.helper import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.sync.agreement import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_address,
     get_adobe_customer_id,

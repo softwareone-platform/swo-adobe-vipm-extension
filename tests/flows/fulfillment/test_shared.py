@@ -63,13 +63,6 @@ def mocked_send_mpt_notification(mocker):
     return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification", spec=True)
 
 
-@pytest.fixture
-def mock_get_template_data_by_adobe_subscription(mocker):
-    return mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_template_data_by_adobe_subscription"
-    )
-
-
 @pytest.mark.parametrize(
     ("status", "subject"),
     [

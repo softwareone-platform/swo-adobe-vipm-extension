@@ -1,6 +1,6 @@
 from freezegun import freeze_time
 
-from adobe_vipm.flows.sync.asset import AssetsSyncer
+from adobe_vipm.flows.sync.asset import AssetSyncer
 
 
 @freeze_time("2025-06-23")
@@ -27,7 +27,7 @@ def test_asset_syncer_sync(
         used_quantity=6,
     )
     mock_customer = adobe_customer_factory(coterm_date="2025-04-04")
-    assets_syncer = AssetsSyncer(
+    assets_syncer = AssetSyncer(
         mock_mpt_client, agreement["id"], [mock_asset], mock_customer, [adobe_subscription]
     )
 
@@ -71,7 +71,7 @@ def test_asset_syncer_sync_asset_without_external_id(
         used_quantity=6,
     )
     mock_customer = adobe_customer_factory(coterm_date="2025-04-04")
-    assets_syncer = AssetsSyncer(
+    assets_syncer = AssetSyncer(
         mock_mpt_client, agreement["id"], [mock_asset], mock_customer, [adobe_subscription]
     )
 
@@ -109,7 +109,7 @@ def test_sync_agreement_update_asset_dry_run(
         used_quantity=6,
     )
     mock_customer = adobe_customer_factory(coterm_date="2025-04-04")
-    assets_syncer = AssetsSyncer(
+    assets_syncer = AssetSyncer(
         mock_mpt_client, agreement["id"], [mock_asset], mock_customer, [adobe_subscription]
     )
 

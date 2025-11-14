@@ -1,25 +1,25 @@
 import pytest
 
-from adobe_vipm.flows.sync.agreement import AgreementsSyncer
+from adobe_vipm.flows.sync.agreement import AgreementSyncer
 
 
 @pytest.fixture
 def mock_check_update_airtable_missing_deployments(mocker, mocked_agreement_syncer):
     return mocker.patch.object(
-        AgreementsSyncer, "_check_update_airtable_missing_deployments", spec=True
+        AgreementSyncer, "_check_update_airtable_missing_deployments", spec=True
     )
 
 
 @pytest.fixture
 def mock_process_orphaned_deployment_subscriptions(mocker, mocked_agreement_syncer):
     return mocker.patch.object(
-        AgreementsSyncer, "_process_orphaned_deployment_subscriptions", spec=True
+        AgreementSyncer, "_process_orphaned_deployment_subscriptions", spec=True
     )
 
 
 @pytest.fixture
 def mock_process_main_agreement(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(AgreementsSyncer, "_process_main_agreement", spec=True)
+    return mocker.patch.object(AgreementSyncer, "_process_main_agreement", spec=True)
 
 
 @pytest.fixture
