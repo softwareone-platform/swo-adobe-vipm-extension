@@ -10,6 +10,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_agreement,
     get_agreement_asset_by_external_id,
     get_agreement_subscription_by_external_id,
+    get_asset_template_by_name,
     get_authorizations_by_currency_and_seller_id,
     get_gc_price_list_by_currency,
     get_licensee,
@@ -36,6 +37,7 @@ from adobe_vipm.flows.constants import (
     GLOBAL_SUFFIX,
     MARKET_SEGMENT_COMMERCIAL,
     MPT_ORDER_STATUS_COMPLETED,
+    TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_NAME_TRANSFER,
     ItemTermsModel,
     Param,
@@ -439,6 +441,10 @@ def create_gc_agreement_asset(
     if price is not None:
         unit_price = {"price": {"unitPP": price}}
 
+    template = get_asset_template_by_name(
+        mpt_client, agreement_deployment.product_id, TEMPLATE_ASSET_DEFAULT
+    )
+    template_data = {"id": template["id"], "name": template["name"]} if template else None
     asset = {
         "status": "Active",
         "name": f"Asset for {item['name']}",
@@ -472,6 +478,7 @@ def create_gc_agreement_asset(
         "buyer": {"id": buyer_id},
         "licensee": {"id": agreement_deployment.licensee_id},
         "seller": {"id": agreement_deployment.seller_id},
+        "template": template_data,
     }
     asset = create_asset(mpt_client, asset)
     logger.info("Created GC agreement asset %s", asset["id"])

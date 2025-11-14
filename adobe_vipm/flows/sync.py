@@ -17,6 +17,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_agreements_by_query,
     get_all_agreements,
     get_asset_by_id,
+    get_asset_template_by_name,
     get_product_items_by_period,
     get_product_items_by_skus,
     get_template_by_name,
@@ -37,6 +38,7 @@ from adobe_vipm.adobe.errors import (
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
+    TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
     AgreementStatus,
@@ -131,6 +133,10 @@ def _add_missing_subscriptions(
         sku_discount_level = get_sku_with_discount_level(adobe_subscription["offerId"], customer)
         unit_price = {"price": {"unitPP": prices[sku_discount_level]}}
         if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
+            template = get_asset_template_by_name(
+                mpt_client, agreement["product"]["id"], TEMPLATE_ASSET_DEFAULT
+            )
+            template_data = {"id": template["id"], "name": template["name"]} if template else None
             create_asset(
                 mpt_client,
                 {
@@ -166,6 +172,7 @@ def _add_missing_subscriptions(
                     "buyer": {"id": agreement["buyer"]["id"]},
                     "licensee": {"id": agreement["licensee"]["id"]},
                     "seller": {"id": agreement["seller"]["id"]},
+                    "template": template_data,
                 },
             )
         else:

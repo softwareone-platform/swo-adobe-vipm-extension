@@ -14,7 +14,7 @@ python = ">=3.12,<4"
 django = "4.2.*" # should it be a dependency of the extension ? it is already a dependency of the sdk.
 jinja2 = "3.1.*"
 markdown-it-py = "3.0.*"
-mpt-extension-sdk = "4.5.*"
+mpt-extension-sdk = "4.6.*"
 openpyxl = "3.1.*"
 phonenumbers = "8.13.*"
 pyairtable = "2.3.*"

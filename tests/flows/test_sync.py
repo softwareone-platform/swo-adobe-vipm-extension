@@ -7,7 +7,13 @@ from adobe_vipm.adobe import constants
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
-from adobe_vipm.flows.constants import AgreementStatus, ItemTermsModel, Param, TeamsColorCode
+from adobe_vipm.flows.constants import (
+    TEMPLATE_ASSET_DEFAULT,
+    AgreementStatus,
+    ItemTermsModel,
+    Param,
+    TeamsColorCode,
+)
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync import (
     _add_missing_subscriptions,  # noqa: PLC2701
@@ -2107,6 +2113,7 @@ def test_add_missing_subscriptions_without_vendor_id(
 
 @freeze_time("2025-07-24")
 def test_add_missing_subscriptions(
+    mocker,
     items_factory,
     mock_mpt_client,
     mock_adobe_client,
@@ -2149,6 +2156,9 @@ def test_add_missing_subscriptions(
         term_period=ItemTermsModel.ONE_TIME.value,
         term_model=ItemTermsModel.ONE_TIME.value,
     )[0]
+    mock_mpt_get_asset_template_by_name = mocker.patch(
+    "adobe_vipm.flows.sync.get_asset_template_by_name", return_value=None
+    )
     mock_get_product_items_by_skus.return_value = [mock_yearly_item, mock_one_time_item]
     mock_get_product_items_by_period.return_value = [mock_yearly_item, mock_one_time_item]
 
@@ -2166,6 +2176,9 @@ def test_add_missing_subscriptions(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
     )
     mock_get_product_items_by_period.assert_not_called()
+    mock_mpt_get_asset_template_by_name.assert_called_once_with(
+        mock_mpt_client, "PRD-1111-1111", TEMPLATE_ASSET_DEFAULT
+    )
     mock_create_asset.assert_called_once_with(
         mock_mpt_client,
         {
@@ -2186,6 +2199,7 @@ def test_add_missing_subscriptions(
             "buyer": {"id": "BUY-3731-7971"},
             "licensee": {"id": "LC-321-321-321"},
             "seller": {"id": "SEL-9121-8944"},
+            "template": None,
         },
     )
     mock_create_agreement_subscription.assert_called_once_with(
@@ -2232,6 +2246,7 @@ def test_add_missing_subscriptions(
 
 @freeze_time("2025-07-24")
 def test_add_missing_subscriptions_deployment(
+    mocker,
     items_factory,
     mock_mpt_client,
     mock_adobe_client,
@@ -2284,7 +2299,9 @@ def test_add_missing_subscriptions_deployment(
     agreement = agreement_factory(
         fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deploymentId")
     )
-
+    mock_mpt_get_asset_template_by_name = mocker.patch(
+    "adobe_vipm.flows.sync.get_asset_template_by_name", return_value=None
+    )
     mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
 
     _add_missing_subscriptions(
@@ -2297,6 +2314,9 @@ def test_add_missing_subscriptions_deployment(
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
+    )
+    mock_mpt_get_asset_template_by_name.assert_called_once_with(
+        mock_mpt_client, "PRD-1111-1111", TEMPLATE_ASSET_DEFAULT
     )
     mock_create_asset.assert_called_once_with(
         mock_mpt_client,
@@ -2318,6 +2338,7 @@ def test_add_missing_subscriptions_deployment(
             "buyer": {"id": "BUY-3731-7971"},
             "licensee": {"id": "LC-321-321-321"},
             "seller": {"id": "SEL-9121-8944"},
+            "template": {"id": "fake_id", "name": "fake_name"},
         },
     )
     mock_create_agreement_subscription.assert_called_once_with(
