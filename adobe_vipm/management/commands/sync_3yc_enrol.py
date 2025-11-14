@@ -1,7 +1,7 @@
 from mpt_extension_sdk.core.utils import setup_client
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.flows.sync.helper import sync_agreements_by_3yc_enroll_status
+from adobe_vipm.flows.sync.agreement import sync_agreements_by_3yc_enroll_status
 from adobe_vipm.management.commands.base import AdobeBaseCommand
 
 
