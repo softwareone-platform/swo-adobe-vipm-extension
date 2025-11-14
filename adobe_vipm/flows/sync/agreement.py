@@ -5,6 +5,7 @@ import traceback
 from functools import partial
 from typing import Any
 
+from mpt_extension_sdk.core.utils import setup_client
 from mpt_extension_sdk.mpt_http import mpt
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.utils import find_first
@@ -15,6 +16,7 @@ from adobe_vipm.adobe.errors import AuthorizationNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
+    TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
     AgreementStatus,
@@ -252,6 +254,11 @@ class AgreementsSyncer:  # noqa: WPS214
     def _create_mpt_asset(
         self, adobe_subscription: dict[str, Any], item: dict[str, Any], unit_price: dict[str, Any]
     ) -> None:
+        mpt_client = setup_client()
+        template = mpt.get_asset_template_by_name(
+            mpt_client, self.product_id, TEMPLATE_ASSET_DEFAULT
+        )
+        template_data = {"id": template["id"], "name": template["name"]} if template else None
         asset_payload = {
             "status": "Active",
             "name": f"Asset for {item['name']}",
@@ -285,6 +292,7 @@ class AgreementsSyncer:  # noqa: WPS214
             "buyer": {"id": self._agreement["buyer"]["id"]},
             "licensee": {"id": self._licensee_id},
             "seller": {"id": self._seller_id},
+            "template": template_data,
         }
         if self._dry_run:
             logger.info(

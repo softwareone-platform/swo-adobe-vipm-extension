@@ -1663,6 +1663,7 @@ def mock_setup_client(mocker, mock_mpt_client):
         "adobe_vipm.management.commands.sync_3yc_enrol",
         "adobe_vipm.management.commands.migrate_mpt_assets",
         "adobe_vipm.management.commands.sync_agreements",
+        "adobe_vipm.flows.sync.agreement",
     ]
     for path in paths:
         mocker.patch(f"{path}.setup_client", return_value=mock_mpt_client)

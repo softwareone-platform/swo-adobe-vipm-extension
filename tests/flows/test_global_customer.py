@@ -5,7 +5,7 @@ import pytest
 from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_sku_price
-from adobe_vipm.flows.constants import ItemTermsModel, Param
+from adobe_vipm.flows.constants import TEMPLATE_ASSET_DEFAULT, ItemTermsModel, Param
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
 from adobe_vipm.flows.global_customer import (
     check_gc_agreement_deployments,
@@ -738,6 +738,9 @@ def test_check_gc_agreement_deployments_create_asset(
         "adobe_vipm.flows.global_customer.get_agreement_subscription_by_external_id",
         return_value=[],
     )
+    mocked_get_asset_template_by_name = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_asset_template_by_name", return_value=None
+    )
     mocked_create_asset = mocker.patch("adobe_vipm.flows.global_customer.create_asset")
     mocked_create_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.global_customer.create_agreement_subscription"
@@ -786,6 +789,7 @@ def test_check_gc_agreement_deployments_create_asset(
     mocked_get_listing_by_id.assert_called_once()
     mocked_get_asset_by_external_id.assert_called_once()
     mocked_get_subscription_by_external_id.assert_not_called()
+    mocked_get_asset_template_by_name.assert_called_once()
     mocked_create_asset.assert_called_once()
     mocked_create_agreement_subscription.assert_not_called()
     mocked_get_agreement.assert_called_once()
@@ -1307,7 +1311,11 @@ def test_create_gc_agreement_asset(
     adobe_subscription_factory,
     items_factory,
 ):
-    mocked_create_asset = mocker.patch("adobe_vipm.flows.global_customer.create_asset")
+    mock_get_asset_template_by_name = mocker.patch(
+        "adobe_vipm.flows.global_customer.get_asset_template_by_name",
+        return_value={"id": "fake_id", "name": "fake_name"},
+    )
+    mock_create_asset = mocker.patch("adobe_vipm.flows.global_customer.create_asset")
     adobe_one_time_subscription = adobe_subscription_factory(
         offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
     )
@@ -1362,5 +1370,9 @@ def test_create_gc_agreement_asset(
         "buyer": {"id": buyer_id},
         "licensee": {"id": "LC-321-321-321"},
         "seller": {"id": "SEL-321-321"},
+        "template": {"id": "fake_id", "name": "fake_name"},
     }
-    mocked_create_asset.assert_called_once_with(mock_mpt_client, expected_asset)
+    mock_get_asset_template_by_name.assert_called_once_with(
+        mock_mpt_client, "PRD-123-123-123", TEMPLATE_ASSET_DEFAULT
+    )
+    mock_create_asset.assert_called_once_with(mock_mpt_client, expected_asset)
