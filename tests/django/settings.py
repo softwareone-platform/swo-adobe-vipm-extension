@@ -164,17 +164,16 @@ USE_APPLICATIONINSIGHTS = os.getenv("USE_APPLICATIONINSIGHTS", "False").lower() 
 }
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
 
-MPT_API_BASE_URL = os.getenv("MPT_API_BASE_URL", "http://localhost:8000")
-MPT_API_TOKEN = os.getenv("MPT_API_TOKEN", "change-me!")
-MPT_API_TOKEN_OPERATIONS = os.getenv("MPT_API_TOKEN_OPERATIONS", "change-me!")
-# TODO: Should be synced with the initializer.py::initialize function
+MPT_API_BASE_URL = "http://test.url"
+MPT_API_TOKEN = "test-api-token"
+MPT_API_TOKEN_OPERATIONS = "test-api-token"
 MPT_PRODUCTS_IDS = ["PRD-1111-1111"]
 MPT_ORDERS_API_POLLING_INTERVAL_SECS = 30
-MPT_PORTAL_BASE_URL = "https://portal.s1.local"
+MPT_PORTAL_BASE_URL = "https://test.url"
 
 EXTENSION_CONFIG = {
-    "ADOBE_API_BASE_URL": "https://api.adobe",
-    "ADOBE_AUTH_ENDPOINT_URL": "https://authenticate.adobe",
+    "ADOBE_API_BASE_URL": "https://test.adobe.api.url",
+    "ADOBE_AUTH_ENDPOINT_URL": "https://test.adobe.authenticate.url",
     "WEBHOOKS_SECRETS": {"PRD-1111-1111": "that's my awesome test secret"},
     "AIRTABLE_BASES": {"PRD-1111-1111": "some-bases"},
     "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM", "PRD-2222-2222": "GOV", "PRD-3333-3333": "GOV_LGA"},

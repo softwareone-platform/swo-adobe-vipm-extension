@@ -20,6 +20,7 @@ from adobe_vipm.flows.constants import (
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
+    TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
     Param,
@@ -1251,8 +1252,9 @@ def test_get_return_orders_step(mocker, mock_adobe_client, mock_order, adobe_ord
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_add_asset(mocker, order_factory, adobe_subscription_factory, assets_factory):
-    client = mocker.MagicMock()
+def test_add_asset(
+    mocker, mock_setup_client, order_factory, adobe_subscription_factory, assets_factory
+):
     order = order_factory()
     adobe_subscription = adobe_subscription_factory(
         subscription_id="one-time-sub-id", autorenewal_enabled=False
@@ -1260,15 +1262,21 @@ def test_add_asset(mocker, order_factory, adobe_subscription_factory, assets_fac
     mocked_get_order_asset_by_external_id = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_order_asset_by_external_id", return_value=None
     )
+    mocked_get_asset_template_by_name = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_asset_template_by_name", return_value=None
+    )
     asset = assets_factory()[0]
     mocked_create_order_asset = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_order_asset", return_value=asset
     )
 
-    add_asset(client, adobe_subscription, order, adobe_subscription)
+    add_asset(mock_setup_client, adobe_subscription, order, adobe_subscription)
 
     mocked_get_order_asset_by_external_id.assert_called_once_with(
-        client, "ORD-0792-5000-2253-4210", "one-time-sub-id"
+        mock_setup_client, "ORD-0792-5000-2253-4210", "one-time-sub-id"
+    )
+    mocked_get_asset_template_by_name.assert_called_once_with(
+        mock_setup_client, "PRD-1111-1111", TEMPLATE_ASSET_DEFAULT
     )
     expected_payload = {
         "name": "Asset for Awesome product",
@@ -1296,9 +1304,10 @@ def test_add_asset(mocker, order_factory, adobe_subscription_factory, assets_fac
                 "id": "ALI-2119-4550-8674-5962-0001",
             },
         ],
+        "template": None,
     }
     mocked_create_order_asset.assert_called_once_with(
-        client, "ORD-0792-5000-2253-4210", expected_payload
+        mock_setup_client, "ORD-0792-5000-2253-4210", expected_payload
     )
 
 
@@ -1328,6 +1337,7 @@ def test_create_or_update_asset_step(
     mocker,
     mock_adobe_client,
     mock_mpt_client,
+    mock_setup_client,
     mock_order,
     order_factory,
     subscriptions_factory,
@@ -1344,6 +1354,10 @@ def test_create_or_update_asset_step(
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
         return_value=[items_factory()[0]["externalIds"]["vendor"]],
+    )
+    mocked_get_asset_template_by_name = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_asset_template_by_name",
+        return_value={"id": "fake_id", "name": "fake_name"},
     )
     mocked_create_order_asset = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.create_order_asset",
@@ -1366,6 +1380,9 @@ def test_create_or_update_asset_step(
         context.authorization_id,
         context.adobe_customer_id,
         adobe_order["lineItems"][0]["subscriptionId"],
+    )
+    mocked_get_asset_template_by_name.assert_called_once_with(
+        mock_mpt_client, "PRD-1111-1111", TEMPLATE_ASSET_DEFAULT
     )
     mocked_create_order_asset.assert_called_once_with(
         mock_mpt_client,
@@ -1390,6 +1407,7 @@ def test_create_or_update_asset_step(
             },
             "externalIds": {"vendor": adobe_order["lineItems"][0]["subscriptionId"]},
             "lines": [{"id": mock_order["lines"][0]["id"]}],
+            "template": {"id": "fake_id", "name": "fake_name"},
         },
     )
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)

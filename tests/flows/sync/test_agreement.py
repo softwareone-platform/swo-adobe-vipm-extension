@@ -7,6 +7,7 @@ from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
 from adobe_vipm.flows.constants import (
+    TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
     AgreementStatus,
@@ -24,6 +25,7 @@ def mock_get_template_data_by_adobe_subscription(mocker):
 
 
 def test_agreement_syncer_sync_dry_run(
+    mocker,
     mock_mpt_client,
     mock_adobe_client,
     adobe_customer_factory,
@@ -35,6 +37,7 @@ def test_agreement_syncer_sync_dry_run(
     mock_get_prices_for_skus,
     mock_get_product_items_by_skus,
     mock_mpt_create_asset,
+    mock_mpt_get_asset_template_by_name,
     mock_get_template_data_by_adobe_subscription,
     mock_mpt_create_agreement_subscription,
     mock_mpt_get_agreement_subscription,
@@ -64,6 +67,7 @@ def test_agreement_syncer_sync_dry_run(
     ]
     mock_get_template_data_by_adobe_subscription.return_value = None
     mock_mpt_get_agreement_subscription.return_value = mock_agreement["subscriptions"][0]
+    mock_mpt_get_asset_template_by_name.return_value = None
 
     AgreementsSyncer(
         mock_mpt_client,
@@ -82,6 +86,7 @@ def test_agreement_syncer_sync_dry_run(
         "Dry run mode: skipping subscription creation for agreement AGR-2119-4550-8674-5962"
         in caplog.text
     )
+
     mock_mpt_create_asset.assert_not_called()
     assert (
         "Dry run mode: skipping create mpt asset for agreement AGR-2119-4550-8674-5962"
@@ -1559,8 +1564,10 @@ def test_add_missing_subscriptions_without_vendor_id(
 
 @freeze_time("2025-07-24")
 def test_add_missing_subscriptions(
+    mocker,
     items_factory,
     mock_mpt_client,
+    mock_setup_client,
     mock_adobe_client,
     agreement_factory,
     adobe_customer_factory,
@@ -1571,6 +1578,7 @@ def test_add_missing_subscriptions(
     mock_get_product_items_by_period,
     mock_mpt_create_asset,
     mock_mpt_create_agreement_subscription,
+    mock_mpt_get_asset_template_by_name,
     mock_get_template_data_by_adobe_subscription,
     mocked_agreement_syncer,
 ):
@@ -1604,6 +1612,7 @@ def test_add_missing_subscriptions(
         term_period=ItemTermsModel.ONE_TIME.value,
         term_model=ItemTermsModel.ONE_TIME.value,
     )[0]
+    mock_mpt_get_asset_template_by_name.return_value = None
     mock_get_product_items_by_skus.return_value = [mock_yearly_item, mock_one_time_item]
     mock_get_product_items_by_period.return_value = [mock_yearly_item, mock_one_time_item]
     mock_get_template_data_by_adobe_subscription.return_value = {
@@ -1617,6 +1626,9 @@ def test_add_missing_subscriptions(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
     )
     mock_get_product_items_by_period.assert_not_called()
+    mock_mpt_get_asset_template_by_name.assert_called_once_with(
+        mock_setup_client, "PRD-1111-1111", TEMPLATE_ASSET_DEFAULT
+    )
     mock_mpt_create_asset.assert_called_once_with(
         mock_mpt_client,
         {
@@ -1637,6 +1649,7 @@ def test_add_missing_subscriptions(
             "buyer": {"id": "BUY-3731-7971"},
             "licensee": {"id": "LC-321-321-321"},
             "seller": {"id": "SEL-9121-8944"},
+            "template": None,
         },
     )
     mock_mpt_create_agreement_subscription.assert_called_once_with(
@@ -1685,6 +1698,7 @@ def test_add_missing_subscriptions(
 def test_add_missing_subscriptions_deployment(
     items_factory,
     mock_mpt_client,
+    mock_setup_client,
     mock_adobe_client,
     agreement_factory,
     adobe_customer_factory,
@@ -1695,6 +1709,7 @@ def test_add_missing_subscriptions_deployment(
     fulfillment_parameters_factory,
     mock_mpt_create_asset,
     mock_mpt_create_agreement_subscription,
+    mock_mpt_get_asset_template_by_name,
     mock_get_template_data_by_adobe_subscription,
     mocked_agreement_syncer,
 ):
@@ -1743,11 +1758,15 @@ def test_add_missing_subscriptions_deployment(
         "id": "TPL-1234",
         "name": "Renewing",
     }
+    mock_mpt_get_asset_template_by_name.return_value = {"id": "fake_id", "name": "fake_name"}
 
     mocked_agreement_syncer._add_missing_subscriptions_and_assets()
 
     mock_get_product_items_by_skus.assert_called_once_with(
         mock_mpt_client, "PRD-1111-1111", {"65322572CA", "75322572CA"}
+    )
+    mock_mpt_get_asset_template_by_name.assert_called_once_with(
+        mock_setup_client, "PRD-1111-1111", TEMPLATE_ASSET_DEFAULT
     )
     mock_mpt_create_asset.assert_called_once_with(
         mock_mpt_client,
@@ -1769,6 +1788,7 @@ def test_add_missing_subscriptions_deployment(
             "buyer": {"id": "BUY-3731-7971"},
             "licensee": {"id": "LC-321-321-321"},
             "seller": {"id": "SEL-9121-8944"},
+            "template": {"id": "fake_id", "name": "fake_name"},
         },
     )
     mock_mpt_create_agreement_subscription.assert_called_once_with(
