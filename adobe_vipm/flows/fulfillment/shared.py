@@ -12,6 +12,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     create_order_asset,
     create_subscription,
     fail_order,
+    get_asset_template_by_name,
     get_order_asset_by_external_id,
     get_order_subscription_by_external_id,
     get_product_template_or_default,
@@ -49,6 +50,7 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     MPT_ORDER_STATUS_PROCESSING,
     MPT_ORDER_STATUS_QUERYING,
+    TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
     TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
@@ -345,8 +347,10 @@ def add_asset(client, adobe_subscription, order, line):
         return asset
 
     order_line = get_order_line_by_sku(order, line["offerId"])
+    product_id = order["agreement"]["product"]["id"]
+    template = get_asset_template_by_name(client, product_id, TEMPLATE_ASSET_DEFAULT)
     asset = create_order_asset(
-        client, order["id"], create_asset_payload(adobe_subscription, order_line, line)
+        client, order["id"], create_asset_payload(adobe_subscription, order_line, line, template)
     )
     logger.info(
         "Asset %s (%s) created for order %s",
@@ -357,17 +361,19 @@ def add_asset(client, adobe_subscription, order, line):
     return asset
 
 
-def create_asset_payload(adobe_subscription, order_line, item):
+def create_asset_payload(adobe_subscription, order_line, item, template):
     """Create an asset payload.
 
     Args:
         adobe_subscription (dict): the adobe subscription
         order_line (dict): the order line.
         item (dict) : the item.
+        template (dict | None): the template.
 
     Returns: A dict with the asset payload
 
     """
+    template_data = {"id": template["id"], "name": template["name"]} if template else None
     return {
         "name": f"Asset for {order_line['item']['name']}",
         "parameters": {
@@ -394,6 +400,7 @@ def create_asset_payload(adobe_subscription, order_line, item):
                 "id": order_line["id"],
             },
         ],
+        "template": template_data,
     }
 
 
@@ -1013,6 +1020,8 @@ class CreateOrUpdateAssets(Step):
 
         adobe_client = get_adobe_client()
         one_time_skus = get_one_time_skus(client, context.order)
+        product_id = context.order["agreement"]["product"]["id"]
+        template = get_asset_template_by_name(client, product_id, TEMPLATE_ASSET_DEFAULT)
         for line in filter(
             lambda x: get_partial_sku(x["offerId"]) in one_time_skus,
             context.adobe_new_order["lineItems"],
@@ -1033,7 +1042,7 @@ class CreateOrUpdateAssets(Step):
                 continue
 
             asset = order_line.get("asset")
-            asset_data = create_asset_payload(adobe_subscription, order_line, line)
+            asset_data = create_asset_payload(adobe_subscription, order_line, line, template)
             if asset:
                 update_order_asset(
                     client, context.order_id, asset["id"], parameters=asset_data["parameters"]

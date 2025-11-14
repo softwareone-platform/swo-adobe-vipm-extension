@@ -1177,6 +1177,18 @@ def agreement(buyer, licensee, listing, fulfillment_parameters_factory):
                 "name": "Asset for Stock Credit Pack for Teams (500 credits pack); Multi Language"
                 " - North America; Multi",
                 "externalIds": {"vendor": "22414976d94999ab2c976bdd52b779NA"},
+                "lines": [
+                    {
+                        "id": "ALI-2032-3191-7916-0006",
+                        "item": {
+                            "id": "ITM-0535-8763-0335",
+                            "name": "Stock Credit Pack for Teams (500 credits pack); Multi Language"
+                            " - North America; Multi",
+                            "externalIds": {"vendor": "65327701CA"},
+                        },
+                        "quantity": 222,
+                    }
+                ],
                 "status": "Active",
                 "price": {"PPx1": 41359.56000, "currency": "USD"},
                 "parameters": {
