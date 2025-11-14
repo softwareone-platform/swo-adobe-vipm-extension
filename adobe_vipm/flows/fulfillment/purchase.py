@@ -23,9 +23,10 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_CONTACT,
     ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
     ERR_VIPM_UNHANDLED_EXCEPTION,
-    MARKET_SEGMENT_COMMERCIAL,
+    MARKET_SEGMENT_EDUCATION,
     STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
     STATUS_MARKET_SEGMENT_PENDING,
+    TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
     TEMPLATE_NAME_PURCHASE,
     VALID_GOVERNMENT_AGENCY_TYPES,
     Param,
@@ -54,7 +55,6 @@ from adobe_vipm.flows.helpers import (
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
-    get_market_segment_eligibility_status,
     get_ordering_parameter,
     set_adobe_3yc_commitment_request_status,
     set_adobe_customer_id,
@@ -80,7 +80,7 @@ class RefreshCustomer(Step):
         next_step(client, context)
 
 
-class ValidateMarketSegmentEligibility(Step):
+class ValidateMarketSubSegments(Step):
     """
     Validate if the customer is eligible to place orders for a given market segment.
 
@@ -89,43 +89,36 @@ class ValidateMarketSegmentEligibility(Step):
 
     def __call__(self, client, context, next_step):
         """Validate if the customer is eligible to place orders for a given market segment."""
-        if context.market_segment != MARKET_SEGMENT_COMMERCIAL:
-            if not self._validate_agency_type(client, context):
-                return
+        if context.market_segment == MARKET_SEGMENT_EDUCATION and not context.adobe_customer.get(
+            "companyProfile", {}
+        ).get("marketSubSegments"):
+            switch_order_to_query(
+                client,
+                context.order,
+                template_name=TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
+            )
+            return
 
-            status = get_market_segment_eligibility_status(context.order)
-            if not self._handle_eligibility_status(client, context, status):
+        if is_large_government_agency_type(context.product_id):
+            agency_type_param = get_ordering_parameter(context.order, Param.AGENCY_TYPE.value)
+            if agency_type_param.get("value") not in VALID_GOVERNMENT_AGENCY_TYPES:
+                logger.info(
+                    "%s: agency type is not valid for segment %s",
+                    context,
+                    context.market_segment,
+                )
+                context.order = set_ordering_parameter_error(
+                    context.order,
+                    Param.AGENCY_TYPE.value,
+                    ERR_ADOBE_AGENCY_TYPE.to_dict(
+                        title=Param.AGENCY_TYPE.value,
+                        details="This parameter is mandatory and must be: FEDERAL, STATE.",
+                    ),
+                )
+                switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
                 return
 
         next_step(client, context)
-
-    def _validate_agency_type(self, client, context):
-        product_id = context.order["product"]["id"]
-        if not is_large_government_agency_type(product_id):
-            return True
-
-        agency_type_param = get_ordering_parameter(context.order, Param.AGENCY_TYPE.value)
-        valid_agency_types = VALID_GOVERNMENT_AGENCY_TYPES
-
-        if agency_type_param.get("value") in valid_agency_types:
-            return True
-
-        logger.info(
-            "%s: agency type is not valid for segment %s",
-            context,
-            context.market_segment,
-        )
-        context.order = set_ordering_parameter_error(
-            context.order,
-            Param.AGENCY_TYPE.value,
-            ERR_ADOBE_AGENCY_TYPE.to_dict(
-                title=Param.AGENCY_TYPE.value,
-                details="This parameter is mandatory and must be: FEDERAL, STATE.",
-            ),
-        )
-
-        switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
-        return False
 
     def _handle_eligibility_status(self, client, context, status):
         if status is None:
@@ -336,9 +329,9 @@ def fulfill_purchase_order(client, order):
         StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         SetupDueDate(),
         ValidateDuplicateLines(),
-        ValidateMarketSegmentEligibility(),
         PrepareCustomerData(),
         CreateCustomer(),
+        ValidateMarketSubSegments(),
         Validate3YCCommitment(),
         GetPreviewOrder(),
         UpdatePrices(),

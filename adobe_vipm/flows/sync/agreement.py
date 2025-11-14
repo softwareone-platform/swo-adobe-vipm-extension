@@ -16,6 +16,7 @@ from adobe_vipm.adobe.errors import AuthorizationNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
+    MARKET_SEGMENT_EDUCATION,
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
@@ -37,6 +38,7 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+from adobe_vipm.flows.utils.market_segment import get_market_segment
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.notifications import send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
@@ -551,6 +553,9 @@ class AgreementsSyncer:  # noqa: WPS214
             "externalId": Param.COTERM_DATE.value,
             "value": self._customer.get("cotermDate", ""),
         })
+
+        self._add_education_market_sub_segments(parameters)
+
         if self._dry_run:
             logger.info(
                 "Dry run mode: skipping update for agreement %s with:/n lines: %s/n parameters: %s",
@@ -956,6 +961,16 @@ class AgreementsSyncer:  # noqa: WPS214
             )
         else:
             mpt.update_agreement(self._mpt_client, self.agreement_id, parameters=parameters_data)
+
+    def _add_education_market_sub_segments(self, parameters: dict) -> dict:
+        if get_market_segment(self.product_id) == MARKET_SEGMENT_EDUCATION:
+            parameters[Param.PHASE_FULFILLMENT.value].append({
+                "externalId": Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
+                "value": ",".join(
+                    self._customer.get("companyProfile", {}).get("marketSubSegments", "")
+                ),
+            })
+        return parameters
 
 
 def _is_deployment_matched(missing_deployment_id: str, subscription: dict) -> bool:

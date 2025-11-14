@@ -2064,3 +2064,89 @@ def test_check_update_airtable_missing_deployments_none(
 
     mock_create_gc_agreement_deployments.assert_not_called()
     mock_send_warning.assert_not_called()
+
+
+@freeze_time("2025-06-23")
+def test_sync_agreement_education_market_sub_segments(
+    mocker,
+    lines_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    mock_get_prices_for_skus,
+    mock_get_template_data_by_adobe_subscription,
+    adobe_subscription_factory,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
+    mocked_agreement_syncer,
+):
+    mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
+    mocked_agreement_syncer._customer["companyProfile"]["marketSubSegments"] = ["K-12", "HIGHER_ED"]
+    mocked_agreement_update = mocker.patch(
+        "mpt_extension_sdk.mpt_http.mpt.update_agreement", autospec=True
+    )
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 1234.55}
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Renewing",
+    }
+    agreement = agreement_factory(
+        subscriptions=subscriptions_factory(
+            adobe_subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", lines=lines_factory()
+        ),
+    )
+    agreement["product"]["id"] = "PRD-4444-4444"
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(
+                subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA",
+                offer_id="65304578CA01A12",
+                used_quantity=6,
+            )
+        ]
+    }
+    mock_mpt_get_agreement_subscription.return_value = agreement["subscriptions"][0]
+    mocked_agreement_syncer._agreement = agreement
+
+    mocked_agreement_syncer.sync(sync_prices=False)
+
+    mock_mpt_update_agreement_subscription.assert_called_once_with(
+        mock_mpt_client,
+        "SUB-1000-2000-3000",
+        autoRenew=True,
+        commitmentDate="2025-04-04",
+        lines=[{"id": "ALI-2119-4550-8674-5962-0001", "quantity": 10}],
+        parameters={
+            "fulfillment": [
+                {"externalId": "adobeSKU", "value": "65304578CA01A12"},
+                {"externalId": "currentQuantity", "value": "10"},
+                {"externalId": "renewalQuantity", "value": "10"},
+                {"externalId": "renewalDate", "value": "2026-10-11"},
+                {"externalId": "lastSyncDate", "value": "2025-06-23"},
+            ],
+        },
+        template={"id": "TPL-1234", "name": "Renewing"},
+    )
+
+    parameters = {
+        "fulfillment": [
+            {"externalId": "cotermDate", "value": "2025-04-04"},
+            {"externalId": "educationSubSegment", "value": "K-12,HIGHER_ED"},
+        ]
+    }
+
+    mocked_agreement_update.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=agreement["lines"],
+            parameters=parameters,
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
+        ),
+    ])
