@@ -1,4 +1,5 @@
 import logging
+from unittest import mock
 
 import pytest
 from freezegun import freeze_time
@@ -281,6 +282,43 @@ def test_sync_agreement_update_agreement(
     mock_get_agreement.assert_called_once_with(
         mock_mpt_client, mocked_agreement_syncer._agreement["id"]
     )
+
+
+@freeze_time("2025-06-23")
+def test_sync_agreement_update_agreement_education(
+    mock_mpt_client,
+    mocked_agreement_syncer,
+    mock_get_agreement,
+    mock_get_prices_for_skus,
+    mock_mpt_update_agreement,
+):
+    mocked_agreement_syncer._agreement["product"]["id"] = "PRD-4444-4444"
+    mocked_agreement_syncer._customer["companyProfile"]["marketSubSegments"] = ["EDU_1", "EDU_2"]
+
+    mocked_agreement_syncer.sync(sync_prices=True)  # act
+
+    mock_mpt_update_agreement.assert_has_calls([
+        mock.call(
+            mock_mpt_client,
+            mocked_agreement_syncer._agreement["id"],
+            parameters={
+                "fulfillment": [
+                    {"externalId": "cotermDate", "value": "2024-01-23"},
+                    {"externalId": "educationSubSegment", "value": "EDU_1,EDU_2"},
+                ],
+            },
+            lines=[],
+        ),
+        mock.call(
+            mock_mpt_client,
+            mocked_agreement_syncer._agreement["id"],
+            parameters={
+                "fulfillment": [
+                    {"externalId": "lastSyncDate", "value": "2025-06-23"},
+                ],
+            },
+        ),
+    ])
 
 
 @freeze_time("2025-06-23")
