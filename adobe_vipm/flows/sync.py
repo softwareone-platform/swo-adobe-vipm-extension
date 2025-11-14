@@ -5,6 +5,7 @@ import sys
 import traceback
 from collections.abc import Sequence
 from functools import partial
+from typing import Any
 
 from dateutil.relativedelta import relativedelta
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -562,11 +563,7 @@ def _get_assets_for_update(
             continue
 
         mpt_asset = get_asset_by_id(mpt_client, asset["id"])
-        adobe_subscription_id = mpt_asset["externalIds"]["vendor"]
-        adobe_subscription = find_first(
-            partial(_check_adobe_subscription_id, adobe_subscription_id),
-            adobe_subscriptions,
-        )
+        adobe_subscription = _get_adobe_subscription(mpt_asset)
         if not adobe_subscription:
             logger.error("No subscription found in Adobe customer data!")
             continue
@@ -579,6 +576,19 @@ def _get_assets_for_update(
 
     return for_update
 
+def _get_adobe_subscription(self, asset: dict[str, Any]) -> dict[str, Any] | None:
+    adobe_subscription_id = asset.get("externalIds").get("vendor")
+    if not adobe_subscription_id:
+        logger.warning(
+            "No vendor subscription found for asset %s: asset.externalIds.vendor is empty",
+            asset["id"],
+        )
+        return None
+
+    return find_first(
+        partial(_check_adobe_subscription_id, adobe_subscription_id),
+        self._adobe_subscriptions,
+    )
 
 def _get_subscriptions_for_update(
     mpt_client: MPTClient, agreement: dict, customer: dict, adobe_subscriptions: Sequence[dict]
