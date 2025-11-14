@@ -65,7 +65,7 @@ class AssetsSyncer:
         return for_update
 
     def _get_adobe_subscription(self, asset: dict[str, Any]) -> dict[str, Any] | None:
-        adobe_subscription_id = asset["externalIds"].get("vendor")
+        adobe_subscription_id = asset.get("externalIds", {}).get("vendor")
         if not adobe_subscription_id:
             logger.warning(
                 "No vendor subscription found for asset %s: asset.externalIds.vendor is empty",
