@@ -2,7 +2,8 @@ import pytest
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
 from adobe_vipm.adobe.constants import AdobeStatus
-from adobe_vipm.flows.sync.agreement import AgreementsSyncer
+from adobe_vipm.flows.sync.agreement import AgreementSyncer
+from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
 
 
 @pytest.fixture
@@ -61,7 +62,7 @@ def mock_get_prices_for_skus(mocker):
 
 @pytest.fixture
 def mock_sync_agreements_by_agreement_ids(mocker):
-    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.helper.sync_agreements_by_agreement_ids")
+    mock = mocker.MagicMock(spec="adobe_vipm.flows.sync.agreement.sync_agreements_by_agreement_ids")
     return mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids", new=mock
     )
@@ -124,17 +125,24 @@ def mock_get_gc_agreement_deployment_model(mocker):
 
 @pytest.fixture
 def mock_get_subscriptions_for_update(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(AgreementsSyncer, "_get_subscriptions_for_update", spec=True)
+    return mocker.patch.object(AgreementSyncer, "_get_subscriptions_for_update", spec=True)
 
 
 @pytest.fixture
 def mock_update_subscriptions(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(AgreementsSyncer, "_update_subscriptions", spec=True)
+    return mocker.patch.object(SubscriptionSyncer, "sync", spec=True)
 
 
 @pytest.fixture
 def mock_add_missing_subscriptions_and_assets(mocker):
-    return mocker.patch.object(AgreementsSyncer, "_add_missing_subscriptions_and_assets", spec=True)
+    return mocker.patch.object(AgreementSyncer, "_add_missing_subscriptions_and_assets", spec=True)
+
+
+@pytest.fixture
+def mock_check_update_airtable_missing_deployments(mocker, mocked_agreement_syncer):
+    return mocker.patch.object(
+        AgreementSyncer, "_check_update_airtable_missing_deployments", spec=True
+    )
 
 
 @pytest.fixture
@@ -149,7 +157,7 @@ def mock_agreement(agreement_factory):
 
 @pytest.fixture
 def mock_sync_agreement(mocker):
-    return mocker.patch("adobe_vipm.flows.sync.helper.sync_agreement", spec=True)
+    return mocker.patch("adobe_vipm.flows.sync.agreement.sync_agreement", spec=True)
 
 
 @pytest.fixture
@@ -171,7 +179,7 @@ def mocked_agreement_syncer(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
         ),
     ]
-    return AgreementsSyncer(
+    return AgreementSyncer(
         mock_mpt_client,
         mock_adobe_client,
         agreement_factory(),
@@ -184,7 +192,8 @@ def mocked_agreement_syncer(
 @pytest.fixture
 def mock_notify_agreement_unhandled_exception_in_teams(mocker):
     return mocker.patch(
-        "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams", spec=True
+        "adobe_vipm.flows.utils.notification.notify_agreement_unhandled_exception_in_teams",
+        spec=True,
     )
 
 
@@ -203,7 +212,7 @@ def mock_get_agreement(mocker, mock_agreement):
 @pytest.fixture
 def mock_get_agreements_by_3yc_commitment_request_invitation(mocker, mock_agreement):
     return mocker.patch(
-        "adobe_vipm.flows.sync.helper.get_agreements_by_3yc_commitment_request_invitation",
+        "adobe_vipm.flows.sync.agreement.get_agreements_by_3yc_commitment_request_invitation",
         return_value=[mock_agreement],
         autospec=True,
     )
@@ -227,3 +236,22 @@ def mock_mpt_create_agreement_subscription(mocker):
 @pytest.fixture
 def mock_mpt_get_template_by_name(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_template_by_name", spec=True)
+
+
+@pytest.fixture
+def mock_notify_missing_prices(mocker):
+    return mocker.patch("adobe_vipm.flows.utils.notify_missing_prices", spec=True)
+
+
+@pytest.fixture
+def mock_get_template_data_by_adobe_subscription(mocker):
+    mock = mocker.MagicMock(
+        spec="adobe_vipm.flows.utils.template.get_template_data_by_adobe_subscription"
+    )
+    for path in (
+        "adobe_vipm.flows.sync.agreement.get_template_data_by_adobe_subscription",
+        "adobe_vipm.flows.sync.subscription.get_template_data_by_adobe_subscription",
+        "adobe_vipm.flows.fulfillment.shared.get_template_data_by_adobe_subscription",
+    ):
+        mocker.patch(path, new=mock)
+    return mock
