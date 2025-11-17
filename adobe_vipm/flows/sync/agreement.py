@@ -925,6 +925,14 @@ class AgreementsSyncer:  # noqa: WPS214
                     deployment_agreement, subscriptions_for_update, sync_prices=sync_prices
                 )
 
+            AssetsSyncer(
+                self._mpt_client,
+                deployment_agreement["id"],
+                deployment_agreement["assets"],
+                self._customer,
+                self._adobe_subscriptions,
+            ).sync(dry_run=self._dry_run)
+
             self._update_agreement(deployment_agreement)
 
             self._sync_gc_3yc_agreements(deployment_agreement)
