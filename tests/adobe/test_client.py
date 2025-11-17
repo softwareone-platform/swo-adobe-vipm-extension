@@ -23,7 +23,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
-from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.constants import GOVERNMENT_AGENCY_TYPE_FEDERAL, Param
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.utils import get_customer_data
 
@@ -192,6 +192,88 @@ def test_create_customer_account(
 
     customer_id = client.create_customer_account(
         authorization_uk, seller_id, "external_id", "COM", customer_data
+    )
+    assert customer_id == {"customerId": "A-customer-id"}
+
+
+def test_create_customer_account_lga(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_authorizations_file,
+    customer_data,
+    adobe_client_factory,
+):
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
+    reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+
+    client, authorization, api_token = adobe_client_factory()
+
+    company_name = f"{customer_data['companyName']} (external_id)"
+
+    customer_data[Param.AGENCY_TYPE.value] = GOVERNMENT_AGENCY_TYPE_FEDERAL
+
+    payload = {
+        "resellerId": reseller_id,
+        "externalReferenceId": "external_id",
+        "companyProfile": {
+            "companyName": company_name,
+            "preferredLanguage": "en-US",
+            "marketSegment": "GOV",
+            "address": {
+                "country": customer_data["address"]["country"],
+                "region": customer_data["address"]["state"],
+                "city": customer_data["address"]["city"],
+                "addressLine1": customer_data["address"]["addressLine1"],
+                "addressLine2": customer_data["address"]["addressLine2"],
+                "postalCode": customer_data["address"]["postCode"],
+                "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
+            },
+            "contacts": [
+                {
+                    "firstName": customer_data["contact"]["firstName"],
+                    "lastName": customer_data["contact"]["lastName"],
+                    "email": customer_data["contact"]["email"],
+                    "phoneNumber": join_phone_number(customer_data["contact"]["phone"]),
+                }
+            ],
+            "marketSubSegments": [GOVERNMENT_AGENCY_TYPE_FEDERAL],
+        },
+        "benefits": [
+            {
+                "type": "LARGE_GOVERNMENT_AGENCY",
+            },
+        ],
+    }
+    correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+    requests_mocker.post(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/customers"),
+        status=201,
+        json={
+            "customerId": "A-customer-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": correlation_id,
+                },
+            ),
+            matchers.json_params_matcher(payload),
+        ],
+    )
+
+    customer_id = client.create_customer_account_lga(
+        authorization_uk, seller_id, "external_id", "GOV", customer_data
     )
     assert customer_id == {"customerId": "A-customer-id"}
 
