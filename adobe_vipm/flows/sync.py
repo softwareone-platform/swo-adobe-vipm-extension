@@ -569,7 +569,14 @@ def _get_assets_for_update(
             continue
 
         mpt_asset = get_asset_by_id(mpt_client, asset["id"])
-        adobe_subscription_id = mpt_asset["externalIds"]["vendor"]
+        adobe_subscription_id = mpt_asset.get("externalIds").get("vendor")
+        if not adobe_subscription_id:
+            logger.warning(
+                "No vendor subscription found for asset %s: asset.externalIds.vendor is empty",
+                asset["id"],
+            )
+            continue
+
         adobe_subscription = find_first(
             partial(_check_adobe_subscription_id, adobe_subscription_id),
             adobe_subscriptions,
