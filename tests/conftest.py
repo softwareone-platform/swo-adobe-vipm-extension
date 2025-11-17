@@ -278,6 +278,8 @@ def customer_data(account_data):
     data["3YC"] = []
     data["3YCConsumables"] = ""
     data["3YCLicenses"] = ""
+    data["deploymentId"] = ""
+    data["deployments"] = ""
     return data
 
 
