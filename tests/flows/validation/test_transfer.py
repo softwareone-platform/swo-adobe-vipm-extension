@@ -24,6 +24,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.transfer import CreateTransferSubscriptions
 from adobe_vipm.flows.utils import get_ordering_parameter
 from adobe_vipm.flows.validation.transfer import FetchTransferData, get_prices, validate_transfer
 
@@ -1705,4 +1706,65 @@ def test_validate_transfer_government_transfer_lga_product_with_lga_agency_type(
             adobe_preview_transfer["items"][0]["offerId"][:10],
             adobe_preview_transfer["items"][1]["offerId"][:10],
         ],
+    )
+
+
+def test_create_transfer_subscription_agreement(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    mock_next_step,
+    adobe_customer_factory,
+    order_factory,
+    subscriptions_factory,
+    caplog,
+):
+    mock_create_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.create_agreement_subscriptions",
+        return_value=[subscriptions_factory()[0]],
+    )
+    adobe_customer = adobe_customer_factory()
+    adobe_transfer_order = order_factory()
+    context = Context(order=mock_order, adobe_customer=adobe_customer)
+    context.adobe_transfer_order = adobe_transfer_order
+    step = CreateTransferSubscriptions()
+
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_create_agreement_subscription.assert_called_once_with(
+        adobe_transfer_order, mock_mpt_client, mock_order, mock_adobe_client, adobe_customer
+    )
+    mock_next_step.assert_called_with(mock_mpt_client, context)
+    assert (
+        "No subscriptions found without deployment ID to be added to the main agreement"
+        not in caplog.text
+    )
+
+
+def test_create_transfer_subscription_agreement_without_subscriptions(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    mock_next_step,
+    adobe_customer_factory,
+    order_factory,
+    caplog,
+):
+    mock_create_agreement_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.create_agreement_subscriptions", return_value=[]
+    )
+    adobe_customer = adobe_customer_factory()
+    adobe_transfer_order = order_factory()
+    context = Context(order=mock_order, adobe_customer=adobe_customer)
+    context.adobe_transfer_order = adobe_transfer_order
+    step = CreateTransferSubscriptions()
+
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_create_agreement_subscription.assert_called_once()
+    assert (
+        "No subscriptions found without deployment ID to be added to the main agreement"
+        in caplog.text
     )
