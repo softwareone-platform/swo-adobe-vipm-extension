@@ -49,6 +49,7 @@ class OrderClientMixin:
     """Adobe Client Mixin to manage Orders flows of Adobe VIPM."""
 
     flex_discount_not_qualify_re = re.compile(r"Line Item: ?(\d+)", re.IGNORECASE)
+    deployment_country_pattern = "{} ?- ?([A-Z]{{2,}})"
 
     @wrap_http_error
     def get_orders(self, authorization_id: str, customer_id: str, filters: dict | None = None):
@@ -551,10 +552,19 @@ class OrderClientMixin:
         offer_ids: tuple,
     ) -> dict:
         # TODO: Change this when Adobe starts supporting multiple codes per single baseOfferId
+        country = context.customer_data["address"]["country"]
+        if context.customer_data[Param.DEPLOYMENT_ID]:
+            match = re.match(
+                self.deployment_country_pattern.format(context.customer_data[Param.DEPLOYMENT_ID]),
+                context.customer_data[Param.DEPLOYMENTS],
+                re.IGNORECASE,
+            )
+            if match:
+                country = match.group(1)
         flex_discounts = self._get_flex_discounts(
             authorization,
             context.market_segment,
-            context.customer_data["address"]["country"],
+            country,
             offer_ids,
         )
         base_offers_with_discounts = {}
