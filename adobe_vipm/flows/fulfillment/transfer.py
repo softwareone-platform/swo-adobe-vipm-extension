@@ -1313,16 +1313,9 @@ class CreateTransferSubscriptions(Step):
         )
 
         if not context.subscriptions:
-            error = "No subscriptions found without deployment ID to be added to the main agreement"
-            logger.error(error)
-            sync_main_agreement(
-                context.gc_main_agreement,
-                context.product_id,
-                context.authorization_id,
-                context.customer_id,
-                error,
+            logger.info(
+                "No subscriptions found without deployment ID to be added to the main agreement"
             )
-            return
 
         next_step(client, context)
 
