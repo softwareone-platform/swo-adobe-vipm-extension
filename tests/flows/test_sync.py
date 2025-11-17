@@ -920,6 +920,7 @@ def test_sync_global_customer_parameter(
     mock_get_prices_for_skus,
     mock_update_subscriptions,
     adobe_subscription_factory,
+    assets_factory,
     fulfillment_parameters_factory,
     mock_add_missing_subscriptions,
     mock_get_adobe_product_by_marketplace_sku,
@@ -987,6 +988,9 @@ def test_sync_global_customer_parameter(
     )
     mock_get_prices_for_skus.return_value = {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22}
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
+    mock_asset = assets_factory()[0]
+    mock_asset["externalIds"] = {}
+    mocker.patch("adobe_vipm.flows.sync.get_asset_by_id", return_value=mock_asset)
 
     sync_agreement(mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
@@ -1067,6 +1071,10 @@ def test_sync_global_customer_parameter(
         ]
     assert "Getting subscriptions for update for agreement AGR-deployment-1" in caplog.messages
     assert "Getting subscriptions for update for agreement AGR-deployment-2" not in caplog.messages
+    assert (
+            "No vendor subscription found for asset AST-1000-2000-3000: asset.externalIds.vendor "
+            "is empty" in caplog.messages
+    )
 
 @freeze_time("2025-06-19")
 def test_sync_global_customer_parameter_not_prices(
