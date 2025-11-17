@@ -1292,6 +1292,7 @@ def order_factory(
     lines_factory,
     status="Processing",
     deployment_id="",
+    deployments=None,
     order_type="Purchase",
 ):
     def _order(
@@ -1306,12 +1307,13 @@ def order_factory(
         status=status,
         template=None,
         deployment_id=deployment_id,
+        deployments=[] if deployments is None else deployments,
     ):
         order_parameters = (
             order_parameters_factory() if order_parameters is None else order_parameters
         )
         fulfillment_parameters = (
-            fulfillment_parameters_factory(deployment_id=deployment_id)
+            fulfillment_parameters_factory(deployment_id=deployment_id, deployments=deployments)
             if fulfillment_parameters is None
             else fulfillment_parameters
         )
