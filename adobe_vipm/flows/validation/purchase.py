@@ -34,6 +34,7 @@ from adobe_vipm.flows.constants import (
     ERR_EMAIL_FORMAT,
     ERR_FIRST_NAME_FORMAT,
     ERR_LAST_NAME_FORMAT,
+    ERR_LGA_QUANTITIES,
     ERR_PHONE_NUMBER_LENGTH,
     ERR_POSTAL_CODE_FORMAT,
     ERR_POSTAL_CODE_LENGTH,
@@ -55,6 +56,9 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_ordering_parameter_error,
     update_ordering_parameter_value,
+)
+from adobe_vipm.flows.utils.market_segment import (
+    is_large_government_agency_type,
 )
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
@@ -294,6 +298,21 @@ class ValidateCustomerData(Step):
         next_step(client, context)
 
 
+class ValidateQuantitiesLGA(Step):
+    """Validates the quantities of the LGA product."""
+
+    def __call__(self, client, context, next_step):
+        """Validates the quantities of the LGA product."""
+        if is_large_government_agency_type(context.order["product"]["id"]) and context.new_lines:
+            count_licenses = sum(line["quantity"] for line in context.new_lines)
+            if count_licenses < 100:
+                context.order = set_order_error(context.order, ERR_LGA_QUANTITIES.to_dict())
+                context.validation_succeeded = False
+                return
+
+        next_step(client, context)
+
+
 def validate_purchase_order(client, order):
     """Validate purchase order pipeline."""
     pipeline = Pipeline(
@@ -302,6 +321,7 @@ def validate_purchase_order(client, order):
         CheckPurchaseValidationEnabled(),
         ValidateCustomerData(),
         ValidateDuplicateLines(),
+        ValidateQuantitiesLGA(),
         Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),
         UpdatePrices(),

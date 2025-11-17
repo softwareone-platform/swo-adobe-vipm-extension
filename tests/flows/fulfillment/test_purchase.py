@@ -225,7 +225,31 @@ def test_validate_market_segment_eligibility_step_status_eligible(
     mocked_next_step.assert_not_called()
 
 
-def test_create_customer_step(mocker, order_factory, customer_data, adobe_customer_factory):
+def test_validate_market_segment_eligibility_lga_agency_type_not_federal_or_state(
+    mocker,
+    mock_order,
+):
+    mocked_switch_to_query = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=mock_order)
+
+    step = ValidateMarketSegmentEligibility()
+    step(mocked_client, context, mocked_next_step)
+    mocked_switch_to_query.assert_called_once_with(
+        mocked_client,
+        context.order,
+        template_name=TEMPLATE_NAME_PURCHASE,
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_create_customer_step(
+    mocker, mock_adobe_client, mock_order, customer_data, adobe_customer_factory, order_factory
+):
     adobe_customer = adobe_customer_factory()
 
     mocked_adobe_client = mocker.MagicMock()
@@ -248,6 +272,7 @@ def test_create_customer_step(mocker, order_factory, customer_data, adobe_custom
 
     context = Context(
         order=order,
+        product_id="PRD-1111-1111",
         customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
@@ -262,6 +287,41 @@ def test_create_customer_step(mocker, order_factory, customer_data, adobe_custom
     assert context.adobe_customer_id == adobe_customer["customerId"]
 
     mocked_adobe_client.create_customer_account.assert_called_once_with(
+        context.authorization_id,
+        context.seller_id,
+        context.agreement_id,
+        context.market_segment,
+        customer_data,
+    )
+    mocked_save_data.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_create_customer_lga_step(
+    mocker, mock_adobe_client, mock_order, customer_data, adobe_customer_factory
+):
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.create_customer_account_lga.return_value = adobe_customer
+    mocked_save_data = mocker.patch.object(CreateCustomer, "save_data")
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+
+    context = Context(
+        order=mock_order,
+        product_id="PRD-3333-3333",
+        customer_data=customer_data,
+        agreement_id="agreement-id",
+        authorization_id="auth-id",
+        seller_id="seller-id",
+        market_segment="market-segment",
+    )
+
+    step = CreateCustomer()
+    step(mocked_client, context, mocked_next_step)
+
+    assert context.adobe_customer == adobe_customer
+    assert context.adobe_customer_id == adobe_customer["customerId"]
+    mock_adobe_client.create_customer_account_lga.assert_called_once_with(
         context.authorization_id,
         context.seller_id,
         context.agreement_id,
@@ -362,7 +422,8 @@ def test_create_customer_step_exception(
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
-        order=order,
+        product_id="PRD-1111-1111",
+        order=mock_order,
         customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
