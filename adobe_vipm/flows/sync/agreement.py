@@ -757,33 +757,28 @@ class AgreementsSyncer:  # noqa: WPS214
             })
 
         if missing_deployments_data:
-            deployment_model = models.get_gc_agreement_deployment_model(
-                models.AirTableBaseInfo.for_migrations(self.product_id)
-            )
             missing_deployments = []
             for missing_deployment_data in missing_deployments_data:
                 logger.info(
                     "> Adding missing deployment to Airtable: %s",
                     missing_deployment_data["deployment"]["deploymentId"],
                 )
-                missing_deployments.append(
-                    deployment_model(
-                        deployment_id=missing_deployment_data["deployment"]["deploymentId"],
-                        main_agreement_id=self.agreement_id,
-                        account_id=self._agreement["client"]["id"],
-                        seller_id=self._seller_id,
-                        product_id=self.product_id,
-                        membership_id=missing_deployment_data["transfer"].membership_id,
-                        transfer_id=missing_deployment_data["transfer"].transfer_id,
-                        status="pending",
-                        customer_id=self._adobe_customer_id,
-                        deployment_currency=missing_deployment_data["deployment_currency"],
-                        deployment_country=missing_deployment_data["deployment"]["companyProfile"][
-                            "address"
-                        ]["country"],
-                        licensee_id=self._licensee_id,
-                    )
-                )
+                missing_deployments.append({
+                    "deployment_id": missing_deployment_data["deployment"]["deploymentId"],
+                    "main_agreement_id": self._agreement["id"],
+                    "account_id": self._agreement["client"]["id"],
+                    "seller_id": self._agreement["seller"]["id"],
+                    "product_id": self._agreement["product"]["id"],
+                    "membership_id": missing_deployment_data["transfer"].membership_id,
+                    "transfer_id": missing_deployment_data["transfer"].transfer_id,
+                    "status": "pending",
+                    "customer_id": get_adobe_customer_id(self._agreement),
+                    "deployment_currency": missing_deployment_data["deployment_currency"],
+                    "deployment_country": missing_deployment_data["deployment"]["companyProfile"][
+                        "address"
+                    ]["country"],
+                    "licensee_id": self._agreement["licensee"]["id"],
+                })
             models.create_gc_agreement_deployments(self.product_id, missing_deployments)
             send_warning(
                 "Missing deployments added to Airtable",

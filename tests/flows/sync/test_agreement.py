@@ -1945,22 +1945,16 @@ def test_sync_agreement_without_subscriptions(
 
 def test_check_update_airtable_missing_deployments(
     mocker,
-    mock_settings,
-    mock_pymsteams,
     agreement_factory,
     mock_send_warning,
     mock_airtable_base_info,
     adobe_deployment_factory,
     adobe_subscription_factory,
     fulfillment_parameters_factory,
-    mock_create_gc_agreement_deployments,
-    mock_get_gc_agreement_deployment_model,
     mock_get_gc_agreement_deployments_by_main_agreement,
     mocked_agreement_syncer,
-    adobe_customer_factory,
+    mock_get_gc_agreement_deployment_model,
 ):
-    mock_gc_agreement_deployment_model = mocker.MagicMock(name="GCAgreementDeployment")
-    mock_get_gc_agreement_deployment_model.return_value = mock_gc_agreement_deployment_model
     deployments = [
         get_gc_agreement_deployment_model(AirTableBaseInfo(api_key="api-key", base_id="base-id"))(
             deployment_id=f"{i}"
@@ -1968,11 +1962,8 @@ def test_check_update_airtable_missing_deployments(
         for i in range(1, 4)
     ]
     mock_get_gc_agreement_deployments_by_main_agreement.return_value = deployments
-    agreement = agreement_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(customer_id="P1005158636")
-    )
+    agreement = agreement_factory(fulfillment_parameters=fulfillment_parameters_factory())
     mocked_agreement_syncer._agreement = agreement
-    mocked_agreement_syncer._customer = adobe_customer_factory()
     adobe_deployments = [
         adobe_deployment_factory(deployment_id=f"deployment-{i}") for i in range(1, 4)
     ]
@@ -1993,46 +1984,38 @@ def test_check_update_airtable_missing_deployments(
 
     mocked_agreement_syncer._check_update_airtable_missing_deployments(adobe_deployments)
 
-    mock_create_gc_agreement_deployments.assert_called_once_with(
-        agreement["product"]["id"],
-        [
-            mock_gc_agreement_deployment_model.return_value,
-            mock_gc_agreement_deployment_model.return_value,
-        ],
-    )
-    mock_gc_agreement_deployment_model.assert_has_calls(
-        (
-            mocker.call(
-                deployment_id="deployment-1",
-                main_agreement_id="AGR-2119-4550-8674-5962",
-                account_id="ACC-9121-8944",
-                seller_id="SEL-9121-8944",
-                product_id="PRD-1111-1111",
-                membership_id="membership_id",
-                transfer_id="transfer_id",
-                status="pending",
-                customer_id="a-client-id",
-                deployment_currency=None,
-                deployment_country="DE",
-                licensee_id="LC-321-321-321",
-            ),
-            mocker.call(
-                deployment_id="deployment-2",
-                main_agreement_id="AGR-2119-4550-8674-5962",
-                account_id="ACC-9121-8944",
-                seller_id="SEL-9121-8944",
-                product_id="PRD-1111-1111",
-                membership_id="membership_id",
-                transfer_id="transfer_id",
-                status="pending",
-                customer_id="a-client-id",
-                deployment_currency=None,
-                deployment_country="DE",
-                licensee_id="LC-321-321-321",
-            ),
+    assert mock_get_gc_agreement_deployment_model.mock_calls[:2] == [
+        mocker.call(
+            deployment_id="deployment-1",
+            main_agreement_id="AGR-2119-4550-8674-5962",
+            account_id="ACC-9121-8944",
+            seller_id="SEL-9121-8944",
+            product_id="PRD-1111-1111",
+            membership_id="membership_id",
+            transfer_id="transfer_id",
+            status="pending",
+            customer_id=mocked_agreement_syncer._customer["customerId"],
+            deployment_currency=None,
+            deployment_country="DE",
+            licensee_id="LC-321-321-321",
         ),
-        any_order=True,
-    )
+        mocker.call(
+            deployment_id="deployment-2",
+            main_agreement_id="AGR-2119-4550-8674-5962",
+            account_id="ACC-9121-8944",
+            seller_id="SEL-9121-8944",
+            product_id="PRD-1111-1111",
+            membership_id="membership_id",
+            transfer_id="transfer_id",
+            status="pending",
+            customer_id=mocked_agreement_syncer._customer["customerId"],
+            deployment_currency=None,
+            deployment_country="DE",
+            licensee_id="LC-321-321-321",
+        ),
+    ]
+    assert mock_get_gc_agreement_deployment_model.mock_calls[2][0] == "batch_save"
+    assert len(mock_get_gc_agreement_deployment_model.mock_calls[2].args[0]) == 2
     mock_send_warning.assert_called_once()
 
 
