@@ -115,10 +115,11 @@ def mock_create_gc_agreement_deployments(mocker):
 
 @pytest.fixture
 def mock_get_gc_agreement_deployment_model(mocker):
-    return mocker.patch(
-        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
-        spec=True,
+    mock = mocker.MagicMock(name="GCAgreementDeployment")
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model", return_value=mock, spec=True
     )
+    return mock
 
 
 @pytest.fixture
