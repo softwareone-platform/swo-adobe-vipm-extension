@@ -459,6 +459,141 @@ def test_create_preview_order_upsize(
     }
 
 
+def test_create_prev_upsize_deplyment_discount(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_config_file,
+    adobe_authorizations_file,
+    adobe_subscription_factory,
+    order_factory,
+    lines_factory,
+    adobe_client_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    flex_discounts_factory,
+    adobe_order_factory,
+    mock_mpt_client,
+):
+    mocker.patch(
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        side_effect=["uuid-1", "uuid-2", "uuid-3", "uuid-4", "uuid-5", "uuid-6"],
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
+    customer_id = "a-customer"
+    deployment_id = "a_deployment_id"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    order = order_factory(
+        lines=lines_factory(old_quantity=5, quantity=10),
+        deployment_id=deployment_id,
+        deployments=[f"{deployment_id} - UK"],
+    )
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+    adobe_subscription = adobe_subscription_factory(
+        current_quantity=5,
+        renewal_quantity=5,
+    )
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions",
+        ),
+        status=200,
+        json={"items": [adobe_subscription]},
+    )
+    flex_discount_data = flex_discounts_factory()
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/flex-discounts",
+        ),
+        status=200,
+        json=flex_discount_data,
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "country": "UK",
+                "offer-ids": "65304578CA01A12",
+            })
+        ],
+    )
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=200,
+        json=adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-5",
+                    "x-correlation-id": "uuid-6",
+                },
+            ),
+            matchers.json_params_matcher(
+                {
+                    "externalReferenceId": order["id"],
+                    "orderType": "PREVIEW",
+                    "lineItems": [
+                        {
+                            "extLineItemNumber": to_adobe_line_id(order["lines"][0]["id"]),
+                            "offerId": adobe_full_sku,
+                            "quantity": 5,
+                            "deploymentId": deployment_id,
+                            "currencyCode": "USD",
+                        },
+                    ],
+                },
+            ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
+        ],
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=order["lines"],
+        new_lines=[],
+        customer_data=get_customer_data(order),
+        adobe_customer_id=customer_id,
+    )
+
+    preview_order = client.create_preview_order(context)
+    assert preview_order == {
+        "currencyCode": "USD",
+        "externalReferenceId": "external_id",
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "pricing": {
+                    "discountedPartnerPrice": 849.16,
+                    "lineItemPartnerPrice": 846.83,
+                    "netPartnerPrice": 846.83,
+                    "partnerPrice": 875.16,
+                },
+                "quantity": 170,
+            }
+        ],
+        "orderType": "PREVIEW",
+    }
+
+
 def test_create_preview_order_upsize_product_not_found(
     mocker,
     settings,
@@ -663,6 +798,122 @@ def test_create_preview_newlines(
             matchers.query_param_matcher({
                 "market-segment": "MARKET_SEGMENT_COMMERCIAL",
                 "country": "US",
+                "offer-ids": "65304578CA01A12",
+            })
+        ],
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id=authorization_uk,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        product_id="PRD-1234",
+        currency="EUR",
+        upsize_lines=[],
+        new_lines=order["lines"],
+        customer_data=get_customer_data(order),
+        adobe_customer_id=customer_id,
+    )
+
+    preview_order = client.create_preview_order(context)
+    assert preview_order == {
+        "currencyCode": "USD",
+        "externalReferenceId": "external_id",
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "pricing": {
+                    "discountedPartnerPrice": 849.16,
+                    "lineItemPartnerPrice": 846.83,
+                    "netPartnerPrice": 846.83,
+                    "partnerPrice": 875.16,
+                },
+                "quantity": 170,
+            }
+        ],
+        "orderType": "PREVIEW",
+    }
+
+
+def test_create_preview_newlines_deplyment_discount(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_config_file,
+    adobe_authorizations_file,
+    order_factory,
+    lines_factory,
+    adobe_client_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    flex_discounts_factory,
+    mock_uuid4,
+    adobe_order_factory,
+    mock_mpt_client,
+):
+    mocker.patch(
+        "adobe_vipm.adobe.mixins.order.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    adobe_full_sku = adobe_config_file["skus_mapping"][0]["sku"]
+    customer_id = "a-customer"
+    deployment_id = "a_deployment_id"
+
+    client, authorization, api_token = adobe_client_factory()
+
+    order = order_factory(
+        lines=lines_factory(old_quantity=0, quantity=5),
+        deployment_id=deployment_id,
+        deployments=[f"{deployment_id} - UK"],
+    )
+    order["lines"][0]["item"]["externalIds"] = {"vendor": "65304578CA"}
+
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=200,
+        json=adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "a21beee6-c07e-43e1-b5b7-fbef9644dbbb",
+                    "x-correlation-id": "a21beee6-c07e-43e1-b5b7-fbef9644dbbb",
+                },
+            ),
+            matchers.json_params_matcher(
+                {
+                    "externalReferenceId": order["id"],
+                    "orderType": "PREVIEW",
+                    "lineItems": [
+                        {
+                            "extLineItemNumber": to_adobe_line_id(order["lines"][0]["id"]),
+                            "offerId": adobe_full_sku,
+                            "quantity": 5,
+                            "deploymentId": deployment_id,
+                            "currencyCode": "USD",
+                        },
+                    ],
+                },
+            ),
+            matchers.query_param_matcher({"fetch-price": "true"}),
+        ],
+    )
+    flex_discount_data = flex_discounts_factory()
+    requests_mocker.get(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
+        status=200,
+        json=flex_discount_data,
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "country": "UK",
                 "offer-ids": "65304578CA01A12",
             })
         ],
