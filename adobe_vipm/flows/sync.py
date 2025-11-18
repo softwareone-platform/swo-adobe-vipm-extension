@@ -710,7 +710,7 @@ def _sync_agreements_by_param(
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
-        "select=lines,parameters,subscriptions,product,listing"
+        "select=lines,parameters,assets,subscriptions,product,listing"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug("Syncing agreement %s", agreement)
@@ -738,7 +738,7 @@ def sync_agreements_by_renewal_date(mpt_client: MPTClient, *, dry_run: bool) -> 
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
-        "select=lines,parameters,subscriptions,product,listing"
+        "select=lines,parameters,assets,subscriptions,product,listing"
     )
     for agreement in get_agreements_by_query(mpt_client, rql_query):
         logger.debug("Syncing agreement %s", agreement)
