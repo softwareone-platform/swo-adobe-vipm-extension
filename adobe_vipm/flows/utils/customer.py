@@ -38,6 +38,16 @@ def get_customer_data(order: dict) -> dict:
         )
         customer_data[param_external_id] = param.get("value")
 
+    for param_external_id in (
+        Param.DEPLOYMENT_ID.value,
+        Param.DEPLOYMENTS.value,
+    ):
+        param = get_fulfillment_parameter(
+            order,
+            param_external_id,
+        )
+        customer_data[param_external_id] = param.get("value")
+
     return customer_data
 
 
