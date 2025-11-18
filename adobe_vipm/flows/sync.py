@@ -863,9 +863,6 @@ def _check_update_airtable_missing_deployments(
         })
 
     if missing_deployments_data:
-        deployment_model = models.get_gc_agreement_deployment_model(
-            models.AirTableBaseInfo.for_migrations(product_id)
-        )
         missing_deployments = []
         for missing_deployment_data in missing_deployments_data:
             logger.info(
@@ -873,22 +870,22 @@ def _check_update_airtable_missing_deployments(
                 missing_deployment_data["deployment"]["deploymentId"],
             )
             missing_deployments.append(
-                deployment_model(
-                    deployment_id=missing_deployment_data["deployment"]["deploymentId"],
-                    main_agreement_id=agreement_id,
-                    account_id=agreement["client"]["id"],
-                    seller_id=agreement["seller"]["id"],
-                    product_id=product_id,
-                    membership_id=missing_deployment_data["transfer"].membership_id,
-                    transfer_id=missing_deployment_data["transfer"].transfer_id,
-                    status="pending",
-                    customer_id=get_adobe_customer_id(agreement),
-                    deployment_currency=missing_deployment_data["deployment_currency"],
-                    deployment_country=missing_deployment_data["deployment"]["companyProfile"][
+                {
+                    "deployment_id": missing_deployment_data["deployment"]["deploymentId"],
+                    "main_agreement_id": agreement["id"],
+                    "account_id": agreement["client"]["id"],
+                    "seller_id": agreement["seller"]["id"],
+                    "product_id": agreement["product"]["id"],
+                    "membership_id": missing_deployment_data["transfer"].membership_id,
+                    "transfer_id": missing_deployment_data["transfer"].transfer_id,
+                    "status": "pending",
+                    "customer_id": get_adobe_customer_id(agreement),
+                    "deployment_currency": missing_deployment_data["deployment_currency"],
+                    "deployment_country": missing_deployment_data["deployment"]["companyProfile"][
                         "address"
                     ]["country"],
-                    licensee_id=agreement["licensee"]["id"],
-                )
+                    "licensee_id": agreement["licensee"]["id"],
+                }
             )
         models.create_gc_agreement_deployments(product_id, missing_deployments)
         send_notification(
