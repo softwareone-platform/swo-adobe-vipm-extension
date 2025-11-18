@@ -2259,6 +2259,89 @@ def test_validate_reseller_change_expired_code_fulfillment_mode(
     assert "Reseller change code has expired" in error_data["message"]
 
 
+def test_validate_reseller_change_lga_product_without_lga_agency_type(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=order)
+    context.adobe_transfer = {"customer_id": "existing-customer-id", "benefits": []}
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+
+    step = ValidateResellerChange(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mock_mpt_client,
+        context.order,
+        ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict(),
+    )
+
+
+def test_validate_reseller_change_not_lga_product_with_lga_agency_type(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    order["product"]["id"] = "PRD-2222-2222"
+    context = Context(order=order)
+    context.adobe_transfer = {
+        "customer_id": "existing-customer-id",
+        "benefits": [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}],
+    }
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+
+    step = ValidateResellerChange(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_next_step.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mock_mpt_client,
+        context.order,
+        ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict(),
+    )
+
+
+def test_validate_reseller_change_lga_product_with_lga_agency_type(
+    order_factory,
+    reseller_change_order_parameters_factory,
+    adobe_reseller_change_preview_factory,
+    mock_next_step,
+    mock_mpt_client,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+
+    adobe_transfer = adobe_reseller_change_preview_factory(
+        approval_expiry=(dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=5)).isoformat()
+    )
+    adobe_transfer["customerId"] = "existing-customer-id"
+    adobe_transfer["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
+
+    order["product"]["id"] = "PRD-3333-3333"
+    context = Context(order=order)
+    context.adobe_transfer = adobe_transfer
+
+    step = ValidateResellerChange(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)
+
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
 @freeze_time("2024-01-01")
 def test_validate_sku_availability_with_valid_3yc_commitment_skips_validation(
     mocker,
