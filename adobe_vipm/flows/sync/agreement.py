@@ -747,7 +747,7 @@ class AgreementsSyncer:  # noqa: WPS214
             is_deployment_matched = partial(_is_deployment_matched, missing_deployment_id)
             deployment_currency = (
                 find_first(is_deployment_matched, self._adobe_subscriptions, {})
-            ).get("currency")
+            ).get("currencyCode")
             missing_deployments_data.append({
                 "deployment": find_first(
                     partial(_check_adobe_deployment_id, missing_deployment_id), adobe_deployments
