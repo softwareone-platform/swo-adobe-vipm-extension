@@ -124,7 +124,7 @@ def test_sync_agreement_prices(
     mock_mpt_update_agreement,
     mock_get_template_data_by_adobe_subscription,
     mocked_agreement_syncer,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
 ):
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
@@ -604,7 +604,7 @@ def test_sync_global_customer_parameter(
     mock_update_subscriptions,
     adobe_subscription_factory,
     fulfillment_parameters_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_adobe_product_by_marketplace_sku,
     mock_get_agreements_by_customer_deployments,
     mock_check_update_airtable_missing_deployments,
@@ -685,7 +685,7 @@ def test_sync_global_customer_parameter(
 
     sync_agreement(mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=True)
 
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     mock_mpt_update_agreement.assert_has_calls([
         mocker.call(
@@ -763,7 +763,7 @@ def test_sync_global_customer_parameter_dry_run(
     mock_update_subscriptions,
     adobe_subscription_factory,
     fulfillment_parameters_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_adobe_product_by_marketplace_sku,
     mock_get_agreements_by_customer_deployments,
     mock_check_update_airtable_missing_deployments,
@@ -835,7 +835,7 @@ def test_sync_global_customer_parameter_dry_run(
 
     sync_agreement(mock_mpt_client, mock_adobe_client, agreement, dry_run=True, sync_prices=True)
 
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     mock_mpt_update_agreement.assert_not_called()
 
 
@@ -897,7 +897,7 @@ def test_sync_global_customer_no_active_deployments(
     mock_adobe_client,
     mock_mpt_update_agreement,
     adobe_customer_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_subscriptions_for_update,
     mock_get_agreements_by_customer_deployments,
     mock_get_prices_for_skus,
@@ -910,7 +910,7 @@ def test_sync_global_customer_no_active_deployments(
         mock_mpt_client, mock_adobe_client, agreement_factory(), dry_run=False, sync_prices=True
     )
 
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     mock_get_subscriptions_for_update.assert_called()
     mock_get_agreements_by_customer_deployments.assert_not_called()
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
@@ -980,10 +980,10 @@ def test_sync_global_customer_parameters_error(
 
 def test_sync_agreement_notify_exception(
     mocked_agreement_syncer,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_notify_agreement_unhandled_exception_in_teams,
 ):
-    mock_add_missing_subscriptions.side_effect = Exception("Test exception")
+    mock_add_missing_subscriptions_and_assets.side_effect = Exception("Test exception")
 
     mocked_agreement_syncer.sync(sync_prices=False)
 
@@ -1047,7 +1047,7 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_mpt_get_template_by_name,
     mock_get_template_data_by_adobe_subscription,
     mocked_agreement_syncer,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
 ):
     agreement = agreement_factory(
         lines=lines_factory(

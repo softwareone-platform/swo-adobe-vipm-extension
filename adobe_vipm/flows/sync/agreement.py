@@ -123,7 +123,7 @@ class AgreementsSyncer:  # noqa: WPS214
                     self._agreement, subscriptions_for_update, sync_prices=sync_prices
                 )
 
-            self._prepare_agreement_line_prices(self._agreement, self._currency, self.product_id)
+            self._update_agreement_line_prices(self._agreement, self._currency, self.product_id)
 
             self._update_agreement(self._agreement)
 
@@ -132,7 +132,7 @@ class AgreementsSyncer:  # noqa: WPS214
                     self._authorization_id, self._adobe_customer_id
                 )
                 self._sync_global_customer_parameters(adobe_deployments)
-                self._sync_deployments_prices(adobe_deployments, sync_prices=sync_prices)
+                self._sync_deployment_agreements(adobe_deployments, sync_prices=sync_prices)
 
         except AuthorizationNotFoundError:
             logger.exception(
@@ -613,7 +613,7 @@ class AgreementsSyncer:  # noqa: WPS214
 
         return new_parameters
 
-    def _prepare_agreement_line_prices(
+    def _update_agreement_line_prices(
         self, agreement: dict, currency: str, product_id: str
     ) -> None:
         agreement_lines = []
@@ -875,7 +875,9 @@ class AgreementsSyncer:  # noqa: WPS214
                     f"{error}",
                 )
 
-    def _sync_deployments_prices(self, adobe_deployments: list[dict], *, sync_prices: bool) -> None:
+    def _sync_deployment_agreements(
+        self, adobe_deployments: list[dict], *, sync_prices: bool
+    ) -> None:
         """
         Sync deployment agreements prices.
 

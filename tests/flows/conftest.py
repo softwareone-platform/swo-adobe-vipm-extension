@@ -133,7 +133,7 @@ def mock_update_subscriptions(mocker, mocked_agreement_syncer):
 
 
 @pytest.fixture
-def mock_add_missing_subscriptions(mocker):
+def mock_add_missing_subscriptions_and_assets(mocker):
     return mocker.patch.object(AgreementsSyncer, "_add_missing_subscriptions_and_assets", spec=True)
 
 
