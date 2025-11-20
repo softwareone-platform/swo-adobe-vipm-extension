@@ -629,13 +629,19 @@ class AgreementsSyncer:  # noqa: WPS214
         prices = models.get_sku_price(self._customer, skus, product_id, currency)
         for line, actual_sku in agreement_lines:
             current_price = line["price"]["unitPP"]
-            line["price"]["unitPP"] = prices[actual_sku]
+            try:
+                new_price = prices[actual_sku]
+            except KeyError:
+                logger.warning("No price found for %s in agreement %s", actual_sku, agreement["id"])
+                continue
+
+            line["price"]["unitPP"] = new_price
             logger.info(
-                "OneTime item: %s: sku=%s, current_price=%s, new_price=%s",
+                "Item: %s: sku=%s, current_price=%s, new_price=%s",
                 line["id"],
                 actual_sku,
                 current_price,
-                prices[actual_sku],
+                new_price,
             )
 
     # REFACTOR: get method must not update subscriptions in mpt or terminate a subscription
@@ -900,6 +906,7 @@ class AgreementsSyncer:  # noqa: WPS214
             if agreement["status"] == AgreementStatus.ACTIVE
         ]
         for deployment_agreement in active_deployment_agreements:
+            logger.info("> Sync agreement for deployment %s", deployment_agreement)
             subscriptions_for_update = self._get_subscriptions_for_update(deployment_agreement)
             if subscriptions_for_update:
                 self._update_subscriptions(
