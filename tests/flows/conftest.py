@@ -138,13 +138,6 @@ def mock_add_missing_subscriptions_and_assets(mocker):
 
 
 @pytest.fixture
-def mock_check_update_airtable_missing_deployments(mocker, mocked_agreement_syncer):
-    return mocker.patch.object(
-        AgreementsSyncer, "_check_update_airtable_missing_deployments", spec=True
-    )
-
-
-@pytest.fixture
 def mock_get_product_items_by_period(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_product_items_by_period", spec=True)
 
