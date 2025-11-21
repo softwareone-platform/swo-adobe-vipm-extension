@@ -227,3 +227,8 @@ def mock_mpt_create_agreement_subscription(mocker):
 @pytest.fixture
 def mock_mpt_get_template_by_name(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_template_by_name", spec=True)
+
+
+@pytest.fixture
+def mock_assets_syncer(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.agreement.AssetsSyncer", spec=True)

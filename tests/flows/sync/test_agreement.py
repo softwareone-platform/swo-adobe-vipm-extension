@@ -609,6 +609,8 @@ def test_sync_global_customer_parameter(
     mock_get_adobe_product_by_marketplace_sku,
     mock_get_agreements_by_customer_deployments,
     mock_check_update_airtable_missing_deployments,
+    assets_factory,
+    mock_assets_syncer,
     caplog,
 ):
     agreement = agreement_factory(
@@ -655,9 +657,8 @@ def test_sync_global_customer_parameter(
             {**adobe_deployment_subscription, "subscriptionId": "d-sub-id"},
         ]
     }
-    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
-        coterm_date="2025-04-04", global_sales_enabled=True
-    )
+    adobe_customer = adobe_customer_factory(coterm_date="2025-04-04", global_sales_enabled=True)
+    mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
             "deploymentId": "deployment-id",
@@ -665,6 +666,7 @@ def test_sync_global_customer_parameter(
             "companyProfile": {"address": {"country": "DE"}},
         }
     ]
+    assets = assets_factory()
     deployment_agreements = [
         agreement_factory(
             agreement_id="AGR-deployment-1",
@@ -672,6 +674,7 @@ def test_sync_global_customer_parameter(
                 global_customer="", deployment_id="deployment-1", deployments=""
             ),
             lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22),
+            assets=assets,
         ),
         agreement_factory(
             agreement_id="AGR-deployment-2",
@@ -746,6 +749,24 @@ def test_sync_global_customer_parameter(
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-19"}]},
         ),
     ])
+    assert mock_assets_syncer.mock_calls == [
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            agreement["assets"],
+            adobe_customer,
+            mock_adobe_client.get_subscriptions.return_value["items"],
+        ),
+        mocker.call().sync(dry_run=False),
+        mocker.call(
+            mock_mpt_client,
+            deployment_agreements[0]["id"],
+            deployment_agreements[0]["assets"],
+            adobe_customer,
+            mock_adobe_client.get_subscriptions.return_value["items"],
+        ),
+        mocker.call().sync(dry_run=False),
+    ]
     assert "Getting subscriptions for update for agreement AGR-deployment-1" in caplog.messages
     assert "Getting subscriptions for update for agreement AGR-deployment-2" not in caplog.messages
 
@@ -833,6 +854,8 @@ def test_sync_global_customer(
         "Setting global customer for agreement AGR-2119-4550-8674-5962",
         "Setting deployments for agreement AGR-2119-4550-8674-5962",
         "Getting subscriptions for update for agreement AGR-deployment-1",
+        "Getting assets for update for agreement AGR-deployment-1",
+        "No subscription found in Adobe customer data!",
         "Agreement updated AGR-deployment-1",
         "Looking for orphaned deployment subscriptions in Adobe.",
         "Updating Last Sync Date for agreement AGR-2119-4550-8674-5962",
