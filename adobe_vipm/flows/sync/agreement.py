@@ -133,33 +133,12 @@ class AgreementsSyncer:  # noqa: WPS214
                 )
                 self._sync_global_customer_parameters(adobe_deployments)
 
-                deployment_agreements = mpt.get_agreements_by_customer_deployments(
-                    self._mpt_client,
-                    Param.DEPLOYMENT_ID.value,
-                    [deployment["deploymentId"] for deployment in adobe_deployments],
-                )
-
-                active_deployment_agreements = [
-                    agreement
-                    for agreement in deployment_agreements
-                    if agreement["status"] == AgreementStatus.ACTIVE
-                ]
-
-                if active_deployment_agreements:
-                    self._sync_deployment_agreements(
-                        adobe_deployments, active_deployment_agreements, sync_prices=sync_prices
-                    )
-
                 deployment_id = get_parameter(
                     Param.PHASE_FULFILLMENT.value, self._agreement, Param.DEPLOYMENT_ID.value
                 ).get("value", "")
 
                 if not deployment_id:
-                    self._check_update_airtable_missing_deployments(adobe_deployments)
-                    if active_deployment_agreements:
-                        self._process_orphaned_deployment_subscriptions(  # noqa: WPS220
-                            active_deployment_agreements
-                        )
+                    self._process_main_agreement(adobe_deployments, sync_prices=sync_prices)
 
         except AuthorizationNotFoundError:
             logger.exception(
@@ -171,6 +150,24 @@ class AgreementsSyncer:  # noqa: WPS214
         else:
             self._update_last_sync_date()
             self._agreement = mpt.get_agreement(self._mpt_client, self._agreement["id"])
+
+    def _process_main_agreement(self, adobe_deployments: list[dict], *, sync_prices: bool):
+        self._check_update_airtable_missing_deployments(adobe_deployments)
+        deployment_agreements = mpt.get_agreements_by_customer_deployments(
+            self._mpt_client,
+            Param.DEPLOYMENT_ID.value,
+            [deployment["deploymentId"] for deployment in adobe_deployments],
+        )
+        active_deployment_agreements = [
+            agreement
+            for agreement in deployment_agreements
+            if agreement["status"] == AgreementStatus.ACTIVE
+        ]
+        if active_deployment_agreements:
+            self._sync_deployment_agreements(
+                adobe_deployments, active_deployment_agreements, sync_prices=sync_prices
+            )
+            self._process_orphaned_deployment_subscriptions(active_deployment_agreements)
 
     def _is_sync_possible(self):
         if any(
