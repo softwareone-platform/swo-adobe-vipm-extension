@@ -2935,6 +2935,54 @@ def test_check_update_airtable_missing_deployments(
     mock_send_notification.assert_called_once()
 
 
+def test_check_update_airtable_missing_deployments_dry(
+    mocker,
+    agreement_factory,
+    mock_send_notification,
+    mock_airtable_base_info,
+    adobe_deployment_factory,
+    adobe_subscription_factory,
+    fulfillment_parameters_factory,
+    mock_get_gc_agreement_deployments_by_main_agreement,
+    mock_get_gc_agreement_deployment_model
+):
+    deployments = [
+        get_gc_agreement_deployment_model(AirTableBaseInfo(api_key="api-key", base_id="base-id"))(
+            deployment_id=f"{i}"
+        )
+        for i in range(1, 4)
+    ]
+    mock_get_gc_agreement_deployments_by_main_agreement.return_value = deployments
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id="P1005158636")
+    )
+    adobe_deployments = [
+        adobe_deployment_factory(deployment_id=f"deployment-{i}") for i in range(1, 4)
+    ]
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id=f"subscriptionId{i}", deployment_id=f"deployment-{i}"
+        ) for i in range(3)
+    ]
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_transfer_by_authorization_membership_or_customer",
+        side_effect=[
+            mocker.MagicMock(
+                name="Transfer", membership_id="membership_id", transfer_id="transfer_id"
+            )
+            for _ in range(2)
+        ]
+        + [None],
+        spec=True,
+    )
+
+    _check_update_airtable_missing_deployments(
+        agreement, adobe_deployments, adobe_subscriptions, dry_run=True
+    )
+
+    mock_get_gc_agreement_deployment_model.assert_not_called()
+
+
 def test_check_update_airtable_missing_deployments_none(
     agreement_factory,
     mock_send_notification,
