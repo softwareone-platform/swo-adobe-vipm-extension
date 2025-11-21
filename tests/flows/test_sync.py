@@ -2560,7 +2560,9 @@ def test_check_update_airtable_missing_deployments(
         adobe_deployment_factory(deployment_id=f"deployment-{i}") for i in range(1, 4)
     ]
     adobe_subscriptions = [
-        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(3)
+        adobe_subscription_factory(
+            subscription_id=f"subscriptionId{i}", deployment_id=f"deployment-{i}"
+        ) for i in range(3)
     ]
     mocker.patch(
         "adobe_vipm.airtable.models.get_transfer_by_authorization_membership_or_customer",
@@ -2587,7 +2589,7 @@ def test_check_update_airtable_missing_deployments(
             transfer_id="transfer_id",
             status="pending",
             customer_id="P1005158636",
-            deployment_currency=None,
+            deployment_currency="USD",
             deployment_country="DE",
             licensee_id="LC-321-321-321",
         ),
@@ -2601,7 +2603,7 @@ def test_check_update_airtable_missing_deployments(
             transfer_id="transfer_id",
             status="pending",
             customer_id="P1005158636",
-            deployment_currency=None,
+            deployment_currency="USD",
             deployment_country="DE",
             licensee_id="LC-321-321-321",
         )

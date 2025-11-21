@@ -851,8 +851,8 @@ def _check_update_airtable_missing_deployments(
             continue
 
         is_deployment_matched = partial(_is_deployment_matched, missing_deployment_id)
-        deployment_currency = (find_first(is_deployment_matched, adobe_subscriptions, {})).get(
-            "currency"
+        deployment_currency = find_first(is_deployment_matched, adobe_subscriptions, {}).get(
+            "currencyCode"
         )
         missing_deployments_data.append({
             "deployment": find_first(
