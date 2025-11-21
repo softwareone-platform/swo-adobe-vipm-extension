@@ -298,7 +298,7 @@ def sync_agreement_prices(
         dry_run=dry_run,
     )
 
-    _log_agreement_lines(agreement, currency, customer, product_id, dry_run=dry_run)
+    _update_agreement_line_prices(agreement, currency, customer, product_id, dry_run=dry_run)
 
 
 def _update_agreement(
@@ -391,7 +391,7 @@ def _add_3yc_fulfillment_params(
     return new_parameters
 
 
-def _log_agreement_lines(
+def _update_agreement_line_prices(
     agreement: dict,
     currency: str,
     customer: dict,
@@ -1105,7 +1105,7 @@ def sync_agreement(  # noqa: C901
             sync_global_customer_parameters(
                 mpt_client, adobe_deployments, adobe_subscriptions, agreement
             )
-            sync_deployments_prices(
+            sync_deployment_agreements(
                 mpt_client,
                 adobe_client,
                 agreement,
@@ -1209,7 +1209,7 @@ def _process_orphaned_deployment_subscriptions(
             )
 
 
-def sync_deployments_prices(
+def sync_deployment_agreements(
     mpt_client: MPTClient,
     adobe_client: AdobeClient,
     main_agreement: dict,

@@ -155,9 +155,9 @@ def mock_get_subscriptions_for_update(mocker):
 
 
 @pytest.fixture()
-def mock_sync_deployments_prices(mocker):
+def mock_sync_deployment_agreements(mocker):
     return mocker.patch(
-        "adobe_vipm.flows.sync.sync_deployments_prices",
+        "adobe_vipm.flows.sync.sync_deployment_agreements",
         spec=True,
     )
 

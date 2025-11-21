@@ -36,7 +36,7 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
 @pytest.fixture(autouse=True)
-def mock_add_missing_subscriptions(mocker):
+def mock_add_missing_subscriptions_and_assets(mocker):
     return mocker.patch("adobe_vipm.flows.sync._add_missing_subscriptions", spec=True)
 
 
@@ -922,7 +922,7 @@ def test_sync_global_customer_parameter(
     adobe_subscription_factory,
     assets_factory,
     fulfillment_parameters_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_adobe_product_by_marketplace_sku,
     dry_run,
     caplog,
@@ -994,7 +994,7 @@ def test_sync_global_customer_parameter(
 
     sync_agreement(mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True)
 
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     assert mock_update_subscriptions.call_count == 2
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     if not dry_run:
@@ -1083,7 +1083,7 @@ def test_sync_global_customer_parameter_not_prices(
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_subscriptions_for_update,
 ):
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
@@ -1104,7 +1104,7 @@ def test_sync_global_customer_parameter_not_prices(
 
     mock_sync_agreement_prices.assert_not_called()
     mock_get_subscriptions_for_update.assert_not_called()
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     assert caplog.messages == [
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Getting assets for update for agreement AGR-2119-4550-8674-5962",
@@ -1133,7 +1133,7 @@ def test_sync_global_customer_update_not_required(
     adobe_subscription_factory,
     mock_update_subscriptions,
     fulfillment_parameters_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_subscriptions_for_update,
     mock_get_adobe_product_by_marketplace_sku,
     mock_get_agreements_by_customer_deployments,
@@ -1197,7 +1197,7 @@ def test_sync_global_customer_update_not_required(
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     assert mock_get_subscriptions_for_update.call_count == 3
 
     assert mocked_update_agreement.mock_calls == [
@@ -1428,7 +1428,7 @@ def test_sync_global_customer_parameters_error(
     adobe_api_error_factory,
     mock_get_prices_for_skus,
     adobe_subscription_factory,
-    mock_sync_deployments_prices,
+    mock_sync_deployment_agreements,
     mock_get_agreement_subscription,
     mock_get_subscriptions_for_update,
     mock_update_agreement_subscription,
@@ -1497,7 +1497,7 @@ def test_sync_global_customer_parameters_error(
         sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     mock_get_subscriptions_for_update.assert_not_called()
-    mock_sync_deployments_prices.assert_called_once()
+    mock_sync_deployment_agreements.assert_called_once()
     assert (
         caplog.records[0].message
         == "Error setting global customer parameters for agreement AGR-2119-4550-8674-5962."
