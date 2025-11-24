@@ -26,6 +26,7 @@ app_config = "adobe_vipm.apps:ExtensionConfig"
 
 [dependency-groups]
 dev = [
+    "flake8-aaa>=0.17.2",
     "flake8-pyproject>=1.2.3",
     "freezegun==1.4.*",
     "ipdb==0.13.*",
@@ -89,14 +90,17 @@ relative_files = true
 branch = true
 
 [tool.flake8]
+aaa_act_block_style = "large"
 doctests = true
-extend-exclude = [".venv"]
 extend-ignore = ["WPS226"]
+extend-exclude = [".venv"]
 format = "wemake"
 max-imports = 17
+max-line-length=100
 select = ["AAA", "E999", "WPS"]
 show-source = true
 statistics = false
+# To be fixed and removed
 per-file-ignores = [
   "tests/**/*.py: WPS",
   "tests/*.py: WPS",
@@ -233,7 +237,7 @@ ignore = [
   "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
   "TRY003",  # long exception messages from `tryceratops`
 ]
-external = [ "WPS" ]
+external = [ "AAA", "WPS" ]
 
 # Plugin configs:
 flake8-import-conventions.banned-from = [ "ast", "datetime" ]

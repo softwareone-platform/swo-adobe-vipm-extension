@@ -533,6 +533,19 @@ wheels = [
 ]
 
 [[package]]
+name = "flake8-aaa"
+version = "0.17.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "asttokens" },
+    { name = "flake8" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d2/a6/02187797410d8d9ff9ee17840004cc3e975f8b4f75d9431bed32d7311c3d/flake8_aaa-0.17.2.tar.gz", hash = "sha256:03940a53775da4ff044eb32df9893f740654acf4fe32d04a0ad9a2da29d96b77", size = 20123, upload-time = "2025-10-25T21:58:44.651Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7c/57/dba63d7b53ae35e80a6642064dfcd57da03210f8bae2ca810579013dfd57/flake8_aaa-0.17.2-py3-none-any.whl", hash = "sha256:f73237282b4ed2403902c5806b94dfa61538b471271c68bef5c84c0325c48033", size = 20690, upload-time = "2025-10-25T21:58:43.227Z" },
+]
+
+[[package]]
 name = "flake8-pyproject"
 version = "1.2.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1676,6 +1689,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "flake8-aaa" },
     { name = "flake8-pyproject" },
     { name = "freezegun" },
     { name = "ipdb" },
@@ -1725,6 +1739,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "flake8-aaa", specifier = ">=0.17.2" },
     { name = "flake8-pyproject", specifier = ">=1.2.3" },
     { name = "freezegun", specifier = "==1.4.*" },
     { name = "ipdb", specifier = "==0.13.*" },
