@@ -16,14 +16,16 @@ from adobe_vipm.flows.errors import (
 
 def test_simple_error(mpt_error_factory):
     error_data = mpt_error_factory(500, "Internal Server Error", "Oops!")
-    error = MPTAPIError(500, error_data)
-    assert error.status_code == 500
-    assert error.status == 500
-    assert error.title == "Internal Server Error"
-    assert error.detail == "Oops!"
-    assert error.trace_id == error_data["traceId"]
-    assert str(error) == f"500 Internal Server Error - Oops! ({error.trace_id})"
-    assert repr(error) == str(error_data)
+
+    result = MPTAPIError(500, error_data)
+
+    assert result.status_code == 500
+    assert result.status == 500
+    assert result.title == "Internal Server Error"
+    assert result.detail == "Oops!"
+    assert result.trace_id == error_data["traceId"]
+    assert str(result) == f"500 Internal Server Error - Oops! ({result.trace_id})"
+    assert repr(result) == str(error_data)
 
 
 def test_detailed_error(mpt_error_factory):
@@ -34,10 +36,12 @@ def test_detailed_error(mpt_error_factory):
         trace_id="trace-id",
         errors={"id": ["The value of 'id' does not match expected format."]},
     )
-    error = MPTAPIError(400, error_data)
-    assert error.trace_id == "trace-id"
-    assert error.errors == error_data["errors"]
-    assert str(error) == (
+
+    result = MPTAPIError(400, error_data)
+
+    assert result.trace_id == "trace-id"
+    assert result.errors == error_data["errors"]
+    assert str(result) == (
         "400 Bad Request - One or more validation errors occurred. (trace-id)"
         f"\n{json.dumps(error_data['errors'], indent=2)}"
     )
@@ -51,14 +55,9 @@ def test_wrap_http_error(mocker, mpt_error_factory):
         trace_id="trace-id",
         errors={"id": ["The value of 'id' does not match expected format."]},
     )
-
-    def func():
-        response = mocker.MagicMock()
-        response.status_code = 400
-        response.json.return_value = error_data
-        raise HTTPError(response=response)
-
-    wrapped_func = wrap_http_error(func)
+    response = mocker.Mock(status_code=400, json=mocker.Mock(return_value=error_data))
+    mock_func = mocker.Mock(side_effect=HTTPError(response=response))
+    wrapped_func = wrap_http_error(mock_func)
 
     with pytest.raises(MPTAPIError) as cv:
         wrapped_func()
@@ -72,14 +71,13 @@ def test_wrap_http_error(mocker, mpt_error_factory):
 
 
 def test_wrap_http_error_json_decode_error(mocker):
-    def func():
-        response = mocker.MagicMock()
-        response.status_code = 500
-        response.content = b"Internal Server Error"
-        response.json.side_effect = JSONDecodeError("msg", "doc", 0)
-        raise HTTPError(response=response)
-
-    wrapped_func = wrap_http_error(func)
+    response = mocker.Mock(
+        status_code=500,
+        content=b"Internal Server Error",
+        json=mocker.Mock(side_effect=JSONDecodeError("msg", "doc", 0)),
+    )
+    mock_func = mocker.Mock(side_effect=HTTPError(response=response))
+    wrapped_func = wrap_http_error(mock_func)
 
     with pytest.raises(MPTError) as cv:
         wrapped_func()
@@ -91,24 +89,21 @@ def test_simple_airtable_error(
     airtable_error_factory,
 ):
     error_data = airtable_error_factory("Bad Request", "BAD_REQUEST")
-    error = AirTableAPIError(400, error_data)
-    assert error.status_code == 400
-    assert error.code == 400
-    assert error.message == "Bad Request"
-    assert str(error) == "400 - Bad Request"
-    assert repr(error) == str(error_data)
+
+    result = AirTableAPIError(400, error_data)
+
+    assert result.status_code == 400
+    assert result.code == 400
+    assert result.message == "Bad Request"
+    assert str(result) == "400 - Bad Request"
+    assert repr(result) == str(error_data)
 
 
 def test_wrap_airtable_http_error(mocker, airtable_error_factory):
     error_data = airtable_error_factory("Bad Request", "BAD_REQUEST")
-
-    def func():
-        response = mocker.MagicMock()
-        response.status_code = 400
-        response.json.return_value = error_data
-        raise HTTPError(response=response)
-
-    wrapped_func = wrap_airtable_http_error(func)
+    response = mocker.Mock(status_code=400, json=mocker.Mock(return_value=error_data))
+    mock_func = mocker.Mock(side_effect=HTTPError(response=response))
+    wrapped_func = wrap_airtable_http_error(mock_func)
 
     with pytest.raises(AirTableHttpError) as cv:
         wrapped_func()
@@ -118,14 +113,13 @@ def test_wrap_airtable_http_error(mocker, airtable_error_factory):
 
 
 def test_wrap_airtable_http_error_json_decode_error(mocker):
-    def func():
-        response = mocker.MagicMock()
-        response.status_code = 400
-        response.content = b"Bad Request"
-        response.json.side_effect = JSONDecodeError("msg", "doc", 0)
-        raise HTTPError(response=response)
-
-    wrapped_func = wrap_airtable_http_error(func)
+    response = mocker.Mock(
+        status_code=400,
+        content=b"Bad Request",
+        json=mocker.Mock(side_effect=JSONDecodeError("msg", "doc", 0)),
+    )
+    mock_func = mocker.Mock(side_effect=HTTPError(response=response))
+    wrapped_func = wrap_airtable_http_error(mock_func)
 
     with pytest.raises(AirTableError) as cv:
         wrapped_func()

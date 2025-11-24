@@ -14,16 +14,10 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 def test_invalid_argument(mocker, adobe_authorizations_file, tmp_path):
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
+
     with pytest.raises(CommandError) as pr:
-        call_command(
-            "create_resellers",
-            tmp_path.absolute(),
-        )
+        call_command("create_resellers", tmp_path.absolute())  # act
 
     assert str(pr.value) == f"Invalid Excel file provided: {tmp_path.absolute()}"
 
@@ -33,18 +27,10 @@ def test_invalid_file_too_many_sheets(mocker, adobe_authorizations_file, tmp_pat
     wb = Workbook()
     wb.create_sheet("second")
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
 
     with pytest.raises(CommandError) as pr:
-        call_command(
-            "create_resellers",
-            tmp_path / "test.xlsx",
-        )
+        call_command("create_resellers", tmp_path / "test.xlsx")  # act
 
     assert str(pr.value) == f"Too many worksheet in the input file: {','.join(wb.sheetnames)}."
 
@@ -55,18 +41,10 @@ def test_invalid_file_invalid_columns(mocker, adobe_authorizations_file, tmp_pat
     ws = wb.active
     ws["A1"].value = "Invalid column"
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
 
     with pytest.raises(CommandError) as pr:
-        call_command(
-            "create_resellers",
-            tmp_path / "test.xlsx",
-        )
+        call_command("create_resellers", tmp_path / "test.xlsx")  # act
 
     assert str(pr.value) == (
         "Invalid input worksheet: expected column A to be authorization_uk, found Invalid column."
@@ -77,23 +55,13 @@ def test_invalid_file_no_data(mocker, adobe_authorizations_file, tmp_path):
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
-
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
 
     with pytest.raises(CommandError) as pr:
-        call_command(
-            "create_resellers",
-            tmp_path / "test.xlsx",
-        )
+        call_command("create_resellers", tmp_path / "test.xlsx")  # act
 
     assert str(pr.value) == ("Invalid input worksheet: not enough data to process.")
 
@@ -102,29 +70,16 @@ def test_skip_processed(mocker, adobe_authorizations_file, tmp_path):
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"
-
     ws["O2"].value = "OK"
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
-
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
     out = StringIO()
 
-    call_command(
-        "create_resellers",
-        tmp_path / "test.xlsx",
-        "--no-color",
-        stdout=out,
-    )
+    call_command("create_resellers", tmp_path / "test.xlsx", "--no-color", stdout=out)  # act
 
     assert "Status is OK for" in out.getvalue()
 
@@ -133,32 +88,18 @@ def test_authorization_not_found(mocker, adobe_authorizations_file, tmp_path):
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"
-
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
-
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
     err = StringIO()
 
-    call_command(
-        "create_resellers",
-        tmp_path / "test.xlsx",
-        "--no-color",
-        stderr=err,
-    )
+    call_command("create_resellers", tmp_path / "test.xlsx", "--no-color", stderr=err)  # act
 
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
-
     assert "Authorization not found for " in err.getvalue()
     assert ws["O2"].value == "KO"
     assert ws["P2"].value == "Authorization not found"
@@ -174,10 +115,8 @@ def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
     seller_uk = authorization["resellers"][0]["seller_uk"]
-
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
         if column == "authorization_uk":
@@ -188,21 +127,13 @@ def test_reseller_exists(mocker, settings, adobe_authorizations_file, tmp_path):
             continue
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"
-
     wb.save(tmp_path / "test.xlsx")
-
     out = StringIO()
 
-    call_command(
-        "create_resellers",
-        tmp_path / "test.xlsx",
-        "--no-color",
-        stdout=out,
-    )
+    call_command("create_resellers", tmp_path / "test.xlsx", "--no-color", stdout=out)  # act
 
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
-
     assert "already exist." in out.getvalue()
     assert ws["O2"].value == "OK"
     assert ws["P2"].value is None
@@ -214,10 +145,8 @@ def test_reseller_create_ok(
     settings.EXTENSION_CONFIG = {"ADOBE_AUTHORIZATIONS_FILE": "/path/to/authorizations.json"}
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
-
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
         if column == "authorization_uk":
@@ -228,21 +157,9 @@ def test_reseller_create_ok(
             continue
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"
-
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
-
-    mocker.patch.object(
-        Command,
-        "prepare_reseller_data",
-        return_value=reseller_data,
-    )
-
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
+    mocker.patch.object(Command, "prepare_reseller_data", return_value=reseller_data)
     new_auth = copy.copy(adobe_authorizations_file)
     new_auth["authorizations"][0]["resellers"].append(
         {
@@ -256,27 +173,16 @@ def test_reseller_create_ok(
         return_value=mocked_fobj,
     )
     mocked_dump = mocker.patch("adobe_vipm.management.commands.create_resellers.json.dump")
-
     mock_adobe_client.create_reseller_account.return_value = {"resellerId": "adobe-reseller-id"}
     out = StringIO()
 
-    call_command(
-        "create_resellers",
-        tmp_path / "test.xlsx",
-        "--no-color",
-        stdout=out,
-    )
+    call_command("create_resellers", tmp_path / "test.xlsx", "--no-color", stdout=out)  # act
+
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
-
     assert ws["O2"].value == "OK"
     assert ws["P2"].value is None
-
-    mocked_dump.assert_called_once_with(
-        new_auth,
-        mocked_fobj.__enter__.return_value,
-        indent=4,
-    )
+    mocked_dump.assert_called_once_with(new_auth, mocked_fobj.__enter__.return_value, indent=4)
     mocked_open.assert_called_once_with("w", encoding="utf-8")
 
 
@@ -285,10 +191,8 @@ def test_api_error(
 ):
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
-
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
         if column == "authorization_uk":
@@ -299,7 +203,6 @@ def test_api_error(
             continue
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"
-
     wb.save(tmp_path / "test.xlsx")
     mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
     mocker.patch.object(Command, "validate_reseller_data", return_value=[])
@@ -310,15 +213,10 @@ def test_api_error(
     mock_adobe_client.create_reseller_account.side_effect = api_error
     out = StringIO()
 
-    call_command(
-        "create_resellers",
-        tmp_path / "test.xlsx",
-        "--no-color",
-        stdout=out,
-    )
+    call_command("create_resellers", tmp_path / "test.xlsx", "--no-color", stdout=out)  # act
+
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
-
     assert ws["O2"].value == "KO"
     assert ws["P2"].value == str(api_error)
 
@@ -327,10 +225,8 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
-
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
         if column == "authorization_uk":
@@ -341,35 +237,15 @@ def test_validation_errors_report(mocker, adobe_authorizations_file, tmp_path):
             continue
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"
-
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
-
-    mocker.patch.object(
-        Command,
-        "validate_reseller_data",
-        return_value=[
-            "error1",
-            "error2",
-        ],
-    )
-
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
+    mocker.patch.object(Command, "validate_reseller_data", return_value=["error1", "error2"])
     out = StringIO()
 
-    call_command(
-        "create_resellers",
-        tmp_path / "test.xlsx",
-        "--no-color",
-        stdout=out,
-    )
+    call_command("create_resellers", tmp_path / "test.xlsx", "--no-color", stdout=out)  # act
+
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
-
     assert ws["O2"].value == "KO"
     assert ws["P2"].value == "error1, error2"
 
@@ -478,13 +354,10 @@ def test_validation_errors(
     mocker.patch("adobe_vipm.management.commands.create_resellers.get_adobe_client")
     authorization = adobe_authorizations_file["authorizations"][0]
     authorization_uk = authorization["authorization_uk"]
-
     modified_reseller_data = copy.copy(reseller_data)
     modified_reseller_data[field] = value
-
     wb = Workbook()
     ws = wb.active
-
     for letter, column in COLUMNS.items():
         ws[f"{letter}1"].value = column
         if column == "authorization_uk":
@@ -495,31 +368,14 @@ def test_validation_errors(
             continue
         if letter not in {"O", "P"}:
             ws[f"{letter}2"].value = f"row_1_{column}"
-
     wb.save(tmp_path / "test.xlsx")
-
-    mocker.patch.object(
-        Command,
-        "load_authorizations_data",
-        return_value=adobe_authorizations_file,
-    )
-
-    mocker.patch.object(
-        Command,
-        "prepare_reseller_data",
-        return_value=modified_reseller_data,
-    )
-
+    mocker.patch.object(Command, "load_authorizations_data", return_value=adobe_authorizations_file)
+    mocker.patch.object(Command, "prepare_reseller_data", return_value=modified_reseller_data)
     out = StringIO()
 
-    call_command(
-        "create_resellers",
-        tmp_path / "test.xlsx",
-        "--no-color",
-        stdout=out,
-    )
+    call_command("create_resellers", tmp_path / "test.xlsx", "--no-color", stdout=out)  # act
+
     wb = load_workbook(tmp_path / "test.xlsx")
     ws = wb.active
-
     assert ws["O2"].value == "KO"
     assert ws["P2"].value.startswith("invalid")

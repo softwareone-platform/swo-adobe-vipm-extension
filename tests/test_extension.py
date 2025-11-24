@@ -10,24 +10,26 @@ from adobe_vipm.flows.utils import set_ordering_parameter_error
 
 
 def test_listener_registered():
-    assert ext.events.get_listener("orders") == process_order_fulfillment
+    result = ext.events.get_listener("orders")
+
+    assert result == process_order_fulfillment
 
 
-def test_process_order_fulfillment(mocker):
+def test_process_order_fulfillment(mocker, mock_mpt_client):
     mocked_fulfill_order = mocker.patch("adobe_vipm.extension.fulfill_order")
-    client = mocker.MagicMock()
     event = Event("evt-id", "orders", Context(order={"id": "ORD-0792-5000-2253-4210"}))
 
-    process_order_fulfillment(client, event)
+    process_order_fulfillment(mock_mpt_client, event)  # act
 
-    mocked_fulfill_order.assert_called_once_with(client, event.data.order)
+    mocked_fulfill_order.assert_called_once_with(mock_mpt_client, event.data.order)
 
 
 def test_jwt_secret_callback(mocker, settings, mpt_client, webhook):
     mocked_webhook = mocker.patch("adobe_vipm.extension.get_webhook", return_value=webhook)
-    assert jwt_secret_callback(mpt_client, {"webhook_id": "WH-123-123"}) == get_for_product(
-        settings, "WEBHOOKS_SECRETS", "PRD-1111-1111"
-    )
+
+    result = jwt_secret_callback(mpt_client, {"webhook_id": "WH-123-123"})
+
+    assert result == get_for_product(settings, "WEBHOOKS_SECRETS", "PRD-1111-1111")
     mocked_webhook.assert_called_once_with(mpt_client, "WH-123-123")
 
 
@@ -40,7 +42,7 @@ def test_process_order_validation(client, mocker, mock_order, order_factory, jwt
     )
     m_validate = mocker.patch("adobe_vipm.extension.validate_order", return_value=validated_order)
 
-    resp = client.post(
+    result = client.post(
         "/api/v1/orders/validate",
         content_type="application/json",
         headers={
@@ -50,8 +52,8 @@ def test_process_order_validation(client, mocker, mock_order, order_factory, jwt
         data=json.dumps(mock_order),
     )
 
-    assert resp.status_code == 200
-    assert resp.json() == validated_order
+    assert result.status_code == 200
+    assert result.json() == validated_order
     m_validate.assert_called_once_with(mocker.ANY, mock_order)
 
 
@@ -60,7 +62,8 @@ def test_process_order_validation_error(client, mocker, jwt_token, webhook):
     mocker.patch(
         "adobe_vipm.extension.validate_order", side_effect=Exception("A super duper error")
     )
-    resp = client.post(
+
+    result = client.post(
         "/api/v1/orders/validate",
         content_type="application/json",
         headers={
@@ -69,8 +72,9 @@ def test_process_order_validation_error(client, mocker, jwt_token, webhook):
         },
         data={"whatever": "order"},
     )
-    assert resp.status_code == 400
-    assert resp.json() == {
+
+    assert result.status_code == 400
+    assert result.json() == {
         "id": "VIPMG001",
         "message": "Unexpected error during validation: A super duper error.",
     }

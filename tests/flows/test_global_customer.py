@@ -80,11 +80,11 @@ def test_check_gc_agreement_deployments_no_licensee(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.licensee_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
 
 
@@ -104,7 +104,8 @@ def test_check_gc_agreement_deployments_unexpected_error(
     error = AirTableAPIError(400, airtable_error_factory("Bad Request", "BAD_REQUEST"))
     mocked_gc_agreement_deployments_model.all.side_effect = error
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
 
 
@@ -129,11 +130,11 @@ def test_check_gc_agreement_deployments_no_authorization_id(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.authorization_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_authorizations_by_currency_and_seller_id.assert_called_once()
 
@@ -164,11 +165,10 @@ def test_check_gc_agreement_deployments_get_authorization_error(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     gc_agreement_deployment.authorization_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_authorizations_by_currency_and_seller_id.assert_called_once()
@@ -195,7 +195,7 @@ def test_check_gc_agreement_deployments_get_authorization_more_than_one(
     gc_agreement_deployment.authorization_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_authorizations_by_currency_and_seller_id.assert_called_once()
@@ -236,7 +236,7 @@ def test_check_gc_agreement_deployments_get_price_list_error(
     gc_agreement_deployment.price_list_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_authorizations_by_currency_and_seller_id.assert_called_once()
@@ -264,7 +264,7 @@ def test_check_gc_agreement_deployments_no_price_list(
     gc_agreement_deployment.price_list_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
@@ -291,7 +291,7 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
     gc_agreement_deployment.price_list_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
@@ -333,7 +333,7 @@ def test_check_gc_agreement_deployments_get_listing_error(
     gc_agreement_deployment.listing_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
@@ -399,7 +399,7 @@ def test_check_gc_agreement_deployments_create_listing(
         "adobe_vipm.flows.global_customer.get_agreement", return_value=provisioning_agreement
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
@@ -477,7 +477,7 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
         return_value=provisioning_agreement,
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
@@ -486,11 +486,8 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
     mock_adobe_client.get_customer.assert_called_once()
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_get_product_template_or_default.assert_called_once()
-
     assert mocked_create_agreement.call_args_list[0].args[1] == expected_created_agreement_arg
-
     mocked_get_agreement.assert_called_once()
-
     mocked_update_agreement.assert_called_once()
 
 
@@ -515,7 +512,7 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
     gc_agreement_deployment.listing_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
@@ -553,7 +550,7 @@ def test_check_gc_agreement_deployments_create_listing_error(
     gc_agreement_deployment.listing_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
@@ -605,7 +602,6 @@ def test_check_gc_agreement_deployments_create_agreement_error(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_customer_deployments_active_status.return_value = mocker.MagicMock()
@@ -618,7 +614,7 @@ def test_check_gc_agreement_deployments_create_agreement_error(
         return_value=provisioning_agreement,
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
@@ -688,7 +684,8 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     gc_agreement_deployment.agreement_id = None
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_listings_by_price_list_and_seller_and_authorization.assert_called_once()
     mocked_create_listing.assert_called_once()
@@ -745,12 +742,9 @@ def test_check_gc_agreement_deployments_create_asset(
     mocked_create_agreement_subscription = mocker.patch(
         "adobe_vipm.flows.global_customer.create_agreement_subscription"
     )
-
     mocked_get_sku_price = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_sku_price",
-        return_value={"65304578CA01A12": 100.0},
+        "adobe_vipm.flows.global_customer.get_sku_price", return_value={"65304578CA01A12": 100.0}
     )
-
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
@@ -778,7 +772,7 @@ def test_check_gc_agreement_deployments_create_asset(
         "adobe_vipm.flows.global_customer.get_agreement", return_value=provisioning_agreement
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
@@ -865,7 +859,7 @@ def test_check_gc_agreement_deployments_agreement_asset_exists(
         "adobe_vipm.flows.global_customer.get_agreement", return_value=provisioning_agreement
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
@@ -949,13 +943,12 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
         return_value=provisioning_agreement,
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mock_adobe_client.get_customer.assert_called_once()
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
-
     mocked_update_agreement.assert_called_once()
     mocked_get_product_items_by_skus.assert_called()
     mocked_get_listing_by_id.assert_called_once()
@@ -1023,7 +1016,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
         return_value=provisioning_agreement,
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
@@ -1100,13 +1093,12 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
         "items": [adobe_subscription_factory(deployment_id="deployment_id")]
     }
     mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
-
     mocked_get_agreement = mocker.patch(
-        "adobe_vipm.flows.global_customer.get_agreement",
-        return_value=provisioning_agreement,
+        "adobe_vipm.flows.global_customer.get_agreement", return_value=provisioning_agreement
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
+
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
     mock_adobe_client.get_customer.assert_called_once()
@@ -1184,7 +1176,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
         return_value=provisioning_agreement,
     )
 
-    check_gc_agreement_deployments()
+    check_gc_agreement_deployments()  # act
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_licensee.assert_called_once()
@@ -1250,9 +1242,7 @@ def test_get_sku_price(
     adobe_customer = adobe_customer_factory()
     offer_ids = [expected_sku]
     commitment_dates = request.getfixturevalue(commitment_dates_fixture)
-
     mocker.patch("adobe_vipm.flows.utils.is_consumables_sku", return_value=is_consumable)
-
     if is_consumable:
         mocker.patch(
             "adobe_vipm.flows.utils.get_customer_consumables_discount_level",
@@ -1263,7 +1253,6 @@ def test_get_sku_price(
             "adobe_vipm.flows.utils.get_customer_licenses_discount_level",
             return_value=discount_level,
         )
-
     mock_commitment = None
     if commitment_status:
         mock_commitment = {
@@ -1272,7 +1261,6 @@ def test_get_sku_price(
             "endDate": commitment_dates["end"].isoformat(),
         }
     mocker.patch("adobe_vipm.utils.get_3yc_commitment", return_value=mock_commitment)
-
     if expected_price_function == "get_prices_for_skus":
         mocked_get_prices = mocker.patch(
             "adobe_vipm.airtable.models.get_prices_for_skus",
@@ -1287,7 +1275,6 @@ def test_get_sku_price(
     result = get_sku_price(adobe_customer, offer_ids, product_id, deployment_currency)
 
     assert result == [{expected_sku: 100.0}]
-
     if expected_price_function == "get_prices_for_skus":
         mocked_get_prices.assert_called_once_with(product_id, deployment_currency, [expected_sku])
     else:
@@ -1335,7 +1322,7 @@ def test_create_gc_agreement_asset(
         buyer_id,
         item,
         price,
-    )
+    )  # act
 
     expected_asset = {
         "status": "Active",

@@ -86,7 +86,6 @@ def test_get_returnable_orders_step(
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = returnable_orders
     mock_adobe_client.get_subscriptions.return_value = {
         "items": [{"status": "1000", "offerId": sku}]
@@ -98,15 +97,14 @@ def test_get_returnable_orders_step(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
     )
-
     if test_case["should_fail"]:
         mocked_switch_to_failed.assert_called_once_with(
             mocked_client,
@@ -141,9 +139,9 @@ def test_switch_autorenewal_off(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     step = SwitchAutoRenewalOff()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
@@ -180,14 +178,12 @@ def test_switch_autorenewal_off_already_off(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     step = SwitchAutoRenewalOff()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        adobe_sub["subscriptionId"],
+        context.authorization_id, context.adobe_customer_id, adobe_sub["subscriptionId"]
     )
     mock_adobe_client.update_subscription.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -205,7 +201,7 @@ def test_fulfill_termination_order(mocker):
     mocked_client = mocker.MagicMock()
     mocked_order = mocker.MagicMock()
 
-    fulfill_termination_order(mocked_client, mocked_order)
+    fulfill_termination_order(mocked_client, mocked_order)  # act
 
     expected_steps = [
         SetupContext,
@@ -220,17 +216,12 @@ def test_fulfill_termination_order(mocker):
         CompleteOrder,
         SyncAgreement,
     ]
-
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_TERMINATION
     assert mocked_pipeline_ctor.mock_calls[0].args[9].template_name == TEMPLATE_NAME_TERMINATION
-
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
-    mocked_pipeline_instance.run.assert_called_once_with(
-        mocked_client,
-        mocked_context,
-    )
+    mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 
 
 def test_switch_autorenewal_off_invalid_renewal_state(
@@ -244,7 +235,6 @@ def test_switch_autorenewal_off_invalid_renewal_state(
 ):
     subscriptions = subscriptions_factory()
     order = order_factory(lines=lines_factory(quantity=10), subscriptions=subscriptions)
-
     adobe_sub = adobe_subscription_factory(renewal_quantity=10)
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
@@ -266,9 +256,9 @@ def test_switch_autorenewal_off_invalid_renewal_state(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     step = SwitchAutoRenewalOff()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
@@ -321,9 +311,9 @@ def test_switch_autorenewal_off_error_updating_autorenew(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     step = SwitchAutoRenewalOff()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
@@ -364,9 +354,9 @@ def test_get_returnable_orders_step_inactive_subscription(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id,
@@ -391,7 +381,6 @@ def test_get_returnable_orders_step_no_returnable_orders(
         "items": [{"status": "1000", "offerId": sku}]
     }
     mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
-
     mocked_switch_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
     )
@@ -404,15 +393,13 @@ def test_get_returnable_orders_step_no_returnable_orders(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
+        context.authorization_id, context.adobe_customer_id
     )
-
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
@@ -420,7 +407,6 @@ def test_get_returnable_orders_step_no_returnable_orders(
         context.adobe_customer["cotermDate"],
         return_orders=context.adobe_return_orders.get(sku),
     )
-
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
         context.order,

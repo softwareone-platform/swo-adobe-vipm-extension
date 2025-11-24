@@ -22,11 +22,8 @@ from adobe_vipm.flows.utils import (
 
 def test_notify_unhandled_exception_in_teams(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
-    notify_unhandled_exception_in_teams(
-        "validation",
-        "ORD-0000",
-        "exception-traceback",
-    )
+
+    notify_unhandled_exception_in_teams("validation", "ORD-0000", "exception-traceback")  # act
 
     mocked_send_exc.assert_called_once_with(
         "Order validation unhandled exception!",
@@ -38,10 +35,8 @@ def test_notify_unhandled_exception_in_teams(mocker):
 
 def test_notify_agreement_unhandled_exception_in_teams(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
-    notify_agreement_unhandled_exception_in_teams(
-        "AGR-0000",
-        "exception-traceback",
-    )
+
+    notify_agreement_unhandled_exception_in_teams("AGR-0000", "exception-traceback")  # act
 
     mocked_send_exc.assert_called_once_with(
         "Agreement unhandled exception!",
@@ -53,7 +48,8 @@ def test_notify_agreement_unhandled_exception_in_teams(mocker):
 
 def test_notify_missing_prices(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
-    notify_missing_prices("AGR-0000", ["65504578CA01A12"], "65504575CA01A12", "USD", None)
+
+    notify_missing_prices("AGR-0000", ["65504578CA01A12"], "65504575CA01A12", "USD", None)  # act
 
     mocked_send_exc.assert_called_once_with(
         "Missing prices detected",
@@ -67,12 +63,13 @@ def test_notify_missing_prices(mocker):
 
 def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+
     notify_not_updated_subscriptions(
         order_id="ORD-1234",
         error_message="Some error occurred",
         updated_subscriptions=[],
         product_id="PROD-5678",
-    )
+    )  # act
 
     expected_message = (
         "Some error occurred\n\n"
@@ -80,7 +77,6 @@ def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
         "has failed changing the auto-renewal status\n\n "
         "- Product ID: PROD-5678\n\n"
     )
-
     mocked_send_exc.assert_called_once_with(
         "Error updating the subscriptions in configuration order: ORD-1234", expected_message
     )
@@ -88,6 +84,7 @@ def test_notify_not_updated_subscriptions_no_updated_subs(mocker):
 
 def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
     mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+
     notify_not_updated_subscriptions(
         order_id="ORD-1234",
         error_message="Some error occurred",
@@ -96,7 +93,7 @@ def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
             {"subscription_vendor_id": "SUB-2"},
         ],
         product_id="PROD-5678",
-    )
+    )  # act
 
     expected_message = (
         "Some error occurred\n\n"
@@ -107,7 +104,6 @@ def test_notify_not_updated_subscriptions_with_updated_subs(mocker):
         "  - SUB-1\n"
         "  - SUB-2\n"
     )
-
     mocked_send_exc.assert_called_once_with(
         "Error updating the subscriptions in configuration order: ORD-1234", expected_message
     )
@@ -117,7 +113,7 @@ def test_reset_order_error(mock_order):
     order = reset_order_error(mock_order)
     assert order["error"] is None
 
-    order = set_order_error(order, {"id": "ERR-1234", "message": "error_message"})
+    order = set_order_error(order, {"id": "ERR-1234", "message": "error_message"})  # act
 
     order = reset_order_error(order)
     assert order["error"] is None
@@ -193,19 +189,25 @@ def test_reset_order_error(mock_order):
     ],
 )
 def test_split_phone_number(number, country, expected):
-    assert split_phone_number(number, country) == expected
+    result = split_phone_number(number, country)
+
+    assert result == expected
 
 
 def test_split_phone_number_invalid_number():
-    assert split_phone_number("9929292", "ZZ") is None
+    result = split_phone_number("9929292", "ZZ")
+
+    assert result is None
 
 
 def test_split_phone_number_no_number():
-    assert split_phone_number("", "US") is None
+    result = split_phone_number("", "US")
+
+    assert result is None
 
 
 # TODO: rewrite with parametrize
-def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_factory):
+def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_factory):  # noqa: AAA01
     today = dt.datetime.now(tz=dt.UTC).date()
     assert (
         is_transferring_item_expired(
@@ -247,23 +249,26 @@ def test_get_transfer_item_sku_by_subscription(
 ):
     items = adobe_items_factory(subscription_id="my-awesome-sub")
     transfer = adobe_transfer_factory(items=items)
-    assert get_transfer_item_sku_by_subscription(transfer, "my-awesome-sub") == items[0]["offerId"]
+
+    result = get_transfer_item_sku_by_subscription(transfer, "my-awesome-sub")
+
+    assert result == items[0]["offerId"]
 
 
 def test_get_customer_licenses_discount_level(adobe_customer_factory):
-    assert (
-        get_customer_licenses_discount_level(adobe_customer_factory(licenses_discount_level="05"))
-        == "05"
+    result = get_customer_licenses_discount_level(
+        adobe_customer_factory(licenses_discount_level="05")
     )
+
+    assert result == "05"
 
 
 def test_get_customer_consumables_discount_level(adobe_customer_factory):
-    assert (
-        get_customer_consumables_discount_level(
-            adobe_customer_factory(consumables_discount_level="T2")
-        )
-        == "T2"
+    result = get_customer_consumables_discount_level(
+        adobe_customer_factory(consumables_discount_level="T2")
     )
+
+    assert result == "T2"
 
 
 @freeze_time("2024-05-06")
@@ -274,7 +279,9 @@ def test_is_coterm_date_within_order_creation_window_before_window(
         fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-04-06")
     )
 
-    assert not is_coterm_date_within_order_creation_window(order)
+    result = is_coterm_date_within_order_creation_window(order)
+
+    assert result is False
 
 
 @freeze_time("2024-05-06")
@@ -285,7 +292,9 @@ def test_is_coterm_date_within_order_creation_window_during_window(
         fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-05-05")
     )
 
-    assert is_coterm_date_within_order_creation_window(order)
+    result = is_coterm_date_within_order_creation_window(order)
+
+    assert result is True
 
 
 @freeze_time("2024-05-06")
@@ -296,4 +305,6 @@ def test_is_coterm_date_within_order_creation_window_after_window(
         fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-06-06")
     )
 
-    assert not is_coterm_date_within_order_creation_window(order)
+    result = is_coterm_date_within_order_creation_window(order)
+
+    assert result is False

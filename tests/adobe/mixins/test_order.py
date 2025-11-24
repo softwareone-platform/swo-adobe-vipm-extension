@@ -54,7 +54,9 @@ def test_get_preview_order(
         ],
     )
 
-    assert mocked_client.get_preview_order(authorization, adobe_customer_id, payload) == {
+    result = mocked_client.get_preview_order(authorization, adobe_customer_id, payload)
+
+    assert result == {
         "currencyCode": "USD",
         "externalReferenceId": "external_id",
         "lineItems": [
@@ -89,14 +91,8 @@ def test_get_preview_order_discounts(
     discounts_resp_ok = order_preview_discounts_resp_factory()
     del discounts_resp_ok["lineItems"][1]["flexDiscounts"]
     for payload_to_match, json_body in (
-        (
-            payload,
-            order_preview_discounts_resp_factory(),
-        ),
-        (
-            second_payload,
-            discounts_resp_ok,
-        ),
+        (payload, order_preview_discounts_resp_factory()),
+        (second_payload, discounts_resp_ok),
     ):
         requests_mocker.post(
             urljoin(
@@ -110,7 +106,9 @@ def test_get_preview_order_discounts(
             ],
         )
 
-    assert mocked_client.get_preview_order(authorization, adobe_customer_id, payload) == {
+    result = mocked_client.get_preview_order(authorization, adobe_customer_id, payload)
+
+    assert result == {
         "creationDate": "2025-09-30T11:01:45Z",
         "currencyCode": "USD",
         "customerId": "P1005267002",
@@ -209,6 +207,7 @@ def test_get_preview_order_too_many_failed_discounts(
     )
 
 
+# ???: there isn't asserts
 def test_get_preview_order_not_qualified(
     adobe_client_factory,
     requests_mocker,
@@ -253,7 +252,7 @@ def test_get_preview_order_not_qualified(
             **response,
         )
 
-    mocked_client.get_preview_order(authorization, "test-customer", payload)
+    mocked_client.get_preview_order(authorization, "test-customer", payload)  # act
 
 
 def test_get_preview_order_unexpected_message(
@@ -286,6 +285,7 @@ def test_get_preview_order_unexpected_message(
 
     with pytest.raises(AdobeError) as err:
         mocked_client.get_preview_order(authorization, "test-customer", payload_to_match)
+
     assert str(err.value) == (
         "Can't parse Adobe error message: '['line item 1, Reason: Invalid Flexible "
         "Discount']'. Expected format example: 'Line Item: 2, Reason: Invalid "
@@ -313,7 +313,10 @@ def test_get_preview_order_line_item(
             "status": "Active",
         },
     }
-    assert mocked_client._get_preview_order_line_item(line, "65304578CA", 2, "FLEX_DISCOUNT") == {
+
+    result = mocked_client._get_preview_order_line_item(line, "65304578CA", 2, "FLEX_DISCOUNT")
+
+    assert result == {
         "extLineItemNumber": 1,
         "flexDiscountCodes": ["FLEX_DISCOUNT"],
         "offerId": "65304578CA01A12",

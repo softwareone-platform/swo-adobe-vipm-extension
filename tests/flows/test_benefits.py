@@ -55,7 +55,7 @@ def test_check_3yc_commitment_request(
         {"externalId": "3YCEndDate", "value": "2025-01-01"},
     ])
 
-    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)
+    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)  # act
 
     mocked_get_agreements.assert_called_once_with(mock_mpt_client, is_recommitment=is_recommitment)
     mock_adobe_client.get_customer.assert_called_once_with(
@@ -90,7 +90,7 @@ def test_check_3yc_commitment_request_not_committed(
     )
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.benefits.update_agreement")
 
-    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)
+    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)  # act
 
     mocked_get_agreements.assert_called_once_with(mock_mpt_client, is_recommitment=is_recommitment)
     mocked_update_agreement.assert_called_once_with(
@@ -139,7 +139,7 @@ def test_check_3yc_commitment_request_declined(
     )
     mocked_update_agreement = mocker.patch("adobe_vipm.flows.benefits.update_agreement")
 
-    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)
+    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)  # act
 
     mocked_get_agreements.assert_called_once_with(mock_mpt_client, is_recommitment=is_recommitment)
     mocked_update_agreement.assert_called_once_with(
@@ -189,7 +189,7 @@ def test_check_3yc_commitment_request_exception(
     )
     mocked_send_exception = mocker.patch("adobe_vipm.flows.benefits.send_exception")
 
-    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)
+    check_3yc_commitment_request(mock_mpt_client, is_recommitment=is_recommitment)  # act
 
     mocked_get_agreements.assert_called_once_with(mock_mpt_client, is_recommitment=is_recommitment)
     mock_adobe_client.get_customer.assert_called_once_with(
@@ -228,7 +228,6 @@ def test_check_3yc_commitment_request_global_customers(
         )
         for i in range(2)
     ]
-
     mocker.patch(
         "adobe_vipm.flows.benefits.get_agreements_by_3yc_commitment_request_status",
         return_value=[agreement],
@@ -249,7 +248,7 @@ def test_check_3yc_commitment_request_global_customers(
         return_value=deployment_agreements,
     )
 
-    check_3yc_commitment_request(mpt_client, is_recommitment=False)
+    check_3yc_commitment_request(mpt_client, is_recommitment=False)  # act
 
     mocked_get_agreements_by_deployments.assert_called_once_with(
         mpt_client,

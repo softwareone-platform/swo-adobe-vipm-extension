@@ -65,9 +65,9 @@ def test_refresh_customer_step(mocker, mock_adobe_client, mock_order):
         adobe_customer_id="customer-id",
         adobe_customer=mocked_customer,
     )
-
     step = RefreshCustomer()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.adobe_customer == mocked_refreshed_customer
     mock_adobe_client.get_customer.assert_called_once_with(
@@ -89,9 +89,9 @@ def test_validate_market_segment_eligibility_step(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=order, market_segment=segment)
-
     step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -107,9 +107,9 @@ def test_validate_market_segment_eligibility_commercial(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=order, market_segment=MARKET_SEGMENT_COMMERCIAL)
-
     step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -128,9 +128,10 @@ def test_validate_market_segment_eligibility_step_status_not_set(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=mock_order, market_segment=segment)
-
     step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
     mocked_switch_to_query.assert_called_once_with(
         mocked_client,
         order_factory(
@@ -157,13 +158,10 @@ def test_validate_market_segment_eligibility_step_status_pending(
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        market_segment=segment,
-    )
-
+    context = Context(order=order, market_segment=segment)
     step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
 
@@ -185,18 +183,14 @@ def test_validate_market_segment_eligibility_step_status_eligible(
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        market_segment=segment,
-    )
-
+    context = Context(order=order, market_segment=segment)
     step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client, order, ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(segment=segment)
     )
-
     mocked_next_step.assert_not_called()
 
 
@@ -211,9 +205,10 @@ def test_validate_market_segment_eligibility_lga_agency_type_not_federal_or_stat
     mocked_next_step = mocker.MagicMock()
     mock_order["product"]["id"] = "PRD-3333-3333"
     context = Context(order=mock_order)
-
     step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
     mocked_switch_to_query.assert_called_once_with(
         mocked_client,
         context.order,
@@ -239,9 +234,9 @@ def test_create_customer_step(
         seller_id="seller-id",
         market_segment="market-segment",
     )
-
     step = CreateCustomer()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.adobe_customer == adobe_customer
     assert context.adobe_customer_id == adobe_customer["customerId"]
@@ -264,7 +259,6 @@ def test_create_customer_lga_step(
     mocked_save_data = mocker.patch.object(CreateCustomer, "save_data")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=mock_order,
         product_id="PRD-3333-3333",
@@ -274,9 +268,9 @@ def test_create_customer_lga_step(
         seller_id="seller-id",
         market_segment="market-segment",
     )
-
     step = CreateCustomer()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.adobe_customer == adobe_customer
     assert context.adobe_customer_id == adobe_customer["customerId"]
@@ -313,9 +307,9 @@ def test_create_customer_step_no_contact(
         seller_id="seller-id",
         market_segment="market-segment",
     )
-
     step = CreateCustomer()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.adobe_customer is None
     assert context.adobe_customer_id is None
@@ -351,9 +345,9 @@ def test_create_customer_step_exception(
         seller_id="seller-id",
         market_segment="market-segment",
     )
-
     step = CreateCustomer()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.create_customer_account.assert_called_once_with(
         context.authorization_id,
@@ -372,9 +366,9 @@ def test_create_customer_step_already_created(mocker, mock_adobe_client, mock_or
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=mock_order, adobe_customer_id="customer-id")
-
     step = CreateCustomer()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.create_customer_account.assert_not_called()
     mocked_save_data.assert_not_called()
@@ -394,9 +388,9 @@ def test_create_customer_step_save_data(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = CreateCustomer()
-    step.save_data(mock_mpt_client, context)
+
+    step.save_data(mock_mpt_client, context)  # act
 
     assert get_adobe_customer_id(context.order) == context.adobe_customer_id
     mocked_update_order.assert_called_once_with(
@@ -427,18 +421,16 @@ def test_create_customer_step_save_data_with_3yc_request(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = CreateCustomer()
-    step.save_data(mock_mpt_client, context)
+
+    step.save_data(mock_mpt_client, context)  # act
 
     assert get_adobe_customer_id(context.order) == context.adobe_customer_id
-
     ff_param = get_fulfillment_parameter(
         context.order,
         Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
     )
     assert ff_param["value"] == commitment["status"]
-
     mocked_update_order.assert_called_once_with(
         mock_mpt_client,
         context.order_id,
@@ -459,9 +451,9 @@ def test_create_customer_step_handle_error_unexpected_error(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_failed"
     )
     context = Context(order=mock_order)
-
     step = CreateCustomer()
-    step.handle_error(mock_mpt_client, context, error)
+
+    step.handle_error(mock_mpt_client, context, error)  # act
 
     mocked_switch_to_failed.assert_called_once_with(
         mock_mpt_client,
@@ -485,13 +477,12 @@ def test_create_customer_step_handle_error_address(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
     )
     context = Context(order=mock_order)
-
     step = CreateCustomer()
-    step.handle_error(mock_mpt_client, context, error)
+
+    step.handle_error(mock_mpt_client, context, error)  # act
 
     param = get_ordering_parameter(context.order, Param.ADDRESS.value)
     assert param["error"] == ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error))
-
     mocked_switch_to_query.assert_called_once_with(mock_mpt_client, context.order)
 
 
@@ -510,15 +501,14 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_licenses(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query"
     )
     context = Context(order=mock_order)
-
     step = CreateCustomer()
-    step.handle_error(mock_mpt_client, context, error)
+
+    step.handle_error(mock_mpt_client, context, error)  # act
 
     param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
     assert param_licenses["error"] == ERR_3YC_QUANTITY_LICENSES.to_dict(
         title=param_licenses["name"],
     )
-
     mocked_switch_to_query.assert_called_once_with(mock_mpt_client, context.order)
 
 
@@ -537,9 +527,9 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_consumables(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
     )
     context = Context(order=mock_order)
-
     step = CreateCustomer()
-    step.handle_error(mock_mpt_client, context, error)
+
+    step.handle_error(mock_mpt_client, context, error)  # act
 
     param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
     assert param_consumables["error"] == ERR_3YC_QUANTITY_CONSUMABLES.to_dict(
@@ -563,13 +553,12 @@ def test_create_customer_step_handle_error_3yc_minimum_quantity_no_minimums(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query"
     )
     context = Context(order=mock_order)
-
     step = CreateCustomer()
-    step.handle_error(mock_mpt_client, context, error)
+
+    step.handle_error(mock_mpt_client, context, error)  # act
 
     param_licenses = get_ordering_parameter(context.order, Param.THREE_YC_LICENSES.value)
     param_consumables = get_ordering_parameter(context.order, Param.THREE_YC_CONSUMABLES.value)
-
     assert context.order["error"] == ERR_3YC_NO_MINIMUMS.to_dict(
         title_min_licenses=param_licenses["name"],
         title_min_consumables=param_consumables["name"],
@@ -605,13 +594,12 @@ def test_create_customer_step_handle_error_invalid_fields(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query"
     )
     context = Context(order=mock_order)
-
     step = CreateCustomer()
-    step.handle_error(mock_mpt_client, context, error)
+
+    step.handle_error(mock_mpt_client, context, error)  # act
 
     param = get_ordering_parameter(context.order, param_external_id)
     assert param["error"] == error_constant.to_dict(title=param["name"], details=str(error))
-
     mocked_switch_to_query.assert_called_once_with(mock_mpt_client, context.order)
 
 
@@ -626,7 +614,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
         "adobe_vipm.flows.fulfillment.purchase.Context", return_value=mocked_context
     )
 
-    fulfill_purchase_order(mock_mpt_client, mock_order)
+    fulfill_purchase_order(mock_mpt_client, mock_order)  # act
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 18
     expected_steps = [
@@ -651,7 +639,6 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
     ]
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
-
     assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_PURCHASE
     assert mocked_pipeline_ctor.mock_calls[0].args[15].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mock_order)

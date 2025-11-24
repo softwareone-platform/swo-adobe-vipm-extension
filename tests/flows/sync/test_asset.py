@@ -31,7 +31,7 @@ def test_asset_syncer_sync(
         mock_mpt_client, agreement["id"], [mock_asset], mock_customer, [adobe_subscription]
     )
 
-    assets_syncer.sync(dry_run=False)
+    assets_syncer.sync(dry_run=False)  # act
 
     mock_mpt_get_asset_by_id.assert_called_once_with(mock_mpt_client, asset_id)
     mock_mpt_update_asset.assert_called_once_with(
@@ -75,7 +75,7 @@ def test_asset_syncer_sync_asset_without_external_id(
         mock_mpt_client, agreement["id"], [mock_asset], mock_customer, [adobe_subscription]
     )
 
-    assets_syncer.sync(dry_run=False)
+    assets_syncer.sync(dry_run=False)  # act
 
     mock_mpt_get_asset_by_id.assert_called_once_with(mock_mpt_client, asset_id)
     mock_mpt_update_asset.assert_not_called()
@@ -113,7 +113,7 @@ def test_sync_agreement_update_asset_dry_run(
         mock_mpt_client, agreement["id"], [mock_asset], mock_customer, [adobe_subscription]
     )
 
-    assets_syncer.sync(dry_run=True)
+    assets_syncer.sync(dry_run=True)  # act
 
     mock_mpt_get_asset_by_id.assert_called_once()
     mock_mpt_update_asset.assert_not_called()

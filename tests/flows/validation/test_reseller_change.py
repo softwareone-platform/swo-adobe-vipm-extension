@@ -38,7 +38,7 @@ def test_validate_reseller_change_success(
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
 
-    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert isinstance(validated_order["lines"], list)
@@ -70,7 +70,7 @@ def test_validate_reseller_change_success_adding_line(
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
 
-    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     order_line = [
         {
@@ -130,7 +130,7 @@ def test_validate_reseller_change_success_adding_additional_licenses(
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
 
-    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     order_line = [
         {
@@ -170,10 +170,9 @@ def test_validate_reseller_change_expired_code(
         items=adobe_items, approval_expiry=(today - dt.timedelta(days=1)).isoformat()
     )
     mock_adobe_client.reseller_change_request.return_value = adobe_preview
-
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
 
-    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE.value)
@@ -194,7 +193,7 @@ def test_validate_reseller_change_adobe_api_error(
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
     mock_adobe_client.reseller_change_request.side_effect = api_error
 
-    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.CHANGE_RESELLER_CODE.value)
@@ -229,7 +228,7 @@ def test_validate_reseller_change_no_subscriptions(
         return_value=product_items,
     )
 
-    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert isinstance(validated_order["lines"], list)
@@ -257,7 +256,7 @@ def test_validate_reseller_change_missing_admin_email(
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
     mock_adobe_client.get_subscriptions.return_value = {"items": adobe_items_factory()}
 
-    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert isinstance(has_errors, bool)
     assert isinstance(validated_order, dict)

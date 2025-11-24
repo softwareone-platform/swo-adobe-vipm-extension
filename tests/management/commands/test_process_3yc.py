@@ -4,15 +4,13 @@ from django.core.management import call_command
 def test_process_sync_agreements(mocker):
     mocked_client = mocker.MagicMock()
     mocker.patch(
-        "adobe_vipm.management.commands.process_3yc.setup_client",
-        return_value=mocked_client,
+        "adobe_vipm.management.commands.process_3yc.setup_client", return_value=mocked_client
     )
-
     mocked_check = mocker.patch(
         "adobe_vipm.management.commands.process_3yc.check_3yc_commitment_request"
     )
 
-    call_command("process_3yc")
+    call_command("process_3yc")  # act
 
     assert mocked_check.mock_calls[0].args == (mocked_client,)
     assert mocked_check.mock_calls[0].kwargs == {"is_recommitment": False}

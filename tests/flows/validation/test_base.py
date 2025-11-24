@@ -115,9 +115,9 @@ def test_validate_order(mocker, mock_mpt_client, mock_order, caplog):
         return_value=mocker.Mock(return_value=(False, mock_order)),
     )
 
-    validated_order = validate_order(mock_mpt_client, mock_order)
+    result = validate_order(mock_mpt_client, mock_order)
 
-    assert validated_order == mock_order
+    assert result == mock_order
     mock_copy_order_without_errors.assert_called_once()
     mock_get_validator_by_order_type.assert_called_once()
     assert "Validation of order ORD-0792-5000-2253-4210 succeeded without errors" in caplog.text
@@ -131,9 +131,9 @@ def test_validate_order_no_validator(mocker, mock_mpt_client, mock_order, caplog
         "adobe_vipm.flows.validation.base.get_validator_by_order_type", return_value=None
     )
 
-    validated_order = validate_order(mock_mpt_client, mock_order)
+    result = validate_order(mock_mpt_client, mock_order)
 
-    assert validated_order == mock_order
+    assert result == mock_order
     mock_copy_order_without_errors.assert_called_once()
     mock_get_validator_by_order_type.assert_called_once()
     assert "Validation of order ORD-0792-5000-2253-4210 succeeded without errors" in caplog.text
@@ -148,9 +148,9 @@ def test_validate_order_no_validate(mocker, mock_mpt_client, mock_order, caplog)
         return_value=mocker.Mock(return_value=(True, mock_order)),
     )
 
-    validated_order = validate_order(mock_mpt_client, mock_order)
+    result = validate_order(mock_mpt_client, mock_order)
 
-    assert validated_order == mock_order
+    assert result == mock_order
     mock_copy_order_without_errors.assert_called_once()
     mock_get_validator_by_order_type.assert_called_once()
     assert "Validation of order ORD-0792-5000-2253-4210 succeeded with errors" in caplog.text

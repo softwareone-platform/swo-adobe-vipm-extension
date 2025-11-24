@@ -73,7 +73,7 @@ def test_validate_transfer(
         return_value=product_items,
     )
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     lines = lines_factory(line_id=None, unit_purchase_price=12.14)
     assert has_errors is False
@@ -127,7 +127,7 @@ def test_validate_transfer_lines_exist(
         return_value=product_items,
     )
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order["lines"] == lines_factory()
@@ -170,11 +170,10 @@ def test_validate_transfer_membership_error(
     api_error = AdobeAPIError(400, adobe_api_error_factory(status_code, "An error"))
     mock_adobe_client.preview_transfer.side_effect = api_error
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
-
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID.to_dict(
         title=param["name"], details=str(api_error.message)
     )
@@ -208,7 +207,7 @@ def test_validate_transfer_http_error(
     order = order_factory(order_parameters=transfer_order_parameters_factory())
     mock_adobe_client.preview_transfer.side_effect = error
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
@@ -237,7 +236,7 @@ def test_validate_transfer_unknown_item(
     mocker.patch("adobe_vipm.flows.validation.transfer.get_product_items_by_skus", return_value=[])
     mocker.patch("adobe_vipm.flows.validation.transfer.get_prices", return_value=[])
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
@@ -278,7 +277,7 @@ def test_validate_transfer_already_migrated(
     mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
     assert has_errors is False
@@ -318,7 +317,7 @@ def test_validate_transfer_migration_running(
         return_value=mocked_transfer,
     )
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
@@ -345,7 +344,7 @@ def test_validate_transfer_migration_synchronized(
         return_value=mocked_transfer,
     )
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
@@ -376,7 +375,7 @@ def test_validate_transfer_no_items(
     adobe_preview_transfer = adobe_preview_transfer_factory(items=[])
     mock_adobe_client.preview_transfer.return_value = adobe_preview_transfer
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
@@ -392,9 +391,9 @@ def test_get_prices(mocker, mock_order):
         return_value={"sku-1": 10.11},
     )
 
-    prices = get_prices(mock_order, None, ["sku-1"])
+    result = get_prices(mock_order, None, ["sku-1"])
 
-    assert prices == {"sku-1": 10.11}
+    assert result == {"sku-1": 10.11}
     mocked_get_prices_for_skus.assert_called_once_with(
         mock_order["agreement"]["product"]["id"],
         mock_order["agreement"]["listing"]["priceList"]["currency"],
@@ -423,7 +422,7 @@ def test_validate_transfer_account_inactive(
     mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
     mock_adobe_client.get_transfer.return_value = adobe_transfer
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
@@ -449,9 +448,9 @@ def test_get_prices_3yc(mocker, mock_order, adobe_commitment_factory, commitment
         return_value={"sku-1": 10.11},
     )
 
-    prices = get_prices(mock_order, commitment, ["sku-1"])
+    result = get_prices(mock_order, commitment, ["sku-1"])
 
-    assert prices == {"sku-1": 10.11}
+    assert result == {"sku-1": 10.11}
     mocked_get_prices_for_skus.assert_called_once_with(
         mock_order["agreement"]["product"]["id"],
         mock_order["agreement"]["listing"]["priceList"]["currency"],
@@ -471,9 +470,10 @@ def test_get_prices_3yc_expired(mocker, mock_order, adobe_commitment_factory):
     mocked_get_prices_for_3yc_skus = mocker.patch(
         "adobe_vipm.flows.validation.transfer.get_prices_for_3yc_skus",
     )
-    prices = get_prices(mock_order, commitment, ["sku-1"])
 
-    assert prices == {"sku-1": 10.11}
+    result = get_prices(mock_order, commitment, ["sku-1"])
+
+    assert result == {"sku-1": 10.11}
     mocked_get_prices_for_skus.assert_called_once_with(
         mock_order["agreement"]["product"]["id"],
         mock_order["agreement"]["listing"]["priceList"]["currency"],
@@ -523,7 +523,7 @@ def test_validate_transfer_already_migrated_all_items_expired(
     mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     membership_param = get_ordering_parameter(order, Param.MEMBERSHIP_ID.value)
     assert has_errors is False
@@ -594,7 +594,7 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order == order
@@ -682,7 +682,7 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order == order
@@ -778,7 +778,7 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order == order
@@ -900,7 +900,7 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order == order
@@ -1005,7 +1005,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order == order
@@ -1116,7 +1116,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
@@ -1185,11 +1185,10 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
-
     lines = lines_factory(
         line_id=None,
         item_id=1,
@@ -1198,7 +1197,6 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
         external_vendor_id="65304990CA",
         unit_purchase_price=33.04,
     )
-
     assert validated_order["lines"] == lines
 
 
@@ -1263,7 +1261,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
     }
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     assert validated_order["error"] == ERR_UPDATING_TRANSFER_ITEMS.to_dict()
@@ -1311,7 +1309,7 @@ def test_validate_transfer_already_migrated_no_items(
     mock_adobe_client.get_subscriptions.return_value = {"items": []}
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order["lines"] == []
@@ -1338,7 +1336,6 @@ def test_validate_transfer_already_migrated_no_items_add_line(
         external_vendor_id="65304990CA",
         unit_purchase_price=33.04,
     )
-
     order = order_factory(order_parameters=order_params, lines=order_lines)
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     product_items = items_factory(
@@ -1370,7 +1367,7 @@ def test_validate_transfer_already_migrated_no_items_add_line(
     mock_adobe_client.get_subscriptions.return_value = {"items": []}
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     lines = lines_factory(
@@ -1409,7 +1406,7 @@ def test_validate_transfer_already_migrated_items_with_deployment(
     mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(global_sales_enabled=True)
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     membership_param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert has_errors is True
@@ -1476,7 +1473,7 @@ def test_validate_transfer_with_one_line_items(
         return_value=product_items,
     )
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert validated_order["lines"] == [
@@ -1561,7 +1558,7 @@ def test_validate_transfer_adobe_errors(
     )
     mock_adobe_client.get_subscriptions.side_effect = error
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
@@ -1598,9 +1595,9 @@ def test_fetch_transfer_data_not_lga_product_with_lga_agency_type(
     )
     adobe_transfer_preview["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
     mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
-
     step = FetchTransferData()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.validation_succeeded is False
     param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID.value)
@@ -1633,9 +1630,9 @@ def test_fetch_transfer_data_lga_product_with_not_lga_agency_type(
         ],
     )
     mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
-
     step = FetchTransferData()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.validation_succeeded is False
     param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID.value)
@@ -1658,10 +1655,7 @@ def test_validate_transfer_government_transfer_lga_product_with_lga_agency_type(
         "adobe_vipm.flows.validation.transfer.get_transfer_by_authorization_membership_or_customer",
         return_value=None,
     )
-    order = order_factory(
-        order_parameters=transfer_order_parameters_factory(),
-        lines=[],
-    )
+    order = order_factory(order_parameters=transfer_order_parameters_factory(), lines=[])
     order["product"]["id"] = "PRD-3333-3333"
     order["parameters"]["ordering"].append({
         "id": "PAR-1164-2550-0043",
@@ -1694,7 +1688,7 @@ def test_validate_transfer_government_transfer_lga_product_with_lga_agency_type(
         return_value=product_items,
     )
 
-    has_errors, validated_order = validate_transfer(mock_mpt_client, order)
+    has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
     lines = lines_factory(line_id=None, unit_purchase_price=12.14)
     assert has_errors is False
@@ -1730,7 +1724,7 @@ def test_create_transfer_subscription_agreement(
     context.adobe_transfer_order = adobe_transfer_order
     step = CreateTransferSubscriptions()
 
-    step(mock_mpt_client, context, mock_next_step)
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_create_agreement_subscription.assert_called_once_with(
         adobe_transfer_order, mock_mpt_client, mock_order, mock_adobe_client, adobe_customer
@@ -1761,7 +1755,7 @@ def test_create_transfer_subscription_agreement_without_subscriptions(
     context.adobe_transfer_order = adobe_transfer_order
     step = CreateTransferSubscriptions()
 
-    step(mock_mpt_client, context, mock_next_step)
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_create_agreement_subscription.assert_called_once()
     assert (

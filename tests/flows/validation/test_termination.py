@@ -57,7 +57,6 @@ def test_validate_downsizes_step_success(
     ret_info_3 = ReturnableOrderInfo(
         adobe_order_3, adobe_order_3["lineItems"][0], adobe_order_3["lineItems"][0]["quantity"]
     )
-
     sku = order["lines"][0]["item"]["externalIds"]["vendor"]
     mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
         ret_info_1,
@@ -76,9 +75,9 @@ def test_validate_downsizes_step_success(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id,
@@ -118,15 +117,14 @@ def test_validate_downsizes_step_no_returnable_orders(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
     )
-
     assert not context.validation_succeeded
     assert context.order["error"] == ERR_INVALID_TERMINATION_ORDER_QUANTITY.to_dict()
     mocked_next_step.assert_not_called()
@@ -175,9 +173,9 @@ def test_validate_downsizes_step_quantity_mismatch(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id, context.adobe_customer_id
@@ -210,9 +208,9 @@ def test_validate_downsizes_step_inactive_subscription(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscriptions.assert_called_once_with(
         context.authorization_id, context.adobe_customer_id
@@ -234,7 +232,7 @@ def test_validate_termination_order(mocker):
     mocked_client = mocker.MagicMock()
     mocked_order = mocker.MagicMock()
 
-    validate_termination_order(mocked_client, mocked_order)
+    validate_termination_order(mocked_client, mocked_order)  # act
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 6
     expected_steps = [
@@ -247,6 +245,5 @@ def test_validate_termination_order(mocker):
     ]
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
-
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
