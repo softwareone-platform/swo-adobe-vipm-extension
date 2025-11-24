@@ -163,11 +163,11 @@ class AgreementsSyncer:  # noqa: WPS214
             for agreement in deployment_agreements
             if agreement["status"] == AgreementStatus.ACTIVE
         ]
+        self._process_orphaned_deployment_subscriptions(active_deployment_agreements)
         if active_deployment_agreements:
             self._sync_deployment_agreements(
                 adobe_deployments, active_deployment_agreements, sync_prices=sync_prices
             )
-            self._process_orphaned_deployment_subscriptions(active_deployment_agreements)
 
     def _is_sync_possible(self):
         if any(

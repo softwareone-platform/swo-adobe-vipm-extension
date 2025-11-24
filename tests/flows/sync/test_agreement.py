@@ -832,9 +832,9 @@ def test_sync_global_customer(
         "Agreement updated AGR-2119-4550-8674-5962",
         "Setting global customer for agreement AGR-2119-4550-8674-5962",
         "Setting deployments for agreement AGR-2119-4550-8674-5962",
+        "Looking for orphaned deployment subscriptions in Adobe.",
         "Getting subscriptions for update for agreement AGR-deployment-1",
         "Agreement updated AGR-deployment-1",
-        "Looking for orphaned deployment subscriptions in Adobe.",
         "Updating Last Sync Date for agreement AGR-2119-4550-8674-5962",
     ]
 
