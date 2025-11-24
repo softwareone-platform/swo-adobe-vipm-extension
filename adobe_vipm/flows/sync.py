@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from functools import partial
 
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     create_agreement_subscription,
@@ -1026,7 +1027,7 @@ def process_lost_customer(  # noqa: C901
                     )
 
 
-def sync_agreement(  # noqa: C901
+def sync_agreement(  # noqa: C901 # NOSONAR
     mpt_client: MPTClient,
     agreement: dict,
     *,
@@ -1042,6 +1043,10 @@ def sync_agreement(  # noqa: C901
         dry_run: If True do not update agreement.
         sync_prices: If true sync prices. Keep in mind dry_run parameter.
     """
+    if agreement["product"]["id"] not in settings.MPT_PRODUCTS_IDS:
+        logger.error("Product %s not in MPT_PRODUCTS_IDS. Skipping.", agreement["product"]["id"])
+        return
+
     logger.debug("Syncing agreement %s", agreement)
     if agreement["status"] != AgreementStatus.ACTIVE:
         logger.info("Skipping agreement %s because it is not in Active status", agreement["id"])

@@ -2243,7 +2243,7 @@ def test_sync_agreement_lost_customer_error(
 def test_sync_agreement_skips_inactive_agreement(
     mock_mpt_client, mock_get_adobe_client, mock_update_last_sync_date, status
 ):
-    agreement = {"id": "1", "status": status, "subscriptions": []}
+    agreement = {"id": "1", "status": status, "subscriptions": [], "product": {"id": "2"}}
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
@@ -3015,3 +3015,15 @@ def test_check_update_airtable_missing_deployments_none(
 
     mock_create_gc_agreement_deployments.assert_not_called()
     mock_send_notification.assert_not_called()
+
+
+def test_not_syncing_unknown_products(
+        mocker, mock_mpt_client, agreement_factory, mock_get_adobe_client, caplog
+):
+    agreement = agreement_factory()
+    agreement["product"]["id"] = "NOT_CONFIGURED_PRODUCT"
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
+
+    mock_get_adobe_client.assert_not_called()
+    assert caplog.messages == ["Product NOT_CONFIGURED_PRODUCT not in MPT_PRODUCTS_IDS. Skipping."]
