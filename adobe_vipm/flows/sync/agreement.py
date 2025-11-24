@@ -158,12 +158,12 @@ class AgreementsSyncer:  # noqa: WPS214
             Param.DEPLOYMENT_ID.value,
             [deployment["deploymentId"] for deployment in adobe_deployments],
         )
+        self._process_orphaned_deployment_subscriptions(deployment_agreements)
         active_deployment_agreements = [
             agreement
             for agreement in deployment_agreements
             if agreement["status"] == AgreementStatus.ACTIVE
         ]
-        self._process_orphaned_deployment_subscriptions(active_deployment_agreements)
         if active_deployment_agreements:
             self._sync_deployment_agreements(
                 adobe_deployments, active_deployment_agreements, sync_prices=sync_prices
