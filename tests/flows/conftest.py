@@ -155,9 +155,9 @@ def mock_get_subscriptions_for_update(mocker):
 
 
 @pytest.fixture()
-def mock_sync_deployments_prices(mocker):
+def mock_sync_deployment_agreements(mocker):
     return mocker.patch(
-        "adobe_vipm.flows.sync.sync_deployments_prices",
+        "adobe_vipm.flows.sync.sync_deployment_agreements",
         spec=True,
     )
 
@@ -175,4 +175,36 @@ def mock_get_product_items_by_period(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync.get_product_items_by_period",
         spec=True,
+    )
+
+@pytest.fixture()
+def mock_check_update_airtable_missing_deployments(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync._check_update_airtable_missing_deployments", spec=True
+    )
+
+
+@pytest.fixture()
+def mock_process_orphaned_deployment_subscriptions(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync._process_orphaned_deployment_subscriptions", spec=True
+    )
+
+
+@pytest.fixture()
+def mock_get_transfer_by_authorization_membership_or_customer(mocker):
+    return mocker.patch(
+        "adobe_vipm.airtable.models.get_transfer_by_authorization_membership_or_customer", spec=True
+    )
+
+
+@pytest.fixture()
+def mock_process_main_agreement(mocker):
+    return mocker.patch("adobe_vipm.flows.sync._process_main_agreement", spec=True)
+
+
+@pytest.fixture()
+def mock_notify_agreement_unhandled_exception_in_teams(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams", spec=True
     )

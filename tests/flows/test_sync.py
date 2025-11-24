@@ -36,7 +36,7 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
 @pytest.fixture(autouse=True)
-def mock_add_missing_subscriptions(mocker):
+def mock_add_missing_subscriptions_and_assets(mocker):
     return mocker.patch("adobe_vipm.flows.sync._add_missing_subscriptions", spec=True)
 
 
@@ -907,7 +907,6 @@ def test_sync_agreement_prices_with_3yc(
 
 
 @freeze_time("2025-06-19")
-@pytest.mark.parametrize("dry_run", [True, False])
 def test_sync_global_customer_parameter(
     mocker,
     lines_factory,
@@ -922,9 +921,8 @@ def test_sync_global_customer_parameter(
     adobe_subscription_factory,
     assets_factory,
     fulfillment_parameters_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_adobe_product_by_marketplace_sku,
-    dry_run,
     caplog,
 ):
     agreement = agreement_factory(
@@ -992,89 +990,160 @@ def test_sync_global_customer_parameter(
     mock_asset["externalIds"] = {}
     mocker.patch("adobe_vipm.flows.sync.get_asset_by_id", return_value=mock_asset)
 
-    sync_agreement(mock_mpt_client, agreement, dry_run=dry_run, sync_prices=True)
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     assert mock_update_subscriptions.call_count == 2
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
-    if not dry_run:
-        assert mocked_update_agreement.call_args_list == [
-            mocker.call(
-                mock_mpt_client,
-                agreement["id"],
-                lines=expected_lines,
-                parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
-            ),
-            mocker.call(
-                mock_mpt_client,
-                agreement["id"],
-                parameters={
-                    "fulfillment": [
-                        {"externalId": "globalCustomer", "value": ["Yes"]},
-                        {"externalId": "deployments", "value": "deployment-id - DE"},
-                    ]
-                },
-            ),
-            mocker.call(
-                mock_mpt_client,
-                deployment_agreements[0]["id"],
-                lines=expected_lines,
-                parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
-            ),
-            mocker.call(
-                mock_mpt_client,
-                deployment_agreements[0]["id"],
-                parameters={
-                    "fulfillment": [
-                        {
-                            "id": "PAR-3528-2927",
-                            "name": "3YC End Date",
-                            "externalId": "3YCEndDate",
-                            "type": "Date",
-                            "value": "",
-                        },
-                        {
-                            "id": "PAR-9876-5432",
-                            "name": "3YC Enroll Status",
-                            "externalId": "3YCEnrollStatus",
-                            "type": "SingleLineText",
-                            "value": "",
-                        },
-                        {
-                            "id": "PAR-2266-4848",
-                            "name": "3YC Start Date",
-                            "externalId": "3YCStartDate",
-                            "type": "Date",
-                            "value": "",
-                        },
-                    ]
-                },
-            ),
-            mocker.call(
-                mock_mpt_client,
-                agreement["id"],
-                parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-19"}]},
-            ),
-        ]
-    else:
-        assert mocked_update_agreement.call_args_list == [
-            mocker.call(
-                mock_mpt_client,
-                agreement["id"],
-                parameters={
-                    "fulfillment": [
-                        {"externalId": "globalCustomer", "value": ["Yes"]},
-                        {"externalId": "deployments", "value": "deployment-id - DE"},
-                    ]
-                },
-            )
-        ]
-    assert "Getting subscriptions for update for agreement AGR-deployment-1" in caplog.messages
-    assert "Getting subscriptions for update for agreement AGR-deployment-2" not in caplog.messages
-    assert (
-            "No vendor subscription found for asset AST-1000-2000-3000: asset.externalIds.vendor "
-            "is empty" in caplog.messages
+    assert mocked_update_agreement.call_args_list == [
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            parameters={
+                "fulfillment": [
+                    {"externalId": "globalCustomer", "value": ["Yes"]},
+                    {"externalId": "deployments", "value": "deployment-id - DE"},
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            deployment_agreements[0]["id"],
+            lines=expected_lines,
+            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            deployment_agreements[0]["id"],
+            parameters={
+                "fulfillment": [
+                    {
+                        "id": "PAR-3528-2927",
+                        "name": "3YC End Date",
+                        "externalId": "3YCEndDate",
+                        "type": "Date",
+                        "value": "",
+                    },
+                    {
+                        "id": "PAR-9876-5432",
+                        "name": "3YC Enroll Status",
+                        "externalId": "3YCEnrollStatus",
+                        "type": "SingleLineText",
+                        "value": "",
+                    },
+                    {
+                        "id": "PAR-2266-4848",
+                        "name": "3YC Start Date",
+                        "externalId": "3YCStartDate",
+                        "type": "Date",
+                        "value": "",
+                    },
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-19"}]},
+        ),
+    ]
+
+
+@freeze_time("2025-06-19")
+def test_sync_global_customer_parameter_dry_run(
+        mocker,
+        lines_factory,
+        mock_mpt_client,
+        mock_adobe_client,
+        agreement_factory,
+        mock_mpt_update_agreement,
+        subscriptions_factory,
+        adobe_customer_factory,
+        mock_get_prices_for_skus,
+        mock_update_subscriptions,
+        adobe_subscription_factory,
+        fulfillment_parameters_factory,
+        mock_add_missing_subscriptions_and_assets,
+        mock_get_adobe_product_by_marketplace_sku,
+        mock_get_agreements_by_customer_deployments,
+        mock_check_update_airtable_missing_deployments,
+):
+    agreement = agreement_factory(
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22),
+        subscriptions=[
+            {
+                "id": "SUB-1000-2000-3000",
+                "status": "Active",
+                "item": {"id": "ITM-0000-0001-0001"},
+                "externalIds": {"vendor": "1e5b9c974c4ea1bcabdb0fe697a2f1NA"},
+            },
+            {
+                "id": "SUB-1234-5678",
+                "status": "Terminated",
+                "item": {"id": "ITM-0000-0001-0002"},
+                "externalIds": {"vendor": "1e5b9c974c4ea1bcabdb0fe697a2f1NA"},
+            },
+            {
+                "id": "SUB-1000-2000-5000",
+                "status": "Active",
+                "item": {"id": "ITM-0000-0001-0003"},
+                "externalIds": {"vendor": "1e5b9c974c4ea1bcabdb0fe697a2f1NA"},
+            },
+        ],
     )
+    adobe_subscription = adobe_subscription_factory()
+    another_adobe_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=15,
+        renewal_quantity=15,
+    )
+    adobe_deployment_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=20,
+        renewal_quantity=20,
+    )
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription,
+            another_adobe_subscription,
+            adobe_deployment_subscription,
+            {**adobe_deployment_subscription, "subscriptionId": "d-sub-id"},
+        ]
+    }
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        coterm_date="2025-04-04", global_sales_enabled=True
+    )
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    deployment_agreements = [
+        agreement_factory(
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="", deployment_id="deployment-1", deployments=""
+            ),
+            lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22),
+        )
+    ]
+    mock_get_agreements_by_customer_deployments.return_value = deployment_agreements
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22}
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=True, sync_prices=True)
+
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
+    mock_mpt_update_agreement.assert_not_called()
+
 
 @freeze_time("2025-06-19")
 def test_sync_global_customer_parameter_not_prices(
@@ -1083,7 +1152,7 @@ def test_sync_global_customer_parameter_not_prices(
     mock_mpt_client,
     mock_adobe_client,
     agreement_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_subscriptions_for_update,
 ):
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
@@ -1104,7 +1173,7 @@ def test_sync_global_customer_parameter_not_prices(
 
     mock_sync_agreement_prices.assert_not_called()
     mock_get_subscriptions_for_update.assert_not_called()
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     assert caplog.messages == [
         "Synchronizing agreement AGR-2119-4550-8674-5962...",
         "Getting assets for update for agreement AGR-2119-4550-8674-5962",
@@ -1133,7 +1202,7 @@ def test_sync_global_customer_update_not_required(
     adobe_subscription_factory,
     mock_update_subscriptions,
     fulfillment_parameters_factory,
-    mock_add_missing_subscriptions,
+    mock_add_missing_subscriptions_and_assets,
     mock_get_subscriptions_for_update,
     mock_get_adobe_product_by_marketplace_sku,
     mock_get_agreements_by_customer_deployments,
@@ -1197,7 +1266,7 @@ def test_sync_global_customer_update_not_required(
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
-    mock_add_missing_subscriptions.assert_called_once()
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
     assert mock_get_subscriptions_for_update.call_count == 3
 
     assert mocked_update_agreement.mock_calls == [
@@ -1428,7 +1497,7 @@ def test_sync_global_customer_parameters_error(
     adobe_api_error_factory,
     mock_get_prices_for_skus,
     adobe_subscription_factory,
-    mock_sync_deployments_prices,
+    mock_sync_deployment_agreements,
     mock_get_agreement_subscription,
     mock_get_subscriptions_for_update,
     mock_update_agreement_subscription,
@@ -1497,11 +1566,262 @@ def test_sync_global_customer_parameters_error(
         sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
 
     mock_get_subscriptions_for_update.assert_not_called()
-    mock_sync_deployments_prices.assert_called_once()
+    mock_sync_deployment_agreements.assert_called_once()
     assert (
         caplog.records[0].message
         == "Error setting global customer parameters for agreement AGR-2119-4550-8674-5962."
     )
+
+
+def test_sync_global_customer(
+        mock_adobe_client,
+        mock_mpt_client,
+        agreement_factory,
+        mock_mpt_update_agreement,
+        adobe_customer_factory,
+        mock_get_prices_for_skus,
+        mock_update_subscriptions,
+        adobe_subscription_factory,
+        fulfillment_parameters_factory,
+        mock_add_missing_subscriptions_and_assets,
+        mock_get_agreements_by_customer_deployments,
+        mock_check_update_airtable_missing_deployments,
+        mock_get_agreement_subscription,
+        caplog,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id=""
+        ),
+        assets=[],
+    )
+    mock_get_agreement_subscription.return_value = agreement[
+        "subscriptions"
+    ][0]
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    adobe_subscription = adobe_subscription_factory()
+    another_adobe_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=15,
+        renewal_quantity=15,
+    )
+    adobe_deployment_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=20,
+        renewal_quantity=20,
+    )
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription,
+            another_adobe_subscription,
+            adobe_deployment_subscription,
+            {**adobe_deployment_subscription, "subscriptionId": "d-sub-id"},
+        ]
+    }
+    deployment_agreements = [
+        agreement_factory(
+            agreement_id="AGR-deployment-1",
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="", deployment_id="deployment-1", deployments=""
+            ),
+        ),
+        agreement_factory(
+            agreement_id="AGR-deployment-2",
+            status=AgreementStatus.TERMINATED,
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="", deployment_id="deployment-2", deployments=""
+            ),
+        ),
+    ]
+    mock_get_agreements_by_customer_deployments.return_value = deployment_agreements
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
+
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
+    mock_mpt_update_agreement.assert_called()
+    assert caplog.messages == [
+        "Synchronizing agreement AGR-2119-4550-8674-5962...",
+        "Getting assets for update for agreement AGR-2119-4550-8674-5962",
+        "Getting subscriptions for update for agreement AGR-2119-4550-8674-5962",
+        'No subscription found in Adobe customer data!',
+        "Agreement updated AGR-2119-4550-8674-5962",
+        "Setting global customer for agreement AGR-2119-4550-8674-5962",
+        "Setting deployments for agreement AGR-2119-4550-8674-5962",
+        "Looking for orphaned deployment subscriptions in Adobe.",
+        "Getting subscriptions for update for agreement AGR-deployment-1",
+        'No subscription found in Adobe customer data!',
+        "Agreement updated AGR-deployment-1",
+        "Updating Last Sync Date for agreement AGR-2119-4550-8674-5962",
+    ]
+
+
+def test_sync_global_customer_dry(
+        mock_adobe_client,
+        mock_mpt_client,
+        agreement_factory,
+        mock_mpt_update_agreement,
+        adobe_customer_factory,
+        mock_get_prices_for_skus,
+        mock_update_subscriptions,
+        adobe_subscription_factory,
+        fulfillment_parameters_factory,
+        mock_add_missing_subscriptions_and_assets,
+        mock_get_agreements_by_customer_deployments,
+        mock_get_agreement_subscription,
+        mock_get_gc_agreement_deployments_by_main_agreement,
+        mock_get_transfer_by_authorization_membership_or_customer,
+        caplog,
+):
+
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id=""
+        ),
+        assets=[],
+    )
+    mock_get_agreement_subscription.return_value = agreement[
+        "subscriptions"
+    ][0]
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    adobe_subscription = adobe_subscription_factory()
+    another_adobe_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=15,
+        renewal_quantity=15,
+    )
+    adobe_deployment_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=20,
+        renewal_quantity=20,
+    )
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription,
+            another_adobe_subscription,
+            adobe_deployment_subscription,
+            {**adobe_deployment_subscription, "subscriptionId": "d-sub-id"},
+        ]
+    }
+    deployment_agreements = [
+        agreement_factory(
+            agreement_id="AGR-deployment-1",
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="", deployment_id="deployment-1", deployments=""
+            ),
+        ),
+        agreement_factory(
+            agreement_id="AGR-deployment-2",
+            status=AgreementStatus.TERMINATED,
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="", deployment_id="deployment-2", deployments=""
+            ),
+        ),
+    ]
+    mock_get_agreements_by_customer_deployments.return_value = deployment_agreements
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=True, sync_prices=True)
+
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
+    mock_mpt_update_agreement.assert_not_called()
+    assert "skipping update" in caplog.text
+
+
+def test_sync_deployment_agreement(
+        mock_adobe_client,
+        mock_mpt_client,
+        agreement_factory,
+        mock_mpt_update_agreement,
+        adobe_customer_factory,
+        mock_get_prices_for_skus,
+        mock_update_subscriptions,
+        adobe_subscription_factory,
+        fulfillment_parameters_factory,
+        mock_add_missing_subscriptions_and_assets,
+        mock_get_agreements_by_customer_deployments,
+        mock_process_main_agreement,
+        mock_process_orphaned_deployment_subscriptions,
+        mock_get_agreement_subscription,
+        caplog,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id="deployment-1"
+        )
+    )
+    agreement["assets"] = []
+    mock_get_agreement_subscription.return_value = agreement[
+        "subscriptions"
+    ][0]
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    adobe_subscription = adobe_subscription_factory()
+    another_adobe_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=15,
+        renewal_quantity=15,
+    )
+    adobe_deployment_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=20,
+        renewal_quantity=20,
+    )
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription,
+            another_adobe_subscription,
+            adobe_deployment_subscription,
+            {**adobe_deployment_subscription, "subscriptionId": "d-sub-id"},
+        ]
+    }
+    deployment_agreements = [
+        agreement_factory(
+            agreement_id="AGR-deployment-1",
+            fulfillment_parameters=fulfillment_parameters_factory(
+                global_customer="", deployment_id="deployment-1", deployments=""
+            ),
+        ),
+    ]
+    mock_get_agreements_by_customer_deployments.return_value = deployment_agreements
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
+
+    mock_add_missing_subscriptions_and_assets.assert_called_once()
+    mock_mpt_update_agreement.assert_called()
+    mock_process_main_agreement.assert_not_called()
+    mock_process_orphaned_deployment_subscriptions.assert_not_called()
+    assert caplog.messages == [
+        "Synchronizing agreement AGR-2119-4550-8674-5962...",
+        "Getting assets for update for agreement AGR-2119-4550-8674-5962",
+        "Getting subscriptions for update for agreement AGR-2119-4550-8674-5962",
+        'No subscription found in Adobe customer data!',
+        "Agreement updated AGR-2119-4550-8674-5962",
+        "Setting global customer for agreement AGR-2119-4550-8674-5962",
+        "Setting deployments for agreement AGR-2119-4550-8674-5962",
+        "Updating Last Sync Date for agreement AGR-2119-4550-8674-5962",
+    ]
 
 
 def test_sync_agreement_error_getting_adobe_customer(
@@ -2560,7 +2880,9 @@ def test_check_update_airtable_missing_deployments(
         adobe_deployment_factory(deployment_id=f"deployment-{i}") for i in range(1, 4)
     ]
     adobe_subscriptions = [
-        adobe_subscription_factory(subscription_id=f"subscriptionId{i}") for i in range(3)
+        adobe_subscription_factory(
+            subscription_id=f"subscriptionId{i}", deployment_id=f"deployment-{i}"
+        ) for i in range(3)
     ]
     mocker.patch(
         "adobe_vipm.airtable.models.get_transfer_by_authorization_membership_or_customer",
@@ -2574,7 +2896,9 @@ def test_check_update_airtable_missing_deployments(
         spec=True,
     )
 
-    _check_update_airtable_missing_deployments(agreement, adobe_deployments, adobe_subscriptions)
+    _check_update_airtable_missing_deployments(
+        agreement, adobe_deployments, adobe_subscriptions, dry_run=False
+    )
 
     assert mock_get_gc_agreement_deployment_model.mock_calls[:2] == [
         mocker.call(
@@ -2587,7 +2911,7 @@ def test_check_update_airtable_missing_deployments(
             transfer_id="transfer_id",
             status="pending",
             customer_id="P1005158636",
-            deployment_currency=None,
+            deployment_currency="USD",
             deployment_country="DE",
             licensee_id="LC-321-321-321",
         ),
@@ -2601,7 +2925,7 @@ def test_check_update_airtable_missing_deployments(
             transfer_id="transfer_id",
             status="pending",
             customer_id="P1005158636",
-            deployment_currency=None,
+            deployment_currency="USD",
             deployment_country="DE",
             licensee_id="LC-321-321-321",
         )
@@ -2609,6 +2933,54 @@ def test_check_update_airtable_missing_deployments(
     assert mock_get_gc_agreement_deployment_model.mock_calls[2][0] == "batch_save"
     assert len(mock_get_gc_agreement_deployment_model.mock_calls[2].args[0]) == 2
     mock_send_notification.assert_called_once()
+
+
+def test_check_update_airtable_missing_deployments_dry(
+    mocker,
+    agreement_factory,
+    mock_send_notification,
+    mock_airtable_base_info,
+    adobe_deployment_factory,
+    adobe_subscription_factory,
+    fulfillment_parameters_factory,
+    mock_get_gc_agreement_deployments_by_main_agreement,
+    mock_get_gc_agreement_deployment_model
+):
+    deployments = [
+        get_gc_agreement_deployment_model(AirTableBaseInfo(api_key="api-key", base_id="base-id"))(
+            deployment_id=f"{i}"
+        )
+        for i in range(1, 4)
+    ]
+    mock_get_gc_agreement_deployments_by_main_agreement.return_value = deployments
+    agreement = agreement_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(customer_id="P1005158636")
+    )
+    adobe_deployments = [
+        adobe_deployment_factory(deployment_id=f"deployment-{i}") for i in range(1, 4)
+    ]
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id=f"subscriptionId{i}", deployment_id=f"deployment-{i}"
+        ) for i in range(3)
+    ]
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_transfer_by_authorization_membership_or_customer",
+        side_effect=[
+            mocker.MagicMock(
+                name="Transfer", membership_id="membership_id", transfer_id="transfer_id"
+            )
+            for _ in range(2)
+        ]
+        + [None],
+        spec=True,
+    )
+
+    _check_update_airtable_missing_deployments(
+        agreement, adobe_deployments, adobe_subscriptions, dry_run=True
+    )
+
+    mock_get_gc_agreement_deployment_model.assert_not_called()
 
 
 def test_check_update_airtable_missing_deployments_none(
@@ -2638,6 +3010,7 @@ def test_check_update_airtable_missing_deployments_none(
             {"deploymentId": "deployment-3"},
         ],
         adobe_subscriptions,
+        dry_run=False,
     )
 
     mock_create_gc_agreement_deployments.assert_not_called()

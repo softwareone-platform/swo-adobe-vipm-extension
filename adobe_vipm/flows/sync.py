@@ -298,7 +298,7 @@ def sync_agreement_prices(
         dry_run=dry_run,
     )
 
-    _log_agreement_lines(agreement, currency, customer, product_id, dry_run=dry_run)
+    _update_agreement_line_prices(agreement, currency, customer, product_id, dry_run=dry_run)
 
 
 def _update_agreement(
@@ -391,7 +391,7 @@ def _add_3yc_fulfillment_params(
     return new_parameters
 
 
-def _log_agreement_lines(
+def _update_agreement_line_prices(
     agreement: dict,
     currency: str,
     customer: dict,
@@ -827,7 +827,8 @@ def _check_adobe_deployment_id(deployment_id: str, adobe_deployment: dict) -> bo
 
 
 def _check_update_airtable_missing_deployments(
-    agreement: dict, adobe_deployments: list[dict], adobe_subscriptions: Sequence[dict]
+        agreement: dict, adobe_deployments: list[dict], adobe_subscriptions: Sequence[dict],
+        dry_run: bool
 ) -> None:
     agreement_id = agreement["id"]
     product_id = agreement["product"]["id"]
@@ -851,8 +852,8 @@ def _check_update_airtable_missing_deployments(
             continue
 
         is_deployment_matched = partial(_is_deployment_matched, missing_deployment_id)
-        deployment_currency = (find_first(is_deployment_matched, adobe_subscriptions, {})).get(
-            "currency"
+        deployment_currency = find_first(is_deployment_matched, adobe_subscriptions, {}).get(
+            "currencyCode"
         )
         missing_deployments_data.append({
             "deployment": find_first(
@@ -887,25 +888,31 @@ def _check_update_airtable_missing_deployments(
                     "licensee_id": agreement["licensee"]["id"],
                 }
             )
-        models.create_gc_agreement_deployments(product_id, missing_deployments)
-        send_notification(
-            "Missing deployments added to Airtable",
-            f"agreement {agreement_id}, deployments: {missing_deployment_ids}.",
-            TeamsColorCode.ORANGE.value,
-        )
+        if dry_run:
+            logger.info(
+                "Dry run mode: skip create gc agreement deployments in Airtablewith: %s",
+                missing_deployments,
+            )
+        else:
+            models.create_gc_agreement_deployments(product_id, missing_deployments)
+            send_notification(
+                "Missing deployments added to Airtable",
+                f"agreement {agreement_id}, deployments: {missing_deployment_ids}.",
+                TeamsColorCode.ORANGE.value,
+            )
 
 
 def sync_global_customer_parameters(
     mpt_client: MPTClient,
     adobe_deployments: list[dict],
-    adobe_subscriptions: Sequence[dict],
     agreement: dict,
+    *,
+    dry_run: bool,
 ) -> None:
     """
     Sync global customer parameters for the agreement.
 
     Args:
-        adobe_subscriptions: adobe subscriptions
         mpt_client: MPT API client.
         adobe_deployments: Adobe customer deployments.
         agreement: main customer agreement.
@@ -931,11 +938,15 @@ def sync_global_customer_parameters(
                 "externalId": "deployments",
                 "value": ",".join(deployments),
             })
-            _check_update_airtable_missing_deployments(
-                agreement, adobe_deployments, adobe_subscriptions
-            )
         if parameters[Param.PHASE_FULFILLMENT.value]:
-            update_agreement(mpt_client, agreement["id"], parameters=parameters)
+            if dry_run:
+                logger.info(
+                    "Dry run mode: skipping update agreement %s with:\n parameters: %s",
+                    agreement["id"],
+                    parameters,
+                )
+            else:
+                update_agreement(mpt_client, agreement["id"], parameters=parameters)
     except Exception:
         logger.exception(
             "Error setting global customer parameters for agreement %s.",
@@ -1103,19 +1114,24 @@ def sync_agreement(  # noqa: C901
                 authorization_id, customer_id
             )
             sync_global_customer_parameters(
-                mpt_client, adobe_deployments, adobe_subscriptions, agreement
-            )
-            sync_deployments_prices(
-                mpt_client,
-                adobe_client,
-                agreement,
-                customer,
-                adobe_deployments,
-                adobe_subscriptions,
-                dry_run=dry_run,
-                sync_prices=sync_prices,
+                mpt_client, adobe_deployments, agreement, dry_run=dry_run
             )
 
+            deployment_id = get_parameter(
+                Param.PHASE_FULFILLMENT.value, agreement, Param.DEPLOYMENT_ID.value
+            ).get("value", "")
+
+            if not deployment_id:
+                _process_main_agreement(
+                    mpt_client,
+                    adobe_client,
+                    agreement,
+                    customer,
+                    adobe_deployments,
+                    adobe_subscriptions,
+                    dry_run=dry_run,
+                    sync_prices=sync_prices
+                )
     except AuthorizationNotFoundError:
         logger.exception("AuthorizationNotFoundError synchronizing agreement %s.", agreement["id"])
     except Exception:
@@ -1124,6 +1140,51 @@ def sync_agreement(  # noqa: C901
     else:
         if not dry_run:
             _update_last_sync_date(mpt_client, agreement)
+
+
+def _process_main_agreement(
+        mpt_client: MPTClient,
+        adobe_client: AdobeClient,
+        agreement: dict,
+        customer: dict,
+        adobe_deployments: list[dict],
+        adobe_subscriptions: list[dict],
+        *,
+        dry_run: bool,
+        sync_prices: bool
+):
+    _check_update_airtable_missing_deployments(
+        agreement, adobe_deployments, adobe_subscriptions, dry_run=dry_run
+    )
+    deployment_agreements = get_agreements_by_customer_deployments(
+        mpt_client,
+        Param.DEPLOYMENT_ID.value,
+        [deployment["deploymentId"] for deployment in adobe_deployments],
+    )
+    active_deployment_agreements = [
+        agreement
+        for agreement in deployment_agreements
+        if agreement["status"] == AgreementStatus.ACTIVE
+    ]
+    _process_orphaned_deployment_subscriptions(
+        adobe_client,
+        agreement["authorization"]["id"],
+        customer["customerId"],
+        active_deployment_agreements,
+        adobe_subscriptions
+    )
+    if active_deployment_agreements:
+        sync_deployment_agreements(
+            mpt_client,
+            agreement,
+            customer,
+            adobe_deployments,
+            active_deployment_agreements,
+            adobe_subscriptions,
+            dry_run=dry_run,
+            sync_prices=sync_prices
+        )
+
 
 
 def _get_customer_or_process_lost_customer(mpt_client, adobe_client, agreement, customer_id):
@@ -1209,12 +1270,12 @@ def _process_orphaned_deployment_subscriptions(
             )
 
 
-def sync_deployments_prices(
+def sync_deployment_agreements(
     mpt_client: MPTClient,
-    adobe_client: AdobeClient,
     main_agreement: dict,
     customer: dict,
     adobe_deployments: list[dict],
+    deployment_agreements: list[dict],
     adobe_subscriptions: Sequence[dict],
     *,
     dry_run: bool,
@@ -1225,7 +1286,6 @@ def sync_deployments_prices(
 
     Args:
         mpt_client: MPT API client.
-        adobe_client: Adobe API client.
         main_agreement: Main MPT agreement.
         customer: Adobe customer.
         adobe_deployments: Adobe customer deployments.
@@ -1236,26 +1296,7 @@ def sync_deployments_prices(
     if not adobe_deployments:
         return
 
-    deployment_agreements = get_agreements_by_customer_deployments(
-        mpt_client,
-        Param.DEPLOYMENT_ID.value,
-        [deployment["deploymentId"] for deployment in adobe_deployments],
-    )
-
-    _process_orphaned_deployment_subscriptions(
-        adobe_client,
-        main_agreement["authorization"]["id"],
-        customer["customerId"],
-        deployment_agreements,
-        adobe_subscriptions,
-    )
-
-    active_deployment_agreements = [
-        agreement
-        for agreement in deployment_agreements
-        if agreement["status"] == AgreementStatus.ACTIVE
-    ]
-    for deployment_agreement in active_deployment_agreements:
+    for deployment_agreement in deployment_agreements:
         if sync_prices:
             subscriptions_for_update = _get_subscriptions_for_update(
                 mpt_client, deployment_agreement, customer, adobe_subscriptions
