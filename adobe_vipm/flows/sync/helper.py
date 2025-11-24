@@ -2,6 +2,7 @@ import datetime as dt
 import logging
 
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from mpt_extension_sdk.mpt_http import mpt
 from mpt_extension_sdk.mpt_http.base import MPTClient
 
@@ -258,6 +259,9 @@ def sync_agreement(
         mpt_client, adobe_client, agreement, adobe_customer_id, dry_run=dry_run
     )
     if not customer:
+        return
+    if agreement["product"]["id"] not in settings.MPT_PRODUCTS_IDS:
+        logger.error("Product %s not in MPT_PRODUCTS_IDS. Skipping.", agreement["product"]["id"])
         return
 
     authorization_id: str = agreement["authorization"]["id"]
