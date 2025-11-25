@@ -959,6 +959,7 @@ def subscriptions_factory(lines_factory, subscription_price_factory):
             {
                 "id": subscription_id,
                 "name": f"Subscription for {product_name}",
+                "status": "Active",
                 "price": price,
                 "parameters": {
                     "fulfillment": [
