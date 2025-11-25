@@ -1166,18 +1166,18 @@ def _process_main_agreement(
         Param.DEPLOYMENT_ID.value,
         [deployment["deploymentId"] for deployment in adobe_deployments],
     )
+    _process_orphaned_deployment_subscriptions(
+        adobe_client,
+        agreement["authorization"]["id"],
+        customer["customerId"],
+        deployment_agreements,
+        adobe_subscriptions
+    )
     active_deployment_agreements = [
         agreement
         for agreement in deployment_agreements
         if agreement["status"] == AgreementStatus.ACTIVE
     ]
-    _process_orphaned_deployment_subscriptions(
-        adobe_client,
-        agreement["authorization"]["id"],
-        customer["customerId"],
-        active_deployment_agreements,
-        adobe_subscriptions
-    )
     if active_deployment_agreements:
         sync_deployment_agreements(
             mpt_client,
