@@ -72,6 +72,18 @@ class ValidationError:
         }
 
 
+class ValidationBusinessError(Exception):
+    """Validation business error."""
+
+
+class GovernmentLGANotValidOrderError(ValidationBusinessError):
+    """Government without LGA."""
+
+
+class GovernmentNotValidOrderError(ValidationBusinessError):
+    """Government without LGA."""
+
+
 class AirTableError(Exception):
     """Base exception to Airtable Error."""
 

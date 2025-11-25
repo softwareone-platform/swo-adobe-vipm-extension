@@ -176,7 +176,7 @@ EXTENSION_CONFIG = {
     "ADOBE_AUTH_ENDPOINT_URL": "https://test.adobe.authenticate.url",
     "WEBHOOKS_SECRETS": {"PRD-1111-1111": "that's my awesome test secret"},
     "AIRTABLE_BASES": {"PRD-1111-1111": "some-bases"},
-    "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM", "PRD-2222-2222": "GOV"},
+    "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM", "PRD-2222-2222": "GOV", "PRD-3333-3333": "GOV_LGA"},
     "MAX_RETRY_ATTEMPS": "10",
     "DUE_DATE_DAYS": "30",
     "ORDER_CREATION_WINDOW_HOURS": "24",

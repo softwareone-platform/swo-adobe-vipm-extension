@@ -20,6 +20,8 @@ from adobe_vipm.airtable.models import (
     STATUS_SYNCHRONIZED,
 )
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_TRANSFER_PREVIEW,
@@ -38,8 +40,10 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.fulfillment.transfer import (
+    HandleMigratedTransfer,
     SyncGCMainAgreement,
     UpdateTransferStatus,
+    ValidateTransfer,
 )
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
@@ -5454,4 +5458,485 @@ def test_fulfill_transfer_migrated_order_offer_id_expired(
 
     mock_sync_main_agreement.assert_called_once_with(
         None, "PRD-1111-1111", "AUT-1234-4567", "customer-id"
+    )
+
+
+def test_validate_transfer_not_lga_product_with_lga_agency_type(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+):
+    mock_order["product"]["id"] = "PRD-2222-2222"
+    context = Context(
+        order=mock_order,
+        agreement_id="agreement-id",
+        authorization_id="auth-id",
+        seller_id="seller-id",
+        market_segment="market-segment",
+        membership_id="membership-id",
+    )
+    mock_next_step = mocker.Mock()
+
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
+    adobe_transfer_preview["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.switch_order_to_failed",
+    )
+    mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
+
+    step = ValidateTransfer()
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_switch_to_failed.assert_called_once_with(
+        mock_mpt_client, mock_order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict()
+    )
+
+
+def test_validate_transfer_lga_product_with_not_lga_agency_type(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_preview_transfer_factory,
+    adobe_items_factory,
+):
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(
+        order=mock_order,
+        agreement_id="agreement-id",
+        authorization_id="auth-id",
+        seller_id="seller-id",
+        market_segment="market-segment",
+        membership_id="membership-id",
+    )
+    mock_next_step = mocker.Mock()
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.switch_order_to_failed",
+    )
+    mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
+
+    step = ValidateTransfer()
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_switch_to_failed.assert_called_once_with(
+        mock_mpt_client, mock_order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict()
+    )
+
+
+def test_handle_migrated_transfer_lga_product_with_not_lga_agency_type(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_customer_factory,
+):
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    context = Context(
+        order=mock_order,
+        agreement_id="agreement-id",
+        authorization_id="auth-id",
+        seller_id="seller-id",
+        market_segment="market-segment",
+        membership_id="membership-id",
+    )
+    context.transfer = mocker.Mock(customer_id="customer-id")
+    mock_next_step = mocker.Mock()
+    adobe_customer = adobe_customer_factory()
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.switch_order_to_failed",
+    )
+
+    step = HandleMigratedTransfer()
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_switch_to_failed.assert_called_once_with(
+        mock_mpt_client, mock_order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict()
+    )
+
+
+def test_handle_migrated_transfer_not_lga_product_with_lga_agency_type(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_customer_factory,
+):
+    mock_order["product"]["id"] = "PRD-2222-2222"
+    context = Context(
+        order=mock_order,
+        agreement_id="agreement-id",
+        authorization_id="auth-id",
+        seller_id="seller-id",
+        market_segment="market-segment",
+        membership_id="membership-id",
+    )
+    context.transfer = mocker.Mock(customer_id="customer-id")
+    mock_next_step = mocker.Mock()
+    adobe_customer = adobe_customer_factory()
+    adobe_customer["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.switch_order_to_failed",
+    )
+
+    step = HandleMigratedTransfer()
+    step(mock_mpt_client, context, mock_next_step)
+
+    mocked_switch_to_failed.assert_called_once_with(
+        mock_mpt_client, mock_order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict()
+    )
+
+
+@freeze_time("2024-01-01")
+def test_transfer_lga_product_with_lga_agency_type(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    agreement,
+    order_factory,
+    transfer_order_parameters_factory,
+    fulfillment_parameters_factory,
+    adobe_preview_transfer_factory,
+    adobe_transfer_factory,
+    adobe_items_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    assets_factory,
+    items_factory,
+    lines_factory,
+    subscriptions_factory,
+):
+    mocked_get_template = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_transfer_by_authorization_membership_or_customer",
+        return_value=None,
+    )
+    mocker.patch("adobe_vipm.flows.helpers.get_agreement", return_value=agreement)
+    mocker.patch("adobe_vipm.flows.fulfillment.transfer.get_gc_main_agreement", return_value=None)
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_gc_agreement_deployments_by_main_agreement",
+        return_value=None,
+    )
+    adobe_transfer = adobe_transfer_factory(
+        status=AdobeStatus.PROCESSED.value,
+        customer_id="a-client-id",
+        items=adobe_items_factory(subscription_id="a-sub-id")
+        + adobe_items_factory(line_number=2, subscription_id="inactive-sub-id")
+        + adobe_items_factory(
+            line_number=3, offer_id="99999999CA01A12", subscription_id="one-time-sub-id"
+        ),
+    )
+    adobe_transfer_preview = adobe_preview_transfer_factory(
+        items=[
+            adobe_items_factory()[0],
+            adobe_items_factory(offer_id="99999999CA01A12", subscription_id="one-time-sub-id")[0],
+        ],
+    )
+    adobe_transfer_preview["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
+
+    adobe_customer = adobe_customer_factory()
+    adobe_customer["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
+    adobe_customer["companyProfile"]["marketSubSegments"] = ["STATE"]
+
+    adobe_subscription = adobe_subscription_factory()
+    adobe_inactive_subscription = adobe_subscription_factory(
+        subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
+    adobe_one_time_subscription = adobe_subscription_factory(
+        offer_id="99999999CA01A12", subscription_id="one-time-sub-id", autorenewal_enabled=False
+    )
+    mock_adobe_client.preview_transfer.return_value = adobe_transfer_preview
+    mock_adobe_client.create_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscription.side_effect = [
+        adobe_one_time_subscription,
+        adobe_subscription,
+        adobe_inactive_subscription,
+        adobe_one_time_subscription,
+    ]
+    mock_adobe_client.update_subscription.return_value = adobe_subscription
+    order = order_factory(
+        lines=[lines_factory()[0], lines_factory(external_vendor_id="99999999CA")[0]],
+        order_parameters=transfer_order_parameters_factory(),
+    )
+    order["product"]["id"] = "PRD-3333-3333"
+
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement")
+    asset = assets_factory(adobe_sku="99999999CA01A12")[0]
+    mocked_add_asset = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.add_asset", return_value=asset
+    )
+    subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
+    mocked_create_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.create_subscription", return_value=subscription
+    )
+    mocked_get_onetime = mocker.patch(
+        "adobe_vipm.flows.utils.order.get_product_onetime_items_by_ids",
+        return_value=items_factory(item_id=2, external_vendor_id="99999999CA"),
+    )
+    mocked_process_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.set_processing_template"
+    )
+    mocked_complete_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.complete_order")
+    mocked_sync_agreement = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.sync_agreements_by_agreement_ids"
+    )
+
+    fulfill_order(mock_mpt_client, order)
+
+    authorization_id = order["authorization"]["id"]
+    adobe_customer_address = adobe_customer["companyProfile"]["address"]
+    adobe_customer_contact = adobe_customer["companyProfile"]["contacts"][0]
+    mock_adobe_client.preview_transfer.assert_called_once_with(authorization_id, "a-membership-id")
+    assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
+    assert mocked_update_order.mock_calls[0].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                due_date="2024-01-31",
+            ),
+            "ordering": order["parameters"]["ordering"],
+        },
+    }
+    assert mocked_update_order.mock_calls[1].args == (mock_mpt_client, order["id"])
+    assert mocked_update_order.mock_calls[1].kwargs == {
+        "externalIds": {
+            "vendor": adobe_transfer["transferId"],
+        },
+    }
+    assert mocked_update_order.mock_calls[2].args == (mock_mpt_client, order["id"])
+
+    assert mocked_update_order.mock_calls[2].kwargs == {
+        "externalIds": {
+            "vendor": adobe_transfer["transferId"],
+        },
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                due_date="2024-01-31",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+            ),
+        },
+    }
+    assert mocked_update_order.mock_calls[3].args == (mock_mpt_client, order["id"])
+    assert mocked_update_order.mock_calls[3].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                due_date="2024-01-31",
+                coterm_date="",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+            ),
+        },
+        "externalIds": {"vendor": "a-transfer-id"},
+    }
+
+    assert mocked_update_order.mock_calls[4].args == (
+        mock_mpt_client,
+        order["id"],
+    )
+    assert mocked_update_order.mock_calls[4].kwargs == {
+        "parameters": {
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                due_date=None,
+                coterm_date="2024-01-01",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+            ),
+        },
+    }
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["id"],
+            externalIds={"vendor": "a-client-id"},
+        ),
+    ])
+    mocked_add_asset.assert_called_once_with(
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+    )
+    mocked_create_subscription.assert_called_once_with(
+        mock_mpt_client,
+        order["id"],
+        {
+            "name": "Subscription for Awesome product",
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": "adobeSKU",
+                        "value": adobe_subscription["offerId"],
+                    },
+                    {
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                    },
+                    {
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
+                    },
+                    {
+                        "externalId": "renewalDate",
+                        "value": adobe_subscription["renewalDate"],
+                    },
+                ],
+            },
+            "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
+            "lines": [
+                {
+                    "id": order["lines"][0]["id"],
+                },
+            ],
+            "startDate": adobe_subscription["creationDate"],
+            "commitmentDate": adobe_subscription["renewalDate"],
+            "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
+        },
+    )
+    mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
+    mocked_complete_order.assert_called_once_with(
+        mock_mpt_client,
+        order["id"],
+        {"id": "TPL-1111"},
+        parameters={
+            "fulfillment": fulfillment_parameters_factory(
+                customer_id="a-client-id",
+                due_date=None,
+                coterm_date="2024-01-01",
+            ),
+            "ordering": transfer_order_parameters_factory(
+                company_name=adobe_customer["companyProfile"]["companyName"],
+                address={
+                    "country": adobe_customer_address["country"],
+                    "state": adobe_customer_address["region"],
+                    "city": adobe_customer_address["city"],
+                    "addressLine1": adobe_customer_address["addressLine1"],
+                    "addressLine2": adobe_customer_address["addressLine2"],
+                    "postCode": adobe_customer_address["postalCode"],
+                },
+                contact={
+                    "firstName": adobe_customer_contact["firstName"],
+                    "lastName": adobe_customer_contact["lastName"],
+                    "email": adobe_customer_contact["email"],
+                    "phone": split_phone_number(
+                        adobe_customer_contact.get("phoneNumber"),
+                        adobe_customer_address["country"],
+                    ),
+                },
+            ),
+        },
+    )
+    mock_adobe_client.get_transfer.assert_called_once_with(
+        authorization_id, "a-membership-id", adobe_transfer["transferId"]
+    )
+    mock_adobe_client.get_subscription.assert_has_calls([
+        mocker.call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
+        mocker.call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
+        mocker.call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
+    ])
+    mocked_get_template.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["product"]["id"],
+            MPT_ORDER_STATUS_PROCESSING,
+            TEMPLATE_NAME_TRANSFER,
+        ),
+        mocker.call(
+            mock_mpt_client,
+            order["agreement"]["product"]["id"],
+            MPT_ORDER_STATUS_COMPLETED,
+            TEMPLATE_NAME_TRANSFER,
+        ),
+    ])
+    mocked_get_onetime.assert_called_with(
+        mock_mpt_client,
+        order["agreement"]["product"]["id"],
+        [line["item"]["id"] for line in order["lines"]],
+    )
+    mocked_sync_agreement.assert_called_once_with(
+        mock_mpt_client,
+        [order["agreement"]["id"]],
+        dry_run=False,
+        sync_prices=False,
     )

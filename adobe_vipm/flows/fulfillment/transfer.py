@@ -35,6 +35,8 @@ from adobe_vipm.airtable.models import (
     get_transfer_by_authorization_membership_or_customer,
 )
 from adobe_vipm.flows.constants import (
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
+    ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_MEMBERSHIP_ID,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_TRANSFER_PREVIEW,
@@ -50,6 +52,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateAssets,
@@ -91,6 +94,7 @@ from adobe_vipm.flows.utils import (
     set_global_customer,
     set_ordering_parameter_error,
 )
+from adobe_vipm.flows.utils.validation import validate_government_lga_data
 from adobe_vipm.notifications import Button, FactsSection, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
@@ -148,6 +152,17 @@ def _check_transfer(mpt_client, order, membership_id):
     except AdobeError as error:
         _handle_transfer_preview_error(mpt_client, order, error)
         logger.warning("Transfer order %s has been failed: %s.", order["id"], str(error))
+        return False
+
+    try:
+        validate_government_lga_data(order, transfer_preview)
+    except GovernmentLGANotValidOrderError:
+        switch_order_to_failed(
+            mpt_client, order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict()
+        )
+        return False
+    except GovernmentNotValidOrderError:
+        switch_order_to_failed(mpt_client, order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict())
         return False
 
     adobe_lines = sorted(
@@ -473,7 +488,6 @@ def _transfer_migrated(  # noqa: C901
 
         switch_order_to_query(mpt_client, order)
         return
-
     if transfer.status == STATUS_SYNCHRONIZED:
         switch_order_to_failed(
             mpt_client,
@@ -488,7 +502,6 @@ def _transfer_migrated(  # noqa: C901
     if adobe_order_id:
         _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement)
         return
-
     adobe_client = get_adobe_client()
     authorization_id = order["authorization"]["id"]
 
@@ -1131,6 +1144,9 @@ class HandleMigratedTransfer(Step):
 
         check_processing_template(client, context.order, TEMPLATE_NAME_BULK_MIGRATE)
 
+        if not self._validate_government_transfer(client, context):
+            return
+
         _transfer_migrated(
             client,
             context.order,
@@ -1139,6 +1155,26 @@ class HandleMigratedTransfer(Step):
             context.gc_main_agreement,
             context.existing_deployments,
         )
+
+    def _validate_government_transfer(self, client, context):
+        adobe_client = get_adobe_client()
+        adobe_customer = adobe_client.get_customer(
+            context.authorization_id, context.transfer.customer_id
+        )
+        try:
+            validate_government_lga_data(context.order, adobe_customer)
+        except GovernmentLGANotValidOrderError:
+            switch_order_to_failed(
+                client, context.order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict()
+            )
+            return False
+        except GovernmentNotValidOrderError:
+            switch_order_to_failed(
+                client, context.order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA.to_dict()
+            )
+            return False
+
+        return True
 
 
 class CheckTransferTemplate(Step):

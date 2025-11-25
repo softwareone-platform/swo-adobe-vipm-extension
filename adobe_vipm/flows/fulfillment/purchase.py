@@ -18,6 +18,7 @@ from adobe_vipm.flows.constants import (
     ERR_3YC_QUANTITY_CONSUMABLES,
     ERR_3YC_QUANTITY_LICENSES,
     ERR_ADOBE_ADDRESS,
+    ERR_ADOBE_AGENCY_TYPE,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
@@ -26,6 +27,7 @@ from adobe_vipm.flows.constants import (
     STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
     STATUS_MARKET_SEGMENT_PENDING,
     TEMPLATE_NAME_PURCHASE,
+    VALID_GOVERNMENT_AGENCY_TYPES,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -60,6 +62,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_ordering_parameter_error,
 )
+from adobe_vipm.flows.utils.market_segment import get_agency_type, is_large_government_agency_type
 
 logger = logging.getLogger(__name__)
 
@@ -87,32 +90,74 @@ class ValidateMarketSegmentEligibility(Step):
     def __call__(self, client, context, next_step):
         """Validate if the customer is eligible to place orders for a given market segment."""
         if context.market_segment != MARKET_SEGMENT_COMMERCIAL:
+            if not self._validate_agency_type(client, context):
+                return
+
             status = get_market_segment_eligibility_status(context.order)
-            if not status:
-                context.order = set_market_segment_eligibility_status_pending(context.order)
-                switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
-                logger.info(
-                    "%s: customer is pending eligibility approval for segment %s",
-                    context,
-                    context.market_segment,
-                )
+            if not self._handle_eligibility_status(client, context, status):
                 return
-            if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
-                logger.info(
-                    "%s: customer is not eligible for segment %s",
-                    context,
-                    context.market_segment,
-                )
-                switch_order_to_failed(
-                    client,
-                    context.order,
-                    ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(segment=context.market_segment),
-                )
-                return
-            if status == STATUS_MARKET_SEGMENT_PENDING:
-                return
-            logger.info("%s: customer is eligible for segment %s", context, context.market_segment)
+
         next_step(client, context)
+
+    def _validate_agency_type(self, client, context):
+        product_id = context.order["product"]["id"]
+        if not is_large_government_agency_type(product_id):
+            return True
+
+        agency_type_param = get_ordering_parameter(context.order, Param.AGENCY_TYPE.value)
+        valid_agency_types = VALID_GOVERNMENT_AGENCY_TYPES
+
+        if agency_type_param.get("value") in valid_agency_types:
+            return True
+
+        logger.info(
+            "%s: agency type is not valid for segment %s",
+            context,
+            context.market_segment,
+        )
+        context.order = set_ordering_parameter_error(
+            context.order,
+            Param.AGENCY_TYPE.value,
+            ERR_ADOBE_AGENCY_TYPE.to_dict(
+                title=Param.AGENCY_TYPE.value,
+                details="This parameter is mandatory and must be: FEDERAL, STATE.",
+            ),
+        )
+
+        switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
+        return False
+
+    def _handle_eligibility_status(self, client, context, status):
+        if status is None:
+            context.order = set_market_segment_eligibility_status_pending(context.order)
+            switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_PURCHASE)
+            logger.info(
+                "%s: customer is pending eligibility approval for segment %s",
+                context,
+                context.market_segment,
+            )
+            return False
+        if status == STATUS_MARKET_SEGMENT_NOT_ELIGIBLE:
+            logger.info(
+                "%s: customer is not eligible for segment %s",
+                context,
+                context.market_segment,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(segment=context.market_segment),
+            )
+            return False
+        if status == STATUS_MARKET_SEGMENT_PENDING:
+            return False
+
+        logger.info(
+            "%s: customer is eligible for segment %s",
+            context,
+            context.market_segment,
+        )
+        return True
 
 
 class CreateCustomer(Step):
@@ -248,13 +293,23 @@ class CreateCustomer(Step):
                 switch_order_to_query(client, context.order)
                 return
 
-            customer = adobe_client.create_customer_account(
-                context.authorization_id,
-                context.seller_id,
-                context.agreement_id,
-                context.market_segment,
-                context.customer_data,
-            )
+            if is_large_government_agency_type(context.product_id):
+                context.customer_data[Param.AGENCY_TYPE.value] = get_agency_type(context.order)
+                customer = adobe_client.create_customer_account_lga(
+                    context.authorization_id,
+                    context.seller_id,
+                    context.agreement_id,
+                    context.market_segment,
+                    context.customer_data,
+                )
+            else:
+                customer = adobe_client.create_customer_account(
+                    context.authorization_id,
+                    context.seller_id,
+                    context.agreement_id,
+                    context.market_segment,
+                    context.customer_data,
+                )
             context.adobe_customer_id = customer["customerId"]
             context.adobe_customer = customer
 

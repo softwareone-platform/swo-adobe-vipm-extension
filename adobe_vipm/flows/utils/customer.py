@@ -7,6 +7,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.date import is_within_last_two_weeks
+from adobe_vipm.flows.utils.market_segment import is_large_government_agency_type
 from adobe_vipm.flows.utils.parameter import (
     get_fulfillment_parameter,
     get_ordering_parameter,
@@ -122,6 +123,28 @@ def set_adobe_customer_id(order: dict, customer_id: str) -> dict:
     )
     customer_ff_param["value"] = customer_id
     return updated_order
+
+
+def set_agency_type(order: dict, customer_data: dict) -> dict:
+    """
+    Sets agency type to the AGENCY_TYPE order parameter.
+
+    Args:
+        order: MPT order.
+        customer_data: Adobe customer data.
+
+    Returns:
+        Updated MPT order.
+    """
+    if (
+        is_large_government_agency_type(order["product"]["id"])
+        and customer_data["companyProfile"]["marketSubSegments"]
+    ):
+        updated_order = copy.deepcopy(order)
+        agency_type_param = get_ordering_parameter(updated_order, Param.AGENCY_TYPE.value)
+        agency_type_param["value"] = customer_data["companyProfile"]["marketSubSegments"][0]
+        return updated_order
+    return order
 
 
 def get_customer_licenses_discount_level(customer: dict) -> int:

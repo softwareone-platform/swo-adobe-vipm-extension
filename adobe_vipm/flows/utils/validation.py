@@ -1,6 +1,13 @@
 from adobe_vipm.flows.constants import (
+    MARKET_SEGMENT_GOVERNMENT,
+    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     PARAM_REQUIRED_CUSTOMER_ORDER,
     Param,
+)
+from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
+from adobe_vipm.flows.utils.market_segment import (
+    get_market_segment,
+    is_large_government_agency_type,
 )
 from adobe_vipm.flows.utils.parameter import get_ordering_parameter, is_ordering_param_required
 from adobe_vipm.flows.utils.subscription import is_line_item_active_subscription
@@ -88,9 +95,7 @@ def is_migrate_customer(order: dict) -> bool:
         if parameter of Agreement Type is marked as 'Migrate'
     """
     agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value).get("value")
-    return agreement_type == "Migrate" and is_ordering_param_required(
-        order, Param.MEMBERSHIP_ID.value
-    )
+    return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)
 
 
 def is_reseller_change(order: dict) -> bool:
@@ -107,3 +112,36 @@ def is_reseller_change(order: dict) -> bool:
     return agreement_type == "Transfer" and is_ordering_param_required(
         order, Param.CHANGE_RESELLER_CODE
     )
+
+
+def validate_government_lga_data(order: dict, adobe_data: dict):
+    """
+    Validates the government order with adobe data.
+
+    Args:
+        order (dict): MPT order containing product and order information.
+        adobe_data (dict): Customer information obtained from Adobe.
+
+    Returns:
+        None: If the validation is successful.
+
+    Raises:
+        GovernmentLGANotValidOrderError: If the product is LGA but the Adobe data is not.
+        GovernmentNotValidOrderError: If the product is NOT LGA but the Adobe data is.
+    """
+    product_id = order["product"]["id"]
+    market_segment = get_market_segment(product_id)
+    if market_segment not in {MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY}:
+        return
+
+    benefits_type = next(
+        (benefit.get("type") for benefit in adobe_data.get("benefits", []) if "type" in benefit),
+        None,
+    )
+    is_large_government_agency_data = benefits_type == "LARGE_GOVERNMENT_AGENCY"
+    is_lga_product = is_large_government_agency_type(product_id)
+
+    if is_lga_product == is_large_government_agency_data:
+        return
+
+    raise GovernmentLGANotValidOrderError if is_lga_product else GovernmentNotValidOrderError

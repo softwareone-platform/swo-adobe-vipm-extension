@@ -27,6 +27,7 @@ class Param(StrEnum):
 
     ADDRESS = "address"
     ADOBE_SKU = "adobeSKU"
+    AGENCY_TYPE = "companyAgencyType"
     COMPANY_NAME = "companyName"
     CONTACT = "contact"
     CUSTOMER_ID = "customerId"
@@ -72,7 +73,13 @@ PARAM_OPTIONAL_CUSTOMER_ORDER = (
     Param.THREE_YC_LICENSES.value,
 )
 
-PARAM_NEW_CUSTOMER_PARAMETERS = PARAM_REQUIRED_CUSTOMER_ORDER + PARAM_OPTIONAL_CUSTOMER_ORDER
+PARAM_REQUIRED_CUSTOMER_ORDER_LGA = (Param.AGENCY_TYPE.value,)
+
+PARAM_NEW_CUSTOMER_PARAMETERS = (
+    PARAM_REQUIRED_CUSTOMER_ORDER
+    + PARAM_OPTIONAL_CUSTOMER_ORDER
+    + PARAM_REQUIRED_CUSTOMER_ORDER_LGA
+)
 
 
 STATUS_MARKET_SEGMENT_ELIGIBLE = "eligible"
@@ -83,6 +90,11 @@ TRANSFER_CUSTOMER_PARAMETERS = (
     Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value,
     Param.CHANGE_RESELLER_CODE.value,
 )
+
+GOVERNMENT_AGENCY_TYPE_FEDERAL = "FEDERAL"
+GOVERNMENT_AGENCY_TYPE_STATE = "STATE"
+
+VALID_GOVERNMENT_AGENCY_TYPES = {GOVERNMENT_AGENCY_TYPE_FEDERAL, GOVERNMENT_AGENCY_TYPE_STATE}
 
 CANCELLATION_WINDOW_DAYS = 14
 GLOBAL_SUFFIX = "_global"
@@ -95,6 +107,7 @@ ERR_ADOBE_COMPANY_NAME = ValidationError("VIPM0001", ADOBE_ERR_MSG)
 ERR_ADOBE_ADDRESS = ValidationError("VIPM0003", ADOBE_ERR_MSG)
 ERR_ADOBE_CONTACT = ValidationError("VIPM0004", ADOBE_ERR_MSG)
 ERR_ADOBE_MEMBERSHIP_ID = ValidationError("VIPM0005", ADOBE_ERR_MSG)
+ERR_ADOBE_AGENCY_TYPE = ValidationError("VIPM0005", ADOBE_ERR_MSG)
 ERR_ADOBE_MEMBERSHIP_ID_ITEM = ValidationError(
     "VIPM0006",
     "The provided `{title}` contains the item with SKU `{item_sku}` "
@@ -203,6 +216,7 @@ ERR_ADOBE_RESSELLER_CHANGE_PREVIEW = ValidationError(
     "VIPM0036", "Error processing the reseller change code {reseller_change_code}: {error}"
 )
 
+
 ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
     "VIPM0036",
     (
@@ -217,6 +231,22 @@ ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(
     (
         "The adobe reseller change product is not configured for this product and "
         "cannot be added to the order."
+    ),
+)
+
+ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA = ValidationError(
+    "VIPM0038",
+    (
+        "This Adobe account is for a Large Government Agency. "
+        "Please use the Adobe VIP Marketplace for Large Government Agencies product."
+    ),
+)
+
+ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA = ValidationError(
+    "VIPM0039",
+    (
+        "This Adobe account is a Government account. "
+        "Please use the Adobe VIP Marketplace for Government product."
     ),
 )
 
@@ -245,11 +275,20 @@ TEMPLATE_SUBSCRIPTION_TERMINATION = "Terminated"
 MARKET_SEGMENT_COMMERCIAL = "COM"
 MARKET_SEGMENT_EDUCATION = "EDU"
 MARKET_SEGMENT_GOVERNMENT = "GOV"
+MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY = "GOV_LGA"
+
+MARKET_SEGMENTS = {
+    MARKET_SEGMENT_COMMERCIAL: "COM",
+    MARKET_SEGMENT_GOVERNMENT: "GOV",
+    MARKET_SEGMENT_EDUCATION: "EDU",
+    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY: "GOV",
+}
 
 FAKE_CUSTOMERS_IDS = {
     MARKET_SEGMENT_COMMERCIAL: "1234567890",
     MARKET_SEGMENT_GOVERNMENT: "1234567890GOV",
     MARKET_SEGMENT_EDUCATION: "1234567890EDU",
+    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY: "1234567890GOV",
 }
 
 ERR_INVALID_DOWNSIZE_QUANTITY = ValidationError(
@@ -389,6 +428,11 @@ ERR_CUSTOMER_LOST_EXCEPTION = ValidationError("VIPM0039", "{error}")
 ERR_SKU_AVAILABILITY = ValidationError(
     "VIPM0038",
     "The following SKUs are expired: {missing_skus}. Available SKUs: {available_skus}.",
+)
+
+ERR_LGA_QUANTITIES = ValidationError(
+    "VIPM0040",
+    "The quantity selected must be greater than 100 licenses for Large Government Agency.",
 )
 
 
