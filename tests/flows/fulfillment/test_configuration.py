@@ -35,9 +35,9 @@ def test_subscription_update_auto_renewal_step(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=order, adobe_customer_id="adobe-customer-id")
-
     step = SubscriptionUpdateAutoRenewal()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
@@ -74,9 +74,9 @@ def test_subscription_update_auto_renewal_step_no_matching_subscription(
     context = Context(
         order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
     )
-
     step = SubscriptionUpdateAutoRenewal()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
@@ -117,9 +117,9 @@ def test_subscription_update_auto_renewal_step_already_updated(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=order, adobe_customer_id="adobe-customer-id")
-
     step = SubscriptionUpdateAutoRenewal()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
@@ -158,9 +158,9 @@ def test_subscription_update_auto_renewal_step_error(
     context = Context(
         order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
     )
-
     step = SubscriptionUpdateAutoRenewal()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
@@ -178,12 +178,10 @@ def test_subscription_update_auto_renewal_step_error(
     call_args = mocked_notify.call_args[0]
     assert call_args[0] == order["id"]
     assert call_args[3] == context.product_id
-
     assert mocked_switch_to_failed.call_count == 1
     call_args = mocked_switch_to_failed.call_args[0]
     assert call_args[0] == mocked_client
     assert call_args[1] == order
-
     mocked_next_step.assert_not_called()
 
 
@@ -207,9 +205,9 @@ def test_subscription_update_auto_renewal_step_all_failed(
     context = Context(
         order=order, product_id="PRD-1111-1111", adobe_customer_id="adobe-customer-id"
     )
-
     step = SubscriptionUpdateAutoRenewal()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         order["authorization"]["id"],
@@ -266,9 +264,9 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=order, product_id="PRD-1111-1111")
-
     step = SubscriptionUpdateAutoRenewal()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert mock_adobe_client.update_subscription.call_count == 3  # 2 updates + 1 rollback
     first_update_call = mock_adobe_client.update_subscription.call_args_list[0]
@@ -295,7 +293,6 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
         auto_renewal=not subscriptions[0]["autoRenew"],
         quantity=subscriptions[0]["lines"][0]["quantity"],
     )
-
     mocked_notify.assert_called_once()
     mocked_switch_to_failed.assert_called_once()
     mocked_next_step.assert_not_called()
@@ -303,7 +300,6 @@ def test_subscription_update_auto_renewal_step_rollback_on_partial_failure(
 
 def test_fulfill_configuration_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
-
     mocked_pipeline_ctor = mocker.patch(
         "adobe_vipm.flows.fulfillment.configuration.Pipeline",
         return_value=mocked_pipeline_instance,
@@ -316,10 +312,9 @@ def test_fulfill_configuration_order(mocker):
     mocked_client = mocker.MagicMock()
     mocked_order = mocker.MagicMock()
 
-    fulfill_configuration_order(mocked_client, mocked_order)
+    fulfill_configuration_order(mocked_client, mocked_order)  # act
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 9
-
     expected_steps = [
         SetupContext,
         StartOrderProcessing,
@@ -332,12 +327,7 @@ def test_fulfill_configuration_order(mocker):
         SyncAgreement,
     ]
     actual_steps = list(mocked_pipeline_ctor.mock_calls[0].args)
-
     for actual, expected in zip(actual_steps, expected_steps, strict=False):
         assert isinstance(actual, expected)
-
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
-    mocked_pipeline_instance.run.assert_called_once_with(
-        mocked_client,
-        mocked_context,
-    )
+    mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)

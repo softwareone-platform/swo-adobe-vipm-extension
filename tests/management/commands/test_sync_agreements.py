@@ -19,7 +19,7 @@ def test_process_sync_agreements(mocker, dry_run, mock_mpt_client, mock_adobe_cl
         spec=True,
     )
 
-    call_command("sync_agreements", dry_run=dry_run)
+    call_command("sync_agreements", dry_run=dry_run)  # act
 
     for v in mocked.values():
         v.assert_called_once_with(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
@@ -32,11 +32,7 @@ def test_process_by_agreement_ids(mocker, dry_run, mock_mpt_client, mock_adobe_c
         "adobe_vipm.management.commands.sync_agreements.sync_agreements_by_agreement_ids"
     )
 
-    call_command(
-        "sync_agreements",
-        agreements=["AGR-0001", "AGR-0002"],
-        dry_run=dry_run,
-    )
+    call_command("sync_agreements", agreements=["AGR-0001", "AGR-0002"], dry_run=dry_run)  # act
 
     mocked.assert_called_once_with(
         mock_mpt_client,
@@ -52,11 +48,6 @@ def test_process_by_agreement_ids(mocker, dry_run, mock_mpt_client, mock_adobe_c
 def test_process_all(mocker, dry_run, mock_mpt_client, mock_adobe_client):
     mocked = mocker.patch("adobe_vipm.management.commands.sync_agreements.sync_all_agreements")
 
-    call_command(
-        "sync_agreements",
-        all=True,
-        dry_run=dry_run,
-        sync_prices=True,
-    )
+    call_command("sync_agreements", all=True, dry_run=dry_run, sync_prices=True)  # act
 
     mocked.assert_called_once_with(mock_mpt_client, mock_adobe_client, dry_run=dry_run)

@@ -21,7 +21,6 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_re
         Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
     )
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
-
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
         f"eq(externalId,{param_external_id}),"
@@ -38,22 +37,20 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_re
     )
     status_condition = "eq(status,Active)"
     product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
-
     rql_query = (
         f"and({status_condition},{enroll_status_condition}"
         f",{request_3yc_condition},{product_condition})&select=parameters"
     )
-
     mocked_get_by_query = mocker.patch(
-        "adobe_vipm.flows.mpt.get_agreements_by_query",
-        return_value=[{"id": "AGR-0001"}],
+        "adobe_vipm.flows.mpt.get_agreements_by_query", return_value=[{"id": "AGR-0001"}]
     )
-
     mocked_client = mocker.MagicMock()
 
-    assert get_agreements_by_3yc_commitment_request_status(
+    result = get_agreements_by_3yc_commitment_request_status(
         mocked_client, is_recommitment=is_recommitment
-    ) == [{"id": "AGR-0001"}]
+    )
+
+    assert result == [{"id": "AGR-0001"}]
     mocked_get_by_query.assert_called_once_with(mocked_client, rql_query)
 
 
@@ -69,6 +66,6 @@ def test_get_agreements_by_3yc_commitment_request_invitation(
 
     get_agreements_by_3yc_commitment_request_invitation(
         mock_mpt_client, ("REQUESTED", "ACCEPTED"), status=status
-    )
+    )  # act
 
     mock_mpt_get_agreements_by_query.assert_called_once_with(mock_mpt_client, rql_query)

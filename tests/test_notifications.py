@@ -22,17 +22,10 @@ def test_send_notification_full(mocker, settings):
     }
     mocked_message = mocker.MagicMock()
     mocked_section = mocker.MagicMock()
-
     mocked_card = mocker.patch(
-        "adobe_vipm.notifications.pymsteams.connectorcard",
-        return_value=mocked_message,
+        "adobe_vipm.notifications.pymsteams.connectorcard", return_value=mocked_message
     )
-
-    mocker.patch(
-        "adobe_vipm.notifications.pymsteams.cardsection",
-        return_value=mocked_section,
-    )
-
+    mocker.patch("adobe_vipm.notifications.pymsteams.cardsection", return_value=mocked_section)
     button = Button("button-label", "button-url")
     facts_section = FactsSection("section-title", {"key": "value"})
 
@@ -42,7 +35,7 @@ def test_send_notification_full(mocker, settings):
         "not-color",
         button=button,
         facts=facts_section,
-    )
+    )  # act
 
     mocked_message.title.assert_called_once_with("not-title")
     mocked_message.text.assert_called_once_with("not-text")
@@ -63,21 +56,10 @@ def test_send_notification_simple(mocker, settings):
         "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
     }
     mocked_message = mocker.MagicMock()
+    mocker.patch("adobe_vipm.notifications.pymsteams.connectorcard", return_value=mocked_message)
+    mocked_cardsection = mocker.patch("adobe_vipm.notifications.pymsteams.cardsection")
 
-    mocker.patch(
-        "adobe_vipm.notifications.pymsteams.connectorcard",
-        return_value=mocked_message,
-    )
-
-    mocked_cardsection = mocker.patch(
-        "adobe_vipm.notifications.pymsteams.cardsection",
-    )
-
-    send_notification(
-        "not-title",
-        "not-text",
-        "not-color",
-    )
+    send_notification("not-title", "not-text", "not-color")  # act
 
     mocked_message.title.assert_called_once_with("not-title")
     mocked_message.text.assert_called_once_with("not-text")
@@ -93,18 +75,10 @@ def test_send_notification_exception(mocker, settings, caplog):
     }
     mocked_message = mocker.MagicMock()
     mocked_message.send.side_effect = pymsteams.TeamsWebhookException("error")
-
-    mocker.patch(
-        "adobe_vipm.notifications.pymsteams.connectorcard",
-        return_value=mocked_message,
-    )
+    mocker.patch("adobe_vipm.notifications.pymsteams.connectorcard", return_value=mocked_message)
 
     with caplog.at_level(logging.ERROR):
-        send_notification(
-            "not-title",
-            "not-text",
-            "not-color",
-        )
+        send_notification("not-title", "not-text", "not-color")  # act
 
     assert "Error sending notification to MSTeams!" in caplog.text
 
@@ -122,7 +96,7 @@ def test_send_others(function, color, icon, mocker):
     mocked_button = mocker.MagicMock()
     mocked_facts_section = mocker.MagicMock()
 
-    function("title", "text", button=mocked_button, facts=mocked_facts_section)
+    function("title", "text", button=mocked_button, facts=mocked_facts_section)  # act
 
     mock_send_notification.assert_called_once_with(
         f"{icon} title",
@@ -139,8 +113,8 @@ def test_mpt_notify(mocker, mock_mpt_client):
     mocked_jinja_env = mocker.MagicMock()
     mocked_jinja_env.get_template.return_value = mocked_template
     mocker.patch("adobe_vipm.notifications.env", mocked_jinja_env)
-
     mocked_notify = mocker.patch("adobe_vipm.notifications.notify", autospec=True)
+
     mpt_notify(
         mock_mpt_client,
         "account_id",
@@ -148,7 +122,7 @@ def test_mpt_notify(mocker, mock_mpt_client):
         "email-subject",
         "template_name",
         {"test": "context"},
-    )
+    )  # act
 
     mocked_jinja_env.get_template.assert_called_once_with("template_name.html")
     mocked_template.render.assert_called_once_with({"test": "context"})
@@ -168,12 +142,12 @@ def test_mpt_notify_exception(mocker, mock_mpt_client, caplog):
     mocked_jinja_env = mocker.MagicMock()
     mocked_jinja_env.get_template.return_value = mocked_template
     mocker.patch("adobe_vipm.notifications.env", mocked_jinja_env)
-
     mocker.patch(
         "adobe_vipm.notifications.notify",
         autospec=True,
         side_effect=Exception("error"),
     )
+
     with caplog.at_level(logging.ERROR):
         mpt_notify(
             mock_mpt_client,
@@ -182,7 +156,7 @@ def test_mpt_notify_exception(mocker, mock_mpt_client, caplog):
             "email-subject",
             "template_name",
             {"test": "context"},
-        )
+        )  # act
 
     assert (
         f"Cannot send MPT API notification:"
@@ -203,4 +177,6 @@ def test_mpt_notify_exception(mocker, mock_mpt_client, caplog):
     ],
 )
 def test_dateformat(date_time, expected_result):
-    assert dateformat(date_time) == expected_result
+    result = dateformat(date_time)
+
+    assert result == expected_result

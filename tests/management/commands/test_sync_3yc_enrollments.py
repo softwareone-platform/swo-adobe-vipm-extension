@@ -8,7 +8,7 @@ def test_process_sync_agreements(mocker, mock_mpt_client, mock_adobe_client):
         "adobe_vipm.management.commands.sync_3yc_enrol.sync_agreements_by_3yc_enroll_status"
     )
 
-    call_command("sync_3yc_enrol")
+    call_command("sync_3yc_enrol")  # act
 
     mock_sync_agreements_by_3yc_enroll_status.assert_called_once_with(
         mock_mpt_client, mock_adobe_client, dry_run=False

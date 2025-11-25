@@ -52,17 +52,12 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 def test_validate_company_name(order_factory, order_parameters_factory, company_name):
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_company_name(context)
+
+    step.validate_company_name(context)  # act
 
     assert context.validation_succeeded is True
-
     param = get_ordering_parameter(context.order, Param.COMPANY_NAME.value)
     assert "error" not in param
 
@@ -79,17 +74,12 @@ def test_validate_company_name_invalid_length(
 ):
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_company_name(context)
+
+    step.validate_company_name(context)  # act
 
     assert context.validation_succeeded is False
-
     param = get_ordering_parameter(context.order, Param.COMPANY_NAME.value)
     assert param["error"] == ERR_COMPANY_NAME_LENGTH.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
@@ -108,16 +98,12 @@ def test_validate_company_name_invalid_length(
 def test_validate_company_name_invalid_chars(order_factory, order_parameters_factory, company_name):
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
     customer_data = get_customer_data(order)
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_company_name(context)
+
+    step.validate_company_name(context)  # act
 
     assert context.validation_succeeded is False
-
     param = get_ordering_parameter(context.order, Param.COMPANY_NAME.value)
     assert param["error"] == ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
@@ -131,9 +117,9 @@ def test_validate_address(mock_order, address_line_2, state_or_province):
     customer_data[Param.ADDRESS.value]["addressLine2"] = address_line_2
     customer_data[Param.ADDRESS.value]["state"] = state_or_province
     context = Context(order=mock_order, customer_data=customer_data)
-
     step = ValidateCustomerData()
-    step.validate_address(context)
+
+    step.validate_address(context)  # act
 
     assert context.validation_succeeded is True
     param = get_ordering_parameter(context.order, Param.ADDRESS.value)
@@ -154,25 +140,17 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
         )
     )
     customer_data = get_customer_data(order)
-
     context = Context(
         order=order,
         customer_data=customer_data,
     )
-
     step = ValidateCustomerData()
-    step.validate_address(context)
+
+    step.validate_address(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.ADDRESS.value,
-    )
-    assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["name"],
-        errors=ERR_COUNTRY_CODE,
-    )
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+    assert param["error"] == ERR_ADDRESS.to_dict(title=param["name"], errors=ERR_COUNTRY_CODE)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -191,25 +169,14 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
         )
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_address(context)
+
+    step.validate_address(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.ADDRESS.value,
-    )
-    assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["name"],
-        errors=ERR_STATE_OR_PROVINCE,
-    )
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+    assert param["error"] == ERR_ADDRESS.to_dict(title=param["name"], errors=ERR_STATE_OR_PROVINCE)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -228,26 +195,15 @@ def test_validate_address_invalid_state_did_u_mean(order_factory, order_paramete
         )
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_address(context)
+
+    step.validate_address(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.ADDRESS.value,
-    )
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
     error = f"{ERR_STATE_OR_PROVINCE} (Did you mean California, Colorado ?)"
-    assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["name"],
-        errors=error,
-    )
+    assert param["error"] == ERR_ADDRESS.to_dict(title=param["name"], errors=error)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -266,25 +222,14 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
         )
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_address(context)
+
+    step.validate_address(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.ADDRESS.value,
-    )
-    assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["name"],
-        errors=ERR_POSTAL_CODE_FORMAT,
-    )
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+    assert param["error"] == ERR_ADDRESS.to_dict(title=param["name"], errors=ERR_POSTAL_CODE_FORMAT)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -303,25 +248,14 @@ def test_validate_address_invalid_postal_code_length(order_factory, order_parame
         )
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_address(context)
+
+    step.validate_address(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.ADDRESS.value,
-    )
-    assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["name"],
-        errors=ERR_POSTAL_CODE_LENGTH,
-    )
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+    assert param["error"] == ERR_ADDRESS.to_dict(title=param["name"], errors=ERR_POSTAL_CODE_LENGTH)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -340,27 +274,15 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
         )
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_address(context)
+
+    step.validate_address(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.ADDRESS.value,
-    )
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
     errors = f"{ERR_ADDRESS_LINE_1_LENGTH}; {ERR_CITY_LENGTH}; {ERR_ADDRESS_LINE_2_LENGTH}"
-
-    assert param["error"] == ERR_ADDRESS.to_dict(
-        title=param["name"],
-        errors=errors,
-    )
+    assert param["error"] == ERR_ADDRESS.to_dict(title=param["name"], errors=errors)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -368,9 +290,9 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
 def test_validate_contact(mock_order):
     customer_data = get_customer_data(mock_order)
     context = Context(order=mock_order, customer_data=customer_data)
-
     step = ValidateCustomerData()
-    step.validate_contact(context)
+
+    step.validate_contact(context)  # act
 
     assert context.validation_succeeded is True
     param = get_ordering_parameter(context.order, Param.CONTACT.value)
@@ -378,31 +300,16 @@ def test_validate_contact(mock_order):
 
 
 def test_validate_contact_mandatory(order_factory, order_parameters_factory):
-    order = order_factory(
-        order_parameters=order_parameters_factory(
-            contact={},
-        ),
-    )
+    order = order_factory(order_parameters=order_parameters_factory(contact={}))
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_contact(context)
+
+    step.validate_contact(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.CONTACT.value,
-    )
-    assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["name"],
-        errors="it is mandatory.",
-    )
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
+    assert param["error"] == ERR_CONTACT.to_dict(title=param["name"], errors="it is mandatory.")
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -418,25 +325,14 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
         ),
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_contact(context)
+
+    step.validate_contact(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.CONTACT.value,
-    )
-    assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["name"],
-        errors=ERR_FIRST_NAME_FORMAT,
-    )
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
+    assert param["error"] == ERR_CONTACT.to_dict(title=param["name"], errors=ERR_FIRST_NAME_FORMAT)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -452,25 +348,14 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
         ),
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_contact(context)
+
+    step.validate_contact(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.CONTACT.value,
-    )
-    assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["name"],
-        errors=ERR_LAST_NAME_FORMAT,
-    )
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
+    assert param["error"] == ERR_CONTACT.to_dict(title=param["name"], errors=ERR_LAST_NAME_FORMAT)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -486,25 +371,14 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
         ),
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_contact(context)
+
+    step.validate_contact(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.CONTACT.value,
-    )
-    assert param["error"] == ERR_CONTACT.to_dict(
-        title=param["name"],
-        errors=ERR_EMAIL_FORMAT,
-    )
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
+    assert param["error"] == ERR_CONTACT.to_dict(title=param["name"], errors=ERR_EMAIL_FORMAT)
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
 
@@ -524,21 +398,13 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
         ),
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_contact(context)
+
+    step.validate_contact(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        Param.CONTACT.value,
-    )
+    param = get_ordering_parameter(context.order, Param.CONTACT.value)
     assert param["error"] == ERR_CONTACT.to_dict(
         title=param["name"],
         errors=ERR_PHONE_NUMBER_LENGTH,
@@ -549,29 +415,17 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
 
 def test_validate_customer_data_step(mocker):
     mocked_validate_company_name = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_company_name",
+        ValidateCustomerData, "validate_company_name"
     )
-    mocked_validate_address = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_address",
-    )
-    mocked_validate_contact = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_contact",
-    )
-    mocked_validate_3yc = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_3yc",
-    )
-
+    mocked_validate_address = mocker.patch.object(ValidateCustomerData, "validate_address")
+    mocked_validate_contact = mocker.patch.object(ValidateCustomerData, "validate_contact")
+    mocked_validate_3yc = mocker.patch.object(ValidateCustomerData, "validate_3yc")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=mocker.MagicMock())
-
     step = ValidateCustomerData()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_validate_company_name.assert_called_once_with(context)
     mocked_validate_address.assert_called_once_with(context)
@@ -582,29 +436,17 @@ def test_validate_customer_data_step(mocker):
 
 def test_validate_customer_data_step_no_validate(mocker):
     mocked_validate_company_name = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_company_name",
+        ValidateCustomerData, "validate_company_name"
     )
-    mocked_validate_address = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_address",
-    )
-    mocked_validate_contact = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_contact",
-    )
-    mocked_validate_3yc = mocker.patch.object(
-        ValidateCustomerData,
-        "validate_3yc",
-    )
-
+    mocked_validate_address = mocker.patch.object(ValidateCustomerData, "validate_address")
+    mocked_validate_contact = mocker.patch.object(ValidateCustomerData, "validate_contact")
+    mocked_validate_3yc = mocker.patch.object(ValidateCustomerData, "validate_3yc")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=mocker.MagicMock(), validation_succeeded=False)
-
     step = ValidateCustomerData()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_validate_company_name.assert_called_once_with(context)
     mocked_validate_address.assert_called_once_with(context)
@@ -629,17 +471,15 @@ def test_validate_3yc(order_factory, order_parameters_factory, quantities):
         ),
     )
     customer_data = get_customer_data(order)
-
     context = Context(
         order=order,
         customer_data=customer_data,
     )
-
     step = ValidateCustomerData()
-    step.validate_3yc(context)
+
+    step.validate_3yc(context)  # act
 
     assert context.validation_succeeded is True
-
     for param_name in (Param.THREE_YC_LICENSES.value, Param.THREE_YC_CONSUMABLES.value):
         param = get_ordering_parameter(context.order, param_name)
         assert "error" not in param
@@ -657,30 +497,17 @@ def test_validate_3yc_invalid(
     order_factory, order_parameters_factory, param_name, factory_field, quantity, error
 ):
     order = order_factory(
-        order_parameters=order_parameters_factory(
-            p3yc=["Yes"],
-            **{factory_field: quantity},
-        ),
+        order_parameters=order_parameters_factory(p3yc=["Yes"], **{factory_field: quantity}),
     )
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_3yc(context)
+
+    step.validate_3yc(context)  # act
 
     assert context.validation_succeeded is False
-
-    param = get_ordering_parameter(
-        context.order,
-        param_name,
-    )
-    assert param["error"] == error.to_dict(
-        title=param["name"],
-    )
+    param = get_ordering_parameter(context.order, param_name)
+    assert param["error"] == error.to_dict(title=param["name"])
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is False
 
@@ -688,14 +515,10 @@ def test_validate_3yc_invalid(
 def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
     order = order_factory(order_parameters=order_parameters_factory())
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_3yc(context)
+
+    step.validate_3yc(context)  # act
 
     assert context.validation_succeeded is True
 
@@ -703,14 +526,10 @@ def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
 def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
     order = order_factory(order_parameters=order_parameters_factory(p3yc=["Yes"]))
     customer_data = get_customer_data(order)
-
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
-
+    context = Context(order=order, customer_data=customer_data)
     step = ValidateCustomerData()
-    step.validate_3yc(context)
+
+    step.validate_3yc(context)  # act
 
     assert context.validation_succeeded is False
     error = ERR_3YC_NO_MINIMUMS.to_dict(
@@ -723,9 +542,9 @@ def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
 def test_check_purchase_validation_enabled_step(mocker, mock_mpt_client, mock_order):
     mocked_next_step = mocker.MagicMock()
     context = Context(order=mock_order)
-
     step = CheckPurchaseValidationEnabled()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
@@ -737,9 +556,9 @@ def test_check_purchase_validation_enabled_step_disabled(mocker, mock_mpt_client
         return_value=False,
     )
     context = Context(order=mock_order)
-
     step = CheckPurchaseValidationEnabled()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
 
@@ -754,7 +573,7 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
         "adobe_vipm.flows.validation.purchase.Context", return_value=mocked_context
     )
 
-    validate_purchase_order(mock_mpt_client, mock_order)
+    validate_purchase_order(mock_mpt_client, mock_order)  # act
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 9
     expected_steps = [
@@ -768,7 +587,6 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
         GetPreviewOrder,
         UpdatePrices,
     ]
-
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     mocked_context_ctor.assert_called_once_with(order=mock_order)
@@ -777,12 +595,11 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
 
 def test_validate_quantities_lga_invalid_quantities(mock_order, mock_mpt_client, mock_next_step):
     customer_data = get_customer_data(mock_order)
-
     mock_order["product"]["id"] = "PRD-3333-3333"
     context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 50}])
-
     step = ValidateQuantitiesLGA()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.validation_succeeded is False
     assert context.order["error"] == ERR_LGA_QUANTITIES.to_dict()
@@ -790,12 +607,11 @@ def test_validate_quantities_lga_invalid_quantities(mock_order, mock_mpt_client,
 
 def test_validate_quantities_lga_valid_quantities(mock_order, mock_mpt_client, mock_next_step):
     customer_data = get_customer_data(mock_order)
-
     mock_order["product"]["id"] = "PRD-3333-3333"
     context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 101}])
-
     step = ValidateQuantitiesLGA()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.validation_succeeded is True
     assert context.order["error"] is None
@@ -803,12 +619,11 @@ def test_validate_quantities_lga_valid_quantities(mock_order, mock_mpt_client, m
 
 def test_validate_quantities_not_lga(mock_order, mock_mpt_client, mock_next_step):
     customer_data = get_customer_data(mock_order)
-
     mock_order["product"]["id"] = "PRD-1111-1111"
     context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 101}])
-
     step = ValidateQuantitiesLGA()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.validation_succeeded is True
     assert context.order["error"] is None

@@ -59,9 +59,9 @@ def test_validate_downsizes_step(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.validation_succeeded is True
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
@@ -96,9 +96,9 @@ def test_validate_downsizes_step_no_returnable_orders(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.validation_succeeded is True
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
@@ -161,9 +161,9 @@ def test_validate_downsizes_step_invalid_quantity(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.validation_succeeded is False
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
@@ -207,9 +207,9 @@ def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.validation_succeeded is True
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -239,7 +239,6 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
     mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [ret_info_1]
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         authorization_id=order["authorization"]["id"],
@@ -247,9 +246,9 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
         adobe_customer_id=adobe_customer["customerId"],
         adobe_customer=adobe_customer,
     )
-
     step = ValidateDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.validation_succeeded is False
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
@@ -272,10 +271,8 @@ def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
 
 def test_validate_change_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
-
     mocked_pipeline_ctor = mocker.patch(
-        "adobe_vipm.flows.validation.change.Pipeline",
-        return_value=mocked_pipeline_instance,
+        "adobe_vipm.flows.validation.change.Pipeline", return_value=mocked_pipeline_instance
     )
     mocked_context = mocker.MagicMock()
     mocked_context_ctor = mocker.patch(
@@ -284,10 +281,9 @@ def test_validate_change_order(mocker):
     mocked_client = mocker.MagicMock()
     mocked_order = mocker.MagicMock()
 
-    validate_change_order(mocked_client, mocked_order)
+    validate_change_order(mocked_client, mocked_order)  # act
 
     assert len(mocked_pipeline_ctor.mock_calls[0].args) == 9
-
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
@@ -298,12 +294,7 @@ def test_validate_change_order(mocker):
         Validate3YCCommitment,
         GetPreviewOrder,
     ]
-
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:8]]
     assert actual_steps == expected_steps
-
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
-    mocked_pipeline_instance.run.assert_called_once_with(
-        mocked_client,
-        mocked_context,
-    )
+    mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)

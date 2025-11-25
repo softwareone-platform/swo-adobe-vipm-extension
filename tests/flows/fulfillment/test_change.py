@@ -83,7 +83,6 @@ def test_get_returnable_orders_step(
             subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
         ),
     )
-
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
     )
@@ -109,9 +108,9 @@ def test_get_returnable_orders_step(
         adobe_customer=adobe_customer,
         adobe_return_orders={sku: return_orders},
     )
-
     step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.adobe_returnable_orders[sku] == (ret_info_3,)
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
@@ -140,7 +139,6 @@ def test_get_returnable_orders_step_no_returnable_order(
     mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         authorization_id=order["authorization"]["id"],
@@ -149,9 +147,9 @@ def test_get_returnable_orders_step_no_returnable_order(
         adobe_customer=adobe_customer,
         adobe_return_orders={sku: []},
     )
-
     step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert sku not in context.adobe_returnable_orders
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
@@ -222,9 +220,9 @@ def test_get_returnable_orders_step_quantity_mismatch(
         adobe_customer=adobe_customer,
         adobe_return_orders={},
     )
-
     step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.adobe_returnable_orders[sku] is None
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
@@ -259,9 +257,9 @@ def test_get_returnable_orders_step_last_two_weeks(
         adobe_customer=adobe_customer,
         adobe_return_orders={},
     )
-
     step = GetReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.adobe_returnable_orders == {}
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_not_called()
@@ -281,9 +279,9 @@ def test_validate_returnable_orders_step(mocker, order_factory):
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     step = ValidateReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_switch_to_failed.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -302,9 +300,9 @@ def test_validate_returnable_orders_step_invalid(mocker, order_factory):
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     step = ValidateReturnableOrders()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_switch_to_failed.assert_called_once_with(
         mocked_client,
@@ -334,7 +332,6 @@ def test_update_renewal_quantities_step(
     mock_adobe_client.get_subscription.return_value = adobe_sub
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -343,9 +340,9 @@ def test_update_renewal_quantities_step(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     step = UpdateRenewalQuantities()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
@@ -379,7 +376,6 @@ def test_update_renewal_quantities_downsize_step(
     mock_adobe_client.get_subscription.return_value = adobe_sub
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -388,9 +384,9 @@ def test_update_renewal_quantities_downsize_step(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     step = UpdateRenewalQuantitiesDownsizes()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
@@ -424,9 +420,9 @@ def test_update_renewal_quantities_step_quantity_match(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-
     step = UpdateRenewalQuantities()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_called_once_with(
         context.authorization_id,
@@ -450,7 +446,7 @@ def test_fulfill_change_order(mocker):
     mocked_client = mocker.MagicMock()
     mocked_order = mocker.MagicMock()
 
-    fulfill_change_order(mocked_client, mocked_order)
+    fulfill_change_order(mocked_client, mocked_order)  # act
 
     expected_steps = [
         SetupContext,
@@ -477,20 +473,14 @@ def test_fulfill_change_order(mocker):
         NullifyFlexDiscountParam,
         SyncAgreement,
     ]
-
     pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
     assert len(pipeline_args) == len(expected_steps)
-
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
     assert pipeline_args[19].template_name == TEMPLATE_NAME_CHANGE
-
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
-    mocked_pipeline_instance.run.assert_called_once_with(
-        mocked_client,
-        mocked_context,
-    )
+    mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 
 
 def test_validate_update_renewal_quantity_invalid_renewal_state(
@@ -518,10 +508,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
     mock_adobe_client.get_subscription.return_value = adobe_sub
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
@@ -530,9 +517,9 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
             "Inactive Subscription or Pending Renewal is not Editable",
         ),
     )
-
     step = UpdateRenewalQuantities()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_switch_order_to_failed.assert_called_once_with(
         mock_mpt_client,
@@ -570,10 +557,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_ok(
         authorization_id="auth-id",
         adobe_customer_id="adobe-customer-id",
     )
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
     mock_adobe_client.get_subscription.return_value = adobe_sub
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
@@ -582,9 +566,9 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_ok(
             "Update could not be performed because it would create an invalid renewal state",
         ),
     )
-
     step = UpdateRenewalQuantities()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_switch_order_to_failed.assert_not_called()
     mock_notify_not_updated_subscriptions.assert_not_called()
@@ -621,10 +605,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_ok(
             status=AdobeStatus.PROCESSED.value,
         ),
     )
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
     mock_adobe_client.get_subscription.return_value = adobe_sub
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
@@ -633,9 +614,9 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_ok(
             "Update could not be performed because it would create an invalid renewal state",
         ),
     )
-
     step = UpdateRenewalQuantities()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_switch_order_to_failed.assert_not_called()
     mock_notify_not_updated_subscriptions.assert_not_called()
@@ -672,10 +653,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_failed(
             status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value,
         ),
     )
-    adobe_sub = adobe_subscription_factory(
-        renewal_quantity=10,
-    )
-
+    adobe_sub = adobe_subscription_factory(renewal_quantity=10)
     mock_adobe_client.get_subscription.return_value = adobe_sub
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
@@ -684,9 +662,9 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_failed(
             "Update could not be performed because it would create an invalid renewal state",
         ),
     )
-
     step = UpdateRenewalQuantities()
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_switch_order_to_failed.assert_called()
     mock_next_step.assert_not_called()
@@ -728,9 +706,9 @@ def test_validate_update_renewal_quantity_error(
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400, adobe_api_error_factory("1000", "Error updating autorenewal quantity")
     )
-
     step = UpdateRenewalQuantities()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_switch_to_failed.assert_not_called()
     mocked_notify.assert_called_once()
@@ -783,9 +761,9 @@ def test_rollback_updated_subscriptions_error(
     context.updated = [
         {"subscription_vendor_id": "sub-1-id", "old_quantity": 10, "new_quantity": 5}
     ]
-
     step = UpdateRenewalQuantities()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert mock_adobe_client.update_subscription.call_count == 3
     mock_adobe_client.update_subscription.assert_any_call(
@@ -867,9 +845,9 @@ def test_rollback_updated_subscriptions_error_during_rollback(
         {"subscription_vendor_id": "sub-1-id", "old_quantity": 10, "new_quantity": 5},
         {"subscription_vendor_id": "sub-2-id", "old_quantity": 15, "new_quantity": 5},
     ]
-
     step = UpdateRenewalQuantities()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert mock_adobe_client.update_subscription.call_count == 3
     mock_adobe_client.update_subscription.assert_any_call(

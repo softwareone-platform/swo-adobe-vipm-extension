@@ -47,10 +47,7 @@ def test_setup_context_step(
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
     )
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-    )
-
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client")
     downsizing_items = lines_factory(
         line_id=1,
         item_id=1,
@@ -63,35 +60,26 @@ def test_setup_context_step(
         old_quantity=10,
         quantity=12,
     )
-
     order = order_factory(
         lines=downsizing_items + upsizing_items,
         fulfillment_parameters=fulfillment_parameters_factory(
             due_date="2025-01-01",
         ),
     )
-
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=order)
-
     step = SetupContext()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.order["agreement"] == agreement
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
     assert context.due_date.strftime("%Y-%m-%d") == "2025-01-01"
     assert context.downsize_lines == downsizing_items
     assert context.upsize_lines == upsizing_items
-    mocked_get_agreement.assert_called_once_with(
-        mocked_client,
-        order["agreement"]["id"],
-    )
-    mocked_get_licensee.assert_called_once_with(
-        mocked_client,
-        order["agreement"]["licensee"]["id"],
-    )
+    mocked_get_agreement.assert_called_once_with(mocked_client, order["agreement"]["id"])
+    mocked_get_licensee.assert_called_once_with(mocked_client, order["agreement"]["licensee"]["id"])
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -121,9 +109,9 @@ def test_setup_context_step_with_adobe_customer_and_order_id(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=order)
-
     step = SetupContext()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.order["agreement"] == agreement
     assert context.order["agreement"]["licensee"] == agreement["licensee"]
@@ -168,11 +156,10 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=order)
-
     step = SetupContext()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert context.due_date == dt.date(2025, 1, 31)
     mocked_get_agreement.assert_called_once_with(mocked_client, order["agreement"]["id"])
@@ -180,7 +167,8 @@ def test_setup_context_step_when_retry_count_was_not_zero(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_error(
+# FIX: it has multiple act blocks
+def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_error(  # noqa: AAA02
     mocker,
     requests_mocker,
     settings,
@@ -198,7 +186,6 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
         code=AdobeStatus.INTERNAL_SERVER_ERROR.value,
         message="Internal Server Error",
     )
-
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -207,38 +194,25 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
         status=500,
         json=adobe_api_error,
     )
-
+    # ???: why do we have this here?
     with pytest.raises(AdobeError) as exc_info:
         adobe_client.get_customer(authorization_uk, customer_id)
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=adobe_client)
     mocked_get_agreement = mocker.patch(
         "adobe_vipm.flows.helpers.get_agreement", return_value=agreement
     )
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.helpers.get_licensee", return_value=agreement["licensee"]
     )
-
-    fulfillment_parameters = fulfillment_parameters_factory(
-        customer_id=customer_id,
-    )
-
+    fulfillment_parameters = fulfillment_parameters_factory(customer_id=customer_id)
     external_ids = {"vendor": customer_id}
-
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters,
-        external_ids=external_ids,
-    )
-
+    order = order_factory(fulfillment_parameters=fulfillment_parameters, external_ids=external_ids)
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(order=order)
-
     step = SetupContext()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert str(exc_info.value) == f"{adobe_api_error['code']} - {adobe_api_error['message']}"
     assert context.order["agreement"] == agreement
@@ -250,18 +224,13 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     assert context.adobe_customer_id == customer_id
     assert context.adobe_customer is None
     assert context.adobe_new_order_id is None
-    mocked_get_agreement.assert_called_once_with(
-        mocked_client,
-        order["agreement"]["id"],
-    )
-    mocked_get_licensee.assert_called_once_with(
-        mocked_client,
-        order["agreement"]["licensee"]["id"],
-    )
+    mocked_get_agreement.assert_called_once_with(mocked_client, order["agreement"]["id"])
+    mocked_get_licensee.assert_called_once_with(mocked_client, order["agreement"]["licensee"]["id"])
     mocked_next_step.assert_not_called()
 
 
-def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
+# FIX: it has multiple act blocks
+def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(  # noqa: AAA02
     mocker,
     mock_mpt_client,
     requests_mocker,
@@ -289,6 +258,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
         status=400,
         json=adobe_api_error,
     )
+    # ???: why do we have this here?
     with pytest.raises(AdobeError):
         adobe_client.get_customer(authorization_uk, customer_id)
     mocker.patch(
@@ -305,15 +275,12 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(
         customer_id=customer_id,
     )
     external_ids = {"vendor": customer_id}
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters,
-        external_ids=external_ids,
-    )
+    order = order_factory(fulfillment_parameters=fulfillment_parameters, external_ids=external_ids)
     mocked_next_step = mocker.MagicMock()
     context = Context(order=order)
-
     step = SetupContext()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_switch_order_to_failed.assert_called_once_with(
         mock_mpt_client,
@@ -336,9 +303,9 @@ def test_prepare_customer_data_step(mocker, mock_order, customer_data):
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(order=mock_order, customer_data=customer_data)
-
     step = PrepareCustomerData()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_update_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -347,10 +314,7 @@ def test_prepare_customer_data_step(mocker, mock_order, customer_data):
 def test_prepare_customer_data_step_no_company_name(mocker, mock_order, customer_data):
     no_company_customer_data = copy.copy(customer_data)
     del no_company_customer_data[Param.COMPANY_NAME.value]
-
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
@@ -358,16 +322,15 @@ def test_prepare_customer_data_step_no_company_name(mocker, mock_order, customer
         order_id="order-id",
         customer_data=no_company_customer_data,
     )
-
     step = PrepareCustomerData()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert get_customer_data(context.order) == context.customer_data
     assert (
         context.customer_data[Param.COMPANY_NAME.value]
         == context.order["agreement"]["licensee"]["name"]
     )
-
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -379,10 +342,7 @@ def test_prepare_customer_data_step_no_company_name(mocker, mock_order, customer
 def test_prepare_customer_data_step_no_address(mocker, mock_order, customer_data):
     no_address_customer_data = copy.copy(customer_data)
     del no_address_customer_data[Param.ADDRESS.value]
-
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
@@ -390,9 +350,9 @@ def test_prepare_customer_data_step_no_address(mocker, mock_order, customer_data
         order_id="order-id",
         customer_data=no_address_customer_data,
     )
-
     step = PrepareCustomerData()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert get_customer_data(context.order) == context.customer_data
     assert context.customer_data[Param.ADDRESS.value] == {
@@ -403,7 +363,6 @@ def test_prepare_customer_data_step_no_address(mocker, mock_order, customer_data
         "addressLine2": context.order["agreement"]["licensee"]["address"].get("addressLine2"),
         "postCode": context.order["agreement"]["licensee"]["address"]["postCode"],
     }
-
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -415,20 +374,13 @@ def test_prepare_customer_data_step_no_address(mocker, mock_order, customer_data
 def test_prepare_customer_data_step_no_contact(mocker, mock_order, customer_data):
     no_contact_customer_data = copy.copy(customer_data)
     del no_contact_customer_data[Param.CONTACT.value]
-
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=mock_order,
-        order_id="order-id",
-        customer_data=no_contact_customer_data,
-    )
-
+    context = Context(order=mock_order, order_id="order-id", customer_data=no_contact_customer_data)
     step = PrepareCustomerData()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert get_customer_data(context.order) == context.customer_data
     assert context.customer_data[Param.CONTACT.value] == {
@@ -437,7 +389,6 @@ def test_prepare_customer_data_step_no_contact(mocker, mock_order, customer_data
         "email": context.order["agreement"]["licensee"]["contact"]["email"],
         "phone": context.order["agreement"]["licensee"]["contact"].get("phone"),
     }
-
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -454,9 +405,9 @@ def test_update_prices_step_no_orders(mocker, mock_mpt_client, mock_order):
         adobe_new_order=None,
         adobe_preview_order=None,
     )
-
     step = UpdatePrices()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
@@ -487,9 +438,9 @@ def test_update_prices_step_with_new_order(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-
     step = UpdatePrices()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_get_prices.assert_not_called()
     mocked_update_order.assert_not_called()
@@ -513,9 +464,9 @@ def test_update_prices_step_with_preview_order(
         currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
         adobe_preview_order=adobe_order,
     )
-
     step = UpdatePrices()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
@@ -561,9 +512,9 @@ def test_update_prices_step_with_3yc_commitment(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-
     step = UpdatePrices()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_update_order.assert_called_once_with(
         mock_mpt_client,
@@ -612,9 +563,9 @@ def test_update_prices_step_with_expired_3yc_commitment(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-
     step = UpdatePrices()
-    step(mock_mpt_client, context, mocked_next_step)
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
@@ -641,21 +592,14 @@ def test_update_prices_step_with_multiple_lines(
     line_1 = lines_factory()[0]
     line_2 = lines_factory(line_id=2, item_id=2)[0]
     order = order_factory(lines=[line_1, line_2])
-
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
     sku = adobe_order["lineItems"][0]["offerId"]
-
     mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
+        "adobe_vipm.flows.helpers.get_prices_for_skus", return_value={sku: 121.36}
     )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-
     context = Context(
         order=order,
         order_id=order["id"],
@@ -666,9 +610,9 @@ def test_update_prices_step_with_multiple_lines(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-
     step = UpdatePrices()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
@@ -689,9 +633,7 @@ def test_update_prices_step_with_multiple_lines(
 
 
 def test_validate_3yc_commitment_without_adobe_customer(
-    mocker,
-    order_factory,
-    mock_get_sku_adobe_mapping_model,
+    mocker, order_factory, mock_get_sku_adobe_mapping_model
 ):
     lines = [
         {
@@ -711,11 +653,7 @@ def test_validate_3yc_commitment_without_adobe_customer(
             "oldQuantity": 12,
         },
     ]
-
-    order = order_factory(
-        lines=lines,
-    )
-
+    order = order_factory(lines=lines)
     context = Context(
         order=order,
         adobe_customer=None,
@@ -725,17 +663,15 @@ def test_validate_3yc_commitment_without_adobe_customer(
         },
         upsize_lines=lines,
     )
-
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -756,11 +692,7 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_license_quantity(
             "oldQuantity": 0,
         }
     ]
-
-    order = order_factory(
-        lines=lines,
-    )
-
+    order = order_factory(lines=lines)
     context = Context(
         order=order,
         adobe_customer=None,
@@ -768,17 +700,15 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_license_quantity(
         customer_data={"3YCLicenses": 10},
         upsize_lines=lines,
     )
-
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     error_call = mocked_switch_order_to_failed.call_args
     error_dict = error_call[0][2]
@@ -790,9 +720,7 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_license_quantity(
 
 
 def test_validate_3yc_commitment_without_adobe_customer_fail_consumables_quantity(
-    mocker,
-    order_factory,
-    mock_get_sku_adobe_mapping_model,
+    mocker, order_factory, mock_get_sku_adobe_mapping_model
 ):
     mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
     lines = [
@@ -805,11 +733,7 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_consumables_quantit
             "oldQuantity": 0,
         }
     ]
-
-    order = order_factory(
-        lines=lines,
-    )
-
+    order = order_factory(lines=lines)
     context = Context(
         order=order,
         adobe_customer=None,
@@ -817,17 +741,15 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_consumables_quantit
         customer_data={"3YCConsumables": 10},
         upsize_lines=lines,
     )
-
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     error_call = mocked_switch_order_to_failed.call_args
     error_dict = error_call[0][2]
@@ -851,7 +773,6 @@ def test_validate_3yc_commitment_requested_status(
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
-
     adobe_customer = adobe_customer_factory(commitment=commitment, commitment_request=commitment)
     lines = [
         {
@@ -876,9 +797,9 @@ def test_validate_3yc_commitment_requested_status(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
 
@@ -934,9 +855,9 @@ def test_validate_3yc_commitment_expired_status(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once()
@@ -1001,9 +922,9 @@ def test_validate_3yc_commitment_item_not_found(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once()
@@ -1064,9 +985,9 @@ def test_validate_3yc_commitment_item_not_found_validation(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment(is_validation=True)
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
     mocked_set_order_error.assert_called_once()
@@ -1076,7 +997,8 @@ def test_validate_3yc_commitment_item_not_found_validation(
     assert error_dict.get("message") == "Item 65304578CA not found in Adobe subscriptions"
 
 
-@pytest.mark.parametrize("is_validation", [True, False])
+# FIX: it has multiple act blocks
+@pytest.mark.parametrize("is_validation", [True, False])  # noqa: AAA01
 def test_validate_3yc_commitment_below_minimum_licenses(
     mocker,
     mock_adobe_client,
@@ -1116,7 +1038,6 @@ def test_validate_3yc_commitment_below_minimum_licenses(
             "oldQuantity": 15,
         },
     ]
-
     order = order_factory(lines=lines)
     context = Context(
         order=order,
@@ -1131,11 +1052,10 @@ def test_validate_3yc_commitment_below_minimum_licenses(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
+    # FIX: it should be split into two tests
     if is_validation:
         step = Validate3YCCommitment(is_validation=True)
         step(mocked_client, context, mocked_next_step)
-
         mocked_next_step.assert_not_called()
         mocked_set_order_error.assert_called_once()
         mocked_switch_order_to_failed.assert_not_called()
@@ -1163,7 +1083,8 @@ def test_validate_3yc_commitment_below_minimum_licenses(
         assert error_expected == error_dict.get("message")
 
 
-@pytest.mark.parametrize("is_validation", [True, False])
+# FIX: it has multiple act blocks
+@pytest.mark.parametrize("is_validation", [True, False])  # noqa: AAA01
 def test_validate_3yc_commitment_below_minimum_consumables(
     mocker,
     mock_adobe_client,
@@ -1214,7 +1135,6 @@ def test_validate_3yc_commitment_below_minimum_consumables(
 
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
@@ -1308,9 +1228,9 @@ def test_validate_3yc_commitment_below_minimum_consumables_and_licenses(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment(is_validation=False)
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once()
@@ -1336,7 +1256,6 @@ def test_validate_3yc_commitment_success(
 ):
     mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
-
     commitment = adobe_commitment_factory(
         status=ThreeYearCommitmentStatus.COMMITTED.value,
         start_date="2024-01-01",
@@ -1393,9 +1312,9 @@ def test_validate_3yc_commitment_success(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
     mocked_switch_order_to_failed.assert_not_called()
@@ -1452,9 +1371,9 @@ def test_validate_3yc_commitment_rejected(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once()
@@ -1492,16 +1411,15 @@ def test_validate_3yc_commitment_return_order_create(
             ]
         },
     )
-
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
-
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -1537,7 +1455,6 @@ def test_validate_3yc_commitment_no_commitment(
             }
         ],
     )
-
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
@@ -1545,16 +1462,15 @@ def test_validate_3yc_commitment_no_commitment(
         authorization_id="test-auth-id",
         customer_data={},
     )
-
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -1596,9 +1512,9 @@ def test_validate_3yc_commitment_date_before_coterm_date(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once()
 
@@ -1672,9 +1588,9 @@ def test_validate_3yc_commitment_date_without_coterm_date(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
     mocked_switch_order_to_failed.assert_not_called()
@@ -1750,9 +1666,9 @@ def test_validate_3yc_commitment_sku_not_found(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=AdobeProductNotFoundError("Product not found in Adobe configuration"),
     )
-
     step = Validate3YCCommitment()
-    step(mocked_client, context, mocked_next_step)
+
+    step(mocked_client, context, mocked_next_step)  # act
 
     assert mocked_switch_order_to_failed.call_args[0][2]["message"] == (
         "The order has failed. The reduction in quantity "
@@ -1775,23 +1691,20 @@ def test_fetch_reseller_change_data_success(
 ):
     adobe_transfer = adobe_reseller_change_preview_factory()
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
     mock_adobe_client.reseller_change_request.return_value = adobe_transfer
-
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mock_adobe_client,
     )
-
     context = Context(
         order=order,
         order_id="order-id",
         agreement_id="agreement-id",
         authorization_id="AUT-1234-4567",
     )
-
     step = FetchResellerChangeData(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_adobe_client.reseller_change_request.assert_called_once_with(
         context.authorization_id,
@@ -1813,19 +1726,14 @@ def test_fetch_reseller_change_data_already_has_customer_id(
     mock_adobe_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client",
         return_value=mock_adobe_client,
     )
-
-    context = Context(
-        order=order,
-        adobe_customer_id="existing-customer-id",
-    )
-
+    context = Context(order=order, adobe_customer_id="existing-customer-id")
     step = FetchResellerChangeData(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_adobe_client.reseller_change_request.assert_not_called()
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
@@ -1841,18 +1749,11 @@ def test_fetch_reseller_change_data_adobe_api_error_fulfillment_mode(
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
-
     mock_adobe_client.reseller_change_request.side_effect = api_error
-
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mock_adobe_client,
-    )
-
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
     )
-
     context = Context(
         order=order,
         order_id="order-id",
@@ -1860,7 +1761,8 @@ def test_fetch_reseller_change_data_adobe_api_error_fulfillment_mode(
         authorization_id="AUT-1234-4567",
     )
     step = FetchResellerChangeData(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_adobe_client.reseller_change_request.assert_called_once()
     mocked_switch_order_to_failed.assert_called_once_with(
@@ -1884,23 +1786,17 @@ def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
-
     mock_adobe_client.reseller_change_request.side_effect = api_error
-
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mock_adobe_client,
-    )
-
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     context = Context(
         order=order,
         order_id="order-id",
         agreement_id="agreement-id",
         authorization_id="AUT-1234-4567",
     )
-
     step = FetchResellerChangeData(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_adobe_client.reseller_change_request.assert_called_once()
     assert context.validation_succeeded is False
@@ -1908,21 +1804,19 @@ def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
 
 
 def test_validate_reseller_change_success_when_customer_id_exists(
-    mocker,
     order_factory,
     reseller_change_order_parameters_factory,
     mock_next_step,
     mock_mpt_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
     context = Context(
         order=order,
         adobe_customer_id="existing-customer-id",
     )
     step = ValidateResellerChange(is_validation=False)
 
-    step(mock_mpt_client, context, mock_next_step)
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
@@ -1936,16 +1830,15 @@ def test_validate_reseller_change_success_when_validation_passes(
     mock_mpt_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
     adobe_transfer = adobe_reseller_change_preview_factory(
         approval_expiry=(dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=5)).isoformat()
     )
-
     context = Context(order=order)
     context.adobe_transfer = adobe_transfer
-
     step = ValidateResellerChange(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
@@ -1958,25 +1851,20 @@ def test_validate_reseller_change_expired_code_fulfillment_mode(
     mock_mpt_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
     adobe_transfer = adobe_reseller_change_preview_factory(
         approval_expiry=(dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=1)).isoformat()
     )
-
     context = Context(order=order)
     context.adobe_transfer = adobe_transfer
-
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
-
     step = ValidateResellerChange(is_validation=False)
 
-    step(mock_mpt_client, context, mock_next_step)
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once()
-
     call_args = mocked_switch_order_to_failed.call_args
     error_data = call_args[0][2]  # Third argument is error_data
     assert error_data["id"] == ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.id
@@ -1997,10 +1885,9 @@ def test_validate_reseller_change_lga_product_without_lga_agency_type(
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
-
     step = ValidateResellerChange(is_validation=False)
 
-    step(mock_mpt_client, context, mock_next_step)
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once_with(
@@ -2027,10 +1914,9 @@ def test_validate_reseller_change_not_lga_product_with_lga_agency_type(
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
-
     step = ValidateResellerChange(is_validation=False)
 
-    step(mock_mpt_client, context, mock_next_step)
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_not_called()
     mocked_switch_order_to_failed.assert_called_once_with(
@@ -2048,20 +1934,17 @@ def test_validate_reseller_change_lga_product_with_lga_agency_type(
     mock_mpt_client,
 ):
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
-
     adobe_transfer = adobe_reseller_change_preview_factory(
         approval_expiry=(dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=5)).isoformat()
     )
     adobe_transfer["customerId"] = "existing-customer-id"
     adobe_transfer["benefits"] = [{"type": "LARGE_GOVERNMENT_AGENCY", "status": None}]
-
     order["product"]["id"] = "PRD-3333-3333"
     context = Context(order=order)
     context.adobe_transfer = adobe_transfer
-
     step = ValidateResellerChange(is_validation=False)
 
-    step(mock_mpt_client, context, mock_next_step)
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
@@ -2075,27 +1958,21 @@ def test_validate_sku_availability_with_valid_3yc_commitment_skips_validation(
     mock_next_step,
     mock_mpt_client,
 ):
-    """Test that validation is skipped when 3YC commitment is valid for more than 365 days."""
     # Mock 3YC commitment that expires in more than 365 days
     commitment = {
-        "endDate": "2026-01-01",  # More than 365 days from 2024-01-01
+        "endDate": "2026-01-01"  # More than 365 days from 2024-01-01
     }
-
     mocked_get_3yc_commitment = mocker.patch(
         "adobe_vipm.flows.helpers.get_3yc_commitment", return_value=commitment
     )
-
-    # Create order with lines
     lines = lines_factory(
         line_id=1,
         item_id=1,
         external_vendor_id="65304578CA",
         quantity=10,
     )
-
     order = order_factory(lines=lines)
     adobe_customer = adobe_customer_factory()
-
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
@@ -2105,9 +1982,9 @@ def test_validate_sku_availability_with_valid_3yc_commitment_skips_validation(
         product_id="PRD-123",
         currency="USD",
     )
-
     step = ValidateSkuAvailability(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should call next_step without doing SKU validation
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
@@ -2123,34 +2000,27 @@ def test_validate_sku_availability_with_expired_3yc_commitment_continues_validat
     mock_next_step,
     mock_mpt_client,
 ):
-    """Test that validation continues when 3YC commitment expires within 365 days."""
     # Mock 3YC commitment that expires in less than 365 days
     commitment = {
         "endDate": "2024-06-01",  # Less than 365 days from 2024-01-01
     }
-
     mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=commitment)
-
     mocked_get_adobe_product = mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         return_value=mocker.MagicMock(sku="65304578CA01A12"),
     )
-
     mocked_get_prices = mocker.patch(
         "adobe_vipm.flows.helpers.get_prices_for_skus",
         return_value={"65304578CA01A12": 637.32},
     )
-
     lines = lines_factory(
         line_id=1,
         item_id=1,
         external_vendor_id="65304578CA",
         quantity=10,
     )
-
     order = order_factory(lines=lines)
     adobe_customer = adobe_customer_factory()
-
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
@@ -2160,9 +2030,9 @@ def test_validate_sku_availability_with_expired_3yc_commitment_continues_validat
         product_id="PRD-123",
         currency="USD",
     )
-
     step = ValidateSkuAvailability(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should continue with SKU validation
     mocked_get_adobe_product.assert_called_once_with("65304578CA")
@@ -2178,11 +2048,9 @@ def test_validate_sku_availability_success_all_skus_available(
     mock_next_step,
     mock_mpt_client,
 ):
-    """Test successful validation when all SKUs are available."""
     mocked_get_3yc_commitment = mocker.patch(
         "adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None
     )
-
     mocked_get_adobe_product = mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=[
@@ -2191,7 +2059,6 @@ def test_validate_sku_availability_success_all_skus_available(
             mocker.MagicMock(sku="88888888CA01A12"),
         ],
     )
-
     mocked_get_prices = mocker.patch(
         "adobe_vipm.flows.helpers.get_prices_for_skus",
         return_value={
@@ -2200,7 +2067,6 @@ def test_validate_sku_availability_success_all_skus_available(
             "88888888CA01A12": 637.32,
         },
     )
-
     # Create order with mixed line types
     new_lines = lines_factory(
         line_id=1,
@@ -2220,10 +2086,8 @@ def test_validate_sku_availability_success_all_skus_available(
         external_vendor_id="88888888CA",
         quantity=3,
     )
-
     order = order_factory(lines=new_lines + upsize_lines + downsize_lines)
     adobe_customer = adobe_customer_factory()
-
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
@@ -2233,13 +2097,12 @@ def test_validate_sku_availability_success_all_skus_available(
         product_id="PRD-123",
         currency="USD",
     )
-
     step = ValidateSkuAvailability(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
     assert mocked_get_adobe_product.call_count == 3
-
     mocked_get_prices.assert_called_once_with(
         "PRD-123", "USD", ["65304578CA01A12", "77777777CA01A12", "88888888CA01A12"]
     )
@@ -2255,7 +2118,6 @@ def test_validate_sku_availability_missing_skus_validation_mode(
     mock_next_step,
     mock_mpt_client,
 ):
-    """Test validation mode when some SKUs are missing."""
     mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None)
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
@@ -2281,10 +2143,8 @@ def test_validate_sku_availability_missing_skus_validation_mode(
         external_vendor_id="77777777CA",
         quantity=5,
     )
-
     order = order_factory(lines=new_lines + upsize_lines)
     adobe_customer = adobe_customer_factory()
-
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
@@ -2294,9 +2154,9 @@ def test_validate_sku_availability_missing_skus_validation_mode(
         product_id="PRD-123",
         currency="USD",
     )
-
     step = ValidateSkuAvailability(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_not_called()
     assert context.validation_succeeded is False
@@ -2311,7 +2171,6 @@ def test_validate_sku_availability_missing_skus_validation_mode_false(
     mock_next_step,
     mock_mpt_client,
 ):
-    """Test validation mode when some SKUs are missing."""
     mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None)
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
@@ -2337,10 +2196,8 @@ def test_validate_sku_availability_missing_skus_validation_mode_false(
         external_vendor_id="77777777CA",
         quantity=5,
     )
-
     order = order_factory(lines=new_lines + upsize_lines)
     adobe_customer = adobe_customer_factory()
-
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
@@ -2350,9 +2207,9 @@ def test_validate_sku_availability_missing_skus_validation_mode_false(
         product_id="PRD-123",
         currency="USD",
     )
-
     step = ValidateSkuAvailability(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_not_called()
     assert context.validation_succeeded is False
@@ -2366,16 +2223,12 @@ def test_validate_sku_availability_empty_sku_lists(
     mock_next_step,
     mock_mpt_client,
 ):
-    """Test validation with empty SKU lists."""
     mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None)
-
     mocked_get_prices = mocker.patch(
         "adobe_vipm.flows.helpers.get_prices_for_skus", return_value={}
     )
-
     order = order_factory(lines=[])
     adobe_customer = adobe_customer_factory()
-
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
@@ -2385,9 +2238,9 @@ def test_validate_sku_availability_empty_sku_lists(
         product_id="PRD-123",
         currency="USD",
     )
-
     step = ValidateSkuAvailability(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
     mocked_get_prices.assert_called_once_with("PRD-123", "USD", [])
@@ -2400,20 +2253,17 @@ def test_validate_government_transfer_skips_when_not_government_segment(
     mock_mpt_client,
 ):
     mocked_get_market_segment = mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment",
-        return_value="COMMERCIAL",
+        "adobe_vipm.flows.helpers.get_market_segment", return_value="COMMERCIAL"
     )
-
     order = order_factory()
-
     context = Context(
         order=order,
         order_id="order-id",
         authorization_id="AUT-1234-4567",
     )
-
     step = ValidateGovernmentTransfer(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_get_market_segment.assert_called_once_with(order["product"]["id"])
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
@@ -2428,37 +2278,31 @@ def test_validate_government_transfer_success_when_validation_passes(
     mock_adobe_client,
 ):
     mocked_get_market_segment = mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment",
-        return_value=MARKET_SEGMENT_GOVERNMENT,
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
     )
     mocked_get_adobe_client = mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mock_adobe_client,
+        "adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client
     )
     mocked_validate_government_lga_data = mocker.patch(
         "adobe_vipm.flows.helpers.validate_government_lga_data",
     )
-
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.get_customer.return_value = adobe_customer
-
     order = order_factory()
-
     context = Context(
         order=order,
         order_id="order-id",
         authorization_id="AUT-1234-4567",
     )
     context.customer_id = "customer-id"
-
     step = ValidateGovernmentTransfer(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_get_market_segment.assert_called_once_with(order["product"]["id"])
     mocked_get_adobe_client.assert_called_once()
     mock_adobe_client.get_customer.assert_called_once_with(
-        context.authorization_id,
-        context.customer_id,
+        context.authorization_id, context.customer_id
     )
     mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
@@ -2473,13 +2317,9 @@ def test_validate_government_transfer_government_lga_error_fulfillment_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment",
-        return_value=MARKET_SEGMENT_GOVERNMENT,
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
     )
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mock_adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
         "adobe_vipm.flows.helpers.validate_government_lga_data",
         side_effect=GovernmentLGANotValidOrderError(),
@@ -2487,27 +2327,22 @@ def test_validate_government_transfer_government_lga_error_fulfillment_mode(
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
     )
-
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.get_customer.return_value = adobe_customer
-
     order = order_factory()
-
     context = Context(
         order=order,
         order_id="order-id",
         authorization_id="AUT-1234-4567",
     )
     context.customer_id = "customer-id"
-
     step = ValidateGovernmentTransfer(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
     mocked_switch_order_to_failed.assert_called_once_with(
-        mock_mpt_client,
-        context.order,
-        ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict(),
+        mock_mpt_client, context.order, ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict()
     )
     mock_next_step.assert_not_called()
 
@@ -2521,13 +2356,9 @@ def test_validate_government_transfer_government_lga_error_validation_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment",
-        return_value=MARKET_SEGMENT_GOVERNMENT,
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
     )
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mock_adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
         "adobe_vipm.flows.helpers.validate_government_lga_data",
         side_effect=GovernmentLGANotValidOrderError(),
@@ -2535,21 +2366,18 @@ def test_validate_government_transfer_government_lga_error_validation_mode(
     mocked_set_ordering_parameter_error = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_ordering_parameter_error",
     )
-
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.get_customer.return_value = adobe_customer
-
     order = order_factory()
-
     context = Context(
         order=order,
         order_id="order-id",
         authorization_id="AUT-1234-4567",
     )
     context.customer_id = "customer-id"
-
     step = ValidateGovernmentTransfer(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
     mocked_set_ordering_parameter_error.assert_called_once_with(
@@ -2570,13 +2398,9 @@ def test_validate_government_transfer_government_error_fulfillment_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment",
-        return_value=MARKET_SEGMENT_GOVERNMENT,
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
     )
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mock_adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
         "adobe_vipm.flows.helpers.validate_government_lga_data",
         side_effect=GovernmentNotValidOrderError(),
@@ -2584,21 +2408,14 @@ def test_validate_government_transfer_government_error_fulfillment_mode(
     mocked_switch_order_to_failed = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
     )
-
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.get_customer.return_value = adobe_customer
-
     order = order_factory()
-
-    context = Context(
-        order=order,
-        order_id="order-id",
-        authorization_id="AUT-1234-4567",
-    )
+    context = Context(order=order, order_id="order-id", authorization_id="AUT-1234-4567")
     context.customer_id = "customer-id"
-
     step = ValidateGovernmentTransfer(is_validation=False)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
     mocked_switch_order_to_failed.assert_called_once_with(
@@ -2618,13 +2435,9 @@ def test_validate_government_transfer_government_error_validation_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment",
-        return_value=MARKET_SEGMENT_GOVERNMENT,
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
     )
-    mocker.patch(
-        "adobe_vipm.flows.helpers.get_adobe_client",
-        return_value=mock_adobe_client,
-    )
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
         "adobe_vipm.flows.helpers.validate_government_lga_data",
         side_effect=GovernmentNotValidOrderError(),
@@ -2632,21 +2445,14 @@ def test_validate_government_transfer_government_error_validation_mode(
     mocked_set_ordering_parameter_error = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.set_ordering_parameter_error",
     )
-
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.get_customer.return_value = adobe_customer
-
     order = order_factory()
-
-    context = Context(
-        order=order,
-        order_id="order-id",
-        authorization_id="AUT-1234-4567",
-    )
+    context = Context(order=order, order_id="order-id", authorization_id="AUT-1234-4567")
     context.customer_id = "customer-id"
-
     step = ValidateGovernmentTransfer(is_validation=True)
-    step(mock_mpt_client, context, mock_next_step)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_validate_government_lga_data.assert_called_once_with(order, adobe_customer)
     mocked_set_ordering_parameter_error.assert_called_once_with(
