@@ -5936,7 +5936,6 @@ def test_transfer_lga_product_with_lga_agency_type(
     )
     mocked_sync_agreement.assert_called_once_with(
         mock_mpt_client,
-        mock_adobe_client,
         [order["agreement"]["id"]],
         dry_run=False,
         sync_prices=False,

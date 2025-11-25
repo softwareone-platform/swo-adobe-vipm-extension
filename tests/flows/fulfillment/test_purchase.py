@@ -423,7 +423,7 @@ def test_create_customer_step_exception(
 
     context = Context(
         product_id="PRD-1111-1111",
-        order=mock_order,
+        order=order,
         customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
