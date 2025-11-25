@@ -1420,7 +1420,6 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.validation.shared",
         "adobe_vipm.flows.validation.transfer",
         "adobe_vipm.management.commands.create_resellers",
-        "adobe_vipm.management.commands.migrate_mpt_assets",
         "adobe_vipm.management.commands.sync_3yc_enrol",
         "adobe_vipm.management.commands.sync_agreements",
     ]
@@ -1677,7 +1676,6 @@ def mock_mpt_client(mocker):
 def mock_setup_client(mocker, mock_mpt_client):
     paths = [
         "adobe_vipm.management.commands.sync_3yc_enrol",
-        "adobe_vipm.management.commands.migrate_mpt_assets",
         "adobe_vipm.management.commands.sync_agreements",
         "adobe_vipm.flows.sync.agreement",
     ]
