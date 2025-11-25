@@ -340,6 +340,60 @@ def test_sync_agreement_not_prices(
     )
 
 
+@pytest.mark.parametrize(
+    ("agreement_status"),
+    [
+        AgreementStatus.TERMINATED,
+        AgreementStatus.ACTIVE,
+    ],
+)
+def test_process_orphaned_deployment_subscriptions_status(
+    agreement_status,
+    mock_adobe_client,
+    agreement_factory,
+    mock_add_missing_subscriptions_and_assets,
+    mock_get_agreements_by_customer_deployments,
+    fulfillment_parameters_factory,
+    mock_get_prices_for_skus,
+    mock_check_update_airtable_missing_deployments,
+    mocked_agreement_syncer,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+):
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    deployment_agreement = agreement_factory(
+        assets=[],
+        status=agreement_status,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id="deployment_id"
+        ),
+    )
+    mock_get_agreements_by_customer_deployments.return_value = [deployment_agreement]
+    mocked_agreement_syncer._adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="specific_subscription_id", deployment_id="deployment-id"
+        ),
+        adobe_subscription_factory(
+            subscription_id="subscription_id",
+            deployment_id="deployment-id",
+            autorenewal_enabled=False,
+        ),
+    ]
+    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
+
+    mocked_agreement_syncer.sync(sync_prices=True)
+
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        "AUT-1234-5678", "a-client-id", "specific_subscription_id", auto_renewal=False
+    )
+
+
 def test_sync_agreement_prices_dry_run(
     mocker,
     mock_adobe_client,
@@ -2131,55 +2185,93 @@ def test_add_missing_subscriptions_wrong_currency(
     mock_mpt_create_agreement_subscription.assert_not_called()
 
 
-def test_process_orphaned_deployment_subscriptions(
-    agreement_factory, adobe_subscription_factory, mock_adobe_client, mocked_agreement_syncer
-):
-    mocked_agreement_syncer._adobe_subscriptions = [
-        adobe_subscription_factory(subscription_id="a-sub-id", deployment_id="deployment_id"),
-        adobe_subscription_factory(
-            subscription_id="c-sub-id", deployment_id="deployment_id", autorenewal_enabled=False
-        ),
-        adobe_subscription_factory(subscription_id="b-sub-id", deployment_id=""),
-    ]
-
-    mocked_agreement_syncer._process_orphaned_deployment_subscriptions([agreement_factory()])
-
-    mock_adobe_client.update_subscription.assert_called_once_with(
-        "AUT-1234-5678", "a-client-id", "a-sub-id", auto_renewal=False
-    )
-
-
 def test_process_orphaned_deployment_subscriptions_none(
-    agreement_factory,
-    adobe_subscription_factory,
     mock_adobe_client,
+    agreement_factory,
+    mock_add_missing_subscriptions_and_assets,
+    mock_get_agreements_by_customer_deployments,
+    fulfillment_parameters_factory,
+    mock_get_prices_for_skus,
+    mock_check_update_airtable_missing_deployments,
     mocked_agreement_syncer,
-    mock_agreement,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    subscriptions_factory,
 ):
-    mocked_agreement_syncer._adobe_subscriptions = []
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    deployment_agreement = agreement_factory(
+        assets=[],
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes",
+            deployment_id="deployment-id",
+        ),
+        subscriptions=subscriptions_factory(
+            subscription_id="mpt_subscription_id",
+            adobe_subscription_id="specific_subscription_id",
+        ),
+    )
+    mock_get_agreements_by_customer_deployments.return_value = [deployment_agreement]
+    adobe_subscription = adobe_subscription_factory(
+        subscription_id="specific_subscription_id",
+        deployment_id="deployment-id",
+    )
+    mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
+    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
 
-    mocked_agreement_syncer._process_orphaned_deployment_subscriptions([mock_agreement])
+    mocked_agreement_syncer.sync(sync_prices=True)
 
     mock_adobe_client.update_subscription.assert_not_called()
 
 
 def test_process_orphaned_deployment_subscriptions_error(
-    agreement_factory,
-    adobe_subscription_factory,
     mock_adobe_client,
-    mock_send_exception,
+    agreement_factory,
+    mock_add_missing_subscriptions_and_assets,
+    mock_get_agreements_by_customer_deployments,
+    fulfillment_parameters_factory,
+    mock_get_prices_for_skus,
+    mock_check_update_airtable_missing_deployments,
     mocked_agreement_syncer,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    mock_send_exception,
+    caplog,
 ):
     mock_adobe_client.update_subscription.side_effect = Exception("Boom!")
-    mocked_agreement_syncer._adobe_subscriptions = [
-        adobe_subscription_factory(subscription_id="a-sub-id", deployment_id="deployment_id"),
-        adobe_subscription_factory(subscription_id="b-sub-id", deployment_id=""),
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
     ]
+    deployment_agreement = agreement_factory(
+        assets=[],
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id="deployment_id"
+        ),
+    )
+    mock_get_agreements_by_customer_deployments.return_value = [deployment_agreement]
+    adobe_subscription = adobe_subscription_factory(
+        subscription_id="specific_subscription_id", deployment_id="deployment-id"
+    )
+    mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
+    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
 
-    mocked_agreement_syncer._process_orphaned_deployment_subscriptions([agreement_factory()])
+    mocked_agreement_syncer.sync(sync_prices=True)
 
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        "AUT-1234-5678", "a-client-id", "specific_subscription_id", auto_renewal=False
+    )
     mock_send_exception.assert_called_once_with(
-        "Error disabling auto-renewal for orphaned Adobe subscription a-sub-id.", "Boom!"
+        "Error disabling auto-renewal for orphaned Adobe subscription specific_subscription_id.",
+        "Boom!",
     )
 
 
