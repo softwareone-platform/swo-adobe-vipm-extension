@@ -28,10 +28,15 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_GOVERNMENT,
     MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC,
+    TEMPLATE_NAME_QUERY_3YC,
     Param,
 )
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
-from adobe_vipm.flows.fulfillment.shared import handle_error, switch_order_to_failed
+from adobe_vipm.flows.fulfillment.shared import (
+    handle_error,
+    switch_order_to_failed,
+    switch_order_to_query,
+)
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync.helper import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
@@ -208,37 +213,26 @@ class Validate3YCCommitment(Step):
     def __init__(self, *, is_validation=False):
         self.is_validation = is_validation
 
-    def __call__(self, client, context, next_step):  # noqa: C901
+    def __call__(self, client, context, next_step):
         """Validates 3YC parameters."""
-        is_new_purchase_order_validation = not context.adobe_customer
-
         if context.adobe_return_orders:
             next_step(client, context)
             return
 
-        if is_new_purchase_order_validation:
-            logger.info(
-                "%s: No Adobe customer found, validating 3YC quantities parameters",
-                context,
-            )
-            if self.validate_3yc_quantities_parameters(client, context):
-                next_step(client, context)
+        if not context.adobe_customer:
+            self._handle_new_purchase_order_validation(client, context, next_step)
             return
 
-        commitment = get_3yc_commitment_request(
-            context.adobe_customer,
-            is_recommitment=False,
-        ) or get_3yc_commitment(context.adobe_customer)
-
-        adobe_client = get_adobe_client()
+        commitment = self._get_commitment(context.adobe_customer)
         commitment_status = commitment.get("status", "")
 
-        if commitment_status == ThreeYearCommitmentStatus.REQUESTED and not self.is_validation:
+        if self._should_query_commitment(commitment_status):
             logger.info(
                 "%s: 3YC commitment request is in status %s",
                 context,
                 ThreeYearCommitmentStatus.REQUESTED,
             )
+            switch_order_to_query(client, context.order, template_name=TEMPLATE_NAME_QUERY_3YC)
             return
 
         if self._is_commitment_expired_or_rejected(commitment_status, commitment, context):
@@ -251,45 +245,74 @@ class Validate3YCCommitment(Step):
             )
             return
 
-        if commitment:
-            if self._validate_3yc_commitment_date_before_coterm_date(context, commitment):
-                logger.info("%s: 3YC commitment end date is before coterm date", context)
-                next_step(client, context)
-                return
-
-            subscriptions = adobe_client.get_subscriptions(
-                context.authorization_id,
-                context.adobe_customer_id,
-            )
-
-            is_valid, error = self.validate_items_in_subscriptions(context, subscriptions)
-            if not is_valid:
-                manage_order_error(
-                    client,
-                    context,
-                    ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
-                    is_validation=self.is_validation,
-                )
-                return
-
-            count_licenses, count_consumables = self.get_quantities(context, subscriptions)
-
-            error = self.validate_minimum_quantity(
-                context, commitment, count_licenses, count_consumables
-            )
-            if error:
-                manage_order_error(
-                    client,
-                    context,
-                    ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
-                    is_validation=self.is_validation,
-                )
-                return
+        if not self._validate_commitment_requirements(client, context, commitment):
+            return
 
         next_step(client, context)
 
+    def _get_commitment(self, adobe_customer):
+        return get_3yc_commitment_request(
+            adobe_customer, is_recommitment=False
+        ) or get_3yc_commitment(adobe_customer)
+
+    def _handle_new_purchase_order_validation(self, client, context, next_step):
+        logger.info(
+            "%s: No Adobe customer found, validating 3YC quantities parameters",
+            context,
+        )
+        if self.validate_3yc_quantities_parameters(client, context):
+            next_step(client, context)
+
+    def _should_query_commitment(self, commitment_status):
+        return commitment_status == ThreeYearCommitmentStatus.REQUESTED and not self.is_validation
+
+    def _validate_commitment_requirements(self, client, context, commitment):
+        if not commitment:
+            return True
+
+        if self._validate_3yc_commitment_date_before_coterm_date(context, commitment):
+            logger.info("%s: 3YC commitment end date is before coterm date", context)
+            return True
+
+        adobe_client = get_adobe_client()
+        subscriptions = adobe_client.get_subscriptions(
+            context.authorization_id,
+            context.adobe_customer_id,
+        )
+
+        if not self._validate_items_in_subscriptions(client, context, subscriptions):
+            return False
+
+        return self._validate_minimum_quantities(client, context, commitment, subscriptions)
+
+    def _validate_items_in_subscriptions(self, client, context, subscriptions):
+        is_valid, error = self.validate_items_in_subscriptions(context, subscriptions)
+        if not is_valid:
+            manage_order_error(
+                client,
+                context,
+                ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
+                is_validation=self.is_validation,
+            )
+            return False
+        return True
+
+    def _validate_minimum_quantities(self, client, context, commitment, subscriptions):
+        count_licenses, count_consumables = self.get_quantities(context, subscriptions)
+        error = self.validate_minimum_quantity(
+            context, commitment, count_licenses, count_consumables
+        )
+        if error:
+            manage_order_error(
+                client,
+                context,
+                ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
+                is_validation=self.is_validation,
+            )
+            return False
+        return True
+
     def _is_commitment_expired_or_rejected(self, commitment_status, commitment, context):
-        """Check if commitment is expired, noncompliant, or rejected."""
         if commitment_status in {
             ThreeYearCommitmentStatus.EXPIRED,
             ThreeYearCommitmentStatus.NONCOMPLIANT,

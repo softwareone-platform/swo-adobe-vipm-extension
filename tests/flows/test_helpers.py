@@ -20,6 +20,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_CUSTOMER_LOST_EXCEPTION,
     MARKET_SEGMENT_GOVERNMENT,
+    TEMPLATE_NAME_QUERY_3YC,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -773,6 +774,9 @@ def test_validate_3yc_commitment_requested_status(
         start_date="2024-01-01",
         end_date="2027-01-01",
     )
+    mocked_switch_to_query = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_query",
+    )
     adobe_customer = adobe_customer_factory(commitment=commitment, commitment_request=commitment)
     lines = [
         {
@@ -801,6 +805,11 @@ def test_validate_3yc_commitment_requested_status(
 
     step(mocked_client, context, mocked_next_step)  # act
 
+    mocked_switch_to_query.assert_called_once_with(
+        mocked_client,
+        context.order,
+        template_name=TEMPLATE_NAME_QUERY_3YC,
+    )
     mocked_next_step.assert_not_called()
 
 
