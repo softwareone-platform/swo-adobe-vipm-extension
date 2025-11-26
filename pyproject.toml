@@ -77,26 +77,38 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 testpaths = "tests"
 pythonpath = "."
-addopts = "--cov=adobe_vipm --cov-report=term-missing --cov-report=html --cov-report=xml  --import-mode=importlib"
+addopts = "--cov=adobe_vipm --cov-report=term-missing --cov-report=xml  --import-mode=importlib"
 DJANGO_SETTINGS_MODULE = "tests.django.settings"
 log_cli = false
 filterwarnings = [
     "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
-    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
 ]
 
 [tool.coverage.run]
 relative_files = true
 branch = true
+omit = [
+  "__init__.py",
+]
 
 [tool.flake8]
+allowed-domain-names = ["result"]
 aaa_act_block_style = "large"
 doctests = true
 extend-ignore = ["WPS226"]
-extend-exclude = [".venv"]
+extend-exclude = [
+  ".coverage",
+  ".github",
+  ".idea",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".ruff_cache",
+  "uv.lock",
+  ".venv"
+]
 format = "wemake"
 max-imports = 17
-max-line-length=100
+max-line-length = 100
 select = ["AAA", "E999", "WPS"]
 show-source = true
 statistics = false
@@ -164,7 +176,6 @@ per-file-ignores = [
 # Ruff config: https://docs.astral.sh/ruff/settings
 preview = true
 target-version = "py312"
-extend-exclude = [".vscode", ".devcontainer", "swo", "adobe_vipm/flows/pipeline.py"]
 output-format = "full"
 line-length = 100
 
@@ -247,6 +258,7 @@ mccabe.max-complexity = 6
 pydocstyle.convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
+"adobe_vipm/flows/pipeline.py" = ["D101", "D102", "RSE102"]
 "tests/*.py" = [
   "D103", # missing docstring in public function
   "S101", # asserts
