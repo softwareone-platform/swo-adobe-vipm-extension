@@ -10,8 +10,9 @@ from urllib.parse import urljoin
 import requests
 
 from adobe_vipm.adobe import constants as adobe_constants
+from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
-from adobe_vipm.adobe.errors import AdobeError, wrap_http_error
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, wrap_http_error
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
     get_item_by_subcription_id,
@@ -176,7 +177,7 @@ class OrderClientMixin:
             get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
             for line in context.upsize_lines + context.new_lines
         )
-        flex_discounts = self._get_flex_discounts_per_base_offer(authorization, context, offer_ids)
+        flex_discounts = self.get_flex_discounts_per_base_offer(authorization, context, offer_ids)
         if flex_discounts:
             logger.info("Found flex discounts for base SKUs: %s", flex_discounts)
         payload = {
@@ -468,6 +469,45 @@ class OrderClientMixin:
 
         return response_json
 
+    def get_flex_discounts_per_base_offer(
+        self,
+        authorization: Authorization,
+        context: Context,
+        offer_ids: tuple,
+    ) -> dict:
+        """Fetches active flex discounts for the provided base offer IDs."""
+        # TODO: Change this when Adobe starts supporting multiple codes per single baseOfferId
+        country = context.customer_data["address"]["country"]
+        if context.customer_data[Param.DEPLOYMENT_ID]:
+            match = re.match(
+                self.deployment_country_pattern.format(context.customer_data[Param.DEPLOYMENT_ID]),
+                context.customer_data[Param.DEPLOYMENTS],
+                re.IGNORECASE,
+            )
+            if match:
+                country = match.group(1)
+        try:
+            flex_discounts = self._get_flex_discounts(
+                authorization,
+                context.market_segment,
+                country,
+                offer_ids,
+            )
+        except AdobeAPIError as error:
+            if error.code == AdobeStatus.INVALID_COUNTRY_FOR_PARTNER:
+                logger.warning(
+                    "Invalid country %s for partner when getting flex discounts.", country
+                )
+                flex_discounts = ()
+            else:
+                raise
+        base_offers_with_discounts = {}
+        for flex_discount in filter(lambda fd: fd["status"] == "ACTIVE", flex_discounts):
+            base_offers_with_discounts.update(
+                dict.fromkeys(flex_discount["qualification"]["baseOfferIds"], flex_discount["code"])
+            )
+        return base_offers_with_discounts
+
     def _get_fail_discounts_for_cust_not_qualified(self, ex: AdobeError, payload: dict) -> set:
         if ex.code == adobe_constants.AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
             logger.warning("%s", ex)
@@ -544,35 +584,6 @@ class OrderClientMixin:
                 flex_discounts.get(get_adobe_product_by_marketplace_sku(adobe_base_sku).sku),
             )
             payload["lineItems"].append(line_item)
-
-    def _get_flex_discounts_per_base_offer(
-        self,
-        authorization: Authorization,
-        context: Context,
-        offer_ids: tuple,
-    ) -> dict:
-        # TODO: Change this when Adobe starts supporting multiple codes per single baseOfferId
-        country = context.customer_data["address"]["country"]
-        if context.customer_data[Param.DEPLOYMENT_ID]:
-            match = re.match(
-                self.deployment_country_pattern.format(context.customer_data[Param.DEPLOYMENT_ID]),
-                context.customer_data[Param.DEPLOYMENTS],
-                re.IGNORECASE,
-            )
-            if match:
-                country = match.group(1)
-        flex_discounts = self._get_flex_discounts(
-            authorization,
-            context.market_segment,
-            country,
-            offer_ids,
-        )
-        base_offers_with_discounts = {}
-        for flex_discount in filter(lambda fd: fd["status"] == "ACTIVE", flex_discounts):
-            base_offers_with_discounts.update(
-                dict.fromkeys(flex_discount["qualification"]["baseOfferIds"], flex_discount["code"])
-            )
-        return base_offers_with_discounts
 
     def _build_line_item(self, adobe_line_item: dict) -> dict:
         line_item = {

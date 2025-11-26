@@ -6,6 +6,8 @@ from responses import matchers
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.utils import to_adobe_line_id
+from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.utils import get_customer_data
 
 
 def test_get_preview_order(
@@ -322,3 +324,88 @@ def test_get_preview_order_line_item(
         "offerId": "65304578CA01A12",
         "quantity": 2,
     }
+
+
+def test_get_flex_discounts_per_base_offer_invalid_country(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    order_preview_discounts_resp_factory,
+    preview_discounts_payload_factory,
+    mock_order,
+    flex_discounts_factory,
+    adobe_api_error_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    payload = preview_discounts_payload_factory()
+    payload["lineItems"][1]["flexDiscountCodes"] = []
+    response_json = order_preview_discounts_resp_factory()
+    del response_json["lineItems"][1]["flexDiscounts"]
+    requests_mocker.get(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
+        status=400,
+        json=adobe_api_error_factory(
+            AdobeStatus.INVALID_COUNTRY_FOR_PARTNER, "Invalid Country for Partner"
+        ),
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "country": "US",
+                "offer-ids": "99999999CA01A12,99999999CA01A12",
+            })
+        ],
+    )
+    context = Context(
+        order=mock_order,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        customer_data=get_customer_data(mock_order),
+    )
+
+    flex_discounts = mocked_client.get_flex_discounts_per_base_offer(
+        authorization,
+        context,
+        ("99999999CA01A12", "99999999CA01A12"),
+    )  # act
+
+    assert flex_discounts == {}
+
+
+def test_get_flex_discounts_per_base_offer_error(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    order_preview_discounts_resp_factory,
+    preview_discounts_payload_factory,
+    mock_order,
+    flex_discounts_factory,
+    adobe_api_error_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    payload = preview_discounts_payload_factory()
+    payload["lineItems"][1]["flexDiscountCodes"] = []
+    response_json = order_preview_discounts_resp_factory()
+    del response_json["lineItems"][1]["flexDiscounts"]
+    requests_mocker.get(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
+        status=400,
+        json=adobe_api_error_factory(AdobeStatus.INTERNAL_SERVER_ERROR, "Internal server error"),
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "country": "US",
+                "offer-ids": "99999999CA01A12,99999999CA01A12",
+            })
+        ],
+    )
+    context = Context(
+        order=mock_order,
+        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        customer_data=get_customer_data(mock_order),
+    )
+
+    with pytest.raises(AdobeError):
+        mocked_client.get_flex_discounts_per_base_offer(
+            authorization,
+            context,
+            ("99999999CA01A12", "99999999CA01A12"),
+        )  # act
