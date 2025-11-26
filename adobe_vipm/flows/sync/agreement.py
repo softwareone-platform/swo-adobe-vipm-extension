@@ -917,6 +917,7 @@ def _sync_agreements_by_param(
     yesterday = (today - dt.timedelta(days=1)).isoformat()
     rql_query = (
         "eq(status,Active)&"
+        f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))&"
         f"any(parameters.fulfillment,and(eq(externalId,{param}),eq(displayValue,{yesterday})))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
@@ -949,6 +950,7 @@ def sync_agreements_by_renewal_date(
 
     rql_query = (
         "eq(status,Active)&"
+        f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))&"
         f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
