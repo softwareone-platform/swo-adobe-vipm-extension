@@ -254,14 +254,15 @@ def sync_agreement(
         dry_run (bool): Flag indicating whether to execute in dry-run mode (no actual changes).
         sync_prices (bool): Flag indicating whether to synchronize subscription prices.
     """
+    if agreement["product"]["id"] not in settings.MPT_PRODUCTS_IDS:
+        logger.error("Product %s not in MPT_PRODUCTS_IDS. Skipping.", agreement["product"]["id"])
+        return
+
     adobe_customer_id = get_adobe_customer_id(agreement)
     customer = get_customer_or_process_lost_customer(
         mpt_client, adobe_client, agreement, adobe_customer_id, dry_run=dry_run
     )
     if not customer:
-        return
-    if agreement["product"]["id"] not in settings.MPT_PRODUCTS_IDS:
-        logger.error("Product %s not in MPT_PRODUCTS_IDS. Skipping.", agreement["product"]["id"])
         return
 
     authorization_id: str = agreement["authorization"]["id"]

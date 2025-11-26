@@ -2402,7 +2402,9 @@ def test_check_update_airtable_missing_deployments_none(
 def test_not_syncing_unknown_products(
     mocker, mock_mpt_client, mock_adobe_client, agreement_factory, mocked_agreement_syncer, caplog
 ):
-    mocker.patch.object(mocked_agreement_syncer, "sync", spec=True)
+    mock_get_customer_or_process_lost_customer = mocker.patch(
+        "adobe_vipm.flows.sync.helper.get_customer_or_process_lost_customer", spec=True
+    )
     agreement = agreement_factory()
     agreement["product"]["id"] = "NOT_CONFIGURED_PRODUCT"
 
@@ -2410,5 +2412,5 @@ def test_not_syncing_unknown_products(
         mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=True
     )  # act
 
-    mocked_agreement_syncer.sync.assert_not_called()
+    mock_get_customer_or_process_lost_customer.assert_not_called()
     assert caplog.messages == ["Product NOT_CONFIGURED_PRODUCT not in MPT_PRODUCTS_IDS. Skipping."]
