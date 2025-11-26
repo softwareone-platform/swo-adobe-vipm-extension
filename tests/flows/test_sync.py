@@ -3094,15 +3094,15 @@ def test_check_update_airtable_missing_deployments_none(
 
 
 def test_not_syncing_unknown_products(
-    mock_mpt_client, agreement_factory, mock_get_adobe_client, mock_adobe_client, caplog
+    mocker,mock_mpt_client, agreement_factory, mock_adobe_client, caplog
 ):
+    mock_get_customer_or_process_lost_customer = mocker.patch(
+        "adobe_vipm.flows.sync._get_customer_or_process_lost_customer", spec=True
+    )
     agreement = agreement_factory()
     agreement["product"]["id"] = "NOT_CONFIGURED_PRODUCT"
-    mock_adobe_client.get_customer.side_effect = AuthorizationNotFoundError(
-        "Authorization with uk/id AUT-9054-3239 not found."
-    )
 
     sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
 
-    mock_get_adobe_client.assert_not_called()
+    mock_get_customer_or_process_lost_customer.assert_not_called()
     assert caplog.messages == ["Product NOT_CONFIGURED_PRODUCT not in MPT_PRODUCTS_IDS. Skipping."]
