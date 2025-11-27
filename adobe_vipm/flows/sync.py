@@ -39,6 +39,7 @@ from adobe_vipm.adobe.errors import (
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows.constants import (
+    MARKET_SEGMENT_EDUCATION,
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
@@ -62,6 +63,7 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
+from adobe_vipm.flows.utils.market_segment import get_market_segment
 from adobe_vipm.notifications import send_exception, send_notification
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
@@ -332,6 +334,10 @@ def _update_agreement(
         "externalId": Param.COTERM_DATE.value,
         "value": customer.get("cotermDate", ""),
     })
+
+    if get_market_segment(agreement["product"]["id"]) == MARKET_SEGMENT_EDUCATION:
+        _add_education_market_sub_segments(customer, parameters)
+
     if not dry_run:
         update_agreement(
             mpt_client,
@@ -390,6 +396,14 @@ def _add_3yc_fulfillment_params(
     ]
 
     return new_parameters
+
+
+def _add_education_market_sub_segments(customer, parameters: dict) -> None:
+    subsegments = customer.get("companyProfile", {}).get("marketSubSegments", [])
+    parameters[Param.PHASE_FULFILLMENT.value].append({
+        "externalId": Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
+        "value": ",".join(subsegments),
+    })
 
 
 def _update_agreement_line_prices(

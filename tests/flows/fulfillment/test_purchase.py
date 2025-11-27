@@ -11,12 +11,9 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ADDRESS,
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
-    ERR_MARKET_SEGMENT_NOT_ELIGIBLE,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_COMMERCIAL,
-    STATUS_MARKET_SEGMENT_ELIGIBLE,
-    STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
-    STATUS_MARKET_SEGMENT_PENDING,
+    TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
     TEMPLATE_NAME_PURCHASE,
     Param,
 )
@@ -24,7 +21,8 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.purchase import (
     CreateCustomer,
     RefreshCustomer,
-    ValidateMarketSegmentEligibility,
+    ValidateEducationSubSegments,
+    ValidateGovernmentLGA,
     fulfill_purchase_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -88,29 +86,29 @@ def test_refresh_customer_step(mocker, order_factory):
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-@pytest.mark.parametrize("segment", ["EDU", "GOV"])
-def test_validate_market_segment_eligibility_step(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    segment,
+def test_validate_market_segment_education_without_market_subsegments(
+    mocker, order_factory, adobe_customer_factory
 ):
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            market_segment_eligibility_status=STATUS_MARKET_SEGMENT_ELIGIBLE,
-        ),
-    )
+    order = order_factory()
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        market_segment=segment,
+    mocked_switch_to_query = mocker.patch(
+        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
     )
+    adobe_customer = adobe_customer_factory()
+    adobe_customer["companyProfile"]["marketSegment"] = "EDU"
+    adobe_customer["companyProfile"]["marketSubSegments"] = None
+    context = Context(order=order, market_segment="EDU", adobe_customer=adobe_customer)
+    step = ValidateEducationSubSegments()
 
-    step = ValidateMarketSegmentEligibility()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_next_step.assert_not_called()
+    mocked_switch_to_query.assert_called_once_with(
+        mocked_client,
+        order,
+        template_name=TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
+    )
 
 
 def test_validate_market_segment_eligibility_commercial(
@@ -119,110 +117,18 @@ def test_validate_market_segment_eligibility_commercial(
     fulfillment_parameters_factory,
 ):
     order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            market_segment_eligibility_status=STATUS_MARKET_SEGMENT_ELIGIBLE,
-        ),
+        fulfillment_parameters=fulfillment_parameters_factory(),
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
-        order=order,
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
+        order=order, product_id="PRD-1111-1111", market_segment=MARKET_SEGMENT_COMMERCIAL
     )
+    step = ValidateEducationSubSegments()
 
-    step = ValidateMarketSegmentEligibility()
     step(mocked_client, context, mocked_next_step)
 
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@pytest.mark.parametrize("segment", ["EDU", "GOV"])
-def test_validate_market_segment_eligibility_step_status_not_set(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    segment,
-):
-    order = order_factory()
-    mocked_switch_to_query = mocker.patch(
-        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        market_segment=segment,
-    )
-
-    step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
-    mocked_switch_to_query.assert_called_once_with(
-        mocked_client,
-        order_factory(
-            fulfillment_parameters=fulfillment_parameters_factory(
-                market_segment_eligibility_status=STATUS_MARKET_SEGMENT_PENDING,
-            ),
-        ),
-        template_name=TEMPLATE_NAME_PURCHASE,
-    )
-    mocked_next_step.assert_not_called()
-
-
-@pytest.mark.parametrize("segment", ["EDU", "GOV"])
-def test_validate_market_segment_eligibility_step_status_pending(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    segment,
-):
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            market_segment_eligibility_status=STATUS_MARKET_SEGMENT_PENDING,
-        ),
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        market_segment=segment,
-    )
-
-    step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_next_step.assert_not_called()
-
-
-@pytest.mark.parametrize("segment", ["EDU", "GOV"])
-def test_validate_market_segment_eligibility_step_status_eligible(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    segment,
-):
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(
-            market_segment_eligibility_status=STATUS_MARKET_SEGMENT_NOT_ELIGIBLE,
-        ),
-    )
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.purchase.switch_order_to_failed",
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        market_segment=segment,
-    )
-
-    step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
-
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client, order, ERR_MARKET_SEGMENT_NOT_ELIGIBLE.to_dict(segment=segment)
-    )
-
-    mocked_next_step.assert_not_called()
 
 
 def test_validate_market_segment_eligibility_lga_agency_type_not_federal_or_state(
@@ -235,16 +141,49 @@ def test_validate_market_segment_eligibility_lga_agency_type_not_federal_or_stat
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     mock_order["product"]["id"] = "PRD-3333-3333"
-    context = Context(order=mock_order)
+    mock_order["parameters"]["ordering"].append({
+        "id": "PAR-1164-2550-0043",
+        "externalId": "companyAgencyType",
+        "name": "Agency type",
+        "type": "DropDown",
+        "phase": "Order",
+        "error": None,
+    })
+    context = Context(order=mock_order, product_id="PRD-3333-3333")
+    step = ValidateGovernmentLGA()
 
-    step = ValidateMarketSegmentEligibility()
-    step(mocked_client, context, mocked_next_step)
+    step(mocked_client, context, mocked_next_step)  # act
+
     mocked_switch_to_query.assert_called_once_with(
         mocked_client,
         context.order,
         template_name=TEMPLATE_NAME_PURCHASE,
     )
     mocked_next_step.assert_not_called()
+
+
+def test_validate_market_segment_eligibility_lga_agency_type_valid(
+    mocker,
+    mock_order,
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mock_order["product"]["id"] = "PRD-3333-3333"
+    mock_order["parameters"]["ordering"].append({
+        "id": "PAR-1164-2550-0043",
+        "externalId": "companyAgencyType",
+        "name": "Agency type",
+        "type": "DropDown",
+        "phase": "Order",
+        "error": None,
+        "value": "FEDERAL",
+    })
+    context = Context(order=mock_order, product_id="PRD-3333-3333")
+    step = ValidateGovernmentLGA()
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_create_customer_step(
@@ -798,15 +737,16 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
 
     fulfill_purchase_order(mock_mpt_client, mock_order)
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 18
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 19
     expected_steps = [
         SetupContext,
         StartOrderProcessing,
         SetupDueDate,
         ValidateDuplicateLines,
-        ValidateMarketSegmentEligibility,
+        ValidateGovernmentLGA,
         PrepareCustomerData,
         CreateCustomer,
+        ValidateEducationSubSegments,
         Validate3YCCommitment,
         GetPreviewOrder,
         UpdatePrices,
@@ -823,6 +763,6 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
     assert actual_steps == expected_steps
 
     assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_PURCHASE
-    assert mocked_pipeline_ctor.mock_calls[0].args[15].template_name == TEMPLATE_NAME_PURCHASE
+    assert mocked_pipeline_ctor.mock_calls[0].args[16].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mock_order)
     mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)
