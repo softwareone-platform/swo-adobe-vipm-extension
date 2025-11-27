@@ -1105,7 +1105,6 @@ def get_customer_or_process_lost_customer(
     """
     try:
         return adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
-    # TODO: add AuthorizationNotFoundError error
     except AdobeAPIError as error:
         if error.code == AdobeStatus.INVALID_CUSTOMER:
             logger.info(
@@ -1169,16 +1168,25 @@ def _process_lost_customer(  # noqa: C901
                 f"{error}",
             )
 
-    adobe_deployments = adobe_client.get_customer_deployments_active_status(
-        agreement["authorization"]["id"], customer_id
-    )
+    try:
+        adobe_deployments = adobe_client.get_customer_deployments_active_status(
+            agreement["authorization"]["id"], customer_id
+        )
+    except AdobeAPIError as error:
+        msg = (
+            f"Error getting customer deployments for Suspected Lost Customer {customer_id},"
+            f" authorization {agreement['authorization']['id']}."
+        )
+        send_exception(msg, f"{error}")
+        logger.exception(msg)
+        return
+
     if adobe_deployments:
         deployment_agreements = mpt.get_agreements_by_customer_deployments(
             mpt_client,
             Param.DEPLOYMENT_ID.value,
             [deployment["deploymentId"] for deployment in adobe_deployments],
         )
-
         for deployment_agreement in deployment_agreements:
             for subscription_id in [
                 sub["id"]
@@ -1195,7 +1203,7 @@ def _process_lost_customer(  # noqa: C901
                         subscription_id,
                     )
                     send_exception(
-                        "> Suspected Lost Customer: Error terminating subscription"
+                        f"> Suspected Lost Customer: Error terminating subscription"
                         f" {subscription_id}",
                         f"{error}",
                     )

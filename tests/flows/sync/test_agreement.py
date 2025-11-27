@@ -2796,6 +2796,40 @@ def test_get_customer_or_process_lost_customer_error(
     mock_get_agreements_by_customer_deployments.assert_called_once()
 
 
+def test_get_customer_or_process_lost_customer_deployment_error(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    mock_send_warning,
+    mock_send_exception,
+    mock_mpt_terminate_subscription,
+    mock_get_agreements_by_customer_deployments,
+    agreement,
+    adobe_customer_factory,
+):
+    mock_adobe_client.get_customer.side_effect = [
+        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER, "message": "Test error"})
+    ]
+    mock_adobe_client.get_customer_deployments_active_status.side_effect = [
+        AdobeAPIError(
+            500,
+            {
+                "code": AdobeStatus.INACTIVE_OR_GENERIC_FAILURE,
+                "message": "Inactive or generic failure",
+            },
+        )
+    ]
+
+    result = get_customer_or_process_lost_customer(
+        mock_mpt_client, mock_adobe_client, agreement, "fake_customer_id", dry_run=False
+    )
+
+    assert result is None
+    mock_adobe_client.get_customer.assert_called_once_with("AUT-4785-7184", "fake_customer_id")
+    mock_send_warning.assert_called_once()
+    mock_send_exception.assert_called_once()
+
+
 def test_get_customer_or_process_lost_customer_dry_run(
     mock_mpt_client,
     mock_adobe_client,
