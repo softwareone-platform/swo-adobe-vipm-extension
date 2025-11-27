@@ -951,7 +951,7 @@ def sync_agreements_by_renewal_date(
     rql_query = (
         "eq(status,Active)&"
         f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))&"
-        f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)}))))&"
+        f"any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,({','.join(yesterday_every_month)})))))&"
         f"any(parameters.fulfillment,and(eq(externalId,{Param.LAST_SYNC_DATE.value}),ne(displayValue,{today_iso})))&"
         # Let's get only what we need
         "select=lines,parameters,assets,subscriptions,product,listing"
