@@ -1463,11 +1463,29 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_notify_missing_prices.assert_called_once_with(
         "AGR-2119-4550-8674-5962", ["65304578CA01A12"], "PRD-1111-1111", "USD", None
     )
-    mock_mpt_update_agreement.call_args_list = [
+    assert mock_mpt_update_agreement.call_args_list == [
         mocker.call(
             mock_mpt_client,
             agreement["id"],
-            lines=agreement["lines"],
+            lines=[
+                {
+                    "item": {
+                        "id": "ITM-1234-1234-1234-0001",
+                        "name": "Awesome product",
+                        "externalIds": {"vendor": "77777777CA"},
+                    },
+                    "subscription": {
+                        "id": "SUB-1000-2000-3000",
+                        "status": "Active",
+                        "name": "Subscription for Acrobat Pro for Teams; Multi Language",
+                    },
+                    "oldQuantity": 0,
+                    "quantity": 170,
+                    "price": {"unitPP": 20.22},
+                    "id": "ALI-2119-4550-8674-5962-0001",
+                }
+            ],
+            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
         ),
         mocker.call(
             mock_mpt_client,
