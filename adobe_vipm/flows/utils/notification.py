@@ -1,3 +1,4 @@
+import datetime as dt
 import functools
 
 from adobe_vipm.notifications import send_exception
@@ -42,7 +43,7 @@ def notify_missing_prices(
     missing_skus: list[str],
     product_id: str,
     currency: str,
-    commitment_date: str | None = None,
+    commitment_date: dt.date | None = None,
 ) -> None:
     """
     Notifies about SKUs with missing prices in the agreement.

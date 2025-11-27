@@ -75,7 +75,7 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.sync.helper import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.sync.agreement import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
     exclude_items_with_deployment_id,

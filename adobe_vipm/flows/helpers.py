@@ -38,7 +38,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     switch_order_to_query,
 )
 from adobe_vipm.flows.pipeline import Step
-from adobe_vipm.flows.sync.helper import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.sync.agreement import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
