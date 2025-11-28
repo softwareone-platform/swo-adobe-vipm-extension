@@ -274,6 +274,7 @@ class AgreementSyncer:  # noqa: WPS214
             if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
                 self._create_mpt_asset(adobe_subscription, item, unit_price)
             else:
+                self._ensure_autorenewal_state(adobe_subscription, auto_renewal=True)
                 self._create_mpt_subscription(
                     adobe_subscription, item, sku_discount_level, prices, unit_price
                 )
@@ -872,6 +873,23 @@ class AgreementSyncer:  # noqa: WPS214
             "externalId": Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
             "value": ",".join(subsegments),
         })
+
+    def _ensure_autorenewal_state(self, subscription: dict, *, auto_renewal: bool) -> None:
+        if subscription["autoRenewal"]["enabled"] == auto_renewal:
+            return
+        try:
+            self._adobe_client.update_subscription(
+                self._authorization_id,
+                self._adobe_customer_id,
+                subscription["subscriptionId"],
+                auto_renewal=auto_renewal,
+            )
+            subscription["autoRenewal"]["enabled"] = auto_renewal
+        except Exception:
+            send_exception(
+                "Error updating subscription auto-renewal for subscription %s",
+                subscription["subscriptionId"],
+            )
 
 
 def _is_deployment_matched(missing_deployment_id: str, subscription: dict) -> bool:
