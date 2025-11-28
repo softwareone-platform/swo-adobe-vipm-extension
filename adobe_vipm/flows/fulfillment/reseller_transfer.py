@@ -59,6 +59,7 @@ def fulfill_reseller_change_order(mpt_client, order):
         CommitResellerChange(),
         CheckAdobeResellerTransfer(),
         GetAdobeCustomer(),
+        UpdateAutorenewalSubscriptions(),
         ValidateGCMainAgreement(),
         ValidateAgreementDeployments(),
         CompleteTransferOrder(),
@@ -181,3 +182,38 @@ class CommitResellerChange(Step):
             context.agreement_id,
             externalIds={"vendor": context.adobe_customer_id},
         )
+
+
+class UpdateAutorenewalSubscriptions(Step):
+    """Updates the auto renewal status of the subscriptions."""
+
+    def __call__(self, mpt_client, context, next_step):
+        """Updates the auto renewal status of the subscriptions."""
+        adobe_client = get_adobe_client()
+        subscriptions = adobe_client.get_subscriptions(
+            context.authorization_id,
+            context.customer_id,
+        ).get("items", [])
+
+        disabled_subscriptions = [
+            subscription
+            for subscription in subscriptions
+            if subscription.get("autoRenewal", {}).get("enabled") is False
+        ]
+
+        for subscription in disabled_subscriptions:
+            subscription_id = subscription["subscriptionId"]
+            try:
+                adobe_client.update_subscription(
+                    context.authorization_id,
+                    context.customer_id,
+                    subscription_id,
+                    auto_renewal=True,
+                )
+            except AdobeAPIError:
+                logger.warning(
+                    "%s: Error updating the auto renewal status of the subscription %s",
+                    context,
+                    subscription_id,
+                )
+        next_step(mpt_client, context)
