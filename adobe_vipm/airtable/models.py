@@ -462,6 +462,31 @@ def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict
     return {item.sku: item.unit_pp for item in items}
 
 
+def get_skus_with_available_prices(product_id: str, currency: str, skus: list[str]) -> set:
+    """
+    Given a currency and a list of SKUs it retrieves the skus if the price is available.
+
+    Args:
+        product_id: The ID of the product used to determine the AirTable base.
+        currency: The currency for which the skus must be retrieved.
+        skus: List of SKUs which skus must be retrieved.
+
+    Returns:
+        set: A set of SKUs if the price is available.
+    """
+    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    items = pricelist_model.all(
+        formula=AND(
+            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            EQUAL(FIELD("valid_until"), "BLANK()"),
+            OR(
+                *[EQUAL(FIELD("partial_sku"), to_airtable_value(sku)) for sku in skus],
+            ),
+        ),
+    )
+    return {item.partial_sku for item in items}
+
+
 def get_prices_for_3yc_skus(  # noqa: C901
     product_id: str, currency: str, start_date: dt.date, skus: list[str]
 ) -> dict:
