@@ -12,7 +12,10 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request, get_item_by_partial_sku
-from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku, get_prices_for_skus
+from adobe_vipm.airtable.models import (
+    get_adobe_product_by_marketplace_sku,
+    get_skus_with_available_prices,
+)
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
@@ -786,23 +789,28 @@ class ValidateSkuAvailability(Step):
 
         adobe_skus = context.new_lines + context.upsize_lines + context.downsize_lines
         adobe_skus = [
-            get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
+            get_adobe_product_by_marketplace_sku(
+                line["item"]["externalIds"]["vendor"]
+            ).vendor_external_id
             for line in adobe_skus
         ]
-        sku_prices = get_prices_for_skus(context.product_id, context.currency, adobe_skus)
-        sku_prices = list(sku_prices.keys())
-        missing_skus = [sku for sku in adobe_skus if sku not in sku_prices]
+        skus_with_prices = get_skus_with_available_prices(
+            context.product_id, context.currency, adobe_skus
+        )
+        missing_skus = [sku for sku in adobe_skus if sku not in skus_with_prices]
         if missing_skus:
             logger.warning(
                 "SKU availability validation failed. Missing SKUs: %s. Available SKUs: %s",
                 missing_skus,
-                sku_prices,
+                skus_with_prices,
             )
             context.validation_succeeded = False
             manage_order_error(
                 mpt_client,
                 context,
-                ERR_SKU_AVAILABILITY.to_dict(missing_skus=missing_skus, available_skus=sku_prices),
+                ERR_SKU_AVAILABILITY.to_dict(
+                    missing_skus=missing_skus, available_skus=skus_with_prices
+                ),
                 is_validation=self.is_validation,
             )
             return
