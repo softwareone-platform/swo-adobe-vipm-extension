@@ -23,6 +23,7 @@ from adobe_vipm.airtable.models import (
     get_prices_for_3yc_skus,
     get_prices_for_skus,
     get_sku_adobe_mapping_model,
+    get_skus_with_available_prices,
     get_transfer_by_authorization_membership_or_customer,
     get_transfer_link,
     get_transfer_model,
@@ -253,6 +254,31 @@ def test_get_prices_for_skus(mocker, settings):
     mocked_pricelist_model.all.assert_called_once_with(
         formula=(
             "AND({currency}='currency',{valid_until}=BLANK(),OR({sku}='sku-1',{sku}='sku-2'))"
+        ),
+    )
+
+
+def test_get_skus_with_available_prices(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    mocked_pricelist_model.all.return_value = [
+        mocker.MagicMock(partial_sku="sku-1"),
+        mocker.MagicMock(partial_sku="sku-2"),
+    ]
+
+    result = get_skus_with_available_prices("product_id", "currency", ["sku-1", "sku-2"])
+
+    assert result == {"sku-1", "sku-2"}
+    mocked_pricelist_model.all.assert_called_once_with(
+        formula=(
+            "AND({currency}='currency',{valid_until}=BLANK(),OR({partial_sku}='sku-1',{partial_sku}='sku-2'))"
         ),
     )
 
