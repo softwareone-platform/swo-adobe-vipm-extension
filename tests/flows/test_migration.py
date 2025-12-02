@@ -1541,24 +1541,3 @@ def test_get_transfer_link_button(mocker, return_value, expected_value):
     result = get_transfer_link_button(mocked_transfer)
 
     assert result == expected_value
-
-
-# ???: No act in this test
-def test_checking_gc_main_agreement_when_exists(mocker, mock_transfer):  # noqa: AAA01
-    mock_transfer.customer_id = "customer-id"
-    mock_transfer.transfer_id = "transfer-id"
-    mocked_gc_main_agreement = {
-        "membership_id": "membership-id",
-        "main_agreement_id": "main-agreement-id",
-        "transfer_id": "transfer-id",
-        "status": STATUS_GC_PENDING,
-        "error_description": "",
-    }
-    mocker.patch(
-        "adobe_vipm.flows.migration.get_gc_main_agreement", return_value=mocked_gc_main_agreement
-    )
-    mocked_create_gc_main_agreement = mocker.patch(
-        "adobe_vipm.flows.migration.create_gc_main_agreement"
-    )
-
-    mocked_create_gc_main_agreement.assert_not_called()
