@@ -209,13 +209,13 @@ def test_get_preview_order_too_many_failed_discounts(
     )
 
 
-# ???: there isn't asserts
 def test_get_preview_order_not_qualified(
     adobe_client_factory,
     requests_mocker,
     settings,
     order_preview_discounts_resp_factory,
     preview_discounts_payload_factory,
+    caplog,
 ):
     mocked_client, authorization, _ = adobe_client_factory()
     payload = preview_discounts_payload_factory()
@@ -255,6 +255,11 @@ def test_get_preview_order_not_qualified(
         )
 
     mocked_client.get_preview_order(authorization, "test-customer", payload)  # act
+
+    assert (
+        "2141 - Customer is not qualified for the Flexible Discount: Line Item: 3, Reason: Invalid "
+        "Flexible Discount" in caplog.messages
+    )
 
 
 def test_get_preview_order_unexpected_message(
