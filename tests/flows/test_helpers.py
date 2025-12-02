@@ -529,16 +529,7 @@ def test_update_prices_step_with_new_order(
     adobe_pricing_factory,
 ):
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
-    sku = adobe_order["lineItems"][0]["offerId"]
-
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
-    )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
@@ -556,7 +547,6 @@ def test_update_prices_step_with_new_order(
     step = UpdatePrices()
     step(mock_mpt_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_not_called()
     mocked_update_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
@@ -564,17 +554,7 @@ def test_update_prices_step_with_new_order(
 def test_update_prices_step_with_preview_order(mocker, order_factory, adobe_order_factory):
     order = order_factory()
     adobe_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
-    sku = adobe_order["lineItems"][0]["offerId"]
-
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
-    )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
@@ -584,11 +564,11 @@ def test_update_prices_step_with_preview_order(mocker, order_factory, adobe_orde
         currency=order["agreement"]["listing"]["priceList"]["currency"],
         adobe_preview_order=adobe_order,
     )
+    mocked_client = mocker.MagicMock()
 
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -666,18 +646,7 @@ def test_update_prices_step_with_expired_3yc_commitment(
         end_date="2024-01-01",
     )
     adobe_customer = adobe_customer_factory(commitment=commitment)
-    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
-    sku = adobe_order["lineItems"][0]["offerId"]
-
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
-    )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
-    mocked_client = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_next_step = mocker.MagicMock()
 
     context = Context(
@@ -691,11 +660,11 @@ def test_update_prices_step_with_expired_3yc_commitment(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
+    mocked_client = mocker.MagicMock()
 
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -720,18 +689,7 @@ def test_update_prices_step_with_multiple_lines(
     line_1 = lines_factory()[0]
     line_2 = lines_factory(line_id=2, item_id=2)[0]
     order = order_factory(lines=[line_1, line_2])
-
-    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
-    sku = adobe_order["lineItems"][0]["offerId"]
-
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={sku: 121.36},
-    )
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
 
@@ -749,7 +707,6 @@ def test_update_prices_step_with_multiple_lines(
     step = UpdatePrices()
     step(mocked_client, context, mocked_next_step)
 
-    mocked_get_prices.assert_not_called()
     mocked_update_order.assert_called_once_with(
         mocked_client,
         context.order_id,
@@ -2409,12 +2366,12 @@ def test_validate_sku_availability_with_expired_3yc_commitment_continues_validat
 
     mocked_get_adobe_product = mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
-        return_value=mocker.MagicMock(sku="65304578CA01A12"),
+        return_value=mocker.MagicMock(sku="65304578CA01A12", vendor_external_id="65304578CA"),
     )
 
     mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={"65304578CA01A12": 637.32},
+        "adobe_vipm.flows.helpers.get_skus_with_available_prices",
+        return_value={"65304578CA"},
     )
 
     lines = lines_factory(
@@ -2442,7 +2399,7 @@ def test_validate_sku_availability_with_expired_3yc_commitment_continues_validat
 
     # Should continue with SKU validation
     mocked_get_adobe_product.assert_called_once_with("65304578CA")
-    mocked_get_prices.assert_called_once_with("PRD-123", "USD", ["65304578CA01A12"])
+    mocked_get_prices.assert_called_once_with("PRD-123", "USD", ["65304578CA"])
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
@@ -2462,18 +2419,17 @@ def test_validate_sku_availability_success_all_skus_available(
     mocked_get_adobe_product = mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=[
-            mocker.MagicMock(sku="65304578CA01A12"),
-            mocker.MagicMock(sku="77777777CA01A12"),
-            mocker.MagicMock(sku="88888888CA01A12"),
+            mocker.MagicMock(sku="65304578CA01A12", vendor_external_id="65304578CA"),
+            mocker.MagicMock(sku="77777777CA01A12", vendor_external_id="77777777CA"),
+            mocker.MagicMock(sku="88888888CA01A12", vendor_external_id="88888888CA"),
         ],
     )
-
-    mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
+    mocked_get_skus_with_available_prices = mocker.patch(
+        "adobe_vipm.flows.helpers.get_skus_with_available_prices",
         return_value={
-            "65304578CA01A12": 637.32,
-            "77777777CA01A12": 637.32,
-            "88888888CA01A12": 637.32,
+            "65304578CA",
+            "77777777CA",
+            "88888888CA",
         },
     )
 
@@ -2515,9 +2471,8 @@ def test_validate_sku_availability_success_all_skus_available(
 
     mocked_get_3yc_commitment.assert_called_once_with(adobe_customer)
     assert mocked_get_adobe_product.call_count == 3
-
-    mocked_get_prices.assert_called_once_with(
-        "PRD-123", "USD", ["65304578CA01A12", "77777777CA01A12", "88888888CA01A12"]
+    mocked_get_skus_with_available_prices.assert_called_once_with(
+        "PRD-123", "USD", ["65304578CA", "77777777CA", "88888888CA"]
     )
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
     assert context.validation_succeeded is True
@@ -2536,13 +2491,13 @@ def test_validate_sku_availability_missing_skus_validation_mode(
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=[
-            mocker.MagicMock(sku="65304578CA01A12"),
-            mocker.MagicMock(sku="77777777CA01A12"),
+            mocker.MagicMock(sku="65304578CA01A12", vendor_external_id="65304578CA"),
+            mocker.MagicMock(sku="77777777CA01A12", vendor_external_id="77777777CA"),
         ],
     )
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={"65304578CA01A12": 637.32},
+        "adobe_vipm.flows.helpers.get_skus_with_available_prices",
+        return_value={"65304578CA01A12"},
     )
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
     new_lines = lines_factory(
@@ -2592,13 +2547,13 @@ def test_validate_sku_availability_missing_skus_validation_mode_false(
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=[
-            mocker.MagicMock(sku="65304578CA01A12"),
-            mocker.MagicMock(sku="77777777CA01A12"),
+            mocker.MagicMock(sku="65304578CA01A12", vendor_external_id="65304578CA"),
+            mocker.MagicMock(sku="77777777CA01A12", vendor_external_id="77777777CA"),
         ],
     )
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus",
-        return_value={"65304578CA01A12": 637.32},
+        "adobe_vipm.flows.helpers.get_skus_with_available_prices",
+        return_value={"65304578CA"},
     )
     mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
     new_lines = lines_factory(
@@ -2646,7 +2601,7 @@ def test_validate_sku_availability_empty_sku_lists(
     mocker.patch("adobe_vipm.flows.helpers.get_3yc_commitment", return_value=None)
 
     mocked_get_prices = mocker.patch(
-        "adobe_vipm.flows.helpers.get_prices_for_skus", return_value={}
+        "adobe_vipm.flows.helpers.get_skus_with_available_prices", return_value={}
     )
 
     order = order_factory(lines=[])
