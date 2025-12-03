@@ -247,7 +247,7 @@ Order status update
 												</td>
 												<td style="padding: 8px 16px; text-align: right;">
 <!-- LINE.QUANTITY -->
-{{ line.quantity }}
+{{ line.quantity - line.oldQuantity }}
 												</td>
 											</tr>
 {% endfor %}
