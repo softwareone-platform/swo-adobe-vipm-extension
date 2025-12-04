@@ -5,6 +5,7 @@ from adobe_vipm.flows.fulfillment.reseller_transfer import (
     CheckAdobeResellerTransfer,
     CommitResellerChange,
     SetupResellerChangeContext,
+    UpdateAutorenewalSubscriptions,
     fulfill_reseller_change_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -212,6 +213,7 @@ def test_fulfill_reseller_change_order(mocker, mock_mpt_client):
         CommitResellerChange,
         CheckAdobeResellerTransfer,
         GetAdobeCustomer,
+        UpdateAutorenewalSubscriptions,
         ValidateGCMainAgreement,
         ValidateAgreementDeployments,
         CompleteTransferOrder,
@@ -261,3 +263,75 @@ def test_setup_reseller_change_context_success(
         context.product_id, context.order.get("agreement", {}).get("id", "")
     )
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_autorenewal_subscriptions_step_success(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_api_error_factory,
+    caplog,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            {
+                "subscriptionId": "SUB-1234-5678",
+                "status": "1000",
+                "autoRenewal": {
+                    "enabled": False,
+                },
+            },
+            {
+                "subscriptionId": "SUB-1234-5679",
+                "status": "1000",
+                "autoRenewal": {
+                    "enabled": True,
+                },
+            },
+            {
+                "subscriptionId": "SUB-1234-5680",
+                "status": "1004",
+                "autoRenewal": {
+                    "enabled": False,
+                },
+            },
+        ]
+    }
+    mock_adobe_client.update_subscription.side_effect = [
+        None,
+        AdobeAPIError(400, adobe_api_error_factory("1004", "API error")),
+    ]
+    order = order_factory()
+    context = Context(order=order, authorization_id="AUT-1234-4567")
+    context.customer_id = "CUSTOMER-1234-5678"
+    step = UpdateAutorenewalSubscriptions()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        context.authorization_id,
+        context.customer_id,
+    )
+    mock_adobe_client.update_subscription.assert_has_calls([
+        mocker.call(
+            context.authorization_id,
+            context.customer_id,
+            "SUB-1234-5678",
+            auto_renewal=True,
+        ),
+        mocker.call(
+            context.authorization_id,
+            context.customer_id,
+            "SUB-1234-5680",
+            auto_renewal=True,
+        ),
+    ])
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+    expected_msg = (
+        "None - None None AUT-1234-4567 - - -: "
+        "Error updating the auto renewal status of the subscription SUB-1234-5680"
+    )
+    assert caplog.messages == [expected_msg]
