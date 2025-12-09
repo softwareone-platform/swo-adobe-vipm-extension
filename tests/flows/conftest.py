@@ -199,11 +199,6 @@ def mock_get_transfer_by_authorization_membership_or_customer(mocker):
 
 
 @pytest.fixture()
-def mock_process_main_agreement(mocker):
-    return mocker.patch("adobe_vipm.flows.sync._process_main_agreement", spec=True)
-
-
-@pytest.fixture()
 def mock_notify_agreement_unhandled_exception_in_teams(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams", spec=True
