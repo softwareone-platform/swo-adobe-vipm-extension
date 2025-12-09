@@ -138,8 +138,10 @@ class AgreementSyncer:  # noqa: WPS214
                     Param.PHASE_FULFILLMENT.value, self._agreement, Param.DEPLOYMENT_ID.value
                 ).get("value", "")
 
-                if not deployment_id:
-                    self._process_main_agreement(adobe_deployments, sync_prices=sync_prices)
+                if not deployment_id and adobe_deployments:
+                    self._process_main_agreement_deployments(
+                        adobe_deployments, sync_prices=sync_prices
+                    )
 
         except AuthorizationNotFoundError:
             logger.exception(
@@ -154,7 +156,9 @@ class AgreementSyncer:  # noqa: WPS214
             self._update_last_sync_date()
             self._agreement = mpt.get_agreement(self._mpt_client, self._agreement["id"])
 
-    def _process_main_agreement(self, adobe_deployments: list[dict], *, sync_prices: bool):
+    def _process_main_agreement_deployments(
+        self, adobe_deployments: list[dict], *, sync_prices: bool
+    ):
         self._check_update_airtable_missing_deployments(adobe_deployments)
         deployment_agreements = mpt.get_agreements_by_customer_deployments(
             self._mpt_client,

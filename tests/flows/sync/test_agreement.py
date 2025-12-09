@@ -1028,7 +1028,6 @@ def test_sync_deployment_agreement(
     fulfillment_parameters_factory,
     mock_add_missing_subscriptions_and_assets,
     mock_get_agreements_by_customer_deployments,
-    mock_process_main_agreement,
     mock_process_orphaned_deployment_subscriptions,
     mock_mpt_get_agreement_subscription,
     mocked_agreement_syncer,
@@ -1086,7 +1085,7 @@ def test_sync_deployment_agreement(
 
     mock_add_missing_subscriptions_and_assets.assert_called_once()
     mock_mpt_update_agreement.assert_called()
-    mock_process_main_agreement.assert_not_called()
+    mock_get_agreements_by_customer_deployments.assert_not_called()
     mock_process_orphaned_deployment_subscriptions.assert_not_called()
     assert caplog.messages == [
         "Synchronizing agreement AGR-2119-4550-8674-5962",
@@ -1264,9 +1263,10 @@ def test_sync_global_customer_no_active_deployments(
         mock_mpt_client, mock_adobe_client, agreement_factory(), dry_run=False, sync_prices=True
     )  # act
 
+    mock_get_gc_agreement_deployments_by_main_agreement.assert_not_called()
+    mock_get_agreements_by_customer_deployments.assert_not_called()
     mock_add_missing_subscriptions_and_assets.assert_called_once()
     mock_get_subscriptions_for_update.assert_called()
-    mock_get_agreements_by_customer_deployments.assert_called_once()
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     assert mock_mpt_update_agreement.mock_calls == [
         mocker.call(
