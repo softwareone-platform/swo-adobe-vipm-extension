@@ -25,7 +25,7 @@ def test_check_3yc_commitment_request(
     status_param_ext_id = (
         "3YCCommitmentRequestStatus" if not is_recommitment else "3YCRecommitmentRequestStatus"
     )
-    request_type_param_ext_id = "3YC" if not is_recommitment else "3YCRecommitment"
+    request_type_param_ext_id = "3YC" if not is_recommitment else "3YCRecommit"
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
     customer_kwargs = {
         "commitment": adobe_commitment_factory(status="COMMITTED"),
