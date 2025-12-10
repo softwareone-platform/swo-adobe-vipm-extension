@@ -1461,6 +1461,7 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.fulfillment.configuration",
         "adobe_vipm.flows.fulfillment.termination",
         "adobe_vipm.flows.fulfillment.transfer",
+        "adobe_vipm.flows.fulfillment.reseller_transfer",
         "adobe_vipm.flows.global_customer",
         "adobe_vipm.flows.helpers",
         "adobe_vipm.flows.migration",
