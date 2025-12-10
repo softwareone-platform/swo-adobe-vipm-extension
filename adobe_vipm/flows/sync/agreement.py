@@ -438,22 +438,10 @@ class AgreementSyncer:  # noqa: WPS214
 
     def _update_agreement(self, agreement: dict) -> None:
         parameters = {}
+
         commitment_info = get_3yc_commitment(self._customer)
-        if commitment_info:
-            parameters = self._add_3yc_fulfillment_params(agreement, commitment_info, parameters)
-            for mq in commitment_info.get("minimumQuantities", {}):
-                if mq["offerType"] == "LICENSE":
-                    parameters.setdefault(Param.PHASE_ORDERING.value, [])
-                    parameters[Param.PHASE_ORDERING.value].append({
-                        "externalId": Param.THREE_YC_LICENSES.value,
-                        "value": str(mq.get("quantity")),
-                    })
-                if mq["offerType"] == "CONSUMABLES":
-                    parameters.setdefault(Param.PHASE_ORDERING.value, [])
-                    parameters[Param.PHASE_ORDERING.value].append({
-                        "externalId": Param.THREE_YC_CONSUMABLES.value,
-                        "value": str(mq.get("quantity")),
-                    })
+        parameters = self._update_3yc_fulfillment_params(agreement, commitment_info, parameters)
+        parameters = self._update_3yc_ordering_params(commitment_info, parameters)
 
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
         parameters[Param.PHASE_FULFILLMENT.value].append({
@@ -483,7 +471,7 @@ class AgreementSyncer:  # noqa: WPS214
                 parameters=parameters,
             )
 
-    def _add_3yc_fulfillment_params(
+    def _update_3yc_fulfillment_params(
         self, agreement: dict, commitment_info: dict, parameters: dict
     ) -> dict:
         new_parameters = copy.deepcopy(parameters)
@@ -508,15 +496,18 @@ class AgreementSyncer:  # noqa: WPS214
             "externalId": status_param_ext_id,
             "value": request_info.get("status"),
         })
+
+        enroll_status = commitment_info.get("status") if commitment_info else request_info.get("status")
+        new_parameters[Param.PHASE_FULFILLMENT.value].append({
+            "externalId": Param.THREE_YC_ENROLL_STATUS.value,
+            "value": enroll_status,
+        })
+
         new_parameters.setdefault(request_type_param_phase, [])
         new_parameters[request_type_param_phase].append(
             {"externalId": request_type_param_ext_id, "value": None},
         )
         new_parameters[Param.PHASE_FULFILLMENT.value] += [
-            {
-                "externalId": Param.THREE_YC_ENROLL_STATUS.value,
-                "value": commitment_info.get("status"),
-            },
             {
                 "externalId": Param.THREE_YC_START_DATE.value,
                 "value": commitment_info.get("startDate"),
@@ -527,6 +518,22 @@ class AgreementSyncer:  # noqa: WPS214
             },
         ]
 
+        return new_parameters
+
+    def _update_3yc_ordering_params(self, commitment_info: dict, parameters: dict):
+        new_parameters = copy.deepcopy(parameters)
+        new_parameters.setdefault(Param.PHASE_ORDERING.value, [])
+        for mq in commitment_info.get("minimumQuantities", {}):
+            if mq["offerType"] == "LICENSE":
+                new_parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_LICENSES.value,
+                    "value": str(mq.get("quantity")),
+                })
+            if mq["offerType"] == "CONSUMABLES":
+                new_parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_CONSUMABLES.value,
+                    "value": str(mq.get("quantity")),
+                })
         return new_parameters
 
     def _update_agreement_line_prices(
