@@ -8,6 +8,7 @@ from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
 from adobe_vipm.flows.constants import (
+    MARKET_SEGMENT_EDUCATION,
     TEMPLATE_ASSET_DEFAULT,
     AgreementStatus,
     ItemTermsModel,
@@ -253,6 +254,83 @@ def test_sync_agreement_update_asset(
             agreement["id"],
             lines=mock_lines,
             parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
+        ),
+    ])
+    mock_adobe_client.get_subscription.assert_not_called()
+
+
+@freeze_time("2025-06-23")
+def test_sync_agreement_update_asset_education(
+    mocker,
+    agreement_factory,
+    assets_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    mock_adobe_client,
+    mock_get_adobe_client,
+    mock_get_agreement_subscription,
+    mock_update_agreement_subscription,
+    mock_mpt_client,
+):
+    asset_id = "AST-1111-2222-3333"
+    mock_asset = assets_factory(asset_id=asset_id, adobe_subscription_id="sub-one-time-id")[0]
+    mocker.patch("adobe_vipm.flows.sync.get_asset_by_id", return_value=mock_asset)
+    mock_lines = lines_factory(external_vendor_id="65327701CA")
+    agreement = agreement_factory(lines=mock_lines, assets=[mock_asset], subscriptions=[])
+
+    mocker.patch(
+        "adobe_vipm.flows.sync.get_market_segment",
+        return_value=MARKET_SEGMENT_EDUCATION
+    )
+
+    adobe_subscription = adobe_subscription_factory(
+        subscription_id="sub-one-time-id",
+        offer_id="65327701CA01A12",
+        used_quantity=6,
+    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    adobe_customer = adobe_customer_factory(coterm_date="2025-04-04")
+    adobe_customer["companyProfile"]["marketSubSegments"] = ["K-12"]
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        return_value=[{"65327701CA01A12": 1234.55}],
+    )
+    mocked_update_asset = mocker.patch("adobe_vipm.flows.sync.update_asset")
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=False)
+
+    mocked_update_asset.assert_called_once_with(
+        mock_mpt_client,
+        asset_id,
+        parameters={
+            "fulfillment": [
+                {"externalId": "usedQuantity", "value": "6"},
+                {"externalId": "lastSyncDate", "value": "2025-06-23"},
+            ]
+        },
+    )
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=mock_lines,
+            parameters={"fulfillment": [
+                {
+                    "externalId": "cotermDate", "value": "2025-04-04"
+                },
+                {
+                    "externalId": "educationSubSegment", "value": "K-12"
+                }
+            ]},
         ),
         mocker.call(
             mock_mpt_client,
