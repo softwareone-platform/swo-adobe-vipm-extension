@@ -1140,8 +1140,8 @@ def sync_agreement(  # noqa: C901 # NOSONAR
                 Param.PHASE_FULFILLMENT.value, agreement, Param.DEPLOYMENT_ID.value
             ).get("value", "")
 
-            if not deployment_id:
-                _process_main_agreement(
+            if not deployment_id and adobe_deployments:
+                _process_main_agreement_deployments(
                     mpt_client,
                     adobe_client,
                     agreement,
@@ -1161,16 +1161,16 @@ def sync_agreement(  # noqa: C901 # NOSONAR
             _update_last_sync_date(mpt_client, agreement)
 
 
-def _process_main_agreement(
-        mpt_client: MPTClient,
-        adobe_client: AdobeClient,
-        agreement: dict,
-        customer: dict,
-        adobe_deployments: list[dict],
-        adobe_subscriptions: list[dict],
-        *,
-        dry_run: bool,
-        sync_prices: bool
+def _process_main_agreement_deployments(
+    mpt_client: MPTClient,
+    adobe_client: AdobeClient,
+    agreement: dict,
+    customer: dict,
+    adobe_deployments: list[dict],
+    adobe_subscriptions: list[dict],
+    *,
+    dry_run: bool,
+    sync_prices: bool,
 ):
     _check_update_airtable_missing_deployments(
         agreement, adobe_deployments, adobe_subscriptions, dry_run=dry_run
