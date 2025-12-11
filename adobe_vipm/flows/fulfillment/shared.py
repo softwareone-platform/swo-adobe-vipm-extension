@@ -34,6 +34,7 @@ from adobe_vipm.adobe.constants import (
     AdobeStatus,
 )
 from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
     sanitize_company_name,
@@ -921,7 +922,7 @@ class GetPreviewOrder(Step):
         if (context.upsize_lines or context.new_lines) and not context.adobe_new_order_id:
             try:
                 context.adobe_preview_order = adobe_client.create_preview_order(context)
-            except AdobeError as error:
+            except (AdobeError, AdobeCreatePreviewError) as error:
                 switch_order_to_failed(
                     mpt_client,
                     context.order,
