@@ -497,7 +497,9 @@ class AgreementSyncer:  # noqa: WPS214
             "value": request_info.get("status"),
         })
 
-        enroll_status = commitment_info.get("status") if commitment_info else request_info.get("status")
+        enroll_status = (
+            commitment_info.get("status") if commitment_info else request_info.get("status")
+        )
         new_parameters[Param.PHASE_FULFILLMENT.value].append({
             "externalId": Param.THREE_YC_ENROLL_STATUS.value,
             "value": enroll_status,
