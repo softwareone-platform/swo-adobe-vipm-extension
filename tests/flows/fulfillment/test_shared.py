@@ -11,6 +11,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
     ERR_DUE_DATE_REACHED,
     ERR_DUPLICATED_ITEMS,
@@ -2013,6 +2014,32 @@ def test_get_preview_order_step_adobe_error(
         ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
     )
     mocked_next_step.assert_not_called()
+
+
+def test_get_preview_order_step_adobe_create_preview_order_error(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    order_factory,
+    lines_factory,
+):
+    order = order_factory(lines=lines_factory(quantity=12, old_quantity=10))
+    mock_adobe_client.create_preview_order.side_effect = AdobeCreatePreviewError("error message")
+    mock_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+    context = Context(
+        order=order,
+        adobe_new_order_id=None,
+        upsize_lines=order["lines"],
+    )
+    step = GetPreviewOrder()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_switch_to_failed.assert_called_once()
+    mock_next_step.assert_not_called()
 
 
 @pytest.mark.parametrize(

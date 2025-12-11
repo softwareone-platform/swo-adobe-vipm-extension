@@ -5,9 +5,54 @@ from responses import matchers
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
+from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.utils import get_customer_data
+
+
+def test_create_preview_order_processing_upsize_lines_error(
+    mocker,
+    mock_get_adobe_product_by_marketplace_sku,
+    mock_order,
+    mock_mpt_client,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
+    adobe_client_factory,
+    flex_discounts_factory,
+    requests_mocker,
+):
+    mocked_client, _, _ = adobe_client_factory()
+    mock_get_flex_discounts_per_base_offer = mocker.patch.object(
+        mocked_client, "get_flex_discounts_per_base_offer", return_value=flex_discounts_factory()
+    )
+    mock_get_subscriptions_for_offers = mocker.patch.object(
+        mocked_client,
+        "get_subscriptions_for_offers",
+        return_value=[
+            {
+                "subscriptionId": "fake-sub-id",
+                "status": "1000",
+                "autoRenewal": {"enabled": False},
+                "offerId": "fake-offer-id",
+            }
+        ],
+    )
+    context = Context(
+        order=mock_order,
+        order_id="order-id",
+        authorization_id=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+        new_lines=[],
+        upsize_lines=mock_order["lines"],
+        customer_data=get_customer_data(mock_order),
+        adobe_customer_id="fake-customer-id",
+    )
+
+    with pytest.raises(AdobeCreatePreviewError, match="Subscription has not been found in Adobe"):
+        mocked_client.create_preview_order(context)
+
+    mock_get_flex_discounts_per_base_offer.assert_called_once()
+    mock_get_subscriptions_for_offers.assert_called_once()
 
 
 def test_get_preview_order(
