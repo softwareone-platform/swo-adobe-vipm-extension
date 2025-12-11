@@ -38,6 +38,7 @@ from .market_segment import (
 )
 from .notification import (
     notify_agreement_unhandled_exception_in_teams,
+    notify_discount_level_error,
     notify_missing_prices,
     notify_not_updated_subscriptions,
     notify_unhandled_exception_in_teams,
