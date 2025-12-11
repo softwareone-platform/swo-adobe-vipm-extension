@@ -244,6 +244,13 @@ def mock_notify_missing_prices(mocker):
 
 
 @pytest.fixture
+def mock_notify_missing_discount_levels(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.utils.subscription.notify_discount_level_error", spec=True
+    )
+
+
+@pytest.fixture
 def mock_get_template_data_by_adobe_subscription(mocker):
     mock = mocker.MagicMock(
         spec="adobe_vipm.flows.utils.template.get_template_data_by_adobe_subscription"
