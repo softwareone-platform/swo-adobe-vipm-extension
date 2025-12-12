@@ -5,6 +5,7 @@ import re
 from collections import defaultdict
 from hashlib import sha256
 from operator import itemgetter
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
@@ -13,6 +14,7 @@ from adobe_vipm.adobe import constants as adobe_constants
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, wrap_http_error
+from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError, ProcessingUpsizeLinesError
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
     get_item_by_subcription_id,
@@ -171,6 +173,9 @@ class OrderClientMixin:
 
         Returns:
             dict: The Preview order.
+
+        Raises:
+            AdobeCreatePreviewError
         """
         authorization = self._config.get_authorization(context.authorization_id)
         offer_ids = tuple(
@@ -186,15 +191,20 @@ class OrderClientMixin:
             "lineItems": [],
         }
         self._process_new_lines(context, flex_discounts, payload)
-        self._process_upsize_lines(context, flex_discounts, payload)
-        deployment_id = get_deployment_id(context.order)
-        if deployment_id:
-            for line_item in payload["lineItems"]:
-                line_item["deploymentId"] = deployment_id
-                line_item["currencyCode"] = authorization.currency
-        else:
-            payload["currencyCode"] = authorization.currency
+        if context.upsize_lines:
+            try:
+                self._process_upsize_lines(
+                    context.authorization_id,
+                    context.adobe_customer_id,
+                    context.upsize_lines,
+                    flex_discounts,
+                    payload,
+                )
+            except ProcessingUpsizeLinesError as error:
+                raise AdobeCreatePreviewError(error) from error
 
+        deployment_id = get_deployment_id(context.order)
+        self._update_payload_by_deployment(authorization, deployment_id, payload)
         if not payload["lineItems"]:
             self._logger.info(
                 "Preview Order for %s was not created: line items are empty.",
@@ -251,7 +261,6 @@ class OrderClientMixin:
             customer_id: Identifier of the customer that place the RETURN order.
             subscription_id: Adobe Subscription ID
             customer_coterm_date: customer coterm date
-            external_reference: External Reference ID.
             return_orders: orders to return
 
         Returns:
@@ -317,7 +326,7 @@ class OrderClientMixin:
         authorization_id: str,
         customer_id: str,
         external_reference: str,
-    ) -> list[dict]:
+    ) -> dict:
         """
         Retrieve RETURN orders filter by external reference.
 
@@ -327,7 +336,7 @@ class OrderClientMixin:
             external_reference: External Reference ID.
 
         Returns:
-            list(dict): The RETURN order.
+            The RETURN orders.
         """
         orders = self.get_orders(
             authorization_id,
@@ -536,25 +545,33 @@ class OrderClientMixin:
             )
             payload["lineItems"].append(line_item)
 
-    def _process_upsize_lines(self, context: Context, flex_discounts: dict, payload: dict):
-        if context.upsize_lines:
-            offer_ids = [
-                line_item["item"]["externalIds"]["vendor"] for line_item in context.upsize_lines
-            ]
-            upsize_subscriptions = self.get_subscriptions_for_offers(
-                context.authorization_id,
-                context.adobe_customer_id,
-                offer_ids,
-            )
-            offer_subscriptions = map_by("offerId", upsize_subscriptions)
-            map_by_base_offer_subscriptions = {
-                get_partial_sku(offer_id): subs for offer_id, subs in offer_subscriptions.items()
-            }
+    def _process_upsize_lines(
+        self,
+        authorization_id: str,
+        adobe_customer_id: str,
+        upsize_lines: list[dict],
+        discounts: dict,
+        payload: dict,
+    ):
+        offer_ids = [line_item["item"]["externalIds"]["vendor"] for line_item in upsize_lines]
+        # ???: This method belongs to SubscriptionClientMixin
+        upsize_subscriptions = self.get_subscriptions_for_offers(
+            authorization_id, adobe_customer_id, offer_ids
+        )
+        offer_subscriptions = map_by("offerId", upsize_subscriptions)
+        map_by_base_offer_subscriptions = {
+            get_partial_sku(offer_id): subs for offer_id, subs in offer_subscriptions.items()
+        }
 
-        for line in context.upsize_lines:
+        for line in upsize_lines:
             adobe_base_sku = line["item"]["externalIds"]["vendor"]
+            try:
+                adobe_subscription = map_by_base_offer_subscriptions[adobe_base_sku]
+            except KeyError:
+                raise ProcessingUpsizeLinesError(
+                    "Subscription has not been found in Adobe for sku %s.", adobe_base_sku
+                )
 
-            adobe_subscription = map_by_base_offer_subscriptions[adobe_base_sku]
             renewal_quantity = adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
             current_quantity = adobe_subscription[Param.CURRENT_QUANTITY.value]
             diff = current_quantity - renewal_quantity if renewal_quantity < current_quantity else 0
@@ -581,7 +598,7 @@ class OrderClientMixin:
                 line,
                 adobe_base_sku,
                 quantity,
-                flex_discounts.get(get_adobe_product_by_marketplace_sku(adobe_base_sku).sku),
+                discounts.get(get_adobe_product_by_marketplace_sku(adobe_base_sku).sku),
             )
             payload["lineItems"].append(line_item)
 
@@ -685,3 +702,14 @@ class OrderClientMixin:
         )
         response.raise_for_status()
         return response.json()["flexDiscounts"]
+
+    def _update_payload_by_deployment(
+        self, authorization: Authorization, deployment_id: str | None, payload: dict[str, Any]
+    ) -> None:
+        if not deployment_id:
+            payload["currencyCode"] = authorization.currency
+            return
+
+        for line_item in payload["lineItems"]:
+            line_item["deploymentId"] = deployment_id
+            line_item["currencyCode"] = authorization.currency

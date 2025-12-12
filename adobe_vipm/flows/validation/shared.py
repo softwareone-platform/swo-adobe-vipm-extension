@@ -3,6 +3,7 @@ from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
+from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
@@ -78,7 +79,7 @@ class GetPreviewOrder(Step):
         adobe_client = get_adobe_client()
         try:
             context.adobe_preview_order = adobe_client.create_preview_order(context)
-        except (AdobeAPIError, AdobeProductNotFoundError) as error:
+        except (AdobeAPIError, AdobeProductNotFoundError, AdobeCreatePreviewError) as error:
             context.validation_succeeded = False
             context.order = set_order_error(
                 context.order, ERR_ADOBE_ERROR.to_dict(details=str(error))

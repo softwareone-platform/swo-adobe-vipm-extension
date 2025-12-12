@@ -2,6 +2,7 @@ import pytest
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
+from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
@@ -192,3 +193,27 @@ def test_get_preview_order_step_product_not_found_error(
     assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details=str(error))
     assert context.adobe_preview_order is None
     mocked_next_step.assert_not_called()
+
+
+def test_get_preview_order_step_adobe_create_preview_order_error(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    order_factory,
+    lines_factory,
+):
+    order = order_factory(lines=lines_factory(quantity=12, old_quantity=10))
+    mock_adobe_client.create_preview_order.side_effect = AdobeCreatePreviewError("error message")
+    context = Context(
+        order=order,
+        adobe_new_order_id=None,
+        upsize_lines=order["lines"],
+    )
+    step = GetPreviewOrder()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details="error message")
+    assert context.adobe_preview_order is None
