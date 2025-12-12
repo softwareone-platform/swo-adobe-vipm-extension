@@ -13,6 +13,7 @@ from adobe_vipm.flows.utils.customer import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
 )
+from adobe_vipm.flows.utils.notification import notify_discount_level_error
 
 
 def get_subscription_by_line_and_item_id(
@@ -142,11 +143,15 @@ def get_sku_with_discount_level(sku: str, customer: dict) -> str:
     Returns:
         Sku with proper discount level based on Adobe customer's discount level.
     """
-    discount_level = (
-        get_customer_licenses_discount_level(customer)
-        if not is_consumables_sku(sku)
-        else get_customer_consumables_discount_level(customer)
-    )
+    try:
+        discount_level = (
+            get_customer_licenses_discount_level(customer)
+            if not is_consumables_sku(sku)
+            else get_customer_consumables_discount_level(customer)
+        )
+    except Exception:
+        notify_discount_level_error(sku, customer)
+        raise
     return f"{sku[0:10]}{discount_level}{sku[12:]}"
 
 
