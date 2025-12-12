@@ -191,7 +191,16 @@ def test_sync_agreement_prices(
             mock_mpt_client,
             agreement["id"],
             lines=expected_lines,
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCEnrollStatus", "value": None},
+                    {"externalId": "3YCStartDate", "value": None},
+                    {"externalId": "3YCEndDate", "value": None},
+                    {"externalId": "cotermDate", "value": "2025-04-04"},
+                ],
+            },
         ),
         mocker.call(
             mock_mpt_client,
@@ -253,7 +262,27 @@ def test_sync_agreement_update_asset(
             mock_mpt_client,
             agreement["id"],
             lines=mock_lines,
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            parameters = {
+                'fulfillment': [{
+                    'externalId': '3YCRecommitmentRequestStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCRecommit',
+                    'value': None
+                }, {
+                    'externalId': '3YCEnrollStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCStartDate',
+                    'value': None
+                }, {
+                    'externalId': '3YCEndDate',
+                    'value': None
+                }, {
+                    'externalId': 'cotermDate',
+                    'value': '2025-04-04'
+                }]
+            },
         ),
         mocker.call(
             mock_mpt_client,
@@ -323,14 +352,30 @@ def test_sync_agreement_update_asset_education(
             mock_mpt_client,
             agreement["id"],
             lines=mock_lines,
-            parameters={"fulfillment": [
-                {
-                    "externalId": "cotermDate", "value": "2025-04-04"
-                },
-                {
-                    "externalId": "educationSubSegment", "value": "K-12"
-                }
-            ]},
+            parameters = {
+                'fulfillment': [{
+                    'externalId': '3YCRecommitmentRequestStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCRecommit',
+                    'value': None
+                }, {
+                    'externalId': '3YCEnrollStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCStartDate',
+                    'value': None
+                }, {
+                    'externalId': '3YCEndDate',
+                    'value': None
+                }, {
+                    'externalId': 'cotermDate',
+                    'value': '2025-04-04'
+                }, {
+                    'externalId': 'educationSubSegment',
+                    'value': 'K-12'
+                }]
+            },
         ),
         mocker.call(
             mock_mpt_client,
@@ -963,7 +1008,7 @@ def test_sync_agreement_prices_with_3yc(
             parameters={
                 "fulfillment": [
                     {"externalId": "3YCRecommitmentRequestStatus", "value": "ACCEPTED"},
-                    {"externalId": "3YCRecommitment", "value": None},
+                    {"externalId": "3YCRecommit", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
                     {"externalId": "3YCStartDate", "value": "2024-01-01"},
                     {"externalId": "3YCEndDate", "value": "2025-01-01"},
@@ -1072,12 +1117,33 @@ def test_sync_global_customer_parameter(
     mock_add_missing_subscriptions_and_assets.assert_called_once()
     assert mock_update_subscriptions.call_count == 2
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
+
     assert mocked_update_agreement.call_args_list == [
         mocker.call(
             mock_mpt_client,
             agreement["id"],
             lines=expected_lines,
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            parameters = {
+                'fulfillment': [{
+                    'externalId': '3YCRecommitmentRequestStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCRecommit',
+                    'value': None
+                }, {
+                    'externalId': '3YCEnrollStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCStartDate',
+                    'value': None
+                }, {
+                    'externalId': '3YCEndDate',
+                    'value': None
+                }, {
+                    'externalId': 'cotermDate',
+                    'value': '2025-04-04'
+                }]
+            }
         ),
         mocker.call(
             mock_mpt_client,
@@ -1093,7 +1159,27 @@ def test_sync_global_customer_parameter(
             mock_mpt_client,
             deployment_agreements[0]["id"],
             lines=expected_lines,
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            parameters = {
+                'fulfillment': [{
+                    'externalId': '3YCRecommitmentRequestStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCRecommit',
+                    'value': None
+                }, {
+                    'externalId': '3YCEnrollStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCStartDate',
+                    'value': None
+                }, {
+                    'externalId': '3YCEndDate',
+                    'value': None
+                }, {
+                    'externalId': 'cotermDate',
+                    'value': '2025-04-04'
+                }]
+            },
         ),
         mocker.call(
             mock_mpt_client,
@@ -1247,12 +1333,33 @@ def test_sync_global_customer_no_active_deployments(
     mock_add_missing_subscriptions_and_assets.assert_called_once()
     mock_get_subscriptions_for_update.assert_called()
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
+
     assert mock_mpt_update_agreement.mock_calls == [
         mocker.call(
             mock_mpt_client,
             "AGR-2119-4550-8674-5962",
             lines=[],
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2024-01-23"}]},
+            parameters = {
+                'fulfillment': [{
+                    'externalId': '3YCRecommitmentRequestStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCRecommit',
+                    'value': None
+                }, {
+                    'externalId': '3YCEnrollStatus',
+                    'value': None
+                }, {
+                    'externalId': '3YCStartDate',
+                    'value': None
+                }, {
+                    'externalId': '3YCEndDate',
+                    'value': None
+                }, {
+                    'externalId': 'cotermDate',
+                    'value': '2024-01-23'
+                }]
+            }
         ),
         mocker.call(
             mock_mpt_client,
@@ -1558,13 +1665,60 @@ def test_sync_global_customer_update_not_required(
                     "id": "ALI-2119-4550-8674-5962-0001",
                 }
             ],
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            parameters={
+                "fulfillment":
+                [
+                    {
+                        'externalId': '3YCCommitmentRequestStatus',
+                        'value': None
+                    }, {
+                        'externalId': '3YCEnrollStatus',
+                        'value': None
+                    }, {
+                        'externalId': '3YCStartDate',
+                        'value': None
+                    }, {
+                        'externalId': '3YCEndDate',
+                        'value': None
+                    }, {
+                        'externalId': 'cotermDate',
+                        'value': '2025-04-04'
+                    }
+                ],
+                "ordering": [{
+                    'externalId': '3YC',
+                    'value': None
+                }],
+            },
         ),
         mocker.call(
             mock_mpt_client,
             "AGR-2119-4550-8674-5962",
             lines=[],
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            parameters={
+                "fulfillment":
+                [
+                    {
+                        'externalId': '3YCRecommitmentRequestStatus',
+                        'value': None
+                    }, {
+                        'externalId': '3YCRecommit',
+                        'value': None
+                    }, {
+                        'externalId': '3YCEnrollStatus',
+                        'value': None
+                    }, {
+                        'externalId': '3YCStartDate',
+                        'value': None
+                    }, {
+                        'externalId': '3YCEndDate',
+                        'value': None
+                    }, {
+                        'externalId': 'cotermDate',
+                        'value': '2025-04-04'
+                    }
+                ]
+            },
         ),
         mocker.call(
             mock_mpt_client, "AGR-2119-4550-8674-5962", parameters={"fulfillment": [{}, {}, {}]}
@@ -1573,7 +1727,30 @@ def test_sync_global_customer_update_not_required(
             mock_mpt_client,
             "AGR-2119-4550-8674-5962",
             lines=[],
-            parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+            parameters={
+                "fulfillment":
+                [
+                    {
+                        'externalId': '3YCRecommitmentRequestStatus',
+                        'value': None
+                    }, {
+                        'externalId': '3YCRecommit',
+                        'value': None
+                    }, {
+                        'externalId': '3YCEnrollStatus',
+                        'value': None
+                    }, {
+                        'externalId': '3YCStartDate',
+                        'value': None
+                    }, {
+                        'externalId': '3YCEndDate',
+                        'value': None
+                    }, {
+                        'externalId': 'cotermDate',
+                        'value': '2025-04-04'
+                    }
+                ]
+            },
         ),
         mocker.call(
             mock_mpt_client,
@@ -1746,7 +1923,28 @@ def test_sync_global_customer_update_adobe_error(
         mock_mpt_client,
         agreement["id"],
         lines=expected_lines,
-        parameters={"fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}]},
+        parameters = {
+            'fulfillment': [{
+                'externalId': '3YCCommitmentRequestStatus',
+                'value': None
+            }, {
+                'externalId': '3YCEnrollStatus',
+                'value': None
+            }, {
+                'externalId': '3YCStartDate',
+                'value': None
+            }, {
+                'externalId': '3YCEndDate',
+                'value': None
+            }, {
+                'externalId': 'cotermDate',
+                'value': '2025-04-04'
+            }],
+            'ordering': [{
+                'externalId': '3YC',
+                'value': None
+            }]
+        },
     )
     mock_adobe_client.get_customer_deployments_active_status.assert_called_once()
     mocked_notifier.assert_called_once()
@@ -3122,7 +3320,7 @@ def test_add_missing_subscriptions_without_price(
         term_period=ItemTermsModel.ONE_TIME.value,
         term_model=ItemTermsModel.ONE_TIME.value,
     )[0]
-    mock_mpt_get_asset_template_by_name = mocker.patch(
+    mocker.patch(
         "adobe_vipm.flows.sync.get_asset_template_by_name",
         return_value=None
     )

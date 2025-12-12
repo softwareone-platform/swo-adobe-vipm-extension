@@ -35,7 +35,7 @@ class Param(StrEnum):
     COTERM_DATE = "cotermDate"
     AGREEMENT_TYPE = "agreementType"
     THREE_YC = "3YC"
-    THREE_YC_RECOMMITMENT = "3YCRecommitment"
+    THREE_YC_RECOMMITMENT = "3YCRecommit"
     THREE_YC_LICENSES = "3YCLicenses"
     THREE_YC_CONSUMABLES = "3YCConsumables"
     THREE_YC_ENROLL_STATUS = "3YCEnrollStatus"
