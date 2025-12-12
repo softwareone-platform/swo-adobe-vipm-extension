@@ -435,6 +435,21 @@ def get_pricelist_model(base_info: AirTableBaseInfo):
     return PriceList
 
 
+def _get_prices_for_skus_from_airtable(
+    product_id: str, currency: str, skus: list[str], column_name: str
+) -> dict:
+    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    return pricelist_model.all(
+        formula=AND(
+            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            EQUAL(FIELD("valid_until"), "BLANK()"),
+            OR(
+                *[EQUAL(FIELD(column_name), to_airtable_value(sku)) for sku in skus],
+            ),
+        ),
+    )
+
+
 def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict:
     """
     Given a currency and a list of SKUs it retrieves the purchase price.
@@ -449,16 +464,7 @@ def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict
     Returns:
         dict: A dictionary with SKU, purchase price items.
     """
-    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
-    items = pricelist_model.all(
-        formula=AND(
-            EQUAL(FIELD("currency"), to_airtable_value(currency)),
-            EQUAL(FIELD("valid_until"), "BLANK()"),
-            OR(
-                *[EQUAL(FIELD("sku"), to_airtable_value(sku)) for sku in skus],
-            ),
-        ),
-    )
+    items = _get_prices_for_skus_from_airtable(product_id, currency, skus, "sku")
     return {item.sku: item.unit_pp for item in items}
 
 
@@ -474,17 +480,48 @@ def get_skus_with_available_prices(product_id: str, currency: str, skus: list[st
     Returns:
         set: A set of SKUs if the price is available.
     """
-    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
-    items = pricelist_model.all(
-        formula=AND(
-            EQUAL(FIELD("currency"), to_airtable_value(currency)),
-            EQUAL(FIELD("valid_until"), "BLANK()"),
-            OR(
-                *[EQUAL(FIELD("partial_sku"), to_airtable_value(sku)) for sku in skus],
-            ),
-        ),
+    items = _get_prices_for_skus_from_airtable(product_id, currency, skus, "partial_sku")
+    return {item.partial_sku for item in items}
+
+
+def get_skus_with_available_prices_3yc(
+    product_id: str, currency: str, start_date: dt.date, skus: list[str]
+) -> set:
+    """
+    Get the SKUs with available prices for the 3YC.
+
+    Args:
+        product_id: The ID of the product used to determine the AirTable base.
+        currency: The currency for which the price must be retrieved.
+        start_date: The date in which the 3YC started.
+        skus: List of SKUs which purchase prices must be retrieved.
+    """
+    items = _get_prices_3yc_for_skus_from_airtable(
+        product_id, currency, start_date, skus, "partial_sku"
     )
     return {item.partial_sku for item in items}
+
+
+def _get_prices_3yc_for_skus_from_airtable(
+    product_id: str, currency: str, start_date: dt.date, skus: list[str], column_name: str
+) -> dict:
+    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    return pricelist_model.all(
+        formula=AND(
+            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            OR(
+                EQUAL(FIELD("valid_until"), "BLANK()"),
+                AND(
+                    LESS_EQUAL(FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))),
+                    GREATER(FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))),
+                ),
+            ),
+            OR(
+                *[EQUAL(FIELD(column_name), to_airtable_value(sku)) for sku in skus],
+            ),
+        ),
+        sort=["-valid_until"],
+    )
 
 
 def get_prices_for_3yc_skus(  # noqa: C901
@@ -522,24 +559,10 @@ def get_prices_for_3yc_skus(  # noqa: C901
     if not skus_to_lookup:
         return prices
 
-    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
-
-    items = pricelist_model.all(
-        formula=AND(
-            EQUAL(FIELD("currency"), to_airtable_value(currency)),
-            OR(
-                EQUAL(FIELD("valid_until"), "BLANK()"),
-                AND(
-                    LESS_EQUAL(FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))),
-                    GREATER(FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))),
-                ),
-            ),
-            OR(
-                *[EQUAL(FIELD("sku"), to_airtable_value(sku)) for sku in skus_to_lookup],
-            ),
-        ),
-        sort=["-valid_until"],
+    items = _get_prices_3yc_for_skus_from_airtable(
+        product_id, currency, start_date, skus_to_lookup, "sku"
     )
+
     for item in items:
         if item.valid_until:
             PRICELIST_CACHE[item.sku].append(

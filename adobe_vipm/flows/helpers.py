@@ -15,6 +15,7 @@ from adobe_vipm.adobe.utils import get_3yc_commitment_request, get_item_by_parti
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
     get_skus_with_available_prices,
+    get_skus_with_available_prices_3yc,
 )
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
@@ -28,6 +29,7 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_CONSUMABLES,
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_SKU_AVAILABILITY,
+    ERR_SKU_NOT_FOUND,
     MARKET_SEGMENT_GOVERNMENT,
     MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC,
@@ -775,10 +777,20 @@ class ValidateSkuAvailability(Step):
 
     def __call__(self, mpt_client, context, next_step):
         """Validate the SKU availability."""
+        try:
+            adobe_skus = self._get_adobe_skus(context)
+        except AdobeProductNotFoundError as error:
+            context.validation_succeeded = False
+            manage_order_error(
+                mpt_client,
+                context,
+                ERR_SKU_NOT_FOUND.to_dict(message=str(error)),
+                is_validation=self.is_validation,
+            )
+            return
+
         commitment = get_3yc_commitment(context.adobe_customer)
-        if commitment:
-            # If the 3YCEndDate > today + 1 year, then the renewal quantity will be modifiable
-            # and the validation will be ok
+        if commitment and commitment["status"] == ThreeYearCommitmentStatus.COMMITTED:
             commitment_end_date = dt.date.fromisoformat(commitment["endDate"])
             if commitment_end_date > (
                 dt.datetime.now(tz=dt.UTC).date()
@@ -786,17 +798,15 @@ class ValidateSkuAvailability(Step):
             ):
                 next_step(mpt_client, context)
                 return
+            commitment_start_date = dt.date.fromisoformat(commitment["startDate"])
+            skus_with_prices = get_skus_with_available_prices_3yc(
+                context.product_id, context.currency, commitment_start_date, adobe_skus
+            )
+        else:
+            skus_with_prices = get_skus_with_available_prices(
+                context.product_id, context.currency, adobe_skus
+            )
 
-        adobe_skus = context.new_lines + context.upsize_lines + context.downsize_lines
-        adobe_skus = [
-            get_adobe_product_by_marketplace_sku(
-                line["item"]["externalIds"]["vendor"]
-            ).vendor_external_id
-            for line in adobe_skus
-        ]
-        skus_with_prices = get_skus_with_available_prices(
-            context.product_id, context.currency, adobe_skus
-        )
         missing_skus = [sku for sku in adobe_skus if sku not in skus_with_prices]
         if missing_skus:
             logger.warning(
@@ -817,6 +827,14 @@ class ValidateSkuAvailability(Step):
 
         logger.info("SKU availability validation passed. All SKUs found in pricing.")
         next_step(mpt_client, context)
+
+    def _get_adobe_skus(self, context):
+        return [
+            get_adobe_product_by_marketplace_sku(
+                line["item"]["externalIds"]["vendor"]
+            ).vendor_external_id
+            for line in context.new_lines + context.upsize_lines + context.downsize_lines
+        ]
 
 
 class ValidateGovernmentTransfer(Step):
