@@ -99,3 +99,19 @@ def notify_not_updated_subscriptions(
         )
 
     send_exception(f"Error updating the subscriptions in configuration order: {order_id}", message)
+
+
+def notify_discount_level_error(sku: str, customer: dict) -> None:
+    """
+    Notify about error getting discount level.
+
+    Args:
+        sku: The SKU being processed.
+        customer: The customer data.
+    """
+    send_exception(
+        "Error getting discount level",
+        f"An error occurred while getting the discount level for SKU **{sku}**.\n\n"
+        f"Customer: {customer.get('customerId')}\n\n"
+        f"discounts: {customer.get('discounts')}",
+    )
