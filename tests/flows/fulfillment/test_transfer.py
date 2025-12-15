@@ -1845,6 +1845,7 @@ def test_fulfill_transfer_order_already_migrated_(
 def test_fulfill_transfer_order_migration_running(
     mocker,
     mock_mpt_client,
+    mock_adobe_client,
     order_factory,
     transfer_order_parameters_factory,
     adobe_authorizations_file,

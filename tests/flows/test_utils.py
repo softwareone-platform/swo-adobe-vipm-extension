@@ -11,6 +11,7 @@ from adobe_vipm.flows.utils import (
     is_coterm_date_within_order_creation_window,
     is_transferring_item_expired,
     notify_agreement_unhandled_exception_in_teams,
+    notify_discount_level_error,
     notify_missing_prices,
     notify_not_updated_subscriptions,
     notify_unhandled_exception_in_teams,
@@ -297,4 +298,24 @@ def test_is_coterm_date_within_order_creation_window_after_window(
         fulfillment_parameters=fulfillment_parameters_factory(coterm_date="2024-06-06")
     )
 
-    assert not is_coterm_date_within_order_creation_window(order)
+    result = is_coterm_date_within_order_creation_window(order)
+
+    assert result is False
+
+
+def test_notify_discount_level_error(mocker, adobe_customer_factory):
+    mocked_send_exc = mocker.patch("adobe_vipm.flows.utils.notification.send_exception")
+    customer = adobe_customer_factory()
+    sku = "65322572CAT1A10"
+
+    notify_discount_level_error(
+        sku,
+        customer,
+    )  # act
+
+    mocked_send_exc.assert_called_once_with(
+        "Error getting discount level",
+        f"An error occurred while getting the discount level for SKU **{sku}**.\n\n"
+        f"Customer: {customer.get('customerId')}\n\n"
+        f"discounts: {customer.get('discounts')}",
+    )

@@ -3075,6 +3075,56 @@ def test_add_missing_subscriptions(
 
 
 @freeze_time("2025-07-24")
+def test_add_missing_subscriptions_fail_recovery_skus(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_notify_missing_discount_levels,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A10"
+        ),
+        adobe_subscription_factory(
+            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A13"
+        ),
+        adobe_subscription_factory(
+            subscription_id="ae5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="75322572CAT1A11"
+        ),
+    ]
+    mock_get_consumable_discount_level = mocker.patch(
+        "adobe_vipm.flows.utils.subscription.get_customer_consumables_discount_level"
+    )
+    mock_get_consumable_discount_level.side_effect = Exception("Test Exception")
+    mock_get_prices_for_skus.side_effect = [
+        {
+            "65322572CAT1A10": 12.14,
+            "65322572CAT1A11": 11.14,
+            "65322572CAT1A12": 10.14,
+            "65322572CAT1A13": 9.14,
+        },
+        {"75322572CAT1A11": 22.14},
+    ]
+
+    with pytest.raises(Exception, match="Test Exception"):
+        _add_missing_subscriptions(
+            mock_mpt_client,
+            mock_adobe_client,
+            adobe_customer_factory(),
+            agreement_factory(),
+            adobe_subscriptions=adobe_subscriptions,
+        )
+
+    mock_get_product_items_by_skus.assert_called_once()
+    mock_notify_missing_discount_levels.assert_called_once()
+
+
+@freeze_time("2025-07-24")
 def test_add_missing_subscriptions_deployment(
     mocker,
     items_factory,
