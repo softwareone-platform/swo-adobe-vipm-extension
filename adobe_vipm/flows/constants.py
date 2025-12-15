@@ -436,6 +436,11 @@ ERR_SKU_AVAILABILITY = ValidationError(
     "The following SKUs are expired: {missing_skus}. Available SKUs: {available_skus}.",
 )
 
+ERR_SKU_NOT_FOUND = ValidationError(
+    "VIPM0041",
+    "{message}",
+)
+
 ERR_LGA_QUANTITIES = ValidationError(
     "VIPM0040",
     "The quantity selected must be greater than 100 licenses for Large Government Agency.",
