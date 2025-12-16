@@ -20,7 +20,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_MEMBERSHIP_ID,
-    ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
@@ -188,9 +187,8 @@ def add_lines_to_order(
                 )
         else:
             adobe_items = [item for item in adobe_items if not is_transferring_item_expired(item)]
-
-    if not adobe_items:
-        return _handle_empty_adobe_items(order)
+    else:
+        return False, order
 
     order_error, order = _get_updated_order_lines(
         adobe_items,
@@ -202,16 +200,6 @@ def add_lines_to_order(
     )
 
     return order_error, order
-
-
-def _handle_empty_adobe_items(order: dict) -> tuple[bool, dict]:
-    if is_migrate_customer(order):
-        order = set_ordering_parameter_error(
-            order,
-            Param.MEMBERSHIP_ID.value,
-            ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict(),
-        )
-    return True, order
 
 
 def _get_updated_order_lines(

@@ -41,6 +41,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.fulfillment.transfer import (
     HandleMigratedTransfer,
+    ManageAccountRevival,
     SyncGCMainAgreement,
     UpdateTransferStatus,
     ValidateTransfer,
@@ -127,6 +128,12 @@ def test_transfer(
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_one_time_subscription,
+            adobe_subscription,
+        ],
+    }
     mock_adobe_client.get_subscription.side_effect = [
         adobe_one_time_subscription,
         adobe_subscription,
@@ -287,7 +294,7 @@ def test_transfer(
         ),
     ])
     mocked_add_asset.assert_called_once_with(
-        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][0]
     )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
@@ -366,7 +373,6 @@ def test_transfer(
     mock_adobe_client.get_subscription.assert_has_calls([
         call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
-        call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
     mocked_get_template.assert_has_calls([
         call(
@@ -458,6 +464,12 @@ def test_transfer_with_no_profile_address(
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_one_time_subscription,
+            adobe_subscription,
+        ],
+    }
     mock_adobe_client.get_subscription.side_effect = [
         adobe_one_time_subscription,
         adobe_subscription,
@@ -594,7 +606,7 @@ def test_transfer_with_no_profile_address(
         ),
     ])
     mocked_add_asset.assert_called_once_with(
-        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][0]
     )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
@@ -665,7 +677,6 @@ def test_transfer_with_no_profile_address(
     mock_adobe_client.get_subscription.assert_has_calls([
         call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
-        call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
     mocked_get_template.assert_has_calls([
         call(
@@ -1958,6 +1969,11 @@ def test_transfer_3yc_customer(
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_subscription.return_value = adobe_subscription
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription,
+        ],
+    }
     mocker.patch(
         "adobe_vipm.flows.fulfillment.transfer.get_adobe_client", return_value=mock_adobe_client
     )
@@ -2258,6 +2274,11 @@ def test_transfer_3yc_customer_with_no_profile_address(
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription,
+        ],
+    }
     mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     subscription = subscriptions_factory(commitment_date="2024-01-01")[0]
@@ -2834,6 +2855,12 @@ def test_transfer_gc_account_all_deployments_created(
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_one_time_subscription,
+            adobe_subscription,
+        ],
+    }
     mock_adobe_client.get_subscription.side_effect = [
         adobe_one_time_subscription,
         adobe_subscription,
@@ -2979,7 +3006,7 @@ def test_transfer_gc_account_all_deployments_created(
         ),
     ])
     mocked_add_asset.assert_called_once_with(
-        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][0]
     )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
@@ -3060,7 +3087,6 @@ def test_transfer_gc_account_all_deployments_created(
     mock_adobe_client.get_subscription.assert_has_calls([
         call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
-        call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
     mocked_get_template.assert_has_calls([
         call(
@@ -3163,6 +3189,12 @@ def test_transfer_gc_account_no_deployments(
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_one_time_subscription,
+            adobe_subscription,
+        ],
+    }
     mock_adobe_client.get_subscription.side_effect = [
         adobe_one_time_subscription,
         adobe_subscription,
@@ -3304,7 +3336,7 @@ def test_transfer_gc_account_no_deployments(
         ),
     ])
     mocked_add_asset.assert_called_once_with(
-        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][0]
     )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
@@ -3385,7 +3417,6 @@ def test_transfer_gc_account_no_deployments(
     mock_adobe_client.get_subscription.assert_has_calls([
         call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
-        call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
     mocked_get_template.assert_has_calls([
         call(
@@ -4632,6 +4663,12 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_one_time_subscription,
+            adobe_subscription,
+        ],
+    }
     mock_adobe_client.get_subscription.side_effect = [
         adobe_one_time_subscription,
         adobe_subscription,
@@ -4804,7 +4841,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
         ),
     ])
     mocked_add_asset.assert_called_once_with(
-        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][0]
     )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
@@ -4885,7 +4922,6 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
     mock_adobe_client.get_subscription.assert_has_calls([
         call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
-        call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
     mocked_get_template.assert_has_calls([
         call(
@@ -5490,6 +5526,12 @@ def test_transfer_lga_product_with_lga_agency_type(
     mock_adobe_client.create_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
     mock_adobe_client.get_transfer.return_value = adobe_transfer
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_one_time_subscription,
+            adobe_subscription,
+        ],
+    }
     mock_adobe_client.get_subscription.side_effect = [
         adobe_one_time_subscription,
         adobe_subscription,
@@ -5654,7 +5696,7 @@ def test_transfer_lga_product_with_lga_agency_type(
         ),
     ])
     mocked_add_asset.assert_called_once_with(
-        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][2]
+        mock_mpt_client, adobe_one_time_subscription, mocker.ANY, adobe_transfer["lineItems"][0]
     )
     mocked_create_subscription.assert_called_once_with(
         mock_mpt_client,
@@ -5733,7 +5775,6 @@ def test_transfer_lga_product_with_lga_agency_type(
     mock_adobe_client.get_subscription.assert_has_calls([
         mocker.call(authorization_id, "a-client-id", adobe_one_time_subscription["subscriptionId"]),
         mocker.call(authorization_id, "a-client-id", adobe_subscription["subscriptionId"]),
-        mocker.call(authorization_id, "a-client-id", adobe_inactive_subscription["subscriptionId"]),
     ])
     mocked_get_template.assert_has_calls([
         mocker.call(
@@ -5761,3 +5802,168 @@ def test_transfer_lga_product_with_lga_agency_type(
         dry_run=False,
         sync_prices=False,
     )
+
+
+def test_manage_account_revival_with_active_subscriptions(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_transfer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client", return_value=mock_adobe_client
+    )
+    order = order_factory()
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        adobe_customer_id="customer-id",
+    )
+    context.adobe_transfer_order = adobe_transfer_factory(customer_id="customer-id")
+    active_subscription = adobe_subscription_factory(status=AdobeStatus.PROCESSED.value)
+    inactive_subscription = adobe_subscription_factory(
+        subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [active_subscription, inactive_subscription]
+    }
+    mock_next_step = mocker.Mock()
+    step = ManageAccountRevival()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.adobe_transfer_order["lineItems"] == [active_subscription]
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
+
+
+def test_manage_account_revival_no_active_subscriptions_with_existing_new_orders(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_transfer_factory,
+    adobe_order_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client", return_value=mock_adobe_client
+    )
+    order = order_factory()
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        adobe_customer_id="customer-id",
+    )
+    context.adobe_transfer_order = adobe_transfer_factory(customer_id="customer-id")
+    inactive_subscription = adobe_subscription_factory(
+        subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [inactive_subscription]}
+    existing_new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
+    mock_adobe_client.get_orders.return_value = [existing_new_order]
+    mock_next_step = mocker.Mock()
+    step = ManageAccountRevival()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
+    mock_adobe_client.get_orders.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
+    mock_adobe_client.create_preview_order.assert_not_called()
+    mock_adobe_client.create_new_order.assert_not_called()
+
+
+def test_manage_account_revival_no_active_subscriptions_no_existing_new_orders(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_transfer_factory,
+    adobe_order_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client", return_value=mock_adobe_client
+    )
+    order = order_factory()
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        adobe_customer_id="customer-id",
+    )
+    context.adobe_transfer_order = adobe_transfer_factory(customer_id="customer-id")
+    inactive_subscription = adobe_subscription_factory(
+        subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [inactive_subscription]}
+    mock_adobe_client.get_orders.return_value = []
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW)
+    mock_adobe_client.create_preview_order.return_value = preview_order
+    mock_adobe_client.create_new_order.return_value = new_order
+    mock_next_step = mocker.Mock()
+    step = ManageAccountRevival()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
+    mock_adobe_client.get_orders.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
+    mock_adobe_client.create_new_order.assert_called_once_with(
+        order["authorization"]["id"], "customer-id", preview_order
+    )
+
+
+def test_manage_account_revival_no_active_subscriptions_preview_order_raises_exception(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_subscription_factory,
+    adobe_transfer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client", return_value=mock_adobe_client
+    )
+    order = order_factory()
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        adobe_customer_id="customer-id",
+    )
+    context.adobe_transfer_order = adobe_transfer_factory(customer_id="customer-id")
+    inactive_subscription = adobe_subscription_factory(
+        subscription_id="inactive-sub-id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+    )
+    mock_adobe_client.get_subscriptions.return_value = {"items": [inactive_subscription]}
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_preview_order.side_effect = AdobeError("preview order failed")
+    mock_adobe_client.create_new_order.return_value = None
+    mock_next_step = mocker.Mock()
+    step = ManageAccountRevival()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
+    mock_adobe_client.get_orders.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
+    mock_adobe_client.create_preview_order.assert_called_once_with(context)
+    mock_adobe_client.create_new_order.assert_not_called()

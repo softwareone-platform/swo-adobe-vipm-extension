@@ -13,7 +13,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_MEMBERSHIP_ID,
-    ERR_ADOBE_MEMBERSHIP_ID_EMPTY,
     ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT,
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
@@ -377,9 +376,8 @@ def test_validate_transfer_no_items(
 
     has_errors, validated_order = validate_transfer(mock_mpt_client, order)  # act
 
-    assert has_errors is True
+    assert has_errors is False
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
-    assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_EMPTY.to_dict()
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
     get_product_items_by_skus_mock.assert_not_called()

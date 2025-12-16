@@ -18,7 +18,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import ORDER_TYPE_NEW, AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
@@ -172,19 +172,22 @@ def _check_transfer(mpt_client, order, membership_id):
         ],
         key=itemgetter(0),
     )
-
     order_lines = sorted(
         [(line["item"]["externalIds"]["vendor"], line["quantity"]) for line in order["lines"]],
         key=itemgetter(0),
     )
-    if adobe_lines != order_lines:
-        error = ERR_MEMBERSHIP_ITEMS_DONT_MATCH.to_dict(
+
+    if not adobe_lines or adobe_lines == order_lines:
+        return True
+
+    switch_order_to_failed(
+        mpt_client,
+        order,
+        ERR_MEMBERSHIP_ITEMS_DONT_MATCH.to_dict(
             lines=",".join([line[0] for line in adobe_lines]),
-        )
-        switch_order_to_failed(mpt_client, order, error)
-        logger.warning("Transfer %s has been failed: %s.", order["id"], error["message"])
-        return False
-    return True
+        ),
+    )
+    return False
 
 
 def _submit_transfer_order(mpt_client, order, membership_id):
@@ -1249,6 +1252,7 @@ class GetAdobeCustomer(Step):
         """Get Adobe customer and saves it to the context."""
         adobe_client = get_adobe_client()
         context.customer_id = context.adobe_transfer_order["customerId"]
+        context.adobe_customer_id = context.adobe_transfer_order["customerId"]
         context.adobe_customer = adobe_client.get_customer(
             context.authorization_id, context.customer_id
         )
@@ -1282,6 +1286,48 @@ class ValidateAgreementDeployments(Step):
             return
 
         next_step(client, context)
+
+
+class ManageAccountRevival(Step):
+    """Manages the account revival."""
+
+    def __call__(self, client, context, next_step):
+        """Manages the account revival."""
+        adobe_client = get_adobe_client()
+        customer_subscriptions = adobe_client.get_subscriptions(
+            context.order["authorization"]["id"], context.adobe_transfer_order["customerId"]
+        )
+        active_subscriptions = [
+            subscription
+            for subscription in customer_subscriptions["items"]
+            if subscription["status"] == AdobeStatus.PROCESSED
+        ]
+        if not active_subscriptions:
+            logger.info("No active subscriptions found, create a new order for account revival")
+            try:
+                self._create_order_account_revival(adobe_client, context)
+            except AdobeError:
+                logger.exception("Error creating a new order for account revival")
+            return
+
+        logger.info("Found the active subscriptions, continue with the transfer")
+        context.adobe_transfer_order["lineItems"] = active_subscriptions
+        next_step(client, context)
+
+    def _create_order_account_revival(self, adobe_client, context):
+        customer_orders = adobe_client.get_orders(
+            context.authorization_id, context.adobe_customer_id
+        )
+        customer_new_orders = [
+            order for order in customer_orders if order["orderType"] == ORDER_TYPE_NEW
+        ]
+        if customer_new_orders:
+            return
+
+        preview_order = adobe_client.create_preview_order(context)
+        adobe_client.create_new_order(
+            context.authorization_id, context.adobe_customer_id, preview_order
+        )
 
 
 class ProcessTransferOrder(Step):
@@ -1415,6 +1461,7 @@ def fulfill_transfer_order(mpt_client, order):
         ValidateDeploymentItems(),
         GetAdobeCustomer(),
         ValidateAgreementDeployments(),
+        ManageAccountRevival(),
         ProcessTransferOrder(),
         CreateTransferAssets(),
         CreateTransferSubscriptions(),
