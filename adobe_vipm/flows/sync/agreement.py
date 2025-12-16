@@ -31,6 +31,7 @@ from adobe_vipm.flows.mpt import get_agreements_by_3yc_commitment_request_invita
 from adobe_vipm.flows.sync.asset import AssetSyncer
 from adobe_vipm.flows.sync.helper import check_adobe_subscription_id
 from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
+from adobe_vipm.flows.utils import notify_agreement_unhandled_exception_in_teams
 from adobe_vipm.flows.utils.market_segment import get_market_segment
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.notifications import send_exception, send_warning
@@ -47,7 +48,7 @@ class AgreementSyncer:  # noqa: WPS214
         mpt_client: The MPT client used to interact  with the MPT.
         adobe_client: The Adobe client used to interact with Adobe API.
         agreement: The agreement to sync.
-        customer: The customer data.
+        adobe_customer: The customer data.
         adobe_subscriptions: List of the Adobe subscriptions.
         dry_run: If true, no changes will be made (dry run mode).
     """
@@ -57,7 +58,7 @@ class AgreementSyncer:  # noqa: WPS214
         mpt_client: MPTClient,
         adobe_client: AdobeClient,
         agreement: dict,
-        customer: dict,
+        adobe_customer: dict,
         adobe_subscriptions: list[dict],
         *,
         dry_run: bool,
@@ -65,13 +66,13 @@ class AgreementSyncer:  # noqa: WPS214
         self._mpt_client = mpt_client
         self._adobe_client = adobe_client
         self._agreement = agreement
-        self._customer = customer
+        self._adobe_customer = adobe_customer
+        self._adobe_customer_id = adobe_customer["customerId"]
         self._adobe_subscriptions = adobe_subscriptions
         self._dry_run = dry_run
         self._authorization_id: str = agreement["authorization"]["id"]
         self._seller_id: str = agreement["seller"]["id"]
         self._licensee_id: str = agreement["licensee"]["id"]
-        self._adobe_customer_id: str = flows_utils.get_adobe_customer_id(self._agreement)
         self._currency = agreement["listing"]["priceList"]["currency"]
 
     @property
@@ -108,7 +109,7 @@ class AgreementSyncer:  # noqa: WPS214
                 self._mpt_client,
                 self.agreement_id,
                 self._agreement["assets"],
-                self._customer,
+                self._adobe_customer,
                 self._adobe_subscriptions,
             ).sync(dry_run=self._dry_run)
 
@@ -117,7 +118,7 @@ class AgreementSyncer:  # noqa: WPS214
                 SubscriptionSyncer(
                     self._mpt_client,
                     self._agreement,
-                    self._customer,
+                    self._adobe_customer,
                     self._adobe_subscriptions,
                     subscriptions_for_update,
                     dry_run=self._dry_run,
@@ -127,7 +128,7 @@ class AgreementSyncer:  # noqa: WPS214
 
             self._update_agreement(self._agreement)
 
-            if self._customer.get("globalSalesEnabled", False):
+            if self._adobe_customer.get("globalSalesEnabled", False):
                 adobe_deployments = self._adobe_client.get_customer_deployments_active_status(
                     self._authorization_id, self._adobe_customer_id
                 )
@@ -192,7 +193,7 @@ class AgreementSyncer:  # noqa: WPS214
             )
             return False
 
-        if not self._customer.get("discounts", []):
+        if not self._adobe_customer.get("discounts", []):
             msg = (
                 f"Error synchronizing agreement {self.agreement_id}. Customer "
                 f"{self._adobe_customer_id} does not have discounts information."
@@ -238,7 +239,9 @@ class AgreementSyncer:  # noqa: WPS214
             for item in mpt.get_product_items_by_skus(self._mpt_client, self.product_id, skus)
         }
         offer_ids = [
-            flows_utils.get_sku_with_discount_level(adobe_subscription["offerId"], self._customer)
+            flows_utils.get_sku_with_discount_level(
+                adobe_subscription["offerId"], self._adobe_customer
+            )
             for adobe_subscription in missing_adobe_subscriptions
         ]
         for adobe_subscription in missing_adobe_subscriptions:
@@ -269,9 +272,11 @@ class AgreementSyncer:  # noqa: WPS214
                 continue
 
             item = items_map[get_partial_sku(adobe_subscription["offerId"])]
-            prices = models.get_sku_price(self._customer, offer_ids, self.product_id, currency)
+            prices = models.get_sku_price(
+                self._adobe_customer, offer_ids, self.product_id, currency
+            )
             sku_discount_level = flows_utils.get_sku_with_discount_level(
-                adobe_subscription["offerId"], self._customer
+                adobe_subscription["offerId"], self._adobe_customer
             )
             unit_price = {"price": {"unitPP": prices[sku_discount_level]}}
             if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
@@ -438,14 +443,14 @@ class AgreementSyncer:  # noqa: WPS214
     def _update_agreement(self, agreement: dict) -> None:
         parameters = {}
 
-        commitment_info = get_3yc_commitment(self._customer)
+        commitment_info = get_3yc_commitment(self._adobe_customer)
         self._update_3yc_fulfillment_params(agreement, commitment_info, parameters)
         self._update_3yc_ordering_params(commitment_info, parameters)
 
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
         parameters[Param.PHASE_FULFILLMENT.value].append({
             "externalId": Param.COTERM_DATE.value,
-            "value": self._customer.get("cotermDate", ""),
+            "value": self._adobe_customer.get("cotermDate", ""),
         })
 
         if get_market_segment(self.product_id) == MARKET_SEGMENT_EDUCATION:
@@ -472,7 +477,7 @@ class AgreementSyncer:  # noqa: WPS214
 
     def _update_3yc_fulfillment_params(
         self, agreement: dict, commitment_info: dict, parameters: dict
-    ) -> dict:
+    ) -> None:
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
         three_yc_recommitment_par = flows_utils.get_parameter(
             Param.PHASE_FULFILLMENT.value, agreement, Param.THREE_YC_RECOMMITMENT.value
@@ -489,7 +494,9 @@ class AgreementSyncer:  # noqa: WPS214
         request_type_param_phase = (
             Param.PHASE_ORDERING.value if not is_recommitment else Param.PHASE_FULFILLMENT.value
         )
-        request_info = get_3yc_commitment_request(self._customer, is_recommitment=is_recommitment)
+        request_info = get_3yc_commitment_request(
+            self._adobe_customer, is_recommitment=is_recommitment
+        )
         parameters[Param.PHASE_FULFILLMENT.value].append({
             "externalId": status_param_ext_id,
             "value": request_info.get("status"),
@@ -536,11 +543,11 @@ class AgreementSyncer:  # noqa: WPS214
                 actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
                 agreement_lines.append((
                     line,
-                    flows_utils.get_sku_with_discount_level(actual_sku, self._customer),
+                    flows_utils.get_sku_with_discount_level(actual_sku, self._adobe_customer),
                 ))
 
         skus = [item[1] for item in agreement_lines]
-        prices = models.get_sku_price(self._customer, skus, product_id, currency)
+        prices = models.get_sku_price(self._adobe_customer, skus, product_id, currency)
         for line, actual_sku in agreement_lines:
             current_price = line["price"]["unitPP"]
             line["price"]["unitPP"] = prices[actual_sku]
@@ -605,7 +612,7 @@ class AgreementSyncer:  # noqa: WPS214
             for_update.append((
                 mpt_subscription,
                 adobe_subscription,
-                flows_utils.get_sku_with_discount_level(actual_sku, self._customer),
+                flows_utils.get_sku_with_discount_level(actual_sku, self._adobe_customer),
             ))
 
         return for_update
@@ -652,7 +659,7 @@ class AgreementSyncer:  # noqa: WPS214
             transfer = models.get_transfer_by_authorization_membership_or_customer(
                 self.product_id,
                 self._authorization_id,
-                flows_utils.get_adobe_customer_id(self._agreement),
+                self._adobe_customer_id,
             )
             if not transfer:
                 logger.info("No transfer found for missing deployment %s", missing_deployment_id)
@@ -686,7 +693,7 @@ class AgreementSyncer:  # noqa: WPS214
                     "membership_id": missing_deployment_data["transfer"].membership_id,
                     "transfer_id": missing_deployment_data["transfer"].transfer_id,
                     "status": "pending",
-                    "customer_id": flows_utils.get_adobe_customer_id(self._agreement),
+                    "customer_id": self._adobe_customer_id,
                     "deployment_currency": missing_deployment_data["deployment_currency"],
                     "deployment_country": missing_deployment_data["deployment"]["companyProfile"][
                         "address"
@@ -816,7 +823,7 @@ class AgreementSyncer:  # noqa: WPS214
                 SubscriptionSyncer(
                     self._mpt_client,
                     deployment_agreement,
-                    self._customer,
+                    self._adobe_customer,
                     self._adobe_subscriptions,
                     subscriptions_for_update,
                     dry_run=self._dry_run,
@@ -869,7 +876,7 @@ class AgreementSyncer:  # noqa: WPS214
             mpt.update_agreement(self._mpt_client, self.agreement_id, parameters=parameters_data)
 
     def _add_education_market_sub_segments(self, parameters: dict) -> None:
-        subsegments = self._customer.get("companyProfile", {}).get("marketSubSegments", [])
+        subsegments = self._adobe_customer.get("companyProfile", {}).get("marketSubSegments", [])
         parameters[Param.PHASE_FULFILLMENT.value].append({
             "externalId": Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
             "value": ",".join(subsegments),
@@ -1077,10 +1084,19 @@ def sync_agreement(
         return
 
     adobe_customer_id = flows_utils.get_adobe_customer_id(agreement)
-    customer = get_customer_or_process_lost_customer(
+    if not adobe_customer_id:
+        message = (
+            f"CustomerId not found in Agreement {agreement['id']} with params "
+            f"{agreement['parameters']}. Skipping."
+        )
+        logger.warning(message)
+        notify_agreement_unhandled_exception_in_teams(agreement["id"], message)
+        return
+
+    adobe_customer = get_customer_or_process_lost_customer(
         mpt_client, adobe_client, agreement, adobe_customer_id, dry_run=dry_run
     )
-    if not customer:
+    if not adobe_customer:
         return
 
     authorization_id: str = agreement["authorization"]["id"]
@@ -1089,7 +1105,7 @@ def sync_agreement(
     ]
 
     AgreementSyncer(
-        mpt_client, adobe_client, agreement, customer, adobe_subscriptions, dry_run=dry_run
+        mpt_client, adobe_client, agreement, adobe_customer, adobe_subscriptions, dry_run=dry_run
     ).sync(sync_prices=sync_prices)
 
 
