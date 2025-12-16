@@ -861,7 +861,7 @@ def test_sync_agreements_by_3yc_enroll_status_no_cust(
         mock_mpt_client, THREE_YC_TEMP_3YC_STATUSES
     )
     mock_get_customer_or_process_lost_customer.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, agreement, customer_id=""
+        mock_mpt_client, mock_adobe_client, agreement, customer_id="a-client-id"
     )
     mock_update_agreement.assert_not_called()
     mock_sync_agreement.assert_not_called()
@@ -1476,6 +1476,7 @@ def test_sync_global_customer_update_not_required(
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         fulfillment_parameters=[
+            {"externalId": "customerId", "value": "a-client-id"},
             {"externalId": "globalCustomer", "value": ["Yes"]},
             {"externalId": "deployments", "value": "deployment-id - DE"},
         ],
@@ -1609,8 +1610,10 @@ def test_sync_global_customer_update_adobe_error(
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         fulfillment_parameters=[
+            {"externalId": "customerId", "value": "a-client-id"},
             {"externalId": "globalCustomer", "value": ["Yes"]},
             {"externalId": "deployments", "value": "deployment-id - DE"},
+            {"externalId": "deploymentId", "value": "deployment-id"},
         ],
         subscriptions=[
             {"id": "SUB-1000-2000-3000", "status": "Active", "item": {"id": "ITM-0000-0001-0001"}},
@@ -1774,6 +1777,7 @@ def test_sync_global_customer_parameters_error(
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         fulfillment_parameters=[
+            {"externalId": "customerId", "value": "a-client-id"},
             {"externalId": "globalCustomer", "value": ["Yes"]},
             {"externalId": "deployments", "value": "deployment-id - DE"},
         ],
@@ -2103,8 +2107,10 @@ def test_sync_agreement_error_getting_adobe_customer(
     agreement = agreement_factory(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         fulfillment_parameters=[
+            {"externalId": "customerId", "value": "a-client-id"},
             {"externalId": "globalCustomer", "value": ["Yes"]},
             {"externalId": "deployments", "value": "deployment-id - DE"},
+            {"externalId": "deploymentId", "value": "deployment-id"},
         ],
         subscriptions=[
             {
@@ -2386,6 +2392,39 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_terminate_subscription.assert_called_once_with(
         mock_mpt_client, "SUB-1000-2000-6000", "Adobe subscription status 1004."
     )
+
+
+def test_sync_agreement_empty_customer_id(
+    mocker,
+    mock_mpt_client,
+    agreement_factory,
+    mock_notify_agreement_unhandled_exception_in_teams,
+    caplog,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=[{"externalId": "FakeFulfillmentParam"}],
+        ordering_parameters=[{"externalId": "FakeOrderingParam"}],
+    )
+    mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
+        "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams"
+    )
+
+    sync_agreement(
+        mock_mpt_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    expected_params = {
+        "ordering": [{"externalId": "FakeOrderingParam"}],
+        "fulfillment": [{"externalId": "FakeFulfillmentParam"}],
+    }
+    expected_message = (
+        f"CustomerId not found in Agreement AGR-2119-4550-8674-5962 with params "
+        f"{expected_params}. Skipping."
+    )
+    mock_notify_agreement_unhandled_exception_in_teams.assert_called_once_with(
+        "AGR-2119-4550-8674-5962", expected_message
+    )
+    assert expected_message in caplog.messages
 
 
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")

@@ -665,7 +665,7 @@ def reseller_change_order_parameters_factory():
 @pytest.fixture()
 def fulfillment_parameters_factory():
     def _fulfillment_parameters(
-        customer_id="",
+        customer_id="a-client-id",
         due_date=None,
         p3yc_recommitment=None,
         p3yc_enroll_status="",
