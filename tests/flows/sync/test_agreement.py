@@ -2499,6 +2499,92 @@ def test_sync_agreement_without_subscriptions(
     assert "Skipping price sync - no subscriptions found for the customer" in caplog.text
 
 
+@freeze_time("2025-07-24")
+def test_add_missing_subscriptions_without_price(
+    mocker,
+    items_factory,
+    mock_mpt_client,
+    mock_setup_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_send_warning,
+    mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_get_product_items_by_period,
+    mock_mpt_create_asset,
+    mock_mpt_create_agreement_subscription,
+    mock_mpt_get_asset_template_by_name,
+    mock_get_template_data_by_adobe_subscription,
+    mocked_agreement_syncer,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A13"
+        ),
+    ]
+    mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
+    mocked_agreement_syncer._customer = adobe_customer_factory()
+    mock_get_prices_for_skus.side_effect = [
+        {},
+    ]
+    mock_yearly_item = items_factory(item_id=193, external_vendor_id="65322572CA")[0]
+    mock_one_time_item = items_factory(
+        item_id=194,
+        name="One time item",
+        external_vendor_id="75322572CA",
+        term_period=ItemTermsModel.ONE_TIME.value,
+        term_model=ItemTermsModel.ONE_TIME.value,
+    )[0]
+    mock_mpt_get_asset_template_by_name.return_value = None
+    mock_get_product_items_by_skus.return_value = [mock_yearly_item, mock_one_time_item]
+    mock_get_product_items_by_period.return_value = [mock_yearly_item, mock_one_time_item]
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Renewing",
+    }
+
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
+
+    mock_get_product_items_by_skus.assert_called_once_with(
+        mock_mpt_client, "PRD-1111-1111", {"65322572CA"}
+    )
+    mock_get_product_items_by_period.assert_not_called()
+    mock_mpt_create_agreement_subscription.assert_called_once_with(
+        mock_mpt_client,
+        {
+            "status": "Active",
+            "commitmentDate": "2026-10-11",
+            "price": {"unitPP": {}},
+            "parameters": {
+                "fulfillment": [
+                    {"externalId": "adobeSKU", "value": "65322572CAT1A13"},
+                    {"externalId": "currentQuantity", "value": "10"},
+                    {"externalId": "renewalQuantity", "value": "10"},
+                    {"externalId": "renewalDate", "value": "2026-10-11"},
+                ]
+            },
+            "agreement": {"id": "AGR-2119-4550-8674-5962"},
+            "buyer": {"id": "BUY-3731-7971"},
+            "licensee": {"id": "LC-321-321-321"},
+            "seller": {"id": "SEL-9121-8944"},
+            "lines": [
+                {
+                    "quantity": 10,
+                    "item": mock_yearly_item,
+                }
+            ],
+            "name": ("Subscription for Awesome product"),
+            "startDate": "2019-05-20T22:49:55Z",
+            "externalIds": {"vendor": "2e5b9c974c4ea1bcabdb0fe697a2f1NA"},
+            "product": {"id": "PRD-1111-1111"},
+            "autoRenew": True,
+            "template": {"id": "TPL-1234", "name": "Renewing"},
+        },
+    )
+
+
 def test_check_update_airtable_missing_deployments(
     mocker,
     agreement_factory,
