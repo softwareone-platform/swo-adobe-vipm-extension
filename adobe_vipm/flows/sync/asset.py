@@ -22,13 +22,13 @@ class AssetSyncer:
         mpt_client: MPTClient,
         agreement_id: str,
         assets: list[dict],
-        customer: dict,
+        _adobe_customer: dict,
         adobe_subscriptions: list[dict],
     ) -> None:
         self._mpt_client = mpt_client
         self._agreement_id = agreement_id
         self._assets = assets
-        self._customer = customer
+        self._adobe_customer = _adobe_customer
         self._adobe_subscriptions = adobe_subscriptions
 
     def sync(self, *, dry_run: bool) -> None:
@@ -59,7 +59,7 @@ class AssetSyncer:
             for_update.append((
                 mpt_asset,
                 adobe_subscription,
-                get_sku_with_discount_level(adobe_subscription["offerId"], self._customer),
+                get_sku_with_discount_level(adobe_subscription["offerId"], self._adobe_customer),
             ))
 
         return for_update

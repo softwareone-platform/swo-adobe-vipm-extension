@@ -33,7 +33,7 @@ class SubscriptionSyncer:
         self,
         mpt_client: MPTClient,
         agreement: dict,
-        customer: dict,
+        adobe_customer: dict,
         adobe_subscriptions: list[dict],
         subscriptions_for_update: list[dict],
         *,
@@ -48,8 +48,7 @@ class SubscriptionSyncer:
         self._authorization_id: str = agreement["authorization"]["id"]
         self._seller_id: str = agreement["seller"]["id"]
         self._licensee_id: str = agreement["licensee"]["id"]
-        self._adobe_customer_id: str = flows_utils.get_adobe_customer_id(agreement)
-        self._customer = customer
+        self._adobe_customer = adobe_customer
         self._adobe_subscriptions = adobe_subscriptions
         self._dry_run = dry_run
 
@@ -63,9 +62,11 @@ class SubscriptionSyncer:
         logger.info("Synchronizing subscriptions.")
         try:
             skus = [subscription[2] for subscription in self._subscriptions_for_update]
-            prices = models.get_sku_price(self._customer, skus, self._product_id, self._currency)
+            prices = models.get_sku_price(
+                self._adobe_customer, skus, self._product_id, self._currency
+            )
             missing_prices_skus = []
-            coterm_date = self._customer["cotermDate"]
+            coterm_date = self._adobe_customer["cotermDate"]
             for subscription, adobe_subscription, actual_sku in self._subscriptions_for_update:
                 if actual_sku not in prices:
                     logger.error(
@@ -90,7 +91,7 @@ class SubscriptionSyncer:
                     missing_prices_skus,
                     self._product_id,
                     self._currency,
-                    get_commitment_start_date(self._customer),
+                    get_commitment_start_date(self._adobe_customer),
                 )
         except Exception:
             logger.exception("Error synchronizing agreement %s.", self._agreement_id)

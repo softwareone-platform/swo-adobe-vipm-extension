@@ -172,7 +172,7 @@ def test_sync_agreement_prices(
     mock_adobe_client.get_subscriptions.return_value = {
         "items": [adobe_subscription, another_adobe_subscription]
     }
-    mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(coterm_date="2025-04-04")
     mock_mpt_get_agreement_subscription.side_effect = [mpt_subscription, another_mpt_subscription]
     mocker.patch(
         "adobe_vipm.airtable.models.get_prices_for_skus",
@@ -303,7 +303,10 @@ def test_sync_agreement_update_agreement_education(
     mock_mpt_update_agreement,
 ):
     mocked_agreement_syncer._agreement["product"]["id"] = "PRD-4444-4444"
-    mocked_agreement_syncer._customer["companyProfile"]["marketSubSegments"] = ["EDU_1", "EDU_2"]
+    mocked_agreement_syncer._adobe_customer["companyProfile"]["marketSubSegments"] = [
+        "EDU_1",
+        "EDU_2",
+    ]
 
     mocked_agreement_syncer.sync(sync_prices=True)  # act
 
@@ -353,7 +356,7 @@ def test_sync_agreement_not_prices(
     mocked_agreement_syncer,
     mock_get_product_items_by_skus,
 ):
-    mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(coterm_date="2025-04-04")
     mock_get_prices_for_skus.return_value = {"65304578CA01A12": 1234.55}
     mock_get_template_data_by_adobe_subscription.return_value = {
         "id": "TPL-1234",
@@ -442,7 +445,7 @@ def test_process_orphaned_deployment_subscriptions_status(
             autorenewal_enabled=False,
         ),
     ]
-    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
 
     mocked_agreement_syncer.sync(sync_prices=True)  # act
 
@@ -471,7 +474,7 @@ def test_sync_agreement_prices_dry_run(
         lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11)
     )
     mpt_subscription = subscriptions_factory()[0]
-    mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(coterm_date="2025-04-04")
     mock_mpt_get_agreement_subscription.return_value = mpt_subscription
     mocker.patch(
         "adobe_vipm.airtable.models.get_prices_for_skus",
@@ -909,7 +912,7 @@ def test_sync_global_customer(
     mock_mpt_get_agreement_subscription.return_value = mocked_agreement_syncer._agreement[
         "subscriptions"
     ][0]
-    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
             "deploymentId": "deployment-id",
@@ -1000,7 +1003,7 @@ def test_sync_global_customer_dry(
     mock_mpt_get_agreement_subscription.return_value = mocked_agreement_syncer._agreement[
         "subscriptions"
     ][0]
-    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
             "deploymentId": "deployment-id",
@@ -1078,7 +1081,7 @@ def test_sync_deployment_agreement(
     mock_mpt_get_agreement_subscription.return_value = mocked_agreement_syncer._agreement[
         "subscriptions"
     ][0]
-    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
             "deploymentId": "deployment-id",
@@ -1243,8 +1246,10 @@ def test_sync_global_customer_update_not_required(
     mock_get_agreements_by_customer_deployments.return_value = []
     agreement = agreement_factory(
         fulfillment_parameters=[
+            {"externalId": "customerId", "value": "a-client-id"},
             {"externalId": "globalCustomer", "value": ["Yes"]},
             {"externalId": "deployments", "value": "deployment-id - DE"},
+            {"externalId": "deploymentId", "value": "deployment-id"},
         ],
         subscriptions=[],
     )
@@ -1351,7 +1356,7 @@ def test_sync_global_customer_update_adobe_error(
     mocked_agreement_syncer,
     mock_notify_agreement_unhandled_exception_in_teams,
 ):
-    mocked_agreement_syncer._customer["globalSalesEnabled"] = True
+    mocked_agreement_syncer._adobe_customer["globalSalesEnabled"] = True
     mocked_agreement_syncer._agreement["subscriptions"] = []
     mock_adobe_client.get_customer_deployments_active_status.side_effect = AdobeAPIError(
         400, adobe_api_error_factory("9999", "some error")
@@ -1527,7 +1532,7 @@ def test_sync_agreement_prices_with_missing_prices(
         another_adobe_subscription,
         terminated_adobe_subscription,
     ]
-    mocked_agreement_syncer._customer = adobe_customer_factory(coterm_date="2025-04-04")
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(coterm_date="2025-04-04")
     mock_mpt_get_agreement_subscription.side_effect = [
         mpt_subscription,
         another_mpt_subscription,
@@ -1625,6 +1630,40 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_mpt_terminate_subscription.assert_called_once_with(
         mock_mpt_client, "SUB-1000-2000-6000", "Adobe subscription status 1004."
     )
+
+
+def test_sync_agreement_empty_customer_id(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    mock_notify_agreement_unhandled_exception_in_teams,
+    caplog,
+):
+    agreement = agreement_factory(
+        fulfillment_parameters=[{"externalId": "FakeFulfillmentParam"}],
+        ordering_parameters=[{"externalId": "FakeOrderingParam"}],
+    )
+    mock_notify_agreement_unhandled_exception_in_teams = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.notify_agreement_unhandled_exception_in_teams"
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    expected_params = {
+        "ordering": [{"externalId": "FakeOrderingParam"}],
+        "fulfillment": [{"externalId": "FakeFulfillmentParam"}],
+    }
+    expected_message = (
+        f"CustomerId not found in Agreement AGR-2119-4550-8674-5962 with params "
+        f"{expected_params}. Skipping."
+    )
+    mock_notify_agreement_unhandled_exception_in_teams.assert_called_once_with(
+        "AGR-2119-4550-8674-5962", expected_message
+    )
+    assert expected_message in caplog.messages
 
 
 @pytest.mark.usefixtures("mock_get_agreements_by_customer_deployments")
@@ -2029,7 +2068,7 @@ def test_add_missing_subscriptions(
         ),
     ]
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
-    mocked_agreement_syncer._customer = adobe_customer_factory()
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
     mock_get_prices_for_skus.side_effect = [
         {
             "65322572CAT1A10": 12.14,
@@ -2155,7 +2194,7 @@ def test_add_missing_subscriptions_fail_recovery_skus(
     )
     mock_get_consumable_discount_level.side_effect = Exception("Test Exception")
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
-    mocked_agreement_syncer._customer = adobe_customer_factory()
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
     mock_get_prices_for_skus.side_effect = [
         {
             "65322572CAT1A10": 12.14,
@@ -2210,7 +2249,7 @@ def test_add_missing_subscriptions_deployment(
         ),
     ]
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
-    mocked_agreement_syncer._customer = adobe_customer_factory()
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
     mock_get_prices_for_skus.side_effect = [
         {
             "65322572CAT1A10": 12.14,
@@ -2335,7 +2374,7 @@ def test_add_missing_subscriptions_wrong_currency(
         )
     ]
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
-    mocked_agreement_syncer._customer = adobe_customer_factory()
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
 
     mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
 
@@ -2394,7 +2433,7 @@ def test_process_orphaned_deployment_subscriptions_none(
         deployment_id="deployment-id",
     )
     mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
-    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
 
     mocked_agreement_syncer.sync(sync_prices=True)  # act
 
@@ -2434,7 +2473,7 @@ def test_process_orphaned_deployment_subscriptions_error(
         subscription_id="specific_subscription_id", deployment_id="deployment-id"
     )
     mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
-    mocked_agreement_syncer._customer = adobe_customer_factory(global_sales_enabled=True)
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
 
     mocked_agreement_syncer.sync(sync_prices=True)  # act
 
@@ -2514,7 +2553,7 @@ def test_check_update_airtable_missing_deployments(
             membership_id="membership_id",
             transfer_id="transfer_id",
             status="pending",
-            customer_id=mocked_agreement_syncer._customer["customerId"],
+            customer_id=mocked_agreement_syncer._adobe_customer["customerId"],
             deployment_currency="USD",
             deployment_country="DE",
             licensee_id="LC-321-321-321",
@@ -2528,7 +2567,7 @@ def test_check_update_airtable_missing_deployments(
             membership_id="membership_id",
             transfer_id="transfer_id",
             status="pending",
-            customer_id=mocked_agreement_syncer._customer["customerId"],
+            customer_id=mocked_agreement_syncer._adobe_customer["customerId"],
             deployment_currency="USD",
             deployment_country="DE",
             licensee_id="LC-321-321-321",
