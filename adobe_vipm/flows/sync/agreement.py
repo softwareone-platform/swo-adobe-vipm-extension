@@ -48,7 +48,7 @@ class AgreementSyncer:  # noqa: WPS214
         mpt_client: The MPT client used to interact  with the MPT.
         adobe_client: The Adobe client used to interact with Adobe API.
         agreement: The agreement to sync.
-        adobe_customer: The customer data.
+        adobe_customer: The Adobe customer data.
         adobe_subscriptions: List of the Adobe subscriptions.
         dry_run: If true, no changes will be made (dry run mode).
     """
