@@ -24,7 +24,7 @@ jobs:
       run: echo  "VERSION=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_OUTPUT"
 
     - name: "Build and push image"
-      uses: azure/docker-login@v1
+      uses: azure/docker-login@v2
       with:
         login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
         username: ${{ secrets.REGISTRY_USERNAME }}
