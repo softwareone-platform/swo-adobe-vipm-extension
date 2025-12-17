@@ -8,6 +8,6 @@ RUN uv venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 
-RUN uv sync --frozen --no-cache --all-groups --active
+RUN uv sync --frozen --no-cache --group runtime --active
 
 CMD ["swoext", "run", "--no-color"]

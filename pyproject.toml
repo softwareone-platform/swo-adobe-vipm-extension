@@ -58,12 +58,6 @@ runtime = [
     "watchfiles==0.21.*",
 ]
 
-[tool.uv]
-default-groups = [
-    "dev",
-    "runtime",
-]
-
 [tool.hatch.build.targets.sdist]
 include = ["adobe_vipm"]
 
