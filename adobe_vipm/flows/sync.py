@@ -1067,6 +1067,15 @@ def sync_agreement(  # noqa: C901 # NOSONAR
         return
     try:
         customer_id = get_adobe_customer_id(agreement)
+        if not customer_id:
+            message = (
+                f"CustomerId not found in Agreement {agreement['id']} with params "
+                f"{agreement['parameters']}. Skipping."
+            )
+            logger.warning(message)
+            notify_agreement_unhandled_exception_in_teams(agreement["id"], message)
+            return
+
         adobe_client = get_adobe_client()
         logger.info("Synchronizing agreement %s...", agreement["id"])
 
@@ -1085,6 +1094,8 @@ def sync_agreement(  # noqa: C901 # NOSONAR
             mpt_client, adobe_client, agreement, customer_id
         )
         if not customer:
+            # The agreement has been processed correctly via the lost customer procedure.
+            # All subscriptions have been terminated, so no further action is needed.
             return
 
         adobe_subscriptions = adobe_client.get_subscriptions(
