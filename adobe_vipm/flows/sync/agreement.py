@@ -1097,6 +1097,8 @@ def sync_agreement(
         mpt_client, adobe_client, agreement, adobe_customer_id, dry_run=dry_run
     )
     if not adobe_customer:
+        # The agreement has been processed correctly via the lost customer procedure.
+        # All subscriptions have been terminated, so no further action is needed.
         return
 
     authorization_id: str = agreement["authorization"]["id"]
