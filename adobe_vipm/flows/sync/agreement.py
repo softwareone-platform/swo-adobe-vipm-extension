@@ -935,7 +935,7 @@ def sync_agreements_by_coterm_date(
 def _sync_agreements_by_param(
     mpt_client: MPTClient,
     adobe_client: AdobeClient,
-    param: Param,
+    param: str,
     *,
     dry_run: bool,
     sync_prices: bool,
