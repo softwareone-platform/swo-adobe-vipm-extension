@@ -10,7 +10,7 @@ from adobe_vipm.adobe.constants import (
     AdobeStatus,
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
     ERR_DUE_DATE_REACHED,
@@ -853,6 +853,64 @@ def test_submit_return_orders_step_order_processed(
 
     mock_adobe_client.create_return_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_submit_return_orders_step_error_creating_return_order(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_api_error_factory,
+    mock_send_exception,
+    settings,
+):
+    api_key = "airtable-token"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base-id"},
+        "ADOBE_CREDENTIALS_FILE": "a-credentials-file.json",
+        "ADOBE_AUTHORIZATIONS_FILE": "an-authorization-file.json",
+    }
+    adobe_order_1 = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(quantity=1),
+        status=AdobeStatus.PROCESSED.value,
+    )
+    ret_info_1 = ReturnableOrderInfo(
+        adobe_order_1,
+        adobe_order_1["lineItems"][0],
+        adobe_order_1["lineItems"][0]["quantity"],
+    )
+    sku = adobe_order_1["lineItems"][0]["offerId"][:10]
+    mock_adobe_client.create_return_order.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("2127", "unexpected")
+    )
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1,)},
+        adobe_return_orders={},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitReturnOrders()
+
+    with pytest.raises(AdobeError):
+        step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        ret_info_1.order,
+        ret_info_1.line,
+        context.order["id"],
+        "",
+    )
+    mock_send_exception.assert_called_once()
+    mocked_next_step.assert_not_called()
 
 
 def test_submit_new_order_step(
