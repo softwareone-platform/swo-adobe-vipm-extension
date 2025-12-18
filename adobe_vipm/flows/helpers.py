@@ -348,6 +348,11 @@ class Validate3YCCommitment(Step):
     def get_quantities(self, context, subscriptions) -> tuple[float, float]:
         """Calculates licensees and consumables quantities of subscriptions."""
         count_licenses, count_consumables = self.get_licenses_and_consumables_count(subscriptions)
+        logger.info(
+            "Quantities recovered from subscriptions. Licenses: %s, Consumables: %s",
+            count_licenses,
+            count_consumables,
+        )
 
         count_licenses, count_consumables = self.process_lines_quantities(
             context,
@@ -362,7 +367,11 @@ class Validate3YCCommitment(Step):
             count_consumables=count_consumables,
             is_downsize=False,
         )
-
+        logger.info(
+            "Quantities processed for lines. Licenses: %s, Consumables: %s",
+            count_licenses,
+            count_consumables,
+        )
         return count_licenses, count_consumables
 
     def manage_order_error(self, client, context, error) -> None:
