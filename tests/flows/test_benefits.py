@@ -6,7 +6,7 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.flows.benefits import check_3yc_commitment_request
+from adobe_vipm.flows.benefits import check_3yc_commitment_request, send_3yc_expiration_notification
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils import get_adobe_customer_id, get_company_name
 from adobe_vipm.notifications import Button
@@ -296,3 +296,92 @@ def test_check_3yc_commitment_request_global_customers(
             },
         ),
     ]
+
+
+def test_send_3yc_expiration_notification(
+    mocker,
+    mock_mpt_client,
+    settings,
+    agreement_factory,
+    licensee,
+):
+    ordering_params = [
+        {
+            "id": "PAR-0000-0007",
+            "name": "3YCLicenses",
+            "externalId": Param.THREE_YC_LICENSES.value,
+            "type": "SingleLineText",
+            "value": "10",
+            "displayValue": "10",
+        },
+        {
+            "id": "PAR-0000-0008",
+            "name": "3YCConsumables",
+            "externalId": Param.THREE_YC_CONSUMABLES.value,
+            "type": "SingleLineText",
+            "value": "5",
+            "displayValue": "5",
+        },
+    ]
+    fulfillment_params = [
+        {
+            "id": "PAR-9876-5432",
+            "name": "3YC Enroll Status",
+            "externalId": Param.THREE_YC_ENROLL_STATUS.value,
+            "type": "SingleLineText",
+            "value": "COMMITTED",
+            "displayValue": "COMMITTED",
+        },
+        {
+            "id": "PAR-2266-4848",
+            "name": "3YC Start Date",
+            "externalId": Param.THREE_YC_START_DATE.value,
+            "type": "Date",
+            "value": "2024-01-01",
+            "displayValue": "2024-01-01",
+        },
+        {
+            "id": "PAR-3528-2927",
+            "name": "3YC End Date",
+            "externalId": Param.THREE_YC_END_DATE.value,
+            "type": "Date",
+            "value": "2027-01-01",
+            "displayValue": "2027-01-01",
+        },
+    ]
+    agreement = agreement_factory(
+        ordering_parameters=ordering_params,
+        fulfillment_parameters=fulfillment_params,
+    )
+    mocked_get_licensee = mocker.patch(
+        "adobe_vipm.flows.benefits.get_licensee",
+        return_value=licensee,
+        autospec=True,
+    )
+    mocked_mpt_notify = mocker.patch("adobe_vipm.flows.benefits.mpt_notify", autospec=True)
+
+    send_3yc_expiration_notification(
+        mock_mpt_client,
+        agreement,
+        number_of_days=30,
+        template_name="3yc-expiration-30-days",
+    )  # act
+
+    mocked_get_licensee.assert_called_once_with(mock_mpt_client, agreement["licensee"]["id"])
+    mocked_mpt_notify.assert_called_once_with(
+        mock_mpt_client,
+        licensee["account"]["id"],
+        agreement["buyer"]["id"],
+        "3YC Expiration Notification",
+        "3yc-expiration-30-days",
+        {
+            "agreement": agreement,
+            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+            "minimum_licenses": "10",
+            "minimum_consumables": "5",
+            "three_yc_start_date": "2024-01-01",
+            "three_yc_end_date": "2027-01-01",
+            "three_yc_enroll_status": "COMMITTED",
+            "n_days": 30,
+        },
+    )

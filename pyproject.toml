@@ -148,6 +148,7 @@ per-file-ignores = [
   "adobe_vipm/management/commands/base.py: WPS110",
   "adobe_vipm/management/commands/check_running_transfers.py: WPS110",
   "adobe_vipm/management/commands/create_resellers.py: WPS110 WPS204 WPS210 WPS213 WPS214 WPS221 WPS231 WPS235 WPS237 WPS407 WPS504",
+  "adobe_vipm/management/commands/process_3yc_expiration_notifications.py: WPS110 WPS114 WPS210 WPS237",
   "adobe_vipm/management/commands/process_3yc.py: WPS110 WPS114",
   "adobe_vipm/management/commands/process_transfers.py: WPS110",
   "adobe_vipm/management/commands/sync_3yc_enrollments.py: WPS110 WPS114",

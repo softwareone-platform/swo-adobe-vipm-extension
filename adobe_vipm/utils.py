@@ -58,5 +58,4 @@ def get_3yc_commitment(customer_or_transfer_preview: dict) -> dict:
         customer_or_transfer_preview.get("benefits", []),
         {},
     )
-
     return benefit_3yc.get("commitment", {}) or {}

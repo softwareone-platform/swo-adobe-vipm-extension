@@ -815,6 +815,109 @@ def test_sync_agreement_prices_with_3yc(
     )
 
 
+def test_notify_if_3yc_commitment_expired_when_expired(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    fulfillment_parameters_factory,
+    adobe_commitment_factory,
+):
+    fulfillment_params = fulfillment_parameters_factory(p3yc_enroll_status="COMMITTED")
+    agreement = agreement_factory(fulfillment_parameters=fulfillment_params)
+    adobe_subscription = adobe_subscription_factory()
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    commitment_info = adobe_commitment_factory(status=None)
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        coterm_date="2025-04-04",
+        commitment=commitment_info,
+    )
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        side_effect=[{"65304578CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
+    )
+    mock_send_notification = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.send_3yc_expiration_notification"
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    mock_send_notification.assert_called_once_with(
+        mock_mpt_client, mocker.ANY, 0, "notification_3yc_expired"
+    )
+
+
+def test_notify_if_3yc_commitment_expired_when_not_commited(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    fulfillment_parameters_factory,
+    adobe_commitment_factory,
+):
+    fulfillment_params = fulfillment_parameters_factory(p3yc_enroll_status="NOT_COMMITTED")
+    agreement = agreement_factory(fulfillment_parameters=fulfillment_params)
+    adobe_subscription = adobe_subscription_factory()
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    commitment_info = adobe_commitment_factory(status=None)
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        coterm_date="2025-04-04",
+        commitment=commitment_info,
+    )
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        side_effect=[{"65304578CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
+    )
+    mock_send_notification = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.send_3yc_expiration_notification"
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    mock_send_notification.assert_not_called()
+
+
+@freeze_time("2024-01-19")
+def test_notify_if_3yc_commitment_expired_when_commitment_has_status(
+    mocker,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    fulfillment_parameters_factory,
+    adobe_commitment_factory,
+):
+    fulfillment_params = fulfillment_parameters_factory(p3yc_enroll_status="COMMITTED")
+    agreement = agreement_factory(fulfillment_parameters=fulfillment_params)
+    adobe_subscription = adobe_subscription_factory()
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    commitment_info = adobe_commitment_factory(
+        status="COMMITTED", start_date="2024-01-30", end_date="2025-01-01"
+    )
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        coterm_date="2025-04-04",
+        commitment=commitment_info,
+    )
+    mock_send_notification = mocker.patch(
+        "adobe_vipm.flows.sync.agreement.send_3yc_expiration_notification"
+    )
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
+    )  # act
+
+    mock_send_notification.assert_not_called()
+
+
 @freeze_time("2025-06-19")
 def test_sync_global_customer_parameter(
     mocker,

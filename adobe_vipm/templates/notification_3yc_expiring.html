@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Adobe VIP Marketplace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+</head>
+
+<body style="margin:0; padding:0; background-color:#f5f5f5; font-family: Arial, Helvetica, sans-serif; color:#000000;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f5f5f5;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+
+        <!-- Container -->
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#ffffff; border-radius:6px;">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td align="left">
+                    <img
+                      src="https://www.adobe.com/content/dam/cc/icons/Adobe_Corporate_Horizontal_Red_HEX.svg"
+                      alt="Adobe"
+                      width="120"
+                      style="display:block;"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top:12px; font-size:18px; font-weight:bold;">
+                    Adobe VIP Marketplace
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px; color:#666666;">
+                    from SoftwareOne
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Agreement Title -->
+          <tr>
+            <td style="padding:0 24px 16px 24px;">
+              <div style="font-size:18px; font-weight:bold; color:#0057ff;">
+                {{agreement.name}}
+              </div>
+              <div style="font-size:12px; color:#666666; margin-top:4px;">
+                ({{agreement.id}})
+              </div>
+            </td>
+          </tr>
+
+          <!-- Intro -->
+          <tr>
+            <td style="padding:0 24px 16px 24px; font-size:14px; line-height:20px;">
+              Your <strong>3-year commitment</strong> for Agreement,
+              <strong>{{agreement.id}}</strong>, will end in <strong>{{n_days}} days</strong>.
+              Act now to start a new 3-year commitment.
+            </td>
+          </tr>
+
+          <!-- Options -->
+          <tr>
+            <td style="padding:0 24px 16px 24px; font-size:14px; line-height:20px;">
+              <strong>You have three options:</strong><br><br>
+
+              <strong>1. Lapse:</strong><br>
+              Let your current 3-year commitment expire without starting a new one.
+              Once it expires, your subscription pricing will revert to the standard annual plan rate,
+              which reflects a lower discount level.<br><br>
+
+              <strong>2. Recommit before expiry:</strong><br>
+              You can request a new 3-year commitment before your current commitment ends.
+              The new commitment will take effect when your existing one expires, and your subscription
+              pricing will be updated to the current rate at that time.
+              This pricing will then be locked in for the duration of the new commitment.<br><br>
+
+              <strong>3. Commit after expiry:</strong><br>
+              You can request a new 3-year commitment after your current one has expired.
+              However, any orders placed in the interim will be charged at the higher annual plan rate.
+              There’s a risk that your renewal may also be billed at annual pricing if your anniversary
+              date falls shortly after your current commitment ends.
+            </td>
+          </tr>
+
+          <!-- Contact -->
+          <tr>
+            <td style="padding:0 24px 24px 24px; font-size:14px;">
+              To request a new 3-year commitment, please reach out to your
+              <strong>SoftwareOne Account Team</strong>.
+            </td>
+          </tr>
+
+          <!-- Details -->
+          <tr>
+            <td style="padding:0 24px 16px 24px;">
+              <strong>Here are the details of your current 3-year commitment</strong>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:0 24px 24px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;">
+                <tr>
+                  <td style="padding:6px 0; width:50%;">Start date</td>
+                  <td style="padding:6px 0; font-weight:bold;">{{three_yc_start_date}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;">End date</td>
+                  <td style="padding:6px 0; font-weight:bold;">{{three_yc_end_date}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;">Committed Licenses</td>
+                  <td style="padding:6px 0; font-weight:bold;">{{minimum_licenses}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;">Committed Consumables</td>
+                  <td style="padding:6px 0; font-weight:bold;">{{minimum_consumables}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;">Status</td>
+                  <td style="padding:6px 0; font-weight:bold;">{{three_yc_enroll_status}}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Button -->
+          <tr>
+            <td align="center" style="padding:0 24px 24px 24px;">
+              <a
+                href="https://portal.platform.softwareone.com/commerce/agreements/{{agreement.id}}"
+                style="background-color:#3b5cff; color:#ffffff; text-decoration:none;
+                       padding:12px 24px; font-size:14px; font-weight:bold;
+                       border-radius:4px; display:inline-block;"
+              >
+                Open Agreement
+              </a>
+            </td>
+          </tr>
+
+          <!-- Fallback link -->
+          <tr>
+            <td style="padding:0 24px 24px 24px; font-size:12px; color:#666666; line-height:18px;">
+              If the button above doesn't work for you, copy and paste this link into your browser:<br>
+              <a href="https://portal.platform.softwareone.com/commerce/agreements/{{agreement.id}}"
+                 style="color:#0057ff; word-break:break-all;">
+                https://portal.platform.softwareone.com/commerce/agreements/{{agreement.id}}
+              </a>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:0 24px 24px 24px; font-size:14px;">
+              Warm regards,<br>
+              <strong>SoftwareOne Marketplace Team</strong>
+            </td>
+          </tr>
+
+        </table>
+        <!-- End Container -->
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
