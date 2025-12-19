@@ -3,8 +3,10 @@ import traceback
 from urllib.parse import urljoin
 
 from django.conf import settings
+from mpt_extension_sdk.core.utils import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreements_by_customer_deployments,
+    get_licensee,
     update_agreement,
 )
 
@@ -20,7 +22,8 @@ from adobe_vipm.flows.utils import (
     get_company_name,
     get_global_customer,
 )
-from adobe_vipm.notifications import Button, send_exception, send_warning
+from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
+from adobe_vipm.notifications import Button, mpt_notify, send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment
 
 logger = logging.getLogger(__name__)
@@ -171,3 +174,47 @@ def update_deployment_agreements_3yc(
             deployment_agreement["id"],
             parameters=parameters_3yc,
         )
+
+
+def send_3yc_expiration_notification(
+    client: MPTClient, agreement: dict, number_of_days: int, template_name: str
+):
+    """Send 3YC expiration notification to the customer.
+
+    Args:
+        client: The MPT client.
+        agreement: The agreement.
+        number_of_days: The number of days.
+        template_name: The template name.
+    """
+    try:
+        licensee = get_licensee(client, agreement["licensee"]["id"])
+        minimum_licenses = get_ordering_parameter(agreement, Param.THREE_YC_LICENSES.value)
+        minimum_consumables = get_ordering_parameter(agreement, Param.THREE_YC_CONSUMABLES.value)
+        three_yc_start_date = get_fulfillment_parameter(agreement, Param.THREE_YC_START_DATE.value)
+        three_yc_end_date = get_fulfillment_parameter(agreement, Param.THREE_YC_END_DATE.value)
+        three_yc_enroll_status = get_fulfillment_parameter(
+            agreement, Param.THREE_YC_ENROLL_STATUS.value
+        )
+
+        mpt_notify(
+            client,
+            licensee["account"]["id"],
+            agreement["buyer"]["id"],
+            "3YC Expiration Notification",
+            template_name,
+            {
+                "agreement": agreement,
+                "portal_base_url": settings.MPT_PORTAL_BASE_URL,
+                "minimum_licenses": minimum_licenses.get("displayValue", "N/A"),
+                "minimum_consumables": minimum_consumables.get("displayValue", "N/A"),
+                "three_yc_start_date": three_yc_start_date.get("displayValue", "N/A"),
+                "three_yc_end_date": three_yc_end_date.get("displayValue", "N/A"),
+                "three_yc_enroll_status": three_yc_enroll_status.get("displayValue", "N/A"),
+                "n_days": number_of_days,
+            },
+        )
+
+        logger.info("Notification sent for agreement %s", {agreement["id"]})
+    except Exception:  # pragma: no cover
+        logger.exception("Failed to send notification for agreement %s", agreement["id"])
