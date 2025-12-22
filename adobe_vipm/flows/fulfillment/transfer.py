@@ -151,7 +151,7 @@ def _check_transfer(mpt_client, order, membership_id):
         transfer_preview = adobe_client.preview_transfer(authorization_id, membership_id)
     except AdobeError as error:
         _handle_transfer_preview_error(mpt_client, order, error)
-        logger.warning("Transfer order %s has been failed: %s.", order["id"], str(error))
+        logger.warning("Transfer order %s has been failed: %s.", order["id"], error)
         return False
 
     try:
@@ -669,7 +669,8 @@ def get_new_agreement_deployments(
             "deployment_currency": ",".join(
                 deployment_currency_map.get(deployment.get("deploymentId"), [])
             ),
-            "deployment_country": deployment.get("companyProfile", {})
+            "deployment_country": deployment
+            .get("companyProfile", {})
             .get("address", {})
             .get("country", ""),
         }

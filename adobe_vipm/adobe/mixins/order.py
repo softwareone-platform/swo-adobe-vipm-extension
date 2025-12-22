@@ -305,8 +305,9 @@ class OrderClientMixin:
         if renewal_order_item:
             renewal_order_date = dt.datetime.fromisoformat(renewal_order_item[0]["creationDate"])
             order_items = filter(
-                lambda order_item: dt.datetime.fromisoformat(order_item[0]["creationDate"])
-                >= renewal_order_date,
+                lambda order_item: (
+                    dt.datetime.fromisoformat(order_item[0]["creationDate"]) >= renewal_order_date
+                ),
                 order_items,
             )
 

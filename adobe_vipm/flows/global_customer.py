@@ -177,9 +177,9 @@ def get_price_list_id(mpt_client, agreement_deployment):
 
     global_price_lists = list(
         filter(
-            lambda price_list: price_list.get("externalIds", {})
-            .get("vendor", "")
-            .endswith(GLOBAL_SUFFIX),
+            lambda price_list: (
+                price_list.get("externalIds", {}).get("vendor", "").endswith(GLOBAL_SUFFIX)
+            ),
             price_lists,
         )
     )

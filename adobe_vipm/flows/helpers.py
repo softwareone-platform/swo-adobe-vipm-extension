@@ -337,7 +337,8 @@ class Validate3YCCommitment(Step):
             return False
 
         threeyc_end_date = (
-            dt.datetime.strptime(
+            dt.datetime
+            .strptime(
                 commitment["endDate"],
                 "%Y-%m-%d",
             )
@@ -345,7 +346,8 @@ class Validate3YCCommitment(Step):
             .date()
         )
         coterm_date = (
-            dt.datetime.strptime(
+            dt.datetime
+            .strptime(
                 context.adobe_customer["cotermDate"],
                 "%Y-%m-%d",
             )
