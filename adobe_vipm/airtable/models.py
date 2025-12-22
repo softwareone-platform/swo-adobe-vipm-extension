@@ -547,9 +547,11 @@ def get_prices_for_3yc_skus(  # noqa: C901
     prices = {}
     for sku in skus:
         pricelist_item = find_first(
-            lambda item: item["currency"] == currency
-            and item["valid_from"] <= start_date
-            and item["valid_until"] > start_date,
+            lambda item: (
+                item["currency"] == currency
+                and item["valid_from"] <= start_date
+                and item["valid_until"] > start_date
+            ),
             PRICELIST_CACHE[sku],
         )
         if pricelist_item:
@@ -735,7 +737,8 @@ def get_agreement_deployment_view_link(product_id: str) -> str | None:
         base_id = gc_agreement_deployment_model.Meta.base_id
         table_id = gc_agreement_deployment_model.get_table().id
         view_id = (
-            gc_agreement_deployment_model.get_table()
+            gc_agreement_deployment_model
+            .get_table()
             .schema()
             .view(
                 "Agreement Deployments View",

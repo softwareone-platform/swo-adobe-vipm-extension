@@ -1697,8 +1697,10 @@ def test_sync_agreement_lost_customer(
         " with lost customer procedure.",
     )
     assert caplog.messages == [
-        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
-        " proceeding with lost customer procedure.",
+        (
+            "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
+            " proceeding with lost customer procedure."
+        ),
         "> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
     ]
 
@@ -1756,8 +1758,10 @@ def test_sync_agreement_lost_customer_error(
         " with lost customer procedure.",
     )
     assert [rec.message for rec in caplog.records] == [
-        "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
-        " proceeding with lost customer procedure.",
+        (
+            "Received Adobe error 1116 - Invalid Customer, assuming lost customer and"
+            " proceeding with lost customer procedure."
+        ),
         "> Suspected Lost Customer: Terminating subscription SUB-1000-2000-3000.",
         "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",
         "> Suspected Lost Customer: Error terminating subscription SUB-1000-2000-3000.",

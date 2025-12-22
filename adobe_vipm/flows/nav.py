@@ -39,8 +39,7 @@ def save_token_to_disk(token_data: dict) -> None:
         dt.datetime.now(tz=dt.UTC) + dt.timedelta(seconds=token_data["expires_in"] - 300)
     ).isoformat()
 
-    with Path(TOKEN_CACHE_FILE).open("w", encoding="utf-8") as token_file:
-        token_file.write(json.dumps(new_token_data))
+    Path(TOKEN_CACHE_FILE).write_text(json.dumps(new_token_data), encoding="utf-8")
 
 
 def get_token() -> tuple[bool, str]:

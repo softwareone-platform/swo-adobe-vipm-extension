@@ -73,7 +73,8 @@ class ValidateDownsizes(Step):
             delta = line["oldQuantity"] - line["quantity"]
             if delta not in returnable_by_quantity:
                 end_of_cancellation_window = max(
-                    dt.datetime.fromisoformat(roi.order["creationDate"])
+                    dt.datetime
+                    .fromisoformat(roi.order["creationDate"])
                     .replace(tzinfo=dt.UTC)
                     .date()
                     for roi in returnable_orders

@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.11
+    rev: v0.14.10
     hooks:
       - id: ruff-check
       - id: ruff-format
@@ -14,7 +14,7 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: no-commit-to-branch
-        args: [--pattern, '^release/.*']
+        args: [--pattern, "^release/.*"]
       - id: detect-private-key
 
   - repo: https://github.com/astral-sh/uv-pre-commit
@@ -25,5 +25,10 @@ repos:
   - repo: https://github.com/PyCQA/flake8
     rev: 7.3.0
     hooks:
-    -   id: flake8
-        additional_dependencies: [Flake8-pyproject, Flake8-AAA, wemake-python-styleguide==1.3.*]
+      - id: flake8
+        additional_dependencies:
+          [
+            flake8-aaa==0.17.*,
+            flake8-pyproject==1.2.*,
+            wemake-python-styleguide==1.4.*,
+          ]
