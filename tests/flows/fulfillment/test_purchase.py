@@ -1,5 +1,3 @@
-import copy
-
 import pytest
 
 from adobe_vipm.adobe.constants import AdobeStatus
@@ -174,17 +172,14 @@ def test_validate_market_segment_eligibility_lga_agency_type_valid(
 
 
 def test_create_customer_step(
-    mocker, mock_adobe_client, mock_order, customer_data, adobe_customer_factory
+    mocker, mock_adobe_client, mock_next_step, mock_mpt_client, mock_order, adobe_customer_factory
 ):
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.create_customer_account.return_value = adobe_customer
     mocked_save_data = mocker.patch.object(CreateCustomer, "save_data")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
     context = Context(
         order=mock_order,
         product_id="PRD-1111-1111",
-        customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
@@ -192,7 +187,7 @@ def test_create_customer_step(
     )
     step = CreateCustomer()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.adobe_customer == adobe_customer
     assert context.adobe_customer_id == adobe_customer["customerId"]
@@ -201,24 +196,21 @@ def test_create_customer_step(
         context.seller_id,
         context.agreement_id,
         context.market_segment,
-        customer_data,
+        context.customer_data,
     )
-    mocked_save_data.assert_called_once_with(mocked_client, context)
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_save_data.assert_called_once_with(mock_mpt_client, context)
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_customer_lga_step(
-    mocker, mock_adobe_client, mock_order, customer_data, adobe_customer_factory
+    mocker, mock_adobe_client, mock_mpt_client, mock_next_step, mock_order, adobe_customer_factory
 ):
     adobe_customer = adobe_customer_factory()
     mock_adobe_client.create_customer_account_lga.return_value = adobe_customer
     mocked_save_data = mocker.patch.object(CreateCustomer, "save_data")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
     context = Context(
         order=mock_order,
         product_id="PRD-3333-3333",
-        customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
@@ -226,7 +218,7 @@ def test_create_customer_lga_step(
     )
     step = CreateCustomer()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.adobe_customer == adobe_customer
     assert context.adobe_customer_id == adobe_customer["customerId"]
@@ -235,29 +227,31 @@ def test_create_customer_lga_step(
         context.seller_id,
         context.agreement_id,
         context.market_segment,
-        customer_data,
+        context.customer_data,
     )
-    mocked_save_data.assert_called_once_with(mocked_client, context)
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_save_data.assert_called_once_with(mock_mpt_client, context)
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_create_customer_step_no_contact(
     mocker,
     mock_adobe_client,
-    mock_order,
-    customer_data,
+    mock_next_step,
+    mock_mpt_client,
+    fulfillment_parameters_factory,
+    order_factory,
+    order_parameters_factory,
 ):
-    customer_data_without_contact = copy.copy(customer_data)
-    del customer_data_without_contact["contact"]
     mocked_switch_to_query = mocker.patch(
         "adobe_vipm.flows.fulfillment.purchase.switch_order_to_query",
     )
     mocked_save_data = mocker.patch.object(CreateCustomer, "save_data")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
+    order = order_factory(
+        order_parameters=order_parameters_factory(contact={}),
+        fulfillment_parameters=fulfillment_parameters_factory(),
+    )
     context = Context(
-        order=mock_order,
-        customer_data=customer_data_without_contact,
+        order=order,
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
@@ -265,7 +259,7 @@ def test_create_customer_step_no_contact(
     )
     step = CreateCustomer()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     assert context.adobe_customer is None
     assert context.adobe_customer_id is None
@@ -273,29 +267,27 @@ def test_create_customer_step_no_contact(
     assert param["error"] == ERR_ADOBE_CONTACT.to_dict(
         title=param["name"], details="it is mandatory."
     )
-    mocked_switch_to_query.assert_called_once_with(mocked_client, context.order)
+    mocked_switch_to_query.assert_called_once_with(mock_mpt_client, context.order)
     mock_adobe_client.create_customer_account.assert_not_called()
     mocked_save_data.assert_not_called()
-    mocked_next_step.assert_not_called()
+    mock_next_step.assert_not_called()
 
 
 def test_create_customer_step_exception(
     mocker,
     mock_adobe_client,
+    mock_next_step,
+    mock_mpt_client,
     mock_order,
-    customer_data,
     adobe_api_error_factory,
 ):
     error = AdobeAPIError(400, adobe_api_error_factory("1234", "api error"))
     mock_adobe_client.create_customer_account.side_effect = error
     mocked_save_data = mocker.patch.object(CreateCustomer, "save_data")
     mocked_handle_error = mocker.patch.object(CreateCustomer, "handle_error")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
     context = Context(
         product_id="PRD-1111-1111",
         order=mock_order,
-        customer_data=customer_data,
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
@@ -303,18 +295,18 @@ def test_create_customer_step_exception(
     )
     step = CreateCustomer()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_adobe_client.create_customer_account.assert_called_once_with(
         context.authorization_id,
         context.seller_id,
         context.agreement_id,
         context.market_segment,
-        customer_data,
+        context.customer_data,
     )
     mocked_save_data.assert_not_called()
-    mocked_handle_error.assert_called_once_with(mocked_client, context, error)
-    mocked_next_step.assert_not_called()
+    mocked_handle_error.assert_called_once_with(mock_mpt_client, context, error)
+    mock_next_step.assert_not_called()
 
 
 def test_create_customer_step_already_created(mocker, mock_adobe_client, mock_order):

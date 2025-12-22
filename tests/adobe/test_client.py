@@ -25,7 +25,6 @@ from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
 from adobe_vipm.flows.constants import GOVERNMENT_AGENCY_TYPE_FEDERAL, Param
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.utils import get_customer_data
 
 
 def test_create_reseller_account(
@@ -126,10 +125,7 @@ def test_create_customer_account(
     customer_data,
     adobe_client_factory,
 ):
-    mocker.patch(
-        "adobe_vipm.adobe.client.uuid4",
-        return_value="uuid-1",
-    )
+    mocker.patch("adobe_vipm.adobe.client.uuid4", return_value="uuid-1")
     seller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["seller_id"]
     reseller_id = adobe_authorizations_file["authorizations"][0]["resellers"][0]["id"]
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
@@ -419,7 +415,6 @@ def test_create_preview_order_upsize(
         currency="EUR",
         upsize_lines=order["lines"],
         new_lines=[],
-        customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
     )
 
@@ -552,7 +547,6 @@ def test_create_prev_upsize_deplyment_discount(
         currency="EUR",
         upsize_lines=order["lines"],
         new_lines=[],
-        customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
     )
 
@@ -618,7 +612,6 @@ def test_create_preview_order_upsize_product_not_found(
         currency="EUR",
         upsize_lines=order["lines"],
         new_lines=[],
-        customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
     )
 
@@ -692,7 +685,6 @@ def test_create_preview_order_upsize_after_downsize_lower(
         product_id="PRD-1234",
         currency="EUR",
         upsize_lines=order["lines"],
-        customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
     )
 
@@ -787,7 +779,6 @@ def test_create_preview_newlines(
         currency="EUR",
         upsize_lines=[],
         new_lines=order["lines"],
-        customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
     )
 
@@ -901,7 +892,6 @@ def test_create_preview_newlines_deplyment_discount(
         currency="EUR",
         upsize_lines=[],
         new_lines=order["lines"],
-        customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
     )
 
@@ -1015,7 +1005,6 @@ def test_create_preview_newlines_wo_deployment(
         currency="EUR",
         new_lines=order["lines"],
         upsize_lines=[],
-        customer_data=get_customer_data(order),
         adobe_customer_id=customer_id,
     )
 
@@ -1094,7 +1083,6 @@ def test_create_preview_order_bad_request(
         currency="EUR",
         new_lines=mock_order["lines"],
         upsize_lines=[],
-        customer_data=get_customer_data(mock_order),
         adobe_customer_id=customer_id,
     )
 

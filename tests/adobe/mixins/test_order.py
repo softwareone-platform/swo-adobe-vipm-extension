@@ -8,7 +8,6 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.utils import get_customer_data
 
 
 def test_create_preview_order_processing_upsize_lines_error(
@@ -44,7 +43,6 @@ def test_create_preview_order_processing_upsize_lines_error(
         authorization_id=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
         new_lines=[],
         upsize_lines=mock_order["lines"],
-        customer_data=get_customer_data(mock_order),
         adobe_customer_id="fake-customer-id",
     )
 
@@ -405,11 +403,7 @@ def test_get_flex_discounts_per_base_offer_invalid_country(
             })
         ],
     )
-    context = Context(
-        order=mock_order,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
-        customer_data=get_customer_data(mock_order),
-    )
+    context = Context(order=mock_order, market_segment="MARKET_SEGMENT_COMMERCIAL")
 
     flex_discounts = mocked_client.get_flex_discounts_per_base_offer(
         authorization,
@@ -447,11 +441,7 @@ def test_get_flex_discounts_per_base_offer_error(
             })
         ],
     )
-    context = Context(
-        order=mock_order,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
-        customer_data=get_customer_data(mock_order),
-    )
+    context = Context(order=mock_order, market_segment="MARKET_SEGMENT_COMMERCIAL")
 
     with pytest.raises(AdobeError):
         mocked_client.get_flex_discounts_per_base_offer(
