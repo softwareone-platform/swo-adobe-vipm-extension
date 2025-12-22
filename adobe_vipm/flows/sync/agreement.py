@@ -228,11 +228,10 @@ class AgreementSyncer:  # noqa: WPS214
             if subsc["subscriptionId"] not in mpt_entitlements_external_ids
             and subsc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
         )
-        if missing_adobe_subscriptions:
-            logger.warning("> Found missing subscriptions")
-        else:
+        if not missing_adobe_subscriptions:
             logger.info("> No missing subscriptions found")
             return
+        logger.warning("> Found missing subscriptions")
 
         items_map = {
             item["externalIds"]["vendor"]: item
@@ -248,27 +247,7 @@ class AgreementSyncer:  # noqa: WPS214
             logger.info(">> Adding missing subscription %s", adobe_subscription["subscriptionId"])
 
             if adobe_subscription["currencyCode"] != currency:
-                logger.warning(
-                    "Skipping adobe subscription %s due to  currency mismatch.",
-                    adobe_subscription["subscriptionId"],
-                )
-                if self._dry_run:
-                    logger.info(
-                        "Dry run mode: skipping update adobe subscription %s with: %s",
-                        adobe_subscription["subscriptionId"],
-                        {"auto_renewal": False},
-                    )
-                else:
-                    self._adobe_client.update_subscription(
-                        self._authorization_id,
-                        self._adobe_customer_id,
-                        adobe_subscription["subscriptionId"],
-                        auto_renewal=False,
-                    )
-
-                    send_exception(
-                        title="Price currency mismatch detected!", text=f"{adobe_subscription}"
-                    )
+                self._manage_wrong_currency_subscription(adobe_subscription)
                 continue
 
             item = items_map[get_partial_sku(adobe_subscription["offerId"])]
@@ -278,7 +257,11 @@ class AgreementSyncer:  # noqa: WPS214
             sku_discount_level = flows_utils.get_sku_with_discount_level(
                 adobe_subscription["offerId"], self._adobe_customer
             )
-            unit_price = {"price": {"unitPP": prices[sku_discount_level]}}
+
+            unit_price = {}
+            if sku_discount_level in prices:
+                unit_price = {"price": {"unitPP": prices.get(sku_discount_level)}}
+
             if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
                 self._create_mpt_asset(adobe_subscription, item, unit_price)
             else:
@@ -881,6 +864,26 @@ class AgreementSyncer:  # noqa: WPS214
             "externalId": Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
             "value": ",".join(subsegments),
         })
+
+    def _manage_wrong_currency_subscription(self, adobe_subscription: dict) -> None:
+        logger.warning(
+            "Skipping adobe subscription %s due to  currency mismatch.",
+            adobe_subscription["subscriptionId"],
+        )
+        if self._dry_run:
+            logger.info(
+                "Dry run mode: skipping update adobe subscription %s with: %s",
+                adobe_subscription["subscriptionId"],
+                {"auto_renewal": False},
+            )
+        else:
+            self._adobe_client.update_subscription(
+                self._authorization_id,
+                self._adobe_customer_id,
+                adobe_subscription["subscriptionId"],
+                auto_renewal=False,
+            )
+            send_exception(title="Price currency mismatch detected!", text=f"{adobe_subscription}")
 
 
 def _is_deployment_matched(missing_deployment_id: str, subscription: dict) -> bool:
