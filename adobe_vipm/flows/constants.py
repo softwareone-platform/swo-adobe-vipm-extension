@@ -35,7 +35,7 @@ class Param(StrEnum):
     COTERM_DATE = "cotermDate"
     AGREEMENT_TYPE = "agreementType"
     THREE_YC = "3YC"
-    THREE_YC_RECOMMITMENT = "3YCRecommitment"
+    THREE_YC_RECOMMITMENT = "3YCRecommit"
     THREE_YC_LICENSES = "3YCLicenses"
     THREE_YC_CONSUMABLES = "3YCConsumables"
     THREE_YC_ENROLL_STATUS = "3YCEnrollStatus"
@@ -431,6 +431,11 @@ ERR_CUSTOMER_LOST_EXCEPTION = ValidationError("VIPM0039", "{error}")
 ERR_SKU_AVAILABILITY = ValidationError(
     "VIPM0038",
     "The following SKUs are expired: {missing_skus}. Available SKUs: {available_skus}.",
+)
+
+ERR_SKU_NOT_FOUND = ValidationError(
+    "VIPM0041",
+    "{message}",
 )
 
 ERR_LGA_QUANTITIES = ValidationError(

@@ -1906,6 +1906,7 @@ def test_fulfill_transfer_order_migration_synchronized(
     adobe_authorizations_file,
     agreement,
     mock_sync_agreements_by_agreement_ids,
+    mock_adobe_client
 ):
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -1934,7 +1935,6 @@ def test_fulfill_transfer_order_migration_synchronized(
         return_value=mocked_transfer,
     )
     mocked_fail_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.fail_order")
-    mocker.patch("adobe_vipm.flows.fulfillment.transfer.get_adobe_client")
 
     fulfill_order(mock_mpt_client, order)
 

@@ -134,7 +134,11 @@ def _add_missing_subscriptions(
             agreement["listing"]["priceList"]["currency"],
         )
         sku_discount_level = get_sku_with_discount_level(adobe_subscription["offerId"], customer)
-        unit_price = {"price": {"unitPP": prices[sku_discount_level]}}
+        unit_price = {}
+        if sku_discount_level in prices:
+            unit_price = {"price": {"unitPP": prices.get(sku_discount_level)}}
+
+
         if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
             template = get_asset_template_by_name(
                 mpt_client, agreement["product"]["id"], TEMPLATE_ASSET_DEFAULT
@@ -313,21 +317,20 @@ def _update_agreement(
 ) -> None:
     parameters = {}
     commitment_info = get_3yc_commitment(customer)
-    if commitment_info:
-        parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
-        for mq in commitment_info.get("minimumQuantities", ()):
-            if mq["offerType"] == "LICENSE":
-                parameters.setdefault(Param.PHASE_ORDERING.value, [])
-                parameters[Param.PHASE_ORDERING.value].append({
-                    "externalId": Param.THREE_YC_LICENSES.value,
-                    "value": str(mq.get("quantity")),
-                })
-            if mq["offerType"] == "CONSUMABLES":
-                parameters.setdefault(Param.PHASE_ORDERING.value, [])
-                parameters[Param.PHASE_ORDERING.value].append({
-                    "externalId": Param.THREE_YC_CONSUMABLES.value,
-                    "value": str(mq.get("quantity")),
-                })
+    parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
+    for mq in commitment_info.get("minimumQuantities", ()):
+        if mq["offerType"] == "LICENSE":
+            parameters.setdefault(Param.PHASE_ORDERING.value, [])
+            parameters[Param.PHASE_ORDERING.value].append({
+                "externalId": Param.THREE_YC_LICENSES.value,
+                "value": str(mq.get("quantity")),
+            })
+        if mq["offerType"] == "CONSUMABLES":
+            parameters.setdefault(Param.PHASE_ORDERING.value, [])
+            parameters[Param.PHASE_ORDERING.value].append({
+                "externalId": Param.THREE_YC_CONSUMABLES.value,
+                "value": str(mq.get("quantity")),
+            })
 
     parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
     parameters[Param.PHASE_FULFILLMENT.value].append({
