@@ -134,7 +134,11 @@ def _add_missing_subscriptions(
             agreement["listing"]["priceList"]["currency"],
         )
         sku_discount_level = get_sku_with_discount_level(adobe_subscription["offerId"], customer)
-        unit_price = {"price": {"unitPP": prices[sku_discount_level]}}
+        unit_price = {}
+        if sku_discount_level in prices:
+            unit_price = {"price": {"unitPP": prices.get(sku_discount_level)}}
+        
+        
         if item["terms"]["model"] == ItemTermsModel.ONE_TIME:
             template = get_asset_template_by_name(
                 mpt_client, agreement["product"]["id"], TEMPLATE_ASSET_DEFAULT
