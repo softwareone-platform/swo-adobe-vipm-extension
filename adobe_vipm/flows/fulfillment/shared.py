@@ -33,7 +33,7 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_ORDER_STATUSES,
     AdobeStatus,
 )
-from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
@@ -89,7 +89,7 @@ from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
 from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
-from adobe_vipm.notifications import mpt_notify
+from adobe_vipm.notifications import mpt_notify, send_exception
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -879,35 +879,72 @@ class SubmitReturnOrders(Step):
                     is_returnable,
                     bool(return_order),
                 )
-                if is_returnable:
-                    if return_order:
-                        all_return_orders.append(return_order)
-                        continue
-                    all_return_orders.append(
-                        adobe_client.create_return_order(
-                            context.authorization_id,
-                            context.adobe_customer_id,
-                            returnable_order.order,
-                            returnable_order.line,
-                            context.order_id,
-                            deployment_id,
-                        )
-                    )
+
+                if not self._guard_return_order_creation(
+                    is_returnable=is_returnable,
+                    return_order=return_order,
+                    all_return_orders=all_return_orders,
+                ):
+                    continue
+
+                return_order_created = self._create_return_order(
+                    adobe_client, context, returnable_order, deployment_id
+                )
+
+                if not return_order_created:
+                    return
+
+                all_return_orders.append(return_order_created)
+
+        if not self._ensure_not_pending_return_orders(context, all_return_orders):
+            return
+
+        next_step(client, context)
+
+    def _guard_return_order_creation(
+        self,
+        *,
+        is_returnable: bool,
+        return_order: dict | None,
+        all_return_orders: list,
+    ) -> bool:
+        if not is_returnable:
+            return False
+
+        if return_order:
+            all_return_orders.append(return_order)
+            return False
+
+        return True
+
+    def _create_return_order(self, adobe_client, context, returnable_order, deployment_id):
+        try:
+            return adobe_client.create_return_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                returnable_order.order,
+                returnable_order.line,
+                context.order_id,
+                deployment_id,
+            )
+        except AdobeAPIError as error:
+            logger.info(error)
+            send_exception(title=f"Error creating return order {context.order_id}", text=str(error))
+
+    def _ensure_not_pending_return_orders(self, context, all_return_orders):
         pending_orders = [
             return_order["orderId"]
             for return_order in all_return_orders
             if return_order["status"] != AdobeStatus.PROCESSED
         ]
-
         if pending_orders:
             logger.info(
                 "%s: There are pending return orders %s",
                 context,
                 ", ".join(pending_orders),
             )
-            return
-
-        next_step(client, context)
+            return False
+        return True
 
 
 class GetPreviewOrder(Step):
