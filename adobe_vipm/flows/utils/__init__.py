@@ -3,7 +3,6 @@ from .customer import (
     get_adobe_customer_id,
     get_company_name,
     get_customer_consumables_discount_level,
-    get_customer_data,
     get_customer_licenses_discount_level,
     get_global_customer,
     is_new_customer,

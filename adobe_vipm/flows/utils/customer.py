@@ -14,44 +14,6 @@ from adobe_vipm.flows.utils.parameter import (
 )
 
 
-def get_customer_data(order: dict) -> dict:
-    """
-    Returns a customer data extracted from the corresponding ordering parameters.
-
-    Args:
-        order: The order from which the customer data must be retrieved.
-
-    Returns:
-        Customer data.
-    """
-    customer_data = {}
-    for param_external_id in (
-        Param.COMPANY_NAME.value,
-        Param.ADDRESS.value,
-        Param.CONTACT.value,
-        Param.THREE_YC.value,
-        Param.THREE_YC_CONSUMABLES.value,
-        Param.THREE_YC_LICENSES.value,
-    ):
-        param = get_ordering_parameter(
-            order,
-            param_external_id,
-        )
-        customer_data[param_external_id] = param.get("value")
-
-    for param_external_id in (
-        Param.DEPLOYMENT_ID.value,
-        Param.DEPLOYMENTS.value,
-    ):
-        param = get_fulfillment_parameter(
-            order,
-            param_external_id,
-        )
-        customer_data[param_external_id] = param.get("value")
-
-    return customer_data
-
-
 def set_customer_data(order: dict, customer_data: dict) -> dict:
     """
     Set the ordering parameters with the customer data.

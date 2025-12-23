@@ -24,7 +24,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.helpers import PrepareCustomerData, SetupContext, Validate3YCCommitment
-from adobe_vipm.flows.utils import get_customer_data, get_ordering_parameter
+from adobe_vipm.flows.utils import get_ordering_parameter
 from adobe_vipm.flows.validation.purchase import (
     CheckPurchaseValidationEnabled,
     UpdatePrices,
@@ -51,8 +51,7 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 )
 def test_validate_company_name(order_factory, order_parameters_factory, company_name):
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_company_name(context)  # act
@@ -73,8 +72,7 @@ def test_validate_company_name_invalid_length(
     order_factory, order_parameters_factory, company_name
 ):
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_company_name(context)  # act
@@ -97,8 +95,7 @@ def test_validate_company_name_invalid_length(
 )
 def test_validate_company_name_invalid_chars(order_factory, order_parameters_factory, company_name):
     order = order_factory(order_parameters=order_parameters_factory(company_name=company_name))
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_company_name(context)  # act
@@ -112,11 +109,22 @@ def test_validate_company_name_invalid_chars(order_factory, order_parameters_fac
 
 @pytest.mark.parametrize("state_or_province", ["CA", "California", "Californio"])
 @pytest.mark.parametrize("address_line_2", ["", "a value"])
-def test_validate_address(mock_order, address_line_2, state_or_province):
-    customer_data = get_customer_data(mock_order)
-    customer_data[Param.ADDRESS.value]["addressLine2"] = address_line_2
-    customer_data[Param.ADDRESS.value]["state"] = state_or_province
-    context = Context(order=mock_order, customer_data=customer_data)
+def test_validate_address(
+    address_line_2, state_or_province, order_factory, order_parameters_factory
+):
+    order = order_factory(
+        order_parameters=order_parameters_factory(
+            address={
+                "country": "US",
+                "state": state_or_province,
+                "city": "San Jose",
+                "addressLine1": "3601 Lyon St",
+                "addressLine2": address_line_2,
+                "postCode": "94123",
+            },
+        )
+    )
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_address(context)  # act
@@ -139,11 +147,7 @@ def test_validate_address_invalid_country(order_factory, order_parameters_factor
             },
         )
     )
-    customer_data = get_customer_data(order)
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_address(context)  # act
@@ -168,8 +172,7 @@ def test_validate_address_invalid_state(order_factory, order_parameters_factory)
             },
         )
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_address(context)  # act
@@ -194,8 +197,7 @@ def test_validate_address_invalid_state_did_u_mean(order_factory, order_paramete
             },
         )
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_address(context)  # act
@@ -221,8 +223,7 @@ def test_validate_address_invalid_postal_code(order_factory, order_parameters_fa
             },
         )
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_address(context)  # act
@@ -247,8 +248,7 @@ def test_validate_address_invalid_postal_code_length(order_factory, order_parame
             },
         )
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_address(context)  # act
@@ -273,8 +273,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
             },
         )
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_address(context)  # act
@@ -288,8 +287,7 @@ def test_validate_address_invalid_others(order_factory, order_parameters_factory
 
 
 def test_validate_contact(mock_order):
-    customer_data = get_customer_data(mock_order)
-    context = Context(order=mock_order, customer_data=customer_data)
+    context = Context(order=mock_order)
     step = ValidateCustomerData()
 
     step.validate_contact(context)  # act
@@ -301,8 +299,7 @@ def test_validate_contact(mock_order):
 
 def test_validate_contact_mandatory(order_factory, order_parameters_factory):
     order = order_factory(order_parameters=order_parameters_factory(contact={}))
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_contact(context)  # act
@@ -324,8 +321,7 @@ def test_validate_contact_invalid_first_name(order_factory, order_parameters_fac
             },
         ),
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_contact(context)  # act
@@ -347,8 +343,7 @@ def test_validate_contact_invalid_last_name(order_factory, order_parameters_fact
             },
         ),
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_contact(context)  # act
@@ -370,8 +365,7 @@ def test_validate_contact_invalid_email(order_factory, order_parameters_factory)
             },
         ),
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_contact(context)  # act
@@ -397,8 +391,7 @@ def test_validate_contact_invalid_phone(order_factory, order_parameters_factory)
             },
         ),
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_contact(context)  # act
@@ -470,11 +463,7 @@ def test_validate_3yc(order_factory, order_parameters_factory, quantities):
             **quantities,
         ),
     )
-    customer_data = get_customer_data(order)
-    context = Context(
-        order=order,
-        customer_data=customer_data,
-    )
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_3yc(context)  # act
@@ -499,8 +488,7 @@ def test_validate_3yc_invalid(
     order = order_factory(
         order_parameters=order_parameters_factory(p3yc=["Yes"], **{factory_field: quantity}),
     )
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_3yc(context)  # act
@@ -514,8 +502,7 @@ def test_validate_3yc_invalid(
 
 def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
     order = order_factory(order_parameters=order_parameters_factory())
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_3yc(context)  # act
@@ -525,8 +512,7 @@ def test_validate_3yc_unchecked(order_factory, order_parameters_factory):
 
 def test_validate_3yc_empty_minimums(order_factory, order_parameters_factory):
     order = order_factory(order_parameters=order_parameters_factory(p3yc=["Yes"]))
-    customer_data = get_customer_data(order)
-    context = Context(order=order, customer_data=customer_data)
+    context = Context(order=order)
     step = ValidateCustomerData()
 
     step.validate_3yc(context)  # act
@@ -594,9 +580,8 @@ def test_validate_purchase_order(mocker, mock_mpt_client, mock_order):
 
 
 def test_validate_quantities_lga_invalid_quantities(mock_order, mock_mpt_client, mock_next_step):
-    customer_data = get_customer_data(mock_order)
     mock_order["product"]["id"] = "PRD-3333-3333"
-    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 50}])
+    context = Context(order=mock_order, new_lines=[{"quantity": 50}])
     step = ValidateQuantitiesLGA()
 
     step(mock_mpt_client, context, mock_next_step)  # act
@@ -606,9 +591,8 @@ def test_validate_quantities_lga_invalid_quantities(mock_order, mock_mpt_client,
 
 
 def test_validate_quantities_lga_valid_quantities(mock_order, mock_mpt_client, mock_next_step):
-    customer_data = get_customer_data(mock_order)
     mock_order["product"]["id"] = "PRD-3333-3333"
-    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 101}])
+    context = Context(order=mock_order, new_lines=[{"quantity": 101}])
     step = ValidateQuantitiesLGA()
 
     step(mock_mpt_client, context, mock_next_step)  # act
@@ -618,9 +602,8 @@ def test_validate_quantities_lga_valid_quantities(mock_order, mock_mpt_client, m
 
 
 def test_validate_quantities_not_lga(mock_order, mock_mpt_client, mock_next_step):
-    customer_data = get_customer_data(mock_order)
     mock_order["product"]["id"] = "PRD-1111-1111"
-    context = Context(order=mock_order, customer_data=customer_data, new_lines=[{"quantity": 101}])
+    context = Context(order=mock_order, new_lines=[{"quantity": 101}])
     step = ValidateQuantitiesLGA()
 
     step(mock_mpt_client, context, mock_next_step)  # act

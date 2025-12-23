@@ -1,4 +1,3 @@
-import copy
 import datetime as dt
 from unittest import mock
 from urllib.parse import urljoin
@@ -35,7 +34,6 @@ from adobe_vipm.flows.helpers import (
     ValidateResellerChange,
     ValidateSkuAvailability,
 )
-from adobe_vipm.flows.utils import get_customer_data
 
 
 @freeze_time("2024-01-01")
@@ -297,105 +295,15 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(  #
     mocked_next_step.assert_not_called()
 
 
-def test_prepare_customer_data_step(mocker, mock_order, customer_data):
-    mocked_update_order = mocker.patch(
-        "adobe_vipm.flows.helpers.update_order",
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(order=mock_order, customer_data=customer_data)
+def test_prepare_customer_data_step(mocker, mock_next_step, mock_mpt_client, mock_order):
+    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
+    context = Context(order=mock_order)
     step = PrepareCustomerData()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     mocked_update_order.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_prepare_customer_data_step_no_company_name(mocker, mock_order, customer_data):
-    no_company_customer_data = copy.copy(customer_data)
-    del no_company_customer_data[Param.COMPANY_NAME.value]
-    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=mock_order,
-        order_id="order-id",
-        customer_data=no_company_customer_data,
-    )
-    step = PrepareCustomerData()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert get_customer_data(context.order) == context.customer_data
-    assert (
-        context.customer_data[Param.COMPANY_NAME.value]
-        == context.order["agreement"]["licensee"]["name"]
-    )
-    mocked_update_order.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        parameters=context.order["parameters"],
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_prepare_customer_data_step_no_address(mocker, mock_order, customer_data):
-    no_address_customer_data = copy.copy(customer_data)
-    del no_address_customer_data[Param.ADDRESS.value]
-    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=mock_order,
-        order_id="order-id",
-        customer_data=no_address_customer_data,
-    )
-    step = PrepareCustomerData()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert get_customer_data(context.order) == context.customer_data
-    assert context.customer_data[Param.ADDRESS.value] == {
-        "country": context.order["agreement"]["licensee"]["address"]["country"],
-        "state": context.order["agreement"]["licensee"]["address"]["state"],
-        "city": context.order["agreement"]["licensee"]["address"]["city"],
-        "addressLine1": context.order["agreement"]["licensee"]["address"]["addressLine1"],
-        "addressLine2": context.order["agreement"]["licensee"]["address"].get("addressLine2"),
-        "postCode": context.order["agreement"]["licensee"]["address"]["postCode"],
-    }
-    mocked_update_order.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        parameters=context.order["parameters"],
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_prepare_customer_data_step_no_contact(mocker, mock_order, customer_data):
-    no_contact_customer_data = copy.copy(customer_data)
-    del no_contact_customer_data[Param.CONTACT.value]
-    mocked_update_order = mocker.patch("adobe_vipm.flows.helpers.update_order")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(order=mock_order, order_id="order-id", customer_data=no_contact_customer_data)
-    step = PrepareCustomerData()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert get_customer_data(context.order) == context.customer_data
-    assert context.customer_data[Param.CONTACT.value] == {
-        "firstName": context.order["agreement"]["licensee"]["contact"]["firstName"],
-        "lastName": context.order["agreement"]["licensee"]["contact"]["lastName"],
-        "email": context.order["agreement"]["licensee"]["contact"]["email"],
-        "phone": context.order["agreement"]["licensee"]["contact"].get("phone"),
-    }
-    mocked_update_order.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        parameters=context.order["parameters"],
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_update_prices_step_no_orders(mocker, mock_mpt_client, mock_order):
@@ -612,7 +520,7 @@ def test_update_prices_step_with_multiple_lines(
 
 
 def test_validate_3yc_commitment_without_adobe_customer(
-    mocker, order_factory, mock_get_sku_adobe_mapping_model
+    mocker, order_factory, order_parameters_factory, mock_get_sku_adobe_mapping_model
 ):
     lines = [
         {
@@ -632,14 +540,11 @@ def test_validate_3yc_commitment_without_adobe_customer(
             "oldQuantity": 12,
         },
     ]
-    order = order_factory(lines=lines)
+    order = order_factory(lines=lines, order_parameters=order_parameters_factory(p3yc_licenses=10))
     context = Context(
         order=order,
         adobe_customer=None,
         adobe_customer_id=None,
-        customer_data={
-            "3YCLicenses": 10,
-        },
         upsize_lines=lines,
     )
     mocked_next_step = mocker.MagicMock()
@@ -657,8 +562,11 @@ def test_validate_3yc_commitment_without_adobe_customer(
 
 def test_validate_3yc_commitment_without_adobe_customer_fail_license_quantity(
     mocker,
+    mock_mpt_client,
+    mock_next_step,
     order_factory,
     mock_get_sku_adobe_mapping_model,
+    order_parameters_factory,
 ):
     mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
     lines = [
@@ -671,23 +579,20 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_license_quantity(
             "oldQuantity": 0,
         }
     ]
-    order = order_factory(lines=lines)
+    order = order_factory(lines=lines, order_parameters=order_parameters_factory(p3yc_licenses=10))
     context = Context(
         order=order,
         adobe_customer=None,
         adobe_customer_id=None,
-        customer_data={"3YCLicenses": 10},
         upsize_lines=lines,
     )
-    mocked_next_step = mocker.MagicMock()
-    mocked_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
     step = Validate3YCCommitment()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
     error_call = mocked_switch_order_to_failed.call_args
     error_dict = error_call[0][2]
@@ -699,7 +604,7 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_license_quantity(
 
 
 def test_validate_3yc_commitment_without_adobe_customer_fail_consumables_quantity(
-    mocker, order_factory, mock_get_sku_adobe_mapping_model
+    mocker, order_factory, order_parameters_factory, mock_get_sku_adobe_mapping_model
 ):
     mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
     lines = [
@@ -712,12 +617,13 @@ def test_validate_3yc_commitment_without_adobe_customer_fail_consumables_quantit
             "oldQuantity": 0,
         }
     ]
-    order = order_factory(lines=lines)
+    order = order_factory(
+        lines=lines, order_parameters=order_parameters_factory(p3yc_consumables=10)
+    )
     context = Context(
         order=order,
         adobe_customer=None,
         adobe_customer_id=None,
-        customer_data={"3YCConsumables": 10},
         upsize_lines=lines,
     )
     mocked_next_step = mocker.MagicMock()
@@ -1313,6 +1219,7 @@ def test_validate_3yc_commitment_rejected(
     mocker,
     mock_adobe_client,
     order_factory,
+    order_parameters_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
     adobe_subscription_factory,
@@ -1331,26 +1238,22 @@ def test_validate_3yc_commitment_rejected(
         ]
     }
     mock_adobe_client.get_subscriptions.return_value = subscriptions
-    order = order_factory(
-        lines=[
-            {
-                "id": "line-1",
-                "item": {
-                    "externalIds": {"vendor": "65304578CA"},
-                },
-                "quantity": 15,
-                "oldQuantity": 15,
-            }
-        ],
-    )
+    lines = [
+        {
+            "id": "line-1",
+            "item": {
+                "externalIds": {"vendor": "65304578CA"},
+            },
+            "quantity": 15,
+            "oldQuantity": 15,
+        }
+    ]
+    order = order_factory(lines=lines, order_parameters=order_parameters_factory(p3yc=["Yes"]))
     context = Context(
         order=order,
         adobe_customer=adobe_customer,
         adobe_customer_id="test-customer-id",
         authorization_id="test-auth-id",
-        customer_data={
-            "3YC": ["Yes"],
-        },
     )
     mocked_next_step = mocker.MagicMock()
     mocked_client = mocker.MagicMock()
@@ -1375,20 +1278,21 @@ def test_validate_3yc_commitment_rejected(
 
 def test_validate_3yc_commitment_return_order_create(
     mocker,
+    mock_next_step,
+    mock_mpt_client,
     order_factory,
+    order_parameters_factory,
     adobe_customer_factory,
     adobe_commitment_factory,
     adobe_subscription_factory,
     mock_get_sku_adobe_mapping_model,
 ):
+    order = order_factory(order_parameters=order_parameters_factory(p3yc=["Yes"]))
     context = Context(
-        order=None,
+        order=order,
         adobe_customer=None,
         adobe_customer_id="test-customer-id",
         authorization_id="test-auth-id",
-        customer_data={
-            "3YC": ["Yes"],
-        },
         adobe_return_orders={
             "items": [
                 {
@@ -1398,22 +1302,22 @@ def test_validate_3yc_commitment_return_order_create(
             ]
         },
     )
-    mocked_next_step = mocker.MagicMock()
-    mocked_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
     step = Validate3YCCommitment()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_validate_3yc_commitment_no_commitment(
     mocker,
     mock_adobe_client,
+    mock_next_step,
+    mock_mpt_client,
     order_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -1447,19 +1351,16 @@ def test_validate_3yc_commitment_no_commitment(
         adobe_customer=adobe_customer,
         adobe_customer_id="test-customer-id",
         authorization_id="test-auth-id",
-        customer_data={},
     )
-    mocked_next_step = mocker.MagicMock()
-    mocked_client = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
         side_effect=mock_get_sku_adobe_mapping_model.from_id,
     )
     step = Validate3YCCommitment()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    step(mock_mpt_client, context, mock_next_step)  # act
 
-    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_validate_3yc_commitment_date_before_coterm_date(
