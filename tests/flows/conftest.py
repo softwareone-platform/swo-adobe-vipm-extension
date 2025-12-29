@@ -203,3 +203,34 @@ def mock_notify_agreement_unhandled_exception_in_teams(mocker):
     return mocker.patch(
         "adobe_vipm.flows.sync.notify_agreement_unhandled_exception_in_teams", spec=True
     )
+
+@pytest.fixture()
+def mock_mpt_get_asset_template_by_name(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_asset_template_by_name", spec=True)
+
+
+@pytest.fixture()
+def mock_mpt_create_asset(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_asset", spec=True)
+
+
+@pytest.fixture()
+def mock_mpt_create_agreement_subscription(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.create_agreement_subscription", spec=True)
+
+
+@pytest.fixture()
+def mock_mpt_get_template_by_name(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_template_by_name", spec=True)
+
+
+@pytest.fixture()
+def mock_notify_missing_prices(mocker):
+    return mocker.patch("adobe_vipm.flows.utils.notify_missing_prices", spec=True)
+
+
+@pytest.fixture()
+def mock_notify_missing_discount_levels(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.utils.subscription.notify_discount_level_error", spec=True
+    )
