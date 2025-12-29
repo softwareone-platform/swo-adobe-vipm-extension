@@ -2080,6 +2080,7 @@ def mock_update_order(mocker):
     mock = mocker.MagicMock(spec="mpt_extension_sdk.mpt_http.mpt.update_order")
     mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_order", new=mock)
     mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order", new=mock)
+    mocker.patch("adobe_vipm.flows.helpers.update_order", new=mock)
     return mock
 
 

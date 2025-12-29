@@ -1,5 +1,9 @@
 import datetime as dt
 from dataclasses import dataclass, field
+from typing import Any
+
+from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.utils import get_fulfillment_parameter, get_ordering_parameter
 
 
 @dataclass
@@ -19,7 +23,6 @@ class Context:
     authorization_id: str | None = None
     seller_id: str | None = None
     currency: str | None = None
-    customer_data: dict | None = None
     validation_succeeded: bool = True
     adobe_customer_id: str | None = None
     adobe_customer: dict | None = None
@@ -37,3 +40,25 @@ class Context:
             f"{self.authorization_id} {due_date} "
             f"{self.adobe_customer_id or '-'} {self.adobe_new_order_id or '-'}"
         )
+
+    @property
+    def customer_data(self) -> dict[str, Any]:
+        """Customer data extracted from the corresponding parameters."""
+        customer_data = {}
+        for param_external_id in (
+            Param.COMPANY_NAME,
+            Param.ADDRESS,
+            Param.CONTACT,
+            Param.THREE_YC,
+            Param.THREE_YC_CONSUMABLES,
+            Param.THREE_YC_LICENSES,
+            Param.AGENCY_TYPE,
+        ):
+            ordering_param = get_ordering_parameter(self.order, param_external_id)
+            customer_data[param_external_id.value] = ordering_param.get("value")
+
+        for param_external_id in (Param.DEPLOYMENT_ID, Param.DEPLOYMENTS):
+            fulfillment_param = get_fulfillment_parameter(self.order, param_external_id)
+            customer_data[param_external_id.value] = fulfillment_param.get("value")
+
+        return customer_data

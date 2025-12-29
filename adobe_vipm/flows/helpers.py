@@ -47,7 +47,6 @@ from adobe_vipm.flows.sync.agreement import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
     get_adobe_customer_id,
     get_adobe_order_id,
-    get_customer_data,
     get_due_date,
     get_market_segment,
     get_order_line_by_sku,
@@ -76,22 +75,18 @@ def manage_order_error(client, context, error_data, *, is_validation=False) -> N
 
 
 class PrepareCustomerData(Step):
-    """Prepares customer data from order to Adobe format for futher processing."""
+    """Prepares customer data from order to Adobe format for further processing."""
 
     def __call__(self, client, context, next_step):
-        """Prepares customer data from order to Adobe format for futher processing."""
+        """Prepares customer data from order to Adobe format for further processing."""
         licensee = context.order["agreement"]["licensee"]
-        address = licensee["address"]
-        contact = licensee.get("contact")
+        new_customer_data = {}
+        if not context.customer_data.get(Param.COMPANY_NAME):
+            new_customer_data[Param.COMPANY_NAME.value] = licensee["name"]
 
-        customer_data_updated = False
-
-        if not context.customer_data.get(Param.COMPANY_NAME.value):
-            context.customer_data[Param.COMPANY_NAME.value] = licensee["name"]
-            customer_data_updated = True
-
-        if not context.customer_data.get(Param.ADDRESS.value):
-            context.customer_data[Param.ADDRESS.value] = {
+        if not context.customer_data.get(Param.ADDRESS):
+            address = licensee["address"]
+            new_customer_data[Param.ADDRESS.value] = {
                 "country": address["country"],
                 "state": address["state"],
                 "city": address["city"],
@@ -99,24 +94,19 @@ class PrepareCustomerData(Step):
                 "addressLine2": address.get("addressLine2"),
                 "postCode": address["postCode"],
             }
-            customer_data_updated = True
 
-        if not context.customer_data.get(Param.CONTACT.value) and contact:
-            context.customer_data[Param.CONTACT.value] = {
+        contact = licensee.get("contact")
+        if not context.customer_data.get(Param.CONTACT) and contact:
+            new_customer_data[Param.CONTACT.value] = {
                 "firstName": contact["firstName"],
                 "lastName": contact["lastName"],
                 "email": contact["email"],
                 "phone": contact.get("phone"),
             }
-            customer_data_updated = True
 
-        if customer_data_updated:
-            context.order = set_customer_data(context.order, context.customer_data)
-            update_order(
-                client,
-                context.order_id,
-                parameters=context.order["parameters"],
-            )
+        if new_customer_data:
+            context.order = set_customer_data(context.order, new_customer_data)
+            update_order(client, context.order_id, parameters=context.order["parameters"])
 
         next_step(client, context)
 
@@ -172,7 +162,6 @@ class SetupContext(Step):
         context.product_id = context.order["agreement"]["product"]["id"]
         context.seller_id = context.order["agreement"]["seller"]["id"]
         context.currency = context.order["agreement"]["listing"]["priceList"]["currency"]
-        context.customer_data = get_customer_data(context.order)
         context.market_segment = get_market_segment(context.product_id)
 
         context.adobe_customer_id = get_adobe_customer_id(context.order)

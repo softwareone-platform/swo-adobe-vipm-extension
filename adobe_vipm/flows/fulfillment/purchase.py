@@ -58,7 +58,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_ordering_parameter_error,
 )
-from adobe_vipm.flows.utils.market_segment import get_agency_type, is_large_government_agency_type
+from adobe_vipm.flows.utils.market_segment import is_large_government_agency_type
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +268,6 @@ class CreateCustomer(Step):
                 return
 
             if is_large_government_agency_type(context.product_id):
-                context.customer_data[Param.AGENCY_TYPE.value] = get_agency_type(context.order)
                 customer = adobe_client.create_customer_account_lga(
                     context.authorization_id,
                     context.seller_id,
@@ -287,10 +286,7 @@ class CreateCustomer(Step):
             context.adobe_customer_id = customer["customerId"]
             context.adobe_customer = customer
 
-            self.save_data(
-                client,
-                context,
-            )
+            self.save_data(client, context)
             next_step(client, context)
         except AdobeError as error:
             logger.exception("Create Customer failed")
