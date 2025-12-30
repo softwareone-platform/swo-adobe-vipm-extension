@@ -445,22 +445,21 @@ def _update_assets(
     dry_run: bool,
 ) -> None:
     for asset, adobe_subscription, actual_sku in assets_for_update:
-        parameters = {
-            "fulfillment": [
-                {
-                    "externalId": Param.USED_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
-                },
-                {
-                    "externalId": Param.LAST_SYNC_DATE.value,
-                    "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
-                },
-            ],
-        }
+        parameters = [
+            {
+                "externalId": Param.LAST_SYNC_DATE.value,
+                "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
+            },
+        ]
+        if Param.USED_QUANTITY in adobe_subscription:
+            parameters.append({
+                "externalId": Param.USED_QUANTITY.value,
+                "value": str(adobe_subscription[Param.USED_QUANTITY]),
+            })
 
         if not dry_run:
             logger.info("Updating asset: %s: sku=%s", asset["id"], actual_sku)
-            update_asset(mpt_client, asset["id"], parameters=parameters)
+            update_asset(mpt_client, asset["id"], parameters={"fulfillment": parameters})
         else:
             current_quantity = get_parameter("fulfillment", asset, "usedQuantity")["value"]
             sys.stdout.write(
