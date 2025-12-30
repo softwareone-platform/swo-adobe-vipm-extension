@@ -132,7 +132,6 @@ def test_sync_agreement_prices(
     mock_add_missing_subscriptions_and_assets,
 ):
     agreement = agreement_factory(
-        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         subscriptions=[
             {
                 "id": "SUB-1000-2000-3000",
@@ -257,12 +256,11 @@ def test_sync_agreement_prices(
             template={"id": "TPL-1234", "name": "Renewing"},
         ),
     ])
-    expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     mock_mpt_update_agreement.assert_has_calls([
         mocker.call(
             mock_mpt_client,
             agreement["id"],
-            lines=expected_lines,
+            lines=[],
             parameters={
                 "fulfillment": [
                     {"externalId": "3YCRecommitmentRequestStatus", "value": None},
@@ -605,9 +603,7 @@ def test_sync_agreement_prices_with_3yc(
     mock_mpt_get_template_by_name,
     mock_get_template_data_by_adobe_subscription,
 ):
-    agreement = agreement_factory(
-        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11)
-    )
+    agreement = agreement_factory()
     adobe_subscription = adobe_subscription_factory()
     mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
@@ -671,12 +667,11 @@ def test_sync_agreement_prices_with_3yc(
             template={"id": "TPL-1234", "name": TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE},
         ),
     ])
-    expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     assert mock_mpt_update_agreement.call_args_list == [
         mocker.call(
             mock_mpt_client,
             agreement["id"],
-            lines=expected_lines,
+            lines=[],
             parameters={
                 "fulfillment": [
                     {"externalId": "3YCRecommitmentRequestStatus", "value": "ACCEPTED"},
@@ -1469,10 +1464,6 @@ def test_sync_agreement_prices_with_missing_prices(
     mock_notify_missing_prices,
 ):
     agreement = agreement_factory(
-        lines=lines_factory(
-            external_vendor_id="77777777CA",
-            unit_purchase_price=10.11,
-        ),
         subscriptions=[
             {
                 "id": "SUB-1000-2000-3000",
@@ -1565,24 +1556,7 @@ def test_sync_agreement_prices_with_missing_prices(
         mocker.call(
             mock_mpt_client,
             agreement["id"],
-            lines=[
-                {
-                    "item": {
-                        "id": "ITM-1234-1234-1234-0001",
-                        "name": "Awesome product",
-                        "externalIds": {"vendor": "77777777CA"},
-                    },
-                    "subscription": {
-                        "id": "SUB-1000-2000-3000",
-                        "status": "Active",
-                        "name": "Subscription for Acrobat Pro for Teams; Multi Language",
-                    },
-                    "oldQuantity": 0,
-                    "quantity": 170,
-                    "price": {"unitPP": 20.22},
-                    "id": "ALI-2119-4550-8674-5962-0001",
-                }
-            ],
+            lines=[],
             parameters={
                 "fulfillment": [
                     {"externalId": "3YCRecommitmentRequestStatus", "value": None},

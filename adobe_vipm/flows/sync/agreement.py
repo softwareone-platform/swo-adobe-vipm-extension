@@ -124,8 +124,6 @@ class AgreementSyncer:  # noqa: WPS214
                     dry_run=self._dry_run,
                 ).sync(sync_prices=sync_prices)
 
-            self._update_agreement_line_prices(self._agreement, self._currency, self.product_id)
-
             self._update_agreement(self._agreement)
 
             if self._adobe_customer.get("globalSalesEnabled", False):
