@@ -2089,6 +2089,7 @@ def mock_send_exception(mocker):
     mock = mocker.Mock()
     mocker.patch("adobe_vipm.flows.sync.agreement.send_exception", new=mock)
     mocker.patch("adobe_vipm.adobe.mixins.order.send_exception", new=mock)
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.send_exception", new=mock)
     return mock
 
 
