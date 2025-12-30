@@ -1,0 +1,47 @@
+{
+    "externalReferenceId": "",
+    "customerId": "P1005258435",
+    "resellerId": "P1000084165",
+    "status": "1000",
+    "companyProfile": {
+        "companyName": "TEST1",
+        "preferredLanguage": "en-US",
+        "marketSegment": "COM",
+        "marketSubSegments": [],
+        "address": {
+            "country": "US",
+            "region": "CA",
+            "city": "San Francisco",
+            "addressLine1": "3601 Lyon St",
+            "addressLine2": "",
+            "postalCode": "94123",
+            "phoneNumber": ""
+        },
+        "contacts": [
+            {
+                "firstName": "Default FirstName",
+                "lastName": "Default LastName",
+                "email": "cme527-sandbox-contact+1756730278798@adobe.com",
+                "phoneNumber": "123456789"
+            }
+        ]
+    },
+    "discounts": [
+        {
+            "offerType": "LICENSE",
+            "level": "01"
+        }
+    ],
+    "tags": [],
+    "cotermDate": "2026-10-01",
+    "creationDate": "2025-09-01T12:37:59Z",
+    "benefits": [],
+    "globalSalesEnabled": true,
+    "links": {
+        "self": {
+            "uri": "/v3/customers/P1005258435",
+            "method": "GET",
+            "headers": []
+        }
+    }
+}

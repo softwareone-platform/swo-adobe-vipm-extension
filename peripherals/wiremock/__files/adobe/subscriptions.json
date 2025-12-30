@@ -1,0 +1,97 @@
+{
+    "totalCount": 4,
+    "items": [
+        {
+            "subscriptionId": "fc1f381a5e445198c2188e14bbee3bNA",
+            "offerId": "65304479CA01A12",
+            "currentQuantity": 5,
+            "usedQuantity": 4,
+            "autoRenewal": {
+                "enabled": false,
+                "renewalQuantity": 5
+            },
+            "creationDate": "2025-09-01T12:38:07Z",
+            "renewalDate": "2025-10-01",
+            "status": "1004",
+            "currencyCode": "USD",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/subscriptions/fc1f381a5e445198c2188e14bbee3bNA",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        },
+        {
+            "subscriptionId": "0759fe599d42c1b73c618dddfe6a1cNA",
+            "offerId": "65327674CA01A12",
+            "currentQuantity": 50,
+            "usedQuantity": 8,
+            "autoRenewal": {
+                "enabled": false,
+                "renewalQuantity": 50
+            },
+            "creationDate": "2025-09-03T10:36:12Z",
+            "renewalDate": "2026-09-03",
+            "status": "1000",
+            "deploymentId": "PR1400001941",
+            "currencyCode": "EUR",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/subscriptions/0759fe599d42c1b73c618dddfe6a1cNA",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        },
+        {
+            "subscriptionId": "9e10d8705648faa507b194242f19a6NA",
+            "offerId": "65304520CA01A12",
+            "currentQuantity": 1,
+            "usedQuantity": 1,
+            "autoRenewal": {
+                "enabled": true,
+                "renewalQuantity": 1
+            },
+            "creationDate": "2025-09-03T10:54:38Z",
+            "renewalDate": "2026-10-01",
+            "status": "1000",
+            "currencyCode": "USD",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/subscriptions/9e10d8705648faa507b194242f19a6NA",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        },
+        {
+            "subscriptionId": "d3a901e11a40f8b3c28fac07037b1aNA",
+            "offerId": "30006208CA01A12",
+            "currentQuantity": 0,
+            "usedQuantity": 1,
+            "autoRenewal": {
+                "enabled": false,
+                "renewalQuantity": 0
+            },
+            "creationDate": "2025-10-27T15:47:14Z",
+            "renewalDate": "2026-10-01",
+            "status": "1004",
+            "currencyCode": "USD",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/subscriptions/d3a901e11a40f8b3c28fac07037b1aNA",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        }
+    ],
+    "links": {
+        "self": {
+            "uri": "/v2/customers/P1005258435/subscriptions?fetch-recommendations=false&recommendation-language=MULT",
+            "method": "GET",
+            "headers": []
+        }
+    }
+}

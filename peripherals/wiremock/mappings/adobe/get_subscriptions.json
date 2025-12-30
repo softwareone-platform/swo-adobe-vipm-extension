@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathTemplate": "/v3/customers/{customer_id}/subscriptions"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "adobe/subscriptions.json",
+    "transformers": ["response-template"],
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

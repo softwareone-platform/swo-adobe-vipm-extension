@@ -1,0 +1,917 @@
+{
+    "$meta": {
+        "omitted": [
+            "split"
+        ]
+    },
+    "id": "AGR-0731-7604-4374",
+    "name": "Adobe VIP Marketplace for Commercial for Area302 (Client)",
+    "revision": 6,
+    "status": "Active",
+    "listing": {
+        "id": "LST-5173-5785",
+        "name": "LST-5173-5785",
+        "revision": 1,
+        "authorization": {
+            "id": "AUT-4785-7184",
+            "name": "Adobe PRD-5516-5707",
+            "revision": 1,
+            "currency": "USD"
+        },
+        "product": {
+            "id": "PRD-5516-5707",
+            "name": "Adobe VIP Marketplace for Commercial",
+            "icon": "/v1/catalog/products/PRD-5516-5707/icon",
+            "revision": 3,
+            "externalIds": {},
+            "status": "Published"
+        },
+        "vendor": {
+            "id": "ACC-9226-9856",
+            "name": "Adobe",
+            "revision": 1,
+            "type": "Vendor",
+            "status": "Active"
+        },
+        "seller": {
+            "id": "SEL-7282-9889",
+            "name": "SoftwareOne, Inc.",
+            "icon": "/v1/accounts/sellers/SEL-7282-9889/icon",
+            "revision": 1,
+            "externalId": "78ADB9DA-BC69-4CBF-BAA0-CDBC28619EF7"
+        },
+        "priceList": {
+            "id": "PRC-5516-5707-0003",
+            "revision": 1,
+            "currency": "USD"
+        },
+        "primary": true,
+        "notes": "",
+        "statistics": {
+            "subscriptions": 17,
+            "agreements": 34
+        },
+        "eligibility": {
+            "client": true,
+            "partner": false
+        },
+        "audit": {
+            "created": {
+                "at": "2025-07-11T09:52:49.913Z",
+                "by": {
+                    "id": "USR-7144-5457",
+                    "name": "User 7144-5457",
+                    "revision": 1
+                }
+            }
+        }
+    },
+    "authorization": {
+        "id": "AUT-4785-7184",
+        "name": "Adobe PRD-5516-5707",
+        "revision": 1,
+        "currency": "USD"
+    },
+    "vendor": {
+        "id": "ACC-9226-9856",
+        "name": "Adobe",
+        "revision": 1,
+        "type": "Vendor",
+        "status": "Active"
+    },
+    "client": {
+        "id": "ACC-5809-3083",
+        "name": "Area302 (Client)",
+        "icon": "/v1/accounts/accounts/ACC-5809-3083/icon",
+        "revision": 2,
+        "type": "Client",
+        "status": "Active"
+    },
+    "price": {
+        "PPxY": 244.68000,
+        "PPxM": 20.39000,
+        "currency": "USD"
+    },
+    "template": {
+        "id": "TPL-5516-5707-0019",
+        "name": "Termination",
+        "revision": 1
+    },
+    "lines": [],
+    "assets": [],
+    "subscriptions": [
+        {
+            "id": "SUB-1997-4553-7375",
+            "name": "Subscription for Acrobat Classic 2024 for Enterprise; Multi Language - North America; Multi",
+            "revision": 0,
+            "status": "Terminated",
+            "commitmentDate": "2026-10-01T00:00:00.000Z",
+            "price": {
+                "PPxY": 0.00000,
+                "PPxM": 0.00000,
+                "currency": "USD"
+            },
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "id": "PAR-5516-5707-0023",
+                        "externalId": "adobeSKU",
+                        "name": "Subscription SKU",
+                        "type": "SingleLineText",
+                        "phase": "Fulfillment",
+                        "displayValue": "30006208CA01A12",
+                        "value": "30006208CA01A12"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0024",
+                        "externalId": "renewalDate",
+                        "name": "Renewal date",
+                        "type": "Date",
+                        "phase": "Fulfillment",
+                        "displayValue": "2026-10-01",
+                        "value": "2026-10-01"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0025",
+                        "externalId": "currentQuantity",
+                        "name": "Current quantity",
+                        "type": "SingleLineText",
+                        "phase": "Fulfillment",
+                        "displayValue": "12",
+                        "value": "12"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0026",
+                        "externalId": "renewalQuantity",
+                        "name": "Renewal quantity",
+                        "type": "SingleLineText",
+                        "phase": "Fulfillment",
+                        "displayValue": "12",
+                        "value": "12"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0032",
+                        "externalId": "lastSyncDate",
+                        "name": "Last Synchronisation Date",
+                        "type": "Date",
+                        "phase": "Fulfillment"
+                    }
+                ]
+            },
+            "agreement": {
+                "id": "AGR-0731-7604-4374",
+                "name": "Adobe VIP Marketplace for Commercial for Area302 (Client)",
+                "revision": 6,
+                "status": "Active"
+            },
+            "buyer": {
+                "id": "BUY-0280-5606",
+                "name": "Rolls-Royce Corporation",
+                "icon": "/v1/accounts/buyers/BUY-0280-5606/icon",
+                "revision": 1
+            },
+            "licensee": {
+                "id": "LCE-2599-7734-6675",
+                "name": "User 7734-6675",
+                "revision": 1
+            },
+            "seller": {
+                "id": "SEL-7282-9889",
+                "name": "SoftwareOne, Inc.",
+                "icon": "/v1/accounts/sellers/SEL-7282-9889/icon",
+                "revision": 1,
+                "externalId": "78ADB9DA-BC69-4CBF-BAA0-CDBC28619EF7"
+            },
+            "lines": [],
+            "startDate": "2025-10-27T14:54:11.000Z",
+            "terminationDate": "2025-10-27T15:36:56.401Z",
+            "externalIds": {
+                "vendor": "d3a901e11a40f8b3c28fac07037b1aNA"
+            },
+            "terms": {
+                "model": "quantity",
+                "period": "1y",
+                "commitment": "1y"
+            },
+            "product": {
+                "id": "PRD-5516-5707",
+                "name": "Adobe VIP Marketplace for Commercial",
+                "icon": "/v1/catalog/products/PRD-5516-5707/icon",
+                "revision": 3,
+                "externalIds": {},
+                "status": "Published"
+            },
+            "autoRenew": false,
+            "audit": {
+                "created": {
+                    "at": "2025-10-27T14:54:19.566Z",
+                    "by": {
+                        "id": "TKN-9352-9507",
+                        "name": "User 9352-9507",
+                        "revision": 1
+                    }
+                },
+                "updated": {
+                    "at": "2025-10-27T15:36:56.425Z",
+                    "by": {
+                        "id": "TKN-9352-9507",
+                        "name": "User 9352-9507",
+                        "revision": 1
+                    }
+                }
+            }
+        },
+        {
+            "id": "SUB-9580-3280-5843",
+            "name": "Subscription for Acrobat Pro for Teams; Multi Language - North America; Multi",
+            "revision": 0,
+            "status": "Active",
+            "commitmentDate": "2026-10-01T00:00:00.000Z",
+            "price": {
+                "PPxY": 244.68000,
+                "PPxM": 20.39000,
+                "currency": "USD"
+            },
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "id": "PAR-5516-5707-0023",
+                        "externalId": "adobeSKU",
+                        "name": "Subscription SKU",
+                        "type": "SingleLineText",
+                        "phase": "Fulfillment",
+                        "displayValue": "65304520CA01A12",
+                        "value": "65304520CA01A12"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0024",
+                        "externalId": "renewalDate",
+                        "name": "Renewal date",
+                        "type": "Date",
+                        "phase": "Fulfillment",
+                        "displayValue": "2026-10-01",
+                        "value": "2026-10-01"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0025",
+                        "externalId": "currentQuantity",
+                        "name": "Current quantity",
+                        "type": "SingleLineText",
+                        "phase": "Fulfillment",
+                        "displayValue": "1",
+                        "value": "1"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0026",
+                        "externalId": "renewalQuantity",
+                        "name": "Renewal quantity",
+                        "type": "SingleLineText",
+                        "phase": "Fulfillment",
+                        "displayValue": "1",
+                        "value": "1"
+                    },
+                    {
+                        "id": "PAR-5516-5707-0032",
+                        "externalId": "lastSyncDate",
+                        "name": "Last Synchronisation Date",
+                        "type": "Date",
+                        "phase": "Fulfillment",
+                        "displayValue": "2025-10-27",
+                        "value": "2025-10-27"
+                    }
+                ]
+            },
+            "agreement": {
+                "id": "AGR-0731-7604-4374",
+                "name": "Adobe VIP Marketplace for Commercial for Area302 (Client)",
+                "revision": 6,
+                "status": "Active"
+            },
+            "buyer": {
+                "id": "BUY-0280-5606",
+                "name": "Rolls-Royce Corporation",
+                "icon": "/v1/accounts/buyers/BUY-0280-5606/icon",
+                "revision": 1
+            },
+            "licensee": {
+                "id": "LCE-2599-7734-6675",
+                "name": "User 7734-6675",
+                "revision": 1
+            },
+            "seller": {
+                "id": "SEL-7282-9889",
+                "name": "SoftwareOne, Inc.",
+                "icon": "/v1/accounts/sellers/SEL-7282-9889/icon",
+                "revision": 1,
+                "externalId": "78ADB9DA-BC69-4CBF-BAA0-CDBC28619EF7"
+            },
+            "lines": [
+                {
+                    "id": "ALI-0731-7604-4374-0001",
+                    "quantity": 1,
+                    "item": {
+                        "id": "ITM-5516-5707-0055",
+                        "name": "Acrobat Pro for Teams; Multi Language - North America; Multi",
+                        "revision": 1,
+                        "externalIds": {
+                            "vendor": "65304520CA"
+                        }
+                    },
+                    "price": {
+                        "PPxY": 244.68000,
+                        "PPxM": 20.39000,
+                        "unitPP": 244.68000,
+                        "currency": "USD"
+                    },
+                    "status": "Active",
+                    "subscription": {
+                        "id": "SUB-9580-3280-5843",
+                        "name": "Subscription for Acrobat Pro for Teams; Multi Language - North America; Multi",
+                        "revision": 5
+                    },
+                    "agreement": {
+                        "id": "AGR-0731-7604-4374",
+                        "name": "Adobe VIP Marketplace for Commercial for Area302 (Client)",
+                        "revision": 6,
+                        "status": "Active"
+                    },
+                    "client": {
+                        "id": "ACC-5809-3083",
+                        "name": "Area302 (Client)",
+                        "icon": "/v1/accounts/accounts/ACC-5809-3083/icon",
+                        "revision": 2,
+                        "type": "Client",
+                        "status": "Active"
+                    },
+                    "vendor": {
+                        "id": "ACC-9226-9856",
+                        "name": "Adobe",
+                        "revision": 1,
+                        "type": "Vendor",
+                        "status": "Active"
+                    },
+                    "buyer": {
+                        "id": "BUY-0280-5606",
+                        "name": "Rolls-Royce Corporation",
+                        "icon": "/v1/accounts/buyers/BUY-0280-5606/icon",
+                        "revision": 1
+                    },
+                    "seller": {
+                        "id": "SEL-7282-9889",
+                        "name": "SoftwareOne, Inc.",
+                        "icon": "/v1/accounts/sellers/SEL-7282-9889/icon",
+                        "revision": 1,
+                        "externalId": "78ADB9DA-BC69-4CBF-BAA0-CDBC28619EF7"
+                    },
+                    "product": {
+                        "id": "PRD-5516-5707",
+                        "name": "Adobe VIP Marketplace for Commercial",
+                        "icon": "/v1/catalog/products/PRD-5516-5707/icon",
+                        "revision": 3,
+                        "externalIds": {},
+                        "status": "Published"
+                    }
+                }
+            ],
+            "startDate": "2025-09-03T10:54:38.000Z",
+            "externalIds": {
+                "vendor": "9e10d8705648faa507b194242f19a6NA"
+            },
+            "terms": {
+                "model": "quantity",
+                "period": "1y",
+                "commitment": "1y"
+            },
+            "product": {
+                "id": "PRD-5516-5707",
+                "name": "Adobe VIP Marketplace for Commercial",
+                "icon": "/v1/catalog/products/PRD-5516-5707/icon",
+                "revision": 3,
+                "externalIds": {},
+                "status": "Published"
+            },
+            "autoRenew": true,
+            "audit": {
+                "created": {
+                    "at": "2025-09-03T15:31:13.618Z",
+                    "by": {
+                        "id": "TKN-9352-9507",
+                        "name": "User 9352-9507",
+                        "revision": 1
+                    }
+                },
+                "updated": {
+                    "at": "2025-10-27T16:58:51.333Z",
+                    "by": {
+                        "id": "TKN-9352-9507",
+                        "name": "User 9352-9507",
+                        "revision": 1
+                    }
+                }
+            }
+        }
+    ],
+    "parameters": {
+        "ordering": [
+            {
+                "id": "PAR-5516-5707-0001",
+                "externalId": "agreementType",
+                "name": "Agreement type",
+                "type": "Choice",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                },
+                "displayValue": "Migrate",
+                "value": "Migrate"
+            },
+            {
+                "id": "PAR-5516-5707-0002",
+                "externalId": "companyName",
+                "name": "Company Name",
+                "type": "SingleLineText",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": true,
+                    "readonly": false
+                },
+                "displayValue": "TEST1",
+                "value": "TEST1"
+            },
+            {
+                "id": "PAR-5516-5707-0003",
+                "externalId": "address",
+                "name": "Address",
+                "type": "Address",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": true,
+                    "readonly": false
+                },
+                "displayValue": "3601 Lyon St, San Francisco, CA 94123",
+                "value": {
+                    "addressLine1": "3601 Lyon St",
+                    "addressLine2": "",
+                    "city": "San Francisco",
+                    "state": "CA",
+                    "postCode": "94123",
+                    "country": "US"
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0004",
+                "externalId": "contact",
+                "name": "Contact",
+                "type": "Contact",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": true,
+                    "readonly": false
+                },
+                "displayValue": "Default FirstName Default LastName cme527-sandbox-contact+1756730278798@adobe.com +1 123456789",
+                "value": {
+                    "firstName": "Default FirstName",
+                    "lastName": "Default LastName",
+                    "email": "cme527-sandbox-contact+1756730278798@adobe.com",
+                    "phone": {
+                        "prefix": "+1",
+                        "number": "123456789"
+                    }
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0005",
+                "externalId": "3YC",
+                "name": "3-year commitment",
+                "type": "Checkbox",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": true,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0006",
+                "externalId": "3YCLicenses",
+                "name": "Minimum licenses",
+                "type": "SingleLineText",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": true,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0007",
+                "externalId": "3YCConsumables",
+                "name": "Minimum consumables",
+                "type": "SingleLineText",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": true,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0008",
+                "externalId": "membershipId",
+                "name": "MembershipId",
+                "type": "SingleLineText",
+                "phase": "Order",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                },
+                "displayValue": "F6784DF03003AD3ABA4B",
+                "value": "F6784DF03003AD3ABA4B"
+            }
+        ],
+        "fulfillment": [
+            {
+                "id": "PAR-5516-5707-0009",
+                "externalId": "dueDate",
+                "name": "Due Date",
+                "type": "Date",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0010",
+                "externalId": "customerId",
+                "name": "CustomerId",
+                "type": "SingleLineText",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                },
+                "displayValue": "P1005258435",
+                "value": "P1005258435"
+            },
+            {
+                "id": "PAR-5516-5707-0011",
+                "externalId": "cotermDate",
+                "name": "Anniversary date",
+                "type": "Date",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                },
+                "displayValue": "2026-10-01",
+                "value": "2026-10-01"
+            },
+            {
+                "id": "PAR-5516-5707-0013",
+                "externalId": "3YCEnrollStatus",
+                "name": "3YC enroll status",
+                "type": "SingleLineText",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0014",
+                "externalId": "3YCStartDate",
+                "name": "3YC start date",
+                "type": "Date",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0015",
+                "externalId": "3YCEndDate",
+                "name": "3YC end date",
+                "type": "Date",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0016",
+                "externalId": "3YCCommitmentRequestStatus",
+                "name": "3YC Commitment Request Status",
+                "type": "SingleLineText",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0017",
+                "externalId": "3YCRecommit",
+                "name": "3-year recommitment",
+                "type": "Checkbox",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0018",
+                "externalId": "3YCRecommitmentRequestStatus",
+                "name": "3YC Recommitment Request Status",
+                "type": "SingleLineText",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0019",
+                "externalId": "globalCustomer",
+                "name": "Global customer",
+                "type": "Checkbox",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                },
+                "displayValue": "Yes",
+                "value": [
+                    "Yes"
+                ]
+            },
+            {
+                "id": "PAR-5516-5707-0020",
+                "externalId": "deploymentId",
+                "name": "Deployment ID",
+                "type": "SingleLineText",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            },
+            {
+                "id": "PAR-5516-5707-0021",
+                "externalId": "deployments",
+                "name": "Deployments",
+                "type": "MultiLineText",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                },
+                "displayValue": "PR1400001941 - DE",
+                "value": "PR1400001941 - DE"
+            },
+            {
+                "id": "PAR-5516-5707-0030",
+                "externalId": "lastSyncDate",
+                "name": "Last Synchronisation Date",
+                "type": "Date",
+                "phase": "Fulfillment",
+                "constraints": {
+                    "required": false,
+                    "hidden": false,
+                    "readonly": false
+                }
+            }
+        ]
+    },
+    "licensee": {
+        "id": "LCE-2599-7734-6675",
+        "name": "User 7734-6675",
+        "revision": 1
+    },
+    "buyer": {
+        "id": "BUY-0280-5606",
+        "name": "Rolls-Royce Corporation",
+        "icon": "/v1/accounts/buyers/BUY-0280-5606/icon",
+        "revision": 1,
+        "status": "Enabled",
+        "address": {
+            "addressLine1": "695 Nixon Ports",
+            "addressLine2": "Apt 232",
+            "postCode": "99801",
+            "city": "Port Elainemouth",
+            "state": "AK",
+            "country": "US"
+        },
+        "taxId": "VAT1",
+        "account": {
+            "id": "ACC-5809-3083",
+            "name": "Area302 (Client)",
+            "icon": "/v1/accounts/accounts/ACC-5809-3083/icon",
+            "revision": 2,
+            "type": "Client",
+            "status": "Active"
+        },
+        "sellers": [
+            {
+                "id": "SEL-0209-5314",
+                "name": "20 Adam's buyer",
+                "icon": "/v1/accounts/sellers/SEL-0209-5314/icon",
+                "revision": 1,
+                "externalId": "in_sez_cpx"
+            },
+            {
+                "id": "SEL-7282-9889",
+                "name": "SoftwareOne, Inc.",
+                "icon": "/v1/accounts/sellers/SEL-7282-9889/icon",
+                "revision": 1,
+                "externalId": "78ADB9DA-BC69-4CBF-BAA0-CDBC28619EF7"
+            }
+        ],
+        "audit": {
+            "created": {
+                "at": "2024-04-17T09:16:38.846Z",
+                "by": {
+                    "id": "USR-0000-0055",
+                    "name": "Pavel Lonkin",
+                    "revision": 1
+                }
+            },
+            "updated": {
+                "at": "2024-08-14T08:18:08.460Z",
+                "by": {
+                    "id": "USR-0000-0044",
+                    "name": "veronika poleeva",
+                    "revision": 1
+                }
+            }
+        }
+    },
+    "seller": {
+        "id": "SEL-7282-9889",
+        "name": "SoftwareOne, Inc.",
+        "icon": "/v1/accounts/sellers/SEL-7282-9889/icon",
+        "revision": 1,
+        "externalId": "78ADB9DA-BC69-4CBF-BAA0-CDBC28619EF7",
+        "status": "Active",
+        "currencies": [
+            "USD"
+        ],
+        "address": {
+            "addressLine1": "Some street",
+            "postCode": "P0S C0D3",
+            "city": "Some city",
+            "state": "SS",
+            "country": "US"
+        },
+        "audit": {
+            "created": {
+                "at": "2023-12-14T13:59:57.659Z",
+                "by": {
+                    "id": "USR-0000-0001",
+                    "name": "Will Smith",
+                    "revision": 1
+                }
+            },
+            "updated": {
+                "at": "2025-03-10T07:34:16.559Z",
+                "by": {
+                    "id": "USR-2716-7913",
+                    "name": "Adam Ruszczak",
+                    "revision": 1
+                }
+            }
+        }
+    },
+    "product": {
+        "id": "PRD-5516-5707",
+        "name": "Adobe VIP Marketplace for Commercial",
+        "icon": "/v1/catalog/products/PRD-5516-5707/icon",
+        "revision": 3,
+        "shortDescription": "Adobe’s ground-breaking innovations empower everyone, everywhere to imagine, create, and bring any digital experience to life.",
+        "longDescription": "Adobe’s ground-breaking innovations empower everyone, everywhere to imagine, create, and bring any digital experience to life.",
+        "externalIds": {},
+        "website": "https://www.adobe.com/",
+        "status": "Published",
+        "vendor": {
+            "id": "ACC-9226-9856",
+            "name": "Adobe",
+            "revision": 1,
+            "type": "Vendor",
+            "status": "Active"
+        },
+        "settings": {
+            "productOrdering": true,
+            "productRequests": {
+                "enabled": false
+            },
+            "itemSelection": false,
+            "orderQueueChanges": false,
+            "preValidation": {
+                "purchaseOrderDraft": true,
+                "purchaseOrderQuerying": false,
+                "changeOrderDraft": true,
+                "configurationOrderDraft": true,
+                "terminationOrder": true,
+                "productRequest": false
+            },
+            "subscriptionCessation": {
+                "enabled": true,
+                "mode": "Termination or auto-renewal"
+            }
+        },
+        "statistics": {
+            "itemCount": 392,
+            "ordersPlacedCount": 20,
+            "agreementCount": 34,
+            "subscriptionCount": 17,
+            "requestCount": 0
+        },
+        "audit": {
+            "published": {
+                "at": "2025-07-11T09:46:23.677Z",
+                "by": {
+                    "id": "USR-7144-5457",
+                    "name": "User 7144-5457",
+                    "revision": 1
+                }
+            },
+            "pending": {
+                "at": "2025-07-11T09:16:14.708Z",
+                "by": {
+                    "id": "USR-7144-5457",
+                    "name": "User 7144-5457",
+                    "revision": 1
+                }
+            },
+            "unpublished": {
+                "at": "2025-07-11T09:45:00.920Z",
+                "by": {
+                    "id": "USR-7144-5457",
+                    "name": "User 7144-5457",
+                    "revision": 1
+                }
+            },
+            "created": {
+                "at": "2025-04-17T15:16:36.284Z",
+                "by": {
+                    "id": "TKN-9352-9507",
+                    "name": "User 9352-9507",
+                    "revision": 1
+                }
+            },
+            "updated": {
+                "at": "2025-10-27T15:12:43.196Z",
+                "by": {
+                    "id": "USR-7144-5457",
+                    "name": "User 7144-5457",
+                    "revision": 1
+                }
+            }
+        }
+    },
+    "externalIds": {
+        "client": "",
+        "vendor": "P1005258435"
+    },
+    "termsAndConditions": [],
+    "certificates": [],
+    "audit": {
+        "created": {
+            "at": "2025-09-03T10:55:38.239Z",
+            "by": {
+                "id": "USR-7144-5457",
+                "name": "User 7144-5457",
+                "revision": 1
+            }
+        },
+        "updated": {
+            "at": "2025-10-27T16:58:51.719Z",
+            "by": {
+                "id": "TKN-9352-9507",
+                "name": "User 9352-9507",
+                "revision": 1
+            }
+        }
+    }
+}

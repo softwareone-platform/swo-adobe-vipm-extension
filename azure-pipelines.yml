@@ -10,7 +10,7 @@ resources:
       type: git
       name: MPT/ops-build-templates-aks-releases
       ref: releases/v15
-      
+
 variables:
   - name: appName
     value: swo-extension-adobe
@@ -43,7 +43,7 @@ stages:
             parameters:
               repository: $(appName)
               sourceBuild: $(buildVersion)
-              Dockerfile: prod.Dockerfile 
+              Dockerfile: Dockerfile
               skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
 
       - job: BuildHelmChart

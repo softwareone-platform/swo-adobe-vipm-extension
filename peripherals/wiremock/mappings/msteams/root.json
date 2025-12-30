@@ -1,0 +1,12 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathTemplate": "/msteams"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

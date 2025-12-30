@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/mpt/v1/commerce/orders"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "mpt/fulfillment/orders.json",
+    "transformers": ["response-template"],
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

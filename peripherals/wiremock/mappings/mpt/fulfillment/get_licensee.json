@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathTemplate": "/mpt/v1/accounts/licensees/{licenseeId}"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "mpt/fulfillment/licensee.json",
+    "transformers": ["response-template"],
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

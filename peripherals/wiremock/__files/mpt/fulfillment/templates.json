@@ -1,0 +1,30 @@
+{
+    "$meta": {
+        "pagination": {
+            "offset": 0,
+            "limit": 1,
+            "total": 23
+        },
+        "omitted": [
+            "audit"
+        ]
+    },
+    "data": [
+        {
+            "id": "TPL-5516-5707-0001",
+            "name": "Sample order processing template",
+            "revision": 1,
+            "content": "# Sample Templateects of formatting such as:\r\n- Bullets and numbering\r\n- Italics and Bold\r\n- Titles\r\n- Link embedding \r\n\r\n## Images or Videos\r\nYou can embed images or videos to these templates to share richer visual information by inserting the image or video URL.\r\n\r\n## Template Variables\r\nUse the template variables to identify parameters you wish to embed in this template so for every recipient of this message the parameter will be used in the given context.",
+            "type": "OrderProcessing",
+            "default": false,
+            "product": {
+                "id": "PRD-5516-5707",
+                "name": "Adobe VIP Marketplace for Commercial",
+                "icon": "/v1/catalog/products/PRD-5516-5707/icon",
+                "revision": 3,
+                "externalIds": {},
+                "status": "Published"
+            }
+        }
+    ]
+}

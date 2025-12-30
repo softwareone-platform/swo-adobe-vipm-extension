@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathTemplate": "/mpt/v1/catalog/products/{product_id}/templates"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "mpt/fulfillment/templates.json",
+    "transformers": ["response-template"],
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

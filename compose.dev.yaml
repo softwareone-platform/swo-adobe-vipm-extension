@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      target: dev
+    depends_on:
+      - wiremock
+    env_file:
+      - .env
+      - .env.dev
+
+  wiremock:
+    image: wiremock/wiremock:latest
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./peripherals/wiremock/extensions:/var/wiremock/extensions
+      - ./peripherals/wiremock/__files:/home/wiremock/__files
+      - ./peripherals/wiremock/mappings:/home/wiremock/mappings
+    entrypoint: [ "/docker-entrypoint.sh", "--enable-browser-proxying", "--verbose" ]
