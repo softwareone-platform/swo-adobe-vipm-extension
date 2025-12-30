@@ -80,18 +80,17 @@ class AssetSyncer:
 
     def _update_assets(self, assets_for_update: list[dict], *, dry_run: bool) -> None:
         for asset, adobe_subscription, actual_sku in assets_for_update:
-            asset_params = {
-                "fulfillment": [
-                    {
-                        "externalId": Param.USED_QUANTITY.value,
-                        "value": str(adobe_subscription[Param.USED_QUANTITY]),
-                    },
-                    {
-                        "externalId": Param.LAST_SYNC_DATE.value,
-                        "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
-                    },
-                ],
-            }
+            fulfillment_params = [
+                {
+                    "externalId": Param.LAST_SYNC_DATE.value,
+                    "value": dt.datetime.now(tz=dt.UTC).date().isoformat(),
+                },
+            ]
+            if Param.USED_QUANTITY in adobe_subscription:
+                fulfillment_params.append({
+                    "externalId": Param.USED_QUANTITY.value,
+                    "value": str(adobe_subscription.get(Param.USED_QUANTITY, 0)),
+                })
 
             if dry_run:
                 current_quantity = get_parameter("fulfillment", asset, "usedQuantity")["value"]
@@ -104,4 +103,6 @@ class AssetSyncer:
                 )
             else:
                 logger.info("Updating asset: %s: sku=%s", asset["id"], actual_sku)
-                mpt.update_asset(self._mpt_client, asset["id"], parameters=asset_params)
+                mpt.update_asset(
+                    self._mpt_client, asset["id"], parameters={"fulfillment": fulfillment_params}
+                )
