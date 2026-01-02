@@ -30,7 +30,7 @@ jobs:
         username: ${{ secrets.REGISTRY_USERNAME }}
         password: ${{ secrets.REGISTRY_PASSWORD }}
     - run: |
-        docker build -f prod.Dockerfile -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-vipm:${{ steps.get_version.outputs.VERSION }} .
+        docker build --target prod -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-vipm:${{ steps.get_version.outputs.VERSION }} .
         docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-vipm:${{ steps.get_version.outputs.VERSION }}
 
   dtrack:
