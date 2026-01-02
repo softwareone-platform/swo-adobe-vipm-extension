@@ -3,6 +3,7 @@ from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.flows.sync.agreement import AgreementSyncer
+from adobe_vipm.flows.sync.price_manager import PriceManager
 from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
 
 
@@ -48,6 +49,11 @@ def mock_mpt_get_agreement_subscription(mocker, subscriptions_factory):
         return_value=subscriptions_factory()[0],
         spec=True,
     )
+
+
+@pytest.fixture
+def mock_mpt_get_item_prices_by_pricelist_id(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_item_prices_by_pricelist_id", spec=True)
 
 
 @pytest.fixture
@@ -262,3 +268,31 @@ def mock_get_template_data_by_adobe_subscription(mocker):
     ):
         mocker.patch(path, new=mock)
     return mock
+
+
+@pytest.fixture
+def mock_get_sku_price(mocker):
+    return mocker.patch("adobe_vipm.flows.sync.price_manager.models.get_sku_price", spec=True)
+
+
+@pytest.fixture
+def price_manager_factory(mocker):
+    def _factory(
+        mpt_client=None,
+        adobe_customer=None,
+        lines=None,
+        agreement_id="AGR-1234-5678",
+        pricelist_id="PRC-1234-5678",
+    ):
+        mpt_client = mpt_client or mocker.MagicMock()
+        adobe_customer = adobe_customer or {"customerId": "test-customer-id"}
+        lines = lines or []
+        return PriceManager(
+            mpt_client=mpt_client,
+            adobe_customer=adobe_customer,
+            lines=lines,
+            agreement_id=agreement_id,
+            pricelist_id=pricelist_id,
+        )
+
+    return _factory

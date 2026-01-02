@@ -9,11 +9,11 @@ license = {text = "Apache-2.0 license"}
 dependencies = [
     "django==4.2.*",
     "jinja2==3.1.*",
-    "markdown-it-py==3.0.*",
+    "markdown-it-py==4.0.*",
     "mpt-extension-sdk==5.17.*",
     "openpyxl==3.1.*",
-    "phonenumbers==8.13.*",
-    "pyairtable==2.3.*",
+    "phonenumbers==9.0.*",
+    "pyairtable==3.3.*",
     "pymsteams==0.2.*",
     "python-dateutil==2.9.*",
     "regex>=2024.7.24,<2025",
@@ -56,7 +56,7 @@ runtime = [
     "opentelemetry-instrumentation-logging==0.51b0",
     "opentelemetry-instrumentation-requests==0.51b0",
     "opentelemetry-sdk==1.30.*",
-    "watchfiles==0.21.*",
+    "watchfiles==1.1.*",
 ]
 
 [tool.uv]
@@ -160,6 +160,7 @@ per-file-ignores = [
   "adobe_vipm/flows/sync/agreement.py: WPS110 WPS114 WPS201 WPS202 WPS204 WPS210 WPS211 WPS213 WPS221 WPS229 WPS231 WPS235 WPS237 WPS335 WPS432 WPS504 WPS505",
   "adobe_vipm/flows/sync/subscription.py: WPS211 WPS210 WPS231 WPS229 WPS211",
   "adobe_vipm/flows/sync/util.py: WPS100 WPS453",
+  "adobe_vipm/flows/sync/helper.py: WPS211",
   "adobe_vipm/management/commands/check_gc_agreement_deployments.py: WPS110",
   "adobe_vipm/management/commands/base.py: WPS110",
   "adobe_vipm/management/commands/check_running_transfers.py: WPS110",
