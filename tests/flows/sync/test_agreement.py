@@ -496,6 +496,56 @@ def test_sync_agreement_prices_dry_run(
     mock_get_template_data_by_adobe_subscription.assert_called_once()
 
 
+def test_sync_agreement_lines_missing_prices(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    agreement_factory,
+    subscriptions_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    mock_mpt_update_agreement,
+    mock_mpt_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
+    mocked_agreement_syncer,
+    mock_get_template_data_by_adobe_subscription,
+    mock_notify_missing_prices,
+):
+    mocked_agreement_syncer._agreement = agreement_factory(
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11)
+    )
+    mpt_subscription = subscriptions_factory()[0]
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(coterm_date="2025-04-04")
+    mock_mpt_get_agreement_subscription.return_value = mpt_subscription
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        side_effect=[{"65327701CA01A12": 1234.55}, {}],
+    )
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Expired",
+    }
+    mocked_agreement_syncer._dry_run = True
+
+    mocked_agreement_syncer.sync(sync_prices=True)  # act
+
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mpt_subscription["id"]
+    )
+    mock_notify_missing_prices.assert_called_once_with(
+        "AGR-2119-4550-8674-5962",
+        ["77777777CA01A12"],
+        "PRD-1111-1111",
+        "USD",
+        None,
+    )
+    mock_mpt_update_agreement_subscription.assert_not_called()
+    mock_mpt_update_agreement.assert_not_called()
+    mock_get_template_data_by_adobe_subscription.assert_called_once()
+
+
 def test_sync_agreement_prices_exception(
     mocker,
     mock_adobe_client,
