@@ -51,6 +51,11 @@ def mock_mpt_get_agreement_subscription(mocker, subscriptions_factory):
 
 
 @pytest.fixture
+def mock_mpt_get_item_prices_by_pricelist_id(mocker):
+    return mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_item_prices_by_pricelist_id", spec=True)
+
+
+@pytest.fixture
 def mock_mpt_update_agreement_subscription(mocker):
     return mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement_subscription", spec=True)
 
