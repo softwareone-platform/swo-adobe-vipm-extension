@@ -27,10 +27,10 @@ jobs:
       run: touch .env
 
     - name: "Build test containers"
-      run: docker compose build app_test
+      run: make build
 
     - name: "Run validation & test"
-      run: docker compose run --service-ports app_test
+      run: make check-all
 
     - name: "Run SonarCloud Scan"
       uses: SonarSource/sonarqube-scan-action@master
@@ -40,4 +40,4 @@ jobs:
 
     - name: "Stop containers"
       if: always()
-      run: docker compose down
+      run: make down
