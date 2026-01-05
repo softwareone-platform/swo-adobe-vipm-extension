@@ -1,4 +1,4 @@
-.PHONY: bash build check check-all down format run shell test help
+.PHONY: bash build check check-all down format review run shell test help
 
 DC = docker compose -f compose.yaml
 
@@ -10,6 +10,7 @@ help:
 	@echo "  make check-all        - Run check, format and tests."
 	@echo "  make down             - Stop and remove containers."
 	@echo "  make format           - Format code."
+	@echo "  make review           - Check the code in the cli by running CodeRabbit."
 	@echo "  make run              - Run service."
 	@echo "  make shell            - Open Django shell."
 	@echo "  make test             - Run tests."
