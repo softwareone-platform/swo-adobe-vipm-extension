@@ -1,0 +1,15 @@
+services:
+  app:
+    container_name: adobe_vipm
+    build:
+      context: .
+      target: dev
+      dockerfile: Dockerfile
+    working_dir: /extension
+    command: swoext run --no-color
+    volumes:
+      - .:/extension
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
