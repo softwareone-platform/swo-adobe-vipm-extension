@@ -1850,7 +1850,7 @@ dev = [
     { name = "ruff", specifier = "==0.14.10" },
     { name = "types-openpyxl", specifier = "==3.1.*" },
     { name = "types-requests", specifier = "==2.32.*" },
-    { name = "wemake-python-styleguide", specifier = "==1.4.*" },
+    { name = "wemake-python-styleguide", specifier = "==1.5.*" },
 ]
 runtime = [
     { name = "azure-monitor-opentelemetry-exporter", specifier = "==1.0.0b25" },
@@ -1982,16 +1982,16 @@ wheels = [
 
 [[package]]
 name = "wemake-python-styleguide"
-version = "1.4.0"
+version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "flake8" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/08/c0776aa654dc43cb390e8ee13f597e7241495f30b454b7534ee482ece5b5/wemake_python_styleguide-1.4.0.tar.gz", hash = "sha256:0964cf40ac4d3f1c89dd79aee4b6edba9a1806fb395836c73e746fe287dbae3e", size = 153955, upload-time = "2025-08-25T10:15:08.56Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/06/a0968903b6d41de7c41b8d8cc6a31471894365fe0c7b13684a3e6faa956d/wemake_python_styleguide-1.5.0.tar.gz", hash = "sha256:a764b30bd298ecd3ca9d5cd64b7776dec9a529d728291e8b8076a56649d6cce1", size = 156819, upload-time = "2025-12-22T19:39:10.812Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/58/98c4aa00e3de8e45726029799d8facbdcd75347b2f48b285857577e8efd8/wemake_python_styleguide-1.4.0-py3-none-any.whl", hash = "sha256:c0727475a20a1b7d59f1d806040e84768bdb0935d1147023453aa44c14b65c95", size = 215985, upload-time = "2025-08-25T10:15:06.713Z" },
+    { url = "https://files.pythonhosted.org/packages/15/2a/9e303a946df30335695b60c0f75dc49a5f339cf4a101772522c88d4133f7/wemake_python_styleguide-1.5.0-py3-none-any.whl", hash = "sha256:0743a8d1a748e3b84cad5804de4e6211641cd77e5ea0e4aaeec1993765e7f6c0", size = 219957, upload-time = "2025-12-22T19:39:09.076Z" },
 ]
 
 [[package]]

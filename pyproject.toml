@@ -45,7 +45,7 @@ dev = [
     "ruff==0.14.10", # force ruff version to have same formatting everywhere, also update in pre-commit config
     "types-openpyxl==3.1.*",
     "types-requests==2.32.*",
-    "wemake-python-styleguide==1.4.*", # also update pre-commit config
+    "wemake-python-styleguide==1.5.*", # also update pre-commit config
 ]
 runtime = [
     "azure-monitor-opentelemetry-exporter==1.0.0b25",
