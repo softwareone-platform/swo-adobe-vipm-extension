@@ -1981,7 +1981,7 @@ def test_add_missing_subscriptions_none(
         adobe_subscription_factory(
             subscription_id="55feb5038045e0b1ebf026e7522e17NA",
             offer_id="65304578CA01A12",
-            status=AdobeStatus.SUBSCRIPTION_TERMINATED,
+            status=AdobeStatus.SUBSCRIPTION_TERMINATED.value,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -2016,7 +2016,7 @@ def test_add_missing_subscriptions_without_vendor_id(
         adobe_subscription_factory(
             subscription_id="55feb5038045e0b1ebf026e7522e17NA",
             offer_id="65304578CA01A12",
-            status=AdobeStatus.SUBSCRIPTION_TERMINATED,
+            status=AdobeStatus.SUBSCRIPTION_TERMINATED.value,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -2488,6 +2488,103 @@ def test_process_orphaned_deployment_subscriptions_error(
         "Error disabling auto-renewal for orphaned Adobe subscription specific_subscription_id.",
         "Boom!",
     )
+
+
+@pytest.mark.parametrize(
+    "subscription_status",
+    [AdobeStatus.SUBSCRIPTION_INACTIVE.value, AdobeStatus.PENDING.value],
+)
+def test_process_orphaned_deployment_subscriptions_skip_on_status(
+    subscription_status,
+    mock_adobe_client,
+    agreement_factory,
+    mock_add_missing_subscriptions_and_assets,
+    mock_get_agreements_by_customer_deployments,
+    fulfillment_parameters_factory,
+    mock_get_prices_for_skus,
+    mock_check_update_airtable_missing_deployments,
+    mocked_agreement_syncer,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    caplog,
+):
+    """Test that orphaned subscriptions with SUBSCRIPTION_INACTIVE or PENDING status are skipped."""
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    deployment_agreement = agreement_factory(
+        assets=[],
+        status=AgreementStatus.ACTIVE.value,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id="deployment_id"
+        ),
+    )
+    mock_get_agreements_by_customer_deployments.return_value = [deployment_agreement]
+    mocked_agreement_syncer._adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="inactive_subscription_id",
+            deployment_id="deployment-id",
+            autorenewal_enabled=True,
+            status=subscription_status,
+        ),
+    ]
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
+
+    with caplog.at_level(logging.INFO):
+        mocked_agreement_syncer.sync(sync_prices=True)  # act
+
+    mock_adobe_client.update_subscription.assert_not_called()
+    assert "Skipping orphaned subscription inactive_subscription_id" in caplog.text
+
+
+def test_process_orphaned_deployment_subscriptions_skip_autorenewal_false_with_logging(
+    mock_adobe_client,
+    agreement_factory,
+    mock_get_agreements_by_customer_deployments,
+    fulfillment_parameters_factory,
+    mock_get_prices_for_skus,
+    mock_check_update_airtable_missing_deployments,
+    mocked_agreement_syncer,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    caplog,
+):
+    """Test that orphaned subscriptions with auto-renewal disabled are skipped and logged."""
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    deployment_agreement = agreement_factory(
+        assets=[],
+        status=AgreementStatus.ACTIVE.value,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id="deployment_id"
+        ),
+    )
+    mock_get_agreements_by_customer_deployments.return_value = [deployment_agreement]
+    mocked_agreement_syncer._adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="no_autorenewal_subscription_id",
+            deployment_id="deployment-id",
+            autorenewal_enabled=False,
+            status=AdobeStatus.PROCESSED.value,
+        ),
+    ]
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
+
+    with caplog.at_level(logging.INFO):
+        mocked_agreement_syncer.sync(sync_prices=True)  # act
+
+    mock_adobe_client.update_subscription.assert_not_called()
+    assert "Skipping orphaned subscription no_autorenewal_subscription_id" in caplog.text
+    assert "(auto-renewal: False, status: 1000)" in caplog.text
 
 
 def test_sync_agreement_without_subscriptions(
@@ -3048,7 +3145,7 @@ def test_get_customer_or_process_lost_customer_error(
     adobe_customer_factory,
 ):
     mock_adobe_client.get_customer.side_effect = [
-        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER, "message": "Test error"})
+        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER.value, "message": "Test error"})
     ]
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
@@ -3084,13 +3181,13 @@ def test_get_customer_or_process_lost_customer_deployment_error(
     adobe_customer_factory,
 ):
     mock_adobe_client.get_customer.side_effect = [
-        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER, "message": "Test error"})
+        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER.value, "message": "Test error"})
     ]
     mock_adobe_client.get_customer_deployments_active_status.side_effect = [
         AdobeAPIError(
             500,
             {
-                "code": AdobeStatus.INACTIVE_OR_GENERIC_FAILURE,
+                "code": AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value,
                 "message": "Inactive or generic failure",
             },
         )
@@ -3116,7 +3213,7 @@ def test_get_customer_or_process_lost_customer_dry_run(
     adobe_customer_factory,
 ):
     mock_adobe_client.get_customer.side_effect = [
-        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER, "message": "Test error"})
+        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER.value, "message": "Test error"})
     ]
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
