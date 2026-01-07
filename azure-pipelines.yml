@@ -44,6 +44,7 @@ stages:
               repository: $(appName)
               sourceBuild: $(buildVersion)
               Dockerfile: Dockerfile
+              dockerArgs: --target prod
               skipImagePush: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
 
       - job: BuildHelmChart
