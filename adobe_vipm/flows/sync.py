@@ -1284,7 +1284,16 @@ def _process_orphaned_deployment_subscriptions(
     for subscription in filter(
         partial(_is_subscription_in_set, orphaned_subscription_ids), adobe_subscriptions
     ):
-        if subscription["autoRenewal"]["enabled"] is False:
+        if subscription["autoRenewal"]["enabled"] is False or subscription["status"] in {
+            AdobeStatus.SUBSCRIPTION_INACTIVE.value,
+            AdobeStatus.PENDING.value,
+        }:
+            logger.info(
+                "> Skipping orphaned subscription %s (auto-renewal: %s, status: %s)",
+                subscription["subscriptionId"],
+                subscription["autoRenewal"]["enabled"],
+                subscription["status"],
+            )
             continue
         logger.warning("> Disabling auto-renewal for orphaned subscription %s", subscription)
         try:

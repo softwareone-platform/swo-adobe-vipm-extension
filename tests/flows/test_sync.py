@@ -861,7 +861,9 @@ def test_sync_agreements_by_3yc_enroll_status_status_error(
         autospec=True,
     )
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
-        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.EXPIRED)
+        commitment=adobe_commitment_factory(
+            status=constants.ThreeYearCommitmentStatus.EXPIRED.value
+        )
     )
     mock_sync_agreement = mocker.patch("adobe_vipm.flows.sync.sync_agreement", autospec=True)
     mock_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement", autospec=True)
@@ -890,7 +892,9 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync(
         autospec=True,
     )
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
-        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED)
+        commitment=adobe_commitment_factory(
+            status=constants.ThreeYearCommitmentStatus.COMMITTED.value
+        )
     )
     mock_sync_agreement = mocker.patch(
         "adobe_vipm.flows.sync.sync_agreement",
@@ -930,7 +934,9 @@ def test_sync_agreements_by_3yc_enroll_status_error_sync_unkn(
         autospec=True,
     )
     mock_adobe_client.get_customer.return_value = adobe_customer_factory(
-        commitment=adobe_commitment_factory(status=constants.ThreeYearCommitmentStatus.COMMITTED)
+        commitment=adobe_commitment_factory(
+            status=constants.ThreeYearCommitmentStatus.COMMITTED.value
+        )
     )
     mock_sync_agreement = mocker.patch(
         "adobe_vipm.flows.sync.sync_agreement",
@@ -1178,7 +1184,7 @@ def test_sync_global_customer_parameter(
         ),
         agreement_factory(
             agreement_id="AGR-deployment-2",
-            status=AgreementStatus.TERMINATED,
+            status=AgreementStatus.TERMINATED.value,
             fulfillment_parameters=fulfillment_parameters_factory(
                 global_customer="", deployment_id="deployment-2", deployments=""
             ),
@@ -1502,8 +1508,8 @@ def test_sync_global_customer_parameter_not_prices(
 @pytest.mark.parametrize(
     ("agreement_status"),
     [
-        AgreementStatus.TERMINATED,
-        AgreementStatus.ACTIVE,
+        AgreementStatus.TERMINATED.value,
+        AgreementStatus.ACTIVE.value,
     ],
 )
 def test_process_orphaned_deployment_subscriptions_status(
@@ -2185,7 +2191,7 @@ def test_sync_global_customer(
         ),
         agreement_factory(
             agreement_id="AGR-deployment-2",
-            status=AgreementStatus.TERMINATED,
+            status=AgreementStatus.TERMINATED.value,
             fulfillment_parameters=fulfillment_parameters_factory(
                 global_customer="", deployment_id="deployment-2", deployments=""
             ),
@@ -2277,7 +2283,7 @@ def test_sync_global_customer_dry(
         ),
         agreement_factory(
             agreement_id="AGR-deployment-2",
-            status=AgreementStatus.TERMINATED,
+            status=AgreementStatus.TERMINATED.value,
             fulfillment_parameters=fulfillment_parameters_factory(
                 global_customer="", deployment_id="deployment-2", deployments=""
             ),
@@ -2822,7 +2828,7 @@ def test_sync_agreement_lost_customer_error(
 
 @pytest.mark.parametrize(
     "status",
-    (s.value for s in AgreementStatus if s is not AgreementStatus.ACTIVE),
+    (s.value for s in AgreementStatus if s is not AgreementStatus.ACTIVE.value),
 )
 def test_sync_agreement_skips_inactive_agreement(
     mock_mpt_client, mock_get_adobe_client, mock_update_last_sync_date, status
@@ -2952,7 +2958,7 @@ def test_add_missing_subscriptions_none(
         adobe_subscription_factory(
             subscription_id="55feb5038045e0b1ebf026e7522e17NA",
             offer_id="65304578CA01A12",
-            status=AdobeStatus.SUBSCRIPTION_TERMINATED,
+            status=AdobeStatus.SUBSCRIPTION_TERMINATED.value,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -2988,9 +2994,9 @@ def test_add_missing_subscriptions_without_vendor_id(
     adobe_subscriptions = [
         adobe_subscription_factory(subscription_id="a-sub-id", offer_id="65327701CA01A12"),
         adobe_subscription_factory(
-            subscription_id = "55feb5038045e0b1ebf026e7522e17NA",
-            offer_id = "65304578CA01A12",
-            status = AdobeStatus.SUBSCRIPTION_TERMINATED,
+            subscription_id="55feb5038045e0b1ebf026e7522e17NA",
+            offer_id="65304578CA01A12",
+            status=AdobeStatus.SUBSCRIPTION_TERMINATED.value,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -3688,3 +3694,102 @@ def test_not_syncing_unknown_products(
 
     mock_get_customer_or_process_lost_customer.assert_not_called()
     assert caplog.messages == ["Product NOT_CONFIGURED_PRODUCT not in MPT_PRODUCTS_IDS. Skipping."]
+
+
+@pytest.mark.parametrize(
+    "subscription_status",
+    [AdobeStatus.SUBSCRIPTION_INACTIVE.value, AdobeStatus.PENDING.value],
+)
+def test_process_orphaned_deployment_subscriptions_skip_on_status(
+    subscription_status,
+    mock_adobe_client,
+    agreement_factory,
+    mock_add_missing_subscriptions_and_assets,
+    mock_get_agreements_by_customer_deployments,
+    fulfillment_parameters_factory,
+    mock_get_prices_for_skus,
+    mock_check_update_airtable_missing_deployments,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    caplog,
+    mock_mpt_client,
+):
+    """Test that orphaned subscriptions with SUBSCRIPTION_INACTIVE or PENDING status are skipped."""
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    deployment_agreement = agreement_factory(
+        assets=[],
+        status=AgreementStatus.ACTIVE.value,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id="deployment_id"
+        ),
+    )
+    mock_get_agreements_by_customer_deployments.return_value = [deployment_agreement]
+    mock_adobe_client.get_subscriptions.return_value = {"items": [
+        adobe_subscription_factory(
+            subscription_id="inactive_subscription_id",
+            deployment_id="deployment-id",
+            autorenewal_enabled=True,
+            status=subscription_status,
+        ),
+    ]}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(global_sales_enabled=True)
+
+    with caplog.at_level(logging.INFO):
+        sync_agreement(mock_mpt_client, agreement_factory(assets=[]), sync_prices=True,
+                       dry_run=False)  # act
+
+    mock_adobe_client.update_subscription.assert_not_called()
+    assert "Skipping orphaned subscription inactive_subscription_id" in caplog.text
+
+
+def test_process_orphaned_deployment_subscriptions_skip_autorenewal_false_with_logging(
+    mock_adobe_client,
+    agreement_factory,
+    mock_get_agreements_by_customer_deployments,
+    fulfillment_parameters_factory,
+    mock_get_prices_for_skus,
+    mock_check_update_airtable_missing_deployments,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    caplog,
+    mock_mpt_client,
+):
+    """Test that orphaned subscriptions with auto-renewal disabled are skipped and logged."""
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {
+            "deploymentId": "deployment-id",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    deployment_agreement = agreement_factory(
+        assets=[],
+        status=AgreementStatus.ACTIVE.value,
+        fulfillment_parameters=fulfillment_parameters_factory(
+            global_customer="yes", deployment_id="deployment_id"
+        ),
+    )
+    mock_get_agreements_by_customer_deployments.return_value = [deployment_agreement]
+    mock_adobe_client.get_subscriptions.return_value = {"items": [
+        adobe_subscription_factory(
+            subscription_id="no_autorenewal_subscription_id",
+            deployment_id="deployment-id",
+            autorenewal_enabled=False,
+            status=AdobeStatus.PROCESSED.value,
+        ),
+    ]}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(global_sales_enabled=True)
+
+    with caplog.at_level(logging.INFO):
+        sync_agreement(mock_mpt_client, agreement_factory(assets=[]), sync_prices=True,
+                       dry_run=False)  # act
+
+    mock_adobe_client.update_subscription.assert_not_called()
+    assert "Skipping orphaned subscription no_autorenewal_subscription_id" in caplog.text
+    assert "(auto-renewal: False, status: 1000)" in caplog.text
