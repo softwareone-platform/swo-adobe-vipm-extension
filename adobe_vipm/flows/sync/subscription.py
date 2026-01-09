@@ -8,6 +8,7 @@ from mpt_extension_sdk.mpt_http.base import MPTClient
 from adobe_vipm.airtable import models
 from adobe_vipm.flows import utils as flows_utils
 from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.sync.helper import manage_missing_prices_skus
 from adobe_vipm.flows.utils import notification
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.utils import get_commitment_start_date
@@ -68,13 +69,19 @@ class SubscriptionSyncer:
             missing_prices_skus = []
             coterm_date = self._adobe_customer["cotermDate"]
             for subscription, adobe_subscription, actual_sku in self._subscriptions_for_update:
-                if actual_sku not in prices:
+                if not manage_missing_prices_skus(
+                    self._agreement,
+                    self._mpt_client,
+                    prices,
+                    missing_prices_skus,
+                    subscription["lines"][0],
+                    actual_sku,
+                ):
                     logger.error(
                         "Skipping subscription %s because the sku %s is not in the prices",
                         subscription["id"],
                         actual_sku,
                     )
-                    missing_prices_skus.append(actual_sku)
                     continue
 
                 self._update_subscription(

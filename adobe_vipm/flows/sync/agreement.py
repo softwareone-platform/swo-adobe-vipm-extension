@@ -29,13 +29,13 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_commitment_request_invitation
 from adobe_vipm.flows.sync.asset import AssetSyncer
-from adobe_vipm.flows.sync.helper import check_adobe_subscription_id
+from adobe_vipm.flows.sync.helper import check_adobe_subscription_id, manage_missing_prices_skus
 from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
 from adobe_vipm.flows.utils import notify_agreement_unhandled_exception_in_teams
 from adobe_vipm.flows.utils.market_segment import get_market_segment
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.notifications import send_exception, send_warning
-from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
+from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -531,7 +531,19 @@ class AgreementSyncer:  # noqa: WPS214
 
         skus = [item[1] for item in agreement_lines]
         prices = models.get_sku_price(self._adobe_customer, skus, product_id, currency)
+        missing_prices_skus = []
+
         for line, actual_sku in agreement_lines:
+            if not manage_missing_prices_skus(
+                agreement, self._mpt_client, prices, missing_prices_skus, line, actual_sku
+            ):
+                logger.error(
+                    "Skipping line %s because the sku %s is not in the prices",
+                    line["id"],
+                    actual_sku,
+                )
+                continue
+
             current_price = line["price"]["unitPP"]
             line["price"]["unitPP"] = prices[actual_sku]
             logger.info(
@@ -540,6 +552,15 @@ class AgreementSyncer:  # noqa: WPS214
                 actual_sku,
                 current_price,
                 prices[actual_sku],
+            )
+
+        if missing_prices_skus:
+            flows_utils.notify_missing_prices(
+                self.agreement_id,
+                missing_prices_skus,
+                product_id,
+                currency,
+                get_commitment_start_date(self._adobe_customer),
             )
 
     # REFACTOR: get method must not update subscriptions in mpt or terminate a subscription
