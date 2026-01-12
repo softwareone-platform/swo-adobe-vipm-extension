@@ -42,7 +42,7 @@ dev = [
     "pytest-randomly==4.0.*",
     "pytest-xdist==3.8.*",
     "responses==0.25.*",
-    "ruff==0.14.10", # force ruff version to have same formatting everywhere, also update in pre-commit config
+    "ruff==0.14.11", # force ruff version to have same formatting everywhere, also update in pre-commit config
     "types-openpyxl==3.1.*",
     "types-requests==2.32.*",
     "wemake-python-styleguide==1.5.*", # also update pre-commit config
