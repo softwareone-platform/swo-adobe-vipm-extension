@@ -8,15 +8,14 @@ from mpt_extension_sdk.mpt_http.utils import find_first
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from pyairtable.formulas import (
     AND,
-    EQUAL,
-    FIELD,
-    GREATER,
-    LESS_EQUAL,
+    BLANK,
+    EQ,
+    GT,
     LOWER,
-    NOT_EQUAL,
+    LTE,
+    NE,
     OR,
-    STR_VALUE,
-    to_airtable_value,
+    Field,
 )
 from pyairtable.orm import Model, fields
 from requests import HTTPError
@@ -290,7 +289,7 @@ def get_offer_ids_by_membership_id(product_id: str, membership_id: str) -> list[
         list: List of SKUs that belong to the given membership.
     """
     offer_model = get_offer_model(AirTableBaseInfo.for_migrations(product_id))
-    formula = EQUAL(FIELD("membership_id"), STR_VALUE(membership_id))
+    formula = EQ(Field("membership_id"), membership_id)
 
     return [offer.offer_id for offer in offer_model.all(formula=formula)]
 
@@ -320,8 +319,8 @@ def get_transfers_to_process(product_id: str):
     transfer_model = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return transfer_model.all(
         formula=OR(
-            EQUAL(FIELD("status"), STR_VALUE(STATUS_INIT)),
-            EQUAL(FIELD("status"), STR_VALUE(STATUS_RESCHEDULED)),
+            EQ(Field("status"), STATUS_INIT),
+            EQ(Field("status"), STATUS_RESCHEDULED),
         ),
     )
 
@@ -338,7 +337,7 @@ def get_transfers_to_check(product_id: str):
     """
     transfer_model = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     return transfer_model.all(
-        formula=EQUAL(FIELD("status"), STR_VALUE(STATUS_RUNNING)),
+        formula=EQ(Field("status"), STATUS_RUNNING),
     )
 
 
@@ -361,15 +360,15 @@ def get_transfer_by_authorization_membership_or_customer(
     transfer_model = get_transfer_model(AirTableBaseInfo.for_migrations(product_id))
     transfers = transfer_model.all(
         formula=AND(
-            EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
+            EQ(Field("authorization_uk"), authorization_uk),
             OR(
-                EQUAL(
-                    LOWER(FIELD("membership_id")),
-                    LOWER(STR_VALUE(membership_or_customer_id)),
+                EQ(
+                    LOWER(Field("membership_id")),
+                    LOWER(membership_or_customer_id),
                 ),
-                EQUAL(FIELD("customer_id"), STR_VALUE(membership_or_customer_id)),
+                EQ(Field("customer_id"), membership_or_customer_id),
             ),
-            NOT_EQUAL(FIELD("status"), STR_VALUE(STATUS_DUPLICATED)),
+            NE(Field("status"), STATUS_DUPLICATED),
         ),
     )
 
@@ -387,9 +386,9 @@ def get_transfer_link(transfer) -> str:
         str: The link to the transfer record or None in case of an error.
     """
     try:
-        base_id = transfer.Meta.base_id
-        table_id = transfer.get_table().id
-        view_id = transfer.get_table().schema().view("Transfer View").id
+        base_id = transfer.meta.base.id
+        table_id = transfer.meta.table.id
+        view_id = transfer.meta.table.schema().view("Transfer View").id
         record_id = transfer.id
     except HTTPError:
         return None
@@ -441,10 +440,10 @@ def _get_prices_for_skus_from_airtable(
     pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
     return pricelist_model.all(
         formula=AND(
-            EQUAL(FIELD("currency"), to_airtable_value(currency)),
-            EQUAL(FIELD("valid_until"), "BLANK()"),
+            EQ(Field("currency"), currency),
+            EQ(Field("valid_until"), BLANK()),
             OR(
-                *[EQUAL(FIELD(column_name), to_airtable_value(sku)) for sku in skus],
+                *[EQ(Field(column_name), sku) for sku in skus],
             ),
         ),
     )
@@ -464,6 +463,8 @@ def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict
     Returns:
         dict: A dictionary with SKU, purchase price items.
     """
+    if not skus:
+        return {}
     items = _get_prices_for_skus_from_airtable(product_id, currency, skus, "sku")
     return {item.sku: item.unit_pp for item in items}
 
@@ -480,6 +481,8 @@ def get_skus_with_available_prices(product_id: str, currency: str, skus: list[st
     Returns:
         set: A set of SKUs if the price is available.
     """
+    if not skus:
+        return set()
     items = _get_prices_for_skus_from_airtable(product_id, currency, skus, "partial_sku")
     return {item.partial_sku for item in items}
 
@@ -496,6 +499,8 @@ def get_skus_with_available_prices_3yc(
         start_date: The date in which the 3YC started.
         skus: List of SKUs which purchase prices must be retrieved.
     """
+    if not skus:
+        return set()
     items = _get_prices_3yc_for_skus_from_airtable(
         product_id, currency, start_date, skus, "partial_sku"
     )
@@ -508,16 +513,16 @@ def _get_prices_3yc_for_skus_from_airtable(
     pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
     return pricelist_model.all(
         formula=AND(
-            EQUAL(FIELD("currency"), to_airtable_value(currency)),
+            EQ(Field("currency"), currency),
             OR(
-                EQUAL(FIELD("valid_until"), "BLANK()"),
+                EQ(Field("valid_until"), BLANK()),
                 AND(
-                    LESS_EQUAL(FIELD("valid_from"), STR_VALUE(to_airtable_value(start_date))),
-                    GREATER(FIELD("valid_until"), STR_VALUE(to_airtable_value(start_date))),
+                    LTE(Field("valid_from"), start_date),
+                    GT(Field("valid_until"), start_date),
                 ),
             ),
             OR(
-                *[EQUAL(FIELD(column_name), to_airtable_value(sku)) for sku in skus],
+                *[EQ(Field(column_name), sku) for sku in skus],
             ),
         ),
         sort=["-valid_until"],
@@ -662,10 +667,10 @@ def get_gc_main_agreement(product_id: str, authorization_uk: str, membership_or_
     )
     gc_main_agreements = gc_main_agreement_model.all(
         formula=AND(
-            EQUAL(FIELD("authorization_uk"), STR_VALUE(authorization_uk)),
+            EQ(Field("authorization_uk"), authorization_uk),
             OR(
-                EQUAL(FIELD("membership_id"), STR_VALUE(membership_or_customer_id)),
-                EQUAL(FIELD("customer_id"), STR_VALUE(membership_or_customer_id)),
+                EQ(Field("membership_id"), membership_or_customer_id),
+                EQ(Field("customer_id"), membership_or_customer_id),
             ),
         ),
     )
@@ -691,7 +696,7 @@ def get_gc_agreement_deployments_by_main_agreement(product_id: str, main_agreeme
     )
     return gc_agreement_deployment_model.all(
         formula=AND(
-            EQUAL(FIELD("main_agreement_id"), STR_VALUE(main_agreement_id)),
+            EQ(Field("main_agreement_id"), main_agreement_id),
         ),
     )
 
@@ -714,8 +719,8 @@ def get_gc_agreement_deployments_to_check(product_id: str):
     )
     return gc_agreement_deployment_model.all(
         formula=OR(
-            EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_PENDING)),
-            EQUAL(FIELD("status"), STR_VALUE(STATUS_GC_ERROR)),
+            EQ(Field("status"), STATUS_GC_PENDING),
+            EQ(Field("status"), STATUS_GC_ERROR),
         ),
     )
 
@@ -734,11 +739,10 @@ def get_agreement_deployment_view_link(product_id: str) -> str | None:
         gc_agreement_deployment_model = get_gc_agreement_deployment_model(
             AirTableBaseInfo.for_migrations(product_id)
         )
-        base_id = gc_agreement_deployment_model.Meta.base_id
-        table_id = gc_agreement_deployment_model.get_table().id
+        base_id = gc_agreement_deployment_model.meta.base.id
+        table_id = gc_agreement_deployment_model.meta.table.id
         view_id = (
-            gc_agreement_deployment_model
-            .get_table()
+            gc_agreement_deployment_model.meta.table
             .schema()
             .view(
                 "Agreement Deployments View",
@@ -787,14 +791,11 @@ def get_sku_adobe_mapping_model(base_info: AirTableBaseInfo):
             Returns:
                 AdobeProductMapping: entity of the AdobeProductMapping.
             """
-            entity = cls.first(
-                formula=EQUAL(FIELD("vendor_external_id"), STR_VALUE(vendor_external_id))
-            )
+            entity = cls.first(formula=EQ(Field("vendor_external_id"), vendor_external_id))
             if entity is None:
                 raise AdobeProductNotFoundError(
                     f"AdobeProduct with vendor_external_id `{vendor_external_id}` not found."
                 )
-
             return entity
 
         def is_consumable(self) -> bool:

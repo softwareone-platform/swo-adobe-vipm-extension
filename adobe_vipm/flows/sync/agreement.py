@@ -30,6 +30,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.mpt import get_agreements_by_3yc_commitment_request_invitation
 from adobe_vipm.flows.sync.asset import AssetSyncer
 from adobe_vipm.flows.sync.helper import check_adobe_subscription_id
+from adobe_vipm.flows.sync.price_manager import PriceManager
 from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
 from adobe_vipm.flows.utils import notify_agreement_unhandled_exception_in_teams
 from adobe_vipm.flows.utils.market_segment import get_market_segment
@@ -520,18 +521,21 @@ class AgreementSyncer:  # noqa: WPS214
     def _update_agreement_line_prices(
         self, agreement: dict, currency: str, product_id: str
     ) -> None:
-        agreement_lines = []
-        for line in agreement["lines"]:
-            if line["item"]["externalIds"]["vendor"] != "adobe-reseller-transfer":
-                actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
-                agreement_lines.append((
-                    line,
-                    flows_utils.get_sku_with_discount_level(actual_sku, self._adobe_customer),
-                ))
+        agreement_lines = self._get_processable_agreement_lines(agreement)
+        price_manager = PriceManager(
+            self._mpt_client,
+            self._adobe_customer,
+            agreement_lines,
+            self.agreement_id,
+            self._agreement["listing"]["priceList"]["id"],
+        )
+        skus = [sku for _, sku in agreement_lines]
+        prices = price_manager.get_sku_prices_for_agreement_lines(skus, product_id, currency)
 
-        skus = [item[1] for item in agreement_lines]
-        prices = models.get_sku_price(self._adobe_customer, skus, product_id, currency)
         for line, actual_sku in agreement_lines:
+            if actual_sku not in prices:
+                continue
+
             current_price = line["price"]["unitPP"]
             line["price"]["unitPP"] = prices[actual_sku]
             logger.info(
@@ -541,6 +545,14 @@ class AgreementSyncer:  # noqa: WPS214
                 current_price,
                 prices[actual_sku],
             )
+
+    def _get_processable_agreement_lines(self, agreement: dict) -> list[tuple[dict, str]]:
+        agreement_lines = []
+        for line in agreement["lines"]:
+            if line["item"]["externalIds"]["vendor"] != "adobe-reseller-transfer":
+                actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
+                agreement_lines.append((line, actual_sku))
+        return agreement_lines
 
     # REFACTOR: get method must not update subscriptions in mpt or terminate a subscription
     def _get_subscriptions_for_update(self, agreement: dict) -> list[tuple[dict, dict, str]]:  # noqa: C901
