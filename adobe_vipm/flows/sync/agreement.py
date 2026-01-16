@@ -22,6 +22,7 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
+    TRANSFER_RESELLER_ITEM_SKU,
     AgreementStatus,
     ItemTermsModel,
     Param,
@@ -522,7 +523,7 @@ class AgreementSyncer:  # noqa: WPS214
     ) -> None:
         agreement_lines = []
         for line in agreement["lines"]:
-            if line["item"]["externalIds"]["vendor"] != "adobe-reseller-transfer":
+            if line["item"]["externalIds"]["vendor"] != TRANSFER_RESELLER_ITEM_SKU:
                 actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
                 agreement_lines.append((
                     line,
