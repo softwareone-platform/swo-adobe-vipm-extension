@@ -13,7 +13,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.flows.errors import ValidationError
 
-TRANSFER_RESELLER_PRODUCT_ID = "adobe-reseller-transfer"
+TRANSFER_RESELLER_ITEM_SKU = "adobe-reseller-transfer"
 
 
 class OrderType(StrEnum):
