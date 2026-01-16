@@ -285,7 +285,7 @@ def _fulfill_transfer_migrated(  # noqa: C901
     if not adobe_items:
         error = "No subscriptions found without deployment ID to be added to the main agreement"
         logger.error(error)
-        sync_main_agreement(
+        sync_airtable_main_agreement(
             gc_main_agreement,
             order["agreement"]["product"]["id"],
             authorization_id,
@@ -332,7 +332,7 @@ def _fulfill_transfer_migrated(  # noqa: C901
     transfer.mpt_order_id = order["id"]
     transfer.synchronized_at = dt.datetime.now(tz=dt.UTC)
     transfer.save()
-    sync_main_agreement(
+    sync_airtable_main_agreement(
         gc_main_agreement,
         order["agreement"]["product"]["id"],
         authorization_id,
@@ -424,7 +424,7 @@ class SyncGCMainAgreement(Step):
 
     def __call__(self, client, context, next_step):
         """Sync global customer main agreement."""
-        sync_main_agreement(
+        sync_airtable_main_agreement(
             self.gc_main_agreement,
             context.order["agreement"]["product"]["id"],
             context.order["authorization"]["id"],
@@ -920,7 +920,9 @@ def create_agreement_subscriptions(adobe_transfer_order, mpt_client, order, adob
     return subscriptions
 
 
-def sync_main_agreement(gc_main_agreement, product_id, authorization_id, customer_id, error=""):
+def sync_airtable_main_agreement(
+    gc_main_agreement, product_id, authorization_id, customer_id, error=""
+):
     """
     Synchronizes the main agreement status in Airtable.
 
@@ -1387,7 +1389,7 @@ class CompleteTransferOrder(Step):
             dry_run=False,
             sync_prices=False,
         )
-        sync_main_agreement(
+        sync_airtable_main_agreement(
             context.gc_main_agreement,
             context.product_id,
             context.authorization_id,
