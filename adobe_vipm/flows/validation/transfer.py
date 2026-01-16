@@ -30,6 +30,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
     ERR_UPDATING_TRANSFER_ITEMS,
+    TRANSFER_RESELLER_ITEM_SKU,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -532,7 +533,7 @@ class AddResellerChangeLinesToOrder(Step):
     def __call__(self, mpt_client, context, next_step):
         """Add lines from reseller change back to the MPT order."""
         reseller_change_item = get_product_items_by_skus(
-            mpt_client, context.order["agreement"]["product"]["id"], ["adobe-reseller-transfer"]
+            mpt_client, context.order["agreement"]["product"]["id"], [TRANSFER_RESELLER_ITEM_SKU]
         )
 
         if not reseller_change_item:
