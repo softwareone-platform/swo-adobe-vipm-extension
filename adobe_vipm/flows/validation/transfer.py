@@ -25,8 +25,6 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_ID_ITEM,
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_MEMBERSHIP_PROCESSING,
-    ERR_ADOBE_RESSELLER_CHANGE_LINES,
-    ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
     ERR_UPDATING_TRANSFER_ITEMS,
@@ -519,48 +517,28 @@ def validate_reseller_change(mpt_client, order):
         SetupTransferContext(),
         FetchResellerChangeData(is_validation=True),
         ValidateResellerChange(is_validation=True),
-        AddResellerChangeLinesToOrder(),
+        AddResellerLinesToOrder(),
     )
     context = Context(order=order)
     pipeline.run(mpt_client, context)
     return not context.validation_succeeded, context.order
 
 
-class AddResellerChangeLinesToOrder(Step):
+class AddResellerLinesToOrder(Step):
     """Add lines from reseller change back to the MPT order."""
 
     def __call__(self, mpt_client, context, next_step):
         """Add lines from reseller change back to the MPT order."""
-        reseller_change_item = get_product_items_by_skus(
-            mpt_client, context.order["agreement"]["product"]["id"], ["adobe-reseller-transfer"]
+        reseller_items = get_product_items_by_skus(
+            mpt_client,
+            context.order["agreement"]["product"]["id"],
+            [
+                get_partial_sku(item["offerId"])
+                for item in context.adobe_transfer["lineItems"]
+                if not item.get("deploymentId", "")
+            ],
         )
-
-        if not reseller_change_item:
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED.to_dict()
-            )
-            context.validation_succeeded = False
-            return
-
-        reseller_change_item = reseller_change_item[0]
+        context.order["lines"] = reseller_items
         context.validation_succeeded = True
 
-        lines = context.order["lines"]
-        if lines:
-            if len(lines) == 1 and lines[0]["item"]["id"] == reseller_change_item["id"]:
-                next_step(mpt_client, context)
-                return
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_RESSELLER_CHANGE_LINES.to_dict()
-            )
-            context.validation_succeeded = False
-        new_line = [
-            {
-                "item": reseller_change_item,
-                "quantity": 1,
-                "oldQuantity": 0,
-                "price": {"unitPP": 0},
-            }
-        ]
-        context.order["lines"] = new_line
         next_step(mpt_client, context)

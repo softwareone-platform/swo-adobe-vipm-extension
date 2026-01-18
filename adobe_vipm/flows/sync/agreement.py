@@ -521,14 +521,6 @@ class AgreementSyncer:  # noqa: WPS214
         self, agreement: dict, currency: str, product_id: str
     ) -> None:
         agreement_lines = []
-        for line in agreement["lines"]:
-            if line["item"]["externalIds"]["vendor"] != "adobe-reseller-transfer":
-                actual_sku = models.get_adobe_sku(line["item"]["externalIds"]["vendor"])
-                agreement_lines.append((
-                    line,
-                    flows_utils.get_sku_with_discount_level(actual_sku, self._adobe_customer),
-                ))
-
         skus = [item[1] for item in agreement_lines]
         prices = models.get_sku_price(self._adobe_customer, skus, product_id, currency)
         for line, actual_sku in agreement_lines:
