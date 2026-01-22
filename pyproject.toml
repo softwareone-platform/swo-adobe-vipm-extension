@@ -47,23 +47,6 @@ dev = [
     "types-requests==2.32.*",
     "wemake-python-styleguide==1.5.*", # also update pre-commit config
 ]
-runtime = [
-    "azure-monitor-opentelemetry-exporter==1.0.0b25",
-    "debugpy==1.8.*",
-    "gunicorn==23.0.*",
-    "opentelemetry-api==1.30.*",
-    "opentelemetry-instrumentation-django==0.51b0",
-    "opentelemetry-instrumentation-logging==0.51b0",
-    "opentelemetry-instrumentation-requests==0.51b0",
-    "opentelemetry-sdk==1.30.*",
-    "watchfiles==0.21.*",
-]
-
-[tool.uv]
-default-groups = [
-    "dev",
-    "runtime",
-]
 
 [tool.hatch.build.targets.sdist]
 include = ["adobe_vipm"]
