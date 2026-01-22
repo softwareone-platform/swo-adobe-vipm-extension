@@ -9,11 +9,11 @@ license = {text = "Apache-2.0 license"}
 dependencies = [
     "django==4.2.*",
     "jinja2==3.1.*",
-    "markdown-it-py==3.0.*",
+    "markdown-it-py==4.0.*",
     "mpt-extension-sdk==5.17.*",
     "openpyxl==3.1.*",
     "phonenumbers==9.0.*",
-    "pyairtable==2.3.*",
+    "pyairtable==3.3.*",
     "pymsteams==0.2.*",
     "python-dateutil==2.9.*",
     "regex==2026.*",
