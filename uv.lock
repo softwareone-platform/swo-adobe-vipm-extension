@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <4"
 
 [[package]]
@@ -1251,7 +1251,7 @@ wheels = [
 
 [[package]]
 name = "pyairtable"
-version = "2.3.7"
+version = "3.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "inflection" },
@@ -1260,9 +1260,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/82/56/1fa79af9ce4e5ff59db63f286a2c5436dfca01891f9d0ff474d96a920a1f/pyairtable-2.3.7.tar.gz", hash = "sha256:2afd6f095bce99f1114c36bf729e80ced3d3f4235325db0d32f53a87078ba04b", size = 97752, upload-time = "2024-12-06T19:34:55.003Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/1d/8a572580e02297cef7ae01053a8b550b7759ea80326cd3231df87b00555b/pyairtable-3.3.0.tar.gz", hash = "sha256:d6d3b77f6feb7a02a84779c2235d37a46605f36030cf20ed99b08bab73108a8c", size = 150168, upload-time = "2025-11-05T20:11:41.435Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/65/e2d11fe11e2e4a85ebe70f467ba95a6d9b4f539cdc8c2ee609e1468ff559/pyairtable-2.3.7-py2.py3-none-any.whl", hash = "sha256:cd1651355774c1212e618f3407b3b3bf51640438f5db22f436f689898011d71c", size = 68896, upload-time = "2024-12-06T19:34:52.937Z" },
+    { url = "https://files.pythonhosted.org/packages/13/7b/bebb0ebb86353b63740869ed10ac1fef1636ccc6042beb1d8d3956cad02d/pyairtable-3.3.0-py2.py3-none-any.whl", hash = "sha256:38af09c18659918b96539ac4d9730c9656f6ce2088cdff692dd311fa16802acf", size = 101513, upload-time = "2025-11-05T20:11:40.137Z" },
 ]
 
 [[package]]
@@ -1823,7 +1823,7 @@ requires-dist = [
     { name = "mpt-extension-sdk", specifier = "==5.17.*" },
     { name = "openpyxl", specifier = "==3.1.*" },
     { name = "phonenumbers", specifier = "==9.0.*" },
-    { name = "pyairtable", specifier = "==2.3.*" },
+    { name = "pyairtable", specifier = "==3.3.*" },
     { name = "pymsteams", specifier = "==0.2.*" },
     { name = "python-dateutil", specifier = "==2.9.*" },
     { name = "regex", specifier = "==2026.*" },

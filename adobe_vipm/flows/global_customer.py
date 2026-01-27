@@ -642,6 +642,7 @@ def process_agreement_deployment(  # noqa: C901
             listing,
             licensee,
         )
+
         if not gc_agreement_id:
             return
 

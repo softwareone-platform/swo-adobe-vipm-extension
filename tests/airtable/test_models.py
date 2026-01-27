@@ -2,6 +2,17 @@ import datetime as dt
 from collections import defaultdict
 
 import pytest
+from pyairtable.formulas import (
+    AND,
+    BLANK,
+    EQ,
+    GT,
+    LOWER,
+    LTE,
+    NE,
+    OR,
+    Field,
+)
 from requests import HTTPError
 
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
@@ -52,8 +63,8 @@ def test_get_transfer_model():
 
     result = get_transfer_model(base_info)
 
-    assert result.get_api().api_key == base_info.api_key
-    assert result.get_base().id == base_info.base_id
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
 
 
 def test_get_offer_model():
@@ -61,8 +72,8 @@ def test_get_offer_model():
 
     result = get_offer_model(base_info)
 
-    assert result.get_api().api_key == base_info.api_key
-    assert result.get_base().id == base_info.base_id
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
 
 
 def test_get_offer_ids_by_membership_id(mocker, settings):
@@ -81,7 +92,7 @@ def test_get_offer_ids_by_membership_id(mocker, settings):
     result = get_offer_ids_by_membership_id("product_id", "member_id")
 
     assert result == ["offer-id"]
-    mocked_offer_model.all.assert_called_once_with(formula="{membership_id}='member_id'")
+    mocked_offer_model.all.assert_called_once_with(formula=EQ(Field("membership_id"), "member_id"))
 
 
 def test_create_offers(mocker, settings):
@@ -133,7 +144,7 @@ def test_get_transfers_to_process(mocker, settings):
 
     assert result == [mocked_transfer]
     mocked_transfer_model.all.assert_called_once_with(
-        formula="OR({status}='init',{status}='rescheduled')",
+        formula=OR(EQ(Field("status"), "init"), EQ(Field("status"), "rescheduled")),
     )
 
 
@@ -152,7 +163,7 @@ def test_get_transfers_to_check(mocker, settings):
     result = get_transfers_to_check("product_id")
 
     assert result == [mocked_transfer]
-    mocked_transfer_model.all.assert_called_once_with(formula="{status}='running'")
+    mocked_transfer_model.all.assert_called_once_with(formula=EQ(Field("status"), "running"))
 
 
 def test_get_transfer_by_authorization_membership_or_customer(mocker, settings):
@@ -173,10 +184,13 @@ def test_get_transfer_by_authorization_membership_or_customer(mocker, settings):
 
     assert result == mocked_transfer
     mocked_transfer_model.all.assert_called_once_with(
-        formula=(
-            "AND({authorization_uk}='authorization_uk',"
-            "OR(LOWER({membership_id})=LOWER('membership_id'),{customer_id}='membership_id'),"
-            "{status}!='duplicated')"
+        formula=AND(
+            EQ(Field("authorization_uk"), "authorization_uk"),
+            OR(
+                EQ(LOWER(Field("membership_id")), LOWER("membership_id")),
+                EQ(Field("customer_id"), "membership_id"),
+            ),
+            NE(Field("status"), "duplicated"),
         ),
     )
 
@@ -184,15 +198,9 @@ def test_get_transfer_by_authorization_membership_or_customer(mocker, settings):
 def test_get_transfer_link(mocker):
     transfer = mocker.MagicMock()
     transfer.id = "record-id"
-    transfer.Meta.base_id = "base-id"
-    view_mock = mocker.MagicMock()
-    view_mock.id = "view-id"
-    schema_mock = mocker.MagicMock()
-    schema_mock.view.return_value = view_mock
-    table_mock = mocker.MagicMock()
-    table_mock.id = "table-id"
-    table_mock.schema.return_value = schema_mock
-    transfer.get_table.return_value = table_mock
+    transfer.meta.base.id = "base-id"
+    transfer.meta.table.id = "table-id"
+    transfer.meta.table.schema().view().id = "view-id"
 
     result = get_transfer_link(transfer)
 
@@ -201,7 +209,7 @@ def test_get_transfer_link(mocker):
 
 def test_get_transfer_link_exception(mocker):
     transfer = mocker.MagicMock()
-    transfer.get_table.side_effect = HTTPError()
+    transfer.meta.table.schema.side_effect = HTTPError()
 
     result = get_transfer_link(transfer)
 
@@ -227,8 +235,8 @@ def test_get_pricelist_model():
 
     result = get_pricelist_model(base_info)
 
-    assert result.get_api().api_key == base_info.api_key
-    assert result.get_base().id == base_info.base_id
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
 
 
 def test_get_prices_for_skus(mocker, settings):
@@ -253,10 +261,35 @@ def test_get_prices_for_skus(mocker, settings):
 
     assert result == {"sku-1": 12.44, "sku-2": 31.23}
     mocked_pricelist_model.all.assert_called_once_with(
-        formula=(
-            "AND({currency}='currency',{valid_until}=BLANK(),OR({sku}='sku-1',{sku}='sku-2'))"
+        formula=AND(
+            EQ(Field("currency"), "currency"),
+            EQ(Field("valid_until"), BLANK()),
+            OR(EQ(Field("sku"), "sku-1"), EQ(Field("sku"), "sku-2")),
         ),
     )
+
+
+def test_get_prices_for_skus_empty(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    price_item_1 = mocker.MagicMock()
+    price_item_1.sku = "sku-1"
+    price_item_1.unit_pp = 12.44
+    price_item_2 = mocker.MagicMock()
+    price_item_2.sku = "sku-2"
+    price_item_2.unit_pp = 31.23
+    mocked_pricelist_model.all.return_value = [price_item_1, price_item_2]
+
+    result = get_prices_for_skus("product_id", "currency", [])
+
+    assert result == {}
 
 
 def test_get_skus_with_available_prices(mocker, settings):
@@ -278,10 +311,32 @@ def test_get_skus_with_available_prices(mocker, settings):
 
     assert result == {"sku-1", "sku-2"}
     mocked_pricelist_model.all.assert_called_once_with(
-        formula=(
-            "AND({currency}='currency',{valid_until}=BLANK(),OR({partial_sku}='sku-1',{partial_sku}='sku-2'))"
+        formula=AND(
+            EQ(Field("currency"), "currency"),
+            EQ(Field("valid_until"), BLANK()),
+            OR(EQ(Field("partial_sku"), "sku-1"), EQ(Field("partial_sku"), "sku-2")),
         ),
     )
+
+
+def test_get_skus_with_available_prices_skus_empty(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    mocked_pricelist_model.all.return_value = [
+        mocker.MagicMock(partial_sku="sku-1"),
+        mocker.MagicMock(partial_sku="sku-2"),
+    ]
+
+    result = get_skus_with_available_prices("product_id", "currency", [])
+
+    assert result == set()
 
 
 def test_get_skus_with_available_prices_3yc(mocker, settings):
@@ -305,11 +360,41 @@ def test_get_skus_with_available_prices_3yc(mocker, settings):
 
     assert result == {"sku-1", "sku-2"}
     mocked_pricelist_model.all.assert_called_once_with(
-        formula=(
-            "AND({currency}='currency',OR({valid_until}=BLANK(),AND({valid_from}<='2024-01-01',{valid_until}>'2024-01-01')),OR({partial_sku}='sku-1',{partial_sku}='sku-2'))"
+        formula=AND(
+            EQ(Field("currency"), "currency"),
+            OR(
+                EQ(Field("valid_until"), BLANK()),
+                AND(
+                    LTE(Field("valid_from"), dt.date(2024, 1, 1)),
+                    GT(Field("valid_until"), dt.date(2024, 1, 1)),
+                ),
+            ),
+            OR(EQ(Field("partial_sku"), "sku-1"), EQ(Field("partial_sku"), "sku-2")),
         ),
         sort=["-valid_until"],
     )
+
+
+def test_get_skus_with_available_prices_3yc_skus_empty(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    mocked_pricelist_model.all.return_value = [
+        mocker.MagicMock(partial_sku="sku-1"),
+        mocker.MagicMock(partial_sku="sku-2"),
+    ]
+
+    result = get_skus_with_available_prices_3yc(
+        "product_id", "currency", dt.date.fromisoformat("2024-01-01"), []
+    )
+
+    assert result == set()
 
 
 def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
@@ -351,10 +436,16 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
 
     assert result == {"sku-1": 12.44, "sku-2": 31.23}
     mocked_pricelist_model.all.assert_called_once_with(
-        formula=(
-            "AND({currency}='currency',"
-            "OR({valid_until}=BLANK(),AND({valid_from}<='2024-03-03',{valid_until}>'2024-03-03')),"
-            "OR({sku}='sku-1',{sku}='sku-2'))"
+        formula=AND(
+            EQ(Field("currency"), "currency"),
+            OR(
+                EQ(Field("valid_until"), BLANK()),
+                AND(
+                    LTE(Field("valid_from"), dt.date(2024, 3, 3)),
+                    GT(Field("valid_until"), dt.date(2024, 3, 3)),
+                ),
+            ),
+            OR(EQ(Field("sku"), "sku-1"), EQ(Field("sku"), "sku-2")),
         ),
         sort=["-valid_until"],
     )
@@ -406,10 +497,16 @@ def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cach
 
     assert result == {"sku-1": 12.44, "sku-2": 31.23}
     mocked_pricelist_model.all.assert_called_once_with(
-        formula=(
-            "AND({currency}='currency',"
-            "OR({valid_until}=BLANK(),AND({valid_from}<='2024-03-03',{valid_until}>'2024-03-03')),"
-            "OR({sku}='sku-2'))"
+        formula=AND(
+            EQ(Field("currency"), "currency"),
+            OR(
+                EQ(Field("valid_until"), BLANK()),
+                AND(
+                    LTE(Field("valid_from"), dt.date(2024, 3, 3)),
+                    GT(Field("valid_until"), dt.date(2024, 3, 3)),
+                ),
+            ),
+            OR(EQ(Field("sku"), "sku-2")),
         ),
         sort=["-valid_until"],
     )
@@ -450,8 +547,8 @@ def test_get_gc_main_agreement_model():
 
     result = get_gc_main_agreement_model(base_info)
 
-    assert result.get_api().api_key == base_info.api_key
-    assert result.get_base().id == base_info.base_id
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
 
 
 def test_get_gc_agreement_deployment_model():
@@ -459,8 +556,8 @@ def test_get_gc_agreement_deployment_model():
 
     result = get_gc_agreement_deployment_model(base_info)
 
-    assert result.get_api().api_key == base_info.api_key
-    assert result.get_base().id == base_info.base_id
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
 
 
 def test_create_gc_agreement_deployments(mocker, settings):
@@ -576,8 +673,13 @@ def test_get_gc_main_agreement(mocker, settings):
 
     assert result == mocked_gc_main_agreement
     mocked_gc_main_agreement_model.all.assert_called_once_with(
-        formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
-        "{customer_id}='main_agreement_id'))",
+        formula=AND(
+            EQ(Field("authorization_uk"), "authorization_uk"),
+            OR(
+                EQ(Field("membership_id"), "main_agreement_id"),
+                EQ(Field("customer_id"), "main_agreement_id"),
+            ),
+        ),
     )
 
 
@@ -597,8 +699,13 @@ def test_get_gc_main_agreement_empty_response(mocker, settings):
 
     assert result is None
     mocked_gc_main_agreement_model.all.assert_called_once_with(
-        formula="AND({authorization_uk}='authorization_uk',OR({membership_id}='main_agreement_id',"
-        "{customer_id}='main_agreement_id'))",
+        formula=AND(
+            EQ(Field("authorization_uk"), "authorization_uk"),
+            OR(
+                EQ(Field("membership_id"), "main_agreement_id"),
+                EQ(Field("customer_id"), "main_agreement_id"),
+            ),
+        ),
     )
 
 
@@ -619,7 +726,7 @@ def test_get_gc_agreement_deployments_by_main_agreement(mocker, settings):
 
     assert result == [gc_agreement_deployments]
     mocked_gc_agreement_deployments_model.all.assert_called_once_with(
-        formula="AND({main_agreement_id}='main_agreement_id')",
+        formula=AND(EQ(Field("main_agreement_id"), "main_agreement_id")),
     )
 
 
@@ -640,7 +747,7 @@ def test_get_gc_agreement_deployments_to_check(mocker, settings):
 
     assert result == [gc_agreement_deployments]
     mocked_gc_agreement_deployments_model.all.assert_called_once_with(
-        formula="OR({status}='pending',{status}='error')",
+        formula=OR(EQ(Field("status"), "pending"), EQ(Field("status"), "error")),
     )
 
 
@@ -655,15 +762,9 @@ def test_get_agreement_deployment_view_link(mocker, settings):
         return_value=mocked_gc_agreement_deployments_model,
     )
     mocked_gc_agreement_deployments_model.id = "record-id"
-    mocked_gc_agreement_deployments_model.Meta.base_id = "base-id"
-    view_mock = mocker.MagicMock()
-    view_mock.id = "view-id"
-    schema_mock = mocker.MagicMock()
-    schema_mock.view.return_value = view_mock
-    table_mock = mocker.MagicMock()
-    table_mock.id = "table-id"
-    table_mock.schema.return_value = schema_mock
-    mocked_gc_agreement_deployments_model.get_table.return_value = table_mock
+    mocked_gc_agreement_deployments_model.meta.base.id = "base-id"
+    mocked_gc_agreement_deployments_model.meta.table.id = "table-id"
+    mocked_gc_agreement_deployments_model.meta.table.schema().view().id = "view-id"
 
     result = get_agreement_deployment_view_link("product_id")
 
@@ -680,7 +781,7 @@ def test_get_agreement_deployment_view_link_exception(mocker, settings):
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
         return_value=mocked_gc_agreement_deployments_model,
     )
-    mocked_gc_agreement_deployments_model.get_table.side_effect = HTTPError()
+    mocked_gc_agreement_deployments_model.meta.table.schema.side_effect = HTTPError()
 
     result = get_agreement_deployment_view_link("product_id")
 
@@ -692,8 +793,8 @@ def test_get_sku_adobe_mapping_model():
 
     result = get_sku_adobe_mapping_model(base_info)
 
-    assert result.get_api().api_key == base_info.api_key
-    assert result.get_base().id == base_info.base_id
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
 
 
 # FIX: it has multiple act blocks

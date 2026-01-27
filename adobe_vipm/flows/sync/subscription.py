@@ -5,12 +5,10 @@ import traceback
 from mpt_extension_sdk.mpt_http import mpt
 from mpt_extension_sdk.mpt_http.base import MPTClient
 
-from adobe_vipm.airtable import models
-from adobe_vipm.flows import utils as flows_utils
 from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.sync.price_manager import PriceManager
 from adobe_vipm.flows.utils import notification
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
-from adobe_vipm.utils import get_commitment_start_date
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +59,23 @@ class SubscriptionSyncer:
         """
         logger.info("Synchronizing subscriptions.")
         try:
-            skus = [subscription[2] for subscription in self._subscriptions_for_update]
-            prices = models.get_sku_price(
-                self._adobe_customer, skus, self._product_id, self._currency
+            processable_lines = [
+                (subscription["lines"][0], actual_sku)
+                for subscription, _, actual_sku in self._subscriptions_for_update
+            ]
+            price_manager = PriceManager(
+                self._mpt_client,
+                self._adobe_customer,
+                processable_lines,
+                self._agreement_id,
+                self._agreement["listing"]["priceList"]["id"],
             )
-            missing_prices_skus = []
+            skus = [subscription[2] for subscription in self._subscriptions_for_update]
+            prices = price_manager.get_sku_prices_for_agreement_lines(
+                skus, self._product_id, self._currency
+            )
             coterm_date = self._adobe_customer["cotermDate"]
+
             for subscription, adobe_subscription, actual_sku in self._subscriptions_for_update:
                 if actual_sku not in prices:
                     logger.error(
@@ -74,7 +83,6 @@ class SubscriptionSyncer:
                         subscription["id"],
                         actual_sku,
                     )
-                    missing_prices_skus.append(actual_sku)
                     continue
 
                 self._update_subscription(
@@ -84,14 +92,6 @@ class SubscriptionSyncer:
                     prices,
                     subscription,
                     sync_prices=sync_prices,
-                )
-            if missing_prices_skus:
-                flows_utils.notify_missing_prices(
-                    self._agreement_id,
-                    missing_prices_skus,
-                    self._product_id,
-                    self._currency,
-                    get_commitment_start_date(self._adobe_customer),
                 )
         except Exception:
             logger.exception("Error synchronizing agreement %s.", self._agreement_id)
