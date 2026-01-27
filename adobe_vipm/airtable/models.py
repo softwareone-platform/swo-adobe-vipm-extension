@@ -21,6 +21,7 @@ from pyairtable.orm import Model, fields
 from requests import HTTPError
 
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
+from adobe_vipm.flows.constants import MARKET_SEGMENT_TO_AIRTABLE_SEGMENT
 from adobe_vipm.utils import get_commitment_start_date
 
 STATUS_INIT = "init"
@@ -781,17 +782,23 @@ def get_sku_adobe_mapping_model(base_info: AirTableBaseInfo):
             base_id = base_info.base_id
 
         @classmethod
-        def from_short_id(cls, vendor_external_id: str):
+        def from_short_id(cls, vendor_external_id: str, market_segment: str):
             """
             Returns the AdobeProductMapping entity for the cutted Adobe SKU.
 
             Args:
                 vendor_external_id: cutted Adobe SKU.
+                market_segment: Adobe market segment.
 
             Returns:
                 AdobeProductMapping: entity of the AdobeProductMapping.
             """
-            entity = cls.first(formula=EQ(Field("vendor_external_id"), vendor_external_id))
+            entity = cls.first(
+                formula=AND(
+                    EQ(Field("vendor_external_id"), vendor_external_id),
+                    EQ(Field("segment"), market_segment),
+                )
+            )
             if entity is None:
                 raise AdobeProductNotFoundError(
                     f"AdobeProduct with vendor_external_id `{vendor_external_id}` not found."
@@ -813,23 +820,26 @@ def get_sku_adobe_mapping_model(base_info: AirTableBaseInfo):
     return AdobeProductMapping
 
 
-def get_adobe_product_by_marketplace_sku(vendor_external_id: str):
+def get_adobe_product_by_marketplace_sku(vendor_external_id: str, market_segment: str):
     """
     Get an AdobeProductMapping object by the vendor_external_id.
 
     Args:
         vendor_external_id: The vendor external id to search for the AdobeProductMapping.
+        market_segment: Adobe market segment.
 
     Raises:
         AdobeProductNotFoundError: If no AdobeProductMapping exists for the given
         vendor external id.
     """
     adobe_item_model = get_sku_adobe_mapping_model(AirTableBaseInfo.for_sku_mapping())
-    return adobe_item_model.from_short_id(vendor_external_id)
+    return adobe_item_model.from_short_id(
+        vendor_external_id, MARKET_SEGMENT_TO_AIRTABLE_SEGMENT[market_segment]
+    )
 
 
 @cache
-def get_adobe_sku(vendor_item_id: str) -> str:
+def get_adobe_sku(vendor_item_id: str, market_segment: str) -> str:
     """
     Retrieves full sku with first discount level based on cutted Adobe SKU.
 
@@ -837,8 +847,9 @@ def get_adobe_sku(vendor_item_id: str) -> str:
 
     Args:
         vendor_item_id: cutted Adobe SKU.
+        market_segment: Adobe market segment.
 
     Returns:
         str: full sku with first discount level.
     """
-    return get_adobe_product_by_marketplace_sku(vendor_item_id).sku
+    return get_adobe_product_by_marketplace_sku(vendor_item_id, market_segment).sku

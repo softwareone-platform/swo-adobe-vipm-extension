@@ -18,6 +18,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_CUSTOMER_LOST_EXCEPTION,
+    MARKET_SEGMENT_COMMERCIAL,
     MARKET_SEGMENT_GOVERNMENT,
     TEMPLATE_NAME_QUERY_3YC,
     Param,
@@ -2114,13 +2115,14 @@ def test_validate_sku_availability_with_commited_3yc_continues_validation(
         downsize_lines=[],
         product_id="PRD-123",
         currency="USD",
+        market_segment=MARKET_SEGMENT_COMMERCIAL,
     )
     step = ValidateSkuAvailability(is_validation=True)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should continue with SKU validation
-    mocked_get_adobe_product.assert_called_once_with("65304578CA")
+    mocked_get_adobe_product.assert_called_once_with("65304578CA", MARKET_SEGMENT_COMMERCIAL)
     mocked_get_prices.assert_called_once_with(
         "PRD-123", "USD", dt.date.fromisoformat(commitment["startDate"]), ["65304578CA"]
     )
@@ -2167,13 +2169,14 @@ def test_validate_sku_availability_with_expired_3yc_commitment_continues_validat
         downsize_lines=[],
         product_id="PRD-123",
         currency="USD",
+        market_segment=MARKET_SEGMENT_COMMERCIAL,
     )
     step = ValidateSkuAvailability(is_validation=True)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should continue with SKU validation
-    mocked_get_adobe_product.assert_called_once_with("65304578CA")
+    mocked_get_adobe_product.assert_called_once_with("65304578CA", MARKET_SEGMENT_COMMERCIAL)
     mocked_get_prices.assert_called_once_with("PRD-123", "USD", ["65304578CA"])
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 

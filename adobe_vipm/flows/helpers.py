@@ -347,7 +347,9 @@ class Validate3YCCommitment(Step):
 
     def get_quantities(self, context, subscriptions) -> tuple[float, float]:
         """Calculates licensees and consumables quantities of subscriptions."""
-        count_licenses, count_consumables = self.get_licenses_and_consumables_count(subscriptions)
+        count_licenses, count_consumables = self.get_licenses_and_consumables_count(
+            context.market_segment, subscriptions
+        )
         logger.info(
             "Quantities recovered from subscriptions. Licenses: %s, Consumables: %s",
             count_licenses,
@@ -388,11 +390,14 @@ class Validate3YCCommitment(Step):
                 ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
             )
 
-    def get_licenses_and_consumables_count(self, subscriptions: dict) -> tuple[float, float]:
+    def get_licenses_and_consumables_count(
+        self, market_segment: str, subscriptions: dict
+    ) -> tuple[float, float]:
         """
         Get the count of licenses and consumables from the Adobe customer subscriptions.
 
         Args:
+            market_segment: Adobe market segment.
             subscriptions: Adobe customer subscriptions.
 
         Returns:
@@ -406,7 +411,9 @@ class Validate3YCCommitment(Step):
         ]
         for subscription in active_subscriptions:
             try:
-                sku = get_adobe_product_by_marketplace_sku(get_partial_sku(subscription["offerId"]))
+                sku = get_adobe_product_by_marketplace_sku(
+                    get_partial_sku(subscription["offerId"]), market_segment
+                )
             except AdobeProductNotFoundError:
                 logger.exception(
                     "Adobe product not found for SKU: %s", get_partial_sku(subscription["offerId"])
@@ -441,7 +448,9 @@ class Validate3YCCommitment(Step):
         for line in lines:
             delta = self._calculate_delta(line, is_downsize)
             try:
-                sku = get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"])
+                sku = get_adobe_product_by_marketplace_sku(
+                    line["item"]["externalIds"]["vendor"], context.market_segment
+                )
             except AdobeProductNotFoundError:
                 logger.exception(
                     "Adobe product not found for SKU: %s", line["item"]["externalIds"]["vendor"]
@@ -831,7 +840,7 @@ class ValidateSkuAvailability(Step):
     def _get_adobe_skus(self, context):
         return [
             get_adobe_product_by_marketplace_sku(
-                line["item"]["externalIds"]["vendor"]
+                line["item"]["externalIds"]["vendor"], context.market_segment
             ).vendor_external_id
             for line in context.new_lines + context.upsize_lines + context.downsize_lines
         ]
