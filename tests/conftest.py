@@ -1678,6 +1678,7 @@ def mock_setup_client(mocker, mock_mpt_client):
     paths = [
         "adobe_vipm.management.commands.sync_3yc_enrol",
         "adobe_vipm.management.commands.sync_agreements",
+        "adobe_vipm.management.commands.process_3yc_expiration_notifications",
         "adobe_vipm.flows.sync.agreement",
     ]
     for path in paths:

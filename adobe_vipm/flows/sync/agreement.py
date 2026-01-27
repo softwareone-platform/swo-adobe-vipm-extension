@@ -17,6 +17,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
 from adobe_vipm.flows import utils as flows_utils
+from adobe_vipm.flows.benefits import send_3yc_expiration_notification
 from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_EDUCATION,
     TEMPLATE_ASSET_DEFAULT,
@@ -34,6 +35,7 @@ from adobe_vipm.flows.sync.price_manager import PriceManager
 from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
 from adobe_vipm.flows.utils import notify_agreement_unhandled_exception_in_teams
 from adobe_vipm.flows.utils.market_segment import get_market_segment
+from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.notifications import send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
@@ -428,6 +430,8 @@ class AgreementSyncer:  # noqa: WPS214
         parameters = {}
 
         commitment_info = get_3yc_commitment(self._adobe_customer)
+
+        self._notify_if_3yc_commitment_expired(agreement, commitment_info)
         self._update_3yc_fulfillment_params(agreement, commitment_info, parameters)
         self._update_3yc_ordering_params(commitment_info, parameters)
 
@@ -458,6 +462,17 @@ class AgreementSyncer:  # noqa: WPS214
                 lines=agreement["lines"],
                 parameters=parameters,
             )
+
+    def _notify_if_3yc_commitment_expired(self, agreement: dict, commitment_info: dict) -> None:
+        three_yc_enroll_status = get_fulfillment_parameter(
+            agreement, Param.THREE_YC_ENROLL_STATUS.value
+        )
+        enroll_status_value = three_yc_enroll_status.get("value")
+
+        if enroll_status_value != "COMMITTED" or commitment_info.get("status"):
+            return
+
+        send_3yc_expiration_notification(self._mpt_client, agreement, 0, "notification_3yc_expired")
 
     def _update_3yc_fulfillment_params(
         self, agreement: dict, commitment_info: dict, parameters: dict
