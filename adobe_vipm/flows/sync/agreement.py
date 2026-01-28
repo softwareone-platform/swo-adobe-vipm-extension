@@ -23,7 +23,6 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
-    TRANSFER_RESELLER_ITEM_SKU,
     AgreementStatus,
     ItemTermsModel,
     Param,
@@ -565,11 +564,10 @@ class AgreementSyncer:  # noqa: WPS214
     def _get_processable_agreement_lines(self, agreement: dict) -> list[tuple[dict, str]]:
         agreement_lines = []
         for line in agreement["lines"]:
-            if line["item"]["externalIds"]["vendor"] != TRANSFER_RESELLER_ITEM_SKU:
-                actual_sku = models.get_adobe_sku(
-                    line["item"]["externalIds"]["vendor"], get_market_segment(self.product_id)
-                )
-                agreement_lines.append((line, actual_sku))
+            actual_sku = models.get_adobe_sku(
+                line["item"]["externalIds"]["vendor"], get_market_segment(self.product_id)
+            )
+            agreement_lines.append((line, actual_sku))
         return agreement_lines
 
     # REFACTOR: get method must not update subscriptions in mpt or terminate a subscription
