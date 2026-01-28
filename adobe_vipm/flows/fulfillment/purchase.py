@@ -23,6 +23,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_CONTACT,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     MARKET_SEGMENT_EDUCATION,
+    MARKET_SEGMENTS,
     TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
     TEMPLATE_NAME_PURCHASE,
     VALID_GOVERNMENT_AGENCY_TYPES,
@@ -273,7 +274,7 @@ class CreateCustomer(Step):
                     context.authorization_id,
                     context.seller_id,
                     context.agreement_id,
-                    context.market_segment,
+                    MARKET_SEGMENTS[context.market_segment],
                     context.customer_data,
                 )
             else:
@@ -281,7 +282,7 @@ class CreateCustomer(Step):
                     context.authorization_id,
                     context.seller_id,
                     context.agreement_id,
-                    context.market_segment,
+                    MARKET_SEGMENTS[context.market_segment],
                     context.customer_data,
                 )
             context.adobe_customer_id = customer["customerId"]

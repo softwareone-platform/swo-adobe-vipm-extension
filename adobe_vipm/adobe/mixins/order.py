@@ -21,7 +21,7 @@ from adobe_vipm.adobe.utils import (  # noqa: WPS347
     to_adobe_line_id,
 )
 from adobe_vipm.airtable.models import get_adobe_product_by_marketplace_sku
-from adobe_vipm.flows.constants import FAKE_CUSTOMERS_IDS, Param
+from adobe_vipm.flows.constants import FAKE_CUSTOMERS_IDS, MARKET_SEGMENTS, Param
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.utils.deployment import get_deployment_id
 from adobe_vipm.notifications import send_exception
@@ -179,7 +179,9 @@ class OrderClientMixin:
         """
         authorization = self._config.get_authorization(context.authorization_id)
         offer_ids = tuple(
-            get_adobe_product_by_marketplace_sku(line["item"]["externalIds"]["vendor"]).sku
+            get_adobe_product_by_marketplace_sku(
+                line["item"]["externalIds"]["vendor"], context.market_segment
+            ).sku
             for line in context.upsize_lines + context.new_lines
         )
         flex_discounts = self.get_flex_discounts_per_base_offer(authorization, context, offer_ids)
@@ -199,6 +201,7 @@ class OrderClientMixin:
                     context.upsize_lines,
                     flex_discounts,
                     payload,
+                    context.market_segment,
                 )
             except ProcessingUpsizeLinesError as error:
                 raise AdobeCreatePreviewError(error) from error
@@ -498,7 +501,7 @@ class OrderClientMixin:
         try:
             flex_discounts = self._get_flex_discounts(
                 authorization,
-                context.market_segment,
+                MARKET_SEGMENTS[context.market_segment],
                 country,
                 offer_ids,
             )
@@ -541,7 +544,10 @@ class OrderClientMixin:
                 line,
                 adobe_base_sku,
                 line["quantity"],
-                flex_discounts.get(get_adobe_product_by_marketplace_sku(adobe_base_sku).sku),
+                flex_discounts.get(
+                    get_adobe_product_by_marketplace_sku(adobe_base_sku, context.market_segment).sku
+                ),
+                context.market_segment,
             )
             payload["lineItems"].append(line_item)
 
@@ -552,6 +558,7 @@ class OrderClientMixin:
         upsize_lines: list[dict],
         discounts: dict,
         payload: dict,
+        market_segment: str,
     ):
         offer_ids = [line_item["item"]["externalIds"]["vendor"] for line_item in upsize_lines]
         # ???: This method belongs to SubscriptionClientMixin
@@ -598,7 +605,10 @@ class OrderClientMixin:
                 line,
                 adobe_base_sku,
                 quantity,
-                discounts.get(get_adobe_product_by_marketplace_sku(adobe_base_sku).sku),
+                discounts.get(
+                    get_adobe_product_by_marketplace_sku(adobe_base_sku, market_segment).sku
+                ),
+                market_segment,
             )
             payload["lineItems"].append(line_item)
 
@@ -665,11 +675,11 @@ class OrderClientMixin:
         return response.json()
 
     def _get_preview_order_line_item(
-        self, line: dict, adobe_base_sku, quantity: int, discount_code
+        self, line: dict, adobe_base_sku, quantity: int, discount_code, market_segment: str
     ) -> dict:
         line_item = {
             "extLineItemNumber": to_adobe_line_id(line["id"]),
-            "offerId": get_adobe_product_by_marketplace_sku(adobe_base_sku).sku,
+            "offerId": get_adobe_product_by_marketplace_sku(adobe_base_sku, market_segment).sku,
             "quantity": quantity,
         }
         if discount_code:
