@@ -1471,6 +1471,31 @@ def adobe_items_factory():  # noqa: C901
 
 
 @pytest.fixture
+def adobe_transfer_items_factory():
+    def _items(
+        line_number=1,
+        offer_id="65304578CA01A12",
+        quantity=170,
+        subscription_id="9bec01597a466898af170a5a203bb1NA",
+        renewal_date="2025-06-10T16:22:08.000+00:00",
+        deployment_id="",
+        currency_code="USD",
+    ):
+        item = {
+            "lineItemNumber": line_number,
+            "offerId": offer_id,
+            "quantity": quantity,
+            "subscriptionId": subscription_id,
+            "renewalDate": renewal_date,
+            "deploymentId": deployment_id,
+            "currencyCode": currency_code,
+        }
+        return [item]
+
+    return _items
+
+
+@pytest.fixture
 def adobe_pricing_factory():
     def _pricing():
         return {
@@ -1582,11 +1607,15 @@ def adobe_preview_transfer_factory(adobe_items_factory):
 
 @pytest.fixture
 def adobe_reseller_change_preview_factory(
-    adobe_items_factory,
+    adobe_transfer_items_factory,
 ):
     def _preview(items=None, approval_expiry=None):
         today = dt.datetime.now(tz=dt.UTC).today()
-        items = items if items is not None else adobe_items_factory(renewal_date=today.isoformat())
+        items = (
+            items
+            if items is not None
+            else adobe_transfer_items_factory(renewal_date=today.isoformat())
+        )
         if approval_expiry is None:
             approval_expiry = (today + dt.timedelta(days=5)).isoformat()
         return {
