@@ -183,7 +183,7 @@ def test_create_customer_step(
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
-        market_segment="market-segment",
+        market_segment="COM",
     )
     step = CreateCustomer()
 
@@ -214,7 +214,7 @@ def test_create_customer_lga_step(
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
-        market_segment="market-segment",
+        market_segment="COM",
     )
     step = CreateCustomer()
 
@@ -291,7 +291,7 @@ def test_create_customer_step_exception(
         agreement_id="agreement-id",
         authorization_id="auth-id",
         seller_id="seller-id",
-        market_segment="market-segment",
+        market_segment="COM",
     )
     step = CreateCustomer()
 

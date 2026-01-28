@@ -42,6 +42,7 @@ from adobe_vipm.airtable.models import (
     get_transfers_to_check,
     get_transfers_to_process,
 )
+from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
 
 
 def test_airtable_base_info_for_migrations(settings):
@@ -797,6 +798,50 @@ def test_get_sku_adobe_mapping_model():
     assert result.meta.base.id == base_info.base_id
 
 
+def test_adobe_product_mapping_from_short_id(mocker):
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    adobe_product_mapping_model = get_sku_adobe_mapping_model(base_info)
+    mocked_entity = mocker.MagicMock()
+    mocker.patch.object(
+        adobe_product_mapping_model,
+        "first",
+        return_value=mocked_entity,
+    )
+
+    result = adobe_product_mapping_model.from_short_id("65304578CA", "COM")
+
+    assert result == mocked_entity
+    adobe_product_mapping_model.first.assert_called_once_with(
+        formula=AND(
+            EQ(Field("vendor_external_id"), "65304578CA"),
+            EQ(Field("segment"), "COM"),
+        )
+    )
+
+
+def test_adobe_product_mapping_from_short_id_not_found(mocker):
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    adobe_product_mapping_model = get_sku_adobe_mapping_model(base_info)
+    mocker.patch.object(
+        adobe_product_mapping_model,
+        "first",
+        return_value=None,
+    )
+
+    with pytest.raises(AdobeProductNotFoundError) as exc_info:
+        adobe_product_mapping_model.from_short_id("non_existent_sku", "COM")
+
+    assert "AdobeProduct with vendor_external_id `non_existent_sku` not found." in str(
+        exc_info.value
+    )
+    adobe_product_mapping_model.first.assert_called_once_with(
+        formula=AND(
+            EQ(Field("vendor_external_id"), "non_existent_sku"),
+            EQ(Field("segment"), "COM"),
+        )
+    )
+
+
 # FIX: it has multiple act blocks
 def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):  # noqa: AAA02
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
@@ -810,9 +855,9 @@ def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     )
 
     with pytest.raises(AdobeProductNotFoundError):
-        get_adobe_product_by_marketplace_sku("vendor_external_id")
+        get_adobe_product_by_marketplace_sku("vendor_external_id", MARKET_SEGMENT_COMMERCIAL)
 
-    result = get_adobe_product_by_marketplace_sku("65304578CA")
+    result = get_adobe_product_by_marketplace_sku("65304578CA", MARKET_SEGMENT_COMMERCIAL)
 
     assert result.vendor_external_id == "65304578CA"
     assert result.sku == "65304578CA01A12"

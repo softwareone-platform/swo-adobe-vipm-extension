@@ -364,7 +364,7 @@ def test_create_preview_order_upsize(
         json=flex_discount_data,
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "US",
                 "offer-ids": "65304578CA01A12",
             })
@@ -410,7 +410,7 @@ def test_create_preview_order_upsize(
         order=order,
         order_id=order["id"],
         authorization_id=authorization_uk,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        market_segment="COM",
         product_id="PRD-1234",
         currency="EUR",
         upsize_lines=order["lines"],
@@ -496,7 +496,7 @@ def test_create_prev_upsize_deplyment_discount(
         json=flex_discount_data,
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "UK",
                 "offer-ids": "65304578CA01A12",
             })
@@ -542,7 +542,7 @@ def test_create_prev_upsize_deplyment_discount(
         order=order,
         order_id=order["id"],
         authorization_id=authorization_uk,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        market_segment="COM",
         product_id="PRD-1234",
         currency="EUR",
         upsize_lines=order["lines"],
@@ -671,7 +671,7 @@ def test_create_preview_order_upsize_after_downsize_lower(
         json=flex_discount_data,
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "US",
                 "offer-ids": "65304578CA01A12",
             })
@@ -681,7 +681,7 @@ def test_create_preview_order_upsize_after_downsize_lower(
         order=order,
         order_id="order-id",
         authorization_id=authorization_uk,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        market_segment="COM",
         product_id="PRD-1234",
         currency="EUR",
         upsize_lines=order["lines"],
@@ -764,7 +764,7 @@ def test_create_preview_newlines(
         json=flex_discount_data,
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "US",
                 "offer-ids": "65304578CA01A12",
             })
@@ -774,7 +774,7 @@ def test_create_preview_newlines(
         order=order,
         order_id=order["id"],
         authorization_id=authorization_uk,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        market_segment="COM",
         product_id="PRD-1234",
         currency="EUR",
         upsize_lines=[],
@@ -877,7 +877,7 @@ def test_create_preview_newlines_deplyment_discount(
         json=flex_discount_data,
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "UK",
                 "offer-ids": "65304578CA01A12",
             })
@@ -887,7 +887,7 @@ def test_create_preview_newlines_deplyment_discount(
         order=order,
         order_id=order["id"],
         authorization_id=authorization_uk,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        market_segment="COM",
         product_id="PRD-1234",
         currency="EUR",
         upsize_lines=[],
@@ -990,7 +990,7 @@ def test_create_preview_newlines_wo_deployment(
         json=flex_discount_data,
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "US",
                 "offer-ids": "65304578CA01A12",
             })
@@ -1000,7 +1000,7 @@ def test_create_preview_newlines_wo_deployment(
         order=order,
         order_id=order["id"],
         authorization_id=authorization_uk,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        market_segment="COM",
         product_id="PRD-1234",
         currency="EUR",
         new_lines=order["lines"],
@@ -1068,7 +1068,7 @@ def test_create_preview_order_bad_request(
         json=flex_discounts_factory(),
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "US",
                 "offer-ids": "65304578CA01A12",
             })
@@ -1078,7 +1078,7 @@ def test_create_preview_order_bad_request(
         order=mock_order,
         order_id="order-id",
         authorization_id=authorization_uk,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
+        market_segment="COM",
         product_id="PRD-1234",
         currency="EUR",
         new_lines=mock_order["lines"],
