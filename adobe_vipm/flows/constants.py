@@ -229,15 +229,6 @@ ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
         "the automatically included item can be processed"
     ),
 )
-
-ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(
-    "VIPM0036",
-    (
-        "The adobe reseller change product is not configured for this product and "
-        "cannot be added to the order."
-    ),
-)
-
 ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA = ValidationError(
     "VIPM0038",
     (

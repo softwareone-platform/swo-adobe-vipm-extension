@@ -1,7 +1,8 @@
 import datetime as dt
 import logging
+from typing import Any
 
-from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus
+from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -26,17 +27,20 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_MEMBERSHIP_NOT_FOUND,
     ERR_ADOBE_MEMBERSHIP_PROCESSING,
     ERR_ADOBE_RESSELLER_CHANGE_LINES,
-    ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
     ERR_UPDATING_TRANSFER_ITEMS,
-    TRANSFER_RESELLER_ITEM_SKU,
     Param,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
+from adobe_vipm.flows.errors import (
+    GovernmentLGANotValidOrderError,
+    GovernmentNotValidOrderError,
+    MPTError,
+)
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
+    UpdatePrices,
     ValidateGovernmentTransfer,
     ValidateResellerChange,
 )
@@ -46,6 +50,7 @@ from adobe_vipm.flows.utils import (
     exclude_items_with_deployment_id,
     exclude_subscriptions_with_deployment_id,
     get_adobe_membership_id,
+    get_market_segment,
     get_order_line_by_sku,
     get_ordering_parameter,
     get_transfer_item_sku_by_subscription,
@@ -54,8 +59,11 @@ from adobe_vipm.flows.utils import (
     is_transferring_item_expired,
     set_order_error,
     set_ordering_parameter_error,
+    split_downsizes_upsizes_new,
 )
 from adobe_vipm.flows.utils.validation import validate_government_lga_data
+from adobe_vipm.flows.validation.shared import GetPreviewOrder
+from adobe_vipm.notifications import send_error
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -344,13 +352,16 @@ class SetupTransferContext(Step):
         context.order["agreement"] = get_agreement(mpt_client, context.order["agreement"]["id"])
 
         product_id = context.order["agreement"]["product"]["id"]
-        authorization_id = context.order["authorization"]["id"]
+        context.authorization_id = context.order["authorization"]["id"]
+        context.order_id = context.order["id"]
         context.membership_id = get_adobe_membership_id(context.order)
+        context.product_id = context.order["agreement"]["product"]["id"]
+        context.market_segment = get_market_segment(context.product_id)
 
         if is_migrate_customer(context.order):
             context.transfer = get_transfer_by_authorization_membership_or_customer(
                 product_id,
-                authorization_id,
+                context.authorization_id,
                 context.membership_id,
             )
         next_step(mpt_client, context)
@@ -520,48 +531,119 @@ def validate_reseller_change(mpt_client, order):
         SetupTransferContext(),
         FetchResellerChangeData(is_validation=True),
         ValidateResellerChange(is_validation=True),
-        AddResellerChangeLinesToOrder(),
+        AddResellerLinesToOrder(),
+        GetPreviewOrder(),
+        UpdatePrices(),
     )
     context = Context(order=order)
     pipeline.run(mpt_client, context)
     return not context.validation_succeeded, context.order
 
 
-class AddResellerChangeLinesToOrder(Step):
+class AddResellerLinesToOrder(Step):
     """Add lines from reseller change back to the MPT order."""
 
     def __call__(self, mpt_client, context, next_step):
         """Add lines from reseller change back to the MPT order."""
-        reseller_change_item = get_product_items_by_skus(
-            mpt_client, context.order["agreement"]["product"]["id"], [TRANSFER_RESELLER_ITEM_SKU]
-        )
+        order_lines_from_transfer = self._get_order_lines_from_transfer(context, mpt_client)
 
-        if not reseller_change_item:
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED.to_dict()
+        if order_lines_from_transfer:
+            if not context.order["lines"]:
+                logger.info("No existing order lines, proceeding with transfer lines")
+                context.order = update_order(
+                    mpt_client, context.order_id, lines=order_lines_from_transfer
+                )
+                context.validation_succeeded = True
+            elif not self._transfer_order_lines_match(
+                context.order["lines"], order_lines_from_transfer
+            ):
+                logger.warning("Order lines do not match transfer lines")
+                context.order = set_order_error(
+                    context.order, ERR_ADOBE_RESSELLER_CHANGE_LINES.to_dict()
+                )
+                context.validation_succeeded = False
+                return
+            else:
+                logger.info(
+                    "Order lines match transfer lines successfully (%d lines)",
+                    len(order_lines_from_transfer),
+                )
+                context.validation_succeeded = True
+        elif context.order["lines"]:
+            logger.info(
+                "No transfer lines but order has %d existing lines, processing new lines",
+                len(context.order["lines"]),
+            )
+            downsize_lines, upsize_lines, new_lines = split_downsizes_upsizes_new(context.order)
+            context.downsize_lines = downsize_lines
+            context.upsize_lines = upsize_lines
+            context.new_lines = new_lines
+
+            context.validation_succeeded = True
+        else:
+            logger.error("No transfer lines and no order lines, validation failed")
+            context.order = update_order(
+                mpt_client, context.order_id, lines=order_lines_from_transfer
             )
             context.validation_succeeded = False
             return
 
-        reseller_change_item = reseller_change_item[0]
-        context.validation_succeeded = True
-
-        lines = context.order["lines"]
-        if lines:
-            if len(lines) == 1 and lines[0]["item"]["id"] == reseller_change_item["id"]:
-                next_step(mpt_client, context)
-                return
-            context.order = set_order_error(
-                context.order, ERR_ADOBE_RESSELLER_CHANGE_LINES.to_dict()
-            )
-            context.validation_succeeded = False
-        new_line = [
-            {
-                "item": reseller_change_item,
-                "quantity": 1,
-                "oldQuantity": 0,
-                "price": {"unitPP": 0},
-            }
-        ]
-        context.order["lines"] = new_line
+        logger.info(
+            "Proceeding to next step with validation_succeeded=%s", context.validation_succeeded
+        )
         next_step(mpt_client, context)
+
+    def _get_order_lines_from_transfer(self, context: Context, mpt_client) -> list[Any]:
+        no_deployment_transfer_items = [
+            item for item in context.adobe_transfer["lineItems"] if not item.get("deploymentId", "")
+        ]
+        if not no_deployment_transfer_items:
+            logger.info("No transfer items without deployment ID")
+            return []
+        logger.info(
+            "Processing %d transfer items without deployment ID", len(no_deployment_transfer_items)
+        )
+        reseller_items_map = {
+            item["externalIds"]["vendor"]: item
+            for item in get_product_items_by_skus(
+                mpt_client,
+                context.order["agreement"]["product"]["id"],
+                [get_partial_sku(item["offerId"]) for item in no_deployment_transfer_items],
+            )
+        }
+        logger.debug(
+            "Created reseller items map with %d items: %s",
+            len(reseller_items_map),
+            list(reseller_items_map.keys()),
+        )
+        order_lines_from_transfer = []
+        for item in no_deployment_transfer_items:  # TODO:filter out expired?
+            partial_sku = get_partial_sku(item["offerId"])
+            mapped_item = reseller_items_map.get(partial_sku)
+            if mapped_item is None:
+                error_msg = f"No reseller item found for partial SKU '{partial_sku}' "
+                logger.error(error_msg)
+                send_error("Transfer Validation - Missing reseller item", error_msg)
+                raise MPTError(error_msg)
+            order_lines_from_transfer.append({
+                "item": mapped_item,
+                "oldQuantity": item["quantity"],
+                "quantity": item["quantity"],
+            })
+
+        logger.info("Created %d order lines from transfer items", len(order_lines_from_transfer))
+        return order_lines_from_transfer
+
+    @staticmethod
+    def _transfer_order_lines_match(order_lines: list[dict], transfer_lines: list[dict]) -> bool:
+        """Compare order lines based on relevant fields only."""
+        if len(order_lines) != len(transfer_lines):
+            return False
+
+        order_lines_to_comp = {
+            (line["item"]["externalIds"]["vendor"], line["quantity"]) for line in order_lines
+        }
+        transfer_lines_to_comp = {
+            (line["item"]["externalIds"]["vendor"], line["quantity"]) for line in transfer_lines
+        }
+        return order_lines_to_comp == transfer_lines_to_comp
