@@ -229,15 +229,6 @@ ERR_ADOBE_RESSELLER_CHANGE_LINES = ValidationError(
         "the automatically included item can be processed"
     ),
 )
-
-ERR_ADOBE_RESSELLER_CHANGE_PRODUCT_NOT_CONFIGURED = ValidationError(
-    "VIPM0036",
-    (
-        "The adobe reseller change product is not configured for this product and "
-        "cannot be added to the order."
-    ),
-)
-
 ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA = ValidationError(
     "VIPM0038",
     (
@@ -251,6 +242,13 @@ ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA = ValidationError(
     (
         "This Adobe account is a Government account. "
         "Please use the Adobe VIP Marketplace for Government product."
+    ),
+)
+ERR_ADOBE_RESSELLER_TRANSFER_NO_LINES = ValidationError(
+    "VIPM0043",
+    (
+        "When reviving a reseller during a reseller transfer a purchase is required."
+        " Please add at least one item to this order."
     ),
 )
 

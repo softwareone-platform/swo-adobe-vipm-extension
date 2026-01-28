@@ -72,7 +72,7 @@ class GetPreviewOrder(Step):
 
     def __call__(self, mpt_client, context, next_step):
         """Retrieve a preview order for the upsize/new lines."""
-        if not (context.upsize_lines or context.new_lines):
+        if not (context.upsize_lines or context.new_lines or context.update_pricing_lines):
             next_step(mpt_client, context)
             return
 

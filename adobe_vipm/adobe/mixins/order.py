@@ -182,7 +182,7 @@ class OrderClientMixin:
             get_adobe_product_by_marketplace_sku(
                 line["item"]["externalIds"]["vendor"], context.market_segment
             ).sku
-            for line in context.upsize_lines + context.new_lines
+            for line in context.upsize_lines + context.new_lines + context.update_pricing_lines
         )
         flex_discounts = self.get_flex_discounts_per_base_offer(authorization, context, offer_ids)
         if flex_discounts:
@@ -205,6 +205,7 @@ class OrderClientMixin:
                 )
             except ProcessingUpsizeLinesError as error:
                 raise AdobeCreatePreviewError(error) from error
+        self._process_update_pricing_lines(context, flex_discounts, payload)
 
         deployment_id = get_deployment_id(context.order)
         self._update_payload_by_deployment(authorization, deployment_id, payload)
@@ -610,6 +611,17 @@ class OrderClientMixin:
                     get_adobe_product_by_marketplace_sku(adobe_base_sku, market_segment).sku
                 ),
                 market_segment,
+            )
+            payload["lineItems"].append(line_item)
+
+    def _process_update_pricing_lines(self, context: Context, flex_discounts: dict, payload: dict):
+        for line in context.update_pricing_lines:
+            adobe_base_sku = line["item"]["externalIds"]["vendor"]
+            line_item = self._get_preview_order_line_item(
+                line,
+                adobe_base_sku,
+                line["quantity"],
+                flex_discounts.get(get_adobe_product_by_marketplace_sku(adobe_base_sku).sku),
             )
             payload["lineItems"].append(line_item)
 
