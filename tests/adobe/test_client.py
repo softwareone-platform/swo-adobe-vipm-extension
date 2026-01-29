@@ -345,6 +345,7 @@ def test_create_preview_order_upsize(
     adobe_subscription = adobe_subscription_factory(
         current_quantity=current_quantity,
         renewal_quantity=renewal_quantity,
+        deployment_id=deployment_id,
     )
     requests_mocker.get(
         urljoin(
@@ -352,7 +353,7 @@ def test_create_preview_order_upsize(
             f"/v3/customers/{customer_id}/subscriptions",
         ),
         status=200,
-        json={"items": [adobe_subscription]},
+        json={"items": [adobe_subscription], "links": {}},
     )
     flex_discount_data = flex_discounts_factory()
     requests_mocker.get(
@@ -477,6 +478,7 @@ def test_create_prev_upsize_deplyment_discount(
     adobe_subscription = adobe_subscription_factory(
         current_quantity=5,
         renewal_quantity=5,
+        deployment_id=deployment_id,
     )
     requests_mocker.get(
         urljoin(
@@ -484,7 +486,7 @@ def test_create_prev_upsize_deplyment_discount(
             f"/v3/customers/{customer_id}/subscriptions",
         ),
         status=200,
-        json={"items": [adobe_subscription]},
+        json={"items": [adobe_subscription], "links": {}},
     )
     flex_discount_data = flex_discounts_factory()
     requests_mocker.get(
@@ -652,6 +654,7 @@ def test_create_preview_order_upsize_after_downsize_lower(
     adobe_subscription = adobe_subscription_factory(
         current_quantity=10,
         renewal_quantity=8,
+        deployment_id=deployment_id,
     )
     requests_mocker.get(
         urljoin(
@@ -659,7 +662,7 @@ def test_create_preview_order_upsize_after_downsize_lower(
             f"/v3/customers/{customer_id}/subscriptions",
         ),
         status=200,
-        json={"items": [adobe_subscription]},
+        json={"items": [adobe_subscription], "links": {}},
     )
     flex_discount_data = flex_discounts_factory()
     requests_mocker.get(
