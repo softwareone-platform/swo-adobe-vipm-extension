@@ -1747,6 +1747,50 @@ def test_validate_3yc_commitment_no_commitment(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_validate_3yc_commitment_requested_status_draft_validation(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    commitment = adobe_commitment_factory(
+        status=ThreeYearCommitmentStatus.REQUESTED.value,
+        start_date="2021-01-01",
+        end_date="2023-01-01",
+    )
+    adobe_customer = adobe_customer_factory(commitment=commitment, commitment_request=commitment)
+    lines = [
+        {
+            "id": "line-1",
+            "item": {
+                "externalIds": {"vendor": "65304578CA"},
+            },
+            "quantity": 15,
+            "oldQuantity": 15,
+        }
+    ]
+    order = order_factory(lines=lines)
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        upsize_lines=lines,
+    )
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    step = Validate3YCCommitment(is_validation=True)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    mocked_next_step.assert_called_once()
+
+
 def test_validate_3yc_commitment_date_before_coterm_date(
     mocker,
     order_factory,
