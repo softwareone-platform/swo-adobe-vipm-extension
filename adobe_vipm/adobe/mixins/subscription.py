@@ -94,6 +94,7 @@ class SubscriptionClientMixin:
         authorization_id: str,
         customer_id: str,
         base_offer_ids: list[str],
+        deployment_id: str | None = None,
     ) -> list[dict]:
         """
         Retrieve all the subscriptions of the given offer ids.
@@ -104,11 +105,14 @@ class SubscriptionClientMixin:
             authorization_id: Id of the authorization to use.
             customer_id: Identifier of the customer to which the subscriptions belongs to.
             base_offer_ids: List of base parts of whole Adobe Offer Ids
+            deployment_id: Identifier of the deployment to which the subscriptions belong to.
 
         Returns:
             The retrieved subscriptions.
         """
-        subscriptions = self.get_subscriptions(authorization_id, customer_id)["items"]
+        subscriptions = self.get_subscriptions_by_deployment(
+            authorization_id, customer_id, deployment_id
+        )["items"]
         active_subscriptions = filter(
             lambda sub: sub["status"] == AdobeStatus.PROCESSED,
             subscriptions,

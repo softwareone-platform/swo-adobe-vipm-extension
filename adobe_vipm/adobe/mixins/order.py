@@ -192,6 +192,7 @@ class OrderClientMixin:
             "orderType": adobe_constants.ORDER_TYPE_PREVIEW,
             "lineItems": [],
         }
+        deployment_id = get_deployment_id(context.order)
         self._process_new_lines(context, flex_discounts, payload)
         if context.upsize_lines:
             try:
@@ -202,11 +203,11 @@ class OrderClientMixin:
                     flex_discounts,
                     payload,
                     context.market_segment,
+                    deployment_id,
                 )
             except ProcessingUpsizeLinesError as error:
                 raise AdobeCreatePreviewError(error) from error
 
-        deployment_id = get_deployment_id(context.order)
         self._update_payload_by_deployment(authorization, deployment_id, payload)
         if not payload["lineItems"]:
             self._logger.info(
@@ -560,11 +561,12 @@ class OrderClientMixin:
         discounts: dict,
         payload: dict,
         market_segment: str,
+        deployment_id: str | None,
     ):
         offer_ids = [line_item["item"]["externalIds"]["vendor"] for line_item in upsize_lines]
         # ???: This method belongs to SubscriptionClientMixin
         upsize_subscriptions = self.get_subscriptions_for_offers(
-            authorization_id, adobe_customer_id, offer_ids
+            authorization_id, adobe_customer_id, offer_ids, deployment_id
         )
         offer_subscriptions = map_by("offerId", upsize_subscriptions)
         map_by_base_offer_subscriptions = {
