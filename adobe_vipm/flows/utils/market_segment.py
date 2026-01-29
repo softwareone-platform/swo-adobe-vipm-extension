@@ -5,7 +5,6 @@ from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
-    MARKET_SEGMENTS,
     STATUS_MARKET_SEGMENT_PENDING,
     Param,
 )
@@ -24,7 +23,7 @@ def get_market_segment(product_id: str) -> str:
     Returns:
         Adobe market segment.
     """
-    return MARKET_SEGMENTS[get_for_product(settings, "PRODUCT_SEGMENT", product_id)]
+    return get_for_product(settings, "PRODUCT_SEGMENT", product_id)
 
 
 def is_large_government_agency_type(product_id: str) -> bool:

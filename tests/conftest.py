@@ -2336,7 +2336,7 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
     }
     mocker.patch.object(adobe_product_mapping_model, "all", return_value=all_sku)
 
-    def from_id(external_id):
+    def from_id(external_id, market_segment):
         if external_id not in all_sku:
             raise AdobeProductNotFoundError("Not Found")
         return all_sku[external_id]
@@ -2348,8 +2348,8 @@ def mock_get_sku_adobe_mapping_model(mocker, mock_sku_mapping_data):
 
 @pytest.fixture()
 def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):
-    def get_adobe_product_by_marketplace_sku(sku):
-        return mock_get_sku_adobe_mapping_model.from_short_id(sku)
+    def get_adobe_product_by_marketplace_sku(sku, market_segment):
+        return mock_get_sku_adobe_mapping_model.from_short_id(sku, market_segment)
 
     mocker.patch(
         "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",

@@ -2,6 +2,7 @@ import datetime as dt
 from collections import defaultdict
 
 import pytest
+from pyairtable.formulas import AND, EQUAL, FIELD, STR_VALUE
 from requests import HTTPError
 
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
@@ -31,6 +32,7 @@ from adobe_vipm.airtable.models import (
     get_transfers_to_check,
     get_transfers_to_process,
 )
+from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
 
 
 def test_airtable_base_info_for_migrations(settings):
@@ -716,7 +718,52 @@ def test_get_sku_adobe_mapping_model():
     assert sku_mapping_model.get_base().id == base_info.base_id
 
 
-def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):
+def test_adobe_product_mapping_from_short_id(mocker):
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    adobe_product_mapping_model = get_sku_adobe_mapping_model(base_info)
+    mocked_entity = mocker.MagicMock()
+    mocker.patch.object(
+        adobe_product_mapping_model,
+        "first",
+        return_value=mocked_entity,
+    )
+
+    result = adobe_product_mapping_model.from_short_id("65304578CA", "COM")
+
+    assert result == mocked_entity
+    adobe_product_mapping_model.first.assert_called_once_with(
+        formula=AND(
+            EQUAL(FIELD("vendor_external_id"), STR_VALUE("65304578CA")),
+            EQUAL(FIELD("segment"), STR_VALUE("COM")),
+        )
+    )
+
+
+def test_adobe_product_mapping_from_short_id_not_found(mocker):
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    adobe_product_mapping_model = get_sku_adobe_mapping_model(base_info)
+    mocker.patch.object(
+        adobe_product_mapping_model,
+        "first",
+        return_value=None,
+    )
+
+    with pytest.raises(AdobeProductNotFoundError) as exc_info:
+        adobe_product_mapping_model.from_short_id("non_existent_sku", "COM")
+
+    assert "AdobeProduct with vendor_external_id `non_existent_sku` not found." in str(
+        exc_info.value
+    )
+    adobe_product_mapping_model.first.assert_called_once_with(
+        formula=AND(
+            EQUAL(FIELD("vendor_external_id"), STR_VALUE("non_existent_sku")),
+            EQUAL(FIELD("segment"), STR_VALUE("COM")),
+        )
+    )
+
+
+# FIX: it has multiple act blocks
+def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):  # noqa: AAA02
     base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
     mocker.patch(
         "adobe_vipm.airtable.models.AirTableBaseInfo.for_sku_mapping",
@@ -729,9 +776,10 @@ def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     )
 
     with pytest.raises(AdobeProductNotFoundError):
-        get_adobe_product_by_marketplace_sku("vendor_external_id")
+        get_adobe_product_by_marketplace_sku("vendor_external_id", MARKET_SEGMENT_COMMERCIAL)
 
-    result = get_adobe_product_by_marketplace_sku("65304578CA")
+    result = get_adobe_product_by_marketplace_sku("65304578CA", MARKET_SEGMENT_COMMERCIAL)
+
     assert result.vendor_external_id == "65304578CA"
     assert result.sku == "65304578CA01A12"
     assert not result.is_consumable()

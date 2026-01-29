@@ -7,6 +7,7 @@ from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
+from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.utils import get_customer_data
 
@@ -360,7 +361,12 @@ def test_get_preview_order_line_item(
             "status": "Active",
         },
     }
-    assert mocked_client._get_preview_order_line_item(line, "65304578CA", 2, "FLEX_DISCOUNT") == {
+
+    result = mocked_client._get_preview_order_line_item(
+        line, "65304578CA", 2, "FLEX_DISCOUNT", MARKET_SEGMENT_COMMERCIAL
+    )
+
+    assert result == {
         "extLineItemNumber": 1,
         "flexDiscountCodes": ["FLEX_DISCOUNT"],
         "offerId": "65304578CA01A12",
@@ -391,7 +397,7 @@ def test_get_flex_discounts_per_base_offer_invalid_country(
         ),
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "US",
                 "offer-ids": "99999999CA01A12,99999999CA01A12",
             })
@@ -399,8 +405,8 @@ def test_get_flex_discounts_per_base_offer_invalid_country(
     )
     context = Context(
         order=mock_order,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
-        customer_data=get_customer_data(mock_order),
+        market_segment="COM",
+        customer_data=get_customer_data(mock_order)
     )
 
     flex_discounts = mocked_client.get_flex_discounts_per_base_offer(
@@ -433,7 +439,7 @@ def test_get_flex_discounts_per_base_offer_error(
         json=adobe_api_error_factory(AdobeStatus.INTERNAL_SERVER_ERROR, "Internal server error"),
         match=[
             matchers.query_param_matcher({
-                "market-segment": "MARKET_SEGMENT_COMMERCIAL",
+                "market-segment": "COM",
                 "country": "US",
                 "offer-ids": "99999999CA01A12,99999999CA01A12",
             })
@@ -441,8 +447,8 @@ def test_get_flex_discounts_per_base_offer_error(
     )
     context = Context(
         order=mock_order,
-        market_segment="MARKET_SEGMENT_COMMERCIAL",
-        customer_data=get_customer_data(mock_order),
+        market_segment="COM",
+        customer_data=get_customer_data(mock_order)
     )
 
     with pytest.raises(AdobeError):
