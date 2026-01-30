@@ -362,7 +362,7 @@ def _add_3yc_fulfillment_params(
     three_yc_recommitment_par = get_parameter(
         Param.PHASE_FULFILLMENT.value, agreement, Param.THREE_YC_RECOMMITMENT.value
     )
-    is_recommitment = bool(three_yc_recommitment_par)
+    is_recommitment = three_yc_recommitment_par.get("value") == ["Yes"]
     status_param_ext_id = (
         Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
         if not is_recommitment
