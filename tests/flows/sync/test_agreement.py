@@ -265,14 +265,18 @@ def test_sync_agreement_prices(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
-                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
-                "ordering": [],
+                "ordering": [
+                    {
+                        "externalId": "3YC",
+                        "value": None,
+                    },
+                ],
             },
         ),
         mocker.call(
@@ -316,15 +320,14 @@ def test_sync_agreement_update_agreement_education(
             mocked_agreement_syncer._agreement["id"],
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
-                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                     {"externalId": "educationSubSegment", "value": "EDU_1,EDU_2"},
                 ],
-                "ordering": [],
+                "ordering": [{"externalId": "3YC", "value": None}],
             },
             lines=[],
         ),
@@ -788,14 +791,14 @@ def test_sync_agreement_prices_with_3yc(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCRecommitmentRequestStatus", "value": "ACCEPTED"},
-                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
                     {"externalId": "3YCStartDate", "value": "2024-01-01"},
                     {"externalId": "3YCEndDate", "value": "2025-01-01"},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
                 "ordering": [
+                    {"externalId": "3YC", "value": None},
                     {"externalId": "3YCLicenses", "value": "9"},
                     {"externalId": "3YCConsumables", "value": "1220"},
                 ],
@@ -1024,14 +1027,13 @@ def test_sync_global_customer_parameter(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
-                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
-                "ordering": [],
+                "ordering": [{"externalId": "3YC", "value": None}],
             },
         ),
         mocker.call(
@@ -1050,14 +1052,13 @@ def test_sync_global_customer_parameter(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
-                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
-                "ordering": [],
+                "ordering": [{"externalId": "3YC", "value": None}],
             },
         ),
         mocker.call(
@@ -1537,14 +1538,13 @@ def test_sync_global_customer_no_active_deployments(
             lines=[],
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
-                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                 ],
-                "ordering": [],
+                "ordering": [{"externalId": "3YC", "value": None}],
             },
         ),
         mocker.call(
@@ -1799,14 +1799,13 @@ def test_sync_agreement_prices_with_missing_prices(
             ],
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
-                    {"externalId": "3YCRecommit", "value": None},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
-                "ordering": [],
+                "ordering": [{"externalId": "3YC", "value": None}],
             },
         ),
         mocker.call(
