@@ -1,8 +1,10 @@
 import datetime as dt
 import logging
+from functools import partial
 from typing import Any
 
 from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus, update_order
+from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -45,6 +47,7 @@ from adobe_vipm.flows.helpers import (
     ValidateResellerChange,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
+from adobe_vipm.flows.sync.helper import check_adobe_subscription_id
 from adobe_vipm.flows.utils import (
     are_all_transferring_items_expired,
     exclude_items_with_deployment_id,
@@ -617,7 +620,16 @@ class AddResellerChangeLinesToOrder(Step):
             list(reseller_items_map.keys()),
         )
         order_lines_from_transfer = []
-        for item in no_deployment_transfer_items:  # TODO:filter out expired?
+        for item in no_deployment_transfer_items:
+            adobe_subscription = find_first(  # TODO: make it DRY
+                partial(check_adobe_subscription_id, item["subscriptionId"]),
+                context.adobe_subscriptions["items"],
+            )
+            if (
+                adobe_subscription is None
+                or adobe_subscription["status"] != AdobeStatus.SUBSCRIPTION_ACTIVE.value
+            ):
+                continue
             partial_sku = get_partial_sku(item["offerId"])
             mapped_item = reseller_items_map.get(partial_sku)
             if mapped_item is None:
