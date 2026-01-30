@@ -441,7 +441,7 @@ class FetchTransferData(Step):
             context.validation_succeeded = False
             return
 
-        context.subscriptions = subscriptions
+        context.adobe_subscriptions = subscriptions
         context.adobe_transfer = exclude_items_with_deployment_id(adobe_transfer)
 
         next_step(mpt_client, context)
@@ -452,7 +452,7 @@ class UpdateSubscriptionSkus(Step):
 
     def __call__(self, mpt_client, context, next_step):
         """Update MPT subscription skus."""
-        for subscription in context.subscriptions["items"]:
+        for subscription in context.adobe_subscriptions["items"]:
             correct_sku = get_transfer_item_sku_by_subscription(
                 context.adobe_transfer, subscription["subscriptionId"]
             )
@@ -471,7 +471,7 @@ class FetchCustomerAndValidateEmptySubscriptions(Step):
         )
         context.adobe_customer = customer
 
-        if len(context.subscriptions["items"]) == 0:
+        if len(context.adobe_subscriptions["items"]) == 0:
             if customer.get("globalSalesEnabled", False):
                 logger.error(ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT)
                 param = get_ordering_parameter(context.order, Param.MEMBERSHIP_ID.value)
@@ -499,7 +499,7 @@ class AddLinesToOrder(Step):
         has_error, order = add_lines_to_order(
             mpt_client,
             context.order,
-            context.subscriptions["items"],
+            context.adobe_subscriptions["items"],
             commitment,
             Param.CURRENT_QUANTITY.value,
             is_transferred=True,
