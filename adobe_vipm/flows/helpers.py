@@ -710,6 +710,10 @@ class FetchResellerChangeData(Step):
                 parameter=Param.CHANGE_RESELLER_CODE,
             )
             return
+        context.adobe_subscriptions = adobe_client.get_subscriptions(
+            context.authorization_id,
+            context.adobe_transfer["customerId"],
+        )
 
         next_step(mpt_client, context)
 
