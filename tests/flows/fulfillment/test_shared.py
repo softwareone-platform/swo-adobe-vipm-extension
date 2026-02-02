@@ -1317,7 +1317,7 @@ def test_add_asset(
                 },
                 {
                     "externalId": Param.USED_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                    "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
                 },
             ]
         },
@@ -1426,7 +1426,7 @@ def test_create_or_update_asset_step(
                     },
                     {
                         "externalId": Param.USED_QUANTITY.value,
-                        "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                        "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
                     },
                 ]
             },
@@ -1497,7 +1497,7 @@ def test_create_or_update_assets_exists(
                 },
                 {
                     "externalId": Param.USED_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                    "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
                 },
             ]
         },
