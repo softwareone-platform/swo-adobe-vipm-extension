@@ -564,10 +564,15 @@ class AgreementSyncer:  # noqa: WPS214
     def _get_processable_agreement_lines(self, agreement: dict) -> list[tuple[dict, str]]:
         agreement_lines = []
         for line in agreement["lines"]:
-            actual_sku = models.get_adobe_sku(
-                line["item"]["externalIds"]["vendor"], get_market_segment(self.product_id)
-            )
-
+            try:
+                vendor_id = line["item"]["externalIds"]["vendor"]
+            except KeyError:
+                logger.warning(
+                    "Skipping agreement line %s: missing vendor externalId",
+                    line.get("id"),
+                )
+                continue
+            actual_sku = models.get_adobe_sku(vendor_id, get_market_segment(self.product_id))
             agreement_lines.append((line, actual_sku))
         return agreement_lines
 
