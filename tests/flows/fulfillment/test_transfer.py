@@ -5265,7 +5265,7 @@ def test_fulfill_transfer_migrated_order_offer_id_expired(
         side_effect=[{"id": "TPL-0000"}, {"id": "TPL-1111"}],
     )
     mock_sync_main_agreement = mocker.patch(
-        "adobe_vipm.flows.fulfillment.transfer.sync_main_agreement"
+        "adobe_vipm.flows.fulfillment.transfer.sync_airtable_main_agreement", autospec=True
     )
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = adobe_customer
