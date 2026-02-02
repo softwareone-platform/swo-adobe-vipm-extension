@@ -15,7 +15,11 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.fulfillment.transfer import (
     CompleteTransferOrder,
+    CreateTransferAssets,
+    CreateTransferSubscriptions,
     GetAdobeCustomer,
+    ProcessTransferOrder,
+    SetCommitmentDates,
     ValidateAgreementDeployments,
     ValidateGCMainAgreement,
 )
@@ -216,6 +220,10 @@ def test_fulfill_reseller_change_order(mocker, mock_mpt_client):
         UpdateAutorenewalSubscriptions,
         ValidateGCMainAgreement,
         ValidateAgreementDeployments,
+        ProcessTransferOrder,
+        CreateTransferAssets,
+        CreateTransferSubscriptions,
+        SetCommitmentDates,
         CompleteTransferOrder,
         SyncAgreement,
     ]
@@ -240,11 +248,11 @@ def test_setup_reseller_change_context_success(
     )
     mocked_get_transfer.return_value = None
     mocked_get_main_agreement = mocker.patch(
-        "adobe_vipm.flows.fulfillment.reseller_transfer.get_main_agreement"
+        "adobe_vipm.flows.fulfillment.transfer.get_main_agreement"
     )
     mocked_get_main_agreement.return_value = None
     mocked_get_agreement_deployments = mocker.patch(
-        "adobe_vipm.flows.fulfillment.reseller_transfer.get_agreement_deployments"
+        "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployments"
     )
     mocked_get_agreement_deployments.return_value = []
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
