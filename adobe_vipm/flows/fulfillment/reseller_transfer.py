@@ -11,19 +11,12 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_or_customer
 from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment import transfer
 from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SyncAgreement,
     switch_order_to_failed,
-)
-from adobe_vipm.flows.fulfillment.transfer import (
-    CompleteTransferOrder,
-    GetAdobeCustomer,
-    ValidateAgreementDeployments,
-    ValidateGCMainAgreement,
-    get_agreement_deployments,
-    get_main_agreement,
 )
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
@@ -58,11 +51,15 @@ def fulfill_reseller_change_order(mpt_client, order):
         ValidateResellerChange(is_validation=False),
         CommitResellerChange(),
         CheckAdobeResellerTransfer(),
-        GetAdobeCustomer(),
+        transfer.GetAdobeCustomer(),
         UpdateAutorenewalSubscriptions(),
-        ValidateGCMainAgreement(),
-        ValidateAgreementDeployments(),
-        CompleteTransferOrder(),
+        transfer.ValidateGCMainAgreement(),
+        transfer.ValidateAgreementDeployments(),
+        transfer.ProcessTransferOrder(),
+        transfer.CreateTransferAssets(),
+        transfer.CreateTransferSubscriptions(),
+        transfer.SetCommitmentDates(),
+        transfer.CompleteTransferOrder(),
         SyncAgreement(),
     )
 
@@ -84,13 +81,13 @@ class SetupResellerChangeContext(Step):
             context.reseller_change_code,
         )
 
-        context.gc_main_agreement = get_main_agreement(
+        context.gc_main_agreement = transfer.get_main_agreement(
             context.product_id,
             context.authorization_id,
             context.reseller_change_code,
         )
 
-        context.existing_deployments = get_agreement_deployments(
+        context.existing_deployments = transfer.get_agreement_deployments(
             context.product_id, context.order.get("agreement", {}).get("id", "")
         )
 
