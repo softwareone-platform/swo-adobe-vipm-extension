@@ -165,7 +165,7 @@ def _add_missing_subscriptions(
                             },
                             {
                                 "externalId": Param.USED_QUANTITY.value,
-                                "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                                "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
                             },
                         ]
                     },
@@ -461,7 +461,7 @@ def _update_assets(
         if Param.USED_QUANTITY in adobe_subscription:
             parameters.append({
                 "externalId": Param.USED_QUANTITY.value,
-                "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
             })
 
         if not dry_run:

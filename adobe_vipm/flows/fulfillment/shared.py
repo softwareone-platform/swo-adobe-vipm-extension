@@ -391,7 +391,7 @@ def create_asset_payload(adobe_subscription, order_line, item, template):
                 },
                 {
                     "externalId": Param.USED_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                    "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
                 },
             ]
         },
