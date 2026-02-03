@@ -31,6 +31,7 @@ from adobe_vipm.flows.validation.transfer import FetchTransferData, get_prices, 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer(
     mocker,
     mock_adobe_client,
@@ -88,6 +89,7 @@ def test_validate_transfer(
     )
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_lines_exist(
     mocker,
     mock_adobe_client,
@@ -141,6 +143,7 @@ def test_validate_transfer_lines_exist(
     )
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 @pytest.mark.parametrize(
     "status_code",
     [
@@ -181,6 +184,7 @@ def test_validate_transfer_membership_error(
     assert param["constraints"]["required"] is True
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 @pytest.mark.parametrize(
     ("error", "expected_message"),
     [
@@ -218,6 +222,7 @@ def test_validate_transfer_http_error(
     assert param["constraints"]["required"] is True
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_unknown_item(
     mocker,
     mock_adobe_client,
@@ -248,6 +253,7 @@ def test_validate_transfer_unknown_item(
     assert param["constraints"]["required"] is True
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated(
     mocker,
     mock_adobe_client,
@@ -302,6 +308,7 @@ def test_validate_transfer_already_migrated(
     assert adobe_subscription["offerId"] == "65304578CA03A12"
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_migration_running(
     mocker,
     mock_adobe_client,
@@ -329,6 +336,7 @@ def test_validate_transfer_migration_running(
     assert param["constraints"]["required"] is True
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_migration_synchronized(
     mocker,
     mock_adobe_client,
@@ -355,6 +363,7 @@ def test_validate_transfer_migration_synchronized(
     assert param["constraints"]["required"] is True
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_no_items(
     mocker,
     mock_adobe_client,
@@ -401,6 +410,7 @@ def test_get_prices(mocker, mock_order):
     )
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_account_inactive(
     mocker,
     mock_adobe_client,
@@ -482,6 +492,7 @@ def test_get_prices_3yc_expired(mocker, mock_order, adobe_commitment_factory):
     mocked_get_prices_for_3yc_skus.assert_not_called()
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_all_items_expired(
     mocker,
     mock_adobe_client,
@@ -549,6 +560,7 @@ def test_validate_transfer_already_migrated_all_items_expired(
     assert len(validated_order["lines"]) == len(lines)
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item_active(
     mocker,
     mock_adobe_client,
@@ -620,6 +632,7 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
     assert len(validated_order["lines"]) == len(lines)
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_all_items_expired_delete_existing_line(
     mocker,
     mock_adobe_client,
@@ -708,6 +721,7 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
     assert validated_order["lines"] == lines
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_all_items_expired_update_existing_line(
     mocker,
     mock_adobe_client,
@@ -814,6 +828,7 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
     assert validated_order["lines"] == lines
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     mocker,
     mock_adobe_client,
@@ -946,6 +961,7 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     assert validated_order["lines"] == lines
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_item_active(
     mocker,
     mock_adobe_client,
@@ -1048,6 +1064,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     ]
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_error(
     mocker,
     mock_adobe_client,
@@ -1131,6 +1148,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     assert validated_order["lines"] == lines
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_partial_items_expired_update_line_error(
     mocker,
     mock_adobe_client,
@@ -1200,6 +1218,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
     assert validated_order["lines"] == lines
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_partial_items_expired_remove_line_error(
     mocker,
     mock_adobe_client,
@@ -1286,6 +1305,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
     assert len(validated_order["lines"]) == len(lines)
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_no_items(
     mocker,
     mock_adobe_client,
@@ -1315,6 +1335,7 @@ def test_validate_transfer_already_migrated_no_items(
     assert validated_order["lines"] == []
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_no_items_add_line(
     mocker,
     mock_adobe_client,
@@ -1381,6 +1402,7 @@ def test_validate_transfer_already_migrated_no_items_add_line(
     assert len(validated_order["lines"]) == len(lines)
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_items_with_deployment(
     mocker,
     mock_adobe_client,
@@ -1426,6 +1448,7 @@ def test_validate_transfer_already_migrated_items_with_deployment(
     )
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_with_one_line_items(
     mocker,
     mock_adobe_client,
@@ -1513,6 +1536,7 @@ def test_validate_transfer_with_one_line_items(
     )
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 @pytest.mark.parametrize(
     ("error", "expected_error_message"),
     [
@@ -1639,6 +1663,7 @@ def test_fetch_transfer_data_lga_product_with_not_lga_agency_type(
     assert param["error"] == ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA.to_dict()
 
 
+@pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_government_transfer_lga_product_with_lga_agency_type(
     mocker,
     mock_adobe_client,
