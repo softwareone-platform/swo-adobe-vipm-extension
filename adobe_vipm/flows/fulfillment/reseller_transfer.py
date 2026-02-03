@@ -75,7 +75,7 @@ class SetupResellerChangeContext(Step):
         context.reseller_change_code = get_change_reseller_code(context.order)
         context.customer_deployments = None
 
-        context.transfer = get_transfer_by_authorization_membership_or_customer(
+        context.adobe_transfer_order = get_transfer_by_authorization_membership_or_customer(
             context.product_id,
             context.authorization_id,
             context.reseller_change_code,
