@@ -169,3 +169,8 @@ adobe_secrets.json
 .DS_Store
 .ruff_cache
 .idea
+
+
+# mpt-tool
+migrations/
+.migrations-state.json
