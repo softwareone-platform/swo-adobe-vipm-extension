@@ -12,15 +12,32 @@ from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_
 from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import transfer
+from adobe_vipm.flows.fulfillment.purchase import (
+    CreateCustomer,
+    RefreshCustomer,
+    ValidateEducationSubSegments,
+    ValidateGovernmentLGA,
+)
 from adobe_vipm.flows.fulfillment.shared import (
+    CompleteOrder,
+    CreateOrUpdateAssets,
+    CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
+    NullifyFlexDiscountParam,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
+    SubmitNewOrder,
     SyncAgreement,
+    ValidateDuplicateLines,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
+    PrepareCustomerData,
     SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
     ValidateResellerChange,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
@@ -30,6 +47,7 @@ from adobe_vipm.flows.utils.parameter import (
     get_change_reseller_admin_email,
     get_change_reseller_code,
 )
+from adobe_vipm.flows.validation.transfer import AddResellerChangeLinesToOrder
 
 logger = logging.getLogger(__name__)
 
@@ -49,18 +67,26 @@ def fulfill_reseller_change_order(mpt_client, order):
         SetupResellerChangeContext(),
         FetchResellerChangeData(is_validation=False),
         ValidateResellerChange(is_validation=False),
+        AddResellerChangeLinesToOrder(is_validation=False),
         CommitResellerChange(),
         CheckAdobeResellerTransfer(),
-        transfer.GetAdobeCustomer(),
-        UpdateAutorenewalSubscriptions(),
-        transfer.ValidateGCMainAgreement(),
-        transfer.ValidateAgreementDeployments(),
-        transfer.ProcessTransferOrder(),
-        transfer.CreateTransferAssets(),
-        transfer.CreateTransferSubscriptions(),
-        transfer.SetCommitmentDates(),
-        transfer.CompleteTransferOrder(),
+        ValidateDuplicateLines(),
+        ValidateGovernmentLGA(),
+        PrepareCustomerData(),
+        CreateCustomer(),
+        ValidateEducationSubSegments(),
+        Validate3YCCommitment(),
+        GetPreviewOrder(),
+        UpdatePrices(),
+        SubmitNewOrder(),
+        CreateOrUpdateAssets(),
+        CreateOrUpdateSubscriptions(),
+        RefreshCustomer(),
+        SetOrUpdateCotermDate(),
+        CompleteOrder(TEMPLATE_NAME_TRANSFER),
+        NullifyFlexDiscountParam(),
         SyncAgreement(),
+        # transfer.CompleteTransferOrder(),
     )
 
     context = Context(order=order)
@@ -101,10 +127,17 @@ class CheckAdobeResellerTransfer(Step):
         """Check if the Adobe reseller transfer order exists and it is active."""
         adobe_client = get_adobe_client()
         authorization_id = context.order["authorization"]["id"]
-        transfer_id = get_adobe_order_id(context.order)
-        context.adobe_transfer_order = adobe_client.get_reseller_transfer(
-            authorization_id, transfer_id
-        )
+        try:
+            context.adobe_transfer_order = adobe_client.get_reseller_transfer(
+                authorization_id, context.adobe_new_order_id
+            )
+        except AdobeAPIError as error:
+            if error.code == AdobeStatus.INVALID_FIELDS:
+                logger.info("Transfer already commited.")
+                next_step(mpt_client, context)
+                return
+            else:
+                raise
 
         reseller_code = get_change_reseller_code(context.order)
         context.adobe_transfer_order["membershipId"] = reseller_code
@@ -161,9 +194,6 @@ class CommitResellerChange(Step):
             )
             return
 
-        context.order = set_adobe_order_id(
-            context.order, context.adobe_transfer_order.get("transferId")
-        )
         context.order = set_adobe_customer_id(
             context.order, context.adobe_transfer_order.get("customerId")
         )

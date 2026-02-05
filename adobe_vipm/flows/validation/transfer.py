@@ -531,7 +531,7 @@ def validate_reseller_change(mpt_client, order):
         SetupTransferContext(),
         FetchResellerChangeData(is_validation=True),
         ValidateResellerChange(is_validation=True),
-        AddResellerChangeLinesToOrder(),
+        AddResellerChangeLinesToOrder(is_validation=True),
         GetPreviewOrder(),
         UpdatePrices(),
     )
@@ -543,49 +543,54 @@ def validate_reseller_change(mpt_client, order):
 class AddResellerChangeLinesToOrder(Step):
     """Add lines from reseller change back to the MPT order."""
 
+    def __init__(self, *, is_validation=False):
+        self.is_validation = is_validation
+
     def __call__(self, mpt_client, context, next_step):
         """Add lines from reseller change back to the MPT order."""
-        order_lines_from_transfer = self._get_order_lines_from_transfer(context, mpt_client)
+        if self.is_validation:
+            order_lines_from_transfer = self._get_order_lines_from_transfer(context, mpt_client)
 
-        if order_lines_from_transfer:
-            if not context.order["lines"]:
-                logger.info("No existing order lines, proceeding with transfer lines")
+            if order_lines_from_transfer:
+                if not context.order["lines"]:
+                    logger.info("No existing order lines, proceeding with transfer lines")
+                    context.order = update_order(
+                        mpt_client, context.order_id, lines=order_lines_from_transfer
+                    )
+                    context.validation_succeeded = True
+                elif not self._transfer_order_lines_match(
+                    context.order["lines"], order_lines_from_transfer
+                ):
+                    logger.warning("Order lines do not match transfer lines")
+                    context.order = set_order_error(
+                        context.order, ERR_ADOBE_RESSELLER_CHANGE_LINES.to_dict()
+                    )
+                    context.validation_succeeded = False
+                    return
+                else:
+                    logger.info(
+                        "Order lines match transfer lines successfully (%d lines)",
+                        len(order_lines_from_transfer),
+                    )
+                    context.validation_succeeded = True
+            elif context.order["lines"]:
+                logger.info(
+                    "No transfer lines but order has %d existing lines, processing new lines",
+                    len(context.order["lines"]),
+                )
+                context.validation_succeeded = True
+            else:
+                logger.warning("No transfer lines and no order lines, validation failed")
                 context.order = update_order(
                     mpt_client, context.order_id, lines=order_lines_from_transfer
                 )
-                context.validation_succeeded = True
-            elif not self._transfer_order_lines_match(
-                context.order["lines"], order_lines_from_transfer
-            ):
-                logger.warning("Order lines do not match transfer lines")
-                context.order = set_order_error(
-                    context.order, ERR_ADOBE_RESSELLER_CHANGE_LINES.to_dict()
-                )
                 context.validation_succeeded = False
                 return
-            else:
-                logger.info(
-                    "Order lines match transfer lines successfully (%d lines)",
-                    len(order_lines_from_transfer),
-                )
-                context.validation_succeeded = True
-        elif context.order["lines"]:
-            logger.info(
-                "No transfer lines but order has %d existing lines, processing new lines",
-                len(context.order["lines"]),
-            )
-            context.validation_succeeded = True
-        else:
-            logger.warning("No transfer lines and no order lines, validation failed")
-            context.order = update_order(
-                mpt_client, context.order_id, lines=order_lines_from_transfer
-            )
-            context.validation_succeeded = False
-            return
 
-        logger.info(
-            "Proceeding to next step with validation_succeeded=%s", context.validation_succeeded
-        )
+            logger.info(
+                "Proceeding to next step with validation_succeeded=%s", context.validation_succeeded
+            )
+
         downsize_lines, upsize_lines, new_lines = split_downsizes_upsizes_new(context.order)
         context.downsize_lines = downsize_lines
         context.upsize_lines = upsize_lines

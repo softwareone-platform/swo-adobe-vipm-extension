@@ -1013,7 +1013,7 @@ class SubmitNewOrder(Step):
         context.adobe_new_order = adobe_order
         context.adobe_new_order_id = adobe_order["orderId"]
         if adobe_order["status"] == AdobeStatus.PENDING:
-            logger.info("%s: adobe order %s is still pending.", context, context.adobe_new_order_id)
+            logger.info("%s: adobe order %s is still pending.", context, adobe_order["orderId"])
             return
 
         if adobe_order["status"] in UNRECOVERABLE_ORDER_STATUSES:
