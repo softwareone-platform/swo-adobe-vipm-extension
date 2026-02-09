@@ -12,18 +12,37 @@ from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_
 from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import transfer
+from adobe_vipm.flows.fulfillment.purchase import (
+    RefreshCustomer,
+    ValidateEducationSubSegments,
+    ValidateGovernmentLGA,
+)
 from adobe_vipm.flows.fulfillment.shared import (
+    CompleteOrder,
+    CreateOrUpdateAssets,
+    CreateOrUpdateSubscriptions,
+    GetPreviewOrder,
+    NullifyFlexDiscountParam,
+    SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
+    SubmitNewOrder,
     SyncAgreement,
+    ValidateDuplicateLines,
+    switch_order_to_completed,
     switch_order_to_failed,
 )
+from adobe_vipm.flows.fulfillment.transfer import sync_airtable_main_agreement
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
+    PrepareCustomerData,
     SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
     ValidateResellerChange,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
+from adobe_vipm.flows.sync.agreement import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils.customer import set_adobe_customer_id
 from adobe_vipm.flows.utils.order import get_adobe_order_id, set_adobe_order_id
 from adobe_vipm.flows.utils.parameter import (
@@ -59,7 +78,22 @@ def fulfill_reseller_change_order(mpt_client, order):
         transfer.CreateTransferAssets(),
         transfer.CreateTransferSubscriptions(),
         transfer.SetCommitmentDates(),
-        transfer.CompleteTransferOrder(),
+        CompleteTransferOrder(),
+        ValidateDuplicateLines(),
+        ValidateGovernmentLGA(),
+        # PrepareCustomerData(),
+        # CreateCustomer(),
+        ValidateEducationSubSegments(),
+        Validate3YCCommitment(),
+        GetPreviewOrder(),
+        UpdatePrices(),
+        SubmitNewOrder(),
+        CreateOrUpdateAssets(),
+        CreateOrUpdateSubscriptions(),
+        RefreshCustomer(),
+        SetOrUpdateCotermDate(),
+        CompleteOrder(TEMPLATE_NAME_TRANSFER),
+        NullifyFlexDiscountParam(),
         SyncAgreement(),
     )
 
@@ -213,4 +247,30 @@ class UpdateAutorenewalSubscriptions(Step):
                     context,
                     subscription_id,
                 )
+        next_step(mpt_client, context)
+
+
+class CompleteTransferOrder(Step):
+    """Completes the transfer order processing."""
+
+    def __call__(self, mpt_client, context, next_step):
+        """Completes transfer order with TEMPLATE_NAME_TRANSFER or default Transfer template."""
+        if context.adobe_transfer_order["lineItems"]:
+            switch_order_to_completed(mpt_client, context.order, TEMPLATE_NAME_TRANSFER)
+            adobe_client = get_adobe_client()
+            sync_agreements_by_agreement_ids(
+                mpt_client,
+                adobe_client,
+                [context.order["agreement"]["id"]],
+                dry_run=False,
+                sync_prices=False,
+            )
+            sync_airtable_main_agreement(
+                context.gc_main_agreement,
+                context.product_id,
+                context.authorization_id,
+                context.customer_id,
+            )
+            return
+
         next_step(mpt_client, context)
