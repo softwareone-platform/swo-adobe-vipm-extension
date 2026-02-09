@@ -158,6 +158,7 @@ per-file-ignores = [
   "adobe_vipm/notifications.py: WPS110 WPS202 WPS211 WPS213",
   "adobe_vipm/utils.py: WPS100 WPS110 WPS114",
   "adobe_vipm/management/commands/sync_3yc_enrol.py: WPS114",
+  "migrations/*.py: WPS102 WPS118",
 ]
 
 [tool.ruff]
