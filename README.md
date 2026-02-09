@@ -56,10 +56,10 @@ In the project root, create and configure the following files.
 
 #### Adobe secrets file
 
-Create `adobe_secrets.json`:
+Create `adobe_credentials.json`:
 
 ```bash
-touch adobe_secrets.json
+touch adobe_credentials.json
 ```
 
 Fill it with your Adobe credentials:
@@ -159,7 +159,7 @@ Run the service against real Adobe and SoftwareONE Marketplace APIs. It uses `co
 
 Ensure:
 
-- `adobe_secrets.json` and `adobe_authorizations.json` contain real credentials.
+- `adobe_credentials.json` and `adobe_authorizations.json` contain real credentials.
 - `.env` is populated with real endpoints and tokens.
 
 Start the app:
@@ -173,14 +173,18 @@ The service will be available at `http://localhost:8080`.
 Example `.env` snippet for real services:
 
 ```env
-EXT_ADOBE_CREDENTIALS_FILE=/extension/adobe_secrets.json
 EXT_ADOBE_API_BASE_URL=<adobe-vipm-api>
 EXT_ADOBE_AUTH_ENDPOINT_URL=<adobe-vipm-authentication-url>
-MPT_PRODUCT_ID=PRD-1111-1111,PRD-2222-2222
+EXT_ADOBE_CREDENTIALS_FILE=/extension/adobe_credentials.json
 EXT_WEBHOOKS_SECRETS={"PRD-1111-1111": "<webhook-secret-for-product>", "PRD-2222-2222": "<webhook-secret-for-product>"}
-MPT_PORTAL_BASE_URL=https://portal.s1.show
 MPT_API_BASE_URL=https://api.s1.show/public
 MPT_API_TOKEN=c0fdafd7-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+MPT_PORTAL_BASE_URL=https://portal.s1.show
+MPT_PRODUCT_IDS=PRD-1111-1111,PRD-2222-2222
+MPT_TOOL_STORAGE_TYPE=airtable
+MPT_TOOL_STORAGE_AIRTABLE_API_KEY=<fake-airtable-api-key>
+MPT_TOOL_STORAGE_AIRTABLE_BASE_ID=<fake-storage-airtable-base-id>
+MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME=<fake-storage-airtable-table-name>
 ```
 
 `MPT_PRODUCTS_IDS` is a comma-separated list of SWO Marketplace Product identifiers.
@@ -207,26 +211,32 @@ The following environment variables are typically set in `.env`. Docker Compose 
 
 ### Application
 
-| Environment Variable            | Default                 | Example                                 | Description                                                                               |
-|---------------------------------|-------------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
-| `EXT_ADOBE_CREDENTIALS_FILE`    | -                       | /extension/adobe_secrets.json           | Path to Adobe credentials file                                                            |
-| `EXT_ADOBE_AUTHORIZATIONS_FILE` | -                       | /extension/adobe_authorizations.json    | Path to Adobe authorizations file                                                         |
-| `EXT_ADOBE_API_BASE_URL`        | -                       | `https://partner-example.adobe.io`      | Path to Adobe VIPM API                                                                    |
-| `EXT_ADOBE_AUTH_ENDPOINT_URL`   | -                       | `https://auth.partner-example.adobe.io` | Path to Adobe VIPM authentication API                                                     |
-| `EXT_AIRTABLE_SKU_MAPPING_BASE` | -                       | appXXXXXXXXXXXXXXXX                     | Airtable base ID for the SKU mapping                                                      |
-| `EXT_WEBHOOKS_SECRETS`          | -                       | {"PRD-1111-1111": "123qweasd3432234"}   | Webhook secret of the Draft validation Webhook in SoftwareONE Marketplace for the product |
-| `MPT_PRODUCTS_IDS`              | PRD-1111-1111           | PRD-1234-1234,PRD-4321-4321             | Comma-separated list of SoftwareONE Marketplace Product ID                                |
-| `MPT_API_BASE_URL`              | `http://localhost:8000` | `https://portal.softwareone.com`        | SoftwareONE Marketplace API URL                                                           |
-| `MPT_API_TOKEN`                 | -                       | eyJhbGciOiJSUzI1N...                    | SoftwareONE Marketplace API Token                                                         |
-| `MPT_NOTIFY_CATEGORIES`         | -                       | {"ORDERS": "NTC-0000-0006"}             | SoftwareONE Marketplace Notification Categories                                           |
+| Environment Variable                   | Default                 | Example                                 | Description                                                                               |
+|----------------------------------------|-------------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
+| `EXT_ADOBE_API_BASE_URL`               | -                       | `https://partner-example.adobe.io`      | Path to Adobe VIPM API                                                                    |
+| `EXT_ADOBE_AUTHORIZATIONS_FILE`        | -                       | /extension/adobe_authorizations.json    | Path to Adobe authorizations file                                                         |
+| `EXT_ADOBE_AUTH_ENDPOINT_URL`          | -                       | `https://auth.partner-example.adobe.io` | Path to Adobe VIPM authentication API                                                     |
+| `EXT_ADOBE_CREDENTIALS_FILE`           | -                       | /extension/adobe_credentials.json       | Path to Adobe credentials file                                                            |
+| `EXT_AIRTABLE_SKU_MAPPING_BASE`        | -                       | appXXXXXXXXXXXXXXXX                     | Airtable base ID for the SKU mapping                                                      |
+| `EXT_NAV_AUTH_AUDIENCE`                | -                       | `api://default`                         | Audience/identifier string used by the NAV auth provider for JWT validation               |
+| `EXT_WEBHOOKS_SECRETS`                 | -                       | {"PRD-1111-1111": "123qweasd3432234"}   | Webhook secret of the Draft validation Webhook in SoftwareONE Marketplace for the product |
+| `MPT_API_BASE_URL`                     | `http://localhost:8000` | `https://api.s1.show`                   | SoftwareONE Marketplace API URL                                                           |
+| `MPT_API_TOKEN`                        | -                       | eyJhbGciOiJSUzI1N...                    | SoftwareONE Marketplace API Token                                                         |
+| `MPT_NOTIFY_CATEGORIES`                | -                       | {"ORDERS": "NTC-0000-0006"}             | SoftwareONE Marketplace Notification Categories                                           |
+| `MPT_PORTAL_BASE_URL`                  | `http://localhost:8000` | `https://portal.softwareone.com`        | Base URL for the Marketplace Portal used to construct portal links and API endpoints      |
+| `MPT_PRODUCTS_IDS`                     | PRD-1111-1111           | PRD-1234-1234,PRD-4321-4321             | Comma-separated list of SoftwareONE Marketplace Product ID                                |
+| `MPT_TOOL_STORAGE_TYPE`                | `local`                 | `airtable`                              | Storage type for MPT tools (local or airtable)                                            |
+| `MPT_TOOL_STORAGE_AIRTABLE_API_KEY`    | -                       | patXXXXXXXXXXXXXX                       | Airtable API key for MPT tool storage (required when storage type is airtable)            |
+| `MPT_TOOL_STORAGE_AIRTABLE_BASE_ID`    | -                       | appXXXXXXXXXXXXXX                       | Airtable base ID for MPT tool storage (required when storage type is airtable)            |
+| `MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME` | -                       | MigrationTracking                       | Airtable table name for MPT tool storage (required when storage type is airtable)         |
 
 ### Azure AppInsights
 
 | Environment Variable                    | Default                            | Example                                                                                                                                                                                               | Description                                                                                                   |
 |-----------------------------------------|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| `OTEL_SERVICE_NAME`                     | -                                  | Swo.Extensions.AdobeVIPM                                                                                                                                                                              | Service name that is visible in the AppInsights logs                                                          |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | -                                  | `InstrumentationKey=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx;IngestionEndpoint=https://westeurope-1.in.applicationinsights.azure.com/;LiveEndpoint=https://westeurope.livediagnostics.monitor.azure.com/` | Azure Application Insights connection string                                                                  |
 | `LOGGING_ATTEMPT_GETTER`                | adobe_vipm.utils.get_attempt_count | adobe_vipm.utils.get_attempt_count                                                                                                                                                                    | Path to python function that retrieves order processing attempt to put it into the Azure Application Insights |
+| `OTEL_SERVICE_NAME`                     | -                                  | Swo.Extensions.AdobeVIPM                                                                                                                                                                              | Service name that is visible in the AppInsights logs                                                          |
 
 ### Other
 
