@@ -625,11 +625,7 @@ class AddResellerChangeLinesToOrder(Step):
                 logger.error(error_msg)
                 send_error("Transfer Validation - Missing reseller item", error_msg)
                 raise MPTError(error_msg)
-            order_lines_from_transfer.append({
-                "item": mapped_item,
-                "oldQuantity": item["quantity"],
-                "quantity": item["quantity"],
-            })
+            order_lines_from_transfer.append({"item": mapped_item, "quantity": item["quantity"]})
 
         logger.info("Created %d order lines from transfer items", len(order_lines_from_transfer))
         return order_lines_from_transfer
