@@ -59,7 +59,6 @@ from adobe_vipm.flows.utils import (
     is_transferring_item_expired,
     set_order_error,
     set_ordering_parameter_error,
-    split_downsizes_upsizes_new,
 )
 from adobe_vipm.flows.utils.validation import validate_government_lga_data
 from adobe_vipm.flows.validation.shared import GetPreviewOrder
@@ -574,10 +573,6 @@ class AddResellerChangeLinesToOrder(Step):
                 "No transfer lines but order has %d existing lines, processing new lines",
                 len(context.order["lines"]),
             )
-            downsize_lines, upsize_lines, new_lines = split_downsizes_upsizes_new(context.order)
-            context.downsize_lines = downsize_lines
-            context.upsize_lines = upsize_lines
-            context.new_lines = new_lines
 
             context.validation_succeeded = True
         else:
@@ -625,11 +620,7 @@ class AddResellerChangeLinesToOrder(Step):
                 logger.error(error_msg)
                 send_error("Transfer Validation - Missing reseller item", error_msg)
                 raise MPTError(error_msg)
-            order_lines_from_transfer.append({
-                "item": mapped_item,
-                "oldQuantity": item["quantity"],
-                "quantity": item["quantity"],
-            })
+            order_lines_from_transfer.append({"item": mapped_item, "quantity": item["quantity"]})
 
         logger.info("Created %d order lines from transfer items", len(order_lines_from_transfer))
         return order_lines_from_transfer
