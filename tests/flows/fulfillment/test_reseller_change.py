@@ -1,6 +1,7 @@
 from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment import transfer
 from adobe_vipm.flows.fulfillment.reseller_transfer import (
     CheckAdobeResellerTransfer,
     CommitResellerChange,
@@ -12,12 +13,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SyncAgreement,
-)
-from adobe_vipm.flows.fulfillment.transfer import (
-    CompleteTransferOrder,
-    GetAdobeCustomer,
-    ValidateAgreementDeployments,
-    ValidateGCMainAgreement,
 )
 from adobe_vipm.flows.helpers import FetchResellerChangeData, SetupContext, ValidateResellerChange
 from adobe_vipm.flows.utils import get_adobe_customer_id, get_adobe_order_id
@@ -212,11 +207,15 @@ def test_fulfill_reseller_change_order(mocker, mock_mpt_client):
         ValidateResellerChange,
         CommitResellerChange,
         CheckAdobeResellerTransfer,
-        GetAdobeCustomer,
+        transfer.GetAdobeCustomer,
         UpdateAutorenewalSubscriptions,
-        ValidateGCMainAgreement,
-        ValidateAgreementDeployments,
-        CompleteTransferOrder,
+        transfer.ValidateGCMainAgreement,
+        transfer.ValidateAgreementDeployments,
+        transfer.ProcessTransferOrder,
+        transfer.CreateTransferAssets,
+        transfer.CreateTransferSubscriptions,
+        transfer.SetCommitmentDates,
+        transfer.CompleteTransferOrder,
         SyncAgreement,
     ]
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
@@ -240,11 +239,11 @@ def test_setup_reseller_change_context_success(
     )
     mocked_get_transfer.return_value = None
     mocked_get_main_agreement = mocker.patch(
-        "adobe_vipm.flows.fulfillment.reseller_transfer.get_main_agreement"
+        "adobe_vipm.flows.fulfillment.transfer.get_main_agreement"
     )
     mocked_get_main_agreement.return_value = None
     mocked_get_agreement_deployments = mocker.patch(
-        "adobe_vipm.flows.fulfillment.reseller_transfer.get_agreement_deployments"
+        "adobe_vipm.flows.fulfillment.transfer.get_agreement_deployments"
     )
     mocked_get_agreement_deployments.return_value = []
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
