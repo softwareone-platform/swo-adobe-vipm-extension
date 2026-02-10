@@ -34,7 +34,10 @@ from adobe_vipm.flows.sync.helper import check_adobe_subscription_id
 from adobe_vipm.flows.sync.price_manager import PriceManager
 from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
 from adobe_vipm.flows.utils import notify_agreement_unhandled_exception_in_teams
-from adobe_vipm.flows.utils.market_segment import get_market_segment
+from adobe_vipm.flows.utils.market_segment import (
+    get_market_segment,
+    is_large_government_agency_type,
+)
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.notifications import send_exception, send_warning
@@ -431,9 +434,10 @@ class AgreementSyncer:  # noqa: WPS214
 
         commitment_info = get_3yc_commitment(self._adobe_customer)
 
-        self._notify_if_3yc_commitment_expired(agreement, commitment_info)
-        self._update_3yc_fulfillment_params(agreement, commitment_info, parameters)
-        self._update_3yc_ordering_params(commitment_info, parameters)
+        if not is_large_government_agency_type(self.product_id):
+            self._notify_if_3yc_commitment_expired(agreement, commitment_info)
+            self._update_3yc_fulfillment_params(agreement, commitment_info, parameters)
+            self._update_3yc_ordering_params(commitment_info, parameters)
 
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
         parameters[Param.PHASE_FULFILLMENT.value].append({
