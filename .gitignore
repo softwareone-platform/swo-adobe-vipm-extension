@@ -170,6 +170,8 @@ adobe_secrets.json
 .ruff_cache
 .idea
 
+# Makefile
+make/local.mk
 
 # mpt-tool
 .migrations-state.json

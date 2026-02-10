@@ -11,46 +11,51 @@ Extension integrates Adobe VIP Marketplace Extension with the SoftwareONE Market
 
 - Docker and Docker Compose plugin (`docker compose` CLI)
 - `make`
-- Valid `.env` file
-- Adobe credentials and authorizations JSON files in the project root
 - [CodeRabbit CLI](https://www.coderabbit.ai/cli) (optional. Used for running review check locally)
+
 
 ### Make targets overview
 
-Common development workflows are wrapped in the `makefile`:
+Common development workflows are wrapped in the `Makefile`. Run `make help` to see the list of available commands.
 
-- `make help` – list available commands
-- `make bash` – start the app container and open a bash shell
-- `make build` – build the application image for development
-- `make check` – run code quality checks (ruff, flake8, lockfile check)
-- `make check-all` – run checks, formatting, and tests
-- `make format` – apply formatting and import fixes
-- `make down` – stop and remove containers
-- `make review` –  check the code in the cli by running CodeRabbit
-- `make run` – run the service
-- `make shell` – open a Django shell inside the running app container
-- `make test` – run the test suite with pytest
+### How the Makefile works
 
-## Running tests
+The project uses a modular Makefile structure that organizes commands into logical groups:
 
-Tests run inside Docker using the dev configuration.
+- **Main Makefile** (`Makefile`): Entry point that automatically includes all `.mk` files from the `make/` directory
+- **Modular includes** (`make/*.mk`): Commands are organized by category:
+  - `common.mk` - Core development commands (build, test, format, etc.)
+  - `repo.mk` - Repository management and dependency commands
+  - `migrations.mk` - Database migration commands (Only available in extension repositories)
+  - `external_tools.mk` - Integration with external tools
 
-Run the full test suite:
 
-```bash
-make test
-```
+You can extend the Makefile with your own custom commands creating a `local.mk` file inside make folder. This file is
+automatically ignored by git, so your personal commands won't affect other developers or appear in version control.
 
-Pass additional arguments to pytest using the `args` variable:
+
+### Setup
+
+Follow these steps to set up the development environment:
+
+#### 1. Clone the repository
 
 ```bash
-make test args="-k test_extension -vv"
-make test args="tests/flows/test_orders_flow.py"
+git clone <repository-url>
+```
+```bash
+cd swo-adobe-vipm-extension
 ```
 
-## Running the service
+#### 2. Create environment configuration
 
-### 1. Configuration files
+Copy the sample environment file and update it with your values:
+
+```bash
+cp .env.sample .env
+```
+
+Edit the `.env` file with your actual configuration values. See the [Configuration](#configuration) section for details on available variables.
 
 In the project root, create and configure the following files.
 
@@ -143,24 +148,30 @@ Example:
 }
 ```
 
-#### Environment files
+#### 3. Build the Docker images
 
-Start from the sample file:
+Build the development environment:
 
 ```bash
-cp .env.sample .env
+make build
 ```
 
-Update `.env` with your values. This file is used by all Docker Compose configurations and the `make run` target.
+This will create the Docker images with all required dependencies and the virtualenv.
 
-### 2. Running
+#### 4. Verify the setup
 
-Run the service against real Adobe and SoftwareONE Marketplace APIs. It uses `compose.yaml` and reads environment from `.env`.
+Run the test suite to ensure everything is configured correctly:
 
-Ensure:
+```bash
+make test
+```
 
-- `adobe_credentials.json` and `adobe_authorizations.json` contain real credentials.
-- `.env` is populated with real endpoints and tokens.
+You're now ready to start developing! See [Running the service](#running-the-service) for next steps.
+
+
+## Running the service
+
+Before running, ensure your `.env` file is populated with real endpoints and tokens.
 
 Start the app:
 
@@ -180,7 +191,7 @@ EXT_WEBHOOKS_SECRETS={"PRD-1111-1111": "<webhook-secret-for-product>", "PRD-2222
 MPT_API_BASE_URL=https://api.s1.show/public
 MPT_API_TOKEN=c0fdafd7-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 MPT_PORTAL_BASE_URL=https://portal.s1.show
-MPT_PRODUCT_IDS=PRD-1111-1111,PRD-2222-2222
+MPT_PRODUCTS_IDS=PRD-1111-1111,PRD-2222-2222
 MPT_TOOL_STORAGE_TYPE=airtable
 MPT_TOOL_STORAGE_AIRTABLE_API_KEY=<fake-airtable-api-key>
 MPT_TOOL_STORAGE_AIRTABLE_BASE_ID=<fake-storage-airtable-base-id>
@@ -188,7 +199,7 @@ MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME=<fake-storage-airtable-table-name>
 ```
 
 `MPT_PRODUCTS_IDS` is a comma-separated list of SWO Marketplace Product identifiers.
-For each product ID in the `MPT_PRODUCTS_IDS` list, define the corresponding entry in the `WEBHOOKS_SECRETS` JSON using the product ID as the key.
+For each product ID in the `MPT_PRODUCTS_IDS` list, define the corresponding entry in the `EXT_WEBHOOKS_SECRETS` JSON using the product ID as the key.
 
 
 
@@ -205,11 +216,25 @@ make review    # check the code in the cli by running CodeRabbit
 make shell     # open a Django shell in the app container
 ```
 
-## Configuration
+### Migration commands
+
+The mpt-tool provides commands for managing database migrations:
+
+```bash
+make migrate-check                           # check migration status
+make migrate-data                            # run data migrations
+make migrate-schema                          # run schema migrations
+make migrate-list                            # list available migrations
+make migrate-new-data name=migration_id      # create a new data migration
+make migrate-new-schema name=migration_id    # create a new schema migration
+```
+
+
+# Configuration
 
 The following environment variables are typically set in `.env`. Docker Compose reads them when using the Make targets described above.
 
-### Application
+## Application
 
 | Environment Variable                   | Default                 | Example                                 | Description                                                                               |
 |----------------------------------------|-------------------------|-----------------------------------------|-------------------------------------------------------------------------------------------|
