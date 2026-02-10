@@ -818,6 +818,117 @@ def test_sync_agreement_prices_with_3yc(
     )
 
 
+@freeze_time("2024-11-09 12:30:00")
+def test_sync_agreement_prices_large_government_agency(
+    mocker,
+    agreement_factory,
+    subscriptions_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_mpt_update_agreement_subscription,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement,
+    mock_mpt_get_template_by_name,
+    mock_get_template_data_by_adobe_subscription,
+):
+    agreement = agreement_factory(
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11)
+    )
+    agreement["product"]["id"] = "PRD-3333-3333"
+    adobe_subscription = adobe_subscription_factory()
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(
+        coterm_date="2025-04-04",
+        commitment=adobe_commitment_factory(licenses=9, consumables=1220),
+        recommitment_request=adobe_commitment_factory(status="ACCEPTED"),
+    )
+    mpt_subscription = subscriptions_factory()[0]
+    mock_mpt_get_agreement_subscription.return_value = mpt_subscription
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_3yc_skus",
+        side_effect=[{"65304578CA01A12": 1234.55}, {"77777777CA01A12": 20.22}],
+    )
+    mock_mpt_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Terminated"}
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Renewing",
+    }
+
+    sync_agreement(
+        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=True
+    )  # act
+
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mpt_subscription["id"]
+    )
+    mock_mpt_update_agreement_subscription.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            "SUB-1234-5678",
+            template={"id": "TPL-1234", "name": TEMPLATE_SUBSCRIPTION_TERMINATION},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            mpt_subscription["id"],
+            lines=[
+                {"id": "ALI-2119-4550-8674-5962-0001", "price": {"unitPP": 1234.55}, "quantity": 10}
+            ],
+            parameters={
+                "fulfillment": [
+                    {"externalId": "adobeSKU", "value": "65304578CA01A12"},
+                    {
+                        "externalId": Param.CURRENT_QUANTITY.value,
+                        "value": str(adobe_subscription[Param.CURRENT_QUANTITY.value]),
+                    },
+                    {
+                        "externalId": Param.RENEWAL_QUANTITY.value,
+                        "value": str(
+                            adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+                        ),
+                    },
+                    {
+                        "externalId": "renewalDate",
+                        "value": adobe_subscription["renewalDate"],
+                    },
+                    {"externalId": "lastSyncDate", "value": "2024-11-09"},
+                ]
+            },
+            commitmentDate="2025-04-04",
+            autoRenew=adobe_subscription["autoRenewal"]["enabled"],
+            template={"id": "TPL-1234", "name": TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE},
+        ),
+    ])
+    expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
+    assert mock_mpt_update_agreement.call_args_list == [
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "fulfillment": [
+                    {"externalId": "cotermDate", "value": "2025-04-04"},
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2024-11-09"}]},
+        ),
+    ]
+    mock_mpt_get_template_by_name.assert_called_once_with(
+        mock_mpt_client, "PRD-3333-3333", TEMPLATE_SUBSCRIPTION_TERMINATION
+    )
+    mock_get_template_data_by_adobe_subscription.assert_called_once_with(
+        adobe_subscription, "PRD-3333-3333"
+    )
+
+
 def test_notify_if_3yc_commitment_expired_when_expired(
     mocker,
     mock_mpt_client,
@@ -3046,7 +3157,7 @@ def test_sync_agreements_by_3yc_end_date(
     mock_mpt_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
         "eq(status,Active)&"
-        "in(product.id,(PRD-1111-1111))&"
+        "in(product.id,(PRD-1111-1111,PRD-3333-3333))&"
         "any(parameters.fulfillment,and(eq(externalId,3YCEndDate),eq(displayValue,2024-11-08)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2024-11-09)))&"
         "select=lines,parameters,assets,subscriptions,product,listing",
@@ -3075,7 +3186,7 @@ def test_sync_agreements_by_coterm_date(
     mock_mpt_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
         "eq(status,Active)&"
-        "in(product.id,(PRD-1111-1111))&"
+        "in(product.id,(PRD-1111-1111,PRD-3333-3333))&"
         "any(parameters.fulfillment,and(eq(externalId,cotermDate),eq(displayValue,2025-06-15)))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-06-16)))&"
         "select=lines,parameters,assets,subscriptions,product,listing",
@@ -3103,7 +3214,7 @@ def test_sync_agreements_by_renewal_date(
     mock_mpt_get_agreements_by_query.assert_called_once_with(
         mock_mpt_client,
         "eq(status,Active)&"
-        "in(product.id,(PRD-1111-1111))&"
+        "in(product.id,(PRD-1111-1111,PRD-3333-3333))&"
         "any(subscriptions,any(parameters.fulfillment,and(eq(externalId,renewalDate),in(displayValue,(2026-07-15,2026-06-15,2026-05-15,2026-04-15,2026-03-15,2026-02-15,2026-01-15,2025-12-15,2025-11-15,2025-10-15,2025-09-15,2025-08-15,2025-07-15,2025-06-15,2025-05-15,2025-04-15,2025-03-15,2025-02-15,2025-01-15,2024-12-15,2024-11-15,2024-10-15,2024-09-15,2024-08-15)))))&"
         "any(parameters.fulfillment,and(eq(externalId,lastSyncDate),ne(displayValue,2025-07-16)))&"
         "select=lines,parameters,assets,subscriptions,product,listing",
