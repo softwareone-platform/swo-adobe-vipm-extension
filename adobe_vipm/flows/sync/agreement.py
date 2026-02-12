@@ -576,8 +576,12 @@ class AgreementSyncer:  # noqa: WPS214
                     line.get("id"),
                 )
                 continue
-            actual_sku = models.get_adobe_sku(vendor_id, get_market_segment(self.product_id))
-            agreement_lines.append((line, actual_sku))
+            if (
+                vendor_id != "adobe-reseller-transfer"
+            ):  # TODO: remove conditional after MPT-17491 done
+                actual_sku = models.get_adobe_sku(vendor_id, get_market_segment(self.product_id))
+                agreement_lines.append((line, actual_sku))
+
         return agreement_lines
 
     # REFACTOR: get method must not update subscriptions in mpt or terminate a subscription
