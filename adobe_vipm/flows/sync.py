@@ -63,7 +63,10 @@ from adobe_vipm.flows.utils import (
     notify_agreement_unhandled_exception_in_teams,
     notify_missing_prices,
 )
-from adobe_vipm.flows.utils.market_segment import get_market_segment
+from adobe_vipm.flows.utils.market_segment import (
+    get_market_segment,
+    is_large_government_agency_type,
+)
 from adobe_vipm.notifications import send_exception, send_notification
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
@@ -316,21 +319,22 @@ def _update_agreement(
     dry_run: bool,
 ) -> None:
     parameters = {}
-    commitment_info = get_3yc_commitment(customer)
-    parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
-    for mq in commitment_info.get("minimumQuantities", ()):
-        if mq["offerType"] == "LICENSE":
-            parameters.setdefault(Param.PHASE_ORDERING.value, [])
-            parameters[Param.PHASE_ORDERING.value].append({
-                "externalId": Param.THREE_YC_LICENSES.value,
-                "value": str(mq.get("quantity")),
-            })
-        if mq["offerType"] == "CONSUMABLES":
-            parameters.setdefault(Param.PHASE_ORDERING.value, [])
-            parameters[Param.PHASE_ORDERING.value].append({
-                "externalId": Param.THREE_YC_CONSUMABLES.value,
-                "value": str(mq.get("quantity")),
-            })
+    if not is_large_government_agency_type(agreement["product"]["id"]):
+        commitment_info = get_3yc_commitment(customer)
+        parameters = _add_3yc_fulfillment_params(agreement, commitment_info, customer, parameters)
+        for mq in commitment_info.get("minimumQuantities", ()):
+            if mq["offerType"] == "LICENSE":
+                parameters.setdefault(Param.PHASE_ORDERING.value, [])
+                parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_LICENSES.value,
+                    "value": str(mq.get("quantity")),
+                })
+            if mq["offerType"] == "CONSUMABLES":
+                parameters.setdefault(Param.PHASE_ORDERING.value, [])
+                parameters[Param.PHASE_ORDERING.value].append({
+                    "externalId": Param.THREE_YC_CONSUMABLES.value,
+                    "value": str(mq.get("quantity")),
+                })
 
     parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
     parameters[Param.PHASE_FULFILLMENT.value].append({

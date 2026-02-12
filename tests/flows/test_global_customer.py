@@ -91,11 +91,6 @@ def test_check_gc_agreement_deployments_no_licensee(
 def test_check_gc_agreement_deployments_unexpected_error(
     mocker, mock_adobe_client, settings, airtable_error_factory
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
@@ -114,11 +109,6 @@ def test_check_gc_agreement_deployments_no_authorization_id(
     settings,
     gc_agreement_deployment,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
     settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_authorizations_by_currency_and_seller_id = mocker.patch(
@@ -139,14 +129,8 @@ def test_check_gc_agreement_deployments_no_authorization_id(
 
 
 def test_check_gc_agreement_deployments_get_authorization_error(
-    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     error_data = mpt_error_factory(
         400,
@@ -175,14 +159,8 @@ def test_check_gc_agreement_deployments_get_authorization_error(
 
 
 def test_check_gc_agreement_deployments_get_authorization_more_than_one(
-    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_authorizations_by_currency_and_seller_id = mocker.patch(
         "adobe_vipm.flows.global_customer.get_authorizations_by_currency_and_seller_id",
@@ -203,14 +181,8 @@ def test_check_gc_agreement_deployments_get_authorization_more_than_one(
 
 
 def test_check_gc_agreement_deployments_get_price_list_error(
-    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     error_data = mpt_error_factory(
         400,
@@ -246,12 +218,6 @@ def test_check_gc_agreement_deployments_get_price_list_error(
 def test_check_gc_agreement_deployments_no_price_list(
     mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_gc_price_list_by_currency = mocker.patch(
         "adobe_vipm.flows.global_customer.get_gc_price_list_by_currency",
@@ -273,12 +239,6 @@ def test_check_gc_agreement_deployments_no_price_list(
 def test_check_gc_agreement_deployments_get_price_more_than_one(
     mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_gc_price_list_by_currency = mocker.patch(
         "adobe_vipm.flows.global_customer.get_gc_price_list_by_currency",
@@ -298,14 +258,8 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
 
 
 def test_check_gc_agreement_deployments_get_listing_error(
-    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     price_list = mocker.MagicMock()
     price_list.externalIds = "price_list_global"
@@ -343,7 +297,6 @@ def test_check_gc_agreement_deployments_get_listing_error(
 def test_check_gc_agreement_deployments_create_listing(
     mocker,
     mock_adobe_client,
-    settings,
     adobe_customer_factory,
     adobe_subscription_factory,
     agreement_factory,
@@ -358,12 +311,6 @@ def test_check_gc_agreement_deployments_create_listing(
     expected_created_agreement_arg = created_agreement_factory(
         deployments="", is_profile_address_exists=True
     )
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
@@ -433,12 +380,6 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
     expected_created_agreement_arg = created_agreement_factory(
         deployments=mock_adobe_customer_deployments_external_ids, is_profile_address_exists=False
     )
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
@@ -495,14 +436,8 @@ def test_check_gc_agreement_deployments_create_listing_with_no_address(
 
 
 def test_check_gc_agreement_deployments_get_listing_more_than_one(
-    mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
+    mocker, mock_adobe_client, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
@@ -524,12 +459,6 @@ def test_check_gc_agreement_deployments_get_listing_more_than_one(
 def test_check_gc_agreement_deployments_create_listing_error(
     mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
@@ -563,7 +492,6 @@ def test_check_gc_agreement_deployments_create_listing_error(
 def test_check_gc_agreement_deployments_create_agreement_error(
     mocker,
     mock_adobe_client,
-    settings,
     mpt_error_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -573,12 +501,6 @@ def test_check_gc_agreement_deployments_create_agreement_error(
     licensee,
     template,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
@@ -633,7 +555,6 @@ def test_check_gc_agreement_deployments_create_agreement_error(
 def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     mocker,
     mock_adobe_client,
-    settings,
     mpt_error_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -645,12 +566,6 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
     listing,
     template,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_listings_by_price_list_and_seller_and_authorization = mocker.patch(
         "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
@@ -704,7 +619,6 @@ def test_check_gc_agreement_deployments_get_adobe_subscriptions_error(
 def test_check_gc_agreement_deployments_create_asset(
     mocker,
     mock_adobe_client,
-    settings,
     mpt_error_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -714,12 +628,6 @@ def test_check_gc_agreement_deployments_create_asset(
     licensee,
     listing,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
@@ -810,12 +718,6 @@ def test_check_gc_agreement_deployments_agreement_asset_exists(
     listing,
     assets_factory,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
@@ -894,12 +796,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
     licensee,
     listing,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
@@ -968,7 +864,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
 def test_check_gc_agreement_deployments_create_agreement_subscription_already_created(
     mocker,
     mock_adobe_client,
-    settings,
     mpt_error_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -978,12 +873,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
     licensee,
     listing,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.global_customer.get_licensee", return_value=licensee
@@ -1040,7 +929,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_already_cr
 def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     mocker,
     mock_adobe_client,
-    settings,
     mpt_error_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -1048,12 +936,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
     provisioning_agreement,
     gc_agreement_deployment,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.global_customer.get_licensee", return_value=mocker.MagicMock()
@@ -1123,7 +1005,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_error(
 def test_check_gc_agreement_deployments_create_agreement_subscription_enable_auto_renew(
     mocker,
     mock_adobe_client,
-    settings,
     mpt_error_factory,
     adobe_customer_factory,
     adobe_subscription_factory,
@@ -1131,12 +1012,6 @@ def test_check_gc_agreement_deployments_create_agreement_subscription_enable_aut
     provisioning_agreement,
     gc_agreement_deployment,
 ):
-    settings.EXTENSION_CONFIG = {
-        "AIRTABLE_API_TOKEN": "api_key",
-        "AIRTABLE_BASES": {"PRD-1111-1111": "base_id"},
-        "PRODUCT_SEGMENT": {"PRD-1111-1111": "COM"},
-    }
-    settings.MPT_API_TOKEN_OPERATIONS = "operations_api_key"
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
     mocked_get_licensee = mocker.patch(
         "adobe_vipm.flows.global_customer.get_licensee", return_value=mocker.MagicMock()
