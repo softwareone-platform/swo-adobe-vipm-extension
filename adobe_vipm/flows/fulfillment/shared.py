@@ -391,7 +391,7 @@ def create_asset_payload(adobe_subscription, order_line, item, template):
                 },
                 {
                     "externalId": Param.USED_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                    "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
                 },
             ]
         },
@@ -1259,12 +1259,14 @@ class SetSubscriptionTemplate(Step):
         }
 
         for subscription in context.order["agreement"]["subscriptions"]:
-            subscription_id = subscription["externalIds"]["vendor"]
+            subscription_id = subscription.get("externalIds", {}).get("vendor", "")
             adobe_subscription = adobe_subscriptions_map.get(subscription_id)
 
             if not adobe_subscription:
                 logger.warning(
-                    "%s: Adobe subscription %s not found, skipping", context, subscription_id
+                    "subscription_id: %s Adobe subscription: %s not found, skipping",
+                    subscription.get("id"),
+                    subscription_id,
                 )
                 continue
 

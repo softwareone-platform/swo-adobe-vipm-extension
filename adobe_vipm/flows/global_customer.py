@@ -461,7 +461,7 @@ def create_gc_agreement_asset(
                 },
                 {
                     "externalId": Param.USED_QUANTITY.value,
-                    "value": str(adobe_subscription[Param.USED_QUANTITY]),
+                    "value": str(adobe_subscription.get(Param.USED_QUANTITY, "")),
                 },
             ]
         },
