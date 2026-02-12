@@ -546,8 +546,8 @@ def test_create_customer_step_handle_error_invalid_fields(
 
     step.handle_error(mock_mpt_client, context, error)  # act
 
-    param = get_ordering_parameter(context.order, param_external_id)
-    assert param["error"] == error_constant.to_dict(title=param["name"], details=str(error))
+    param = get_ordering_parameter(context.order, Param.ADDRESS.value)
+    assert param["error"] == ERR_ADOBE_ADDRESS.to_dict(title=param["name"], details=str(error))
     mocked_switch_to_query.assert_called_once_with(mock_mpt_client, context.order)
 
 
