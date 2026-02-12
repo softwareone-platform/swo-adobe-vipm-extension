@@ -186,7 +186,7 @@ class CreateCustomer(Step):
                 ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
             )
             return
-        if error.code == AdobeStatus.INVALID_ADDRESS:
+        if error.code in {AdobeStatus.INVALID_ADDRESS, AdobeStatus.INVALID_FIELDS}:
             param = get_ordering_parameter(context.order, Param.ADDRESS.value)
             context.order = set_ordering_parameter_error(
                 context.order,
