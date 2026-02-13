@@ -1266,6 +1266,7 @@ def test_fulfill_transfer_order_already_migrated(
         mocked_transfer.customer_id,
         transfer_items[0]["subscriptionId"],
         auto_renewal=True,
+        quantity=10,
     )
 
 
@@ -1418,6 +1419,7 @@ def test_fulfill_transfer_order_with_no_profile_address_already_migrated(
         mocked_transfer.customer_id,
         transfer_items[0]["subscriptionId"],
         auto_renewal=True,
+        quantity=10,
     )
 
 

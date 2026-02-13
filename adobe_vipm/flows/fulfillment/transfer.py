@@ -367,12 +367,16 @@ def _sync_subscription_order(
         dict or None: The added subscription if successful, None otherwise
     """
     if status != ThreeYearCommitmentStatus.COMMITTED:
+        renewal_quantity = adobe_subscription.get("autoRenewal", {}).get("renewalQuantity")
+        line_quantity = line.get("quantity") or line.get("currentQuantity")
+        new_renewal_quantity = min(line_quantity, renewal_quantity)
         try:
             adobe_subscription = adobe_client.update_subscription(
                 authorization_id,
                 customer_id,
                 line["subscriptionId"],
                 auto_renewal=True,
+                quantity=new_renewal_quantity,
             )
         except AdobeAPIError:
             logger.exception(
@@ -904,7 +908,6 @@ def create_agreement_subscriptions(adobe_transfer_order, mpt_client, order, adob
             continue
 
         commitment = get_3yc_commitment(customer)
-
         subscription = _sync_subscription_order(
             adobe_client,
             mpt_client,
