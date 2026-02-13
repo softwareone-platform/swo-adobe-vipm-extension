@@ -1,10 +1,8 @@
 services:
   app:
-    container_name: adobe_vipm
     build:
       context: .
       target: dev
-      dockerfile: Dockerfile
     working_dir: /extension
     command: swoext run --no-color
     volumes:

@@ -7,11 +7,12 @@ requires-python = ">=3.12,<4"
 readme = "README.md"
 license = { text = "Apache-2.0 license" }
 dependencies = [
+  "black>=26.1.0",
   "django==4.2.*",
   "jinja2==3.1.*",
   "markdown-it-py==4.0.*",
   "mpt-extension-sdk==5.18.*",
-  "mpt-tool==5.2.*",
+  "mpt-tool==5.3.*",
   "openpyxl==3.1.*",
   "phonenumbers==9.0.*",
   "pyairtable==3.3.*",
@@ -235,7 +236,7 @@ ignore = [
   "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
   "TRY003", # long exception messages from `tryceratops`
 ]
-external = ["AAA", "WPS"]
+external = [ "AAA", "WPS" ]
 
 # Plugin configs:
 [tool.ruff.lint.flake8-import-conventions]
@@ -299,6 +300,10 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "gunicorn.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "migrations.*"
+disallow_subclassing_any = false
 
 [[tool.mypy.overrides]]
 module = "pymsteams.*"

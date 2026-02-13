@@ -30,5 +30,5 @@ repos:
           [
             flake8-aaa==0.17.*,
             flake8-pyproject==1.2.*,
-            wemake-python-styleguide==1.4.*,
+            wemake-python-styleguide==1.5.*,
           ]
