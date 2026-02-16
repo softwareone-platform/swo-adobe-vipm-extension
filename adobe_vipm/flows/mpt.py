@@ -39,19 +39,19 @@ def get_agreements_by_3yc_commitment_request_status(
 
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
-        f"eq(externalId,{param_external_id}),"
+        f"eq(externalId,'{param_external_id}'),"
         f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED},{ThreeYearCommitmentStatus.ACCEPTED}))"
         ")"
         ")"
     )
     request_3yc_condition = (
         f"any(parameters.{request_type_param_phase},and("
-        f"eq(externalId,{request_type_param_ext_id}),"
+        f"eq(externalId,'{request_type_param_ext_id}'),"
         "like(displayValue,*Yes*)"
         ")"
         ")"
     )
-    status_condition = "eq(status,Active)"
+    status_condition = "eq(status,'Active')"
     product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
 
     rql_query = (
@@ -77,9 +77,9 @@ def get_agreements_by_3yc_commitment_request_invitation(
     """
     param_condition = (
         f"any(parameters.fulfillment,"
-        f"and(eq(externalId,3YCCommitmentRequestStatus),in(displayValue,({','.join(enroll_statuses)}))))"
+        f"and(eq(externalId,'3YCCommitmentRequestStatus'),in(displayValue,({','.join(enroll_statuses)}))))"
     )
-    status_condition = f"eq(status,{status})"
+    status_condition = f"eq(status,'{status}')"
 
     rql_query = (
         f"and({status_condition},{param_condition})"
