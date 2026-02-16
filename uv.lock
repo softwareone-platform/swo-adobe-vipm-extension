@@ -923,7 +923,7 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "5.18.0"
+version = "5.18.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -946,9 +946,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/85/58/bef2fe2cd8f45cada4a1cf9efe8a2a76f815df9860209e6a74ee1d7db8e2/mpt_extension_sdk-5.18.0.tar.gz", hash = "sha256:0d28b7037003a9af4ed8b27aab3e5700c0c1912904907abc76ee17dcabe697a9", size = 32935, upload-time = "2026-02-05T15:21:36.889Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/fd/b4e9988e9564a0af535195607e0a04ca7b7301f139b715191b41597a811a/mpt_extension_sdk-5.18.1.tar.gz", hash = "sha256:d874639406b0c9b0f3fef20ae014347627c6de469ee3d19d0b8454bf40900bd8", size = 32917, upload-time = "2026-02-09T11:40:49.404Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/01/cf8cd677a858f9c37e828d1836daf245ba61bd6bd867dcc65bb536a240e3/mpt_extension_sdk-5.18.0-py3-none-any.whl", hash = "sha256:0c40cb0f87cc5a9593f6719b79f9abed7b06a71ff9a8fcf486cd24db889573b7", size = 44517, upload-time = "2026-02-05T15:21:35.813Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/99/99e3928e8d905515967794ef48515937ca1ef49a8d5f53c7ded42041eb97/mpt_extension_sdk-5.18.1-py3-none-any.whl", hash = "sha256:30423b46ae105eaf6b666d18c4044b292259af9a428d93fc60ea22299aec8af8", size = 44517, upload-time = "2026-02-09T11:40:48.544Z" },
 ]
 
 [[package]]
@@ -1243,11 +1243,11 @@ wheels = [
 
 [[package]]
 name = "phonenumbers"
-version = "9.0.22"
+version = "9.0.24"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/16/12/8583ba0f327cebf42e4c1a63f394332f42d86a5cc16e0f578bb29d17b524/phonenumbers-9.0.22.tar.gz", hash = "sha256:eff985c65575749d1d54e07c56c3517d5243e03e08e4a6191761df9aab2278f2", size = 2297728, upload-time = "2026-01-16T06:31:02.211Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/bf/277ae37edb6f5189937223cc3b2a21b8de9d70ac2d0eb684cf33ba055fdd/phonenumbers-9.0.24.tar.gz", hash = "sha256:97c38e4b5b8af992c75de01bd9c0f84e61701a9c900fd84f49744714910a4dc3", size = 2298138, upload-time = "2026-02-13T11:28:57.724Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/95/a958da5ca5ae35b3a0d4a1ce88b001b4360fd6b48b97339dba2815ec10d4/phonenumbers-9.0.22-py2.py3-none-any.whl", hash = "sha256:645e66cd9a136b3b257b5f941fa97d324124114d31ad3c9f2488682f47ad7ee1", size = 2584081, upload-time = "2026-01-16T06:30:58.43Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/c7/b01beac6077df7261d92c6b52408617690147144d8946f6f6ecb7d9766ab/phonenumbers-9.0.24-py2.py3-none-any.whl", hash = "sha256:fa86ab7112ef8b286a811392311bd76bbbae7d1d271c2ed26cf73f2e9fa4d3c6", size = 2584198, upload-time = "2026-02-13T11:28:55.334Z" },
 ]
 
 [[package]]
