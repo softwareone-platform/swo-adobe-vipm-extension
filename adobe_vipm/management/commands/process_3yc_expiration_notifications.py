@@ -18,9 +18,9 @@ def notify_3yc_expirations(number_of_days):
     target_date = (today + dt.timedelta(days=number_of_days)).isoformat()
 
     rql = (
-        f"and(eq(status,Active),"
+        f"and(eq(status,'Active'),"
         f"any(parameters.fulfillment,and("
-        f"eq(externalId,{Param.THREE_YC_END_DATE.value}),"
+        f"eq(externalId,'{Param.THREE_YC_END_DATE.value}'),"
         f"in(displayValue,({target_date}))"
         f")))&select=parameters"
     )

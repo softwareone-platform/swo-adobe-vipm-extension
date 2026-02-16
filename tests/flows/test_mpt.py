@@ -23,19 +23,19 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_re
     request_type_param_phase = "ordering" if not is_recommitment else "fulfillment"
     enroll_status_condition = (
         "any(parameters.fulfillment,and("
-        f"eq(externalId,{param_external_id}),"
+        f"eq(externalId,'{param_external_id}'),"
         f"in(displayValue,({ThreeYearCommitmentStatus.REQUESTED.value},{ThreeYearCommitmentStatus.ACCEPTED.value}))"
         ")"
         ")"
     )
     request_3yc_condition = (
         f"any(parameters.{request_type_param_phase},and("
-        f"eq(externalId,{request_type_param_ext_id}),"
+        f"eq(externalId,'{request_type_param_ext_id}'),"
         "like(displayValue,*Yes*)"
         ")"
         ")"
     )
-    status_condition = "eq(status,Active)"
+    status_condition = "eq(status,'Active')"
     product_condition = f"in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)}))"
     rql_query = (
         f"and({status_condition},{enroll_status_condition}"
@@ -59,7 +59,7 @@ def test_get_agreements_by_3yc_commitment_request_invitation(
     mock_mpt_client, mock_mpt_get_agreements_by_query, status
 ):
     rql_query = (
-        f"and(eq(status,{status}),any(parameters.fulfillment,and(eq(externalId,3YCCommitmentRequestStatus),"
+        f"and(eq(status,'{status}'),any(parameters.fulfillment,and(eq(externalId,'3YCCommitmentRequestStatus'),"
         "in(displayValue,(REQUESTED,ACCEPTED)))))"
         "&select=lines,parameters,assets,subscriptions,product,listing"
     )
