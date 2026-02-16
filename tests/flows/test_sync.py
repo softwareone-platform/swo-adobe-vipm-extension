@@ -3033,6 +3033,40 @@ def test_get_subscriptions_for_update_terminated_withoud_template(
     mock_update_agreement_subscription.assert_not_called()
 
 
+@freeze_time("2025-07-23")
+def test_get_subscriptions_for_update_with_no_lines(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    subscriptions_factory,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_get_agreement_subscription,
+    mock_update_agreement_subscription,
+    mock_get_template_by_name,
+    mock_send_warning,
+):
+    adobe_subscriptions = adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_ACTIVE.value)
+    mock_get_template_by_name.side_effect = [
+        {"id": "TPL-1234", "name": "Expired"}
+    ]
+    agreement = agreement_factory()
+    agreement["subscriptions"] = [agreement["subscriptions"][0]]
+    mock_get_agreement_subscription.return_value = {"id": "SUB-1000-2000-3000", "lines": []}
+
+    _get_subscriptions_for_update(
+        mock_mpt_client, agreement_factory(), adobe_customer_factory(), adobe_subscriptions
+    )
+
+    mock_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, "SUB-1000-2000-3000"
+    )
+    mock_send_warning.assert_called_once_with(
+        "Subscription has no lines",
+        "Subscription SUB-1000-2000-3000 has no lines",
+    )
+
+
 def test_add_missing_subscriptions_none(
     mock_mpt_client,
     mock_adobe_client,

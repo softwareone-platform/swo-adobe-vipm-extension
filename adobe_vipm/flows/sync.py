@@ -67,7 +67,7 @@ from adobe_vipm.flows.utils.market_segment import (
     get_market_segment,
     is_large_government_agency_type,
 )
-from adobe_vipm.notifications import send_exception, send_notification
+from adobe_vipm.notifications import send_exception, send_notification, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -636,6 +636,13 @@ def _get_subscriptions_for_update(
             continue
 
         mpt_subscription = get_agreement_subscription(mpt_client, subscription["id"])
+
+        if not mpt_subscription["lines"]:
+            logger.info("Skipping subscription %s because it has no lines", subscription["id"])
+            send_warning(
+                "Subscription has no lines", f"Subscription {subscription['id']} has no lines"
+            )
+            continue
         adobe_subscription_id = mpt_subscription.get("externalIds", {}).get("vendor")
 
         adobe_subscription = find_first(

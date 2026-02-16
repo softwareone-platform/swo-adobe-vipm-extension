@@ -46,6 +46,15 @@ def mock_send_notification(mocker):
     return mock
 
 
+@pytest.fixture
+def mock_send_warning(mocker):
+    mock = mocker.Mock()
+    mocker.patch("adobe_vipm.flows.benefits.send_warning", new=mock)
+    mocker.patch("adobe_vipm.flows.fulfillment.transfer.send_warning", new=mock)
+    mocker.patch("adobe_vipm.flows.sync.send_warning", new=mock)
+    return mock
+
+
 @pytest.fixture()
 def mock_get_adobe_client(mocker, mock_adobe_client):
     mock = mocker.MagicMock(
