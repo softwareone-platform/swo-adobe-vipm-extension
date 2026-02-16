@@ -588,7 +588,6 @@ class AgreementSyncer:  # noqa: WPS214
     def _get_subscriptions_for_update(self, agreement: dict) -> list[tuple[dict, dict, str]]:  # noqa: C901
         logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
         for_update = []
-
         for subscription in agreement["subscriptions"]:
             if subscription["status"] in {
                 SubscriptionStatus.TERMINATED,
@@ -605,6 +604,13 @@ class AgreementSyncer:  # noqa: WPS214
                 continue
 
             mpt_subscription = mpt.get_agreement_subscription(self._mpt_client, subscription["id"])
+            if not mpt_subscription["lines"]:
+                logger.info("Skipping subscription %s because it has no lines", subscription["id"])
+                send_warning(
+                    "Subscription has no lines", f"Subscription {subscription['id']} has no lines"
+                )
+                continue
+
             adobe_subscription_id = mpt_subscription.get("externalIds", {}).get("vendor")
 
             adobe_subscription = find_first(
