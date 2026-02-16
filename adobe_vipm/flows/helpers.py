@@ -726,7 +726,7 @@ class FetchResellerChangeData(Step):
             )
         except AdobeAPIError as ex:
             error_data = ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
-                reseller_change_code=reseller_change_code["value"],
+                reseller_change_code=reseller_change_code.get("value"),
                 error=str(ex),
             )
             handle_error(
