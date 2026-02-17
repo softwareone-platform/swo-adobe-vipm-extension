@@ -46,7 +46,7 @@ def mock_send_notification(mocker):
     return mock
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_send_warning(mocker):
     mock = mocker.Mock()
     mocker.patch("adobe_vipm.flows.benefits.send_warning", new=mock)

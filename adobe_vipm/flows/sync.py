@@ -34,7 +34,6 @@ from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AuthorizationNotFoundError,
-    CustomerDiscountsNotFoundError,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
@@ -1124,10 +1123,17 @@ def sync_agreement(  # noqa: C901 # NOSONAR
             return
 
         if not customer.get("discounts", []):
-            raise CustomerDiscountsNotFoundError(  # noqa: TRY301
-                f"Customer {customer_id} does not have discounts information. "
-                f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
+            # Adobe discounts are not set for the customer when the subscriptions expired.
+            # In that case we should continue the sync process to terminate the subscriptions.
+            # There is another scenario when the 3YC is only for licenses.
+            # The discounts are not correctly returned by the API for the consumables.
+            msg = (
+                f"Error synchronizing agreement {agreement['id']}. Customer "
+                f"{customer_id} does not have discounts information."
+                f" Cannot proceed with price synchronization."
             )
+            logger.error(msg)
+            send_warning("Customer does not have discounts information", msg)
 
         _add_missing_subscriptions(
             mpt_client, adobe_client, customer, agreement, adobe_subscriptions

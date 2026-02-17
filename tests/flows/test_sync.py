@@ -2243,6 +2243,7 @@ def test_sync_global_customer(
         ),
         assets=[],
     )
+    agreement["subscriptions"][0]["lines"] = [{"item": {"id": "ITM-0000-0001-0001"}}]
     mock_get_agreement_subscription.return_value = agreement[
         "subscriptions"
     ][0]
@@ -2335,6 +2336,7 @@ def test_sync_global_customer_dry(
         ),
         assets=[],
     )
+    agreement["subscriptions"][0]["lines"] = [{"item": {"id": "ITM-0000-0001-0001"}}]
     mock_get_agreement_subscription.return_value = agreement[
         "subscriptions"
     ][0]
@@ -2412,6 +2414,7 @@ def test_sync_deployment_agreement(
         )
     )
     agreement["assets"] = []
+    agreement["subscriptions"][0]["lines"] = [{"item": {"id": "ITM-0000-0001-0001"}}]
     mock_get_agreement_subscription.return_value = agreement[
         "subscriptions"
     ][0]
