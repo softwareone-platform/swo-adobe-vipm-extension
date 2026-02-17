@@ -200,6 +200,10 @@ class AgreementSyncer:  # noqa: WPS214
             return False
 
         if not self._adobe_customer.get("discounts", []):
+            # Adobe discounts are not set for the customer when the subscriptions expired.
+            # In that case we should continue the sync process to terminate the subscriptions.
+            # There is another scenario when the 3YC is only for licenses.
+            # The discounts are not correctly returned by the API for the consumables.
             msg = (
                 f"Error synchronizing agreement {self.agreement_id}. Customer "
                 f"{self._adobe_customer_id} does not have discounts information."
@@ -209,7 +213,6 @@ class AgreementSyncer:  # noqa: WPS214
             # the main method.
             logger.error(msg)
             send_warning("Customer does not have discounts information", msg)
-            return False
 
         return True
 
