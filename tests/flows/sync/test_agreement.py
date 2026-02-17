@@ -1733,34 +1733,105 @@ def test_sync_agreement_notify_exception(
     )
 
 
+@freeze_time("2025-06-23")
 def test_sync_agreement_empty_discounts(
-    mock_adobe_client,
-    mock_mpt_client,
+    mocker,
     agreement_factory,
     subscriptions_factory,
+    lines_factory,
+    adobe_subscription_factory,
     adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    mock_adobe_client,
+    mock_mpt_get_agreement_subscription,
+    mock_mpt_update_agreement_subscription,
+    mock_mpt_terminate_subscription,
+    mock_mpt_client,
+    mock_mpt_update_agreement,
+    mock_mpt_get_template_by_name,
+    mocked_agreement_syncer,
+    mock_add_missing_subscriptions_and_assets,
     mock_send_warning,
-    caplog,
 ):
     agreement = agreement_factory(
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
         subscriptions=[
             {
                 "id": "SUB-1000-2000-3000",
                 "status": "Active",
-                "item": {
-                    "id": "ITM-0000-0001-0001",
-                },
+                "item": {"id": "ITM-0000-0001-0003"},
+                "externalIds": {"vendor": "terminated-sub-id"},
             },
         ],
     )
-    customer = adobe_customer_factory()
-    customer["discounts"] = []
-    mock_adobe_client.get_customer.return_value = customer
+    mocked_agreement_syncer._agreement = agreement
+    mpt_subscription = subscriptions_factory(
+        adobe_sku="77777777CA01A12",
+        adobe_subscription_id="terminated-sub-id",
+        subscription_id="SUB-1000-2000-3000",
+    )[0]
+    adobe_subscription = adobe_subscription_factory(
+        subscription_id="terminated-sub-id",
+        offer_id="77777777CA01A12",
+        status=AdobeStatus.SUBSCRIPTION_TERMINATED,
+    )
+    mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory(coterm_date="2025-04-04")
+    mocked_agreement_syncer._adobe_customer["discounts"] = []
+    mock_mpt_get_agreement_subscription.return_value = mpt_subscription
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        return_value={"77777777CA01A12": 20.22},
+    )
+    mock_mpt_get_template_by_name.return_value = {
+        "id": "TPL-2345",
+        "name": "Expired",
+    }
 
-    sync_agreement(
-        mock_mpt_client, mock_adobe_client, agreement, dry_run=False, sync_prices=False
-    )  # act
+    mocked_agreement_syncer.sync(sync_prices=True)  # act
 
+    mock_mpt_get_agreement_subscription.assert_called_once_with(
+        mock_mpt_client, mpt_subscription["id"]
+    )
+    mock_mpt_update_agreement_subscription.assert_called_once_with(
+        mock_mpt_client,
+        mpt_subscription["id"],
+        template={"id": "TPL-2345", "name": "Expired"},
+    )
+    mock_mpt_terminate_subscription.assert_called_once_with(
+        mock_mpt_client,
+        mpt_subscription["id"],
+        "Adobe subscription status 1004.",
+    )
+    expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
+    mock_mpt_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCEnrollStatus", "value": None},
+                    {"externalId": "3YCStartDate", "value": None},
+                    {"externalId": "3YCEndDate", "value": None},
+                    {"externalId": "cotermDate", "value": "2025-04-04"},
+                ],
+                "ordering": [
+                    {
+                        "externalId": "3YC",
+                        "value": None,
+                    },
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
+        ),
+    ])
     mock_send_warning.assert_called_once_with(
         "Customer does not have discounts information",
         "Error synchronizing agreement AGR-2119-4550-8674-5962. Customer a-client-id "
