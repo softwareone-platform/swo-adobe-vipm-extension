@@ -33,6 +33,7 @@ class Context:
     adobe_return_orders: dict = field(default_factory=dict)
     membership_id: str | None = None
     adobe_transfer: dict | None = None
+    adobe_transfer_order: dict = field(default_factory=dict)
 
     def __str__(self):
         due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else "-"
