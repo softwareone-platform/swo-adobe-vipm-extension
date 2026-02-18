@@ -79,6 +79,7 @@ class PrepareCustomerData(Step):
 
     def __call__(self, client, context, next_step):
         """Prepares customer data from order to Adobe format for further processing."""
+        logger.info("%s: preparing customer data for Adobe", context)
         licensee = context.order["agreement"]["licensee"]
         new_customer_data = {}
         if not context.customer_data.get(Param.COMPANY_NAME):
@@ -105,9 +106,17 @@ class PrepareCustomerData(Step):
             }
 
         if new_customer_data:
+            logger.info(
+                "%s: updating customer data fields: %s",
+                context,
+                ",".join(sorted(new_customer_data.keys())),
+            )
             context.order = set_customer_data(context.order, new_customer_data)
             update_order(client, context.order_id, parameters=context.order["parameters"])
+        else:
+            logger.info("%s: customer data already present, skipping update", context)
 
+        logger.info("%s: customer data preparation completed", context)
         next_step(client, context)
 
 
@@ -209,16 +218,23 @@ class Validate3YCCommitment(Step):
 
     def __call__(self, client, context, next_step):
         """Validates 3YC parameters."""
+        logger.info("%s: validating 3YC commitment", context)
+
         if context.adobe_return_orders:
+            logger.info("%s: skipping 3YC validation for return orders", context)
             next_step(client, context)
             return
 
         if not context.adobe_customer:
+            logger.info(
+                "%s: no Adobe customer found, using new-purchase 3YC validation path", context
+            )
             self._handle_new_purchase_order_validation(client, context, next_step)
             return
 
         commitment = self._get_commitment(context.adobe_customer)
         commitment_status = commitment.get("status", "")
+        logger.info("%s: resolved 3YC commitment status: %s", context, commitment_status or "empty")
 
         if self._should_query_commitment(commitment_status):
             logger.info(
@@ -240,8 +256,10 @@ class Validate3YCCommitment(Step):
             return
 
         if not self._validate_commitment_requirements(client, context, commitment):
+            logger.info("%s: 3YC commitment validation did not pass requirement checks", context)
             return
 
+        logger.info("%s: 3YC commitment validation passed", context)
         next_step(client, context)
 
     def _get_commitment(self, adobe_customer):
@@ -600,7 +618,14 @@ class UpdatePrices(Step):
 
     def __call__(self, client, context, next_step):
         """Update prices based on airtable and adobe discount level."""
+        logger.info("%s: evaluating price update from Adobe preview order", context)
         if context.adobe_new_order or not context.adobe_preview_order:
+            logger.info(
+                "%s: skipping price update (adobe_new_order=%s adobe_preview_order=%s)",
+                context,
+                bool(context.adobe_new_order),
+                bool(context.adobe_preview_order),
+            )
             next_step(client, context)
             return
 
@@ -610,8 +635,10 @@ class UpdatePrices(Step):
         logger.info("Actual SKUs: %s", self._actual_skus)
         prices = self._get_prices_for_skus()
         updated_lines = self._create_updated_lines(prices)
+        logger.info("%s: updating prices for %s order lines", context, len(updated_lines))
         self._update_order(updated_lines)
 
+        logger.info("%s: price update step completed", context)
         next_step(self._client, self._context)
 
     def _get_actual_skus(self):
