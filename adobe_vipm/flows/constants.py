@@ -61,6 +61,11 @@ class Param(StrEnum):
     PHASE_ORDERING = "ordering"
     PHASE_FULFILLMENT = "fulfillment"
     FLEXIBLE_DISCOUNTS = "flexibleDiscounts"
+    LINKED_MEMBERSHIP_ID = "lmID"
+    LINKED_MEMBERSHIP_NAME = "lmName"
+    LINKED_MEMBERSHIP_TYPE = "lmType"
+    LINKED_MEMBERSHIP_ROLE = "lmRole"
+    LINKED_MEMBERSHIP_CREATED = "lmCreated"
 
 
 PARAM_REQUIRED_CUSTOMER_ORDER = (

@@ -106,6 +106,8 @@ class AgreementSyncer:  # noqa: WPS214
             return
 
         try:
+            self._update_agreement_customer_parameters(self._adobe_customer, self._agreement)
+
             if not self._is_sync_possible():
                 return
 
@@ -132,7 +134,7 @@ class AgreementSyncer:  # noqa: WPS214
 
             self._update_agreement_line_prices(self._agreement, self._currency, self.product_id)
 
-            self._update_agreement(self._agreement)
+            self._update_agreement_bussines_parameters(self._agreement)
 
             if self._adobe_customer.get("globalSalesEnabled", False):
                 adobe_deployments = self._adobe_client.get_customer_deployments_active_status(
@@ -432,7 +434,35 @@ class AgreementSyncer:  # noqa: WPS214
 
         return mpt_entitlements_external_ids
 
-    def _update_agreement(self, agreement: dict) -> None:
+    def _update_agreement_customer_parameters(self, adobe_customer: dict, agreement: dict) -> None:
+        if adobe_customer.get("linkedMembership"):
+            parameters = {}
+            parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
+            parameters[Param.PHASE_FULFILLMENT.value].extend([
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_ID.value,
+                    "value": adobe_customer.get("linkedMembership").get("id"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_NAME.value,
+                    "value": adobe_customer.get("linkedMembership").get("name"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_TYPE.value,
+                    "value": adobe_customer.get("linkedMembership").get("type"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_ROLE.value,
+                    "value": adobe_customer.get("linkedMembership").get("linkedMembershipType"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_CREATED.value,
+                    "value": adobe_customer.get("linkedMembership").get("creationDate", "")[:10],
+                },
+            ])
+            self._execute_agreement_update(agreement, parameters)
+
+    def _update_agreement_bussines_parameters(self, agreement: dict) -> None:
         parameters = {}
 
         commitment_info = get_3yc_commitment(self._adobe_customer)
@@ -872,7 +902,7 @@ class AgreementSyncer:  # noqa: WPS214
                     dry_run=self._dry_run,
                 ).sync(sync_prices=sync_prices)
 
-            self._update_agreement(deployment_agreement)
+            self._update_agreement_bussines_parameters(deployment_agreement)
 
             self._sync_gc_3yc_agreements(deployment_agreement)
 

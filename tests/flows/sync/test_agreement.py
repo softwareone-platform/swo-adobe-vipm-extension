@@ -1733,6 +1733,39 @@ def test_sync_agreement_notify_exception(
     )
 
 
+def test_sync_agreement_updates_linked_membership_params(
+    mock_mpt_client, mock_mpt_update_agreement, mocked_agreement_syncer, mocker
+):
+    mocked_agreement_syncer._adobe_customer["linkedMembership"] = {
+        "id": "membership-id",
+        "name": "Membership Name",
+        "type": "member-type",
+        "linkedMembershipType": "admin",
+        "creationDate": "2025-06-30T12:34:56Z",
+    }
+    mock_is_sync_possible = mocker.patch.object(
+        mocked_agreement_syncer, "_is_sync_possible", return_value=False
+    )
+
+    mocked_agreement_syncer.sync(sync_prices=False)  # act
+
+    mock_is_sync_possible.assert_called_once_with()
+    mock_mpt_update_agreement.assert_called_once_with(
+        mock_mpt_client,
+        mocked_agreement_syncer._agreement["id"],
+        lines=mocked_agreement_syncer._agreement["lines"],
+        parameters={
+            Param.PHASE_FULFILLMENT.value: [
+                {"externalId": Param.LINKED_MEMBERSHIP_ID.value, "value": "membership-id"},
+                {"externalId": Param.LINKED_MEMBERSHIP_NAME.value, "value": "Membership Name"},
+                {"externalId": Param.LINKED_MEMBERSHIP_TYPE.value, "value": "member-type"},
+                {"externalId": Param.LINKED_MEMBERSHIP_ROLE.value, "value": "admin"},
+                {"externalId": Param.LINKED_MEMBERSHIP_CREATED.value, "value": "2025-06-30"},
+            ]
+        },
+    )
+
+
 @freeze_time("2025-06-23")
 def test_sync_agreement_empty_discounts(
     mocker,
