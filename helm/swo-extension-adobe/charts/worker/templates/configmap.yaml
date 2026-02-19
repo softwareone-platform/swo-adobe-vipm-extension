@@ -12,6 +12,9 @@ data:
   MPT_API_BASE_URL: {{ .Values.global.MpBaseUrl | quote }}
   MPT_API_TOKEN: {{ .Values.global.MpApiToken | quote }}
   MPT_PRODUCTS_IDS: {{ .Values.global.MpProductsIds | quote }}
+  MPT_TOOL_STORAGE_TYPE: {{ .Values.global.MptToolStorageType | quote }}
+  MPT_TOOL_STORAGE_AIRTABLE_BASE_ID: {{ .Values.global.MptToolStorageAirtableBaseId | quote }}
+  MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME: {{ .Values.global.MptToolStorageAirtableTableName | quote }}
   EXT_ADOBE_API_BASE_URL: {{ .Values.global.AdobeApiEndpoint | quote }}
   EXT_ADOBE_AUTH_ENDPOINT_URL: {{ .Values.global.AdobeAuthEndpoint | quote }}
   EXT_MIGRATION_RUNNING_MAX_RETRIES: {{ .Values.global.MigrationRunningMaxRetries | quote }}
