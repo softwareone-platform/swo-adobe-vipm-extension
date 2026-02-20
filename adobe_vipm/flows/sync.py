@@ -34,7 +34,6 @@ from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AuthorizationNotFoundError,
-    CustomerDiscountsNotFoundError,
 )
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
@@ -67,7 +66,7 @@ from adobe_vipm.flows.utils.market_segment import (
     get_market_segment,
     is_large_government_agency_type,
 )
-from adobe_vipm.notifications import send_exception, send_notification
+from adobe_vipm.notifications import send_exception, send_notification, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_commitment_start_date, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -636,6 +635,13 @@ def _get_subscriptions_for_update(
             continue
 
         mpt_subscription = get_agreement_subscription(mpt_client, subscription["id"])
+
+        if not mpt_subscription["lines"]:
+            logger.info("Skipping subscription %s because it has no lines", subscription["id"])
+            send_warning(
+                "Subscription has no lines", f"Subscription {subscription['id']} has no lines"
+            )
+            continue
         adobe_subscription_id = mpt_subscription.get("externalIds", {}).get("vendor")
 
         adobe_subscription = find_first(
@@ -1117,10 +1123,17 @@ def sync_agreement(  # noqa: C901 # NOSONAR
             return
 
         if not customer.get("discounts", []):
-            raise CustomerDiscountsNotFoundError(  # noqa: TRY301
-                f"Customer {customer_id} does not have discounts information. "
-                f"Cannot proceed with price synchronization for the agreement {agreement['id']}."
+            # Adobe discounts are not set for the customer when the subscriptions expired.
+            # In that case we should continue the sync process to terminate the subscriptions.
+            # There is another scenario when the 3YC is only for licenses.
+            # The discounts are not correctly returned by the API for the consumables.
+            msg = (
+                f"Error synchronizing agreement {agreement['id']}. Customer "
+                f"{customer_id} does not have discounts information."
+                f" Cannot proceed with price synchronization."
             )
+            logger.error(msg)
+            send_warning("Customer does not have discounts information", msg)
 
         _add_missing_subscriptions(
             mpt_client, adobe_client, customer, agreement, adobe_subscriptions
