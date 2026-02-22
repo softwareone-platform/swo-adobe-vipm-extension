@@ -335,7 +335,6 @@ def test_validate_reseller_change_filters_items_with_deployment(
                         "terms": {"period": "1y", "model": "quantity"},
                         "status": "Published",
                     },
-                    "oldQuantity": 170,
                     "quantity": 170,
                 }
             ],

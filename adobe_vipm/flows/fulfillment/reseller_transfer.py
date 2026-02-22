@@ -1,26 +1,28 @@
 import logging
 
-from mpt_extension_sdk.mpt_http.mpt import (
-    update_agreement,
-    update_order,
-)
+from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
 from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_or_customer
-from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
+from adobe_vipm.flows.constants import (
+    ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
+    TEMPLATE_NAME_PURCHASE,
+    TEMPLATE_NAME_TRANSFER,
+)
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.fulfillment import transfer
-from adobe_vipm.flows.fulfillment.shared import (
-    SetupDueDate,
-    StartOrderProcessing,
-    SyncAgreement,
-    switch_order_to_failed,
+from adobe_vipm.flows.fulfillment import shared, transfer
+from adobe_vipm.flows.fulfillment.purchase import (
+    RefreshCustomer,
+    ValidateEducationSubSegments,
+    ValidateGovernmentLGA,
 )
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
     SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
     ValidateResellerChange,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
@@ -44,8 +46,8 @@ def fulfill_reseller_change_order(mpt_client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
-        StartOrderProcessing(TEMPLATE_NAME_TRANSFER),
-        SetupDueDate(),
+        shared.StartOrderProcessing(TEMPLATE_NAME_TRANSFER),
+        shared.SetupDueDate(),
         SetupResellerChangeContext(),
         FetchResellerChangeData(is_validation=False),
         ValidateResellerChange(is_validation=False),
@@ -60,7 +62,7 @@ def fulfill_reseller_change_order(mpt_client, order):
         transfer.CreateTransferSubscriptions(),
         transfer.SetCommitmentDates(),
         transfer.CompleteTransferOrder(),
-        SyncAgreement(),
+        shared.SyncAgreement(),
     )
 
     context = Context(order=order)
@@ -102,22 +104,62 @@ class CheckAdobeResellerTransfer(Step):
         adobe_client = get_adobe_client()
         authorization_id = context.order["authorization"]["id"]
         transfer_id = get_adobe_order_id(context.order)
-        context.adobe_transfer_order = adobe_client.get_reseller_transfer(
-            authorization_id, transfer_id
-        )
-
-        reseller_code = get_change_reseller_code(context.order)
-        context.adobe_transfer_order["membershipId"] = reseller_code
         logger.info(
-            "%s: Adobe transfer order with status %s",
+            "%s: checking Adobe reseller transfer order %s for authorization %s",
             context,
-            context.adobe_transfer_order.get("status"),
+            transfer_id,
+            authorization_id,
         )
+        try:
+            context.adobe_transfer_order = adobe_client.get_reseller_transfer(
+                authorization_id, transfer_id
+            )
+        except AdobeAPIError as error:
+            if error.code == AdobeStatus.INVALID_FIELDS:
+                logger.info("Transfer already committed.")
+                self._make_the_next_step(mpt_client, context, next_step)
+                return
+            raise
+        except AdobeHttpError as err:
+            logger.warning("%s: Adobe reseller transfer order not found %s", context, err)
+        else:
+            reseller_code = get_change_reseller_code(context.order)
+            context.adobe_transfer_order["membershipId"] = reseller_code
+            logger.info(
+                "%s: Adobe transfer order with status %s",
+                context,
+                context.adobe_transfer_order.get("status"),
+            )
 
-        if context.adobe_transfer_order.get("status") == AdobeStatus.PENDING:
-            return
+            if context.adobe_transfer_order.get("status") == AdobeStatus.PENDING:
+                logger.info(
+                    "%s: Adobe reseller transfer order is pending, waiting for completion", context
+                )
+                return
 
-        next_step(mpt_client, context)
+        self._make_the_next_step(mpt_client, context, next_step)
+
+    def _make_the_next_step(self, mpt_client, context, next_step):
+        if context.adobe_transfer_order.get("lineItems"):
+            logger.info(
+                "%s: Adobe reseller transfer order has line items, continuing pipeline", context
+            )
+            next_step(mpt_client, context)
+        else:
+            logger.info(
+                "%s: Adobe reseller transfer order has no line items,"
+                " falling back to purchase fulfillment",
+                context,
+            )
+            if (
+                context.adobe_new_order_id
+                and context.adobe_new_order_id == context.adobe_transfer_order.get("transferId")
+            ):
+                logger.info("%s: Adobe order id is the same as transfer id, resetting", context)
+                context.order = shared.save_adobe_order_id(mpt_client, context.order, "")
+                context.adobe_new_order_id = ""
+
+            fulfill_purchase_order(mpt_client, context)
 
 
 class CommitResellerChange(Step):
@@ -151,7 +193,7 @@ class CommitResellerChange(Step):
             )
         except AdobeAPIError as ex:
             logger.exception("%s: Error committing reseller change", context)
-            switch_order_to_failed(
+            shared.switch_order_to_failed(
                 mpt_client,
                 context.order,
                 ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
@@ -214,3 +256,25 @@ class UpdateAutorenewalSubscriptions(Step):
                     subscription_id,
                 )
         next_step(mpt_client, context)
+
+
+def fulfill_purchase_order(client, context):
+    """Purchase order pipeline."""
+    pipeline = Pipeline(
+        shared.ValidateDuplicateLines(),
+        ValidateGovernmentLGA(),
+        ValidateEducationSubSegments(),
+        Validate3YCCommitment(),
+        shared.GetPreviewOrder(),
+        UpdatePrices(),
+        shared.SubmitNewOrder(),
+        shared.CreateOrUpdateAssets(),
+        shared.CreateOrUpdateSubscriptions(),
+        RefreshCustomer(),
+        shared.SetOrUpdateCotermDate(),
+        shared.CompleteOrder(TEMPLATE_NAME_PURCHASE),
+        shared.NullifyFlexDiscountParam(),
+        shared.SyncAgreement(),
+    )
+
+    pipeline.run(client, context)
