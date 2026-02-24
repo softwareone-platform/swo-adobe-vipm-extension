@@ -431,7 +431,11 @@ def _update_agreement_line_prices(
 
     skus = [item[1] for item in agreement_lines]
     prices = models.get_sku_price(customer, skus, product_id, currency)
+
     for line, actual_sku in agreement_lines:
+        if actual_sku not in prices:
+            continue
+
         current_price = line["price"]["unitPP"]
         line["price"]["unitPP"] = prices[actual_sku]
 

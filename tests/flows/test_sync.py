@@ -212,6 +212,79 @@ def test_sync_agreement_prices(
 
 
 @freeze_time("2025-06-23")
+def test_sync_agreement_prices_skip_one_time_line_without_price(
+    mocker,
+    agreement_factory,
+    subscriptions_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    mock_adobe_client,
+    mock_get_adobe_client,
+    mock_get_agreement_subscription,
+    mock_mpt_client,
+    mock_get_template_by_name,
+):
+    agreement = agreement_factory(
+        lines=lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11),
+        subscriptions=[
+            {"id": "SUB-1000-2000-3000", "status": "Active", "item": {"id": "ITM-0000-0001-0001"}},
+            {"id": "SUB-1234-5678", "status": "Terminated", "item": {"id": "ITM-0000-0001-0002"}},
+            {"id": "SUB-1000-2000-5000", "status": "Active", "item": {"id": "ITM-0000-0001-0003"}},
+        ],
+    )
+    mpt_subscription = subscriptions_factory()[0]
+    another_mpt_subscription = subscriptions_factory(
+        adobe_sku="77777777CA01A12",
+        adobe_subscription_id="b-sub-id",
+        subscription_id="SUB-1000-2000-5000",
+    )[0]
+    adobe_subscription = adobe_subscription_factory()
+    another_adobe_subscription = adobe_subscription_factory(
+        subscription_id="b-sub-id",
+        offer_id="77777777CA01A12",
+        current_quantity=15,
+        renewal_quantity=15,
+    )
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [adobe_subscription, another_adobe_subscription]
+    }
+    mock_adobe_client.get_customer.return_value = adobe_customer_factory(coterm_date="2025-04-04")
+    mock_get_agreement_subscription.side_effect = [mpt_subscription, another_mpt_subscription]
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        side_effect=[
+            {"65304578CA01A12": 1234.55, "77777777CA01A12": 20.22},
+            {"65304578CA01A12": 1234.55},
+        ],
+    )
+    mocked_update_agreement = mocker.patch("adobe_vipm.flows.sync.update_agreement")
+    mock_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Renewing"}
+
+    sync_agreement(mock_mpt_client, agreement, dry_run=False, sync_prices=True)
+
+    expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=10.11)
+    mocked_update_agreement.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "fulfillment": [
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCEnrollStatus", "value": None},
+                    {"externalId": "3YCStartDate", "value": None},
+                    {"externalId": "3YCEndDate", "value": None},
+                    {"externalId": "cotermDate", "value": "2025-04-04"},
+                ],
+                "ordering": [{'externalId': '3YC', 'value': None}],
+            },
+        ),
+    ])
+
+
+@freeze_time("2025-06-23")
 def test_sync_agreement_update_asset(
     mocker,
     agreement_factory,
