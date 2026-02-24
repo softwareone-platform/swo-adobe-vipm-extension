@@ -1,6 +1,6 @@
 import typer
-from mpt_api_client import MPTClient
 from django.conf import settings
+from mpt_api_client import MPTClient
 from mpt_extension_sdk.core.utils import setup_client
 
 from adobe_vipm.adobe.client import get_adobe_client
