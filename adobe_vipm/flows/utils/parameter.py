@@ -1,5 +1,6 @@
 import copy
 import functools
+import json
 from typing import Any
 
 from django.conf import settings
@@ -183,7 +184,7 @@ def get_coterm_date(order: dict) -> str | None:
     ).get("value")
 
 
-def update_ordering_parameter_value(order: dict, param_external_id: str, value: str) -> dict:
+def update_ordering_parameter_value(order: dict, param_external_id: str, value: Any) -> dict:
     """
     Update ordering parameter value in MPT order.
 
@@ -197,6 +198,28 @@ def update_ordering_parameter_value(order: dict, param_external_id: str, value: 
     """
     updated_order = copy.deepcopy(order)
     param = get_ordering_parameter(
+        updated_order,
+        param_external_id,
+    )
+    param["value"] = value
+
+    return updated_order
+
+
+def update_fulfillment_parameter_value(order: dict, param_external_id: str, value: Any) -> dict:
+    """
+    Update ordering parameter value in MPT order.
+
+    Args:
+        order: MPT order.
+        param_external_id: MPT parameter external id.
+        value: parameter value.
+
+    Returns:
+        Updated MPT order.
+    """
+    updated_order = copy.deepcopy(order)
+    param = get_fulfillment_parameter(
         updated_order,
         param_external_id,
     )
@@ -353,3 +376,64 @@ def update_agreement_params_visibility(
             param["constraints"]["hidden"] = param["externalId"] not in visible_params
 
     return updated_order
+
+def set_flex_discounts_parameter(order: dict, adobe_order: dict) -> dict:
+    """
+    Save flex discounts to the order.
+
+    Args:
+        order: MPT order.
+        adobe_order: Adobe order.
+
+    Returns:
+        Updated MPT order.
+    """
+    flex_discounts = [
+        {
+            "extLineItemNumber": line.get("extLineItemNumber"),
+            "offerId": line.get("offerId"),
+            "subscriptionId": line.get("subscriptionId"),
+            "flexDiscountCode": [flex_discount["code"] for flex_discount in line["flexDiscounts"]],
+        }
+        for line in adobe_order["lineItems"]
+        if line.get("flexDiscounts")
+    ]
+    flex_discounts = json.dumps(flex_discounts) if flex_discounts else None
+    order = update_fulfillment_parameter_value(
+        order, Param.FLEXIBLE_DISCOUNTS.value, flex_discounts
+    )
+    return order
+
+
+def set_adobe_order_ids_created_parameter(context, order_ids: list[str | None]) -> dict:
+    """Persist Adobe order IDs for Change orders as comma-separated values."""
+    sanitized_order_ids = [
+        order_id.strip() for order_id in order_ids if order_id and order_id.strip()
+    ]
+    if not sanitized_order_ids:
+        return context.order
+
+    order_ids_param = get_ordering_parameter(context.order, Param.ADOBE_ORDER_IDS.value)
+    existing_order_ids = [
+        order_id.strip()
+        for order_id in (order_ids_param.get("value") or "").split(",")
+        if order_id.strip()
+    ]
+    merged_order_ids = list(dict.fromkeys(existing_order_ids + sanitized_order_ids))
+    if merged_order_ids == existing_order_ids:
+        return context.order
+
+    adobe_order_ids = ",".join(merged_order_ids)
+    if not order_ids_param:
+        context.order.setdefault("parameters", {}).setdefault(
+            Param.PHASE_ORDERING.value, []
+        ).append({
+            "externalId": Param.ADOBE_ORDER_IDS.value,
+            "value": adobe_order_ids,
+        })
+
+    context.order = update_ordering_parameter_value(
+        context.order, Param.ADOBE_ORDER_IDS.value, adobe_order_ids
+    )
+
+    return context.order

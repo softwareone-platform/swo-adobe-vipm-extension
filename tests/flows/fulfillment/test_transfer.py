@@ -4253,6 +4253,7 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
                     adobe_customer_address["country"],
                 ),
             },
+            adobe_order_ids="P0123456789",
         ),
         external_ids={"vendor": "transfer-id"},
     )
@@ -4315,20 +4316,24 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
         membership_id_param["value"],
     )
     mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
+
+    order_parameters = order["parameters"]["ordering"]
+
     assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 due_date="2012-02-13",
             ),
-            "ordering": order["parameters"]["ordering"],
+            "ordering": order_parameters,
         },
     }
     assert mocked_update_order.mock_calls[2].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[2].kwargs == {
         "externalIds": {"vendor": new_order["orderId"]},
         "parameters": {
-            "fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]
+            "fulfillment": updated_order["parameters"]["fulfillment"],
+            "ordering": updated_order["parameters"]["ordering"],
         },
     }
 
@@ -4385,6 +4390,7 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
                     adobe_customer_address["country"],
                 ),
             },
+            adobe_order_ids="P0123456789",
         ),
         external_ids={"vendor": "transfer-id"},
     )
@@ -4443,6 +4449,7 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
         membership_id_param["value"],
     )
     mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
+
     assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
@@ -4456,7 +4463,8 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
     assert mocked_update_order.mock_calls[2].kwargs == {
         "externalIds": {"vendor": new_order["orderId"]},
         "parameters": {
-            "fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]
+            "fulfillment": updated_order["parameters"]["fulfillment"],
+            "ordering": updated_order["parameters"]["ordering"],
         },
     }
 

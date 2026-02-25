@@ -344,6 +344,13 @@ def test_prepare_customer_no_data_step(
                     "value": None,
                 },
                 {
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -496,6 +503,14 @@ def test_prepare_customer_no_data_step(
                     "externalId": "3YCConsumables",
                     "id": "PAR-0000-0008",
                     "name": "3YCConsumables",
+                    "type": "SingleLineText",
+                    "value": "",
+                },
+                {
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
                     "type": "SingleLineText",
                     "value": "",
                 },

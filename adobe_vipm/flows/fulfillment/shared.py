@@ -86,7 +86,10 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
-from adobe_vipm.flows.utils.parameter import (
+from adobe_vipm.flows.utils.parameter import (    
+    get_ordering_parameter,
+    set_adobe_order_ids_created_parameter,
+    set_flex_discounts_parameter,
     set_ordering_parameter_error,
     update_agreement_params_visibility,
 )
@@ -893,6 +896,15 @@ class SubmitReturnOrders(Step):
                 return_order_created = self._create_return_order(
                     adobe_client, context, returnable_order, deployment_id
                 )
+                context.order = set_adobe_order_ids_created_parameter(
+                    context,
+                    [return_order_created.get("orderId")],
+                )
+                update_order(
+                    client,
+                    context.order_id,
+                    parameters=context.order["parameters"],
+                )
 
                 all_return_orders.append(return_order_created)
 
@@ -986,19 +998,13 @@ class SubmitNewOrder(Step):
             )
             logger.info("%s: new adobe order created: %s", context, adobe_order["orderId"])
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
-            flex_discounts = _get_flex_discounts(adobe_order)
+            context.order = set_adobe_order_ids_created_parameter(context, [adobe_order["orderId"]])
+            context.order = set_flex_discounts_parameter(context.order, adobe_order)
             update_order(
                 client,
                 context.order_id,
                 externalIds=context.order["externalIds"],
-                parameters={
-                    Param.PHASE_FULFILLMENT.value: [
-                        {
-                            "externalId": Param.FLEXIBLE_DISCOUNTS,
-                            "value": flex_discounts,
-                        },
-                    ]
-                },
+                parameters=context.order["parameters"],
             )
         elif not context.adobe_new_order_id and not context.adobe_preview_order:
             logger.info(
@@ -1037,20 +1043,6 @@ class SubmitNewOrder(Step):
             logger.warning("%s: the order has been failed due to %s.", context, error["message"])
             return
         next_step(client, context)
-
-
-def _get_flex_discounts(adobe_order: dict) -> str | None:
-    flex_discounts = [
-        {
-            "extLineItemNumber": line.get("extLineItemNumber"),
-            "offerId": line.get("offerId"),
-            "subscriptionId": line.get("subscriptionId"),
-            "flexDiscountCode": [flex_discount["code"] for flex_discount in line["flexDiscounts"]],
-        }
-        for line in adobe_order["lineItems"]
-        if line.get("flexDiscounts")
-    ]
-    return json.dumps(flex_discounts) if flex_discounts else None
 
 
 class CreateOrUpdateAssets(Step):
@@ -1257,11 +1249,16 @@ class CompleteOrder(Step):
             MPT_ORDER_STATUS_COMPLETED,
             self.template_name,
         )
+        list_adobe_order_ids = get_ordering_parameter(context.order, Param.ADOBE_ORDER_IDS.value)
+        adobe_order_ids = (list_adobe_order_ids.get("value") or "").strip()
+        if adobe_order_ids:
+            context.order = set_adobe_order_id(context.order, adobe_order_ids)
         agreement = context.order["agreement"]
         context.order = complete_order(
             client,
             context.order_id,
             template,
+            externalIds=context.order.get("externalIds", {}),
             parameters=context.order["parameters"],
         )
         context.order["agreement"] = agreement

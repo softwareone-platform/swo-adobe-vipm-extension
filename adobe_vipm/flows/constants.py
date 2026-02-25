@@ -66,6 +66,7 @@ class Param(StrEnum):
     LINKED_MEMBERSHIP_TYPE = "lmType"
     LINKED_MEMBERSHIP_ROLE = "lmRole"
     LINKED_MEMBERSHIP_CREATED = "lmCreated"
+    ADOBE_ORDER_IDS = "adobeOrderIds"
 
 
 PARAM_REQUIRED_CUSTOMER_ORDER = (
