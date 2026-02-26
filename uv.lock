@@ -905,15 +905,15 @@ wheels = [
 
 [[package]]
 name = "mpt-api-client"
-version = "5.0.0"
+version = "5.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "python-box" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/c5/2a30be6b9f7adf3a72fa19cdc9f24f9011c6a0d2b5a5a243d8ea2e3f3ea0/mpt_api_client-5.0.0.tar.gz", hash = "sha256:36cef02d1ee097207ea281509571d3a51f9069d0ee6381483f482f92fd879757", size = 39488, upload-time = "2026-01-20T16:03:30.338Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/07/86a4d59c4e44f49299449012da69bbeb4d2d6736db838ee9da4f34a6c4fe/mpt_api_client-5.2.0.tar.gz", hash = "sha256:c145d391b1339861d64b2235668c520ed070a26f86f91405c8299939b751c9e7", size = 41343, upload-time = "2026-02-24T11:33:03.176Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/fa/f696e4c244c8f97d0e8634de49a5d9f3a372e04430a24bc2a6051b709969/mpt_api_client-5.0.0-py3-none-any.whl", hash = "sha256:2c28f4bed98d63b5cef3bd4e8b6ba89fb2b5a731e7afde0af0be9a0cc6677597", size = 78194, upload-time = "2026-01-20T16:03:28.945Z" },
+    { url = "https://files.pythonhosted.org/packages/34/6d/27136754f367ba0044c994adb093781d28f587d04898a6db7154ca42f77a/mpt_api_client-5.2.0-py3-none-any.whl", hash = "sha256:1b0348d8f06481b21ce0385473ddf43d864afdef08ec98b0be407bfbb7e78acc", size = 92135, upload-time = "2026-02-24T11:33:01.576Z" },
 ]
 
 [[package]]
@@ -948,16 +948,16 @@ wheels = [
 
 [[package]]
 name = "mpt-tool"
-version = "5.4.0"
+version = "5.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mpt-api-client" },
     { name = "pyairtable" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/07/6c03444c5d6ace1547183ef0d3cf9c27e4dcfe42a5a9b6feb7b16490c2e8/mpt_tool-5.4.0.tar.gz", hash = "sha256:57e81c158d7e37425b9bbceaa71248e1862e7084614578320a9d7c86f566d893", size = 24290, upload-time = "2026-02-20T10:02:13.753Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a9/ab/32a104b6f1605e139eff1feecf134c8bd0d03400db277e1be6da09720178/mpt_tool-5.6.0.tar.gz", hash = "sha256:6a4513562646b2e7ea1545b5429e9b224bbdc9a3d97c9ac5b6e8bfc2a548f8cc", size = 24570, upload-time = "2026-02-26T10:10:09.891Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/2d/07d332d7b510d3278714d35851991641020f7ea2aebb7375c1bbe3efa26c/mpt_tool-5.4.0-py3-none-any.whl", hash = "sha256:86decd9162ddd4b8b5e86b939000e759ceda0ea97c49774a0c875eb33629e222", size = 37734, upload-time = "2026-02-20T10:02:12.834Z" },
+    { url = "https://files.pythonhosted.org/packages/30/07/fb96878306df97bbaf5006c68fb039b4fcf7296112373875ef1bdf042a73/mpt_tool-5.6.0-py3-none-any.whl", hash = "sha256:1d100b6339988363a21b97322c4fe4c3981ddd89be634b8ac872244b8cc17a64", size = 38058, upload-time = "2026-02-26T10:10:08.846Z" },
 ]
 
 [[package]]
@@ -1934,7 +1934,7 @@ requires-dist = [
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "markdown-it-py", specifier = "==4.0.*" },
     { name = "mpt-extension-sdk", specifier = "==5.20.*" },
-    { name = "mpt-tool", specifier = "==5.4.*" },
+    { name = "mpt-tool", specifier = "==5.6.*" },
     { name = "openpyxl", specifier = "==3.1.*" },
     { name = "phonenumbers", specifier = "==9.0.*" },
     { name = "pyairtable", specifier = "==3.3.*" },
@@ -1979,7 +1979,7 @@ wheels = [
 
 [[package]]
 name = "typer"
-version = "0.23.2"
+version = "0.24.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
@@ -1987,9 +1987,9 @@ dependencies = [
     { name = "rich" },
     { name = "shellingham" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/ae/93d16574e66dfe4c2284ffdaca4b0320ade32858cb2cc586c8dd79f127c5/typer-0.23.2.tar.gz", hash = "sha256:a99706a08e54f1aef8bb6a8611503808188a4092808e86addff1828a208af0de", size = 120162, upload-time = "2026-02-16T18:52:40.354Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/24/cb09efec5cc954f7f9b930bf8279447d24618bb6758d4f6adf2574c41780/typer-0.24.1.tar.gz", hash = "sha256:e39b4732d65fbdcde189ae76cf7cd48aeae72919dea1fdfc16593be016256b45", size = 118613, upload-time = "2026-02-21T16:54:40.609Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/2c/dee705c427875402200fe779eb8a3c00ccb349471172c41178336e9599cc/typer-0.23.2-py3-none-any.whl", hash = "sha256:e9c8dc380f82450b3c851a9b9d5a0edf95d1d6456ae70c517d8b06a50c7a9978", size = 56834, upload-time = "2026-02-16T18:52:39.308Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/91/48db081e7a63bb37284f9fbcefda7c44c277b18b0e13fbc36ea2335b71e6/typer-0.24.1-py3-none-any.whl", hash = "sha256:112c1f0ce578bfb4cab9ffdabc68f031416ebcc216536611ba21f04e9aa84c9e", size = 56085, upload-time = "2026-02-21T16:54:41.616Z" },
 ]
 
 [[package]]
