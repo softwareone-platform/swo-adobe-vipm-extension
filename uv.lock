@@ -918,7 +918,7 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "5.20.1"
+version = "5.20.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -941,9 +941,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/81/f442b98ea32ca31c942436d3f6a9b2160a1a3b9c5332d78caa175be5e710/mpt_extension_sdk-5.20.1.tar.gz", hash = "sha256:8fbd4dd37b60399d8425b0640b5a8b1957239807da5b90f7f3e6a9e8850f3621", size = 34271, upload-time = "2026-02-19T12:48:09.865Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b7/92/e6600e5041187331b86b56be9a8e8bfaddd88aa6b11fa5a7d28ceb9a3eb4/mpt_extension_sdk-5.20.2.tar.gz", hash = "sha256:076310fe9c47ece4c7b51427d5a67fed50c4703b8cb5defcb53b038a5152040c", size = 34288, upload-time = "2026-02-25T19:55:56.498Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/96/6df6dfec9538d6548472b5c722da439842cb0e071096f29e3d92992e14c2/mpt_extension_sdk-5.20.1-py3-none-any.whl", hash = "sha256:cace07b6dee4c6049ed69bf61a18fc0d9041cc3830a29d7fff1b3e4e07b1cad2", size = 48597, upload-time = "2026-02-19T12:48:08.38Z" },
+    { url = "https://files.pythonhosted.org/packages/42/58/a28e444e454edbdd7828eb3f2cd582f6924fbca06b34212aba709a873cd3/mpt_extension_sdk-5.20.2-py3-none-any.whl", hash = "sha256:1f3ce65c7c5c359b28844719d4b90f4e2227fe30074a72d20614d3496dd636c5", size = 48614, upload-time = "2026-02-25T19:55:55.603Z" },
 ]
 
 [[package]]
