@@ -5,6 +5,9 @@ global:
   MpBaseUrl: default
   MpApiToken: default
   MptOperationApiToken: ZGVmYXVsdA==
+  MptToolStorageType: default
+  MptToolStorageAirtableBaseId: default
+  MptToolStorageAirtableTableName: default
   ConfigJson: ZGVmYXVsdA==
   CredentialsJson: ZGVmYXVsdA==
   AuthorizationsJson: ZGVmYXVsdA==
