@@ -918,7 +918,7 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "5.20.2"
+version = "5.21.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -939,11 +939,12 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "typing-extensions" },
+    { name = "uvicorn-worker" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b7/92/e6600e5041187331b86b56be9a8e8bfaddd88aa6b11fa5a7d28ceb9a3eb4/mpt_extension_sdk-5.20.2.tar.gz", hash = "sha256:076310fe9c47ece4c7b51427d5a67fed50c4703b8cb5defcb53b038a5152040c", size = 34288, upload-time = "2026-02-25T19:55:56.498Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/ab/fcf38d28f4e23df7428ecda3bed07feb02979fb7e67d5215f01d9ad41081/mpt_extension_sdk-5.21.0.tar.gz", hash = "sha256:66c3b7bd94a685225accc437c5ac390db5c584277859fc75b92116ae361cbf4a", size = 34326, upload-time = "2026-02-27T10:16:27.745Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/58/a28e444e454edbdd7828eb3f2cd582f6924fbca06b34212aba709a873cd3/mpt_extension_sdk-5.20.2-py3-none-any.whl", hash = "sha256:1f3ce65c7c5c359b28844719d4b90f4e2227fe30074a72d20614d3496dd636c5", size = 48614, upload-time = "2026-02-25T19:55:55.603Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/c5/5fb0b84e1d54f4b122437b73364d8cbf3c046c2bf33f0d69e6b89ba3b1d0/mpt_extension_sdk-5.21.0-py3-none-any.whl", hash = "sha256:d69f781b3a781dc1eaba77f90a5458e6d07275394134992e47648ca7f70f5b69", size = 48642, upload-time = "2026-02-27T10:16:25.288Z" },
 ]
 
 [[package]]
@@ -1933,7 +1934,7 @@ requires-dist = [
     { name = "django", specifier = "==4.2.*" },
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "markdown-it-py", specifier = "==4.0.*" },
-    { name = "mpt-extension-sdk", specifier = "==5.20.*" },
+    { name = "mpt-extension-sdk", specifier = "==5.21.*" },
     { name = "mpt-tool", specifier = "==5.6.*" },
     { name = "openpyxl", specifier = "==3.1.*" },
     { name = "phonenumbers", specifier = "==9.0.*" },
@@ -2050,6 +2051,32 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c7/24/5f1b3bdffd70275f6661c76461e25f024d5a38a46f04aaca912426a2b1d3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed", size = 435556, upload-time = "2026-01-07T16:24:43.925Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4", size = 131584, upload-time = "2026-01-07T16:24:42.685Z" },
+]
+
+[[package]]
+name = "uvicorn"
+version = "0.41.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/ce/eeb58ae4ac36fe09e3842eb02e0eb676bf2c53ae062b98f1b2531673efdd/uvicorn-0.41.0.tar.gz", hash = "sha256:09d11cf7008da33113824ee5a1c6422d89fbc2ff476540d69a34c87fab8b571a", size = 82633, upload-time = "2026-02-16T23:07:24.1Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/e4/d04a086285c20886c0daad0e026f250869201013d18f81d9ff5eada73a88/uvicorn-0.41.0-py3-none-any.whl", hash = "sha256:29e35b1d2c36a04b9e180d4007ede3bcb32a85fbdfd6c6aeb3f26839de088187", size = 68783, upload-time = "2026-02-16T23:07:22.357Z" },
+]
+
+[[package]]
+name = "uvicorn-worker"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "gunicorn" },
+    { name = "uvicorn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/59/9101b9c0680fd80e9d26c07deb822a5d18a324339fcf9cd017885ee808ad/uvicorn_worker-0.4.0.tar.gz", hash = "sha256:8ee5306070d8f38dce124adce488c3c0b50f20cf0c0222b12c66188da7214493", size = 9361, upload-time = "2025-09-20T10:47:01.218Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/90/25/09cd7a90c8bb7fb693be0d6704fccd5f9778d5513214b7a01cc4a94ff314/uvicorn_worker-0.4.0-py3-none-any.whl", hash = "sha256:e2ed952cef976f5e9e429d7269640bbcafbd36c80aa80f1003c8c77a6797abde", size = 5364, upload-time = "2025-09-20T10:46:59.776Z" },
 ]
 
 [[package]]
