@@ -78,12 +78,12 @@ class Config:
         Args:
             auth_id: the identifier of the Authorization.
 
+        Returns:
+            Authorization object identified by the provided id.
+
         Raises:
             AuthorizationNotFoundError: if there is no Authorization
                 with such id.
-
-        Returns:
-            Authorization object identified by the provided id.
         """
         try:
             return self.authorizations[auth_id]
@@ -101,12 +101,12 @@ class Config:
             reseller.
             auth_id: Identifier of the Reseller to retrieve.
 
+        Returns:
+            The Reseller object.
+
         Raises:
             ResellerNotFoundError: if there is no Reseller with such
             lookup keys.
-
-        Returns:
-            The Reseller object.
         """
         try:
             return self.resellers[authorization, auth_id]
@@ -138,12 +138,12 @@ class Config:
             code: The Country code to retrieve the Country
                 object.
 
+        Returns:
+            The Country object.
+
         Raises:
             CountryNotFoundError: If there is no Country object
                 identified by the given Country code.
-
-        Returns:
-            The Country object.
         """
         try:
             return self.countries[code]
