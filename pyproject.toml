@@ -117,6 +117,7 @@ per-file-ignores = [
   "adobe_vipm/flows/fulfillment/shared.py: WPS110 WPS201 WPS202 WPS203 WPS204 WPS210 WPS213 WPS220 WPS221 WPS229 WPS231 WPS235 WPS237 WPS336 WPS426 WPS441 WPS504",
   "adobe_vipm/flows/fulfillment/termination.py: WPS210 WPS220 WPS229 WPS231 WPS235",
   "adobe_vipm/flows/fulfillment/transfer.py: WPS110 WPS201 WPS202 WPS203 WPS204 WPS210 WPS211 WPS221 WPS231 WPS235 WPS237 WPS432 WPS479 WPS480",
+  "adobe_vipm/flows/fulfillment/reseller_transfer.py: WPS202",
   "adobe_vipm/flows/fulfillment/__init__.py: WPS412",
   "adobe_vipm/flows/utils/customer.py: WPS110 WPS202",
   "adobe_vipm/flows/utils/date.py: WPS110 WPS221",
