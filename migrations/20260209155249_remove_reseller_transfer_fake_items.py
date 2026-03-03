@@ -13,6 +13,8 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
 
     def run(self):
         """Migration to unpublish fake items."""
+        errors: list[Exception] = []
+
         items_service = self.mpt_client.catalog.items
         fake_items = items_service.filter(
             RQLQuery("externalIds.vendor").eq("adobe-reseller-transfer")
@@ -22,5 +24,9 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
             logger.info("%s - unpublish item %s", idx, fake_item.id)
             try:
                 items_service.unpublish(fake_item.id)
-            except Exception:
+            except Exception as exc:
                 logger.exception("%s - error processing item %s", idx, fake_item.id)
+                errors.append(exc)
+
+        if errors:
+            raise ExceptionGroup("Processing errors", errors)

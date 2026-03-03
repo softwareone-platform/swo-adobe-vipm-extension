@@ -14,6 +14,8 @@ class Migration(DataBaseMigration, MPTAPIClientMixin):
 
     def run(self):
         """Migration to remove fake items from Agreements."""
+        self._errors: list[Exception] = []
+
         fake_agreement_lines = self.mpt_client.commerce.agreements.filter(
             RQLQuery().n("item.externalIds.vendor").eq("adobe-reseller-transfer").any("lines")
             & RQLQuery(product__id__in=os.environ["MPT_PRODUCTS_IDS"].replace(" ", "").split(","))
@@ -29,17 +31,21 @@ class Migration(DataBaseMigration, MPTAPIClientMixin):
                 logger.info("%s - terminating asset %s", idx, fake_asset_id)
                 try:
                     self.mpt_client.commerce.assets.terminate(fake_asset_id)
-                except Exception:
+                except Exception as exc:
                     logger.exception("%s - error terminating asset %s", idx, fake_asset_id)
+                    self._errors.append(exc)
 
-    @staticmethod
-    def _get_fake_asset_ids(agreement: Agreement, idx: int) -> set:
+        if self._errors:
+            raise ExceptionGroup("Processing errors", self._errors)
+
+    def _get_fake_asset_ids(self, agreement: Agreement, idx: int) -> set:
         try:
             return {
                 line["asset"]["id"]
                 for line in agreement.to_dict()["lines"]
                 if line["item"]["externalIds"]["vendor"] == "adobe-reseller-transfer"
             }
-        except (KeyError, TypeError):
+        except (KeyError, TypeError) as exc:
             logger.exception("%s - error getting fake assets from agreement %s", idx, agreement.id)
+            self._errors.append(exc)
             return set()
