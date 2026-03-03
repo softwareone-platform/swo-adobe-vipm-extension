@@ -5,6 +5,7 @@ from typing import Any
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.flows.constants import (
+    AGREEMENT_VISIBLE_PARAMETERS,
     PARAM_NEW_CUSTOMER_PARAMETERS,
     PARAM_OPTIONAL_CUSTOMER_ORDER,
     TRANSFER_CUSTOMER_PARAMETERS,
@@ -317,3 +318,32 @@ def get_retry_count(order: dict) -> str | None:
         return None
 
     return param["value"] if param.get("value") else ""
+
+
+def update_agreement_parameters_visibility_for_agreement(order: dict) -> dict:
+    """Updates order parameters hidden constraint for ordering and fulfillment parameters.
+
+    Sets the hidden constraint on each parameter based on the agreement type
+    visibility rules. Parameters whose external ID is present in the visibility
+    rules dictionary for the current agreement type are marked as visible;
+    all others are marked as hidden.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        Updated MPT order with visibility constraints applied.
+    """
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value)
+    agreement_value = (agreement_type.get("value") or "").lower()
+    visible_params = AGREEMENT_VISIBLE_PARAMETERS.get(agreement_value, set())
+    updated_order = copy.deepcopy(order)
+
+    for phase in (Param.PHASE_ORDERING.value, Param.PHASE_FULFILLMENT.value):
+        for param in updated_order["parameters"][phase]:
+            param["constraints"] = {
+                "hidden": not param["externalId"] in visible_params,
+                "required": False,
+            }
+
+    return updated_order

@@ -72,7 +72,7 @@ filterwarnings = [
 relative_files = true
 branch = true
 omit = [
-  "__init__.py",
+  "__init__.py"
 ]
 
 [tool.flake8]
@@ -88,7 +88,8 @@ extend-exclude = [
   ".pytest_cache",
   ".ruff_cache",
   "uv.lock",
-  ".venv"
+  ".venv",
+  "migrations"
 ]
 format = "wemake"
 max-imports = 17
@@ -164,6 +165,8 @@ preview = true
 target-version = "py312"
 output-format = "full"
 line-length = 100
+exclude = ["migrations"]
+
 
 [tool.ruff.format]
 quote-style = "double"
