@@ -101,6 +101,7 @@ statistics = false
 per-file-ignores = [
   "tests/**/*.py: WPS",
   "tests/*.py: WPS",
+  "migrations/*.py: WPS102, WPS232",
   "adobe_vipm/flows/pipeline.py: WPS",
   "adobe_vipm/adobe/validation.py: WPS202",
   "adobe_vipm/adobe/utils.py: WPS100",
