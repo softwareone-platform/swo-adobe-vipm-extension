@@ -2,12 +2,16 @@ import copy
 import functools
 from typing import Any
 
+from django.conf import settings
 from mpt_extension_sdk.mpt_http.utils import find_first
+from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.flows.constants import (
+    AGREEMENT_VISIBLE_PARAMETERS,
     PARAM_NEW_CUSTOMER_PARAMETERS,
     PARAM_OPTIONAL_CUSTOMER_ORDER,
     TRANSFER_CUSTOMER_PARAMETERS,
+    AgreementType,
     Param,
 )
 
@@ -317,3 +321,35 @@ def get_retry_count(order: dict) -> str | None:
         return None
 
     return param["value"] if param.get("value") else ""
+
+
+def update_agreement_params_visibility(
+    order: dict[str, Any],
+) -> dict[str, Any]:
+    """Updates order parameters hidden constraint for ordering and fulfillment parameters.
+
+    Sets the hidden constraint on each parameter based on the agreement type
+    and market segment visibility rules. Parameters whose external ID is present
+    in the visibility rules dictionary for the current agreement type and market
+    segment are marked as visible; all others are marked as hidden.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        Updated MPT order with visibility constraints applied.
+    """
+    agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value)
+    agreement_type_value = agreement_type.get("value") or AgreementType.NEW.value
+    market_segment = get_for_product(settings, "PRODUCT_SEGMENT", order["product"]["id"])
+    visible_params = list(AGREEMENT_VISIBLE_PARAMETERS.get(agreement_type_value, []))
+    visible_params.extend(AGREEMENT_VISIBLE_PARAMETERS.get(market_segment, []))
+    updated_order = copy.deepcopy(order)  # noqa: WPS204
+
+    for phase in (Param.PHASE_ORDERING.value, Param.PHASE_FULFILLMENT.value):
+        for param in updated_order["parameters"][phase]:
+            if "constraints" not in param:
+                param["constraints"] = {}
+            param["constraints"]["hidden"] = param["externalId"] not in visible_params
+
+    return updated_order

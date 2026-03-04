@@ -2,6 +2,7 @@ from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_GOVERNMENT,
     MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     PARAM_REQUIRED_CUSTOMER_ORDER,
+    AgreementType,
     Param,
 )
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
@@ -95,7 +96,9 @@ def is_migrate_customer(order: dict) -> bool:
         if parameter of Agreement Type is marked as 'Migrate'
     """
     agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value).get("value")
-    return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)
+    return agreement_type == AgreementType.MIGRATE.value and is_ordering_param_required(
+        order, Param.MEMBERSHIP_ID
+    )
 
 
 def is_reseller_change(order: dict) -> bool:
@@ -109,7 +112,7 @@ def is_reseller_change(order: dict) -> bool:
         if parameter of Agreement Type is marked as 'Transfer'
     """
     agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE).get("value")
-    return agreement_type == "Transfer" and is_ordering_param_required(
+    return agreement_type == AgreementType.TRANSFER.value and is_ordering_param_required(
         order, Param.CHANGE_RESELLER_CODE
     )
 

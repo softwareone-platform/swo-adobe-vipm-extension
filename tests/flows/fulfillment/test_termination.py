@@ -16,6 +16,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitReturnOrders,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.fulfillment.termination import (
@@ -208,6 +209,7 @@ def test_fulfill_termination_order(mocker):
         StartOrderProcessing,
         SetupDueDate,
         SetOrUpdateCotermDate,
+        UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
         GetReturnOrders,
         GetReturnableOrders,
@@ -219,7 +221,7 @@ def test_fulfill_termination_order(mocker):
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_TERMINATION
-    assert mocked_pipeline_ctor.mock_calls[0].args[9].template_name == TEMPLATE_NAME_TERMINATION
+    assert mocked_pipeline_ctor.mock_calls[0].args[10].template_name == TEMPLATE_NAME_TERMINATION
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 

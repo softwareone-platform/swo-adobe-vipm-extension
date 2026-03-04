@@ -25,6 +25,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
 )
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
@@ -507,6 +508,7 @@ def test_fulfill_reseller_change_order(mocker, mock_mpt_client):
         ProcessResellerTransferOrder,
         transfer.CreateTransferAssets,
         transfer.CreateTransferSubscriptions,
+        UpdateAgreementParamsVisibility,
         transfer.SetCommitmentDates,
         CompleteResellerTransferOrder,
         SyncAgreement,
@@ -530,7 +532,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client):
 
     fulfill_purchase_order(mock_mpt_client, mocked_context)  # act
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 9
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 10
     expected_steps = [
         GetPreviewOrder,
         UpdatePrices,
@@ -538,6 +540,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client):
         CreateOrUpdateAssets,
         CreateOrUpdateSubscriptions,
         SetOrUpdateCotermDate,
+        UpdateAgreementParamsVisibility,
         CompleteOrder,
         NullifyFlexDiscountParam,
         SyncAgreement,

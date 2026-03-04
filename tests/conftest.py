@@ -419,6 +419,7 @@ def transfer_order_parameters_factory():
         p3yc=None,
         p3yc_licenses=None,
         p3yc_consumables=None,
+        agency_type="STATE",
     ):
         return [
             {
@@ -522,7 +523,7 @@ def transfer_order_parameters_factory():
                 "name": "Agency type",
                 "externalId": Param.AGENCY_TYPE.value,
                 "type": "SingleLineText",
-                "value": "STATE",
+                "value": agency_type,
                 "constraints": {
                     "hidden": True,
                     "required": False,

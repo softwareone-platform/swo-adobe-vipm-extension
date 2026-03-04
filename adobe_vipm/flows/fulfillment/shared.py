@@ -86,7 +86,10 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
-from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
+from adobe_vipm.flows.utils.parameter import (
+    set_ordering_parameter_error,
+    update_agreement_params_visibility,
+)
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
 from adobe_vipm.notifications import mpt_notify, send_exception
@@ -1417,3 +1420,13 @@ class NullifyFlexDiscountParam(Step):
         except Exception:
             logger.exception("%s: failed to nullify flex discounts.", context)
         next_step(mpt_client, context)
+
+
+class UpdateAgreementParamsVisibility(Step):
+    """Updates the visibility of agreement parameters based on agreement type and market segment."""
+
+    def __call__(self, client, context, next_step):
+        """Updates the visibility of agreement parameters."""
+        context.order = update_agreement_params_visibility(context.order)
+        update_order(client, context.order_id, parameters=context.order["parameters"])
+        next_step(client, context)

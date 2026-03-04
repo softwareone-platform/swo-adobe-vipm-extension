@@ -32,6 +32,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import (
@@ -454,6 +455,7 @@ def test_fulfill_change_order(mocker):
         SetupDueDate,
         ValidateDuplicateLines,
         SetOrUpdateCotermDate,
+        UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
         ValidateSkuAvailability,
         GetReturnOrders,
@@ -478,7 +480,7 @@ def test_fulfill_change_order(mocker):
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[19].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[20].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 

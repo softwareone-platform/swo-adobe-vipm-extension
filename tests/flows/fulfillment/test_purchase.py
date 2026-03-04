@@ -34,6 +34,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
 )
 from adobe_vipm.flows.helpers import (
@@ -564,7 +565,6 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
 
     fulfill_purchase_order(mock_mpt_client, mock_order)  # act
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 19
     expected_steps = [
         SetupContext,
         StartOrderProcessing,
@@ -582,6 +582,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
         CreateOrUpdateSubscriptions,
         RefreshCustomer,
         SetOrUpdateCotermDate,
+        UpdateAgreementParamsVisibility,
         CompleteOrder,
         NullifyFlexDiscountParam,
         SyncAgreement,
@@ -589,6 +590,6 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_PURCHASE
-    assert mocked_pipeline_ctor.mock_calls[0].args[16].template_name == TEMPLATE_NAME_PURCHASE
+    assert mocked_pipeline_ctor.mock_calls[0].args[17].template_name == TEMPLATE_NAME_PURCHASE
     mocked_context_ctor.assert_called_once_with(order=mock_order)
     mocked_pipeline_instance.run.assert_called_once_with(mock_mpt_client, mocked_context)
