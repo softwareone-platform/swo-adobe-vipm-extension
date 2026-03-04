@@ -58,6 +58,14 @@ pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
 
 @pytest.fixture(autouse=True)
+def mocked_update_agreement_params_visibility(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.UpdateAgreementParamsVisibility.__call__",
+        side_effect=lambda client, context, next_step: next_step(client, context),
+    )
+
+
+@pytest.fixture(autouse=True)
 def mocked_send_mpt_notification(mocker):
     return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification", spec=True)
 

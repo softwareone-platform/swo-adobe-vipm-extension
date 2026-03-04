@@ -1,5 +1,6 @@
 import copy
 import datetime as dt
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -11,7 +12,7 @@ from adobe_vipm.flows.utils.parameter import (
 )
 
 
-def set_due_date(order: dict) -> dict:
+def set_due_date(order: dict[str, Any]) -> dict[str, Any]:
     """
     Sets DUE_DATE parameter to the value of today() + EXT_DUE_DATE_DAYS if it is not set yet.
 
@@ -44,7 +45,7 @@ def set_due_date(order: dict) -> dict:
     return updated_order
 
 
-def get_due_date(order: dict) -> dt.date | None:
+def get_due_date(order: dict[str, Any]) -> dt.date | None:
     """
     Gets DUE_DATE parameter.
 
@@ -65,7 +66,7 @@ def get_due_date(order: dict) -> dt.date | None:
     return None
 
 
-def reset_due_date(order: dict) -> dict:
+def reset_due_date(order: dict[str, Any]) -> dict[str, Any]:
     """
     Reset the due date fulfillment parameter to None.
 
@@ -103,7 +104,7 @@ def is_within_last_two_weeks(coterm_date: str) -> bool:
     return dt.datetime.now(tz=dt.UTC).date() >= last_two_weeks
 
 
-def is_coterm_date_within_order_creation_window(order: dict) -> bool:
+def is_coterm_date_within_order_creation_window(order: dict[str, Any]) -> bool:
     """
     Checks if coterm date is within the order creation window.
 

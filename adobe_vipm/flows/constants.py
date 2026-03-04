@@ -93,8 +93,8 @@ TRANSFER_CUSTOMER_PARAMETERS = (
     Param.CHANGE_RESELLER_CODE.value,
 )
 
-AGREEMENT_VISIBLE_PARAMETERS: dict[str, set[str]] = {
-    "new": {
+AGREEMENT_VISIBLE_PARAMETERS: dict[str, list[str]] = {
+    "new": [
         Param.AGREEMENT_TYPE.value,
         Param.COMPANY_NAME.value,
         Param.ADDRESS.value,
@@ -112,8 +112,8 @@ AGREEMENT_VISIBLE_PARAMETERS: dict[str, set[str]] = {
         Param.GLOBAL_CUSTOMER.value,
         Param.DEPLOYMENT_ID.value,
         Param.DEPLOYMENTS.value,
-    },
-    "migrate": {
+    ],
+    "migrate": [
         Param.AGREEMENT_TYPE.value,
         Param.COMPANY_NAME.value,
         Param.ADDRESS.value,
@@ -132,8 +132,8 @@ AGREEMENT_VISIBLE_PARAMETERS: dict[str, set[str]] = {
         Param.GLOBAL_CUSTOMER.value,
         Param.DEPLOYMENT_ID.value,
         Param.DEPLOYMENTS.value,
-    },
-    "transfer": {
+    ],
+    "transfer": [
         Param.AGREEMENT_TYPE.value,
         Param.COMPANY_NAME.value,
         Param.ADDRESS.value,
@@ -153,13 +153,13 @@ AGREEMENT_VISIBLE_PARAMETERS: dict[str, set[str]] = {
         Param.GLOBAL_CUSTOMER.value,
         Param.DEPLOYMENT_ID.value,
         Param.DEPLOYMENTS.value,
-    },
-    "lga": {
+    ],
+    "GOV_LGA": [
         Param.AGENCY_TYPE.value,
-    },
-    "edu": {
+    ],
+    "EDU": [
         Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
-    },
+    ],
 }
 
 GOVERNMENT_AGENCY_TYPE_FEDERAL = "FEDERAL"

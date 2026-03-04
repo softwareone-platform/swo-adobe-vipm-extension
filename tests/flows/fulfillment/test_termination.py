@@ -16,6 +16,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitReturnOrders,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.fulfillment.termination import (
@@ -203,8 +204,10 @@ def test_fulfill_termination_order(mocker):
 
     fulfill_termination_order(mocked_client, mocked_order)  # act
 
+    pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
     expected_steps = [
         SetupContext,
+        UpdateAgreementParamsVisibility,
         StartOrderProcessing,
         SetupDueDate,
         SetOrUpdateCotermDate,
@@ -216,10 +219,12 @@ def test_fulfill_termination_order(mocker):
         CompleteOrder,
         SyncAgreement,
     ]
-    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
+    assert len(pipeline_args) == len(expected_steps)
+    actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
-    assert mocked_pipeline_ctor.mock_calls[0].args[1].template_name == TEMPLATE_NAME_TERMINATION
-    assert mocked_pipeline_ctor.mock_calls[0].args[9].template_name == TEMPLATE_NAME_TERMINATION
+    assert pipeline_args[1].template_name == TEMPLATE_NAME_TERMINATION
+    assert pipeline_args[2].template_name == TEMPLATE_NAME_TERMINATION
+    assert pipeline_args[10].template_name == TEMPLATE_NAME_TERMINATION
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 

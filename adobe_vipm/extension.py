@@ -45,12 +45,15 @@ def process_order_fulfillment(client: MPTClient, event) -> None:
 @ext.api.post(
     "/v1/orders/validate",
     response={
-        200: dict,
+        200: dict[str, Any],
         400: Error,
     },
     auth=JWTAuth(jwt_secret_callback),
 )
-def process_order_validation(request, order: Annotated[dict | None, Body()] = None):
+def process_order_validation(
+    request,
+    order: Annotated[dict[str, Any] | None, Body()] = None,
+):
     """API handler to process order validation http query."""
     try:
         validated_order = validate_order(request.client, order)

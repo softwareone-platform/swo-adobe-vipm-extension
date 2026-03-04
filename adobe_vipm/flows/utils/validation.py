@@ -1,3 +1,5 @@
+from typing import Any
+
 from adobe_vipm.flows.constants import (
     MARKET_SEGMENT_GOVERNMENT,
     MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
@@ -68,7 +70,7 @@ def _has_valid_returnable_quantity(line, returnable_orders):
 
 # TODO: rename it? doesn't make sense the naming, since it check that parameters are marked as
 # required
-def is_purchase_validation_enabled(order: dict) -> bool:
+def is_purchase_validation_enabled(order: dict[str, Any]) -> bool:
     """
     Checks if customer parameters are marked as required.
 
@@ -84,7 +86,7 @@ def is_purchase_validation_enabled(order: dict) -> bool:
     )
 
 
-def is_migrate_customer(order: dict) -> bool:
+def is_migrate_customer(order: dict[str, Any]) -> bool:
     """
     Checks if order is a VIP -> VIPM migration order.
 
@@ -98,7 +100,7 @@ def is_migrate_customer(order: dict) -> bool:
     return agreement_type == "Migrate" and is_ordering_param_required(order, Param.MEMBERSHIP_ID)
 
 
-def is_reseller_change(order: dict) -> bool:
+def is_reseller_change(order: dict[str, Any]) -> bool:
     """
     Checks if order is a transfer order from another distributor.
 
@@ -114,7 +116,7 @@ def is_reseller_change(order: dict) -> bool:
     )
 
 
-def validate_government_lga_data(order: dict, adobe_data: dict):
+def validate_government_lga_data(order: dict[str, Any], adobe_data: dict[str, Any]):
     """
     Validates the government order with adobe data.
 

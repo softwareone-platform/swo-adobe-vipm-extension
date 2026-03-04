@@ -1,4 +1,5 @@
 import copy
+from typing import Any
 
 from django.conf import settings
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
@@ -42,7 +43,7 @@ def is_large_government_agency_type(product_id: str) -> bool:
     )
 
 
-def get_market_segment_eligibility_status(order: dict) -> str | None:
+def get_market_segment_eligibility_status(order: dict[str, Any]) -> str | None:
     """
     Retrieves eligibility status parameter value from order.
 
@@ -58,7 +59,7 @@ def get_market_segment_eligibility_status(order: dict) -> str | None:
     ).get("value")
 
 
-def set_market_segment_eligibility_status_pending(order: dict) -> dict:
+def set_market_segment_eligibility_status_pending(order: dict[str, Any]) -> dict[str, Any]:
     """
     Sets eligibility status parameter value to pending.
 
@@ -77,7 +78,7 @@ def set_market_segment_eligibility_status_pending(order: dict) -> dict:
     return updated_order
 
 
-def get_agency_type(order) -> str:
+def get_agency_type(order: dict[str, Any]) -> str:
     """
     Retrieves market sub segments based on provided order.
 

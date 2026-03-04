@@ -1,4 +1,5 @@
 import copy
+from typing import Any
 
 from mpt_extension_sdk.mpt_http.utils import find_first
 
@@ -14,7 +15,10 @@ from adobe_vipm.flows.utils.parameter import (
 )
 
 
-def set_customer_data(order: dict, customer_data: dict) -> dict:
+def set_customer_data(
+    order: dict[str, Any],
+    customer_data: dict[str, Any],
+) -> dict[str, Any]:
     """
     Set the ordering parameters with the customer data.
 
@@ -34,7 +38,7 @@ def set_customer_data(order: dict, customer_data: dict) -> dict:
     return updated_order
 
 
-def get_company_name(source: dict) -> str | None:
+def get_company_name(source: dict[str, Any]) -> str | None:
     """
     Retrieves company name from COMPANY_NAME parameter.
 
@@ -50,7 +54,7 @@ def get_company_name(source: dict) -> str | None:
     ).get("value")
 
 
-def get_adobe_customer_id(source: dict) -> str | None:
+def get_adobe_customer_id(source: dict[str, Any]) -> str | None:
     """
     Get the Adobe customer identifier from the corresponding fulfillment parameter.
 
@@ -67,7 +71,7 @@ def get_adobe_customer_id(source: dict) -> str | None:
     return param.get("value")
 
 
-def set_adobe_customer_id(order: dict, customer_id: str) -> dict:
+def set_adobe_customer_id(order: dict[str, Any], customer_id: str) -> dict[str, Any]:
     """
     Sets Adobe customer id to the CUSTOMER_ID order parameter.
 
@@ -87,7 +91,10 @@ def set_adobe_customer_id(order: dict, customer_id: str) -> dict:
     return updated_order
 
 
-def set_agency_type(order: dict, customer_data: dict) -> dict:
+def set_agency_type(
+    order: dict[str, Any],
+    customer_data: dict[str, Any],
+) -> dict[str, Any]:
     """
     Sets agency type to the AGENCY_TYPE order parameter.
 
@@ -109,7 +116,7 @@ def set_agency_type(order: dict, customer_data: dict) -> dict:
     return order
 
 
-def get_customer_licenses_discount_level(customer: dict) -> int:
+def get_customer_licenses_discount_level(customer: dict[str, Any]) -> int:
     """
     Retrieves customer licensees discount level from Adobe Customer.
 
@@ -125,7 +132,7 @@ def get_customer_licenses_discount_level(customer: dict) -> int:
     return licenses_discount["level"]
 
 
-def get_customer_consumables_discount_level(customer: dict) -> int:
+def get_customer_consumables_discount_level(customer: dict[str, Any]) -> int:
     """
     Retrieves customer consumables discount level from Adobe Customer.
 
@@ -141,7 +148,7 @@ def get_customer_consumables_discount_level(customer: dict) -> int:
     return licenses_discount["level"]
 
 
-def is_new_customer(source: dict) -> bool:
+def is_new_customer(source: dict[str, Any]) -> bool:
     """
     Checks if provided order or agreement has agreement type parameter setup to New.
 
@@ -160,7 +167,7 @@ def is_new_customer(source: dict) -> bool:
     return param.get("value") == "New"
 
 
-def get_global_customer(order: dict) -> list[str] | None:
+def get_global_customer(order: dict[str, Any]) -> list[str] | None:
     """
     Get the globalCustomer parameter from the order.
 
@@ -177,7 +184,7 @@ def get_global_customer(order: dict) -> list[str] | None:
     return global_customer_param.get("value")
 
 
-def set_global_customer(order: dict, global_sales_enabled: str) -> dict:
+def set_global_customer(order: dict[str, Any], global_sales_enabled: str) -> dict[str, Any]:
     """
     Set the globalCustomer parameter on the order.
 
@@ -197,7 +204,7 @@ def set_global_customer(order: dict, global_sales_enabled: str) -> dict:
     return updated_order
 
 
-def is_within_coterm_window(customer: dict) -> bool:
+def is_within_coterm_window(customer: dict[str, Any]) -> bool:
     """
     Checks if the current date is within the last two weeks before the cotermination date.
 
@@ -210,7 +217,7 @@ def is_within_coterm_window(customer: dict) -> bool:
     return customer.get("cotermDate") and is_within_last_two_weeks(customer["cotermDate"])
 
 
-def has_coterm_date(customer: dict) -> bool:
+def has_coterm_date(customer: dict[str, Any]) -> bool:
     """
     Checks if the customer has a cotermination date.
 

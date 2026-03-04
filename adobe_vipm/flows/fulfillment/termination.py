@@ -6,6 +6,9 @@ processing.
 """
 
 import logging
+from typing import Any
+
+from mpt_extension_sdk.mpt_http.base import MPTClient
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus
@@ -24,6 +27,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitReturnOrders,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
@@ -124,7 +128,7 @@ class SwitchAutoRenewalOff(Step):
         next_step(client, context)
 
 
-def fulfill_termination_order(client, order):
+def fulfill_termination_order(client: MPTClient, order: dict[str, Any]):
     """
     Fulfills a termination order with Adobe.
 
@@ -139,6 +143,7 @@ def fulfill_termination_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        UpdateAgreementParamsVisibility(TEMPLATE_NAME_TERMINATION),
         StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
         SetupDueDate(),
         SetOrUpdateCotermDate(),

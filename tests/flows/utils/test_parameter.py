@@ -1,15 +1,26 @@
 import pytest
 
-from adobe_vipm.flows.constants import AGREEMENT_VISIBLE_PARAMETERS, Param
-from adobe_vipm.flows.utils.parameter import (
-    update_agreement_parameters_visibility_for_agreement,
+from adobe_vipm.flows.constants import (
+    AGREEMENT_VISIBLE_PARAMETERS,
+    Param,
 )
+from adobe_vipm.flows.utils.parameter import (
+    update_agreement_params_visibility,
+)
+
+SEGMENT_PRODUCT_IDS = {
+    "COM": "PRD-1111-1111",
+    "GOV": "PRD-2222-2222",
+    "GOV_LGA": "PRD-3333-3333",
+    "EDU": "PRD-4444-4444",
+}
 
 
 @pytest.fixture
 def order_with_parameters():
-    def _order(agreement_type="New"):
+    def _order(agreement_type="New", market_segment="COM"):
         return {
+            "product": {"id": SEGMENT_PRODUCT_IDS[market_segment]},
             "parameters": {
                 "ordering": [
                     {
@@ -59,6 +70,16 @@ def order_with_parameters():
                     },
                     {
                         "externalId": Param.CHANGE_RESELLER_CODE.value,
+                        "value": "",
+                        "constraints": {"hidden": True, "required": False},
+                    },
+                    {
+                        "externalId": Param.AGENCY_TYPE.value,
+                        "value": "",
+                        "constraints": {"hidden": True, "required": False},
+                    },
+                    {
+                        "externalId": Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
                         "value": "",
                         "constraints": {"hidden": True, "required": False},
                     },
@@ -164,7 +185,7 @@ def test_update_agreement_parameters_visibility_for_agreement_visible_params(
     order = order_with_parameters(agreement_type=agreement_type)
     visible_set = AGREEMENT_VISIBLE_PARAMETERS[agreement_type.lower()]
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
     for phase in ("ordering", "fulfillment"):
         for param in result["parameters"][phase]:
@@ -181,11 +202,9 @@ def test_update_agreement_parameters_visibility_for_agreement_new_hides_membersh
 ):
     order = order_with_parameters(agreement_type="New")
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
-    membership_constraints = _get_param_constraints(
-        result, "ordering", Param.MEMBERSHIP_ID.value
-    )
+    membership_constraints = _get_param_constraints(result, "ordering", Param.MEMBERSHIP_ID.value)
     assert membership_constraints["hidden"] is True
     assert membership_constraints["required"] is False
 
@@ -195,11 +214,9 @@ def test_update_agreement_parameters_visibility_for_agreement_migrate_shows_memb
 ):
     order = order_with_parameters(agreement_type="Migrate")
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
-    membership_constraints = _get_param_constraints(
-        result, "ordering", Param.MEMBERSHIP_ID.value
-    )
+    membership_constraints = _get_param_constraints(result, "ordering", Param.MEMBERSHIP_ID.value)
     assert membership_constraints["hidden"] is False
     assert membership_constraints["required"] is False
 
@@ -209,7 +226,7 @@ def test_update_agreement_parameters_visibility_for_agreement_transfer_shows_tra
 ):
     order = order_with_parameters(agreement_type="Transfer")
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
     admin_email_constraints = _get_param_constraints(
         result, "ordering", Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value
@@ -226,7 +243,7 @@ def test_update_agreement_parameters_visibility_for_agreement_new_hides_transfer
 ):
     order = order_with_parameters(agreement_type="New")
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
     admin_email_constraints = _get_param_constraints(
         result, "ordering", Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value
@@ -243,11 +260,9 @@ def test_update_agreement_parameters_visibility_for_agreement_hides_internal_ful
 ):
     order = order_with_parameters(agreement_type="New")
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
-    retry_constraints = _get_param_constraints(
-        result, "fulfillment", Param.RETRY_COUNT.value
-    )
+    retry_constraints = _get_param_constraints(result, "fulfillment", Param.RETRY_COUNT.value)
     eligibility_constraints = _get_param_constraints(
         result, "fulfillment", Param.MARKET_SEGMENT_ELIGIBILITY_STATUS.value
     )
@@ -255,19 +270,16 @@ def test_update_agreement_parameters_visibility_for_agreement_hides_internal_ful
     assert eligibility_constraints["hidden"] is True
 
 
-def test_update_agreement_parameters_visibility_for_agreement_does_not_mutate_original(
+def test_update_agreement_params_visibility_does_not_mutate_original(
     order_with_parameters,
 ):
     order = order_with_parameters(agreement_type="New")
-    original_ordering = [
-        dict(p["constraints"]) for p in order["parameters"]["ordering"]
-    ]
-    original_fulfillment = [
-        dict(p["constraints"]) for p in order["parameters"]["fulfillment"]
-    ]
+    original_ordering = [dict(p["constraints"]) for p in order["parameters"]["ordering"]]
+    original_fulfillment = [dict(p["constraints"]) for p in order["parameters"]["fulfillment"]]
 
-    update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
+    assert result is not None
     for idx, param in enumerate(order["parameters"]["ordering"]):
         assert param["constraints"] == original_ordering[idx]
     for idx, param in enumerate(order["parameters"]["fulfillment"]):
@@ -279,7 +291,7 @@ def test_update_agreement_parameters_visibility_for_agreement_unknown_type_hides
 ):
     order = order_with_parameters(agreement_type="Unknown")
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
     for phase in ("ordering", "fulfillment"):
         for param in result["parameters"][phase]:
@@ -292,10 +304,61 @@ def test_update_agreement_parameters_visibility_for_agreement_empty_type_hides_a
 ):
     order = order_with_parameters(agreement_type="")
 
-    result = update_agreement_parameters_visibility_for_agreement(order)
+    result = update_agreement_params_visibility(order)
 
     for phase in ("ordering", "fulfillment"):
         for param in result["parameters"][phase]:
             assert param["constraints"]["hidden"] is True
             assert param["constraints"]["required"] is False
 
+
+def test_update_agreement_parameters_visibility_for_agreement_gov_lga_shows_agency_type(
+    order_with_parameters,
+):
+    order = order_with_parameters(agreement_type="New", market_segment="GOV_LGA")
+
+    result = update_agreement_params_visibility(order)
+
+    agency_constraints = _get_param_constraints(result, "ordering", Param.AGENCY_TYPE.value)
+    assert agency_constraints["hidden"] is False
+    assert agency_constraints["required"] is False
+
+
+def test_update_agreement_parameters_visibility_for_agreement_edu_shows_education_sub_segment(
+    order_with_parameters,
+):
+    order = order_with_parameters(agreement_type="New", market_segment="EDU")
+
+    result = update_agreement_params_visibility(order)
+
+    edu_constraints = _get_param_constraints(
+        result, "ordering", Param.MARKET_EDUCATION_SUB_SEGMENTS.value
+    )
+    assert edu_constraints["hidden"] is False
+    assert edu_constraints["required"] is False
+
+
+def test_update_agreement_parameters_visibility_for_agreement_gov_hides_agency_type(
+    order_with_parameters,
+):
+    order = order_with_parameters(agreement_type="New", market_segment="GOV")
+
+    result = update_agreement_params_visibility(order)
+
+    agency_constraints = _get_param_constraints(result, "ordering", Param.AGENCY_TYPE.value)
+    assert agency_constraints["hidden"] is True
+
+
+def test_update_agreement_parameters_visibility_for_agreement_com_hides_segment_params(
+    order_with_parameters,
+):
+    order = order_with_parameters(agreement_type="New")
+
+    result = update_agreement_params_visibility(order)
+
+    agency_constraints = _get_param_constraints(result, "ordering", Param.AGENCY_TYPE.value)
+    edu_constraints = _get_param_constraints(
+        result, "ordering", Param.MARKET_EDUCATION_SUB_SEGMENTS.value
+    )
+    assert agency_constraints["hidden"] is True
+    assert edu_constraints["hidden"] is True

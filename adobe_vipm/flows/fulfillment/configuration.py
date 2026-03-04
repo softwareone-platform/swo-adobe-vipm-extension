@@ -6,6 +6,9 @@ processing.
 """
 
 import logging
+from typing import Any
+
+from mpt_extension_sdk.mpt_http.base import MPTClient
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.errors import AdobeError, SubscriptionUpdateError
@@ -31,7 +34,7 @@ from adobe_vipm.flows.utils import notify_not_updated_subscriptions
 logger = logging.getLogger(__name__)
 
 
-def fulfill_configuration_order(client, order):
+def fulfill_configuration_order(client: MPTClient, order: dict[str, Any]):
     """
     Fulfills a configuration order.
 

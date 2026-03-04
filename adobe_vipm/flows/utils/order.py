@@ -1,5 +1,6 @@
 import copy
 import functools
+from typing import Any
 
 from mpt_extension_sdk.mpt_http.mpt import get_product_onetime_items_by_ids
 from mpt_extension_sdk.mpt_http.utils import find_first
@@ -9,7 +10,7 @@ from adobe_vipm.flows.utils.customer import is_new_customer
 from adobe_vipm.utils import get_partial_sku
 
 
-def get_adobe_order_id(order: dict) -> str | None:
+def get_adobe_order_id(order: dict[str, Any]) -> str | None:
     """
     Retrieve the Adobe order identifier from the order vendor external id.
 
@@ -22,7 +23,7 @@ def get_adobe_order_id(order: dict) -> str | None:
     return order.get("externalIds", {}).get("vendor")
 
 
-def set_adobe_order_id(order: dict, adobe_order_id: str) -> dict:
+def set_adobe_order_id(order: dict[str, Any], adobe_order_id: str) -> dict:
     """
     Set Adobe order identifier as the order vendor external id attribute.
 
@@ -38,7 +39,7 @@ def set_adobe_order_id(order: dict, adobe_order_id: str) -> dict:
     return updated_order
 
 
-def is_purchase_order(order: dict) -> bool:
+def is_purchase_order(order: dict[str, Any]) -> bool:
     """
     Check if the order is a real purchase order or a subscriptions transfer order.
 
@@ -51,7 +52,7 @@ def is_purchase_order(order: dict) -> bool:
     return order["type"] == OrderType.PURCHASE and is_new_customer(order)
 
 
-def is_transfer_order(order: dict) -> bool:
+def is_transfer_order(order: dict[str, Any]) -> bool:
     """
     Check if the order is a subscriptions transfer order.
 
@@ -64,7 +65,7 @@ def is_transfer_order(order: dict) -> bool:
     return order["type"] == OrderType.PURCHASE and not is_new_customer(order)
 
 
-def is_change_order(order: dict) -> bool:
+def is_change_order(order: dict[str, Any]) -> bool:
     """
     Cheks if it is a change MPT order.
 
@@ -77,7 +78,7 @@ def is_change_order(order: dict) -> bool:
     return order["type"] == OrderType.CHANGE
 
 
-def is_termination_order(order: dict) -> bool:
+def is_termination_order(order: dict[str, Any]) -> bool:
     """
     Cheks if it is a termination MPT order.
 
@@ -90,7 +91,7 @@ def is_termination_order(order: dict) -> bool:
     return order["type"] == OrderType.TERMINATION
 
 
-def is_configuration_order(order: dict) -> bool:
+def is_configuration_order(order: dict[str, Any]) -> bool:
     """
     Cheks if it is a configuration MPT order.
 
@@ -103,7 +104,9 @@ def is_configuration_order(order: dict) -> bool:
     return order["type"] == OrderType.CONFIGURATION
 
 
-def split_downsizes_upsizes_new(order: dict) -> tuple[list[dict], list[dict], list[dict]]:
+def split_downsizes_upsizes_new(
+    order: dict[str, Any],
+) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Splits MPT order lines to lines that are dowsizes, upsizes and net new.
 
@@ -127,7 +130,7 @@ def split_downsizes_upsizes_new(order: dict) -> tuple[list[dict], list[dict], li
     return downsize_lines, upsize_lines, new_lines
 
 
-def get_order_line_by_sku(order: dict, sku: str) -> dict | None:
+def get_order_line_by_sku(order: dict[str, Any], sku: str) -> dict | None:
     """
     Returns an order line object by sku or None if not found.
 
@@ -175,7 +178,7 @@ def has_order_line_updated(
     return order_line_map != adobe_items_map
 
 
-def set_order_error(order: dict, error: dict) -> dict:
+def set_order_error(order: dict[str, Any], error: dict) -> dict:
     """
     Sets error in MPT order.
 
@@ -191,7 +194,7 @@ def set_order_error(order: dict, error: dict) -> dict:
     return updated_order
 
 
-def reset_order_error(order: dict) -> dict:
+def reset_order_error(order: dict[str, Any]) -> dict:
     """
     Resets error in MPT order.
 
@@ -206,7 +209,7 @@ def reset_order_error(order: dict) -> dict:
     return updated_order
 
 
-def set_template(order: dict, template: dict) -> dict:
+def set_template(order: dict[str, Any], template: dict) -> dict:
     """
     Sets template in MPT order.
 
@@ -222,7 +225,7 @@ def set_template(order: dict, template: dict) -> dict:
     return updated_order
 
 
-def get_one_time_skus(client, order: dict) -> list[str]:
+def get_one_time_skus(client, order: dict[str, Any]) -> list[str]:
     """
     Get tge SKUs from the order lines that correspond to One-Time items.
 

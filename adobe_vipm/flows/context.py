@@ -10,11 +10,11 @@ from adobe_vipm.flows.utils import get_fulfillment_parameter, get_ordering_param
 class Context:
     """Order flow processing context."""
 
-    order: dict
+    order: dict[str, Any]
     due_date: dt.date | None = None
-    downsize_lines: list = field(default_factory=list)
-    upsize_lines: list = field(default_factory=list)
-    new_lines: list = field(default_factory=list)
+    downsize_lines: list[dict[str, Any]] = field(default_factory=list)
+    upsize_lines: list[dict[str, Any]] = field(default_factory=list)
+    new_lines: list[dict[str, Any]] = field(default_factory=list)
     type: str | None = None
     product_id: str | None = None
     market_segment: str | None = None
@@ -25,14 +25,14 @@ class Context:
     currency: str | None = None
     validation_succeeded: bool = True
     adobe_customer_id: str | None = None
-    adobe_customer: dict | None = None
+    adobe_customer: dict[str, Any] | None = None
     adobe_new_order_id: str | None = None
-    adobe_preview_order: dict | None = None
-    adobe_new_order: dict | None = None
-    adobe_returnable_orders: dict = field(default_factory=dict)
-    adobe_return_orders: dict = field(default_factory=dict)
+    adobe_preview_order: dict[str, Any] | None = None
+    adobe_new_order: dict[str, Any] | None = None
+    adobe_returnable_orders: dict[str, Any] = field(default_factory=dict)
+    adobe_return_orders: dict[str, Any] = field(default_factory=dict)
     membership_id: str | None = None
-    adobe_transfer: dict | None = None
+    adobe_transfer: dict[str, Any] | None = None
 
     def __str__(self):
         due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else "-"

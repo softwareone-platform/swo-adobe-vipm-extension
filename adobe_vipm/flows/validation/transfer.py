@@ -69,7 +69,9 @@ from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 logger = logging.getLogger(__name__)
 
 
-def get_prices(order: dict, commitment: dict, adobe_skus: list[str]) -> dict[str, float]:
+def get_prices(
+    order: dict[str, Any], commitment: dict[str, Any], adobe_skus: list[str]
+) -> dict[str, float]:
     """
     Get the purchase prices for the provided SKUs from airtable.
 
@@ -103,15 +105,15 @@ def get_prices(order: dict, commitment: dict, adobe_skus: list[str]) -> dict[str
 
 
 def _update_order_lines(
-    order: dict,
-    adobe_items: list[dict],
+    order: dict[str, Any],
+    adobe_items: list[dict[str, Any]],
     prices: dict[str, float],
-    items_map: dict[str, dict],
+    items_map: dict[str, dict[str, Any]],
     quantity_field: str,
     returned_skus: list[str],
     *,
     order_error: bool,  # TODO: that's a really strange parameter, you pass it down and return back
-) -> tuple[bool, dict]:
+) -> tuple[bool, dict[str, Any]]:
     for adobe_line in adobe_items:
         item = items_map.get(get_partial_sku(adobe_line["offerId"]))
         if not item:
@@ -150,14 +152,14 @@ def _update_order_lines(
 
 
 def add_lines_to_order(
-    mpt_client,
-    order: dict,
-    adobe_items: list[dict],
-    commitment: dict,
+    mpt_client: Any,
+    order: dict[str, Any],
+    adobe_items: list[dict[str, Any]],
+    commitment: dict[str, Any],
     quantity_field: str,
     *,
     is_transferred=False,
-) -> tuple[bool, dict]:
+) -> tuple[bool, dict[str, Any]]:
     """
     Add the lines that belongs to the provided Adobe VIP membership to the current order.
 
@@ -213,7 +215,7 @@ def add_lines_to_order(
     return order_error, order
 
 
-def _handle_empty_adobe_items(order: dict) -> tuple[bool, dict]:
+def _handle_empty_adobe_items(order: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     if is_migrate_customer(order):
         order = set_ordering_parameter_error(
             order,
@@ -224,14 +226,14 @@ def _handle_empty_adobe_items(order: dict) -> tuple[bool, dict]:
 
 
 def _get_updated_order_lines(
-    adobe_items: list[dict],
-    commitment: dict,
-    items: list[dict],
-    order: dict,
+    adobe_items: list[dict[str, Any]],
+    commitment: dict[str, Any],
+    items: list[dict[str, Any]],
+    order: dict[str, Any],
     quantity_field: str,
     *,
     order_error: bool,
-) -> tuple[bool, dict]:
+) -> tuple[bool, dict[str, Any]]:
     valid_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
     returned_full_skus = [item["offerId"] for item in adobe_items]
     prices = get_prices(order, commitment, returned_full_skus)
@@ -253,12 +255,12 @@ def _get_updated_order_lines(
 
 
 def _fail_validation_if_items_updated(
-    adobe_items: list[dict],
-    order: dict,
+    adobe_items: list[dict[str, Any]],
+    order: dict[str, Any],
     quantity_field: str,
     *,
     order_error: bool,
-) -> tuple[list[dict], dict, bool]:
+) -> tuple[list, dict, bool]:
     # remove expired items from adobe items
     non_expired_items = [item for item in adobe_items if not is_transferring_item_expired(item)]
     # If the order items has been updated, the validation order will fail
@@ -272,16 +274,18 @@ def _fail_validation_if_items_updated(
 
 
 def _get_items(
-    adobe_items: list[dict],
-    mpt_client,
-    order: dict,
-) -> dict[str, dict]:
+    adobe_items: list[dict[str, Any]],
+    mpt_client: Any,
+    order: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
     returned_skus = [get_partial_sku(item["offerId"]) for item in adobe_items]
 
     return get_product_items_by_skus(mpt_client, order["agreement"]["product"]["id"], returned_skus)
 
 
-def validate_transfer_not_migrated(mpt_client, order: dict) -> tuple[bool, dict]:
+def validate_transfer_not_migrated(
+    mpt_client: Any, order: dict[str, Any]
+) -> tuple[bool, dict[str, Any]]:
     """
     Validates a transfer that has not been already migrated by the mass migration tool.
 
@@ -509,7 +513,7 @@ class AddLinesToOrder(Step):
         next_step(mpt_client, context)
 
 
-def validate_transfer(mpt_client, order):
+def validate_transfer(mpt_client: Any, order: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     """Validate transfer pipeline."""
     pipeline = Pipeline(
         SetupTransferContext(),
@@ -525,7 +529,7 @@ def validate_transfer(mpt_client, order):
     return not context.validation_succeeded, context.order
 
 
-def validate_reseller_change(mpt_client, order):
+def validate_reseller_change(mpt_client: Any, order: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     """Validate reseller change pipeline."""
     pipeline = Pipeline(
         SetupTransferContext(),

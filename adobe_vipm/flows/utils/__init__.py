@@ -1,5 +1,4 @@
-# flake8: noqa: F401
-from .customer import (
+from adobe_vipm.flows.utils.customer import (
     get_adobe_customer_id,
     get_company_name,
     get_customer_consumables_discount_level,
@@ -10,39 +9,39 @@ from .customer import (
     set_customer_data,
     set_global_customer,
 )
-from .date import (
+from adobe_vipm.flows.utils.date import (
     get_due_date,
     is_coterm_date_within_order_creation_window,
     is_within_last_two_weeks,
     reset_due_date,
     set_due_date,
 )
-from .deployment import (
+from adobe_vipm.flows.utils.deployment import (
     exclude_items_with_deployment_id,
     exclude_subscriptions_with_deployment_id,
     get_deployment_id,
     get_deployments,
     set_deployments,
 )
-from .formatting import (
+from adobe_vipm.flows.utils.formatting import (
     get_address,
     md2html,
     split_phone_number,
     strip_trace_id,
 )
-from .market_segment import (
+from adobe_vipm.flows.utils.market_segment import (
     get_market_segment,
     get_market_segment_eligibility_status,
     set_market_segment_eligibility_status_pending,
 )
-from .notification import (
+from adobe_vipm.flows.utils.notification import (
     notify_agreement_unhandled_exception_in_teams,
     notify_discount_level_error,
     notify_missing_prices,
     notify_not_updated_subscriptions,
     notify_unhandled_exception_in_teams,
 )
-from .order import (
+from adobe_vipm.flows.utils.order import (
     get_adobe_order_id,
     get_one_time_skus,
     get_order_line_by_sku,
@@ -59,7 +58,7 @@ from .order import (
     set_template,
     split_downsizes_upsizes_new,
 )
-from .parameter import (
+from adobe_vipm.flows.utils.parameter import (
     get_adobe_membership_id,
     get_coterm_date,
     get_fulfillment_parameter,
@@ -72,11 +71,11 @@ from .parameter import (
     set_ordering_parameter_error,
     set_parameter_hidden,
     set_parameter_visible,
+    update_agreement_params_visibility,
     update_ordering_parameter_value,
     update_parameters_visibility,
-    update_agreement_parameters_visibility_for_agreement,
 )
-from .subscription import (
+from adobe_vipm.flows.utils.subscription import (
     are_all_transferring_items_expired,
     get_adobe_subscription_id,
     get_price_item_by_line_sku,
@@ -88,14 +87,14 @@ from .subscription import (
     is_line_item_active_subscription,
     is_transferring_item_expired,
 )
-from .three_yc import (
+from adobe_vipm.flows.utils.three_yc import (
     get_3yc_fulfillment_parameters,
     set_adobe_3yc_commitment_request_status,
     set_adobe_3yc_end_date,
     set_adobe_3yc_enroll_status,
     set_adobe_3yc_start_date,
 )
-from .validation import (
+from adobe_vipm.flows.utils.validation import (
     is_migrate_customer,
     is_purchase_validation_enabled,
     is_reseller_change,

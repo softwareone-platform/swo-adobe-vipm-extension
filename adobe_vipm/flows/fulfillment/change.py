@@ -1,4 +1,6 @@
-"""
+# noqa: WPS201
+"""Change fulfillment flow logic.
+
 This module contains the logic to implement the change fulfillment flow.
 
 It exposes a single function that is the entrypoint for change order
@@ -8,7 +10,9 @@ processing.
 import itertools
 import logging
 from functools import partial
+from typing import Any
 
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -35,6 +39,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     switch_order_to_failed,
@@ -46,13 +51,13 @@ from adobe_vipm.flows.helpers import (
     ValidateSkuAvailability,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.utils import (
+from adobe_vipm.flows.utils.customer import is_within_coterm_window
+from adobe_vipm.flows.utils.notification import notify_not_updated_subscriptions
+from adobe_vipm.flows.utils.subscription import (
     get_adobe_subscription_id,
     get_subscription_by_line_and_item_id,
-    notify_not_updated_subscriptions,
+    get_subscription_by_line_subs_id,
 )
-from adobe_vipm.flows.utils.customer import is_within_coterm_window
-from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -320,7 +325,7 @@ class UpdateRenewalQuantitiesDownsizes(UpdateRenewalQuantities):
         return context.downsize_lines
 
 
-def fulfill_change_order(client, order):
+def fulfill_change_order(client: MPTClient, order: dict[str, Any]):
     """
     Fulfills a change order by processing the necessary actions based on the provided parameters.
 
@@ -334,6 +339,7 @@ def fulfill_change_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        UpdateAgreementParamsVisibility(TEMPLATE_NAME_CHANGE),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         SetupDueDate(),
         ValidateDuplicateLines(),

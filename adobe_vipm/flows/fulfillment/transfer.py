@@ -11,7 +11,9 @@ program.
 import datetime as dt
 import logging
 from operator import itemgetter
+from typing import Any
 
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_product_items_by_skus,
     update_order,
@@ -61,6 +63,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermDate,
     SetupDueDate,
     SubmitNewOrder,
+    UpdateAgreementParamsVisibility,
     add_asset,
     add_subscription,
     check_processing_template,
@@ -1401,7 +1404,7 @@ class CompleteTransferOrder(Step):
         next_step(mpt_client, context)
 
 
-def fulfill_transfer_order(mpt_client, order):
+def fulfill_transfer_order(mpt_client: MPTClient, order: dict[str, Any]):
     """
     Fulfill transfer order pipeline.
 
@@ -1411,6 +1414,7 @@ def fulfill_transfer_order(mpt_client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        UpdateAgreementParamsVisibility(TEMPLATE_NAME_TRANSFER),
         SetupDueDate(),
         SetupTransferContext(),
         ValidateGCMainAgreement(),

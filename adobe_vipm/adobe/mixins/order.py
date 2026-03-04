@@ -55,7 +55,9 @@ class OrderClientMixin:
     deployment_country_pattern = "{} ?- ?([A-Z]{{2,}})"
 
     @wrap_http_error
-    def get_orders(self, authorization_id: str, customer_id: str, filters: dict | None = None):
+    def get_orders(
+        self, authorization_id: str, customer_id: str, filters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Retrieve Adobe orders.
 
@@ -121,9 +123,9 @@ class OrderClientMixin:
         self,
         authorization_id: str,
         customer_id: str,
-        adobe_preview_order: dict,
+        adobe_preview_order: dict[str, Any],
         deployment_id: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Create Adobe Order based on Preview order.
 
@@ -367,11 +369,11 @@ class OrderClientMixin:
         self,
         authorization_id: str,
         customer_id: str,
-        returning_order: dict,
-        returning_item: dict,
+        returning_order: dict[str, Any],
+        returning_item: dict[str, Any],
         external_reference: str,
         deployment_id: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates an order of type RETURN for a given `item` that was purchased.
 
@@ -418,8 +420,8 @@ class OrderClientMixin:
         self,
         authorization_id: str,
         customer_id: str,
-        order_created: dict,
-    ) -> dict:
+        order_created: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Creates a return order for a given Adobe order.
 

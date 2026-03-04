@@ -36,7 +36,7 @@ def copy_order_without_errors(order: dict[str, Any]) -> dict[str, Any]:
     return reset_order_error(order)
 
 
-def get_purchase_order_validator(order: dict) -> Callable:
+def get_purchase_order_validator(order: dict[str, Any]) -> Callable:
     """Get purchase order validator.
 
     Args:

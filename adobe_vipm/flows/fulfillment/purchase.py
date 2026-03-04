@@ -6,7 +6,9 @@ processing.
 """
 
 import logging
+from typing import Any
 
+from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -41,6 +43,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
     switch_order_to_failed,
     switch_order_to_query,
@@ -67,7 +70,7 @@ logger = logging.getLogger(__name__)
 class RefreshCustomer(Step):
     """Refresh the processing context retrieving the Adobe customer object through the VIPM API."""
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, client: MPTClient, context: Context, next_step: Any):
         """Refresh the processing context retrieving the Adobe customer."""
         adobe_client = get_adobe_client()
         context.adobe_customer = adobe_client.get_customer(
@@ -84,7 +87,7 @@ class ValidateGovernmentLGA(Step):
     The government agency type is determined by the customer account type.
     """
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, client: MPTClient, context: Context, next_step: Any):
         """Validate if the customer has selected the government agency type."""
         if is_large_government_agency_type(context.product_id):
             agency_type_param = get_ordering_parameter(context.order, Param.AGENCY_TYPE.value)
@@ -114,7 +117,7 @@ class ValidateEducationSubSegments(Step):
     The market segment the order refers to is determined by the product (product per segment).
     """
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, client: MPTClient, context: Context, next_step: Any):
         """Validate if the customer is eligible to place orders for a given market segment."""
         if self._requires_education_subsegment_query(context):
             switch_order_to_query(
@@ -125,7 +128,7 @@ class ValidateEducationSubSegments(Step):
             return
         next_step(client, context)
 
-    def _requires_education_subsegment_query(self, context):
+    def _requires_education_subsegment_query(self, context: Context) -> bool:
         """Check if education segment requires subsegment query."""
         if context.market_segment != MARKET_SEGMENT_EDUCATION:
             return False
@@ -142,7 +145,7 @@ class CreateCustomer(Step):
     That belongs to the order currently being processed.
     """
 
-    def save_data(self, client, context):
+    def save_data(self, client: MPTClient, context: Context):
         """
         Saves customer date back to MPT Order and Agreement.
 
@@ -166,7 +169,7 @@ class CreateCustomer(Step):
             externalIds={"vendor": context.adobe_customer_id},
         )
 
-    def handle_error(self, client, context, error):  # noqa: C901
+    def handle_error(self, client: MPTClient, context: Context, error: AdobeError):  # noqa: C901
         """
         Process error from Adobe API.
 
@@ -249,7 +252,7 @@ class CreateCustomer(Step):
 
         switch_order_to_query(client, context.order)
 
-    def __call__(self, client, context, next_step):
+    def __call__(self, client: MPTClient, context: Context, next_step: Any):
         """Creates a customer account in Adobe for the new agreement."""
         if context.adobe_customer_id:
             next_step(client, context)
@@ -294,7 +297,7 @@ class CreateCustomer(Step):
             self.handle_error(client, context, error)
 
 
-def fulfill_purchase_order(client, order):
+def fulfill_purchase_order(client: MPTClient, order: dict[str, Any]):
     """
     Purchase order pipeline.
 
@@ -304,6 +307,7 @@ def fulfill_purchase_order(client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
+        UpdateAgreementParamsVisibility(TEMPLATE_NAME_PURCHASE),
         StartOrderProcessing(TEMPLATE_NAME_PURCHASE),
         SetupDueDate(),
         ValidateDuplicateLines(),

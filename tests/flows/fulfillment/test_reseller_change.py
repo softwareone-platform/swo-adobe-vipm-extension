@@ -13,6 +13,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetupDueDate,
     StartOrderProcessing,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
 )
 from adobe_vipm.flows.helpers import FetchResellerChangeData, SetupContext, ValidateResellerChange
 from adobe_vipm.flows.utils import get_adobe_customer_id, get_adobe_order_id
@@ -198,8 +199,10 @@ def test_fulfill_reseller_change_order(mocker, mock_mpt_client):
 
     fulfill_reseller_change_order(mock_mpt_client, mocked_order)  # act
 
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 19
     expected_steps = [
         SetupContext,
+        UpdateAgreementParamsVisibility,
         StartOrderProcessing,
         SetupDueDate,
         SetupResellerChangeContext,

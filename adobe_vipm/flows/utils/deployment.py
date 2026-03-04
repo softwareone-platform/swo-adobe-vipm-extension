@@ -1,10 +1,11 @@
 import copy
+from typing import Any
 
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 
 
-def get_deployments(order: dict) -> list[str]:
+def get_deployments(order: dict[str, Any]) -> list[str]:
     """
     Get the deployments parameter from the order.
 
@@ -21,7 +22,10 @@ def get_deployments(order: dict) -> list[str]:
     return deployments_param.get("value").split(",") if deployments_param.get("value") else []
 
 
-def set_deployments(order: dict, deployments: list[str]) -> dict:
+def set_deployments(
+    order: dict[str, Any],
+    deployments: list[str],
+) -> dict[str, Any]:
     """
     Set the deployments parameter on the order.
 
@@ -41,7 +45,7 @@ def set_deployments(order: dict, deployments: list[str]) -> dict:
     return updated_order
 
 
-def exclude_items_with_deployment_id(adobe_transfer: dict) -> dict:
+def exclude_items_with_deployment_id(adobe_transfer: dict[str, Any]) -> dict[str, Any]:
     """
     Excludes items with deployment ID from the transfer order.
 
@@ -56,7 +60,7 @@ def exclude_items_with_deployment_id(adobe_transfer: dict) -> dict:
     return adobe_transfer
 
 
-def exclude_subscriptions_with_deployment_id(adobe_subscriptions: dict) -> dict:
+def exclude_subscriptions_with_deployment_id(adobe_subscriptions: dict[str, Any]) -> dict[str, Any]:
     """
     Excludes subscriptions with deployment ID from the Adobe customer subscriptions.
 
@@ -71,7 +75,7 @@ def exclude_subscriptions_with_deployment_id(adobe_subscriptions: dict) -> dict:
     return adobe_subscriptions
 
 
-def get_deployment_id(source: dict) -> str | None:
+def get_deployment_id(source: dict[str, Any]) -> str | None:
     """
     Get the deploymentId parameter from the source.
 

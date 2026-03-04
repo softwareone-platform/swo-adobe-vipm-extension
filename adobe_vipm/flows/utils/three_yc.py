@@ -1,10 +1,11 @@
 import copy
+from typing import Any
 
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
 
 
-def set_adobe_3yc_enroll_status(order: dict, enroll_status: str) -> dict:
+def set_adobe_3yc_enroll_status(order: dict[str, Any], enroll_status: str) -> dict[str, Any]:
     """
     Sets Adobe 3YC status back to the order.
 
@@ -24,7 +25,7 @@ def set_adobe_3yc_enroll_status(order: dict, enroll_status: str) -> dict:
     return updated_order
 
 
-def set_adobe_3yc_commitment_request_status(order: dict, status: str) -> dict:
+def set_adobe_3yc_commitment_request_status(order: dict[str, Any], status: str) -> dict[str, Any]:
     """
     Sets Adobe 3YC request status back to the order.
 
@@ -46,7 +47,7 @@ def set_adobe_3yc_commitment_request_status(order: dict, status: str) -> dict:
 
 # TODO: probably we should operate always with date/time in the code
 # and have conversion to proper datetime string inside the SDK
-def set_adobe_3yc_start_date(order: dict, start_date: str) -> dict:
+def set_adobe_3yc_start_date(order: dict[str, Any], start_date: str) -> dict[str, Any]:
     """
     Sets Adobe 3YC start date back to the order.
 
@@ -66,7 +67,7 @@ def set_adobe_3yc_start_date(order: dict, start_date: str) -> dict:
     return updated_order
 
 
-def set_adobe_3yc_end_date(order: dict, end_date: str) -> dict:
+def set_adobe_3yc_end_date(order: dict[str, Any], end_date: str) -> dict[str, Any]:
     """
     Sets Adobe 3YC end date back to the order.
 
@@ -87,7 +88,7 @@ def set_adobe_3yc_end_date(order: dict, end_date: str) -> dict:
 
 
 # TODO: checkbox in MPT has specific structure of parameter. Worth to wrap it in SDK
-def set_adobe_3yc(order: dict, value: str) -> dict:
+def set_adobe_3yc(order: dict[str, Any], value: str) -> dict[str, Any]:
     """
     Sets Adobe 3YC checkbox.
 
@@ -107,7 +108,7 @@ def set_adobe_3yc(order: dict, value: str) -> dict:
     return updated_order
 
 
-def get_3yc_fulfillment_parameters(order_or_agreement: dict) -> list[str]:
+def get_3yc_fulfillment_parameters(order_or_agreement: dict[str, Any]) -> list[str]:
     """
     Gets list of 3YC parameters from order or agreement.
 

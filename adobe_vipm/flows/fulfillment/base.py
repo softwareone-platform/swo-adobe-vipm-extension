@@ -1,5 +1,8 @@
 import logging
 import traceback
+from typing import Any
+
+from mpt_extension_sdk.mpt_http.base import MPTClient
 
 from adobe_vipm.flows.constants import OrderType
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
@@ -22,7 +25,7 @@ def _fulfill_purchase_order_router(client, order):
     return fulfill_purchase_order(client, order)
 
 
-def fulfill_order(client, order):
+def fulfill_order(client: MPTClient, order: dict[str, Any]):
     """
     Fulfills an order of any type by processing the actions based on the provided parameters.
 

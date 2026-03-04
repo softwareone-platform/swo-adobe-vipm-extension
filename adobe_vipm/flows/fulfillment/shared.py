@@ -4,6 +4,7 @@ import datetime as dt
 import json
 import logging
 from collections import Counter
+from typing import Any
 
 from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -84,6 +85,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_template,
     split_phone_number,
+    update_agreement_params_visibility,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
 from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
@@ -95,7 +97,9 @@ from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 logger = logging.getLogger(__name__)
 
 
-def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
+def save_adobe_order_id_and_customer_data(
+    client: MPTClient, order: dict[str, Any], order_id: str, customer: dict[str, Any]
+) -> dict[str, Any]:
     """
     Save the customer data retrieved from Adobe into the corresponding ordering parameters.
 
@@ -161,7 +165,7 @@ def save_adobe_order_id_and_customer_data(client, order, order_id, customer):
     return order
 
 
-def save_adobe_order_id(client, order, order_id):
+def save_adobe_order_id(client: MPTClient, order: dict[str, Any], order_id: str) -> dict[str, Any]:
     """
     Sets the Adobe order ID on the provided order and updates it using the MPT client.
 
@@ -178,7 +182,9 @@ def save_adobe_order_id(client, order, order_id):
     return order
 
 
-def switch_order_to_failed(mpt_client, order, error):
+def switch_order_to_failed(
+    mpt_client: MPTClient, order: dict[str, Any], error: dict[str, Any]
+) -> None:
     """
     Marks an MPT order as failed by resetting due date and updating its status.
 
@@ -207,7 +213,9 @@ def switch_order_to_failed(mpt_client, order, error):
     return order
 
 
-def switch_order_to_query(client, order, template_name=None):
+def switch_order_to_query(
+    client: MPTClient, order: dict[str, Any], template_name: str | None = None
+) -> None:
     """
     Switches the status of an MPT order to 'query' and resetting due date.
 
@@ -300,7 +308,7 @@ def handle_error(
         switch_order_to_failed(mpt_client, context.order, error_data)
 
 
-def switch_order_to_completed(client, order, template_name):
+def switch_order_to_completed(client: MPTClient, order: dict[str, Any], template_name: str) -> None:
     """
     Reset the retry count to zero and switch the MPT order to completed.
 
@@ -567,7 +575,7 @@ def save_coterm_dates(client, order, coterm_date):
     return order
 
 
-def send_mpt_notification(mpt_client: MPTClient, order: dict) -> None:
+def send_mpt_notification(mpt_client: MPTClient, order: dict[str, Any]) -> None:
     """
     Send an MPT notification to the customer according to the current order status.
 
@@ -628,7 +636,7 @@ def set_customer_coterm_date_if_null(client, adobe_client, order):
     return order
 
 
-def get_configuration_template_name(order):
+def get_configuration_template_name(order: dict[str, Any]) -> str:
     """
     Helper function to determine the template name based on auto renewal status.
 
@@ -644,6 +652,21 @@ def get_configuration_template_name(order):
         if auto_renewal
         else TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE
     )
+
+
+class UpdateAgreementParamsVisibility(Step):
+    """Updates the visibility of agreement parameters based on agreement type and market segment."""
+
+    def __init__(self, template_name=None):
+        self.template_name = template_name
+
+    def __call__(self, client, context, next_step):
+        """Updates the visibility of agreement parameters."""
+        context.order = update_agreement_params_visibility(context.order)
+        context.order = update_order(
+            client, context.order_id, parameters=context.order["parameters"]
+        )
+        next_step(client, context)
 
 
 class SetupDueDate(Step):
@@ -1036,7 +1059,7 @@ class SubmitNewOrder(Step):
         next_step(client, context)
 
 
-def _get_flex_discounts(adobe_order: dict) -> str | None:
+def _get_flex_discounts(adobe_order: dict[str, Any]) -> str | None:
     flex_discounts = [
         {
             "extLineItemNumber": line.get("extLineItemNumber"),
@@ -1349,7 +1372,9 @@ class ValidateDuplicateLines(Step):
         next_step(client, context)
 
 
-def send_gc_mpt_notification(mpt_client, order: dict, items_with_deployment: list) -> None:
+def send_gc_mpt_notification(
+    mpt_client: MPTClient, order: dict[str, Any], items_with_deployment: list[dict[str, Any]]
+) -> None:
     """
     Send MPT API notification to the subscribers according to the current order status.
 

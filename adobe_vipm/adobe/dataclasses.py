@@ -1,5 +1,6 @@
 import datetime as dt
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -63,15 +64,15 @@ class Country:
     currencies: list[str]
     pricelist_region: str
     postal_code_format_regex: str
-    provinces_to_code: dict | None = None
+    provinces_to_code: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
 class ReturnableOrderInfo:
     """Adobe Returnable Orders info."""
 
-    order: dict
-    line: dict
+    order: dict[str, Any]
+    line: dict[str, Any]
     quantity: int
 
 

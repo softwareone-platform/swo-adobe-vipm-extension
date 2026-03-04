@@ -2,7 +2,9 @@ import copy
 import functools
 from typing import Any
 
+from django.conf import settings
 from mpt_extension_sdk.mpt_http.utils import find_first
+from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.flows.constants import (
     AGREEMENT_VISIBLE_PARAMETERS,
@@ -39,13 +41,18 @@ get_ordering_parameter = functools.partial(get_parameter, Param.PHASE_ORDERING.v
 get_fulfillment_parameter = functools.partial(get_parameter, Param.PHASE_FULFILLMENT.value)
 
 
+def _copy_order(order: dict[str, Any]) -> dict[str, Any]:
+    """Returns a deep copy of the order."""
+    return copy.deepcopy(order)
+
+
 def set_ordering_parameter_error(
-    order: dict,
+    order: dict[str, Any],
     param_external_id: str,
-    error: dict,
+    error: dict[str, Any],
     *,
     required=True,
-) -> dict:
+) -> dict[str, Any]:
     """
     Set a validation error on an ordering parameter.
 
@@ -58,7 +65,7 @@ def set_ordering_parameter_error(
     Returns:
         Updated MPT order.
     """
-    updated_order = copy.deepcopy(order)
+    updated_order = _copy_order(order)  # noqa: WPS204
     param = get_ordering_parameter(
         updated_order,
         param_external_id,
@@ -71,7 +78,7 @@ def set_ordering_parameter_error(
     return updated_order
 
 
-def reset_ordering_parameters_error(order: dict) -> dict:
+def reset_ordering_parameters_error(order: dict[str, Any]) -> dict[str, Any]:
     """
     Reset errors for all ordering parameters.
 
@@ -81,7 +88,7 @@ def reset_ordering_parameters_error(order: dict) -> dict:
     Returns:
         Updated order.
     """
-    updated_order = copy.deepcopy(order)
+    updated_order = _copy_order(order)  # noqa: WPS204
 
     for param in updated_order["parameters"][Param.PHASE_ORDERING.value]:
         param["error"] = None
@@ -89,7 +96,7 @@ def reset_ordering_parameters_error(order: dict) -> dict:
     return updated_order
 
 
-def update_parameters_visibility(order: dict) -> dict:
+def update_parameters_visibility(order: dict[str, Any]) -> dict[str, Any]:
     """
     Update order parameters visibility based on choosen parameter of agreement type.
 
@@ -104,7 +111,7 @@ def update_parameters_visibility(order: dict) -> dict:
     """
     agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value)
     agreement_value = (agreement_type.get("value") or "").lower()
-    updated_order = copy.deepcopy(order)
+    updated_order = _copy_order(order)  # noqa: WPS204
 
     parameters_map = {
         "new": {
@@ -144,7 +151,7 @@ def is_ordering_param_required(source: dict, param_external_id: str) -> bool:
     return (param.get("constraints", {}) or {}).get("required", False)
 
 
-def set_coterm_date(order: dict, coterm_date: str) -> dict:
+def set_coterm_date(order: dict[str, Any], coterm_date: str) -> dict[str, Any]:
     """
     Sets coterm date parameter in MPT order.
 
@@ -155,7 +162,7 @@ def set_coterm_date(order: dict, coterm_date: str) -> dict:
     Returns:
         Updated MPT order.
     """
-    updated_order = copy.deepcopy(order)
+    updated_order = _copy_order(order)  # noqa: WPS204
     customer_ff_param = get_fulfillment_parameter(
         updated_order,
         Param.COTERM_DATE.value,
@@ -164,7 +171,7 @@ def set_coterm_date(order: dict, coterm_date: str) -> dict:
     return updated_order
 
 
-def get_coterm_date(order: dict) -> str | None:
+def get_coterm_date(order: dict[str, Any]) -> str | None:
     """
     Returns coterm date from MPT order coterm date parameter.
 
@@ -180,7 +187,9 @@ def get_coterm_date(order: dict) -> str | None:
     ).get("value")
 
 
-def update_ordering_parameter_value(order: dict, param_external_id: str, value: str) -> dict:
+def update_ordering_parameter_value(
+    order: dict[str, Any], param_external_id: str, value: str
+) -> dict[str, Any]:
     """
     Update ordering parameter value in MPT order.
 
@@ -192,7 +201,7 @@ def update_ordering_parameter_value(order: dict, param_external_id: str, value: 
     Returns:
         Updated MPT order.
     """
-    updated_order = copy.deepcopy(order)
+    updated_order = _copy_order(order)  # noqa: WPS204
     param = get_ordering_parameter(
         updated_order,
         param_external_id,
@@ -253,7 +262,7 @@ def get_change_reseller_admin_email(source):
     return param.get("value")
 
 
-def set_parameter_visible(order: dict, param_external_id: str) -> dict:
+def set_parameter_visible(order: dict[str, Any], param_external_id: str) -> dict[str, Any]:
     """
     Sets ordering parameter visibility.
 
@@ -264,7 +273,7 @@ def set_parameter_visible(order: dict, param_external_id: str) -> dict:
     Returns:
         Updated MPT order.
     """
-    updated_order = copy.deepcopy(order)
+    updated_order = _copy_order(order)  # noqa: WPS204
     param = get_ordering_parameter(
         updated_order,
         param_external_id,
@@ -276,7 +285,7 @@ def set_parameter_visible(order: dict, param_external_id: str) -> dict:
     return updated_order
 
 
-def set_parameter_hidden(order: dict, param_external_id: str) -> dict:
+def set_parameter_hidden(order: dict[str, Any], param_external_id: str) -> dict[str, Any]:
     """
     Sets ordering parameter with param_external_id hidden in MPT order.
 
@@ -287,7 +296,7 @@ def set_parameter_hidden(order: dict, param_external_id: str) -> dict:
     Returns:
         Update MPT order.
     """
-    updated_order = copy.deepcopy(order)
+    updated_order = _copy_order(order)  # noqa: WPS204
     param = get_ordering_parameter(
         updated_order,
         param_external_id,
@@ -299,7 +308,7 @@ def set_parameter_hidden(order: dict, param_external_id: str) -> dict:
     return updated_order
 
 
-def get_retry_count(order: dict) -> str | None:
+def get_retry_count(order: dict[str, Any]) -> str | None:
     """
     Gets RETRY_COUNT parameter.
 
@@ -320,13 +329,15 @@ def get_retry_count(order: dict) -> str | None:
     return param["value"] if param.get("value") else ""
 
 
-def update_agreement_parameters_visibility_for_agreement(order: dict) -> dict:
+def update_agreement_params_visibility(
+    order: dict[str, Any],
+) -> dict[str, Any]:
     """Updates order parameters hidden constraint for ordering and fulfillment parameters.
 
     Sets the hidden constraint on each parameter based on the agreement type
-    visibility rules. Parameters whose external ID is present in the visibility
-    rules dictionary for the current agreement type are marked as visible;
-    all others are marked as hidden.
+    and market segment visibility rules. Parameters whose external ID is present
+    in the visibility rules dictionary for the current agreement type and market
+    segment are marked as visible; all others are marked as hidden.
 
     Args:
         order: MPT order.
@@ -336,13 +347,15 @@ def update_agreement_parameters_visibility_for_agreement(order: dict) -> dict:
     """
     agreement_type = get_ordering_parameter(order, Param.AGREEMENT_TYPE.value)
     agreement_value = (agreement_type.get("value") or "").lower()
-    visible_params = AGREEMENT_VISIBLE_PARAMETERS.get(agreement_value, set())
-    updated_order = copy.deepcopy(order)
+    market_segment = get_for_product(settings, "PRODUCT_SEGMENT", order["product"]["id"])
+    visible_params = list(AGREEMENT_VISIBLE_PARAMETERS.get(agreement_value, []))
+    visible_params.extend(AGREEMENT_VISIBLE_PARAMETERS.get(market_segment, []))
+    updated_order = _copy_order(order)  # noqa: WPS204
 
     for phase in (Param.PHASE_ORDERING.value, Param.PHASE_FULFILLMENT.value):
         for param in updated_order["parameters"][phase]:
             param["constraints"] = {
-                "hidden": not param["externalId"] in visible_params,
+                "hidden": param["externalId"] not in visible_params,
                 "required": False,
             }
 
