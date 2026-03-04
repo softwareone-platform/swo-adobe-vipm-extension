@@ -574,11 +574,6 @@ class AddResellerChangeLinesToOrder(Step):
                 "No transfer lines but order has %d existing lines, processing new lines",
                 len(context.order["lines"]),
             )
-            downsize_lines, upsize_lines, new_lines = split_downsizes_upsizes_new(context.order)
-            context.downsize_lines = downsize_lines
-            context.upsize_lines = upsize_lines
-            context.new_lines = new_lines
-
             context.validation_succeeded = True
         else:
             logger.warning("No transfer lines and no order lines, validation failed")
@@ -588,6 +583,10 @@ class AddResellerChangeLinesToOrder(Step):
             context.validation_succeeded = False
             return
 
+        downsize_lines, upsize_lines, new_lines = split_downsizes_upsizes_new(context.order)
+        context.downsize_lines = downsize_lines
+        context.upsize_lines = upsize_lines
+        context.new_lines = new_lines
         logger.info(
             "Proceeding to next step with validation_succeeded=%s", context.validation_succeeded
         )
@@ -625,11 +624,7 @@ class AddResellerChangeLinesToOrder(Step):
                 logger.error(error_msg)
                 send_error("Transfer Validation - Missing reseller item", error_msg)
                 raise MPTError(error_msg)
-            order_lines_from_transfer.append({
-                "item": mapped_item,
-                "oldQuantity": item["quantity"],
-                "quantity": item["quantity"],
-            })
+            order_lines_from_transfer.append({"item": mapped_item, "quantity": item["quantity"]})
 
         logger.info("Created %d order lines from transfer items", len(order_lines_from_transfer))
         return order_lines_from_transfer

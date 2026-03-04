@@ -1,9 +1,6 @@
 import logging
 
-from mpt_extension_sdk.mpt_http.mpt import (
-    update_agreement,
-    update_order,
-)
+from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction
@@ -11,21 +8,18 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_or_customer
 from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.fulfillment import transfer
-from adobe_vipm.flows.fulfillment.shared import (
-    SetupDueDate,
-    StartOrderProcessing,
-    SyncAgreement,
-    switch_order_to_failed,
-)
+from adobe_vipm.flows.fulfillment import shared, transfer
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
     SetupContext,
+    UpdatePrices,
     ValidateResellerChange,
 )
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.utils.customer import set_adobe_customer_id
-from adobe_vipm.flows.utils.order import get_adobe_order_id, set_adobe_order_id
+from adobe_vipm.flows.sync.agreement import sync_agreements_by_agreement_ids
+from adobe_vipm.flows.utils import exclude_items_with_deployment_id
+from adobe_vipm.flows.utils.customer import get_adobe_customer_id, set_adobe_customer_id
+from adobe_vipm.flows.utils.order import set_adobe_order_id, split_downsizes_upsizes_new
 from adobe_vipm.flows.utils.parameter import (
     get_change_reseller_admin_email,
     get_change_reseller_code,
@@ -44,23 +38,23 @@ def fulfill_reseller_change_order(mpt_client, order):
     """
     pipeline = Pipeline(
         SetupContext(),
-        StartOrderProcessing(TEMPLATE_NAME_TRANSFER),
-        SetupDueDate(),
+        shared.StartOrderProcessing(TEMPLATE_NAME_TRANSFER),
+        shared.SetupDueDate(),
         SetupResellerChangeContext(),
         FetchResellerChangeData(is_validation=False),
         ValidateResellerChange(is_validation=False),
         CommitResellerChange(),
         CheckAdobeResellerTransfer(),
-        transfer.GetAdobeCustomer(),
+        GetAdobeCustomer(),
         UpdateAutorenewalSubscriptions(),
         transfer.ValidateGCMainAgreement(),
         transfer.ValidateAgreementDeployments(),
-        transfer.ProcessTransferOrder(),
+        ProcessResellerTransferOrder(),
         transfer.CreateTransferAssets(),
         transfer.CreateTransferSubscriptions(),
         transfer.SetCommitmentDates(),
-        transfer.CompleteTransferOrder(),
-        SyncAgreement(),
+        CompleteResellerTransferOrder(),
+        shared.SyncAgreement(),
     )
 
     context = Context(order=order)
@@ -99,9 +93,12 @@ class CheckAdobeResellerTransfer(Step):
 
     def __call__(self, mpt_client, context, next_step):
         """Check if the Adobe reseller transfer order exists and it is active."""
+        transfer_id = context.adobe_transfer_order.get("transferId")
+        if not transfer_id:
+            next_step(mpt_client, context)
+            return
         adobe_client = get_adobe_client()
         authorization_id = context.order["authorization"]["id"]
-        transfer_id = get_adobe_order_id(context.order)
         context.adobe_transfer_order = adobe_client.get_reseller_transfer(
             authorization_id, transfer_id
         )
@@ -151,7 +148,7 @@ class CommitResellerChange(Step):
             )
         except AdobeAPIError as ex:
             logger.exception("%s: Error committing reseller change", context)
-            switch_order_to_failed(
+            shared.switch_order_to_failed(
                 mpt_client,
                 context.order,
                 ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
@@ -179,6 +176,7 @@ class CommitResellerChange(Step):
             context.agreement_id,
             externalIds={"vendor": context.adobe_customer_id},
         )
+        next_step(mpt_client, context)
 
 
 class UpdateAutorenewalSubscriptions(Step):
@@ -189,7 +187,7 @@ class UpdateAutorenewalSubscriptions(Step):
         adobe_client = get_adobe_client()
         subscriptions = adobe_client.get_subscriptions(
             context.authorization_id,
-            context.customer_id,
+            context.adobe_customer_id,
         ).get("items", [])
 
         disabled_subscriptions = [
@@ -203,7 +201,7 @@ class UpdateAutorenewalSubscriptions(Step):
             try:
                 adobe_client.update_subscription(
                     context.authorization_id,
-                    context.customer_id,
+                    context.adobe_customer_id,
                     subscription_id,
                     auto_renewal=True,
                 )
@@ -214,3 +212,109 @@ class UpdateAutorenewalSubscriptions(Step):
                     subscription_id,
                 )
         next_step(mpt_client, context)
+
+
+class ProcessResellerTransferOrder(Step):
+    """Processes a reseller transfer order."""
+
+    def __call__(self, mpt_client, context, next_step):
+        """Updates order id and customer data to MPT order."""
+        if not context.adobe_transfer_order.get("lineItems"):
+            logger.info(
+                "%s: Adobe reseller transfer order has no line items,"
+                " falling back to purchase fulfillment",
+                context,
+            )
+            if (
+                context.adobe_new_order_id
+                and context.adobe_new_order_id == context.adobe_transfer_order.get("transferId")
+            ):
+                # this is a workaround solution where Adobe order ID on the agreement is replaced
+                # by new ID of the purchase order in case of Account Revival. It is not being lost
+                # as it is saved in the audit log.
+                # An example of a better solution would be to change the datatype of the property
+                # storing the ID to a one allowing for storing more than one ID.
+                logger.info("%s: Adobe order id is the same as transfer id, resetting", context)
+                context.order = shared.save_adobe_order_id(mpt_client, context.order, "")
+                context.adobe_new_order_id = ""
+
+            downsize_lines, upsize_lines, new_lines = split_downsizes_upsizes_new(context.order)
+            context.downsize_lines = downsize_lines
+            context.upsize_lines = upsize_lines
+            context.new_lines = new_lines
+            fulfill_purchase_order(mpt_client, context)
+            return
+
+        context.adobe_transfer_order = exclude_items_with_deployment_id(
+            context.adobe_transfer_order
+        )
+        context.order = shared.save_adobe_order_id_and_customer_data(
+            mpt_client,
+            context.order,
+            context.adobe_new_order_id,
+            context.adobe_customer,
+        )
+        next_step(mpt_client, context)
+
+
+class GetAdobeCustomer(Step):
+    """Retrieves the Adobe customer information."""
+
+    def __call__(self, client, context, next_step):
+        """Get Adobe customer and saves it to the context."""
+        adobe_client = get_adobe_client()
+        context.adobe_customer_id = context.adobe_transfer_order.get(
+            "customerId"
+        ) or get_adobe_customer_id(context.order)
+        context.adobe_customer = adobe_client.get_customer(
+            context.authorization_id, context.adobe_customer_id
+        )
+
+        context.order = shared.save_adobe_order_id_and_customer_data(
+            client,
+            context.order,
+            context.adobe_new_order_id,
+            context.adobe_customer,
+        )
+
+        next_step(client, context)
+
+
+class CompleteResellerTransferOrder(Step):
+    """Completes the reseller transfer order processing."""
+
+    def __call__(self, mpt_client, context, next_step):
+        """Completes transfer order with TEMPLATE_NAME_TRANSFER or default Transfer template."""
+        shared.switch_order_to_completed(mpt_client, context.order, TEMPLATE_NAME_TRANSFER)
+        adobe_client = get_adobe_client()
+        sync_agreements_by_agreement_ids(
+            mpt_client,
+            adobe_client,
+            [context.order["agreement"]["id"]],
+            dry_run=False,
+            sync_prices=False,
+        )
+        transfer.sync_airtable_main_agreement(
+            context.gc_main_agreement,
+            context.product_id,
+            context.authorization_id,
+            context.adobe_customer_id,
+        )
+        next_step(mpt_client, context)
+
+
+def fulfill_purchase_order(client, context):
+    """Purchase order pipeline."""
+    pipeline = Pipeline(
+        shared.GetPreviewOrder(),
+        UpdatePrices(),
+        shared.SubmitNewOrder(),
+        shared.CreateOrUpdateAssets(),
+        shared.CreateOrUpdateSubscriptions(),
+        shared.SetOrUpdateCotermDate(),
+        shared.CompleteOrder(TEMPLATE_NAME_TRANSFER),
+        shared.NullifyFlexDiscountParam(),
+        shared.SyncAgreement(),
+    )
+
+    pipeline.run(client, context)

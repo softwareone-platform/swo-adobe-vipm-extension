@@ -1633,6 +1633,20 @@ def adobe_reseller_change_preview_factory(
 
 
 @pytest.fixture
+def adobe_reseller_change_factory(
+    adobe_reseller_change_preview_factory,
+):
+    def _change(items=None, approval_expiry=None):
+        adobe_preview = adobe_reseller_change_preview_factory(
+            items=items, approval_expiry=approval_expiry
+        )
+        adobe_preview["transferId"] = "110014510"
+        return adobe_preview
+
+    return _change
+
+
+@pytest.fixture
 def adobe_transfer_factory(adobe_items_factory):
     def _transfer(
         transfer_id="a-transfer-id",
