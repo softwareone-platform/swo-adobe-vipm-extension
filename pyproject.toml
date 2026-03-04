@@ -88,7 +88,8 @@ extend-exclude = [
   ".pytest_cache",
   ".ruff_cache",
   "uv.lock",
-  ".venv"
+  ".venv",
+  "migrations"
 ]
 format = "wemake"
 max-imports = 17
@@ -234,7 +235,7 @@ ignore = [
   "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
   "TRY003", # long exception messages from `tryceratops`
 ]
-external = [ "AAA", "WPS" ]
+external = ["AAA", "WPS"]
 
 # Plugin configs:
 [tool.ruff.lint.flake8-import-conventions]
