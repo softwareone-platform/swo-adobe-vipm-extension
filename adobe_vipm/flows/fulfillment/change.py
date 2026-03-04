@@ -1,4 +1,3 @@
-# noqa: WPS201
 """Change fulfillment flow logic.
 
 This module contains the logic to implement the change fulfillment flow.
