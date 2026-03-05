@@ -24,6 +24,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitReturnOrders,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateRenewalWindow,
     switch_order_to_failed,
 )
@@ -142,6 +143,7 @@ def fulfill_termination_order(client, order):
         StartOrderProcessing(TEMPLATE_NAME_TERMINATION),
         SetupDueDate(),
         SetOrUpdateCotermDate(),
+        UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
         GetReturnOrders(),
         GetReturnableOrders(),

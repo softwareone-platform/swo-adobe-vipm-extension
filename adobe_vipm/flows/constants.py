@@ -490,3 +490,81 @@ class ItemTermsModel(StrEnum):
     ONE_TIME = "one-time"
     USAGE = "usage"
     QUANTITY = "quantity"
+
+
+class AgreementType(StrEnum):
+    """Agreement type parameter values."""
+
+    NEW = "New"
+    MIGRATE = "Migrate"
+    TRANSFER = "Transfer"
+
+
+AGREEMENT_VISIBLE_PARAMETERS: dict[str, list[str]] = {
+    AgreementType.NEW.value: [
+        Param.AGREEMENT_TYPE.value,
+        Param.COMPANY_NAME.value,
+        Param.ADDRESS.value,
+        Param.CONTACT.value,
+        Param.CUSTOMER_ID.value,
+        Param.COTERM_DATE.value,
+        Param.DUE_DATE.value,
+        Param.LAST_SYNC_DATE.value,
+        Param.THREE_YC.value,
+        Param.THREE_YC_LICENSES.value,
+        Param.THREE_YC_CONSUMABLES.value,
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
+        Param.THREE_YC_RECOMMITMENT.value,
+        Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value,
+        Param.GLOBAL_CUSTOMER.value,
+        Param.DEPLOYMENT_ID.value,
+        Param.DEPLOYMENTS.value,
+    ],
+    AgreementType.MIGRATE.value: [
+        Param.AGREEMENT_TYPE.value,
+        Param.COMPANY_NAME.value,
+        Param.ADDRESS.value,
+        Param.CONTACT.value,
+        Param.MEMBERSHIP_ID.value,
+        Param.CUSTOMER_ID.value,
+        Param.COTERM_DATE.value,
+        Param.DUE_DATE.value,
+        Param.LAST_SYNC_DATE.value,
+        Param.THREE_YC.value,
+        Param.THREE_YC_LICENSES.value,
+        Param.THREE_YC_CONSUMABLES.value,
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
+        Param.THREE_YC_RECOMMITMENT.value,
+        Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value,
+        Param.GLOBAL_CUSTOMER.value,
+        Param.DEPLOYMENT_ID.value,
+        Param.DEPLOYMENTS.value,
+    ],
+    AgreementType.TRANSFER.value: [
+        Param.AGREEMENT_TYPE.value,
+        Param.COMPANY_NAME.value,
+        Param.ADDRESS.value,
+        Param.CONTACT.value,
+        Param.ADOBE_CUSTOMER_ADMIN_EMAIL.value,
+        Param.CHANGE_RESELLER_CODE.value,
+        Param.CUSTOMER_ID.value,
+        Param.COTERM_DATE.value,
+        Param.DUE_DATE.value,
+        Param.LAST_SYNC_DATE.value,
+        Param.THREE_YC.value,
+        Param.THREE_YC_LICENSES.value,
+        Param.THREE_YC_CONSUMABLES.value,
+        Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
+        Param.THREE_YC_RECOMMITMENT.value,
+        Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value,
+        Param.GLOBAL_CUSTOMER.value,
+        Param.DEPLOYMENT_ID.value,
+        Param.DEPLOYMENTS.value,
+    ],
+    "GOV_LGA": [
+        Param.AGENCY_TYPE.value,
+    ],
+    "EDU": [
+        Param.MARKET_EDUCATION_SUB_SEGMENTS.value,
+    ],
+}

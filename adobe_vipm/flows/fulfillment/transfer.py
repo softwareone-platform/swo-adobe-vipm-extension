@@ -61,6 +61,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermDate,
     SetupDueDate,
     SubmitNewOrder,
+    UpdateAgreementParamsVisibility,
     add_asset,
     add_subscription,
     check_processing_template,
@@ -451,6 +452,7 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
         CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),
         SetOrUpdateCotermDate(),
+        UpdateAgreementParamsVisibility(),
         UpdatePrices(),
         SyncGCMainAgreement(transfer, gc_main_agreement),
         CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
@@ -1424,6 +1426,7 @@ def fulfill_transfer_order(mpt_client, order):
         ProcessTransferOrder(),
         CreateTransferAssets(),
         CreateTransferSubscriptions(),
+        UpdateAgreementParamsVisibility(),
         SetCommitmentDates(),
         CompleteTransferOrder(),
     )

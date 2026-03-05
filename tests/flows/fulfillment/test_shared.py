@@ -41,6 +41,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SubmitNewOrder,
     SubmitReturnOrders,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     add_asset,
@@ -2550,3 +2551,29 @@ def test_nullify_flex_discount_param_error(
         "Nullifying flex discounts on the agreement agreement_id",
         "None - agreement_id None None - - -: failed to nullify flex discounts.",
     ]
+
+
+def test_update_agreement_params_visibility_step(
+    mocker,
+    order_factory,
+    mock_mpt_client,
+    mock_update_order,
+):
+    mocked_update_agreement_params_visibility = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement_params_visibility",
+        side_effect=lambda order: order,
+        autospec=True,
+    )
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory()
+    context = Context(order=order, order_id=order["id"])
+
+    UpdateAgreementParamsVisibility()(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_update_agreement_params_visibility.assert_called_once_with(order)
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        order["id"],
+        parameters=order["parameters"],
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)

@@ -41,6 +41,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SyncAgreement,
+    UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
     switch_order_to_failed,
     switch_order_to_query,
@@ -262,7 +263,9 @@ class CreateCustomer(Step):
                 context.order = set_ordering_parameter_error(
                     context.order,
                     Param.CONTACT.value,
-                    ERR_ADOBE_CONTACT.to_dict(title=param["name"], details="it is mandatory."),
+                    ERR_ADOBE_CONTACT.to_dict(
+                        title=param.get("name", "Contact"), details="it is mandatory."
+                    ),
                 )
 
                 switch_order_to_query(client, context.order)
@@ -319,6 +322,7 @@ def fulfill_purchase_order(client, order):
         CreateOrUpdateSubscriptions(),
         RefreshCustomer(),
         SetOrUpdateCotermDate(),
+        UpdateAgreementParamsVisibility(),
         CompleteOrder(TEMPLATE_NAME_PURCHASE),
         NullifyFlexDiscountParam(),
         SyncAgreement(),

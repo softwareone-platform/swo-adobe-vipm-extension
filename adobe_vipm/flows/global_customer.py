@@ -39,6 +39,7 @@ from adobe_vipm.flows.constants import (
     MPT_ORDER_STATUS_COMPLETED,
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_NAME_TRANSFER,
+    AgreementType,
     ItemTermsModel,
     Param,
 )
@@ -349,7 +350,7 @@ def create_gc_agreement_deployment(
         )
 
         ordering_parameters = [
-            {"externalId": Param.AGREEMENT_TYPE.value, "value": "Migrate"},
+            {"externalId": Param.AGREEMENT_TYPE.value, "value": AgreementType.MIGRATE.value},
             {
                 "externalId": Param.COMPANY_NAME.value,
                 "value": sanitize_company_name(adobe_customer["companyProfile"]["companyName"]),

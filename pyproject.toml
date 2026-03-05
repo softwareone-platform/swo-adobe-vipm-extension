@@ -126,7 +126,7 @@ per-file-ignores = [
   "adobe_vipm/flows/utils/formatting.py: WPS237 WPS505",
   "adobe_vipm/flows/utils/notification.py: WPS336 WPS519",
   "adobe_vipm/flows/utils/order.py: WPS110 WPS202 WPS430",
-  "adobe_vipm/flows/utils/parameter.py: WPS110 WPS202 WPS210",
+  "adobe_vipm/flows/utils/parameter.py: WPS110 WPS202 WPS204 WPS210",
   "adobe_vipm/flows/utils/subscription.py: WPS110 WPS202 WPS221 WPS237 WPS349 WPS426 WPS432 WPS504",
   "adobe_vipm/flows/utils/three_yc.py: WPS110 WPS114",
   "adobe_vipm/flows/validation/change.py: WPS210 WPS231 WPS327 WPS338 WPS432",
@@ -135,7 +135,7 @@ per-file-ignores = [
   "adobe_vipm/flows/validation/transfer.py: WPS201 WPS602 WPS110 WPS202 WPS203 WPS204 WPS210 WPS211 WPS221 WPS229 WPS235 WPS432",
   "adobe_vipm/flows/validation/__init__.py: WPS412",
   "adobe_vipm/flows/benefits.py: WPS110 WPS114 WPS204 WPS210 WPS229 WPS231 WPS232 WPS504",
-  "adobe_vipm/flows/constants.py: WPS110 WPS114 WPS118 WPS235 WPS407",
+  "adobe_vipm/flows/constants.py: WPS110 WPS114 WPS118 WPS202 WPS235 WPS407",
   "adobe_vipm/flows/context.py: WPS221 WPS237",
   "adobe_vipm/flows/errors.py: WPS110 WPS202 WPS328 WPS430 WPS505",
   "adobe_vipm/flows/global_customer.py: WPS110 WPS202 WPS210 WPS211 WPS212 WPS213 WPS229 WPS231 WPS232 WPS235 WPS237 WPS504",
@@ -255,6 +255,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "adobe_vipm/flows/pipeline.py" = ["D101", "D102", "RSE102"]
+"tests/flows/fulfillment/test_transfer.py" = ["F601"]
 "tests/*.py" = [
   "D103", # missing docstring in public function
   "S101", # asserts
