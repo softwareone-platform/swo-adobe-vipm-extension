@@ -1,6 +1,5 @@
 import copy
 
-from django.conf import settings
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.flows.constants import (
@@ -9,6 +8,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
+from adobe_vipm.settings import settings
 
 
 def get_market_segment(product_id: str) -> str:

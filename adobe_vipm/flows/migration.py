@@ -1,8 +1,6 @@
 import datetime as dt
 import logging
 
-from django.conf import settings
-
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import (
@@ -29,6 +27,7 @@ from adobe_vipm.notifications import (
     send_exception,
     send_warning,
 )
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import get_3yc_commitment
 
 RECOVERABLE_TRANSFER_ERRORS = {

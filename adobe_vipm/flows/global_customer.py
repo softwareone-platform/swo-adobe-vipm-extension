@@ -1,6 +1,5 @@
 import logging
 
-from django.conf import settings
 from mpt_extension_sdk.core.utils import setup_client, setup_operations_client
 from mpt_extension_sdk.mpt_http.mpt import (
     create_agreement,
@@ -48,6 +47,7 @@ from adobe_vipm.flows.utils import (
     get_sku_with_discount_level,
     split_phone_number,
 )
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)

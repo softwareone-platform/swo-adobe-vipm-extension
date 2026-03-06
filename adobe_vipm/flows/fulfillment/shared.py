@@ -5,7 +5,6 @@ import json
 import logging
 from collections import Counter
 
-from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     complete_order,
@@ -90,6 +89,7 @@ from adobe_vipm.flows.utils.parameter import set_ordering_parameter_error
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
 from adobe_vipm.notifications import mpt_notify, send_exception
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)

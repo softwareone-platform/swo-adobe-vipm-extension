@@ -3,7 +3,6 @@ from collections.abc import MutableMapping
 from importlib.resources import files
 from pathlib import Path
 
-from django.conf import settings
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.dataclasses import (
@@ -16,6 +15,7 @@ from adobe_vipm.adobe.errors import (
     CountryNotFoundError,
     ResellerNotFoundError,
 )
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import map_by
 
 REQUIRED_API_SCOPES = ("openid", "AdobeID", "read_organizations")

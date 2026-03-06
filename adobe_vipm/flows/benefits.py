@@ -2,7 +2,6 @@ import logging
 import traceback
 from urllib.parse import urljoin
 
-from django.conf import settings
 from mpt_extension_sdk.core.utils import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     get_agreements_by_customer_deployments,
@@ -24,6 +23,7 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
 from adobe_vipm.notifications import Button, mpt_notify, send_exception, send_warning
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import get_3yc_commitment
 
 logger = logging.getLogger(__name__)

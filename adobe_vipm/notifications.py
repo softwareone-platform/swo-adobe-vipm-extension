@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pymsteams
-from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import notify
 
 from adobe_vipm.adobe.constants import MPT_NOTIFY_CATEGORIES
+from adobe_vipm.settings import settings
 
 logger = logging.getLogger(__name__)
 

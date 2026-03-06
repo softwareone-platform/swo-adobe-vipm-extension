@@ -3,7 +3,6 @@ from collections.abc import Mapping
 from pprint import pformat
 from typing import Annotated, Any
 
-from django.conf import settings
 from mpt_extension_sdk.core.extension import Extension
 from mpt_extension_sdk.core.security import JWTAuth
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -14,6 +13,7 @@ from ninja import Body
 from adobe_vipm.flows.fulfillment import fulfill_order
 from adobe_vipm.flows.validation import validate_order
 from adobe_vipm.models import Error
+from adobe_vipm.settings import settings
 
 logger = logging.getLogger(__name__)
 

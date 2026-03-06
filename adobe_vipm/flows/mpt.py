@@ -1,11 +1,11 @@
 import logging
 
-from django.conf import settings
 from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
 from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
 from adobe_vipm.flows.constants import Param
+from adobe_vipm.settings import settings
 
 logger = logging.getLogger(__name__)
 

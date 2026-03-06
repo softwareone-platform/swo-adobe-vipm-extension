@@ -6,7 +6,8 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
-from django.conf import settings
+
+from adobe_vipm.settings import settings
 
 logger = logging.getLogger(__name__)
 

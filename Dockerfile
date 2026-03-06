@@ -2,6 +2,13 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS base
 
 WORKDIR /extension
 
+# Install build dependencies for packages that need compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN uv venv /opt/venv
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv

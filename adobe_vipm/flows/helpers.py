@@ -5,7 +5,6 @@ import logging
 from operator import itemgetter
 
 from dateutil import parser
-from django.conf import settings
 from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_licensee, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
@@ -61,6 +60,7 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.validation import validate_government_lga_data
 from adobe_vipm.notifications import send_exception, send_warning
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)

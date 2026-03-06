@@ -5,7 +5,6 @@ from functools import partial
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
-from django.conf import settings
 from mpt_extension_sdk.core.utils import setup_client
 from mpt_extension_sdk.mpt_http import mpt
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -41,6 +40,7 @@ from adobe_vipm.flows.utils.market_segment import (
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.notifications import send_exception, send_warning
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)

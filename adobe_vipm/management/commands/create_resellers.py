@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-from django.conf import settings
 from django.core.management.base import CommandError
 from mpt_extension_sdk.mpt_http.utils import find_first
 from openpyxl import load_workbook
@@ -25,6 +24,7 @@ from adobe_vipm.adobe.validation import (
     is_valid_state_or_province,
 )
 from adobe_vipm.management.commands.base import AdobeBaseCommand
+from adobe_vipm.settings import settings
 
 COLUMNS = {
     "A": "authorization_uk",

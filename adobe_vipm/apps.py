@@ -1,8 +1,8 @@
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from mpt_extension_sdk.runtime.djapp.apps import DjAppConfig
 
 from adobe_vipm.extension import ext
+from adobe_vipm.settings import settings
 
 
 class ExtensionConfig(DjAppConfig):

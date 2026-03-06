@@ -175,3 +175,6 @@ make/local.mk
 
 # mpt-tool
 .migrations-state.json
+
+# mrok
+identity.json

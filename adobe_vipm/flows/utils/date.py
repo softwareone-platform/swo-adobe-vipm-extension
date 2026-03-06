@@ -2,13 +2,12 @@ import copy
 import datetime as dt
 from zoneinfo import ZoneInfo
 
-from django.conf import settings
-
 from adobe_vipm.flows.constants import LAST_TWO_WEEKS_DAYS, Param
 from adobe_vipm.flows.utils.parameter import (
     get_coterm_date,
     get_fulfillment_parameter,
 )
+from adobe_vipm.settings import settings
 
 
 def set_due_date(order: dict) -> dict:

@@ -3,7 +3,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cache
 
-from django.conf import settings
 from mpt_extension_sdk.mpt_http.utils import find_first
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 from pyairtable.formulas import (
@@ -22,6 +21,7 @@ from requests import HTTPError
 
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
 from adobe_vipm.flows.constants import MARKET_SEGMENT_TO_AIRTABLE_SEGMENT
+from adobe_vipm.settings import settings
 from adobe_vipm.utils import get_commitment_start_date
 
 STATUS_INIT = "init"
