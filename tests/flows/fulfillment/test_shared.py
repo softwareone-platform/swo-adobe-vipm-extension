@@ -2,6 +2,7 @@ import datetime as dt
 
 import pytest
 from freezegun import freeze_time
+from mpt_extension_sdk.mpt_http.wrap_http_error import MPTError as SDKMPTError
 
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
@@ -2571,6 +2572,32 @@ def test_update_agreement_params_visibility_step(
     UpdateAgreementParamsVisibility()(mock_mpt_client, context, mocked_next_step)  # act
 
     mocked_update_agreement_params_visibility.assert_called_once_with(order)
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        order["id"],
+        parameters=order["parameters"],
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_agreement_params_visibility_step_mpt_error(
+    mocker,
+    order_factory,
+    mock_mpt_client,
+    mock_update_order,
+):
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.update_agreement_params_visibility",
+        side_effect=lambda order: order,
+        autospec=True,
+    )
+    mock_update_order.side_effect = SDKMPTError("update failed")
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory()
+    context = Context(order=order, order_id=order["id"])
+
+    UpdateAgreementParamsVisibility()(mock_mpt_client, context, mocked_next_step)  # act
+
     mock_update_order.assert_called_once_with(
         mock_mpt_client,
         order["id"],

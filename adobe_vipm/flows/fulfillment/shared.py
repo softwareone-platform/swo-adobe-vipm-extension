@@ -26,6 +26,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     update_order_asset,
     update_subscription,
 )
+from mpt_extension_sdk.mpt_http.wrap_http_error import MPTError as SDKMPTError
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
@@ -1427,6 +1428,10 @@ class UpdateAgreementParamsVisibility(Step):
 
     def __call__(self, client, context, next_step):
         """Updates the visibility of agreement parameters."""
+        logger.info("%s - Updating orders parameters visibility", context)
         context.order = update_agreement_params_visibility(context.order)
-        update_order(client, context.order_id, parameters=context.order["parameters"])
+        try:
+            update_order(client, context.order_id, parameters=context.order["parameters"])
+        except SDKMPTError:
+            logger.exception("%s: failed to update parameters visibility.", context)
         next_step(client, context)
