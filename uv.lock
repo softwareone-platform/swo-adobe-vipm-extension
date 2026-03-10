@@ -451,16 +451,16 @@ wheels = [
 
 [[package]]
 name = "django"
-version = "4.2.28"
+version = "4.2.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "sqlparse" },
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/a9/25b75b11a4c7a6efe1661c181afe504992e0659ca6eedb72a065cdd91a25/django-4.2.28.tar.gz", hash = "sha256:a4b9cd881991add394cafa8bb3b11ad1742d1e1470ba99c3ef53dc540316ccfe", size = 10464933, upload-time = "2026-02-03T13:55:27.686Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/7d/7306757cf2ac016d718d8a5dbae66de630addaa73dca2c341fc388458e71/django-4.2.29.tar.gz", hash = "sha256:86d91bc8086569c8d08f9c55888b583a921ac1f95ed3bdc7d5659d4709542014", size = 10438980, upload-time = "2026-03-03T13:56:42.083Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/20/6d0808bc7500a6c654eae17b53f791a50af2c3f3ac4f328cbec324948c31/django-4.2.28-py3-none-any.whl", hash = "sha256:49a23c1b83ef31525f8d71a57b040f91d34660edb3f086280a8519855655ed3c", size = 7995543, upload-time = "2026-02-03T13:55:09.798Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/2b/bd0a1d1846d5580e9f209b9e0128b4859e381ec1b39d6d175c61294bb530/django-4.2.29-py3-none-any.whl", hash = "sha256:074d7c4d2808050e528388bda442bd491f06def4df4fe863f27066851bba010c", size = 7996481, upload-time = "2026-03-03T13:56:36.495Z" },
 ]
 
 [[package]]
@@ -918,7 +918,7 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "5.21.0"
+version = "5.21.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -942,9 +942,9 @@ dependencies = [
     { name = "uvicorn-worker" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/ab/fcf38d28f4e23df7428ecda3bed07feb02979fb7e67d5215f01d9ad41081/mpt_extension_sdk-5.21.0.tar.gz", hash = "sha256:66c3b7bd94a685225accc437c5ac390db5c584277859fc75b92116ae361cbf4a", size = 34326, upload-time = "2026-02-27T10:16:27.745Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/bf/a85a02bc828e3e942be6172339e9dbabc80db9a046c75d37aa1ff98897da/mpt_extension_sdk-5.21.1.tar.gz", hash = "sha256:8f8ed5e3bf8e6ea1c00875436a65b4144f8345f7c8f85e1b1051fa7a85eb371d", size = 34324, upload-time = "2026-03-10T11:18:49.559Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b0/c5/5fb0b84e1d54f4b122437b73364d8cbf3c046c2bf33f0d69e6b89ba3b1d0/mpt_extension_sdk-5.21.0-py3-none-any.whl", hash = "sha256:d69f781b3a781dc1eaba77f90a5458e6d07275394134992e47648ca7f70f5b69", size = 48642, upload-time = "2026-02-27T10:16:25.288Z" },
+    { url = "https://files.pythonhosted.org/packages/04/c1/cc76e2b7423736dcd80ee3c2903d9e189b35abf72d0b30195f088acea77a/mpt_extension_sdk-5.21.1-py3-none-any.whl", hash = "sha256:cc3b09338bd3905eddf5a809937a8354ff643ff61f86202f4ed8d16ebd849b9a", size = 48636, upload-time = "2026-03-10T11:18:48.581Z" },
 ]
 
 [[package]]
