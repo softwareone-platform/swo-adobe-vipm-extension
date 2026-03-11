@@ -54,13 +54,16 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.fulfillment.shared import (
+    CheckManualRenewalSubscriptions,
     CompleteOrder,
     CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
+    PreviewRenewalOrders,
     SetOrUpdateCotermDate,
     SetupDueDate,
     SubmitNewOrder,
+    SubmitRenewalOrders,
     UpdateAgreementParamsVisibility,
     add_asset,
     add_subscription,
@@ -447,7 +450,10 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
     pipeline = Pipeline(
         SetupContext(),
         SaveCustomerData(),
+        CheckManualRenewalSubscriptions(),
         GetPreviewOrder(),
+        PreviewRenewalOrders(),
+        SubmitRenewalOrders(),
         SubmitNewOrder(),
         CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),
