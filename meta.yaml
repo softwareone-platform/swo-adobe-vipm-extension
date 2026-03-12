@@ -1,0 +1,33 @@
+version: 1.0.0
+openapi: /bypass/openapi.json
+#deferrables:
+#  - path: "mrok/api/v2/task/synchronize"
+#    method: "GET"
+#    description: "Run a background synchronization tasks"
+
+events:
+#  - event: platform.commerce.order.status_changed
+#    condition: "and(in(product.id,{{ settings.PRODUCT_IDS }}),eq(type,Purchase))"
+#    path: "/api/v2/events/orders/purchase"
+#    task: true
+#  - event: platform.commerce.order.status_changed
+#    condition: "and(in(product.id, (PRD-5516-5707,)),eq(type,Purchase))"
+#    path: "/api/v2/events/orders/purchase"
+#    task: true
+  - event: platform.commerce.order.created
+    condition: "eq(product.id,PRD-5516-5707)"
+    path: "/api/v2/events/orders/purchase"
+    task: true
+  - event: platform.commerce.order.status_changed
+    condition: "eq(product.id,PRD-5516-5707)"
+    path: "/api/v2/events/orders/change"
+    task: false
+#  - event: platform.commerce.order.status_changed
+#    path: "/api/v2/events/orders/purchase"
+#    task: true
+#webhooks:
+#  - type: validationPurchaseOrderDraft
+#    description: "Validate purchase order draft"
+#    path: "mrok/api/v2/orders/validate"
+#    criteria:
+#      product.id: "{{ settings.product_id }}"

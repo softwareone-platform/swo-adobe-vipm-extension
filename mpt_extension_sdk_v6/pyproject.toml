@@ -1,0 +1,31 @@
+[project]
+name = "mpt-extension-sdk-v6"
+version = "6.0.1"
+description = "MPT Extension SDK v6"
+authors = [
+    { name = "SoftwareOne AG" },
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi[standard]==0.131.*",
+  "httpx-retries>=0.4.6",
+  "mpt-api-client==5.4.*",
+  "mrok==0.9.3",
+  "pydantic==2.12.*",
+  "requests==2.32.*",
+  "typer==0.24.*",
+]
+
+[project.scripts]
+swoext = "mpt_extension_sdk_v6.cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+include = ["mpt_extension_sdk_v6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["mpt_extension_sdk_v6"]

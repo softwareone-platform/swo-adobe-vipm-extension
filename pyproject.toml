@@ -7,7 +7,7 @@ requires-python = ">=3.12,<4"
 readme = "README.md"
 license = { text = "Apache-2.0 license" }
 dependencies = [
-  "mpt-tool==5.6.*",
+  "mpt-extension-sdk-v6",
 ]
 
 
@@ -58,7 +58,7 @@ omit = [
 allowed-domain-names = ["result"]
 aaa_act_block_style = "large"
 doctests = true
-extend-ignore = ["WPS226"]
+extend-ignore = ["WPS226", "WPS115"]
 extend-exclude = [
   ".coverage",
   ".github",
@@ -68,7 +68,16 @@ extend-exclude = [
   ".ruff_cache",
   "uv.lock",
   ".venv",
-  "migrations"
+  "migrations",
+  "mpt_extension_sdk_v6",
+  "swo-adobe-vipm-extension-legacy",
+  "adobe_vipm/adobe",
+  "adobe_vipm/airtable",
+  "adobe_vipm/flows",
+  "adobe_vipm/notifications.py",
+  "adobe_vipm/utils.py",
+  "django",
+  "mpt_extension_sdk",
 ]
 format = "wemake"
 max-imports = 17
@@ -77,7 +86,11 @@ select = ["AAA", "E999", "WPS"]
 show-source = true
 statistics = false
 # To be fixed and removed
-per-file-ignores = []
+per-file-ignores = [
+  "tests/test_orders_handler.py: AAA01 WPS118",
+  "tests/test_purchase_pipeline.py: AAA01 WPS118",
+  "tests/test_sdk_order_resolution.py: AAA01",
+]
 
 [tool.ruff]
 # Ruff config: https://docs.astral.sh/ruff/settings
@@ -85,7 +98,7 @@ preview = true
 target-version = "py312"
 output-format = "full"
 line-length = 100
-exclude = ["migrations"]
+exclude = ["migrations", "swo-adobe-vipm-extension-legacy"]
 
 
 [tool.ruff.format]
@@ -221,3 +234,6 @@ disallow_subclassing_any = false
 [[tool.mypy.overrides]]
 module = "pymsteams.*"
 ignore_missing_imports = true
+
+[tool.uv.sources]
+mpt-extension-sdk-v6 = { path = "./mpt_extension_sdk_v6", editable = true }
