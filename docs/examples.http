@@ -1,0 +1,67 @@
+@baseUrl = http://localhost:8080
+
+### [purchase] Supported purchase order (expected OK)
+POST {{baseUrl}}/api/v2/events/orders/purchase
+Content-Type: application/json
+mpt-task-id: TSK-0014-3792-0694-1776
+x-request-id: 10147b5c-d430-482c-8c42-d17c5df5e207
+
+{
+  "id": "7f3b5127-2f6c-4801-af8f-c4825ce7f9d2",
+  "object": {
+    "id": "ORD-7707-5631-5150",
+    "name": "order",
+    "objectType": "Order"
+  },
+  "details": {
+    "eventType": "created",
+    "enqueueTime": "2026-03-06T12:00:00Z",
+    "deliveryTime": "2026-03-06T12:01:00Z"
+  },
+  "task": {
+    "id": "TSK-0014-3792-0694-1776"
+  }
+}
+
+### [purchase] Unsupported order type (expected Cancel)
+POST {{baseUrl}}/api/v2/events/orders/purchase
+Content-Type: application/json
+mpt-task-id: TSK-0014-1787-1367-2234
+x-request-id: 10147b5c-d430-482c-8c42-d17c5df5e207
+
+{
+  "id": "7f3b5127-2f6c-4801-af8f-c4825ce7f9d2",
+  "object": {
+    "id": "ORD-6464-0167-3006",
+    "name": "order",
+    "objectType": "Order"
+  },
+  "details": {
+    "eventType": "created",
+    "enqueueTime": "2026-03-06T12:00:00Z",
+    "deliveryTime": "2026-03-06T12:01:00Z"
+  },
+  "task": {
+    "id": "TSK-0014-1787-1367-2234"
+  }
+}
+
+### [change] Supported purchase order (expected OK)
+POST {{baseUrl}}/api/v2/events/orders/change
+Content-Type: application/json
+mpt-task-id: TSK-0014-2456-8140-3400
+x-request-id: 10147b5c-d430-482c-8c42-d17c5df5e207
+
+{
+  "id": "7f3b5127-2f6c-4801-af8f-c4825ce7f9d2",
+  "object": {
+    "id": "ORD-3251-4216-0179",
+    "name": "order",
+    "objectType": "Order"
+  },
+  "details": {
+    "eventType": "status_changed",
+    "enqueueTime": "2026-03-06T12:00:00Z",
+    "deliveryTime": "2026-03-06T12:01:00Z"
+  }
+}
