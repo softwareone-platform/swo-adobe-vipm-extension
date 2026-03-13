@@ -577,9 +577,6 @@ class AddResellerChangeLinesToOrder(Step):
             context.validation_succeeded = True
         else:
             logger.warning("No transfer lines and no order lines, validation failed")
-            context.order = update_order(
-                mpt_client, context.order_id, lines=order_lines_from_transfer
-            )
             context.validation_succeeded = False
             return
 
