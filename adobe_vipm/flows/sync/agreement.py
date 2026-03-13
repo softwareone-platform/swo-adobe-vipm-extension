@@ -1175,6 +1175,13 @@ def sync_agreement(
         dry_run (bool): Flag indicating whether to execute in dry-run mode (no actual changes).
         sync_prices (bool): Flag indicating whether to synchronize subscription prices.
     """
+    # Fetch the latest agreement details from MPT to avoid syncing outdated or changed data.
+    # Other processes may update the agreement while processing, so we refresh before each sync.
+    agreement = mpt.get_agreement(mpt_client, agreement["id"])
+    if agreement["status"] != AgreementStatus.ACTIVE:
+        logger.info("Skipping agreement %s because it is not in Active status", agreement["id"])
+        return
+
     if agreement["product"]["id"] not in settings.MPT_PRODUCTS_IDS:
         logger.error("Product %s not in MPT_PRODUCTS_IDS. Skipping.", agreement["product"]["id"])
         return
