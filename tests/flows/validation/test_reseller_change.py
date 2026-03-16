@@ -22,7 +22,6 @@ def test_validate_reseller_change_success(
     adobe_reseller_change_preview_factory,
     lines_factory,
     adobe_order_factory,
-    mock_update_order,
     mock_get_preview_order,
 ):
     """Test successful reseller change validation with transfer items."""
@@ -30,10 +29,6 @@ def test_validate_reseller_change_success(
         ORDER_TYPE_PREVIEW, deployment_id=""
     )
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory()
-    mock_update_order.return_value = order_factory(
-        order_parameters=reseller_change_order_parameters_factory(),
-        lines=lines_factory(old_quantity=170),
-    )
     order = order_factory(lines=[], order_parameters=reseller_change_order_parameters_factory())
 
     has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
@@ -41,23 +36,17 @@ def test_validate_reseller_change_success(
     assert has_errors is False
     assert validated_order["lines"] == [
         {
-            "id": "ALI-2119-4550-8674-5962-0001",
             "item": {
                 "externalIds": {"vendor": "65304578CA"},
                 "id": "ITM-1234-1234-1234-0001",
                 "name": "Awesome product",
+                "status": "Published",
+                "terms": {"model": "quantity", "period": "1y"},
             },
-            "oldQuantity": 170,
-            "price": {"unitPP": 1234.55},
             "quantity": 170,
-            "subscription": {
-                "id": "SUB-1000-2000-3000",
-                "name": "Subscription for Acrobat Pro for Teams; Multi Language",
-                "status": "Active",
-            },
         }
     ]
-    mock_get_preview_order.return_value.assert_called_once()
+    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -68,7 +57,6 @@ def test_validate_reseller_change_success_reviving(
     reseller_change_order_parameters_factory,
     adobe_reseller_change_preview_factory,
     lines_factory,
-    mock_update_order,
     adobe_order_factory,
     mock_get_preview_order,
 ):
@@ -97,10 +85,6 @@ def test_validate_reseller_change_success_reviving(
     )
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=[]
-    )
-    mock_update_order.return_value = order_factory(
-        order_parameters=reseller_change_order_parameters_factory(),
-        lines=lines_factory(old_quantity=170),
     )
 
     has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
@@ -215,7 +199,6 @@ def test_validate_reseller_change_lines_mismatch(
     adobe_customer_factory,
     lines_factory,
     adobe_order_factory,
-    mock_update_order,
     mock_get_preview_order,
 ):
     """Test validation fails when order lines don't match transfer lines."""
@@ -226,9 +209,6 @@ def test_validate_reseller_change_lines_mismatch(
         items=adobe_transfer_items_factory(deployment_id="", quantity=170)
     )
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
-    mock_update_order.return_value = order_factory(
-        order_parameters=reseller_change_order_parameters_factory(), lines=lines_factory()
-    )
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     order["lines"] = [
         {
@@ -271,14 +251,12 @@ def test_validate_reseller_change_no_lines_and_empty_transfer(
     reseller_change_order_parameters_factory,
     adobe_reseller_change_preview_factory,
     mock_get_preview_order,
-    mock_update_order,
 ):
     """Test validation fails when both order and transfer have no lines."""
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=[]
     )
     order = order_factory(lines=[], order_parameters=reseller_change_order_parameters_factory())
-    mock_update_order.return_value = order
 
     has_errors, _ = validate_reseller_change(mock_mpt_client, order)  # act
 
@@ -297,7 +275,6 @@ def test_validate_reseller_change_filters_items_with_deployment(
     adobe_transfer_items_factory,
     items_factory,
     adobe_order_factory,
-    mock_update_order,
     mock_get_product_items_by_skus,
     mock_get_preview_order,
 ):
@@ -313,34 +290,13 @@ def test_validate_reseller_change_filters_items_with_deployment(
         ORDER_TYPE_PREVIEW, deployment_id=""
     )
     mock_get_product_items_by_skus.return_value = items_factory()
-    mock_update_order.return_value = order_factory(
-        order_parameters=reseller_change_order_parameters_factory()
-    )
     order = order_factory(lines=[], order_parameters=reseller_change_order_parameters_factory())
 
     has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is False
     assert len(validated_order["lines"]) == 1
-    assert mock_update_order.mock_calls == [
-        mocker.call(
-            mock_mpt_client,
-            "ORD-0792-5000-2253-4210",
-            lines=[
-                {
-                    "item": {
-                        "id": "ITM-1234-1234-1234-0001",
-                        "name": "Awesome product",
-                        "externalIds": {"vendor": "65304578CA"},
-                        "terms": {"period": "1y", "model": "quantity"},
-                        "status": "Published",
-                    },
-                    "quantity": 170,
-                }
-            ],
-        )
-    ]
-    mock_get_preview_order.return_value.assert_called_once()
+    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -352,7 +308,6 @@ def test_validate_reseller_change_multiple_lines_match(
     adobe_reseller_change_preview_factory,
     adobe_customer_factory,
     adobe_order_factory,
-    mock_update_order,
     mock_get_product_items_by_skus,
     mock_get_preview_order,
 ):
@@ -419,7 +374,6 @@ def test_validate_reseller_change_multiple_lines_match(
             "price": {"unitPP": 20.0},
         },
     ]
-    mock_update_order.return_value = order
 
     has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # act
 
@@ -438,7 +392,6 @@ def test_validate_reseller_change_lines_different_vendor_id(
     adobe_transfer_items_factory,
     adobe_customer_factory,
     adobe_order_factory,
-    mock_update_order,
     mock_get_preview_order,
 ):
     """Test validation fails when order line has different vendor ID than transfer."""
@@ -458,7 +411,6 @@ def test_validate_reseller_change_lines_different_vendor_id(
     ]
     updated_order = deepcopy(order)
     updated_order["lines"][0]["item"]["externalIds"]["vendor"] = "65304578CA"
-    mock_update_order.return_value = updated_order
     mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
         ORDER_TYPE_PREVIEW, deployment_id=""
     )
