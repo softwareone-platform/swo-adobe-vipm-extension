@@ -2,13 +2,10 @@ import datetime as dt
 import logging
 from typing import Any
 
-from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus, update_order
+from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import (
-    AdobeStatus,
-    ThreeYearCommitmentStatus,
-)
+from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_RUNNING,
@@ -550,11 +547,10 @@ class AddResellerChangeLinesToOrder(Step):
         if order_lines_from_transfer:
             if not context.order["lines"]:
                 logger.info("No existing order lines, proceeding with transfer lines")
-                context.order = update_order(
-                    mpt_client, context.order_id, lines=order_lines_from_transfer
-                )
+                context.order["lines"] = order_lines_from_transfer
                 context.validation_succeeded = True
-            elif not self._transfer_order_lines_match(
+                return
+            if not self._transfer_order_lines_match(
                 context.order["lines"], order_lines_from_transfer
             ):
                 logger.warning("Order lines do not match transfer lines")
@@ -563,12 +559,11 @@ class AddResellerChangeLinesToOrder(Step):
                 )
                 context.validation_succeeded = False
                 return
-            else:
-                logger.info(
-                    "Order lines match transfer lines successfully (%d lines)",
-                    len(order_lines_from_transfer),
-                )
-                context.validation_succeeded = True
+            logger.info(
+                "Order lines match transfer lines successfully (%d lines)",
+                len(order_lines_from_transfer),
+            )
+            context.validation_succeeded = True
         elif context.order["lines"]:
             logger.info(
                 "No transfer lines but order has %d existing lines, processing new lines",
