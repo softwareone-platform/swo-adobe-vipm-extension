@@ -82,7 +82,7 @@ def get_agreements_by_3yc_commitment_request_invitation(
     status_condition = f"eq(status,'{status}')"
 
     rql_query = (
-        f"and({status_condition},{param_condition})"
+        f"and({status_condition},{param_condition},in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)})))"
         "&select=lines,parameters,assets,subscriptions,product,listing"
     )
     return get_agreements_by_query(mpt_client, rql_query)

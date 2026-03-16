@@ -56,11 +56,12 @@ def test_get_agreements_by_3yc_commitment_request_status(mocker, settings, is_re
 
 @pytest.mark.parametrize("status", ["Active", "processing"])
 def test_get_agreements_by_3yc_commitment_request_invitation(
-    mock_mpt_client, mock_mpt_get_agreements_by_query, status
+    mock_mpt_client, mock_mpt_get_agreements_by_query, status, settings
 ):
+
     rql_query = (
         f"and(eq(status,'{status}'),any(parameters.fulfillment,and(eq(externalId,'3YCCommitmentRequestStatus'),"
-        "in(displayValue,(REQUESTED,ACCEPTED)))))"
+        f"in(displayValue,(REQUESTED,ACCEPTED)))),in(product.id,({','.join(settings.MPT_PRODUCTS_IDS)})))"
         "&select=lines,parameters,assets,subscriptions,product,listing"
     )
 
