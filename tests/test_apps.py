@@ -36,7 +36,7 @@ def test_products_empty(settings):
 
 
 def test_products_not_defined(settings):
-    delattr(settings, "MPT_PRODUCTS_IDS")
+    del settings.MPT_PRODUCTS_IDS
     app = apps.get_app_config("adobe_vipm")
 
     with pytest.raises(ImproperlyConfigured) as error:
