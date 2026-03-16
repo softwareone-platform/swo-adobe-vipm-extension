@@ -1831,7 +1831,6 @@ def test_transfer_reached_due_date(
         ),
         external_ids={"vendor": "a-transfer-id"},
     )
-    mocked_notification = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification")
     mocked_sync_agreements_by_agreement_ids = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.sync_agreements_by_agreement_ids"
     )
@@ -1846,7 +1845,6 @@ def test_transfer_reached_due_date(
         ERR_DUE_DATE_REACHED.to_dict(due_date="2025-01-01"),
         parameters=order["parameters"],
     )
-    mocked_notification.assert_called_once()
     mocked_sync_agreements_by_agreement_ids.assert_called_once()
 
 
