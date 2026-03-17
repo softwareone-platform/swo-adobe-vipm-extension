@@ -347,7 +347,7 @@ def fulfill_change_order(client, order):
         ValidateReturnableOrders(),
         Validate3YCCommitment(),
         GetPreviewOrder(),
-        UpdatePrices(),
+        UpdatePrices(is_validation=False),
         SubmitNewOrder(),
         UpdateRenewalQuantities(),
         SubmitReturnOrders(),

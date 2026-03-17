@@ -308,7 +308,7 @@ def fulfill_purchase_order(client, context):
     """Purchase order pipeline."""
     pipeline = Pipeline(
         shared.GetPreviewOrder(),
-        UpdatePrices(),
+        UpdatePrices(is_validation=False),
         shared.SubmitNewOrder(),
         shared.CreateOrUpdateAssets(),
         shared.CreateOrUpdateSubscriptions(),

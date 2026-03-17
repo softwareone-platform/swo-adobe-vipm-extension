@@ -530,7 +530,7 @@ def validate_reseller_change(mpt_client, order):
         ValidateResellerChange(is_validation=True),
         AddResellerChangeLinesToOrder(),
         GetPreviewOrder(),
-        UpdatePrices(),
+        UpdatePrices(is_validation=True),
     )
     context = Context(order=order)
     pipeline.run(mpt_client, context)

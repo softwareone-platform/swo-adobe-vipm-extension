@@ -129,7 +129,7 @@ def validate_change_order(client, order):
         ValidateDownsizes(),
         Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),
-        UpdatePrices(),
+        UpdatePrices(is_validation=True),
     )
     context = Context(order=order)
     pipeline.run(client, context)

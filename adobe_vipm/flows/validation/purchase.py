@@ -324,7 +324,7 @@ def validate_purchase_order(client, order):
         ValidateQuantitiesLGA(),
         Validate3YCCommitment(is_validation=True),
         GetPreviewOrder(),
-        UpdatePrices(),
+        UpdatePrices(is_validation=True),
     )
     context = Context(order=order)
     pipeline.run(client, context)
