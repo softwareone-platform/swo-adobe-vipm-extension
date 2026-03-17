@@ -311,7 +311,7 @@ def fulfill_purchase_order(client, order):
         SetupDueDate(),
         ValidateDuplicateLines(),
         ValidateGovernmentLGA(),
-        PrepareCustomerData(),
+        PrepareCustomerData(is_validation=False),
         CreateCustomer(),
         ValidateEducationSubSegments(),
         Validate3YCCommitment(),

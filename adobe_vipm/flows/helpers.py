@@ -77,6 +77,9 @@ def manage_order_error(client, context, error_data, *, is_validation=False) -> N
 class PrepareCustomerData(Step):
     """Prepares customer data from order to Adobe format for further processing."""
 
+    def __init__(self, *, is_validation):
+        self.is_validation = is_validation
+
     def __call__(self, client, context, next_step):
         """Prepares customer data from order to Adobe format for further processing."""
         licensee = context.order["agreement"]["licensee"]
@@ -106,7 +109,8 @@ class PrepareCustomerData(Step):
 
         if new_customer_data:
             context.order = set_customer_data(context.order, new_customer_data)
-            update_order(client, context.order_id, parameters=context.order["parameters"])
+            if not self.is_validation:
+                update_order(client, context.order_id, parameters=context.order["parameters"])
 
         next_step(client, context)
 
