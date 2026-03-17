@@ -316,7 +316,7 @@ def fulfill_purchase_order(client, order):
         ValidateEducationSubSegments(),
         Validate3YCCommitment(),
         GetPreviewOrder(),
-        UpdatePrices(),
+        UpdatePrices(is_validation=False),
         SubmitNewOrder(),
         CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),

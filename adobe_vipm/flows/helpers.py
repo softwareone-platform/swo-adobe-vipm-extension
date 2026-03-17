@@ -602,6 +602,9 @@ class Validate3YCCommitment(Step):
 class UpdatePrices(Step):
     """Update prices based on airtable and adobe discount level."""
 
+    def __init__(self, *, is_validation: bool) -> None:
+        self.is_validation = is_validation
+
     def __call__(self, client, context, next_step):
         """Update prices based on airtable and adobe discount level."""
         if context.adobe_new_order or not context.adobe_preview_order:
@@ -614,7 +617,9 @@ class UpdatePrices(Step):
         logger.info("Actual SKUs: %s", self._actual_skus)
         prices = self._get_prices_for_skus()
         updated_lines = self._create_updated_lines(prices)
-        self._update_order(updated_lines)
+        self._context.order["lines"] = updated_lines
+        if not self.is_validation:
+            self._update_order(updated_lines)
 
         next_step(self._client, self._context)
 

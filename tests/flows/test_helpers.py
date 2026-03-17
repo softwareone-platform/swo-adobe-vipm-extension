@@ -553,7 +553,7 @@ def test_update_prices_step_no_orders(mocker, mock_mpt_client, mock_order):
         adobe_new_order=None,
         adobe_preview_order=None,
     )
-    step = UpdatePrices()
+    step = UpdatePrices(is_validation=False)
 
     step(mock_mpt_client, context, mocked_next_step)  # act
 
@@ -581,7 +581,7 @@ def test_update_prices_step_with_new_order(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-    step = UpdatePrices()
+    step = UpdatePrices(is_validation=False)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
@@ -600,7 +600,7 @@ def test_update_prices_step_with_preview_order(
         currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
         adobe_preview_order=adobe_order,
     )
-    step = UpdatePrices()
+    step = UpdatePrices(is_validation=False)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
@@ -614,6 +614,25 @@ def test_update_prices_step_with_preview_order(
             },
         ],
     )
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_with_preview_order_validation_only(
+    mock_mpt_client, mock_next_step, mock_order, mock_update_order, adobe_order_factory
+):
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        currency=mock_order["agreement"]["listing"]["priceList"]["currency"],
+        adobe_preview_order=adobe_order,
+    )
+    step = UpdatePrices(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_update_order.assert_not_called()
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
@@ -646,7 +665,7 @@ def test_update_prices_step_with_3yc_commitment(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-    step = UpdatePrices()
+    step = UpdatePrices(is_validation=False)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
@@ -691,7 +710,7 @@ def test_update_prices_step_with_expired_3yc_commitment(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-    step = UpdatePrices()
+    step = UpdatePrices(is_validation=False)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
@@ -731,7 +750,7 @@ def test_update_prices_step_with_multiple_lines(
             items=adobe_items_factory(pricing=adobe_pricing_factory()),
         ),
     )
-    step = UpdatePrices()
+    step = UpdatePrices(is_validation=False)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 

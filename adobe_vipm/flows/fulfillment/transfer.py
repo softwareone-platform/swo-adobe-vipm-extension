@@ -453,7 +453,7 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
         CreateOrUpdateSubscriptions(),
         SetOrUpdateCotermDate(),
         UpdateAgreementParamsVisibility(),
-        UpdatePrices(),
+        UpdatePrices(is_validation=False),
         SyncGCMainAgreement(transfer, gc_main_agreement),
         CompleteOrder(TEMPLATE_NAME_BULK_MIGRATE),
         UpdateTransferStatus(transfer, STATUS_SYNCHRONIZED),
