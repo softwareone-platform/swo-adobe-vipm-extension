@@ -203,7 +203,6 @@ def switch_order_to_failed(mpt_client, order, error):
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
-    send_mpt_notification(mpt_client, order)
     adobe_client = get_adobe_client()
     sync_agreements_by_agreement_ids(
         mpt_client, adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
@@ -246,7 +245,6 @@ def switch_order_to_query(client, order, template_name=None):
         **kwargs,
     )
     order["agreement"] = agreement
-    send_mpt_notification(client, order)
 
 
 def handle_retries(client, order, adobe_order_id, adobe_order_type="NEW"):
@@ -330,7 +328,6 @@ def switch_order_to_completed(client, order, template_name):
         parameters=order["parameters"],
     )
     order["agreement"] = agreement
-    send_mpt_notification(client, order)
     logger.info("Order %s has been completed successfully", order["id"])
 
 
@@ -529,28 +526,6 @@ def check_processing_template(client, order, template_name):
 
     if template != order.get("template"):
         set_processing_template(client, order["id"], template)
-
-
-def start_processing_attempt(client, order):
-    """
-    Sets due date and send email notification.
-
-    Args:
-        client (MPTClient): the MPT client used to update the order.
-        order (dict): The order currently processing.
-
-    Returns:
-        dict: The order with the due date parameter updated.
-    """
-    current_due_date = get_due_date(order)
-    if current_due_date:
-        return order
-
-    order = set_due_date(order)
-    update_order(client, order["id"], parameters=order["parameters"])
-    send_mpt_notification(client, order)
-
-    return order
 
 
 def save_coterm_dates(client, order, coterm_date):
@@ -1266,7 +1241,6 @@ class CompleteOrder(Step):
             parameters=context.order["parameters"],
         )
         context.order["agreement"] = agreement
-        send_mpt_notification(client, context.order)
         logger.info("%s: order has been completed successfully", context)
         next_step(client, context)
 

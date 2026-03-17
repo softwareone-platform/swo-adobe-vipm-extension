@@ -50,7 +50,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     send_gc_mpt_notification,
     send_mpt_notification,
     set_customer_coterm_date_if_null,
-    start_processing_attempt,
 )
 from adobe_vipm.flows.utils import (
     get_adobe_order_id,
@@ -162,43 +161,6 @@ def test_check_processing_template_no_template(
     mock_get_product_template_or_default.assert_called_once()
     mock_set_processing_template.assert_not_called()
     assert "Template fake_template_name not found for product PRD-1111-1111" in caplog.text
-
-
-@freeze_time("2025-01-01")
-def test_start_processing_attempt_first_attempt(
-    mocker,
-    mock_mpt_client,
-    mock_order,
-    order_factory,
-    fulfillment_parameters_factory,
-    mocked_send_mpt_notification,
-):
-    updated_order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(due_date="2025-01-31"),
-    )
-    mocked_update = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.update_order", return_value=updated_order
-    )
-
-    start_processing_attempt(mock_mpt_client, mock_order)  # act
-
-    mocked_send_mpt_notification.assert_called_once_with(mock_mpt_client, updated_order)
-    mocked_update.assert_called_once_with(
-        mock_mpt_client, updated_order["id"], parameters=updated_order["parameters"]
-    )
-
-
-@freeze_time("2025-01-01")
-def test_start_processing_attempt_other_attempts(
-    mock_mpt_client, order_factory, fulfillment_parameters_factory, mocked_send_mpt_notification
-):
-    order = order_factory(
-        fulfillment_parameters=fulfillment_parameters_factory(due_date="2024-01-01")
-    )
-
-    start_processing_attempt(mock_mpt_client, order)  # act
-
-    mocked_send_mpt_notification.assert_not_called()
 
 
 def test_set_customer_coterm_date_if_null(
@@ -329,7 +291,7 @@ def test_setup_due_date_when_parameter_is_missed(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_start_order_processing_step(mocker, mock_order, mocked_send_mpt_notification):
+def test_start_order_processing_step(mocker, mock_order):
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
         return_value={"id": "TPL-1234"},
@@ -355,7 +317,6 @@ def test_start_order_processing_step(mocker, mock_order, mocked_send_mpt_notific
         context.order["id"],
         template={"id": "TPL-1234"},
     )
-    mocked_send_mpt_notification.assert_called_once_with(mocked_client, context.order)
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -1849,7 +1810,7 @@ def test_complete_order_step(mocker, mock_mpt_client, order_factory):
     ],
 )
 def test_complete_configuration_order_selects_template(
-    mocker, order_factory, auto_renew, expected_template, mocked_send_mpt_notification
+    mocker, order_factory, auto_renew, expected_template
 ):
     order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
     completed_order = order_factory(status="Completed")
@@ -1884,7 +1845,6 @@ def test_complete_configuration_order_selects_template(
         {"id": "TPL-0000"},
         parameters=order["parameters"],
     )
-    mocked_send_mpt_notification.assert_called_once_with(mocked_client, completed_order)
     assert context.order == completed_order
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
