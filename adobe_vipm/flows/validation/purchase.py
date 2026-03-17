@@ -317,7 +317,7 @@ def validate_purchase_order(client, order):
     """Validate purchase order pipeline."""
     pipeline = Pipeline(
         SetupContext(),
-        PrepareCustomerData(),
+        PrepareCustomerData(is_validation=True),
         CheckPurchaseValidationEnabled(),
         ValidateCustomerData(),
         ValidateDuplicateLines(),

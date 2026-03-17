@@ -298,7 +298,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(  #
 
 def test_prepare_customer_data_step(mock_next_step, mock_mpt_client, mock_order, mock_update_order):
     context = Context(order=mock_order)
-    step = PrepareCustomerData()
+    step = PrepareCustomerData(is_validation=False)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
@@ -320,7 +320,7 @@ def test_prepare_customer_no_data_step(
         order_parameters=ordering_params, fulfillment_parameters=fulfillment_params
     )
     context = Context(order=mock_order)
-    step = PrepareCustomerData()
+    step = PrepareCustomerData(is_validation=False)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
@@ -502,6 +502,46 @@ def test_prepare_customer_no_data_step(
             ],
         },
     )
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_prepare_customer_no_data_step_in_validation_mode(
+    mock_next_step,
+    mock_mpt_client,
+    mock_update_order,
+    fulfillment_parameters_factory,
+    order_factory,
+    order_parameters_factory,
+):
+    ordering_params = order_parameters_factory(company_name=None, address={}, contact={})
+    fulfillment_params = fulfillment_parameters_factory(deployment_id=None, deployments=[])
+    mock_order = order_factory(
+        order_parameters=ordering_params, fulfillment_parameters=fulfillment_params
+    )
+    context = Context(order=mock_order)
+    step = PrepareCustomerData(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    ordering = {
+        param["externalId"]: param["value"] for param in context.order["parameters"]["ordering"]
+    }
+    assert ordering["companyName"] == "FF Buyer good enough"
+    assert ordering["address"] == {
+        "country": "US",
+        "state": "CA",
+        "city": "San Jose",
+        "addressLine1": "3601 Lyon St",
+        "addressLine2": "",
+        "postCode": "94123",
+    }
+    assert ordering["contact"] == {
+        "firstName": "Cic",
+        "lastName": "Faraone",
+        "email": "francesco.faraone@softwareone.com",
+        "phone": {"prefix": "+1", "number": "4082954078"},
+    }
+    mock_update_order.assert_not_called()
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
