@@ -35,7 +35,7 @@ dev = [
   "mypy==1.19.*",
   "pre-commit==4.5.*",
   "pytest==9.0.*",
-  "pytest-cov==7.0.*",
+  "pytest-cov==7.1.*",
   "pytest-deadfixtures==3.1.*",
   "pytest-django==4.12.*",
   "pytest-mock==3.15.*",
