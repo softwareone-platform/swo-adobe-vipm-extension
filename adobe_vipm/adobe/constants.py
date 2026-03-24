@@ -1,0 +1,132 @@
+import json
+import os
+import re
+import types
+from enum import StrEnum
+
+
+class AdobeStatus(StrEnum):
+    """Adobe Order Statuses."""
+
+    PROCESSED = "1000"
+    PENDING = "1002"
+    INACTIVE_OR_GENERIC_FAILURE = "1004"
+    ORDER_CANCELLED = "1008"
+    ORDER_INACTIVE_DISTRIBUTOR = "1020"
+    ORDER_INACTIVE_RESELLER = "1022"
+    ORDER_INACTIVE_CUSTOMER = "1024"
+    ORDER_INVALID_CUSTOMER_ID = "1026"
+    INVALID_FIELDS = "1117"
+    INVALID_ADDRESS = "1118"
+    INVALID_MINIMUM_QUANTITY = "1135"
+    ACCOUNT_ALREADY_EXISTS = "1127"
+    TRANSFER_INVALID_MEMBERSHIP = "5115"
+    TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS = "5116"
+    TRANSFER_INELIGIBLE = "5117"
+    TRANSFER_ALREADY_TRANSFERRED = "5118"
+    TRANSFER_INACTIVE_RESELLER = "5119"
+    TRANSFER_NO_ADMIN_CONTACTS = "5120"
+    TRANSFER_IN_PROGRESS = "5121"
+    TRANSFER_INACTIVE_ACCOUNT = "1010"
+    SUBSCRIPTION_INACTIVE = "3119"
+    INVALID_RENEWAL_STATE = "3120"
+    LINE_ITEM_OFFER_ID_EXPIRED = "3123"
+    INTERNAL_SERVER_ERROR = "1124"
+    GC_DEPLOYMENT_ACTIVE = "1000"
+    SUBSCRIPTION_TERMINATED = "1004"
+    SUBSCRIPTION_ACTIVE = "1000"
+    INVALID_CUSTOMER = "1116"
+    CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT = "2141"
+    INVALID_COUNTRY_FOR_PARTNER = "1178"
+
+
+class ResellerChangeAction(StrEnum):
+    """Reseller change action."""
+
+    PREVIEW = "PREVIEW"
+    COMMIT = "COMMIT"
+
+
+ORDER_STATUS_DESCRIPTION = types.MappingProxyType({
+    AdobeStatus.INACTIVE_OR_GENERIC_FAILURE: "Inactive account, failed order or inactive "
+    "subscription.",
+    AdobeStatus.ORDER_CANCELLED: "Order has been cancelled.",
+    AdobeStatus.ORDER_INACTIVE_DISTRIBUTOR: "Distributor is inactive.",
+    AdobeStatus.ORDER_INACTIVE_RESELLER: "Reseller is inactive.",
+    AdobeStatus.ORDER_INACTIVE_CUSTOMER: "Customer is inactive.",
+    AdobeStatus.ORDER_INVALID_CUSTOMER_ID: "The provided customer identifier is invalid.",
+})
+
+SUBSCRIPTION_STATUS_DESCRIPTION = types.MappingProxyType({
+    AdobeStatus.SUBSCRIPTION_TERMINATED: "Subscription is terminated.",
+})
+
+UNRECOVERABLE_ORDER_STATUSES = tuple(ORDER_STATUS_DESCRIPTION.keys())
+
+UNRECOVERABLE_TRANSFER_STATUSES = (
+    AdobeStatus.TRANSFER_INELIGIBLE,
+    AdobeStatus.TRANSFER_ALREADY_TRANSFERRED,
+    AdobeStatus.TRANSFER_INACTIVE_RESELLER,
+    AdobeStatus.TRANSFER_NO_ADMIN_CONTACTS,
+    AdobeStatus.TRANSFER_IN_PROGRESS,
+)
+
+ORDER_TYPE_NEW = "NEW"
+ORDER_TYPE_PREVIEW = "PREVIEW"
+ORDER_TYPE_PREVIEW_RENEWAL = "PREVIEW_RENEWAL"
+ORDER_TYPE_RENEWAL = "RENEWAL"
+ORDER_TYPE_RETURN = "RETURN"
+
+
+MINLEN_COMPANY_NAME = 4
+MINLEN_NAME = 1
+MAXLEN_POSTAL_CODE = 40
+MAXLEN_CITY = 40
+MAXLEN_ADDRESS_LINE_1 = 60
+MAXLEN_ADDRESS_LINE_2 = 60
+MAXLEN_PHONE_NUMBER = 40
+MAXLEN_COMPANY_NAME = 59
+MAXLEN_NAME = 35
+MINQTY_LICENSES = 10
+MINQTY_CONSUMABLES = 1000
+
+REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")  # noqa: RUF001
+REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")  # noqa: RUF001
+REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")  # noqa: RUF001
+try:
+    REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")  # noqa: RUF001
+except re.error:
+    REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\\w 0-9,.＆&'\\-\\\"]")  # noqa: RUF001
+
+
+class ThreeYearCommitmentStatus(StrEnum):
+    """Three year commitments statuses."""
+
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    COMMITTED = "COMMITTED"
+    ACTIVE = "ACTIVE"
+    REQUESTED = "REQUESTED"
+    NONCOMPLIANT = "NONCOMPLIANT"
+    EXPIRED = "EXPIRED"
+
+
+THREE_YC_TEMP_3YC_STATUSES = (
+    ThreeYearCommitmentStatus.REQUESTED,
+    ThreeYearCommitmentStatus.ACCEPTED,
+)
+
+
+class OfferType(StrEnum):
+    """Offer type for customer."""
+
+    LICENSE = "LICENSE"
+    CONSUMABLES = "CONSUMABLES"
+
+
+CANCELLATION_WINDOW_DAYS = 14
+
+MPT_NOTIFY_CATEGORIES = json.loads(
+    os.getenv("MPT_NOTIFY_CATEGORIES", '{"ORDERS": "NTC-0000-0006"}')
+)
