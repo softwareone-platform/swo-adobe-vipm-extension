@@ -1,42 +1,41 @@
 import logging
 
-from mpt_api_client.models import Model
-from mpt_extension_sdk_v6.api.router import route, task_route
-from mpt_extension_sdk_v6.api.schemas.events import Event, TaskEvent
-from mpt_extension_sdk_v6.errors.pipeline import CancelError, DeferError, FailError
-from mpt_extension_sdk_v6.pipeline.context import ExecutionContext
-from requests import RequestException
+from mpt_extension_sdk.api.models.events import Event, TaskEvent
+from mpt_extension_sdk.errors.pipeline import CancelError
+from mpt_extension_sdk.extension_app import ExtensionRouter
 
+from adobe_vipm.flows.context import AdobeOrderContext
 from adobe_vipm.flows.pipelines.fulfillment.purchase import PurchasePipeline
 
 logger = logging.getLogger(__name__)
+orders_router = ExtensionRouter(prefix="/events/orders")
 
 
-@task_route("/events/orders/purchase", name="orders-purchase")
-async def handle_purchase_order(event: TaskEvent, context: ExecutionContext[Model]) -> None:
+@orders_router.task_route(
+    "/purchase",
+    name="orders-purchase",
+    event="platform.commerce.order.created",
+    condition="eq(product.id,PRD-5516-5707)",
+)
+async def handle_purchase_order(event: TaskEvent, context: AdobeOrderContext) -> None:
     """Handle a purchase order event."""
     logger.info("Processing purchase event id=%s", event.id)
-    logger.info("-" * 24)
-    logger.info("event: %s", event)
-    logger.info("extra: %s", event.__pydantic_extra__)
-    logger.info("-" * 24)
-    logger.info("context: %s", context)
-    context.model = context.mpt_api_service.orders.get(event.object.id)
-    if context.model.type != "Purchase":
+    if context.order.type != "Purchase":
         raise CancelError("Unsupported event. Only purchase orders are supported")
 
-    try:
-        await PurchasePipeline().execute(context)
-    except RequestException as error:
-        logger.exception("Transient error during purchase processing")
-        raise DeferError("Transient error during event processing", delay_seconds=100) from error
-    except Exception as error:
-        logger.exception("Unexpected error during purchase processing")
-        raise FailError("Server error") from error
+    if context.order.status != "Processing":
+        raise CancelError("Order status is not processing.")
+
+    await PurchasePipeline().execute(context)
 
 
-@route("/events/orders/change", name="orders-change")
-def handle_change_order(event: Event, context: ExecutionContext[Model]) -> None:
+@orders_router.route(
+    "/change",
+    name="orders-change",
+    event="platform.commerce.order.status_changed",
+    condition="and(eq(status,Processing),eq(product.id,PRD-5516-5707))",
+)
+async def handle_change_order(event: Event, context: AdobeOrderContext) -> None:
     """Handle a change order event.
 
     Args:
@@ -44,7 +43,7 @@ def handle_change_order(event: Event, context: ExecutionContext[Model]) -> None:
         context: The SDK-provided execution context.
     """
     logger.info("Processing change order id=%s object_id=%s", event.id, event.object.id)
-    logger.info("-" * 24)
-    logger.info("event: %s", event)
-    logger.info("-" * 24)
-    logger.info("context: %s", context)
+    if context.order.status != "Processing":
+        raise CancelError("Order status is not processing.")
+
+    await PurchasePipeline().execute(context)

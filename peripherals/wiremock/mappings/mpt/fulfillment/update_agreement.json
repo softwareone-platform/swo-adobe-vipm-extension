@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "PUT",
+    "urlPathTemplate": "/mpt/public/v1/commerce/agreements/{agreement_id}"
+  },
+  "response": {
+    "status": 200,
+    "body": "{{request.body}}",
+    "transformers": ["response-template"],
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

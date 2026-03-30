@@ -1,6 +1,5 @@
+from typing import Any
 from urllib.parse import urljoin
-
-import requests
 
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import wrap_http_error
@@ -10,11 +9,7 @@ class DeploymentClientMixin:
     """Adobe Client Mixin to manage Deployments flows of Adobe VIPM."""
 
     @wrap_http_error
-    def get_customer_deployments(
-        self,
-        authorization_id: str,
-        customer_id: str,
-    ) -> dict:
+    def get_customer_deployments(self, authorization_id: str, customer_id: str) -> dict[str, Any]:
         """
         Retrieve the customer deployment object.
 
@@ -28,13 +23,13 @@ class DeploymentClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._request(
+            "GET",
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
             ),
             headers=headers,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()

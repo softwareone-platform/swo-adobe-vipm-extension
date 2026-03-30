@@ -1,9 +1,8 @@
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.errors import wrap_http_error
+from adobe_vipm.adobe.models import AdobeSubscription
 from adobe_vipm.adobe.utils import get_partial_sku
 from adobe_vipm.flows.constants import Param
 
@@ -14,7 +13,7 @@ class SubscriptionClientMixin:
     @wrap_http_error
     def get_subscription(
         self, authorization_id: str, customer_id: str, subscription_id: str
-    ) -> dict:
+    ) -> AdobeSubscription:
         """
         Retrieve a subscription by its identifier.
 
@@ -28,16 +27,16 @@ class SubscriptionClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._request(
+            "GET",
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}/subscriptions/{subscription_id}",
             ),
             headers=headers,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
-        return response.json()
+        return AdobeSubscription.from_payload(response.json())
 
     @wrap_http_error
     def get_subscriptions(self, authorization_id: str, customer_id: str) -> dict:
@@ -52,10 +51,10 @@ class SubscriptionClientMixin:
             The retrieved subscriptions.
         """
         authorization = self._config.get_authorization(authorization_id)
-        response = requests.get(
+        response = self._request(
+            "GET",
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/subscriptions"),
             headers=self._get_headers(authorization),
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -161,14 +160,14 @@ class SubscriptionClientMixin:
         if quantity:
             payload["autoRenewal"]["renewalQuantity"] = quantity
 
-        response = requests.patch(
+        response = self._request(
+            "PATCH",
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}/subscriptions/{subscription_id}",
             ),
             headers=headers,
             json=payload,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         # patch doesn't return half of the fields in subscriptions representation

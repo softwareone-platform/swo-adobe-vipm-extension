@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathTemplate": "/v3/customers/{customer_id}/orders"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "adobe/orders.json",
+    "transformers": ["response-template"],
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

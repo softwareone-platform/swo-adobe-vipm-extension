@@ -1,9 +1,13 @@
 import datetime as dt
 import logging
 from collections.abc import MutableMapping
+from functools import wraps
+from urllib.parse import urlsplit
 from uuid import uuid4
 
-import requests
+import httpx
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
 from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
@@ -15,10 +19,46 @@ from adobe_vipm.adobe.mixins.subscription import SubscriptionClientMixin
 from adobe_vipm.adobe.mixins.transfer import TransferClientMixin
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 # setup cache cleanup in number of seconds before actual Adobe token expire
 # just to be sure to refresh token in time
 EXPIRES_IN_DELAY_SECONDS = 180
+
+
+def trace_adobe_request(func):
+    """Wrap Adobe HTTP transport calls with dependency tracing and metadata-only logging."""
+
+    @wraps(func)
+    def wrapper(self, method: str, url: str, **kwargs) -> httpx.Response:
+        method_upper = method.upper()
+        parsed_url = urlsplit(url)
+        span_name = f"{method_upper} {parsed_url.path or '/'}"
+        with tracer.start_as_current_span(span_name, kind=SpanKind.CLIENT) as span:
+            span.set_attribute("http.request.method", method_upper)
+            span.set_attribute("url.full", url)
+            span.set_attribute("server.address", parsed_url.hostname or "")
+            self._logger.info("Adobe API request %s %s", method_upper, url)
+            try:
+                response = func(self, method_upper, url, **kwargs)
+            except httpx.HTTPError as error:
+                span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR, str(error)))
+                self._logger.exception("Adobe API request failed %s %s", method_upper, url)
+                raise
+
+            span.set_attribute("http.response.status_code", response.status_code)
+            if response.status_code >= 400:
+                span.set_status(Status(StatusCode.ERROR, str(response.status_code)))
+            self._logger.info(
+                "Adobe API response %s %s status=%s",
+                method_upper,
+                url,
+                response.status_code,
+            )
+            return response
+
+    return wrapper
 
 
 class AdobeClient(
@@ -33,14 +73,15 @@ class AdobeClient(
 
     def __init__(self) -> None:
         # TODO: client should be refactored cause of several things
-        # 1. There is no shared session for requests
-        # 2. Probably worth to use httpx instead of requests
+        # 1. Mixins are using methods from parent (like _get_headers)
+        # 2. Error handling still happens outside of a dedicated transport layer
         # 3. Mixins are using methods from parent (like _get_headers)
         # 4. Agreed to use composition instead of inheritance
         self._config: Config = get_config()
         self._token_cache: MutableMapping[Authorization, APIToken] = {}
         self._logger = logger
         self._TIMEOUT = 60
+        self._http_client = httpx.Client(timeout=self._TIMEOUT)
 
     def _get_headers(self, authorization: Authorization, correlation_id=None):
         token = self._get_auth_token(authorization).token
@@ -58,7 +99,8 @@ class AdobeClient(
 
         Using the credentials associated to a given the reseller.
         """
-        response = requests.post(
+        response = self._request(
+            "POST",
             url=self._config.auth_endpoint_url,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             data={
@@ -67,7 +109,6 @@ class AdobeClient(
                 "client_secret": authorization.client_secret,
                 "scope": self._config.api_scopes,
             },
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
 
@@ -83,6 +124,11 @@ class AdobeClient(
         if not token or token.is_expired():
             self._refresh_auth_token(authorization)
         return self._token_cache[authorization]
+
+    @trace_adobe_request
+    def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Send an Adobe HTTP request."""
+        return self._http_client.request(method=method, url=url, **kwargs)
 
 
 _ADOBE_CLIENT = None

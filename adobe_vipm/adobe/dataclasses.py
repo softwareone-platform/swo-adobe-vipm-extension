@@ -1,5 +1,5 @@
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ class Country:
     currencies: list[str]
     pricelist_region: str
     postal_code_format_regex: str
-    provinces_to_code: dict | None = None
+    provinces_to_code: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

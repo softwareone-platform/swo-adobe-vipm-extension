@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathTemplate": "/mpt/public/v1/catalog/price-lists/{price_list_id}"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "mpt/fulfillment/price_list.json",
+    "transformers": ["response-template"],
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

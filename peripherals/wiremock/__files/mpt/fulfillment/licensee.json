@@ -1,0 +1,58 @@
+{
+    "id": "LCE-2599-7734-6675",
+    "name": "User 7734-6675",
+    "revision": 1,
+    "status": "Enabled",
+    "address": {
+        "addressLine1": "695 Nixon Ports",
+        "addressLine2": "Apt 232",
+        "postCode": "99801",
+        "city": "Port Elainemouth",
+        "state": "AK",
+        "country": "US"
+    },
+    "useBuyerAddress": true,
+    "account": {
+        "id": "ACC-5809-3083",
+        "name": "Area302 (Client)",
+        "icon": "/v1/accounts/accounts/ACC-5809-3083/icon",
+        "revision": 2,
+        "type": "Client",
+        "status": "Active"
+    },
+    "buyer": {
+        "id": "BUY-0280-5606",
+        "name": "Rolls-Royce Corporation",
+        "icon": "/v1/accounts/buyers/BUY-0280-5606/icon",
+        "revision": 1
+    },
+    "seller": {
+        "id": "SEL-7282-9889",
+        "name": "SoftwareOne, Inc.",
+        "icon": "/v1/accounts/sellers/SEL-7282-9889/icon",
+        "revision": 1,
+        "externalId": "78ADB9DA-BC69-4CBF-BAA0-CDBC28619EF7"
+    },
+    "eligibility": {
+        "client": true,
+        "partner": false
+    },
+    "audit": {
+        "created": {
+            "at": "2025-04-14T16:18:57.148Z",
+            "by": {
+                "id": "USR-7144-5457",
+                "name": "User 7144-5457",
+                "revision": 1
+            }
+        },
+        "updated": {
+            "at": "2025-04-14T16:18:57.390Z",
+            "by": {
+                "id": "USR-7144-5457",
+                "name": "User 7144-5457",
+                "revision": 1
+            }
+        }
+    }
+}

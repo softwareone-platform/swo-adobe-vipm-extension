@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathTemplate": "/mpt/public/v1/system/tasks/{task_id}/{state}"
+  },
+  "response": {
+    "status": 200,
+    "body": "{}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

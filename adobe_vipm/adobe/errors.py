@@ -2,13 +2,14 @@ import json
 import logging
 from collections.abc import Callable
 from functools import wraps
-from typing import ParamSpec, TypeVar
+from json import JSONDecodeError
+from typing import Any, ParamSpec, TypeVar
 
-from requests import HTTPError, JSONDecodeError
+from httpx import HTTPStatusError
 
 from adobe_vipm.adobe.constants import AdobeStatus
 
-Param = ParamSpec("Param")  # noqa: WPS110
+ParamSpec = ParamSpec("ParamSpec")
 RetType = TypeVar("RetType")
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ class AdobeHttpError(AdobeError):
 class AdobeAPIError(AdobeHttpError):
     """Adobe API error."""
 
-    def __init__(self, status_code: int, payload: dict) -> None:
+    def __init__(self, status_code: int, payload: dict[str, Any]) -> None:
         super().__init__(status_code, json.dumps(payload))
         self.payload: dict = payload
         # 504 error response doesn't follow the expected format -
@@ -87,7 +88,7 @@ class AdobeAPIInvalidCustomerError(AdobeAPIError):
     """Adobe API error."""
 
 
-def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:  # noqa: UP047
+def wrap_http_error(func: Callable[ParamSpec, RetType]) -> Callable[ParamSpec, RetType]:  # noqa: UP047
     """
     Wrap HTTP error to Adobe API Error.
 
@@ -99,10 +100,10 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
     """
 
     @wraps(func)
-    def _wrapper(*args: Param.args, **kwargs: Param.kwargs) -> RetType:  # noqa: WPS430
+    def _wrapper(*args: ParamSpec.args, **kwargs: ParamSpec.kwargs) -> RetType:  # noqa: WPS430
         try:
             return func(*args, **kwargs)
-        except HTTPError as error:
+        except HTTPStatusError as error:
             logger.error(error)  # noqa: TRY400
             try:  # noqa: WPS328, WPS505
                 if error.response.status_code == AdobeStatus.INVALID_CUSTOMER:
@@ -111,6 +112,6 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
                     )
                 raise AdobeAPIError(error.response.status_code, error.response.json())
             except JSONDecodeError:
-                raise AdobeHttpError(error.response.status_code, error.response.content.decode())
+                raise AdobeHttpError(error.response.status_code, error.response.text)
 
     return _wrapper

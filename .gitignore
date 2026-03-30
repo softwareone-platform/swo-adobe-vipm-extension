@@ -178,3 +178,4 @@ make/local.mk
 
 # mrok
 *identity.json
+meta.yaml

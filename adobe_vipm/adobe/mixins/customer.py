@@ -1,8 +1,7 @@
 import json
 from hashlib import sha256
+from typing import Any
 from urllib.parse import urljoin
-
-import requests
 
 from adobe_vipm.adobe.constants import OfferType
 from adobe_vipm.adobe.dataclasses import Reseller
@@ -23,7 +22,7 @@ class CustomerClientMixin:
         agreement_id: str,
         market_segment: str,
         customer_data: dict,
-    ) -> dict:
+    ) -> AdobeCustomer:
         """
         Create customer account.
 
@@ -48,7 +47,9 @@ class CustomerClientMixin:
         if customer_data.get("3YC") == ["Yes"]:
             self._add_3yc_benefits(payload, customer_data)
 
-        return self._create_adobe_customer(authorization, payload, company_name, reseller.id)
+        return AdobeCustomer.from_payload(
+            self._create_adobe_customer(authorization, payload, company_name, reseller.id)
+        )
 
     @wrap_http_error
     def create_customer_account_lga(
@@ -87,11 +88,7 @@ class CustomerClientMixin:
         return self._create_adobe_customer(authorization, payload, company_name, reseller.id)
 
     @wrap_http_error
-    def get_customer(
-        self,
-        authorization_id: str,
-        customer_id: str,
-    ) -> AdobeCustomer:
+    def get_customer(self, authorization_id: str, customer_id: str) -> AdobeCustomer:
         """
         Retrieve customer account.
 
@@ -104,16 +101,16 @@ class CustomerClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._request(
+            "GET",
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}",
             ),
             headers=headers,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
-        return AdobeCustomer.from_payload(**response.json())
+        return AdobeCustomer.from_payload(response.json())
 
     @wrap_http_error
     def create_3yc_request(
@@ -163,19 +160,19 @@ class CustomerClientMixin:
             ],
         }
 
-        response = requests.patch(
+        response = self._request(
+            "PATCH",
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}"),
             headers=self._get_headers(
                 self._config.get_authorization(authorization_id),
                 correlation_id=sha256(json.dumps(payload).encode()).hexdigest(),
             ),
             json=payload,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
 
-    def _add_3yc_benefits(self, payload: dict, customer_data: dict) -> None:
+    def _add_3yc_benefits(self, payload: dict[str, Any], customer_data: dict[str, Any]) -> None:
         """Add Three Year Commit benefits to the payload."""
         quantities = []
         if customer_data.get("3YCLicenses"):
@@ -232,14 +229,14 @@ class CustomerClientMixin:
         reseller_id: str,
     ) -> dict:
         """Create customer via API and return the created customer."""
-        response = requests.post(
+        response = self._request(
+            "POST",
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=self._get_headers(
                 authorization,
                 correlation_id=sha256(json.dumps(payload).encode()).hexdigest(),
             ),
             json=payload,
-            timeout=self._TIMEOUT,
         )
 
         response.raise_for_status()

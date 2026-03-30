@@ -2,8 +2,11 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from adobe_vipm.adobe.constants import UNRECOVERABLE_ORDER_STATUSES, AdobeStatus
+from adobe_vipm.adobe.utils import find_first
 
-class BaseSchema(BaseModel):
+
+class AdobeBaseSchema(BaseModel):
     """Base Adobe schema with dict-like compatibility helpers."""
 
     model_config = ConfigDict(extra="allow", from_attributes=True, validate_by_name=True)
@@ -18,7 +21,7 @@ class BaseSchema(BaseModel):
         return cls.model_validate(payload)
 
 
-class AdobeLink(BaseSchema):
+class AdobeLink(AdobeBaseSchema):
     """Adobe hypermedia link."""
 
     headers: list[dict[str, Any]] = Field(default_factory=list)
@@ -26,15 +29,15 @@ class AdobeLink(BaseSchema):
     uri: str
 
 
-class AdobeLinks(BaseSchema):
+class AdobeLinks(AdobeBaseSchema):
     """Adobe links container."""
 
-    next_link: AdobeLink | None = Field(default=None, alias="next")
-    prev_link: AdobeLink | None = Field(default=None, alias="prev")
+    next_link: AdobeLink = Field(default=AdobeLink, alias="next")
+    prev_link: AdobeLink = Field(default=AdobeLink, alias="prev")
     self_link: AdobeLink = Field(alias="self")
 
 
-class AdobeContact(BaseSchema):
+class AdobeContact(AdobeBaseSchema):
     """Adobe customer contact."""
 
     email: str
@@ -43,7 +46,7 @@ class AdobeContact(BaseSchema):
     phone_number: str | None = Field(default=None, alias="phoneNumber")
 
 
-class AdobeAddress(BaseSchema):
+class AdobeAddress(AdobeBaseSchema):
     """Adobe customer address."""
 
     address_line_1: str = Field(alias="addressLine1")
@@ -55,7 +58,7 @@ class AdobeAddress(BaseSchema):
     region: str
 
 
-class AdobeCompanyProfile(BaseSchema):
+class AdobeCompanyProfile(AdobeBaseSchema):
     """Adobe company profile."""
 
     company_name: str = Field(alias="companyName")
@@ -67,14 +70,14 @@ class AdobeCompanyProfile(BaseSchema):
     contacts: list[AdobeContact] = Field(default_factory=list)
 
 
-class CustomerDiscount(BaseSchema):
+class CustomerDiscount(AdobeBaseSchema):
     """Adobe customer discount."""
 
     offer_type: str = Field(alias="offerType")
     level: str
 
 
-class AdobeLinkedMembership(BaseSchema):
+class AdobeLinkedMembership(AdobeBaseSchema):
     """Adobe linked membership."""
 
     id: str
@@ -86,7 +89,7 @@ class AdobeLinkedMembership(BaseSchema):
     type: str
 
 
-class AdobeCustomer(BaseSchema):
+class AdobeCustomer(AdobeBaseSchema):
     """Adobe customer account."""
 
     benefits: list[dict[str, Any]] = Field(default_factory=list)
@@ -100,21 +103,53 @@ class AdobeCustomer(BaseSchema):
 
     company_profile: AdobeCompanyProfile = Field(alias="companyProfile")
     discounts: list[CustomerDiscount] = Field(default_factory=list)
-    linked_membership: AdobeLinkedMembership | None = Field(
-        default=None,
-        alias="linkedMembership",
+    linked_membership: AdobeLinkedMembership = Field(
+        default=AdobeLinkedMembership, alias="linkedMembership"
     )
     links: AdobeLinks
 
+    @property
+    def three_yc_commitment(self) -> dict[str, Any]:
+        """Three year commitment object from the customer object."""
+        benefit_three_yc = find_first(
+            lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
+            self.benefits,
+            {},
+        )
+        return benefit_three_yc.get("commitmentRequest", {}) or {}
 
-class AdobeOrderPromotion(BaseSchema):
+    def get_three_yc_commitment_request(self, *, is_recommitment=False) -> dict[str, Any]:
+        """
+        Extract the commitment or recommitment request object from the customer object.
+
+        Args:
+            is_recommitment (bool): If True it search for a recommitment request.
+            Default to False.
+
+        Returns:
+            dict: The commitment or recommitment request object if
+            it exists or an empty object.
+        """
+        recommitment_or_commitment = (
+            "recommitmentRequest" if is_recommitment else "commitmentRequest"
+        )
+        benefit_three_yc = find_first(
+            lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
+            self.benefits,
+            {},
+        )
+
+        return benefit_three_yc.get(recommitment_or_commitment, {})
+
+
+class AdobeOrderPromotion(AdobeBaseSchema):
     """Adobe order promotion entry."""
 
     code: str
     result: str
 
 
-class AdobeOrderLineItemPricing(BaseSchema):
+class AdobeOrderLineItemPricing(AdobeBaseSchema):
     """Adobe pricing details for an order line item."""
 
     discounted_partner_price: float = Field(alias="discountedPartnerPrice")
@@ -123,30 +158,44 @@ class AdobeOrderLineItemPricing(BaseSchema):
     partner_price: float = Field(alias="partnerPrice")
 
 
-class AdobeOrderLineItem(BaseSchema):
+class FlexDiscount(AdobeBaseSchema):
+    """Adobe flexible discount."""
+
+    id: str
+    code: str
+    result: str
+
+
+class AdobeOrderLineItem(AdobeBaseSchema):
     """Adobe order line item."""
 
     currency_code: str = Field(alias="currencyCode")
-    ext_line_item_number: int = Field(alias="extLineItemNumber")
     deployment_id: str | None = Field(default=None, alias="deploymentId")
+    ext_line_item_number: int = Field(alias="extLineItemNumber")
     offer_id: str = Field(alias="offerId")
     prorated_days: int | None = Field(default=None, alias="proratedDays")
     quantity: int
     status: str
     subscription_id: str | None = Field(default=None, alias="subscriptionId")
 
+    flex_discounts: list[FlexDiscount] = Field(default_factory=list, alias="flexDiscounts")
     pricing: AdobeOrderLineItemPricing | None = None
     promotions: list[AdobeOrderPromotion] = Field(default_factory=list)
 
+    @property
+    def partial_sku(self):
+        """Return the partial SKU."""
+        return self.offer_id[:10]
 
-class AdobeOrderPricingSummary(BaseSchema):
+
+class AdobeOrderPricingSummary(AdobeBaseSchema):
     """Adobe aggregated pricing for an order."""
 
     currency_code: str = Field(alias="currencyCode")
     total_line_item_partner_price: float = Field(alias="totalLineItemPartnerPrice")
 
 
-class AdobeOrder(BaseSchema):
+class AdobeOrder(AdobeBaseSchema):
     """Adobe order resource."""
 
     creation_date: str = Field(alias="creationDate")
@@ -166,8 +215,43 @@ class AdobeOrder(BaseSchema):
         default_factory=list, alias="pricingSummary"
     )
 
+    @property
+    def flex_discounts(self) -> list[dict[str, Any]]:
+        """Flexible discounts."""
+        return [
+            {
+                "extLineItemNumber": line.ext_line_item_number,
+                "offerId": line.offer_id,
+                "subscriptionId": line.subscription_id,
+                "flexDiscountCode": [discount.code for discount in line.flex_discounts],
+            }
+            for line in self.line_items
+            if line.flex_discounts
+        ]
 
-class AdobeOrderCollection(BaseSchema):
+    # REFACTOR: change order_id to id
+    @property
+    def id(self) -> str:
+        """Order ID."""
+        return self.order_id
+
+    @property
+    def is_pending(self) -> bool:
+        """Return True if the order is pending."""
+        return self.status == AdobeStatus.PENDING
+
+    @property
+    def is_processed(self) -> bool:
+        """Return True if the order is processed."""
+        return self.status == AdobeStatus.PROCESSED
+
+    @property
+    def is_unrecoverable(self) -> bool:
+        """Return True if the order is in an unrecoverable state."""
+        return self.status in UNRECOVERABLE_ORDER_STATUSES
+
+
+class AdobeOrderCollection(AdobeBaseSchema):
     """Adobe paginated order response."""
 
     count: int | None = None
@@ -179,7 +263,75 @@ class AdobeOrderCollection(BaseSchema):
     links: AdobeLinks | None = None
 
 
-class AdobeSubscriptionAutoRenewal(BaseSchema):
+class AdobePreviewOrderPricing(AdobeBaseSchema):
+    """Pricing details returned for a preview order line item."""
+
+    partner_price: float | None = Field(default=None, alias="partnerPrice")
+    discounted_partner_price: float | None = Field(default=None, alias="discountedPartnerPrice")
+    net_partner_price: float | None = Field(default=None, alias="netPartnerPrice")
+    line_item_partner_price: float | None = Field(default=None, alias="lineItemPartnerPrice")
+
+
+class AdobePreviewOrderFlexDiscount(AdobeBaseSchema):
+    """Flexible discount result returned for a preview order line item."""
+
+    id: str
+    code: str
+    result: str
+
+
+class AdobePreviewOrderLineItem(AdobeBaseSchema):
+    """Line item returned in an Adobe preview order response."""
+
+    ext_line_item_number: int = Field(alias="extLineItemNumber")
+    offer_id: str = Field(alias="offerId")
+    quantity: int
+    subscription_id: str | None = Field(default=None, alias="subscriptionId")
+    status: str | None = None
+    currency_code: str | None = Field(default=None, alias="currencyCode")
+    deployment_id: str | None = Field(default=None, alias="deploymentId")
+    flex_discounts: list[AdobePreviewOrderFlexDiscount] = Field(
+        default_factory=list, alias="flexDiscounts"
+    )
+    prorated_days: int | None = Field(default=None, alias="proratedDays")
+    pricing: AdobePreviewOrderPricing | None = None
+
+
+class AdobePreviewOrderPricingSummary(AdobeBaseSchema):
+    """Pricing summary returned by Adobe preview order response."""
+
+    total_line_item_partner_price: float = Field(alias="totalLineItemPartnerPrice")
+    currency_code: str = Field(alias="currencyCode")
+
+
+class AdobePreviewOrder(AdobeBaseSchema):
+    """Adobe preview order response model."""
+
+    reference_order_id: str | None = Field(default=None, alias="referenceOrderId")
+    external_reference_id: str = Field(alias="externalReferenceId")
+    order_id: str | None = Field(default=None, alias="orderId")
+    customer_id: str | None = Field(default=None, alias="customerId")
+    currency_code: str | None = Field(default=None, alias="currencyCode")
+    order_type: str = Field(alias="orderType")
+    creation_date: str | None = Field(default=None, alias="creationDate")
+    status: str | None = None
+    line_items: list[AdobePreviewOrderLineItem] = Field(alias="lineItems")
+    pricing_summary: list[AdobePreviewOrderPricingSummary] = Field(
+        default_factory=list, alias="pricingSummary"
+    )
+
+    @property
+    def prices(self) -> dict[str, float | None]:
+        """Prices."""
+        return {line.offer_id: line.pricing.discounted_partner_price for line in self.line_items}
+
+    @property
+    def skus(self) -> list[str]:
+        """SKUs."""
+        return [line.offer_id for line in self.line_items]
+
+
+class AdobeSubscriptionAutoRenewal(AdobeBaseSchema):
     """Adobe subscription auto-renewal settings."""
 
     enabled: bool
@@ -188,7 +340,7 @@ class AdobeSubscriptionAutoRenewal(BaseSchema):
     renewal_quantity: int = Field(alias="renewalQuantity")
 
 
-class AdobeSubscription(BaseSchema):
+class AdobeSubscription(AdobeBaseSchema):
     """Adobe subscription resource."""
 
     allowed_actions: list[str] = Field(default_factory=list, alias="allowedActions")
@@ -205,8 +357,19 @@ class AdobeSubscription(BaseSchema):
     auto_renewal: AdobeSubscriptionAutoRenewal = Field(alias="autoRenewal")
     links: AdobeLinks
 
+    # REFACTOR: change subscription_id to id
+    @property
+    def id(self) -> str:
+        """Subscription ID."""
+        return self.subscription_id
 
-class AdobeSubscriptionCollection(BaseSchema):
+    @property
+    def is_processed(self) -> bool:
+        """Status if processed."""
+        return self.status == AdobeStatus.PROCESSED
+
+
+class AdobeSubscriptionCollection(AdobeBaseSchema):
     """Adobe paginated subscription response."""
 
     items: list[AdobeSubscription] = Field(default_factory=list)
@@ -214,7 +377,7 @@ class AdobeSubscriptionCollection(BaseSchema):
     total_count: int = Field(alias="totalCount")
 
 
-class AdobePriceListOffer(BaseSchema):
+class AdobePriceListOffer(AdobeBaseSchema):
     """Adobe offer entry inside a price list."""
 
     additional_detail: str | None = Field(default=None, alias="additionalDetail")
@@ -236,7 +399,7 @@ class AdobePriceListOffer(BaseSchema):
     version: str | None = None
 
 
-class AdobePriceList(BaseSchema):
+class AdobePriceList(AdobeBaseSchema):
     """Adobe price list response."""
 
     currency: str

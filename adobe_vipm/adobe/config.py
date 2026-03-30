@@ -3,6 +3,7 @@ import os
 from collections.abc import MutableMapping
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 from adobe_vipm.adobe.dataclasses import (
     Authorization,
@@ -37,7 +38,7 @@ class Config:
         Returns:
             The endpoint url
         """
-        return os.getenv("EXT_ADOBE_AUTH_ENDPOINT_URL")
+        return os.getenv("EXT_ADOBE_AUTH_ENDPOINT_URL", "")
 
     @property
     def api_base_url(self) -> str:
@@ -47,7 +48,7 @@ class Config:
         Returns:
             The base url
         """
-        return os.getenv("EXT_ADOBE_API_BASE_URL")
+        return os.getenv("EXT_ADOBE_API_BASE_URL", "")
 
     @property
     def api_scopes(self) -> str:
@@ -146,9 +147,7 @@ class Config:
         try:
             return self.countries[code]
         except KeyError:
-            raise CountryNotFoundError(
-                f"Country with code {code} not found.",
-            )
+            raise CountryNotFoundError(f"Country with code {code} not found.")
 
     def get_preferred_language(self, country: str) -> str:
         """
@@ -161,22 +160,17 @@ class Config:
         Returns:
            The preferred language code or the English United States if not found.
         """
-
-        return find_first(
-            lambda code: code.endswith(f"-{country}"),
-            self.language_codes,
-            "en-US",
-        )
+        return find_first(lambda code: code.endswith(f"-{country}"), self.language_codes, "en-US")
 
     @classmethod
     def _load_credentials(cls):
-        path = Path(os.getenv("EXT_ADOBE_CREDENTIALS_FILE"))
+        path = Path(os.getenv("EXT_ADOBE_CREDENTIALS_FILE", ""))
         with path.open(encoding="utf-8") as cred_file:
             return json.load(cred_file)
 
     @classmethod
     def _load_authorizations(cls):
-        path = Path(os.getenv("EXT_ADOBE_AUTHORIZATIONS_FILE"))
+        path = Path(os.getenv("EXT_ADOBE_AUTHORIZATIONS_FILE", ""))
         with path.open(encoding="utf-8") as auth_file:
             return json.load(auth_file)
 
@@ -216,13 +210,13 @@ class Config:
             if seller_id:  # pragma: no branch
                 self.resellers[authorization, seller_id] = reseller
 
-    def _setup_countries(self, config: dict):
+    def _setup_countries(self, config: dict[str, Any]):
         self.language_codes = config["language_codes"]
         for country in config["countries"]:
             self.countries[country["code"]] = Country(**country)
 
     def _create_authorization(
-        self, authorization_data: dict, credentials_map: dict
+        self, authorization_data: dict[str, Any], credentials_map: dict[str, Any]
     ) -> Authorization:
         auth_uk = authorization_data["authorization_uk"]
         return Authorization(

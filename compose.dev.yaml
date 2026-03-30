@@ -1,3 +1,0 @@
-services:
-  app:
-    command: "uv run swoext run"

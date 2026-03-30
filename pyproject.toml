@@ -7,7 +7,9 @@ requires-python = ">=3.12,<4"
 readme = "README.md"
 license = { text = "Apache-2.0 license" }
 dependencies = [
-  "mpt-extension-sdk-v6",
+  "httpx==0.28.*",
+  "mpt-extension-sdk",
+  "pyairtable>=3.3.0",
 ]
 
 
@@ -69,15 +71,12 @@ extend-exclude = [
   "uv.lock",
   ".venv",
   "migrations",
-  "mpt_extension_sdk_v6",
   "swo-adobe-vipm-extension-legacy",
   "adobe_vipm/adobe",
   "adobe_vipm/airtable",
   "adobe_vipm/flows",
   "adobe_vipm/notifications.py",
   "adobe_vipm/utils.py",
-  "django",
-  "mpt_extension_sdk",
 ]
 format = "wemake"
 max-imports = 17
@@ -86,11 +85,7 @@ select = ["AAA", "E999", "WPS"]
 show-source = true
 statistics = false
 # To be fixed and removed
-per-file-ignores = [
-  "tests/test_orders_handler.py: AAA01 WPS118",
-  "tests/test_purchase_pipeline.py: AAA01 WPS118",
-  "tests/test_sdk_order_resolution.py: AAA01",
-]
+per-file-ignores = []
 
 [tool.ruff]
 # Ruff config: https://docs.astral.sh/ruff/settings
@@ -187,6 +182,7 @@ max-complexity = 6
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
+"*.py" = ["ERA001"]
 "tests/*.py" = [
   "D103", # missing docstring in public function
   "S101", # asserts
@@ -236,4 +232,4 @@ module = "pymsteams.*"
 ignore_missing_imports = true
 
 [tool.uv.sources]
-mpt-extension-sdk-v6 = { path = "./mpt_extension_sdk_v6", editable = true }
+mpt-extension-sdk = { path = "./mpt_extension_sdk", editable = true }

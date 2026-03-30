@@ -2,8 +2,6 @@ import json
 from hashlib import sha256
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.adobe.utils import join_phone_number
 
@@ -43,14 +41,14 @@ class ResellerClientMixin:
                 "contacts": [self._get_contact(reseller_data["contact"])],
             },
         }
-        response = requests.post(
+        response = self._request(
+            "POST",
             urljoin(self._config.api_base_url, "/v3/resellers"),
             headers=self._get_headers(
                 authorization,
                 correlation_id=sha256(json.dumps(payload).encode()).hexdigest(),
             ),
             json=payload,
-            timeout=self._TIMEOUT,
         )
 
         response.raise_for_status()

@@ -12,8 +12,10 @@ All commands in this document must be run from the repository root.
 Minimum required environment variables:
 
 ```dotenv
-SDK_EXTENSION_API_URL=https://api.example.com
-SDK_EXTENSIOM_API_KEY=<platform-api-token>
+SDK_EXTENSION_URL=https://api.example.com
+SDK_EXTENSION_API_KEY=<extension-api-key>
+MPT_API_BASE_URL=https://marketplace-api.example.com
+MPT_API_TOKEN=<marketplace-api-token>
 ```
 
 Optional for Ziticorn:
@@ -42,7 +44,7 @@ Base URL:
 Runs the Extension via `ziticorn`.
 
 ```bash
-make run-dev
+make run
 ```
 
 Service URL format:
@@ -77,9 +79,9 @@ Expected processing outcomes:
 
 Order event requests for local Uvicorn testing are in:
 
-- `adobe_vipm/mrok/example.http`
+- `docs/examples.http`
 
 ## OpenAPI docs
 
-- Swagger UI: `http://localhost:8080/api/v2/bypass/docs`
-- OpenAPI JSON: `http://localhost:8080/api/v2/bypass/openapi.json`
+- Swagger UI: `http://localhost:8080/bypass/docs`
+- OpenAPI JSON: `http://localhost:8080/bypass/openapi.json`

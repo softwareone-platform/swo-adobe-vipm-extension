@@ -8,16 +8,14 @@ from operator import itemgetter
 from typing import Any
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe import constants as adobe_constants
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, wrap_http_error
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError, ProcessingUpsizeLinesError
+from adobe_vipm.adobe.models import AdobeOrder, AdobePreviewOrder, AdobePreviewOrderLineItem
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
-    get_deployment_id,
     get_item_by_subcription_id,
     get_partial_sku,
     map_by,
@@ -39,7 +37,7 @@ def _get_failed_discount_codes(response_json) -> set:
     return failed_discount_codes
 
 
-def _remove_failed_discount_codes(failed_discount_codes: set, payload: dict):
+def _remove_failed_discount_codes(failed_discount_codes: set, payload: dict[str, Any]) -> None:
     for line_item in payload["lineItems"]:
         flex_discount_codes = set(line_item.get("flexDiscountCodes", ()))
         if flex_discount_codes:
@@ -72,11 +70,11 @@ class OrderClientMixin:
         orders_base_url = f"/v3/customers/{customer_id}/orders"
         next_url = f"{orders_base_url}?limit=100&offset=0"
         while next_url:
-            response = requests.get(
+            response = self._request(
+                "GET",
                 urljoin(self._config.api_base_url, next_url),
                 headers=headers,
                 params=filters,
-                timeout=self._TIMEOUT,
             )
             response.raise_for_status()
             page = response.json()
@@ -90,7 +88,7 @@ class OrderClientMixin:
         authorization_id: str,
         customer_id: str,
         order_id: str,
-    ) -> dict:
+    ) -> AdobeOrder:
         """
         Retrieve order by ID.
 
@@ -104,25 +102,25 @@ class OrderClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._request(
+            "GET",
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}/orders/{order_id}",
             ),
             headers=headers,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
-        return response.json()
+        return AdobeOrder.from_payload(response.json())
 
     @wrap_http_error
     def create_new_order(
         self,
         authorization_id: str,
         customer_id: str,
-        adobe_preview_order: dict,
+        adobe_preview_order: AdobePreviewOrder,
         deployment_id: str | None = None,
-    ) -> dict:
+    ) -> AdobeOrder:
         """
         Create Adobe Order based on Preview order.
 
@@ -137,11 +135,11 @@ class OrderClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         line_items = [
-            self._build_line_item(line_item) for line_item in adobe_preview_order["lineItems"]
+            self._build_line_item(line_item) for line_item in adobe_preview_order.line_items
         ]
 
         payload = {
-            "externalReferenceId": adobe_preview_order["externalReferenceId"],
+            "externalReferenceId": adobe_preview_order.external_reference_id,
             "orderType": adobe_constants.ORDER_TYPE_NEW,
             "lineItems": line_items,
         }
@@ -149,21 +147,18 @@ class OrderClientMixin:
             payload["currencyCode"] = authorization.currency
 
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
-        headers = self._get_headers(
-            authorization,
-            correlation_id=correlation_id,
-        )
-        response = requests.post(
+        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        response = self._request(
+            "POST",
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
-        return response.json()
+        return AdobeOrder.from_payload(response.json())
 
     @wrap_http_error
-    def create_preview_order(self, context) -> dict | None:
+    def create_preview_order(self, context) -> dict[str, Any] | None:
         """
         Create Preview orders.
 
@@ -191,7 +186,7 @@ class OrderClientMixin:
             "orderType": adobe_constants.ORDER_TYPE_PREVIEW,
             "lineItems": [],
         }
-        deployment_id = get_deployment_id(context.order)
+        deployment_id = context.deployment_id
         self._process_new_lines(context, flex_discounts, payload)
         if context.upsize_lines:
             try:
@@ -221,11 +216,7 @@ class OrderClientMixin:
         return preview_order
 
     @wrap_http_error
-    def create_preview_renewal(
-        self,
-        authorization_id: str,
-        customer_id: str,
-    ) -> dict:
+    def create_preview_renewal(self, authorization_id: str, customer_id: str) -> dict[str, Any]:
         """
         Create preview order for Renewal.
 
@@ -239,11 +230,11 @@ class OrderClientMixin:
         authorization = self._config.get_authorization(authorization_id)
         payload = {"orderType": adobe_constants.ORDER_TYPE_PREVIEW_RENEWAL}
         headers = self._get_headers(authorization)
-        response = requests.post(
+        response = self._request(
+            "POST",
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -255,7 +246,7 @@ class OrderClientMixin:
         subscription_id: str,
         customer_coterm_date: str,
         return_orders: list | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]] | None:
         """
         Retrieve RETURN orders filter by sku.
 
@@ -330,7 +321,7 @@ class OrderClientMixin:
         authorization_id: str,
         customer_id: str,
         external_reference: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Retrieve RETURN orders filter by external reference.
 
@@ -370,7 +361,7 @@ class OrderClientMixin:
         returning_item: dict,
         external_reference: str,
         deployment_id: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates an order of type RETURN for a given `item` that was purchased.
 
@@ -446,7 +437,7 @@ class OrderClientMixin:
 
     def get_preview_order(  # noqa: WPS231
         self, authorization: Authorization, adobe_customer_id, payload: dict
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         """
         Gets a preview of an order based on the provided payload.
 
@@ -477,8 +468,6 @@ class OrderClientMixin:
             _remove_failed_discount_codes(failed_discount_codes, payload)
         else:
             msg = f"After 5 attempts still finding failed discount codes: {failed_discount_codes}."
-            # REVIEW
-            # send_exception("Failed applying discount codes", msg)
             raise AdobeError(msg)
 
         return response_json
@@ -488,7 +477,7 @@ class OrderClientMixin:
         authorization: Authorization,
         context,
         offer_ids: tuple,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Fetches active flex discounts for the provided base offer IDs."""
         # TODO: Change this when Adobe starts supporting multiple codes per single baseOfferId
         country = context.customer_data["address"]["country"]
@@ -522,7 +511,9 @@ class OrderClientMixin:
             )
         return base_offers_with_discounts
 
-    def _get_fail_discounts_for_cust_not_qualified(self, ex: AdobeError, payload: dict) -> set:
+    def _get_fail_discounts_for_cust_not_qualified(
+        self, ex: AdobeError, payload: dict[str, Any]
+    ) -> set:
         if ex.code == adobe_constants.AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
             logger.warning("%s", ex)
             matched = self.flex_discount_not_qualify_re.match(ex.details[0])
@@ -615,17 +606,17 @@ class OrderClientMixin:
             )
             payload["lineItems"].append(line_item)
 
-    def _build_line_item(self, adobe_line_item: dict) -> dict:
+    def _build_line_item(self, adobe_line_item: AdobePreviewOrderLineItem) -> dict:
         line_item = {
-            "extLineItemNumber": adobe_line_item["extLineItemNumber"],
-            "offerId": adobe_line_item["offerId"],
-            "quantity": adobe_line_item["quantity"],
+            "extLineItemNumber": adobe_line_item.ext_line_item_number,
+            "offerId": adobe_line_item.offer_id,
+            "quantity": adobe_line_item.quantity,
         }
-        if adobe_line_item.get("flexDiscounts"):
-            line_item["flexDiscountCodes"] = [adobe_line_item["flexDiscounts"][0]["code"]]
-        if adobe_line_item.get("deploymentId"):
-            line_item["deploymentId"] = adobe_line_item["deploymentId"]
-            line_item["currencyCode"] = adobe_line_item["currencyCode"]
+        if adobe_line_item.flex_discounts:
+            line_item["flexDiscountCodes"] = [adobe_line_item.flex_discounts[0].code]
+        if adobe_line_item.deployment_id:
+            line_item["deploymentId"] = adobe_line_item.deployment_id
+            line_item["currencyCode"] = adobe_line_item.currency_code
         return line_item
 
     @wrap_http_error
@@ -650,11 +641,11 @@ class OrderClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization, correlation_id=correlation_id)
-        response = requests.post(
+        response = self._request(
+            "POST",
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -664,7 +655,8 @@ class OrderClientMixin:
         self, authorization: Authorization, adobe_customer_id: str, payload: dict
     ) -> dict:
         headers = self._get_headers(authorization)
-        response = requests.post(
+        response = self._request(
+            "POST",
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{adobe_customer_id}/orders",
@@ -672,7 +664,6 @@ class OrderClientMixin:
             params={"fetch-price": "true"},
             headers=headers,
             json=payload,
-            timeout=self._TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -704,14 +695,14 @@ class OrderClientMixin:
     ) -> dict:
         headers = self._get_headers(authorization)
         offer_ids = ",".join(offer_ids)
-        response = requests.get(
+        response = self._request(
+            "GET",
             urljoin(
                 self._config.api_base_url,
                 "v3/flex-discounts",
             ),
             headers=headers,
-            params={"market-segment": {segment}, "country": {country}, "offer-ids": {offer_ids}},
-            timeout=self._TIMEOUT,
+            params={"market-segment": segment, "country": country, "offer-ids": offer_ids},
         )
         response.raise_for_status()
         return response.json()["flexDiscounts"]

@@ -1,0 +1,150 @@
+{
+    "totalCount": 5,
+    "count": 5,
+    "offset": 0,
+    "limit": 25,
+    "items": [
+        {
+            "referenceOrderId": "P9201910887",
+            "externalReferenceId": "",
+            "orderId": "P550051684",
+            "customerId": "P1005258435",
+            "currencyCode": "USD",
+            "orderType": "RETURN",
+            "status": "1000",
+            "lineItems": [
+                {
+                    "extLineItemNumber": 1,
+                    "offerId": "30006208CA01A12",
+                    "quantity": 100,
+                    "subscriptionId": "d3a901e11a40f8b3c28fac07037b1aNA",
+                    "status": "1000",
+                    "currencyCode": "USD"
+                }
+            ],
+            "creationDate": "2025-10-27T16:17:13Z",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/orders/P550051684",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        },
+        {
+            "referenceOrderId": "P9201910862",
+            "externalReferenceId": "ORD-7834-0086-1443_ORD-7212-4787-8055_3",
+            "orderId": "P550051680",
+            "customerId": "P1005258435",
+            "currencyCode": "USD",
+            "orderType": "RETURN",
+            "status": "1000",
+            "lineItems": [
+                {
+                    "extLineItemNumber": 3,
+                    "offerId": "30006208CA01A12",
+                    "quantity": 12,
+                    "subscriptionId": "d3a901e11a40f8b3c28fac07037b1aNA",
+                    "status": "1000",
+                    "currencyCode": "USD"
+                }
+            ],
+            "creationDate": "2025-10-27T15:30:09Z",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/orders/P550051680",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        },
+        {
+            "referenceOrderId": "",
+            "externalReferenceId": "ORD-7212-4787-8055",
+            "orderId": "P9201910862",
+            "customerId": "P1005258435",
+            "currencyCode": "USD",
+            "orderType": "NEW",
+            "status": "1008",
+            "lineItems": [
+                {
+                    "extLineItemNumber": 3,
+                    "offerId": "30006208CA01A12",
+                    "quantity": 12,
+                    "subscriptionId": "d3a901e11a40f8b3c28fac07037b1aNA",
+                    "status": "1008",
+                    "currencyCode": "USD"
+                }
+            ],
+            "creationDate": "2025-10-27T14:54:05Z",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/orders/P9201910862",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        },
+        {
+            "referenceOrderId": "",
+            "externalReferenceId": "ORD-TEST",
+            "orderId": "P9201910887",
+            "customerId": "P1005258435",
+            "currencyCode": "USD",
+            "orderType": "NEW",
+            "status": "1008",
+            "lineItems": [
+                {
+                    "extLineItemNumber": 1,
+                    "offerId": "30006208CA01A12",
+                    "quantity": 100,
+                    "subscriptionId": "d3a901e11a40f8b3c28fac07037b1aNA",
+                    "status": "1008",
+                    "currencyCode": "USD"
+                }
+            ],
+            "creationDate": "2025-10-23T00:00:00Z",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/orders/P9201910887",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        },
+        {
+            "referenceOrderId": "",
+            "externalReferenceId": "",
+            "orderId": "P9201901418",
+            "customerId": "P1005258435",
+            "currencyCode": "USD",
+            "orderType": "RENEWAL",
+            "status": "1000",
+            "lineItems": [
+                {
+                    "extLineItemNumber": 1,
+                    "offerId": "65304520CA01A12",
+                    "quantity": 1,
+                    "subscriptionId": "9e10d8705648faa507b194242f19a6NA",
+                    "status": "1000",
+                    "currencyCode": "USD"
+                }
+            ],
+            "creationDate": "2025-10-01T08:02:30Z",
+            "links": {
+                "self": {
+                    "uri": "/v3/customers/P1005258435/orders/P9201901418",
+                    "method": "GET",
+                    "headers": []
+                }
+            }
+        }
+    ],
+    "links": {
+        "self": {
+            "uri": "/v3/customers/P1005258435/orders?fetch-recommendations=false&recommendation-language=MULT",
+            "method": "GET",
+            "headers": []
+        }
+    }
+}
