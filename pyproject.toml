@@ -44,7 +44,7 @@ dev = [
   "responses==0.26.*",
   "ruff==0.15.*", # force ruff version to have same formatting everywhere, also update in pre-commit config
   "types-openpyxl==3.1.*",
-  "types-requests==2.32.*",
+  "types-requests==2.33.*",
   "wemake-python-styleguide==1.6.*", # also update pre-commit config
 ]
 
