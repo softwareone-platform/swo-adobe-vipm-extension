@@ -1,4 +1,4 @@
-from mpt_extension_sdk_v6.api.schemas.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseSchema
 
 
 class ExternalIds(BaseSchema):

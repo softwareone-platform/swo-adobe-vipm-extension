@@ -1,4 +1,4 @@
-from adobe_vipm.adobe.models import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseSchema
 
 
 class User(BaseSchema):

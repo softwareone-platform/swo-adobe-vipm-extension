@@ -39,6 +39,6 @@ class MetaConfig(BaseModel):
         if not isinstance(raw_payload, dict):
             raise ConfigError("Metadata root must be a mapping")
         try:
-            return MetaConfig.model_validate(raw_payload)
+            return cls.model_validate(raw_payload)
         except ValidationError as error:
             raise ConfigError("Invalid metadata schema: %s", error) from error

@@ -10,7 +10,7 @@ def map_exception_to_event_response(error: Exception) -> EventResponse:
         error: The exception raised by the handler or a pipeline step.
 
     Returns:
-        An :class:`EventResponse` that instructs the platform how to proceed.
+        An EventResponse.
     """
     if isinstance(error, CancelError):
         return EventResponse.cancel(reason=str(error) or "Cancelled")

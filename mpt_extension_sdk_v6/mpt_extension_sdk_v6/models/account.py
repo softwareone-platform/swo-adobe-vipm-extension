@@ -1,4 +1,6 @@
-from mpt_extension_sdk_v6.api.schemas.base import BaseSchema
+from pydantic import Field
+
+from mpt_extension_sdk_v6.models.base import BaseSchema
 
 
 class Account(BaseSchema):
@@ -7,7 +9,21 @@ class Account(BaseSchema):
     id: str
     name: str
     icon: str | None = None
-    revision: int | None = None
+
+
+class BuyerExternalId(BaseSchema):
+    """Buyer external identifiers  model."""
+
+    account_external_id: str | None = Field(default=None, alias="accountExternalId")
+    erp_company_contact: str | None = Field(default=None, alias="erpCompanyContact")
+    erp_customer: str | None = Field(default=None, alias="erpCustomer")
+
+
+class BuyerAccount(Account):
+    """Buyer  model."""
+
+    external_ids: BuyerExternalId | None = Field(default=None, alias="externalIds")
+    status: str | None = None
 
 
 class SellerAccount(Account):

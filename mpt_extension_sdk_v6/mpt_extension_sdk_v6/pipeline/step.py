@@ -14,6 +14,7 @@ class BaseStep(ABC):
 
     async def pre(self, ctx: ExecutionContext) -> None:
         """Run pre-processing hook."""
+        return
 
     @abstractmethod
     async def process(self, ctx: ExecutionContext) -> None:
@@ -22,3 +23,4 @@ class BaseStep(ABC):
 
     async def post(self, ctx: ExecutionContext) -> None:
         """Run post-processing hook."""
+        return

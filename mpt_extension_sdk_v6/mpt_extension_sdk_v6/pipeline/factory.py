@@ -33,7 +33,7 @@ async def build_context(event: Event, handler_logger: logging.Logger) -> Executi
 
 
 async def hydrate_context_model(context: ExecutionContext) -> None:
-    """Populate ``context.model`` for supported marketplace object types."""
+    """Populate `context.model`."""
     object_type = context.meta.object_type.lower()
     model_loaders = {
         "agreement": context.mpt_api_service.agreements.get_by_id,
@@ -44,7 +44,9 @@ async def hydrate_context_model(context: ExecutionContext) -> None:
         raise RuntimeError(f"Unsupported object type: {object_type}")
 
     try:
-        setattr(context, object_type, await model_loader(context.meta.object_id))
+        model = await model_loader(context.meta.object_id)
     except MPTError as error:
         context.logger.warning("Failed to load model: %s", error)
-        raise RuntimeError(f"Failed to load model: {error}") from error
+        raise RuntimeError(f"Failed to load model: {error}")
+
+    setattr(context, object_type, model)

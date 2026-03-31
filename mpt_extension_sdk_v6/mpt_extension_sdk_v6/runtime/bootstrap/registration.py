@@ -2,8 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
-
+from mpt_extension_sdk_v6.runtime.bootstrap.client import register_extension_instance
 from mpt_extension_sdk_v6.runtime.bootstrap.identity import load_identity, save_identity
 from mpt_extension_sdk_v6.settings.runtime import RuntimeSettings
 
@@ -38,21 +37,12 @@ def register_instance(settings: RuntimeSettings) -> RegistrationResult:
     if not existing_identity or identity_extension.lower() != settings.extension_id.lower():
         payload["channel"] = {}
 
-    bootstrap_url = (
-        f"{settings.base_url}/public/v1/integration/extensions/{settings.extension_id}/instances"
+    instance_payload = register_extension_instance(
+        settings.base_url,
+        settings.extension_id,
+        settings.ext_api_key,
+        payload,
     )
-    # TODO: api_client
-    response = httpx.post(
-        bootstrap_url,
-        json=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {settings.ext_api_key}",
-        },
-        timeout=60,
-    )
-    response.raise_for_status()
-    instance_payload = response.json()
 
     identity = instance_payload.get("channel", {}).get("identity")
     if isinstance(identity, dict) and identity:

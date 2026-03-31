@@ -3,6 +3,7 @@ from logging import Logger
 from typing import Any, Self
 
 from mpt_extension_sdk_v6.api.schemas.events import Event
+from mpt_extension_sdk_v6.errors.runtime import ConfigError
 from mpt_extension_sdk_v6.models.agreement import Agreement
 from mpt_extension_sdk_v6.models.order import Order
 from mpt_extension_sdk_v6.services.mpt_api_service import MPTAPIService
@@ -25,7 +26,7 @@ class ExecutionMetadata:
 
 
 @dataclass
-class ExecutionContext[ModelT, ExtensionSettingsT: BaseExtensionSettings]:
+class ExecutionContext:
     """Mutable context passed through pipeline steps."""
 
     logger: Logger
@@ -33,7 +34,7 @@ class ExecutionContext[ModelT, ExtensionSettingsT: BaseExtensionSettings]:
     mpt_api_service: MPTAPIService
 
     account_settings: AccountSettings | None
-    ext_settings: ExtensionSettingsT
+    ext_settings: BaseExtensionSettings
     runtime_settings: RuntimeSettings
 
     state: dict[str, Any] = field(default_factory=dict)
@@ -44,7 +45,7 @@ class ExecutionContext[ModelT, ExtensionSettingsT: BaseExtensionSettings]:
         event: Event,
         logger: Logger,
         mpt_api_service: MPTAPIService,
-        ext_settings: ExtensionSettingsT,
+        ext_settings: BaseExtensionSettings,
         runtime_settings: RuntimeSettings,
         account_settings: AccountSettings | None = None,
         *,
@@ -61,10 +62,10 @@ class ExecutionContext[ModelT, ExtensionSettingsT: BaseExtensionSettings]:
             mpt_api_service: Pre-built MPT API service facade.
             account_settings: Optional account-scoped settings for the current request.
             correlation_id: Request correlation ID for log tracing.
-            task_id: Platform task ID from the ``MPT-Task-Id`` request header.
+            task_id: Platform task ID from the `MPT-Task-Id` request header.
 
         Returns:
-            A new :class:`ExecutionContext` with ``model`` set to ``None``.
+            A new `ExecutionContext`
         """
         return cls(
             logger=logger,
@@ -83,23 +84,36 @@ class ExecutionContext[ModelT, ExtensionSettingsT: BaseExtensionSettings]:
 
 
 @dataclass
-class AgreementContext[ExtensionSettingsT: BaseExtensionSettings](
-    ExecutionContext[Agreement, ExtensionSettingsT]
-):
+class AgreementContext(ExecutionContext):
     """Execution context specialized for agreement events."""
 
     agreement: Agreement = None
 
+    @property
+    def agreement_id(self) -> str:
+        """Agreement ID."""
+        return self.agreement.id
+
 
 @dataclass
-class OrderContext[ExtensionSettingsT: BaseExtensionSettings](
-    ExecutionContext[Order, ExtensionSettingsT]
-):
+class OrderContext(ExecutionContext):
     """Execution context specialized for order events."""
 
     order: Order = None
 
+    @property
+    def order_id(self) -> str:
+        """Order ID."""
+        return self.order.id
+
 
 def get_context_by_type(model_type: str) -> type[OrderContext | AgreementContext]:
     """Return the context subclass matching the marketplace object type."""
-    return OrderContext if model_type == "Order" else AgreementContext
+    context_map = {
+        "Agreement": AgreementContext,
+        "Order": OrderContext,
+    }
+    try:
+        return context_map[model_type]
+    except KeyError as error:
+        raise ConfigError(f"Unsupported object type: {model_type}") from error

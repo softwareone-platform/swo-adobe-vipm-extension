@@ -1,13 +1,15 @@
-from typing import Any, Self
+from typing import Any
 
-from pydantic import AliasChoices, Field
+from pydantic import Field
 
-from mpt_extension_sdk_v6.api.schemas.base import BaseSchema
 from mpt_extension_sdk_v6.models.account import SellerAccount
 from mpt_extension_sdk_v6.models.agreement import Agreement
+from mpt_extension_sdk_v6.models.asset import Asset
 from mpt_extension_sdk_v6.models.authorization import Authorization
+from mpt_extension_sdk_v6.models.base import BaseSchema
 from mpt_extension_sdk_v6.models.external_id import ExternalIds
 from mpt_extension_sdk_v6.models.parameter import ParameterBag
+from mpt_extension_sdk_v6.models.price import Price
 from mpt_extension_sdk_v6.models.product import Product, ProductItem
 from mpt_extension_sdk_v6.models.subscription import Subscription
 from mpt_extension_sdk_v6.models.template import Template
@@ -18,27 +20,27 @@ class OrderLine(BaseSchema):
 
     id: str
     description: str | None = None
-    old_quantity: int = Field(
-        default=0,
-        alias="oldQuantity",
-        validation_alias=AliasChoices("oldQuantity", "old_quantity"),
-    )
+    old_quantity: int = Field(default=0, alias="oldQuantity")
     quantity: int
 
-    item: ProductItem
+    asset: Asset | None = None
+    product_item: ProductItem = Field(alias="item")
+    price: Price
+    subscription: Subscription | None = None
 
 
 class Order(BaseSchema):
     """Order."""
 
     id: str
-    external_ids: ExternalIds = Field(alias="externalIds")
     revision: int | None = None
-    status: str
+    status: str  # TODO: add enum
     type: str
 
     agreement: Agreement
+    assets: list[Asset] = Field(default_factory=list)
     authorization: Authorization
+    external_ids: ExternalIds = Field(alias="externalIds")
     lines: list[OrderLine] = Field(default_factory=list)
     parameters: ParameterBag = Field(default_factory=ParameterBag)
     product: Product
@@ -86,11 +88,18 @@ class Order(BaseSchema):
         """Return the seller identifier when available."""
         return None if self.seller is None else self.seller.id
 
-    @classmethod
-    def from_payload(cls, payload: Any) -> Self:
-        """Build an order from an MPT client resource or plain payload."""
-        return cls.model_validate(payload, from_attributes=True)
+    def complete(self) -> None:
+        """Mark the order as completed."""
+        self.status = "Completed"
 
-    def set_template(self, template: Any) -> None:
+    def get_line_by_sku(self, sku: str) -> OrderLine:
+        """Return the line matching a SKU."""
+        for line in self.lines:
+            if line.product_item.external_ids.vendor in sku:
+                return line
+
+        raise ValueError(f"No line found for SKU: {sku}")
+
+    def set_template(self, template: dict[str, Any]) -> None:
         """Update the order template from a client model or plain payload."""
         self.template = Template.model_validate(template, from_attributes=True)

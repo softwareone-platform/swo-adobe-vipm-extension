@@ -12,9 +12,19 @@ dependencies = [
   "httpx-retries>=0.4.6",
   "mpt-api-client==5.4.*",
   "mrok==0.9.3",
+  "opentelemetry-api==1.40.*",
+  "opentelemetry-exporter-otlp-proto-http==1.40.*",
+  "opentelemetry-instrumentation-fastapi==0.61b0",
+  "opentelemetry-instrumentation-httpx==0.61b0",
+  "opentelemetry-instrumentation-logging==0.61b0",
+  "opentelemetry-sdk==1.40.*",
   "pydantic==2.12.*",
-  "requests==2.32.*",
   "typer==0.24.*",
+]
+
+[project.optional-dependencies]
+azure-monitor = [
+  "azure-monitor-opentelemetry-exporter==1.0.0b51",
 ]
 
 [project.scripts]

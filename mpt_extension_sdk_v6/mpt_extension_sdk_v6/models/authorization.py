@@ -1,7 +1,7 @@
 from pydantic import AliasChoices, Field
 
-from mpt_extension_sdk_v6.api.schemas.base import BaseSchema
 from mpt_extension_sdk_v6.models.account import Account, SellerAccount
+from mpt_extension_sdk_v6.models.base import BaseSchema
 from mpt_extension_sdk_v6.models.external_id import ExternalIds
 from mpt_extension_sdk_v6.models.product import Product
 

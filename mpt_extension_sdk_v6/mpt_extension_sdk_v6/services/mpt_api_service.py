@@ -1,20 +1,29 @@
+import logging
 from collections.abc import Iterable
 from typing import Any, Self
 
 from mpt_api_client import RQLQuery
-from mpt_api_client.models import Model
-from mpt_api_client.resources.accounts.buyers import Buyer
-from mpt_api_client.resources.accounts.licensees import Licensee
-from mpt_api_client.resources.catalog.price_list_items import PriceListItem
-from mpt_api_client.resources.commerce.assets import Asset
-from mpt_api_client.resources.commerce.subscriptions import Subscription
 
-from mpt_extension_sdk_v6.models import Agreement, Order, Template
+from mpt_extension_sdk_v6.api.schemas.base import APIBaseSchema
+from mpt_extension_sdk_v6.models import (
+    Agreement,
+    Asset,
+    Authorization,
+    BuyerAccount,
+    Licensee,
+    Order,
+    Product,
+    ProductItem,
+    Subscription,
+    Template,
+)
 from mpt_extension_sdk_v6.services.api_client_v2.mpt_api_client import AsyncMPTClient
 from mpt_extension_sdk_v6.services.client_factory import build_mpt_client
 
+logger = logging.getLogger(__name__)
 
-class BaseService:
+
+class BaseService[Model]:
     """Base service class for all services."""
 
     _batch_size = 100
@@ -23,28 +32,67 @@ class BaseService:
         """Initialize service with an MPT client."""
         self._client = client
 
-    async def _iterate_all(self, collection: Any, batch_size: int = 100) -> list[Model]:
+    async def _iterate_all(
+        self, collection: Any, model: type[Model], batch_size: int = 100
+    ) -> list[Model]:
         """Collect all resources from an iterable collection query."""
-        return [item async for item in collection.iterate(batch_size=batch_size)]
+        return [
+            model.from_payload(element)
+            async for element in collection.iterate(batch_size=batch_size)
+        ]
 
 
-class OrdersService(BaseService):
+class OrdersService(BaseService[Order]):
     """Orders service wrapper around the MPT client."""
 
-    async def complete(self, order_id: str, template: Any, **kwargs: Any) -> Order:
-        """Complete an order with a template payload."""
-        return Order.from_payload(
-            await self._client.commerce.orders.complete(order_id, {"template": template, **kwargs})
+    async def get_by_id(self, order_id: str) -> Order:
+        """Fetch an order from Marketplace API."""
+        order = await self._client.commerce.orders.get(
+            order_id,
+            select=[
+                "agreement",
+                "agreement.authorizations",
+                "agreement.licensee",
+                "agreement.lines",
+                "agreement.parameters",
+                "assets",
+                "authorization",
+                "externalIds",
+                "lines",
+                "lines.asset",
+                "lines.subscription",
+                "parameters",
+                "product",
+                "seller",
+                "subscriptions",
+                "template",
+            ],
         )
+        logger.debug("Fetched order %s: %s", order_id, order.to_dict())
+        return Order.from_payload(order)
 
-    async def create_asset(self, order_id: str, asset: Any) -> Asset:
-        """Create an asset inside an order."""
-        return Asset.from_payload(await self._client.commerce.orders.assets(order_id).create(asset))
+    async def update(self, order_id: str, **kwargs: Any) -> None:
+        """Update an order."""
+        await self._client.commerce.orders.update(order_id, kwargs)
+
+    async def complete(self, order_id: str, template: Any, **kwargs: Any) -> None:
+        """Complete an order with a template payload."""
+        await self._client.commerce.orders.complete(order_id, {"template": template, **kwargs})
 
     async def fail(self, order_id: str, status_notes: dict, **kwargs: dict) -> None:
         """Fail an order with status notes."""
         kwargs["statusNotes"] = status_notes
         await self._client.commerce.orders.fail(order_id, kwargs)
+
+    async def query(self, order_id: str, **kwargs: Any) -> None:
+        """Switch an order to query with additional payload."""
+        await self._client.commerce.orders.query(order_id, kwargs)
+
+    # order/asset
+    async def create_asset(self, order_id: str, **kwargs: dict[str, Any]) -> Asset:
+        """Create an asset inside an order."""
+        response = await self._client.commerce.orders.assets(order_id).create(kwargs)
+        return Asset.from_payload(response)
 
     async def get_asset_by_external_id(self, order_id: str, asset_external_id: str) -> Asset | None:
         """Fetch the first order asset matching the vendor external ID."""
@@ -52,58 +100,26 @@ class OrdersService(BaseService):
         assets = (
             await self._client.commerce.orders.assets(order_id).filter(query).fetch_page(limit=1)
         )
-        return Asset.model_validate(assets[0], from_attributes=True) if assets else None
+        return Asset.from_payload(assets[0]) if assets else None
 
-    async def get_by_id(self, order_id: str) -> Order:
-        """Fetch an order from Marketplace API."""
-        return Order.from_payload(
-            await self._client.commerce.orders.get(
-                order_id,
-                select=[
-                    "agreement",
-                    "assets",
-                    "authorization",
-                    "externalIds",
-                    "lines",
-                    "parameters",
-                    "product",
-                    "seller",
-                    "subscriptions",
-                    "template",
-                ],
-            )
-        )
+    async def update_asset(self, order_id: str, asset_id: str, **kwargs: Any) -> None:
+        """Update an asset inside an order."""
+        await self._client.commerce.orders.assets(order_id).update(asset_id, kwargs)
 
+    # order/template
     async def get_rendered_template(self, order_id: str) -> str:
         """Fetch the rendered template content for an order."""
         return await self._client.commerce.orders.template(order_id)
 
-    async def query(self, order_id: str, **kwargs: Any) -> Order:
-        """Switch an order to query with additional payload."""
-        return Order.from_payload(await self._client.commerce.orders.query(order_id, kwargs))
-
-    async def set_processing_template(self, order_id: str, template: Any) -> Order:
+    async def set_template(self, order_id: str, template: Template) -> None:
         """Update the order template while the order is processing."""
-        return await self.update(order_id, template=template)
+        await self.update(order_id, template=template.to_dict())
 
-    async def update(self, order_id: str, **kwargs: Any) -> Order:
-        """Update an order."""
-        return Order.from_payload(await self._client.commerce.orders.update(order_id, kwargs))
-
-    async def update_asset(self, order_id: str, asset_id: str, **kwargs: Any) -> Asset:
-        """Update an asset inside an order."""
-        return await self._client.commerce.orders.assets(order_id).update(asset_id, kwargs)
-
-    async def create_subscription(self, order_id: str, subscription: Any) -> Subscription:
+    # order/subscription
+    async def create_subscription(self, order_id: str, **kwargs: dict[str, Any]) -> Subscription:
         """Create a subscription inside an order."""
-        return await self._client.commerce.orders.subscriptions(order_id).create(subscription)
-
-    async def update_subscription(
-        self, order_id: str, subscription_id: str, **kwargs: Any
-    ) -> Subscription:
-        """Update a subscription inside an order."""
-        return await self._client.commerce.orders.subscriptions(order_id).update(
-            subscription_id, kwargs
+        return Subscription.from_payload(
+            await self._client.commerce.orders.subscriptions(order_id).create(kwargs)
         )
 
     async def get_subscription_by_external_id(
@@ -114,14 +130,14 @@ class OrdersService(BaseService):
         subscriptions = await (
             self._client.commerce.orders.subscriptions(order_id).filter(query).fetch_page(limit=1)
         )
-        return (
-            Subscription.model_validate(subscriptions[0], from_attributes=True)
-            if subscriptions
-            else None
-        )
+        return Subscription.from_payload(subscriptions[0]) if subscriptions else None
+
+    async def update_subscription(self, order_id: str, subscription_id: str, **kwargs: Any) -> None:
+        """Update a subscription inside an order."""
+        await self._client.commerce.orders.subscriptions(order_id).update(subscription_id, kwargs)
 
 
-class AgreementsService(BaseService):
+class AgreementsService(BaseService[Agreement]):
     """Agreements service wrapper around the MPT client."""
 
     async def get_by_id(self, agreement_id: str) -> Agreement:
@@ -139,14 +155,12 @@ class AgreementsService(BaseService):
                 "parameters",
             ],
         )
-        return Agreement.model_validate(agreement, from_attributes=True)
+        logger.debug("Fetched agreement %s: %s", agreement_id, agreement.to_dict())
+        return Agreement.from_payload(agreement)
 
-    async def update(self, agreement_id: str, **kwargs: Any) -> Agreement:
+    async def update(self, agreement_id: str, **kwargs: Any) -> None:
         """Update an agreement."""
-        return Agreement.model_validate(
-            await self._client.commerce.agreements.update(agreement_id, kwargs),
-            from_attributes=True,
-        )
+        await self._client.commerce.agreements.update(agreement_id, kwargs)
 
     async def get_by_external_id_values(
         self, external_id: str, display_values: Iterable[str]
@@ -155,20 +169,14 @@ class AgreementsService(BaseService):
         nested_query = (
             RQLQuery(externalId=external_id) & RQLQuery().displayValue.in_(list(display_values))
         ).any("parameters.fulfillment")
-
-        return [
-            item
-            async for item in self._client.commerce.agreements
-            .filter(nested_query)
-            .select(
-                "lines",
-                "parameters",
-                "subscriptions",
-                "product",
-                "listing",
-            )
-            .iterate(batch_size=self._batch_size)
-        ]
+        collection = self._client.commerce.agreements.filter(nested_query).select(
+            "lines",
+            "parameters",
+            "subscriptions",
+            "product",
+            "listing",
+        )
+        return await self._iterate_all(collection, Agreement)
 
     async def get_by_customer_deployments(
         self, deployment_id_parameter: str, deployment_ids: Iterable[str]
@@ -195,24 +203,24 @@ class AgreementsService(BaseService):
         ]
 
 
-class AccountsService(BaseService):
+class AccountsService(BaseService[BuyerAccount | Licensee]):
     """Accounts service wrapper around the MPT client."""
 
     async def get_licensee(self, licensee_id: str) -> Licensee:
         """Fetch a licensee by ID."""
         return await self._client.accounts.licensees.get(licensee_id)
 
-    async def get_buyer(self, buyer_id: str) -> Buyer:
+    async def get_buyer(self, buyer_id: str) -> BuyerAccount:
         """Fetch a buyer by ID."""
-        return await self._client.accounts.buyers.get(buyer_id)
+        return BuyerAccount.from_payload(await self._client.accounts.buyers.get(buyer_id))
 
 
-class AssetsService(BaseService):
+class AssetsService(BaseService[Asset]):
     """Assets service wrapper around the MPT client."""
 
     async def create(self, asset: Any) -> Asset:
         """Create an asset."""
-        return await self._client.commerce.assets.create(asset)
+        return Asset.from_payload(await self._client.commerce.assets.create(asset))
 
     async def update(self, asset_id: str, **kwargs: Any) -> Asset:
         """Update an asset."""
@@ -220,7 +228,7 @@ class AssetsService(BaseService):
 
     async def get_by_id(self, asset_id: str) -> Asset:
         """Fetch an asset by ID."""
-        return await self._client.commerce.assets.get(asset_id)
+        return Asset.from_payload(await self._client.commerce.assets.get(asset_id))
 
     async def get_agreement_asset_by_external_id(
         self, agreement_id: str, asset_external_id: str
@@ -234,10 +242,10 @@ class AssetsService(BaseService):
         assets = await (
             self._client.commerce.assets.filter(query).select("agreement.id").fetch_page(limit=1)
         )
-        return Asset.model_validate(assets[0], from_attributes=True) if assets else None
+        return Asset.from_payload(assets[0]) if assets else None
 
 
-class SubscriptionsService(BaseService):
+class SubscriptionsService(BaseService[Subscription]):
     """Subscriptions service wrapper around the MPT client."""
 
     async def create(self, subscription: Any) -> Subscription:
@@ -267,20 +275,16 @@ class SubscriptionsService(BaseService):
             .select("agreement.id")
             .fetch_page(limit=1)
         )
-        return (
-            Subscription.model_validate(subscription[0], from_attributes=True)
-            if subscription
-            else None
-        )
+        return Subscription.from_payload(subscription[0]) if subscription else None
 
-    async def terminate(self, subscription_id: str, reason: str) -> Subscription:
+    async def terminate(self, subscription_id: str, reason: str) -> None:
         """Terminate a subscription with the provided reason."""
-        return await self._client.commerce.subscriptions.terminate(
+        await self._client.commerce.subscriptions.terminate(
             subscription_id, {"description": reason}
         )
 
 
-class TemplateService(BaseService):
+class TemplateService(BaseService[Template]):
     """Template service wrapper around the MPT client."""
 
     async def get_template(
@@ -302,7 +306,7 @@ class TemplateService(BaseService):
             .fetch_page(limit=1)
         )
 
-        return Template.model_validate(templates[0]) if templates else None
+        return Template.from_payload(templates[0]) if templates else None
 
     async def get_by_name(self, product_id: str, template_name: str) -> Template | None:
         """Fetch a product template by its name."""
@@ -312,13 +316,11 @@ class TemplateService(BaseService):
             .filter(RQLQuery(name=template_name))
             .fetch_page(limit=1)
         )
-        return Template.model_validate(templates[0], from_attributes=True) if templates else None
+        return Template.from_payload(templates[0]) if templates else None
 
     async def get_asset_template_by_name(
-        self,
-        product_id: str,
-        template_name: str,
-    ) -> Model | None:
+        self, product_id: str, template_name: str
+    ) -> Template | None:
         """Fetch an asset template by its name."""
         query = RQLQuery(type="Asset") & RQLQuery(name=template_name)
         templates = (
@@ -327,88 +329,94 @@ class TemplateService(BaseService):
             .filter(query)
             .fetch_page(limit=1)
         )
-        return Template.model_validate(templates[0], from_attributes=True) if templates else None
+        return Template.from_payload(templates[0]) if templates else None
 
 
-class CatalogService(BaseService):
+class ProductService(BaseService[Product | ProductItem]):
     """Catalog service wrapper around the MPT client."""
 
-    async def get_product_items_by_skus(self, product_id: str, skus: Iterable[str]) -> list[Model]:
+    async def get_product_items_by_skus(
+        self, product_id: str, skus: Iterable[str]
+    ) -> list[APIBaseSchema]:
         """Fetch product items matching the provided vendor SKUs."""
         query = RQLQuery(product__id=product_id) & RQLQuery().n("externalIds.vendor").in_(
             list(skus)
         )
-        return await self._iterate_all(self._client.catalog.items.filter(query))
+        return await self._iterate_all(self._client.catalog.items.filter(query), Product)
 
-    async def get_product_onetime_items_by_ids(
+    async def get_product_one_time_items_by_ids(
         self, product_id: str, item_ids: Iterable[str]
-    ) -> list[Model]:
+    ) -> list[ProductItem]:
         """Fetch one-time items by product and item identifiers."""
         query = (
             RQLQuery(product__id=product_id)
             & RQLQuery().id.in_(list(item_ids))
             & RQLQuery().n("terms.period").eq("one-time")
         )
-        return await self._iterate_all(self._client.catalog.items.filter(query))
+        return await self._iterate_all(self._client.catalog.items.filter(query), ProductItem)
 
     async def get_product_items_by_period(
         self,
         product_id: str,
         period: str,
         vendor_external_ids: Iterable[str] | None = None,
-    ) -> list[Model]:
+    ) -> list[ProductItem]:
         """Fetch product items filtered by billing period and optional vendor IDs."""
         query = RQLQuery(product__id=product_id) & RQLQuery().n("terms.period").eq(period)
 
         if vendor_external_ids:
             query &= RQLQuery().n("externalIds.vendor").in_(list(vendor_external_ids))
 
-        return await self._iterate_all(self._client.catalog.items.filter(query))
+        return await self._iterate_all(self._client.catalog.items.filter(query), ProductItem)
 
     async def get_authorizations_by_currency_and_seller_id(
         self, product_id: str, currency: str, owner_id: str
-    ) -> list[Model]:
+    ) -> list[Authorization]:
         """Fetch authorizations by product, currency, and owner."""
         query = (
             RQLQuery(product__id=product_id)
             & RQLQuery(currency=currency)
             & RQLQuery(owner__id=owner_id)
         )
-        return await self._iterate_all(self._client.catalog.authorizations.filter(query))
-
-    async def get_gc_price_list_by_currency(self, product_id: str, currency: str) -> list[Model]:
-        """Fetch price lists by product and currency."""
-        query = RQLQuery(product__id=product_id) & RQLQuery(currency=currency)
-        return await self._iterate_all(self._client.catalog.price_lists.filter(query))
-
-    async def get_listings_by_price_list_and_seller_and_authorization(
-        self, product_id: str, price_list_id: str, seller_id: str, authorization_id: str
-    ) -> list[Model]:
-        """Fetch listings by product, price list, seller, and authorization."""
-        query = (
-            RQLQuery(product__id=product_id)
-            & RQLQuery(priceList__id=price_list_id)
-            & RQLQuery(seller__id=seller_id)
-            & RQLQuery(authorization__id=authorization_id)
-        )
-        return await self._iterate_all(self._client.catalog.listings.filter(query))
-
-    async def get_item_prices_by_pricelist_id(
-        self, price_list_id: str, item_ids: Iterable[str]
-    ) -> list[PriceListItem]:
-        """Fetch price list items by the item identifiers."""
-        query = RQLQuery(item__id__in=list(item_ids))
         return await self._iterate_all(
-            self._client.catalog.price_lists.items(price_list_id).filter(query)
+            self._client.catalog.authorizations.filter(query), Authorization
         )
 
-    async def create_listing(self, listing: Any) -> Model:
-        """Create a listing."""
-        return await self._client.catalog.listings.create(listing)
-
-    async def get_listing_by_id(self, listing_id: str) -> Model:
-        """Fetch a listing by ID."""
-        return await self._client.catalog.listings.get(listing_id)
+    # async def get_gc_price_list_by_currency(
+    #     self, product_id: str, currency: str
+    # ) -> list[PriceList]:
+    #     """Fetch price lists by product and currency."""
+    #     query = RQLQuery(product__id=product_id) & RQLQuery(currency=currency)
+    #     return await self._iterate_all(self._client.catalog.price_lists.filter(query), PriceList)
+    #
+    # async def get_listings_by_price_list_and_seller_and_authorization(
+    #     self, product_id: str, price_list_id: str, seller_id: str, authorization_id: str
+    # ) -> list[Listing]:
+    #     """Fetch listings by product, price list, seller, and authorization."""
+    #     query = (
+    #         RQLQuery(product__id=product_id)
+    #         & RQLQuery(priceList__id=price_list_id)
+    #         & RQLQuery(seller__id=seller_id)
+    #         & RQLQuery(authorization__id=authorization_id)
+    #     )
+    #     return await self._iterate_all(self._client.catalog.listings.filter(query), Listing)
+    #
+    # async def get_item_prices_by_pricelist_id(
+    #     self, price_list_id: str, item_ids: Iterable[str]
+    # ) -> list[PriceListItem]:
+    #     """Fetch price list items by the item identifiers."""
+    #     query = RQLQuery(item__id__in=list(item_ids))
+    #     return await self._iterate_all(
+    #         self._client.catalog.price_lists.items(price_list_id).filter(query), PriceListItem
+    #     )
+    #
+    # async def create_listing(self, listing: Any) -> Listing:
+    #     """Create a listing."""
+    #     return Listing.from_payload(await self._client.catalog.listings.create(listing))
+    #
+    # async def get_listing_by_id(self, listing_id: str) -> Listing:
+    #     """Fetch a listing by ID."""
+    #     return Listing.from_payload(await self._client.catalog.listings.get(listing_id))
 
 
 class NotificationsService(BaseService):
@@ -443,8 +451,8 @@ class NotificationsService(BaseService):
     ) -> None:
         """Send batched notifications to the contacts subscribed for a buyer."""
         contacts = [
-            item
-            async for item in self._client.notifications
+            notification
+            async for notification in self._client.notifications
             .accounts(account_id, category_id)
             .filter(RQLQuery.from_string(f"filter(group.buyers.id,{buyer_id})"))
             .select("id", "-email", "-name", "-status", "-user")
@@ -461,10 +469,6 @@ class NotificationsService(BaseService):
 
 class TasksService(BaseService):
     """Task lifecycle service wrapper authenticated with the SDK runtime key."""
-
-    async def get_all(self):
-        """Fetch all tasks."""
-        return await self._iterate_all(self._client.system.tasks)
 
     async def complete(self, task_id: str) -> None:
         """Signal the platform that a task has been processed successfully.
@@ -512,7 +516,7 @@ class MPTAPIService:
         self.accounts = AccountsService(client)
         self.agreements = AgreementsService(client)
         self.assets = AssetsService(client)
-        self.catalog = CatalogService(client)
+        self.products = ProductService(client)
         self.notifications = NotificationsService(client)
         self.orders = OrdersService(client)
         self.subscriptions = SubscriptionsService(client)

@@ -2,7 +2,7 @@ import datetime as dt
 from enum import StrEnum
 from typing import Annotated, Self
 
-from mpt_extension_sdk_v6.api.schemas.base import BaseSchema
+from mpt_extension_sdk_v6.api.schemas.base import APIBaseSchema
 from pydantic import Field
 
 
@@ -14,7 +14,7 @@ class ResponseEnum(StrEnum):
     OK = "OK"
 
 
-class EventDetails(BaseSchema):
+class EventDetails(APIBaseSchema):
     """Delivery metadata for extension events."""
 
     event_type: Annotated[str, Field(alias="eventType")]
@@ -22,7 +22,7 @@ class EventDetails(BaseSchema):
     delivery_time: Annotated[dt.datetime, Field(alias="deliveryTime")]
 
 
-class EventObject(BaseSchema):
+class EventObject(APIBaseSchema):
     """Business object information from event payload."""
 
     id: str
@@ -30,13 +30,13 @@ class EventObject(BaseSchema):
     object_type: Annotated[str, Field(alias="objectType")]
 
 
-class EventTask(BaseSchema):
+class EventTask(APIBaseSchema):
     """Task metadata for task-based events."""
 
     id: str
 
 
-class Event(BaseSchema):
+class Event(APIBaseSchema):
     """Base event payload."""
 
     id: str
@@ -50,7 +50,7 @@ class TaskEvent(Event):
     task: EventTask
 
 
-class EventResponse(BaseSchema):
+class EventResponse(APIBaseSchema):
     """Event response schema for extension callbacks."""
 
     response: Annotated[ResponseEnum, Field(description="Task action")]

@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from mpt_extension_sdk_v6.api.schemas.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseSchema
 
 
 class ExternalIds(BaseSchema):
@@ -29,4 +29,5 @@ class ProductItem(BaseSchema):
     id: str
     name: str
     description: str | None = None
+
     external_ids: ExternalIds | None = Field(default=None, alias="externalIds")

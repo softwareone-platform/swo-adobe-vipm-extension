@@ -1,42 +1,45 @@
-from pydantic import AliasChoices, Field
+from pydantic import Field
 
-from mpt_extension_sdk_v6.api.schemas.base import BaseSchema
-from mpt_extension_sdk_v6.models.account import Account, SellerAccount
+from mpt_extension_sdk_v6.models.account import Account, BuyerAccount, SellerAccount
+from mpt_extension_sdk_v6.models.asset import Asset, AssetSimple
 from mpt_extension_sdk_v6.models.authorization import Authorization
+from mpt_extension_sdk_v6.models.base import BaseSchema
 from mpt_extension_sdk_v6.models.external_id import ExternalIds
+from mpt_extension_sdk_v6.models.licensee import Licensee
 from mpt_extension_sdk_v6.models.parameter import ParameterBag
 from mpt_extension_sdk_v6.models.product import Product, ProductItem
-from mpt_extension_sdk_v6.models.subscription import Subscription
+from mpt_extension_sdk_v6.models.subscription import Subscription, SubscriptionSimple
 
 
 class AgreementLine(BaseSchema):
     """Agreement line model."""
 
     id: str
-    quantity: int
-    item: ProductItem
-    status: str | None = None
     description: str | None = None
+    quantity: int
+    status: str | None = None
+
+    product_item: ProductItem = Field(alias="item")
 
 
 class Agreement(BaseSchema):
     """Agreement model."""
 
     id: str
-    name: str
     icon: str | None = None
+    name: str
     revision: int | None = None
     status: str | None = None
+
     authorization: Authorization | None = None
-    vendor: Account | None = None
-    client: Account | None = None
+    assets: list[AssetSimple] = Field(default_factory=list)
+    buyer: BuyerAccount | None = None
+    client: Account
+    external_ids: ExternalIds | None = Field(default=None, alias="externalIds")
+    licensee: Licensee
+    lines: list[AgreementLine] = Field(default_factory=list)
+    parameters: ParameterBag
+    product: Product
     seller: SellerAccount | None = None
-    product: Product | None = None
-    external_ids: ExternalIds | None = Field(
-        default=None,
-        alias="externalIds",
-        validation_alias=AliasChoices("externalIds", "external_ids"),
-    )
-    parameters: ParameterBag | None = None
-    lines: list[AgreementLine] | None = None
-    subscriptions: list[Subscription] = Field(default_factory=list)
+    subscriptions: list[SubscriptionSimple] = Field(default_factory=list)
+    vendor: Account | None = None

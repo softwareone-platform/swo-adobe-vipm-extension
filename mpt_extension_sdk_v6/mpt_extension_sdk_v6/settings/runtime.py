@@ -15,6 +15,8 @@ from mpt_extension_sdk_v6.settings.base import BaseSettings
 class RuntimeSettings(BaseSettings):
     """Runtime settings loaded exclusively from environment variables."""
 
+    app_module: str
+    settings_module: str
     ext_api_key: str
     base_url: str
     extension_id: str
@@ -23,38 +25,24 @@ class RuntimeSettings(BaseSettings):
     external_id: str
     identity_file_path: Path
     meta_config: MetaConfig
-    route_prefix: str
-    handlers_modules: list[str]
     local_host: str
     local_port: int
     local_reload: bool
     local_workers: int
     log_level: str
+    observability_enabled: bool
     ziti_workers: int
     ziti_reload: bool
 
-    def __post_init__(self) -> None:
-        """Validate settings immediately after construction."""
-        self.validate()
-
-    def validate(self) -> None:
-        """Raise ConfigError for any missing required setting.
-
-        Raises:
-            ConfigError: When a required environment variable is absent or empty.
-        """
-        required_strings = [
+    @override
+    @property
+    def required_env_vars(self) -> list[tuple[str, ...]]:
+        return [
             (self.base_url, "SDK extension registration URL is required (SDK_EXTENSION_URL)"),
-            (self.extension_id, "Extension ID is required (SDK_EXTENSION_ID)"),
             (self.ext_api_key, "SDK API key is required (SDK_EXTENSION_API_KEY)"),
             (self.mpt_api_base_url, "MPT API base URL is required (MPT_API_BASE_URL)"),
             (self.mpt_api_token, "MPT API token is required (MPT_API_TOKEN)"),
         ]
-        for attr_value, message in required_strings:
-            if not attr_value:
-                raise ConfigError(message)
-        if not self.handlers_modules:
-            raise ConfigError("At least one handlers module is required (SDK_HANDLERS_MODULES)")
 
     @override
     @classmethod
@@ -72,10 +60,11 @@ class RuntimeSettings(BaseSettings):
         else:
             identity_file_path = Path.cwd() / f"{external_id}_identity.json"
 
-        sdk_handler_modules = os.getenv("SDK_HANDLERS_MODULES", "").split(",")
-        handlers_modules = [module.strip() for module in sdk_handler_modules if module.strip()]
+        root_package = cls._discover_extension_root_package(Path.cwd())
 
         return cls(
+            app_module=f"{root_package}.app",
+            settings_module=f"{root_package}.settings",
             ext_api_key=os.getenv("SDK_EXTENSION_API_KEY", ""),
             base_url=os.getenv("SDK_EXTENSION_URL", ""),
             extension_id=os.getenv("SDK_EXTENSION_ID", ""),
@@ -84,9 +73,9 @@ class RuntimeSettings(BaseSettings):
             external_id=external_id,
             identity_file_path=identity_file_path,
             meta_config=MetaConfig.from_file(Path.cwd() / "meta.yaml"),
-            route_prefix=os.getenv("SDK_ROUTE_PREFIX", "/api/v2"),
-            handlers_modules=handlers_modules,
             log_level=os.getenv("LOG_LEVEL", "INFO"),
+            observability_enabled=os.getenv("SDK_OBSERVABILITY_ENABLED", "true").lower()
+            in {"true", "1", "yes"},
             local_host=os.getenv("SDK_LOCAL_HOST", "0.0.0.0"),  # noqa: S104
             local_port=int(os.getenv("SDK_LOCAL_PORT", "8080")),
             local_reload=os.getenv("SDK_LOCAL_RELOAD", "true").lower() in {"true", "1", "yes"},
@@ -95,16 +84,29 @@ class RuntimeSettings(BaseSettings):
             ziti_reload=os.getenv("SDK_ZITI_RELOAD", "true").lower() in {"true", "1", "yes"},
         )
 
+    @staticmethod
+    def _discover_extension_root_package(base_path: Path) -> str:
+        candidates = [
+            entry.name
+            for entry in base_path.iterdir()
+            if entry.is_dir()
+            and (entry / "app.py").exists()
+            and (entry / "settings.py").exists()
+            and not entry.name.startswith(".")
+        ]
+        if len(candidates) != 1:
+            raise ConfigError(
+                "Unable to autodiscover the extension package. "
+                "Expected exactly one top-level package with app.py and settings.py"
+            )
+        return candidates[0]
+
 
 @lru_cache
 def get_runtime_settings() -> RuntimeSettings:
     """Return the cached process-wide runtime settings singleton.
 
-    The instance is created on the first call and reused for the lifetime of
-    the process.  In tests, call ``get_runtime_settings.cache_clear()``
-    to reset the cache between test cases.
-
     Returns:
-        The validated: class:`RuntimeSettings` singleton.
+        The validated RuntimeSettings singleton.
     """
     return RuntimeSettings.load()

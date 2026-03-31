@@ -26,7 +26,7 @@ def validate() -> None:
 
 
 def main() -> None:
-    """Main entry point for the ``swoext`` CLI."""
+    """Main entry point for the `swoext` CLI."""
     app()
 
 
