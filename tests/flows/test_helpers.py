@@ -12,7 +12,12 @@ from adobe_vipm.adobe.constants import (
     ResellerChangeAction,
     ThreeYearCommitmentStatus,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
+from adobe_vipm.adobe.errors import (
+    AdobeAPIError,
+    AdobeError,
+    AdobeHttpError,
+    AdobeProductNotFoundError,
+)
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_LGA,
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
@@ -1968,6 +1973,70 @@ def test_fetch_reseller_change_data_adobe_api_error_validation_mode(
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
     api_error = AdobeAPIError(400, {"code": "9999", "message": "Adobe error"})
     mock_adobe_client.reseller_change_request.side_effect = api_error
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
+    context = Context(
+        order=order,
+        order_id="order-id",
+        agreement_id="agreement-id",
+        authorization_id="AUT-1234-4567",
+    )
+    step = FetchResellerChangeData(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_adobe_client.reseller_change_request.assert_called_once()
+    assert context.validation_succeeded is False
+    mock_next_step.assert_not_called()
+
+
+def test_fetch_reseller_change_data_adobe_http_error_fulfillment_mode(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    http_error = AdobeHttpError(404, "Not found")
+    mock_adobe_client.reseller_change_request.side_effect = http_error
+    mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
+    mocked_switch_order_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+    context = Context(
+        order=order,
+        order_id="order-id",
+        agreement_id="agreement-id",
+        authorization_id="AUT-1234-4567",
+    )
+    step = FetchResellerChangeData(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_adobe_client.reseller_change_request.assert_called_once()
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mock_mpt_client,
+        context.order,
+        ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
+            reseller_change_code="88888888",
+            error=str(http_error),
+        ),
+    )
+    mock_next_step.assert_not_called()
+
+
+def test_fetch_reseller_change_data_adobe_http_error_validation_mode(
+    mocker,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    order = order_factory(order_parameters=reseller_change_order_parameters_factory())
+    http_error = AdobeHttpError(404, "Not found")
+    mock_adobe_client.reseller_change_request.side_effect = http_error
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     context = Context(
         order=order,
