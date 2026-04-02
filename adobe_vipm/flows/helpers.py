@@ -10,7 +10,7 @@ from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_licensee, update_o
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction, ThreeYearCommitmentStatus
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request, get_item_by_partial_sku
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
@@ -706,7 +706,7 @@ class FetchResellerChangeData(Step):
                 admin_email.get("value"),
                 ResellerChangeAction.PREVIEW,
             )
-        except AdobeAPIError as ex:
+        except AdobeHttpError as ex:
             error_data = ERR_ADOBE_RESSELLER_CHANGE_PREVIEW.to_dict(
                 reseller_change_code=reseller_change_code.get("value"),
                 error=str(ex),
