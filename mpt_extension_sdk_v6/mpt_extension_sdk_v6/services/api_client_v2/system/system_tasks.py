@@ -24,18 +24,18 @@ class AsyncTasksService(
 ):
     """Task service."""
 
-    async def complete(self, resource_id: str, resource_data: ResourceData) -> Task:
+    async def complete(self, resource_id: str, resource_data: ResourceData) -> None:
         """Complete the task."""
-        return await self._resource_action(resource_id, "POST", "complete", resource_data)
+        await self._resource_action(resource_id, "POST", "complete", resource_data)
 
-    async def fail(self, resource_id: str) -> Task:
+    async def fail(self, resource_id: str) -> None:
         """Fail the task."""
-        return await self._resource_action(resource_id, "POST", "fail")
+        await self._resource_action(resource_id, "POST", "fail")
 
-    async def reschedule_task(self, resource_id: str) -> Task:
+    async def reschedule_task(self, resource_id: str) -> None:
         """Reschedule the task."""
-        return await self._resource_action(resource_id, "POST", "reschedule")
+        await self._resource_action(resource_id, "POST", "reschedule")
 
-    async def execute(self, resource_id: str) -> Task:
+    async def execute(self, resource_id: str) -> None:
         """Start the task."""
-        return await self._resource_action(resource_id, "POST", "execute")
+        await self._resource_action(resource_id, "POST", "execute")

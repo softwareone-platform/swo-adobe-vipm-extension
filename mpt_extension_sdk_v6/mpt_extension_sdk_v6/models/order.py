@@ -1,12 +1,10 @@
-from typing import Any
-
 from pydantic import Field
 
 from mpt_extension_sdk_v6.models.account import SellerAccount
 from mpt_extension_sdk_v6.models.agreement import Agreement
 from mpt_extension_sdk_v6.models.asset import Asset
 from mpt_extension_sdk_v6.models.authorization import Authorization
-from mpt_extension_sdk_v6.models.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseModel
 from mpt_extension_sdk_v6.models.external_id import ExternalIds
 from mpt_extension_sdk_v6.models.parameter import ParameterBag
 from mpt_extension_sdk_v6.models.price import Price
@@ -15,7 +13,7 @@ from mpt_extension_sdk_v6.models.subscription import Subscription
 from mpt_extension_sdk_v6.models.template import Template
 
 
-class OrderLine(BaseSchema):
+class OrderLine(BaseModel):
     """Order line."""
 
     id: str
@@ -29,7 +27,7 @@ class OrderLine(BaseSchema):
     subscription: Subscription | None = None
 
 
-class Order(BaseSchema):
+class Order(BaseModel):
     """Order."""
 
     id: str
@@ -42,7 +40,7 @@ class Order(BaseSchema):
     authorization: Authorization
     external_ids: ExternalIds = Field(alias="externalIds")
     lines: list[OrderLine] = Field(default_factory=list)
-    parameters: ParameterBag = Field(default_factory=ParameterBag)
+    parameters: ParameterBag = Field(default_factory=ParameterBag)  # noqa: WPS110
     product: Product
     seller: SellerAccount | None = None
     subscriptions: list[Subscription] = Field(default_factory=list)
@@ -61,22 +59,10 @@ class Order(BaseSchema):
     @property
     def customer_id(self) -> str | None:
         """Return the customer identifier from fulfillment parameters."""
-        return self.parameters.get_fulfillment_value("customerId")
+        if not self.agreement.external_ids:
+            return None
 
-    @property
-    def downsize_lines(self) -> list[OrderLine]:
-        """Downsize lines from the order."""
-        return [line for line in self.lines if line.quantity < line.old_quantity]
-
-    @property
-    def upsize_lines(self) -> list[OrderLine]:
-        """Upsize lines from order."""
-        return [line for line in self.lines if line.quantity >= line.old_quantity > 0]
-
-    @property
-    def new_lines(self) -> list[OrderLine]:
-        """New lines from the order."""
-        return [line for line in self.lines if line.old_quantity == 0]
+        return self.agreement.external_ids.vendor
 
     @property
     def product_id(self) -> str:
@@ -88,18 +74,25 @@ class Order(BaseSchema):
         """Return the seller identifier when available."""
         return None if self.seller is None else self.seller.id
 
-    def complete(self) -> None:
-        """Mark the order as completed."""
-        self.status = "Completed"
+    @property
+    def downsize_lines(self) -> list[OrderLine]:
+        """Downsize lines from the order."""
+        return [elem for elem in self.lines if elem.quantity < elem.old_quantity]
+
+    @property
+    def upsize_lines(self) -> list[OrderLine]:
+        """Upsize lines from order."""
+        return [elem for elem in self.lines if elem.quantity >= elem.old_quantity > 0]
+
+    @property
+    def new_lines(self) -> list[OrderLine]:
+        """New lines from the order."""
+        return [elem for elem in self.lines if elem.old_quantity == 0]
 
     def get_line_by_sku(self, sku: str) -> OrderLine:
         """Return the line matching a SKU."""
-        for line in self.lines:
-            if line.product_item.external_ids.vendor in sku:
-                return line
+        for elem in self.lines:
+            if elem.product_item.external_ids.vendor in sku:
+                return elem
 
         raise ValueError(f"No line found for SKU: {sku}")
-
-    def set_template(self, template: dict[str, Any]) -> None:
-        """Update the order template from a client model or plain payload."""
-        self.template = Template.model_validate(template, from_attributes=True)

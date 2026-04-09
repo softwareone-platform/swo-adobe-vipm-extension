@@ -1,9 +1,9 @@
 from pydantic import Field
 
-from mpt_extension_sdk_v6.models.base import BaseSchema, FloatDecimal
+from mpt_extension_sdk_v6.models.base import BaseModel, FloatDecimal
 
 
-class Price(BaseSchema):
+class Price(BaseModel):
     """Price model."""
 
     currency: str

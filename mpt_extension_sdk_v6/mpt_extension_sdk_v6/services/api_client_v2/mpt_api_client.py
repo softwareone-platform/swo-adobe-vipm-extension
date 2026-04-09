@@ -10,11 +10,11 @@ class AsyncMPTClient(BaseAsyncMPTClient):
     """MPT client wrapper to implement endpoints that will be moved there."""
 
     @property
-    def integration(self):
+    def integration(self) -> AsyncIntegration:
         """Integration service."""
         return AsyncIntegration(http_client=self.http_client)
 
     @property
-    def system(self):
+    def system(self) -> AsyncSystem:
         """System service."""
         return AsyncSystem(http_client=self.http_client)

@@ -1,61 +1,79 @@
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from mpt_extension_sdk_v6.errors.pipeline import CancelError, DeferError
-from mpt_extension_sdk_v6.errors.step import (
-    DeferStepError,
-    SkipStepError,
-    StopStepError,
-)
-from mpt_extension_sdk_v6.observability.tracing import (
-    start_pipeline_span,
-    start_step_span,
-)
-from mpt_extension_sdk_v6.pipeline.context import ExecutionContext
-from mpt_extension_sdk_v6.pipeline.step import BaseStep
+from mpt_extension_sdk_v6.errors.step import DeferStepError, SkipStepError, StopStepError
+from mpt_extension_sdk_v6.observability.decorators import start_pipeline_span, start_step_span
+
+if TYPE_CHECKING:
+    from mpt_extension_sdk_v6.pipeline import BaseStep, ExecutionContext
 
 
 class BasePipeline(ABC):
     """Sequential pipeline executor."""
 
     @property
+    def name(self) -> str:
+        """Pipeline name."""
+        return self.__class__.__name__
+
+    @property
     @abstractmethod
-    def steps(self) -> list[BaseStep]:
+    def steps(self) -> list["BaseStep"]:
         """Pipeline steps."""
         raise NotImplementedError
 
-    async def execute(self, ctx: ExecutionContext) -> None:
+    @start_pipeline_span
+    async def execute(self, ctx: "ExecutionContext") -> None:
         """Execute pipeline steps sequentially."""
-        with start_pipeline_span(self, ctx):
-            ctx.logger.info("Starting pipeline %s", self.__class__.__name__)
-            for step in self.steps:
-                await self._execute_step(step, ctx)
+        ctx.logger.info("Starting pipeline %s", self.name)
+        for step in self.steps:
+            await self._execute_step(step, ctx)  # noqa: WPS476
 
-    async def _execute_step(self, step: BaseStep, ctx: ExecutionContext) -> None:
-        """Execute a single step inside its tracing span."""
-        ctx.logger.info("Running step %s", step.__class__.__name__)
-        with start_step_span(step, ctx) as step_span:
-            try:
-                await step.run(ctx)
-            except DeferStepError as error:
-                self._handle_step_error(ctx, step_span, "deferred", error)
-                raise DeferError(str(error), delay_seconds=error.delay_seconds) from error
-            except SkipStepError as error:
-                self._handle_step_error(ctx, step_span, "skipped", error)
-            except StopStepError as error:
-                self._handle_step_error(ctx, step_span, "stopped", error)
-                raise CancelError(str(error)) from error
-            except Exception as error:
-                self._handle_step_error(ctx, step_span, "failed", error)
-                raise
-            else:
-                ctx.logger.info("Step %s completed", step.__class__.__name__)
-
-    @staticmethod
-    def _handle_step_error(
-        ctx: ExecutionContext,
-        step_span: object,
-        outcome: str,
-        error: Exception,
+    async def on_step_deferred(
+        self, step: "BaseStep", ctx: "ExecutionContext", error: DeferStepError
     ) -> None:
-        """Record tracing and logging details for a step failure mode."""
-        ctx.logger.info("Step %s - reason: %s", outcome, error)
+        """Handle a deferred step outcome."""
+        ctx.logger.info("Step %s deferred - reason: %s", step.name, error)
+
+    async def on_step_failed(
+        self, step: "BaseStep", ctx: "ExecutionContext", error: Exception
+    ) -> None:
+        """Handle an unexpected step exception."""
+        ctx.logger.error("Step %s - unhandled exception", step.name, exc_info=error)
+
+    async def on_step_skipped(
+        self, step: "BaseStep", ctx: "ExecutionContext", error: SkipStepError
+    ) -> None:
+        """Handle a skipped step outcome."""
+        ctx.logger.info("Step %s skipped - reason: %s", step.name, error)
+
+    async def on_step_stopped(
+        self, step: "BaseStep", ctx: "ExecutionContext", error: StopStepError
+    ) -> None:
+        """Handle a stopped step outcome."""
+        ctx.logger.info("Step %s stopped - reason: %s", step.name, error)
+
+    async def on_step_succeeded(self, step: "BaseStep", ctx: "ExecutionContext") -> None:
+        """Handle a successful step outcome."""
+        ctx.logger.info("Step %s completed", step.name)
+
+    @start_step_span
+    async def _execute_step(self, step: "BaseStep", ctx: "ExecutionContext") -> None:
+        """Execute a single step inside its tracing span."""
+        ctx.logger.info("Running step %s", step.name)
+        try:
+            await step.run(ctx)
+        except DeferStepError as error:
+            await self.on_step_deferred(step, ctx, error)
+            raise DeferError(str(error), delay_seconds=error.delay_seconds)
+        except SkipStepError as error:
+            await self.on_step_skipped(step, ctx, error)
+        except StopStepError as error:
+            await self.on_step_stopped(step, ctx, error)
+            raise CancelError(str(error))
+        except Exception as error:
+            await self.on_step_failed(step, ctx, error)
+            raise
+        else:
+            await self.on_step_succeeded(step, ctx)

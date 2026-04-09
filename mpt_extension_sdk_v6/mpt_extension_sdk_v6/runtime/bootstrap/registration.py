@@ -38,10 +38,7 @@ def register_instance(settings: RuntimeSettings) -> RegistrationResult:
         payload["channel"] = {}
 
     instance_payload = register_extension_instance(
-        settings.base_url,
-        settings.extension_id,
-        settings.ext_api_key,
-        payload,
+        settings.base_url, settings.extension_id, settings.ext_api_key, payload
     )
 
     identity = instance_payload.get("channel", {}).get("identity")

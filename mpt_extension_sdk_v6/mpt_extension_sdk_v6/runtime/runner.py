@@ -1,13 +1,10 @@
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
 from mrok.agent import ziticorn
 
-from mpt_extension_sdk_v6.runtime.app import create_runtime_app
 from mpt_extension_sdk_v6.runtime.bootstrap.registration import register_instance
-from mpt_extension_sdk_v6.runtime.logging import setup_logging
-from mpt_extension_sdk_v6.settings.runtime import get_runtime_settings
+from mpt_extension_sdk_v6.settings.runtime import RuntimeSettings, get_runtime_settings
 
 
 def run_extension(*, local: bool) -> None:
@@ -18,11 +15,10 @@ def run_extension(*, local: bool) -> None:
             otherwise run with Ziticorn for OpenZiti connectivity.
     """
     settings = get_runtime_settings()
-    setup_logging(log_level=settings.log_level)
-    app = create_runtime_app(settings)
+    create_meta_file(settings)
     if local:
         run_fastapi(
-            app,
+            "mpt_extension_sdk_v6.runtime.main:app",
             host=settings.local_host,
             port=settings.local_port,
             reload=settings.local_reload,
@@ -32,20 +28,23 @@ def run_extension(*, local: bool) -> None:
 
     register_instance(settings=settings)
     run_ziti(
-        app,
+        "mpt_extension_sdk_v6.runtime.main:app",
         settings.identity_file_path,
         reload=settings.ziti_reload,
         workers=settings.ziti_workers,
     )
 
 
-def run_ziti(
-    app: FastAPI,
-    identity_file_path: Path | str,
-    *,
-    reload: bool,
-    workers: int,
-) -> None:
+def create_meta_file(settings: RuntimeSettings) -> None:
+    """Write the generated metadata artifact to disk before runtime startup.
+
+    Args:
+        settings: Runtime settings containing generated metadata and target path.
+    """
+    settings.meta_config.to_file(settings.meta_file_path)
+
+
+def run_ziti(app: str, identity_file_path: Path | str, *, reload: bool, workers: int) -> None:
     """Start the extension with Ziticorn for OpenZiti network connectivity.
 
     Args:
@@ -63,14 +62,7 @@ def run_ziti(
     )
 
 
-def run_fastapi(
-    app: FastAPI,
-    host: str,
-    port: int,
-    *,
-    reload: bool,
-    workers: int,
-) -> None:
+def run_fastapi(app: str, host: str, port: int, *, reload: bool, workers: int) -> None:
     """Start the extension with Uvicorn for local development.
 
     Args:

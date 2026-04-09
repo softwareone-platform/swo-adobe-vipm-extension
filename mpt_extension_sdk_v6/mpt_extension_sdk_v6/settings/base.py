@@ -1,6 +1,7 @@
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Self
+from typing import ClassVar, Self
 
 from mpt_extension_sdk_v6.errors.runtime import ConfigError
 
@@ -9,6 +10,8 @@ from mpt_extension_sdk_v6.errors.runtime import ConfigError
 class BaseSettings(ABC):
     """Base settings class."""
 
+    TRUE_VALUES: ClassVar[frozenset[str]] = frozenset(("true", "1", "yes"))
+
     @property
     def required_env_vars(self) -> list[tuple[str, ...]]:
         """Required environment variables."""
@@ -16,6 +19,27 @@ class BaseSettings(ABC):
 
     def __post_init__(self) -> None:
         self.validate()
+
+    @classmethod
+    @abstractmethod
+    def load(cls) -> Self:
+        """Load all settings."""
+        raise NotImplementedError
+
+    @classmethod
+    def bool_env(cls, env_key: str, *, default: bool) -> bool:
+        """Parse a boolean environment variable using shared settings conventions."""
+        raw_value = os.getenv(env_key, str(default)).lower()
+        return raw_value in cls.TRUE_VALUES
+
+    @classmethod
+    def int_env(cls, env_key: str, default: int) -> int:
+        """Parse an integer environment variable and raise ConfigError on failure."""
+        raw_value = os.getenv(env_key, str(default))
+        try:
+            return int(raw_value)
+        except ValueError as error:
+            raise ConfigError(f"Invalid integer in {env_key}: {raw_value}") from error
 
     def validate(self) -> None:
         """Check required environment variables are not missing.
@@ -29,9 +53,3 @@ class BaseSettings(ABC):
 
         error_msg = ", ".join(errors)
         raise ConfigError(f"Missing required environment variables: {error_msg}")
-
-    @classmethod
-    @abstractmethod
-    def load(cls) -> Self:
-        """Load all settings."""
-        raise NotImplementedError

@@ -2,7 +2,7 @@ import datetime as dt
 from enum import StrEnum
 from typing import Annotated, Self
 
-from mpt_extension_sdk_v6.api.schemas.base import APIBaseSchema
+from mpt_extension_sdk_v6.api.models.base import APIBaseModel
 from pydantic import Field
 
 
@@ -14,34 +14,34 @@ class ResponseEnum(StrEnum):
     OK = "OK"
 
 
-class EventDetails(APIBaseSchema):
+class EventDetails(APIBaseModel):
     """Delivery metadata for extension events."""
 
-    event_type: Annotated[str, Field(alias="eventType")]
     enqueue_time: Annotated[dt.datetime, Field(alias="enqueueTime")]
+    event_type: Annotated[str, Field(alias="eventType")]
     delivery_time: Annotated[dt.datetime, Field(alias="deliveryTime")]
 
 
-class EventObject(APIBaseSchema):
+class EventObject(APIBaseModel):
     """Business object information from event payload."""
 
     id: str
-    name: str
     object_type: Annotated[str, Field(alias="objectType")]
+    name: str
 
 
-class EventTask(APIBaseSchema):
+class EventTask(APIBaseModel):
     """Task metadata for task-based events."""
 
     id: str
 
 
-class Event(APIBaseSchema):
+class Event(APIBaseModel):
     """Base event payload."""
 
     id: str
-    object: EventObject
     details: EventDetails
+    object: EventObject
 
 
 class TaskEvent(Event):
@@ -50,12 +50,14 @@ class TaskEvent(Event):
     task: EventTask
 
 
-class EventResponse(APIBaseSchema):
+class EventResponse(APIBaseModel):
     """Event response schema for extension callbacks."""
 
+    # HACK: the response field should be the first on the dict since there is a bug
+    # in the mpt service
     response: Annotated[ResponseEnum, Field(description="Task action")]
-    defer_delay: Annotated[str | None, Field(alias="deferDelay")] = None
-    cancel_reason: Annotated[str | None, Field(alias="cancelReason")] = None
+    cancel_reason: Annotated[str | None, Field(alias="cancelReason", exclude=True)] = None
+    defer_delay: Annotated[str | None, Field(alias="deferDelay", exclude=True)] = None
 
     @classmethod
     def cancel(cls, reason: str) -> Self:
@@ -65,7 +67,7 @@ class EventResponse(APIBaseSchema):
             reason: Human-readable cancellation reason.
 
         Returns:
-            An EventResponse instructing the platform to cancel the event.
+            An cancel EventResponse.
         """
         return cls(response=ResponseEnum.CANCEL, cancel_reason=reason)
 
@@ -82,6 +84,6 @@ class EventResponse(APIBaseSchema):
             seconds: Number of seconds to wait before retrying.
 
         Returns:
-            An EventResponse instructing the platform to retry later.
+            An Defer EventResponse.
         """
         return cls(response=ResponseEnum.DEFER, defer_delay=f"PT{seconds}S")

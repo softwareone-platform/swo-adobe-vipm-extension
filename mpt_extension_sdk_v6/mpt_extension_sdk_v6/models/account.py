@@ -1,9 +1,9 @@
 from pydantic import Field
 
-from mpt_extension_sdk_v6.models.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseModel
 
 
-class Account(BaseSchema):
+class Account(BaseModel):
     """Account model."""
 
     id: str
@@ -11,8 +11,8 @@ class Account(BaseSchema):
     icon: str | None = None
 
 
-class BuyerExternalId(BaseSchema):
-    """Buyer external identifiers  model."""
+class BuyerExternalId(BaseModel):
+    """Buyer external identifiers model."""
 
     account_external_id: str | None = Field(default=None, alias="accountExternalId")
     erp_company_contact: str | None = Field(default=None, alias="erpCompanyContact")

@@ -1,17 +1,17 @@
 from pydantic import Field
 
 from mpt_extension_sdk_v6.models.account import Account, BuyerAccount, SellerAccount
-from mpt_extension_sdk_v6.models.asset import Asset, AssetSimple
+from mpt_extension_sdk_v6.models.asset import AssetSimple
 from mpt_extension_sdk_v6.models.authorization import Authorization
-from mpt_extension_sdk_v6.models.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseModel
 from mpt_extension_sdk_v6.models.external_id import ExternalIds
 from mpt_extension_sdk_v6.models.licensee import Licensee
 from mpt_extension_sdk_v6.models.parameter import ParameterBag
 from mpt_extension_sdk_v6.models.product import Product, ProductItem
-from mpt_extension_sdk_v6.models.subscription import Subscription, SubscriptionSimple
+from mpt_extension_sdk_v6.models.subscription import SubscriptionSimple
 
 
-class AgreementLine(BaseSchema):
+class AgreementLine(BaseModel):
     """Agreement line model."""
 
     id: str
@@ -22,7 +22,7 @@ class AgreementLine(BaseSchema):
     product_item: ProductItem = Field(alias="item")
 
 
-class Agreement(BaseSchema):
+class Agreement(BaseModel):
     """Agreement model."""
 
     id: str
@@ -38,7 +38,7 @@ class Agreement(BaseSchema):
     external_ids: ExternalIds | None = Field(default=None, alias="externalIds")
     licensee: Licensee
     lines: list[AgreementLine] = Field(default_factory=list)
-    parameters: ParameterBag
+    parameters: ParameterBag  # noqa: WPS110
     product: Product
     seller: SellerAccount | None = None
     subscriptions: list[SubscriptionSimple] = Field(default_factory=list)

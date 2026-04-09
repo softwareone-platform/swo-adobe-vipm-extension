@@ -1,13 +1,13 @@
 from pydantic import Field
 
-from mpt_extension_sdk_v6.models.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseModel
 from mpt_extension_sdk_v6.models.external_id import ExternalIds
 from mpt_extension_sdk_v6.models.parameter import ParameterBag
 from mpt_extension_sdk_v6.models.price import Price
 from mpt_extension_sdk_v6.models.template import Template
 
 
-class AssetLine(BaseSchema):
+class AssetLine(BaseModel):
     """Asset line model."""
 
     id: str
@@ -17,7 +17,7 @@ class AssetLine(BaseSchema):
     price: Price
 
 
-class AssetSimple(BaseSchema):
+class AssetSimple(BaseModel):
     """Asset model."""
 
     id: str
@@ -32,5 +32,5 @@ class Asset(AssetSimple):
     external_id: ExternalIds | None = None
     price: Price
     lines: list[AssetLine] = Field(default_factory=list)
+    parameters: ParameterBag | None = None  # noqa: WPS110
     template: Template | None = None
-    parameters: ParameterBag | None = None

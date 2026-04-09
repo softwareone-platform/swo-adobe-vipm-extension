@@ -3,21 +3,24 @@ import logging
 from decimal import Decimal
 from typing import Annotated, Any, Self
 
-from pydantic import BaseModel, ConfigDict, PlainSerializer
+from pydantic import BaseModel as PydanticBaseModel
+from pydantic import ConfigDict, PlainSerializer
 
 logger = logging.getLogger(__name__)
 
-FloatDecimal = Annotated[Decimal, PlainSerializer(lambda x: float(x), return_type=float)]  # noqa: PLW0108
+FloatDecimal = Annotated[Decimal, PlainSerializer(lambda el: float(el), return_type=float)]  # noqa: PLW0108, WPS506
 ISODatetime = Annotated[
     dt.datetime,
-    PlainSerializer(lambda x: x.isoformat(), return_type=str, when_used="json-unless-none"),
+    PlainSerializer(lambda el: el.isoformat(), return_type=str, when_used="json-unless-none"),
 ]
 
 
-class BaseSchema(BaseModel):
+class BaseModel(PydanticBaseModel):
     """Base schema."""
 
-    model_config = ConfigDict(from_attributes=True, extra="allow", validate_by_name=True)
+    model_config = ConfigDict(
+        from_attributes=True, extra="allow", validate_by_name=True, frozen=True
+    )
 
     def to_dict(self) -> dict[str, Any]:
         """Dump the model using the alias field names."""

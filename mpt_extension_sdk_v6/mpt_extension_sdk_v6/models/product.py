@@ -1,16 +1,16 @@
 from pydantic import Field
 
-from mpt_extension_sdk_v6.models.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseModel
 
 
-class ExternalIds(BaseSchema):
-    """External identifiers  model."""
+class ExternalIds(BaseModel):
+    """External identifiers model."""
 
-    vendor: str | None = None
     seller: str | None = None
+    vendor: str | None = None
 
 
-class Product(BaseSchema):
+class Product(BaseModel):
     """Product  model."""
 
     id: str
@@ -23,7 +23,7 @@ class Product(BaseSchema):
     short_description: str | None = Field(default=None, alias="shortDescription")
 
 
-class ProductItem(BaseSchema):
+class ProductItem(BaseModel):
     """Product item."""
 
     id: str

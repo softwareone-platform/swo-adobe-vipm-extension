@@ -1,4 +1,4 @@
-from mpt_extension_sdk_v6.api.schemas.events import EventResponse
+from mpt_extension_sdk_v6.api.models.events import EventResponse
 from mpt_extension_sdk_v6.errors.pipeline import CancelError, DeferError, FailError
 from mpt_extension_sdk_v6.errors.runtime import ExtRuntimeError
 

@@ -11,7 +11,7 @@ from mpt_extension_sdk_v6.models.product import Product, ProductItem
 from mpt_extension_sdk_v6.models.subscription import Subscription, SubscriptionLine
 from mpt_extension_sdk_v6.models.template import Template
 
-__all__ = [
+__all__ = [  # noqa: WPS410
     "Account",
     "Agreement",
     "AgreementLine",

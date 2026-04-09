@@ -1,11 +1,12 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import StrEnum
 from logging import Logger
 from typing import Any, Self
 
-from mpt_extension_sdk_v6.api.schemas.events import Event
+from mpt_extension_sdk_v6.api.models.events import Event
 from mpt_extension_sdk_v6.errors.runtime import ConfigError
-from mpt_extension_sdk_v6.models.agreement import Agreement
-from mpt_extension_sdk_v6.models.order import Order
+from mpt_extension_sdk_v6.models import Agreement, Order
 from mpt_extension_sdk_v6.services.mpt_api_service import MPTAPIService
 from mpt_extension_sdk_v6.settings.account import AccountSettings
 from mpt_extension_sdk_v6.settings.extension import BaseExtensionSettings
@@ -21,8 +22,57 @@ class ExecutionMetadata:
     object_type: str
     task_id: str
 
-    correlation_id: str | None = None  # TODO: For testing purpose. Remove it
+    correlation_id: str | None = None
     installation_id: str | None = None
+
+
+class AgreementStatusActionType(StrEnum):
+    """Supported agreement transitions requested by business logic."""
+
+    FAIL = "Failed"
+
+
+class OrderStatusActionType(StrEnum):
+    """Supported order transitions requested by business logic."""
+
+    FAIL = "Failed"
+    QUERY = "Querying"
+
+
+@dataclass(frozen=True)
+class AgreementStatusAction:
+    """Structured agreement transition intent declared by business logic."""
+
+    target_status: AgreementStatusActionType
+    message: str
+    status_notes: dict[str, Any] | None = None
+    parameters: dict[str, Any] | None = None  # noqa: WPS110
+
+
+@dataclass
+class AgreementState:
+    """Mutable agreement state transition data shared across pipeline steps."""
+
+    action: AgreementStatusAction | None = None
+    handled: bool = False
+
+
+@dataclass(frozen=True)
+class OrderStatusAction:
+    """Structured order transition intent declared by business logic."""
+
+    target_status: OrderStatusActionType
+    message: str
+    status_notes: dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)  # noqa: WPS110
+
+
+@dataclass
+class OrderState:
+    """Mutable order state transition data shared across pipeline steps."""
+
+    action: OrderStatusAction | None = None
+    handled: bool = False
 
 
 @dataclass
@@ -40,7 +90,7 @@ class ExecutionContext:
     state: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_event(
+    def from_event(  # noqa: WPS211
         cls,
         event: Event,
         logger: Logger,
@@ -56,10 +106,10 @@ class ExecutionContext:
 
         Args:
             event: The incoming platform event.
-            ext_settings: Extension settings for the active extension.
-            runtime_settings: Runtime settings for the current process.
             logger: Logger bound to the handler module.
             mpt_api_service: Pre-built MPT API service facade.
+            ext_settings: Extension settings for the active extension.
+            runtime_settings: Runtime settings for the current process.
             account_settings: Optional account-scoped settings for the current request.
             correlation_id: Request correlation ID for log tracing.
             task_id: Platform task ID from the `MPT-Task-Id` request header.
@@ -83,28 +133,47 @@ class ExecutionContext:
         )
 
 
-@dataclass
-class AgreementContext(ExecutionContext):
+@dataclass(kw_only=True)
+class AgreementContext[MPTAPIServiceT: MPTAPIService](ExecutionContext):
     """Execution context specialized for agreement events."""
 
-    agreement: Agreement = None
+    agreement: Agreement
+    agreement_state: AgreementState = field(default_factory=AgreementState)
 
     @property
     def agreement_id(self) -> str:
         """Agreement ID."""
         return self.agreement.id
 
+    async def refresh_agreement(self) -> None:
+        """Reload the current agreement from Marketplace."""
+        self.agreement = await self.mpt_api_service.agreements.get_by_id(self.agreement_id)
 
-@dataclass
+
+@dataclass(kw_only=True)
 class OrderContext(ExecutionContext):
     """Execution context specialized for order events."""
 
-    order: Order = None
+    order: Order
+    order_state: OrderState = field(default_factory=OrderState)
 
     @property
     def order_id(self) -> str:
         """Order ID."""
         return self.order.id
+
+    async def refresh_order(self) -> None:
+        """Reload the current order from Marketplace."""
+        self.order = await self.mpt_api_service.orders.get_by_id(self.order_id)
+
+
+class ContextAdapter(ABC):
+    """Interface for explicit context adapters."""
+
+    @classmethod
+    @abstractmethod
+    def from_context(cls, ctx: ExecutionContext) -> Self:
+        """Build the custom context from the SDK base context."""
 
 
 def get_context_by_type(model_type: str) -> type[OrderContext | AgreementContext]:

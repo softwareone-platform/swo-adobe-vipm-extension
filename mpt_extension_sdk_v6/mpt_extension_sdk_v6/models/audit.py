@@ -1,7 +1,7 @@
-from mpt_extension_sdk_v6.models.base import BaseSchema
+from mpt_extension_sdk_v6.models.base import BaseModel
 
 
-class User(BaseSchema):
+class User(BaseModel):
     """User model."""
 
     id: str
@@ -9,14 +9,15 @@ class User(BaseSchema):
     revision: int
 
 
-class AuditData(BaseSchema):
+class AuditData(BaseModel):
     """Audit data model."""
 
     at: str
+
     by: User
 
 
-class Audit(BaseSchema):
+class Audit(BaseModel):
     """Audit model."""
 
     created: AuditData | None = None

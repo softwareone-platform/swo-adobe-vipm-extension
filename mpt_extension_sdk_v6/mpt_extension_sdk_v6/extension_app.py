@@ -1,12 +1,15 @@
-import dataclasses
-import re
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
-from functools import lru_cache
-from inspect import isawaitable, signature
-from typing import get_type_hints
+from dataclasses import dataclass, field, replace
 
-from mpt_extension_sdk_v6.pipeline.context import ExecutionContext
+from mpt_extension_sdk_v6.extension_validator import ExtensionValidator
+from mpt_extension_sdk_v6.pipeline import (
+    AgreementContext,
+    ContextAdapter,
+    ExecutionContext,
+    OrderContext,
+)
+from mpt_extension_sdk_v6.runtime.models import MetaConfig, MetaEvent
+from mpt_extension_sdk_v6.services.mpt_api_service.api_service import MPTAPIService
 
 TaskHandler = Callable[..., Awaitable[None] | None]
 EventHandler = Callable[..., Awaitable[None] | None]
@@ -19,14 +22,18 @@ class RouteDefinition:
     Attributes:
         name: Human-readable unique route name.
         path: Route path relative to the runtime prefix.
+        event: Platform event subscribed by the route.
+        condition: Optional event condition expression.
         task_based: Whether the route handles task-backed events.
-        handler: Callable invoked when the route receives an event.
+        callback: Callable invoked when the route receives an event.
     """
 
     name: str
     path: str
+    event: str
+    condition: str | None
     task_based: bool
-    handler: Callable[..., Awaitable[None] | None]
+    callback: Callable[..., Awaitable[None] | None]
 
 
 @dataclass
@@ -42,82 +49,68 @@ class ExtensionRouter:
 
     @property
     def routes(self) -> list[RouteDefinition]:
-        """Return the registered route definitions.
-
-        Returns:
-            A copy of the registered route definitions.
-        """
+        """Return the registered route definitions."""
         return list(self._routes)
 
     def prefixed_routes(self, prefix: str) -> list[RouteDefinition]:
         """Return route definitions with the given prefix applied to each path."""
-        return [
-            dataclasses.replace(route, path=self._join_paths(prefix, route.path))
-            for route in self._routes
-        ]
+        return [self._with_prefix(prefix, route) for route in self._routes]
 
-    def route(self, path: str, name: str) -> Callable[[EventHandler], EventHandler]:
+    def route(
+        self, path: str, name: str, event: str, condition: str | None = None
+    ) -> Callable[[EventHandler], EventHandler]:
         """Register a non-task event handler on the router.
 
         Args:
             path: Route path relative to the router prefix.
             name: Unique human-readable route name.
+            event: Platform event subscribed by the route.
+            condition: Optional condition expression.
 
         Returns:
             A decorator that registers the provided handler.
         """
 
-        def decorator(handler: EventHandler) -> EventHandler:
-            self._register_route(name=name, path=path, task_based=False, handler=handler)
-            return handler
+        def decorator(event_handler: EventHandler) -> EventHandler:
+            self._register_route(
+                name=name,
+                path=path,
+                event=event,
+                condition=condition,
+                task_based=False,
+                callback=event_handler,
+            )
+            return event_handler
 
         return decorator
 
-    def task_route(self, path: str, name: str) -> Callable[[TaskHandler], TaskHandler]:
+    def task_route(
+        self, path: str, name: str, event: str, condition: str | None = None
+    ) -> Callable[[TaskHandler], TaskHandler]:
         """Register a task-based event handler on the router.
 
         Args:
             path: Route path relative to the router prefix.
             name: Unique human-readable route name.
+            event: Platform event subscribed by the route.
+            condition: Optional condition expression.
 
         Returns:
             A decorator that registers the provided handler.
         """
 
-        def decorator(handler: TaskHandler) -> TaskHandler:
-            self._register_route(name=name, path=path, task_based=True, handler=handler)
-            return handler
+        def decorator(task_handler: TaskHandler) -> TaskHandler:
+            self._register_route(
+                name=name,
+                path=path,
+                event=event,
+                condition=condition,
+                task_based=True,
+                callback=task_handler,
+            )
+            return task_handler
 
         return decorator
-
-    def _register_route(
-        self,
-        *,
-        name: str,
-        path: str,
-        task_based: bool,
-        handler: Callable[..., Awaitable[None] | None],
-    ) -> None:
-        """Register a route definition on the router.
-
-        Args:
-            name: Unique human-readable route name.
-            path: Route path relative to the router prefix.
-            task_based: Whether the route handles task-backed events.
-            handler: Callable associated with the route.
-
-        Raises:
-            ValueError: If the name or path is empty or already registered.
-        """
-        normalized_path = self._join_paths(self.prefix, path)
-        if any(route.name == name for route in self._routes):
-            raise ValueError(f"Route name '{name}' is already registered")
-        if any(route.path == normalized_path for route in self._routes):
-            raise ValueError(f"Route path '{normalized_path}' is already registered")
-
-        self._routes.append(
-            RouteDefinition(name=name, path=normalized_path, task_based=task_based, handler=handler)
-        )
 
     def _join_paths(self, prefix: str, path: str) -> str:
         """Join a router prefix and route path.
@@ -147,6 +140,50 @@ class ExtensionRouter:
         normalized_prefix = normalized_prefix.rstrip("/")
         return normalized_prefix if suffix == "/" else f"{normalized_prefix}{suffix}"
 
+    def _with_prefix(self, prefix: str, route: RouteDefinition) -> RouteDefinition:
+        """Return a copy of the route with the provided prefix applied."""
+        return replace(route, path=self._join_paths(prefix, route.path))
+
+    def _register_route(
+        self,
+        *,
+        name: str,
+        path: str,
+        event: str,
+        condition: str | None,
+        task_based: bool,
+        callback: Callable[..., Awaitable[None] | None],
+    ) -> None:
+        """Register a route definition on the router.
+
+        Args:
+            name: Unique human-readable route name.
+            path: Route path relative to the router prefix.
+            event: Platform event subscribed by the route.
+            condition: Optional condition expression.
+            task_based: Whether the route handles task-backed events.
+            callback: Callable associated with the route.
+
+        Raises:
+            ValueError: If the name or path is empty or already registered.
+        """
+        normalized_path = self._join_paths(self.prefix, path)
+        route_definition = RouteDefinition(
+            name=name,
+            path=normalized_path,
+            event=event,
+            condition=condition,
+            task_based=task_based,
+            callback=callback,
+        )
+        ExtensionValidator.validate_route_uniqueness(
+            route_name=route_definition.name,
+            route_path=route_definition.path,
+            route_event=route_definition.event,
+            routes=self._routes,
+        )
+        self._routes.append(route_definition)
+
 
 @dataclass
 class ExtensionApp:
@@ -157,10 +194,23 @@ class ExtensionApp:
 
     Attributes:
         prefix: Prefix applied to every route included in the extension app.
+        version: Extension metadata version.
+        openapi: OpenAPI endpoint published by the runtime.
     """
 
     prefix: str = ""
+    version: str = "1.0.0"
+    openapi: str = "/bypass/openapi.json"
+    mpt_api_service_type: type[MPTAPIService] = MPTAPIService
+    order_context_type: type[ContextAdapter] | None = None
+    agreement_context_type: type[ContextAdapter] | None = None
     _routes: list[RouteDefinition] = field(default_factory=list, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Validate extension app settings."""
+        ExtensionValidator.validate_service_type(self.mpt_api_service_type)
+        ExtensionValidator.validate_context_type(self.order_context_type, OrderContext)
+        ExtensionValidator.validate_context_type(self.agreement_context_type, AgreementContext)
 
     @property
     def routes(self) -> list[RouteDefinition]:
@@ -170,6 +220,22 @@ class ExtensionApp:
             A copy of the registered route definitions.
         """
         return list(self._routes)
+
+    def build_context(self, context: ExecutionContext) -> ExecutionContext:
+        """Adapt a base SDK context to the configured extension-specific context."""
+        if isinstance(context, OrderContext) and self.order_context_type is not None:
+            adapted_context = self.order_context_type.from_context(context)
+            if not isinstance(adapted_context, ExecutionContext):
+                raise TypeError("order_context_type.from_context must return an ExecutionContext")
+            return adapted_context
+        if isinstance(context, AgreementContext) and self.agreement_context_type is not None:
+            adapted_context = self.agreement_context_type.from_context(context)
+            if not isinstance(adapted_context, ExecutionContext):
+                raise TypeError(
+                    "agreement_context_type.from_context must return an ExecutionContext"
+                )
+            return adapted_context
+        return context
 
     def include_router(self, router: ExtensionRouter) -> None:
         """Include a router in the extension app.
@@ -181,97 +247,26 @@ class ExtensionApp:
             ValueError: If any included route duplicates an existing name or path.
         """
         for route in router.prefixed_routes(self.prefix):
-            if any(registered.name == route.name for registered in self._routes):
-                raise ValueError(f"Route name '{route.name}' is already registered")
-            if any(registered.path == route.path for registered in self._routes):
-                raise ValueError(f"Route path '{route.path}' is already registered")
+            ExtensionValidator.validate_route_uniqueness(
+                route_name=route.name,
+                route_path=route.path,
+                route_event=route.event,
+                routes=self._routes,
+            )
             self._routes.append(route)
 
-    async def build_context(
-        self, handler: Callable[..., Awaitable[None] | None], context: ExecutionContext
-    ) -> ExecutionContext:
-        """Adapt the SDK base context to the context expected by the handler.
-
-        Args:
-            handler: Handler callable that will receive the context.
-            context: SDK context built by the runtime.
-
-        Returns:
-            The original context when the handler expects the base context, or
-            an adapted extension-specific context otherwise.
-        """
-        target_context_type = get_handler_context_type(handler)
-        if target_context_type is None or isinstance(context, target_context_type):
-            return context
-
-        builder = self._get_context_builder(target_context_type, type(context))
-        built_context = builder(context)
-        if isawaitable(built_context):
-            built_context = await built_context
-        return built_context
-
-    def _get_context_builder(
-        self, target_context_type: type[ExecutionContext], base_context_type: type[ExecutionContext]
-    ) -> Callable[[ExecutionContext], ExecutionContext | Awaitable[ExecutionContext]]:
-        """Resolve the builder used to adapt a base context to the target type.
-
-        Args:
-            target_context_type: Context type declared by the handler.
-            base_context_type: Concrete base context built by the SDK.
-
-        Returns:
-            A callable that converts the base context into the target context.
-
-        Raises:
-            ValueError: If no suitable builder method exists on the target type.
-        """
-        builder_name = f"from_{self._to_snake_case(base_context_type.__name__)}"
-        builder = getattr(target_context_type, builder_name, None)
-        if callable(builder):
-            return builder
-
-        fallback_builder = getattr(target_context_type, "from_context", None)
-        if callable(fallback_builder):
-            return fallback_builder
-
-        raise ValueError(
-            f"Context type '{target_context_type.__name__}' must define "
-            f"'{builder_name}' or 'from_context'"
+    def to_meta_config(self) -> MetaConfig:
+        """Build extension metadata from the registered application routes."""
+        return MetaConfig(
+            version=self.version,
+            openapi=self.openapi,
+            events=[
+                MetaEvent(
+                    event=route.event,
+                    condition=route.condition,
+                    path=route.path,
+                    task=route.task_based,
+                )
+                for route in self._routes
+            ],
         )
-
-    def _to_snake_case(self, value: str) -> str:
-        """Convert a CamelCase value to snake_case.
-
-        Args:
-            value: CamelCase input value.
-
-        Returns:
-            The normalized snake_case value.
-        """
-        return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
-
-
-@lru_cache
-def get_handler_context_type(
-    handler: Callable[..., Awaitable[None] | None],
-) -> type[ExecutionContext] | None:
-    """Return the context type annotation declared by the handler.
-
-    Args:
-        handler: Handler callable declared by the extension.
-
-    Returns:
-        The annotated context type when available and valid, otherwise
-        `None`.
-    """
-    parameters = list(signature(handler).parameters.values())
-    if len(parameters) < 2:
-        return None
-
-    context_parameter = parameters[1]
-    type_hints = get_type_hints(handler)
-    context_type = type_hints.get(context_parameter.name)
-    if not isinstance(context_type, type) or not issubclass(context_type, ExecutionContext):
-        return None
-
-    return context_type

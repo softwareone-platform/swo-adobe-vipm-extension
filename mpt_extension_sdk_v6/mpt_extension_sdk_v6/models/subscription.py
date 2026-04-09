@@ -1,24 +1,24 @@
 from pydantic import Field
 
-from mpt_extension_sdk_v6.models.base import BaseSchema, ISODatetime
+from mpt_extension_sdk_v6.models.base import BaseModel, ISODatetime
 from mpt_extension_sdk_v6.models.external_id import ExternalIds
 from mpt_extension_sdk_v6.models.parameter import ParameterBag
 from mpt_extension_sdk_v6.models.product import ProductItem
 
 
-class SubscriptionLine(BaseSchema):
+class SubscriptionLine(BaseModel):
     """Subscription line model."""
 
     id: str
     description: str | None = None
-    quantity: int
     status: str | None = None
+    quantity: int
 
     product_item: ProductItem = Field(alias="item")
 
 
-class SubscriptionSimple(BaseSchema):
-    """Subscription model with simple details"""
+class SubscriptionSimple(BaseModel):
+    """Subscription model with simple details."""
 
     id: str
     name: str
@@ -35,4 +35,4 @@ class Subscription(SubscriptionSimple):
 
     external_ids: ExternalIds = Field(alias="externalIds")
     lines: list[SubscriptionLine] = Field(default_factory=list)
-    parameters: ParameterBag = Field(default_factory=ParameterBag)
+    parameters: ParameterBag = Field(default_factory=ParameterBag)  # noqa: WPS110
