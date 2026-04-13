@@ -5,8 +5,7 @@ import pytest
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.flows.constants import Param
-from adobe_vipm.flows.errors import MPTError
+from adobe_vipm.flows.constants import ERR_PROCESSING_TRANSFER_LINES, Param
 from adobe_vipm.flows.utils import get_ordering_parameter
 from adobe_vipm.flows.validation.transfer import validate_reseller_change
 
@@ -487,7 +486,7 @@ def test_validate_reseller_change_lines_different_line_count(
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
-def test_validate_reseller_change_missing_reseller_item_raises_error(
+def test_validate_reseller_change_missing_reseller_item_sets_order_error(
     mock_adobe_client,
     mock_mpt_client,
     order_factory,
@@ -496,7 +495,7 @@ def test_validate_reseller_change_missing_reseller_item_raises_error(
     mock_get_product_items_by_skus,
     mock_send_error,
 ):
-    """Test that missing reseller item raises MPTError during validation."""
+    """Test that missing reseller item sets order validation error."""
     order = order_factory(
         order_parameters=reseller_change_order_parameters_factory(),
         lines=[],
@@ -515,11 +514,69 @@ def test_validate_reseller_change_missing_reseller_item_raises_error(
     )
     mock_get_product_items_by_skus.return_value = []
 
-    with pytest.raises(MPTError) as exc_info:
-        validate_reseller_change(mock_mpt_client, order)  # Act
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # Act
 
-    assert "No reseller item found for partial SKU '65304578CA'" in str(exc_info.value)
+    assert has_errors is True
+    assert validated_order["error"] == ERR_PROCESSING_TRANSFER_LINES.to_dict(
+        details="No reseller item found for partial SKU '65304578CA'"
+    )
     mock_send_error.assert_called_once_with(
         "Transfer Validation - Missing reseller item",
         "No reseller item found for partial SKU '65304578CA'",
+    )
+
+
+@pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
+def test_validate_reseller_change_multiple_missing_reseller_items_sets_aggregated_error(
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    reseller_change_order_parameters_factory,
+    adobe_reseller_change_preview_factory,
+    mock_get_product_items_by_skus,
+    mock_send_error,
+):
+    order = order_factory(
+        order_parameters=reseller_change_order_parameters_factory(),
+        lines=[],
+    )
+    mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
+        items=[
+            {
+                "lineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 10,
+                "subscriptionId": "sub-id-1",
+                "deploymentId": "",
+                "currencyCode": "USD",
+            },
+            {
+                "lineItemNumber": 2,
+                "offerId": "65304579CA01A12",
+                "quantity": 20,
+                "subscriptionId": "sub-id-2",
+                "deploymentId": "",
+                "currencyCode": "USD",
+            },
+        ]
+    )
+    mock_get_product_items_by_skus.return_value = []
+
+    has_errors, validated_order = validate_reseller_change(mock_mpt_client, order)  # Act
+
+    assert has_errors is True
+    assert validated_order["error"] == ERR_PROCESSING_TRANSFER_LINES.to_dict(
+        details=(
+            "No reseller item found for partial SKU '65304578CA'; "
+            "No reseller item found for partial SKU '65304579CA'"
+        )
+    )
+    assert mock_send_error.call_count == 2
+    mock_send_error.assert_any_call(
+        "Transfer Validation - Missing reseller item",
+        "No reseller item found for partial SKU '65304578CA'",
+    )
+    mock_send_error.assert_any_call(
+        "Transfer Validation - Missing reseller item",
+        "No reseller item found for partial SKU '65304579CA'",
     )

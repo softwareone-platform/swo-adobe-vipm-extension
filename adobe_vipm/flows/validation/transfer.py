@@ -26,15 +26,12 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_RESSELLER_CHANGE_LINES,
     ERR_ADOBE_UNEXPECTED_ERROR,
     ERR_NO_SUBSCRIPTIONS_WITHOUT_DEPLOYMENT,
+    ERR_PROCESSING_TRANSFER_LINES,
     ERR_UPDATING_TRANSFER_ITEMS,
     Param,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.errors import (
-    GovernmentLGANotValidOrderError,
-    GovernmentNotValidOrderError,
-    MPTError,
-)
+from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
     UpdatePrices,
@@ -542,8 +539,15 @@ class AddResellerChangeLinesToOrder(Step):
 
     def __call__(self, mpt_client, context, next_step):
         """Add lines from reseller change back to the MPT order."""
-        order_lines_from_transfer = self._get_order_lines_from_transfer(context, mpt_client)
-
+        order_lines_from_transfer, errors = self._get_order_lines_from_transfer(context, mpt_client)
+        if errors:
+            logger.warning("Errors found while processing transfer lines: %s", errors)
+            context.order = set_order_error(
+                context.order,
+                ERR_PROCESSING_TRANSFER_LINES.to_dict(details="; ".join(errors)),
+            )
+            context.validation_succeeded = False
+            return
         if order_lines_from_transfer:
             if not context.order["lines"]:
                 logger.info("No existing order lines, proceeding with transfer lines")
@@ -584,13 +588,16 @@ class AddResellerChangeLinesToOrder(Step):
         )
         next_step(mpt_client, context)
 
-    def _get_order_lines_from_transfer(self, context: Context, mpt_client) -> list[Any]:
+    def _get_order_lines_from_transfer(
+        self, context: Context, mpt_client
+    ) -> tuple[list[Any], list[str]]:
+        errors = []
         no_deployment_transfer_items = [
             item for item in context.adobe_transfer["lineItems"] if not item.get("deploymentId", "")
         ]
         if not no_deployment_transfer_items:
             logger.info("No transfer items without deployment ID")
-            return []
+            return [], []
         logger.info(
             "Processing %d transfer items without deployment ID", len(no_deployment_transfer_items)
         )
@@ -615,11 +622,11 @@ class AddResellerChangeLinesToOrder(Step):
                 error_msg = f"No reseller item found for partial SKU '{partial_sku}'"
                 logger.error(error_msg)
                 send_error("Transfer Validation - Missing reseller item", error_msg)
-                raise MPTError(error_msg)
+                errors.append(error_msg)
             order_lines_from_transfer.append({"item": mapped_item, "quantity": item["quantity"]})
 
         logger.info("Created %d order lines from transfer items", len(order_lines_from_transfer))
-        return order_lines_from_transfer
+        return order_lines_from_transfer, errors
 
     @staticmethod
     def _transfer_order_lines_match(order_lines: list[dict], transfer_lines: list[dict]) -> bool:

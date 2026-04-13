@@ -248,6 +248,10 @@ ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA = ValidationError(
     ),
 )
 
+ERR_PROCESSING_TRANSFER_LINES = ValidationError(
+    "VIPM0042", "Errors processing transfer lines: {details}"
+)
+
 ERR_ADOBE_MEMBERSHIP_NOT_FOUND = "Membership not found"
 ERR_ADOBE_UNEXPECTED_ERROR = "Adobe returned an unexpected error"
 
