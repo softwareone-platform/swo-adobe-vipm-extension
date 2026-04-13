@@ -48,7 +48,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     add_asset,
     check_processing_template,
     send_gc_mpt_notification,
-    send_mpt_notification,
     set_customer_coterm_date_if_null,
 )
 from adobe_vipm.flows.utils import (
@@ -58,58 +57,6 @@ from adobe_vipm.flows.utils import (
     set_coterm_date,
 )
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
-
-
-@pytest.fixture(autouse=True)
-def mocked_send_mpt_notification(mocker):
-    return mocker.patch("adobe_vipm.flows.fulfillment.shared.send_mpt_notification", spec=True)
-
-
-@pytest.mark.parametrize(
-    ("status", "subject"),
-    [
-        (
-            "Processing",
-            "Order status update ORD-1234 for A buyer",
-        ),
-        (
-            "Querying",
-            "This order need your attention ORD-1234 for A buyer",
-        ),
-        (
-            "Completed",
-            "Order status update ORD-1234 for A buyer",
-        ),
-        (
-            "Failed",
-            "Order status update ORD-1234 for A buyer",
-        ),
-    ],
-)
-def test_send_mpt_notification(mocker, settings, order_factory, mock_mpt_client, status, subject):
-    mocked_get_rendered_template = mocker.patch(
-        "adobe_vipm.flows.fulfillment.shared.get_rendered_template",
-        return_value="rendered-template",
-    )
-    mocked_mpt_notify = mocker.patch("adobe_vipm.flows.fulfillment.shared.mpt_notify")
-    order = order_factory(order_id="ORD-1234", status=status)
-
-    send_mpt_notification(mock_mpt_client, order)  # act
-
-    mocked_get_rendered_template.assert_called_once_with(mock_mpt_client, order["id"])
-    mocked_mpt_notify.assert_called_once_with(
-        mock_mpt_client,
-        order["agreement"]["licensee"]["account"]["id"],
-        order["agreement"]["buyer"]["id"],
-        subject,
-        "notification",
-        {
-            "order": order,
-            "activation_template": "<p>rendered-template</p>\n",
-            "api_base_url": settings.MPT_API_BASE_URL,
-            "portal_base_url": settings.MPT_PORTAL_BASE_URL,
-        },
-    )
 
 
 def test_check_processing_template(mocker, mock_mpt_client, mock_order, template):
@@ -359,10 +306,7 @@ def test_configuration_start_order_processing_selects_template(
 
 
 def test_set_processing_template_step_already_set_not_first_attempt(
-    mocker,
-    order_factory,
-    fulfillment_parameters_factory,
-    mocked_send_mpt_notification,
+    mocker, order_factory, fulfillment_parameters_factory
 ):
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -389,7 +333,6 @@ def test_set_processing_template_step_already_set_not_first_attempt(
         "my template",
     )
     mocked_update_order.assert_not_called()
-    mocked_send_mpt_notification.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 

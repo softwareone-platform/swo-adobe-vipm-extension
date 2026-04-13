@@ -6,7 +6,6 @@ import logging
 from collections import Counter
 
 from django.conf import settings
-from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.mpt import (
     complete_order,
     create_order_asset,
@@ -16,7 +15,6 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_order_asset_by_external_id,
     get_order_subscription_by_external_id,
     get_product_template_or_default,
-    get_rendered_template,
     get_template_by_name,
     query_order,
     set_processing_template,
@@ -71,7 +69,6 @@ from adobe_vipm.flows.utils import (
     get_subscription_by_line_and_item_id,
     is_coterm_date_within_order_creation_window,
     map_returnable_to_return_orders,
-    md2html,
     reset_due_date,
     set_adobe_3yc_commitment_request_status,
     set_adobe_3yc_end_date,
@@ -546,38 +543,6 @@ def save_coterm_dates(client, order, coterm_date):
     return order
 
 
-def send_mpt_notification(mpt_client: MPTClient, order: dict) -> None:
-    """
-    Send an MPT notification to the customer according to the current order status.
-
-    It embeds the current order template into the body.
-
-    Args:
-        mpt_client (MPTClient): The client used to consume the MPT API.
-        order (dict): The order for which the notification should be sent.
-    """
-    context = {
-        "order": order,
-        "activation_template": md2html(get_rendered_template(mpt_client, order["id"])),
-        "api_base_url": settings.MPT_API_BASE_URL,
-        "portal_base_url": settings.MPT_PORTAL_BASE_URL,
-    }
-    subject = f"Order status update {order['id']} for {order['agreement']['buyer']['name']}"
-    if order["status"] == "Querying":
-        subject = (
-            f"This order need your attention {order['id']} "
-            f"for {order['agreement']['buyer']['name']}"
-        )
-    mpt_notify(
-        mpt_client,
-        order["agreement"]["licensee"]["account"]["id"],
-        order["agreement"]["buyer"]["id"],
-        subject,
-        "notification",
-        context,
-    )
-
-
 def set_customer_coterm_date_if_null(client, adobe_client, order):
     """
     Retrieves the customer object from adobe and set the coterm date for such order if needed.
@@ -767,8 +732,6 @@ class StartOrderProcessing(Step):
             )
             logger.info("%s: processing template is ok, continue", context)
 
-        if not context.due_date:
-            send_mpt_notification(client, context.order)
         next_step(client, context)
 
 
