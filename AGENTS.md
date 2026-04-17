@@ -1,6 +1,14 @@
 # AGENTS.md
 
-Read this repository in the following order:
+Working protocol for any task in this repository:
+
+1. Identify the task type and select only the local repository files that are relevant to that task.
+2. Read only those relevant local repository files before making changes.
+3. If any selected local file references shared standards or shared operational guidance that are relevant to the same task, read those shared documents too before proceeding.
+4. Treat repository-local documents as repository-specific additions, restrictions, or overrides to shared guidance.
+5. If a repository-local rule conflicts with a shared or global rule, the local repository rule takes precedence.
+
+When applicable, read the repository in the following order:
 
 1. [README.md](README.md) for the repository purpose, quick start, and documentation map.
 2. [docs/deployment.md](docs/deployment.md) for runtime configuration and deployment-facing settings.
