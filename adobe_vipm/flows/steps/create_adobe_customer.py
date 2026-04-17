@@ -43,6 +43,11 @@ class CreateAdobeCustomer(BaseStep, AdobeClientMixin):
         try:
             ctx.adobe_customer = self._create_adobe_customer(ctx)
         except AdobeAPIError as error:
+            ctx.order_state.action = OrderStatusAction(
+                target_status=OrderStatusActionType.QUERY,
+                message="Adobe API error creating customer",
+                status_notes={"id": "VIPM0011", "details": error.details},
+            )
             raise StopStepError("Adobe API error creating customer") from error
 
         status = ctx.adobe_customer.get_three_yc_commitment_request().get("status")

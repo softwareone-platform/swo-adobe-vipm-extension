@@ -8,7 +8,7 @@ readme = "README.md"
 license = { text = "Apache-2.0 license" }
 dependencies = [
   "httpx==0.28.*",
-  "mpt-extension-sdk",
+  "mpt-extension-sdk[azure-monitor]",
   "pyairtable>=3.3.0",
 ]
 
@@ -232,4 +232,4 @@ module = "pymsteams.*"
 ignore_missing_imports = true
 
 [tool.uv.sources]
-mpt-extension-sdk = { path = "./mpt_extension_sdk", editable = true }
+mpt-extension-sdk = { git = "https://github.com/softwareone-platform/mpt-extension-sdk", branch = "MPT-20337-add-sdk-v6" }
