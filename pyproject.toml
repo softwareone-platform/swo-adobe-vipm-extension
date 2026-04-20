@@ -32,7 +32,7 @@ dev = [
   "freezegun==1.5.*",
   "ipdb==0.13.*",
   "ipython==9.*",
-  "mypy==1.19.*",
+  "mypy==1.20.*",
   "pre-commit==4.5.*",
   "pytest==9.0.*",
   "pytest-cov==7.1.*",
@@ -44,7 +44,7 @@ dev = [
   "responses==0.26.*",
   "ruff==0.15.*", # force ruff version to have same formatting everywhere, also update in pre-commit config
   "types-openpyxl==3.1.*",
-  "types-requests==2.32.*",
+  "types-requests==2.33.*",
   "wemake-python-styleguide==1.6.*", # also update pre-commit config
 ]
 
