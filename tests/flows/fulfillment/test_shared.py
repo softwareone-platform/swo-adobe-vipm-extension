@@ -56,7 +56,11 @@ from adobe_vipm.flows.utils import (
     get_due_date,
     set_coterm_date,
 )
-from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter
+from adobe_vipm.flows.utils.parameter import (
+    get_fulfillment_parameter,
+    get_ordering_parameter,
+    set_adobe_order_ids_created_parameter,
+)
 
 
 def test_check_processing_template(mocker, mock_mpt_client, mock_order, template):
@@ -603,6 +607,67 @@ def test_submit_return_orders_step(
     mocked_next_step.assert_not_called()
 
 
+def test_submit_return_orders_step_change_order_persists_adobe_order_ids(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    mock_update_order,
+    settings,
+):
+    api_key = "airtable-token"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_BASES": {"PRD-1111-1111": "base-id"},
+        "ADOBE_CREDENTIALS_FILE": "a-credentials-file.json",
+        "ADOBE_AUTHORIZATIONS_FILE": "an-authorization-file.json",
+    }
+    adobe_order_1 = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(quantity=1),
+        status=AdobeStatus.PROCESSED.value,
+    )
+    ret_info_1 = ReturnableOrderInfo(
+        adobe_order_1,
+        adobe_order_1["lineItems"][0],
+        adobe_order_1["lineItems"][0]["quantity"],
+    )
+    sku = adobe_order_1["lineItems"][0]["offerId"][:10]
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN",
+        order_id="return-order-id",
+        status=AdobeStatus.PENDING.value,
+    )
+    order = order_factory(
+        order_type="Change", fulfillment_parameters=fulfillment_parameters_factory()
+    )
+    order["parameters"]["ordering"] = [
+        {"externalId": Param.ADOBE_ORDER_IDS.value, "value": "new-order-id"}
+    ]
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1,)},
+        adobe_return_orders={},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitReturnOrders()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        parameters=context.order["parameters"],
+    )
+    mocked_next_step.assert_not_called()
+
+
 def test_submit_return_orders_step_with_deployment_id(
     mocker,
     mock_adobe_client,
@@ -850,9 +915,47 @@ def test_submit_new_order_step(
         mock_mpt_client,
         context.order_id,
         externalIds=context.order["externalIds"],
-        parameters={"fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]},
+        parameters=context.order["parameters"],
     )
     assert get_adobe_order_id(context.order) == new_order["orderId"]
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_new_order_step_change_order_persists_adobe_order_ids(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_order_factory,
+    mock_update_order,
+):
+    order = order_factory(order_type="Change", deployment_id=None)
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    new_order = adobe_order_factory(
+        order_type=ORDER_TYPE_NEW,
+        order_id="new-order-id",
+        status=AdobeStatus.PENDING.value,
+    )
+    mock_adobe_client.create_new_order.return_value = new_order
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+        adobe_preview_order=preview_order,
+    )
+    step = SubmitNewOrder()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        externalIds=context.order["externalIds"],
+        parameters=context.order["parameters"],
+    )
     mocked_next_step.assert_not_called()
 
 
@@ -888,22 +991,14 @@ def test_submit_new_order_step_flex_discount(
         preview_order,
         deployment_id=None,
     )
-    mock_update_order.assert_called_once_with(
-        mock_mpt_client,
-        context.order_id,
-        externalIds=context.order["externalIds"],
-        parameters={
-            "fulfillment": [
-                {
-                    "externalId": Param.FLEXIBLE_DISCOUNTS.value,
-                    "value": '[{"extLineItemNumber": 1, '
-                    '"offerId": "65304578CA01A12", '
-                    '"subscriptionId": null, '
-                    '"flexDiscountCode": ["BLACK"]}]',
-                }
-            ]
-        },
-    )
+    mock_update_order.assert_has_calls([
+        mocker.call(
+            mock_mpt_client,
+            context.order_id,
+            externalIds=context.order["externalIds"],
+            parameters=context.order["parameters"],
+        )
+    ])
     assert get_adobe_order_id(context.order) == new_order["orderId"]
 
 
@@ -940,12 +1035,14 @@ def test_submit_new_order_step_with_deployment_id(
         preview_order,
         deployment_id=deployment_id,
     )
-    mocked_update.assert_called_once_with(
-        mocked_client,
-        context.order_id,
-        externalIds=context.order["externalIds"],
-        parameters={"fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]},
-    )
+    mocked_update.assert_has_calls([
+        mocker.call(
+            mocked_client,
+            context.order_id,
+            externalIds=context.order["externalIds"],
+            parameters=context.order["parameters"],
+        ),
+    ])
     assert get_adobe_order_id(context.order) == new_order["orderId"]
     mocked_next_step.assert_not_called()
 
@@ -984,6 +1081,42 @@ def test_submit_new_order_step_order_created_and_processed(
     mock_adobe_client.create_preview_order.assert_not_called()
     mock_adobe_client.create_new_order.assert_not_called()
     mocked_update.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_submit_new_order_step_change_order_skips_ids_update_if_already_present(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    fulfillment_parameters_factory,
+    adobe_order_factory,
+    mock_update_order,
+):
+    adobe_order_id = "new-order-id"
+    order = order_factory(
+        order_type="Change",
+        external_ids={"vendor": adobe_order_id},
+        fulfillment_parameters=fulfillment_parameters_factory(),
+    )
+    mock_adobe_client.get_order.return_value = adobe_order_factory(
+        order_type=ORDER_TYPE_NEW,
+        order_id=adobe_order_id,
+        status=AdobeStatus.PROCESSED.value,
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=order,
+        adobe_new_order_id=adobe_order_id,
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=order["lines"],
+    )
+    step = SubmitNewOrder()
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    mock_update_order.assert_not_called()
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
@@ -1708,8 +1841,11 @@ def test_create_or_update_subscriptions_step_update_existing_subscription(
 
 @freeze_time("2024-01-01")
 def test_complete_order_step(mocker, mock_mpt_client, order_factory):
-    order = order_factory()
-    resetted_order = order_factory()
+    order = order_factory(external_ids={"vendor": "old-adobe-order-id"})
+    for parameter in order["parameters"]["ordering"]:
+        if parameter["externalId"] == Param.ADOBE_ORDER_IDS.value:
+            parameter["value"] = "new-order-id,return-order-id"
+            break
     completed_order = order_factory(status=MPT_ORDER_STATUS_COMPLETED)
     mocked_get_template = mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
@@ -1739,10 +1875,110 @@ def test_complete_order_step(mocker, mock_mpt_client, order_factory):
         mock_mpt_client,
         context.order_id,
         {"id": "TPL-0000"},
-        parameters=resetted_order["parameters"],
+        externalIds={"vendor": "new-order-id,return-order-id"},
+        parameters=order["parameters"],
     )
     assert context.order == completed_order
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+@freeze_time("2024-01-01")
+def test_complete_order_step_preserves_vendor_if_adobe_order_ids_is_empty(
+    mocker, mock_mpt_client, order_factory
+):
+    order = order_factory(external_ids={"vendor": "existing-vendor-id"})
+    for parameter in order["parameters"]["ordering"]:
+        if parameter["externalId"] == Param.ADOBE_ORDER_IDS.value:
+            parameter["value"] = ""
+            break
+    completed_order = order_factory(status=MPT_ORDER_STATUS_COMPLETED)
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.get_product_template_or_default",
+        return_value={"id": "TPL-0000"},
+    )
+    mocked_complete_order = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.complete_order",
+        return_value=completed_order,
+    )
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id=order["agreement"]["product"]["id"],
+    )
+    step = CompleteOrder("my-template")
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_complete_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        {"id": "TPL-0000"},
+        externalIds={"vendor": "existing-vendor-id"},
+        parameters=order["parameters"],
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_set_adobe_order_ids_created_parameter_ignores_empty_values(
+    order_factory, order_parameters_factory
+):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(adobe_order_ids="existing-id"),
+    )
+    context = Context(order=order)
+
+    updated_order = set_adobe_order_ids_created_parameter(context, [None, "", "  "])  # act
+
+    order_ids_param = get_ordering_parameter(updated_order, Param.ADOBE_ORDER_IDS.value)
+    assert order_ids_param["value"] == "existing-id"
+
+
+def test_set_adobe_order_ids_created_parameter_skips_duplicate_ids(
+    order_factory, order_parameters_factory
+):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(adobe_order_ids="id-1,id-2"),
+    )
+    context = Context(order=order)
+
+    updated_order = set_adobe_order_ids_created_parameter(context, ["id-1", "id-2"])  # act
+
+    order_ids_param = get_ordering_parameter(updated_order, Param.ADOBE_ORDER_IDS.value)
+    assert order_ids_param["value"] == "id-1,id-2"
+    assert updated_order is order
+
+
+def test_set_adobe_order_ids_created_parameter_appends_new_ids(
+    order_factory, order_parameters_factory
+):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(adobe_order_ids="id-1"),
+    )
+    context = Context(order=order)
+
+    updated_order = set_adobe_order_ids_created_parameter(context, ["id-2"])  # act
+
+    order_ids_param = get_ordering_parameter(updated_order, Param.ADOBE_ORDER_IDS.value)
+    assert order_ids_param["value"] == "id-1,id-2"
+
+
+def test_set_adobe_order_ids_created_parameter_creates_param_when_missing(
+    order_factory, order_parameters_factory
+):
+    order_params = order_parameters_factory()
+    order_params = [p for p in order_params if p["externalId"] != Param.ADOBE_ORDER_IDS.value]
+    order = order_factory(order_type="Change", order_parameters=order_params)
+    context = Context(order=order)
+
+    updated_order = set_adobe_order_ids_created_parameter(context, ["new-id"])  # act
+
+    order_ids_param = get_ordering_parameter(updated_order, Param.ADOBE_ORDER_IDS.value)
+    assert order_ids_param["externalId"] == Param.ADOBE_ORDER_IDS.value
+    assert order_ids_param["value"] == "new-id"
 
 
 @pytest.mark.parametrize(
@@ -1756,6 +1992,7 @@ def test_complete_configuration_order_selects_template(
     mocker, order_factory, auto_renew, expected_template
 ):
     order = order_factory(subscriptions=[{"autoRenew": auto_renew}])
+    order["externalIds"] = {"vendor": ""}
     completed_order = order_factory(status="Completed")
     context = Context(
         order=order,
@@ -1786,6 +2023,7 @@ def test_complete_configuration_order_selects_template(
         mocked_client,
         context.order_id,
         {"id": "TPL-0000"},
+        externalIds=order.get("externalIds", ""),
         parameters=order["parameters"],
     )
     assert context.order == completed_order
