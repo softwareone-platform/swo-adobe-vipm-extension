@@ -23,6 +23,7 @@ from adobe_vipm.flows.utils.order import set_adobe_order_id, split_downsizes_ups
 from adobe_vipm.flows.utils.parameter import (
     get_change_reseller_admin_email,
     get_change_reseller_code,
+    set_adobe_order_ids_created_parameter,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,6 +159,10 @@ class CommitResellerChange(Step):
                 ),
             )
             return
+
+        context.order = set_adobe_order_ids_created_parameter(
+            context, [context.adobe_transfer_order.get("transferId")]
+        )
 
         context.order = set_adobe_order_id(
             context.order, context.adobe_transfer_order.get("transferId")
