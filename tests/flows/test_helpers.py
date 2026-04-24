@@ -519,6 +519,14 @@ def test_prepare_customer_no_data_step(
                     "type": "SingleLineText",
                     "value": "",
                 },
+                {
+                    "id": "PAR-0000-0009",
+                    "name": "Late Renewals Info",
+                    "externalId": "lateRenewalsInfo",
+                    "type": "DataObject",
+                    "value": "",
+                    "constraints": {"hidden": True, "required": False},
+                },
             ],
         },
     )

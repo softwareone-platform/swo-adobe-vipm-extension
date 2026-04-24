@@ -67,6 +67,7 @@ class Param(StrEnum):
     LINKED_MEMBERSHIP_ROLE = "lmRole"
     LINKED_MEMBERSHIP_CREATED = "lmCreated"
     ADOBE_ORDER_IDS = "adobeOrderIds"
+    LATE_RENEWALS_INFO = "lateRenewalsInfo"
 
 
 PARAM_REQUIRED_CUSTOMER_ORDER = (
@@ -451,6 +452,16 @@ ERR_SKU_NOT_FOUND = ValidationError(
 ERR_LGA_QUANTITIES = ValidationError(
     "VIPM0040",
     "The quantity selected must be greater than 100 licenses for Large Government Agency.",
+)
+
+ERR_MANUAL_RENEWAL_PREVIEW_FAILED = ValidationError(
+    "VIPM0043",
+    "Manual renewal preview failed for subscription {subscription_id}: {error}.",
+)
+
+ERR_MANUAL_RENEWAL_ORDER_FAILED = ValidationError(
+    "VIPM0044",
+    "Manual renewal order failed for subscription {subscription_id}: {error}.",
 )
 
 
