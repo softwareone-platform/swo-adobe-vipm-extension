@@ -1,6 +1,7 @@
 """This module contains shared functions used by the different fulfillment flows."""
 
 import datetime as dt
+import json
 import logging
 from collections import Counter
 
@@ -27,7 +28,10 @@ from mpt_extension_sdk.mpt_http.wrap_http_error import MPTError as SDKMPTError
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    MANUAL_RENEWAL_ACTION,
     ORDER_STATUS_DESCRIPTION,
+    ORDER_TYPE_PREVIEW_RENEWAL,
+    ORDER_TYPE_RENEWAL,
     UNRECOVERABLE_ORDER_STATUSES,
     AdobeStatus,
 )
@@ -43,6 +47,7 @@ from adobe_vipm.flows.constants import (
     ERR_DUE_DATE_REACHED,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
+    ERR_MANUAL_RENEWAL_ORDER_FAILED,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
@@ -89,6 +94,7 @@ from adobe_vipm.flows.utils.parameter import (
     set_flex_discounts_parameter,
     set_ordering_parameter_error,
     update_agreement_params_visibility,
+    update_ordering_parameter_value,
 )
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
@@ -592,6 +598,19 @@ def get_configuration_template_name(order):
     )
 
 
+def get_existing_renewal_order(adobe_client, context, ext_ref) -> dict | None:
+    """Query Adobe for an existing RENEWAL order for this MPT order."""
+    orders = adobe_client.get_orders(
+        context.authorization_id,
+        context.adobe_customer_id,
+        filters={"order-type": ORDER_TYPE_RENEWAL},
+    )
+    for order in orders:
+        if order["externalReferenceId"] == ext_ref:
+            return order
+    return None
+
+
 class SetupDueDate(Step):
     """Setups properly due date."""
 
@@ -996,6 +1015,7 @@ class CreateOrUpdateAssets(Step):
         one_time_skus = get_one_time_skus(client, context.order)
         product_id = context.order["agreement"]["product"]["id"]
         template = get_asset_template_by_name(client, product_id, TEMPLATE_ASSET_DEFAULT)
+
         for line in filter(
             lambda line_item: get_partial_sku(line_item["offerId"]) in one_time_skus,
             context.adobe_new_order["lineItems"],
@@ -1038,17 +1058,20 @@ class CreateOrUpdateSubscriptions(Step):
 
     def __call__(self, client, context, next_step):
         """Create or update subscriptions in MPT based on Adobe Subscriptions."""
-        if not context.adobe_new_order:
+        if not context.adobe_new_order and not context.manual_renewal_lines:
             next_step(client, context)
             return
 
         adobe_client = get_adobe_client()
         one_time_skus = get_one_time_skus(client, context.order)
 
-        lines = filter(
-            lambda line_item: get_partial_sku(line_item["offerId"]) not in one_time_skus,
-            context.adobe_new_order["lineItems"],
-        )
+        all_line_items = self._merge_adobe_line_items(context)
+
+        lines = [
+            line_item
+            for line_item in all_line_items
+            if get_partial_sku(line_item["offerId"]) not in one_time_skus
+        ]
 
         for line in lines:
             order_line = get_order_line_by_sku(context.order, line["offerId"])
@@ -1170,6 +1193,24 @@ class CreateOrUpdateSubscriptions(Step):
             }
 
         return subscription_data
+
+    def _merge_adobe_line_items(self, context):
+        """Merge lineitems from new and renewal orders by subs ID consolidating quantities."""
+        raw_line_items = []
+        if context.adobe_new_order:
+            raw_line_items.extend(context.adobe_new_order["lineItems"])
+        for renewal_order in context.adobe_renewal_orders.values():
+            raw_line_items.extend(renewal_order["lineItems"])
+
+        merged = {}
+        for item in raw_line_items:
+            sub_id = item["subscriptionId"]
+            existing = merged.get(sub_id)
+            if existing is None:
+                merged[sub_id] = {**item}
+            else:
+                existing["quantity"] += item["quantity"]
+        return list(merged.values())
 
 
 class CompleteOrder(Step):
@@ -1368,3 +1409,316 @@ class UpdateAgreementParamsVisibility(Step):
         except SDKMPTError:
             logger.exception("%s: failed to update parameters visibility.", context)
         next_step(client, context)
+
+
+class CheckManualRenewalSubscriptions(Step):
+    """
+    Identifies subscriptions that require manual renewal and regular orders.
+
+    On the first pipeline run, fetches Adobe subscription data to detect lines with
+    allowedActions: ["MANUAL_RENEWAL"], computes renewal quantities, and persists the
+    result to Param.LATE_RENEWALS_INFO so subsequent runs can skip the Adobe lookup.
+    This is necessary because once the RENEWAL order is submitted, Adobe no longer
+    reports the expired state and allowedActions would be empty on retries.
+
+    For each upsize or new line requiring manual renewal:
+      - The line is removed from the normal upsize/new_lines processing.
+      - The renewal quantity is set to min(requested_qty, adobe current_qty).
+      - Any excess quantity (requested > current) is re-added as a new line for
+        a regular purchase order.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Identify MANUAL_RENEWAL subscriptions and split them from normal flow."""
+        stored = self._load_late_renewals_info(context)
+        if stored:
+            logger.info(
+                "%s: restoring manual renewal lines from persisted parameter (%s SKU(s))",
+                context,
+                len(stored),
+            )
+            self._restore_from_stored(context, stored)
+        else:
+            self._compute_from_adobe(context)
+            if context.manual_renewal_lines:
+                self._persist_late_renewals_info(client, context)
+
+        next_step(client, context)
+
+    def _load_late_renewals_info(self, context) -> dict | None:
+        """Return persisted manual renewal data from the ordering parameter, or None if absent."""
+        param = get_ordering_parameter(context.order, Param.LATE_RENEWALS_INFO.value)
+        value = param.get("value")
+        if not value:
+            return None
+
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError:
+            logger.warning(
+                "%s: invalid %s payload, recomputing from Adobe",
+                context,
+                Param.LATE_RENEWALS_INFO.value,
+            )
+            return None
+        return payload
+
+    def _persist_late_renewals_info(self, client, context) -> None:
+        """Serialize manual_renewal_lines (without the line ref) and save to ordering parameter."""
+        context.order = update_ordering_parameter_value(
+            context.order,
+            Param.LATE_RENEWALS_INFO.value,
+            json.dumps(context.manual_renewal_lines),
+        )
+        update_order(client, context.order_id, parameters=context.order["parameters"])
+        logger.info(
+            "%s: persisted late renewals info for %s SKU(s)",
+            context,
+            len(context.manual_renewal_lines.items()),
+        )
+
+    def _restore_from_stored(self, context, stored: dict) -> None:
+        """
+        Restore manual_renewal_lines from persisted data, replaying the line-split logic.
+
+        Matches renewal lines from upsize/new_lines by SKU, removes them, and re-adds
+        any excess quantity as new lines — mirroring _process_renewal_line.
+        """
+        context.manual_renewal_lines = stored
+        for sku, info in stored.items():
+            stored_line = info["line"]
+
+            context.upsize_lines = [
+                line for line in context.upsize_lines if line.get("id") != stored_line.get("id")
+            ]
+            context.new_lines = [
+                line for line in context.new_lines if line.get("id") != stored_line.get("id")
+            ]
+
+            if info["excess_qty"] > 0:
+                context.new_lines.append({
+                    **info["line"],
+                    "quantity": info["excess_qty"],
+                    "oldQuantity": 0,
+                })
+                logger.info(
+                    "%s: excess quantity %s for sku %s will be purchased as a new order",
+                    context,
+                    info["excess_qty"],
+                    sku,
+                )
+
+    def _compute_from_adobe(self, context) -> None:
+        """Detect manual renewal subscriptions via Adobe API and populate manual_renewal_lines."""
+        adobe_subscriptions_by_sku = self._get_adobe_subscriptions_by_sku(context)
+        for line in list(context.upsize_lines) + list(context.new_lines):
+            sku = line["item"]["externalIds"]["vendor"]
+            adobe_subscription = adobe_subscriptions_by_sku.get(sku)
+            if self._needs_manual_renewal(adobe_subscription):
+                self._process_renewal_line(context, line, adobe_subscription)
+
+    def _needs_manual_renewal(self, adobe_subscription) -> bool:
+        return adobe_subscription is not None and MANUAL_RENEWAL_ACTION in adobe_subscription.get(
+            "allowedActions", []
+        )
+
+    def _get_adobe_subscriptions_by_sku(self, context) -> dict:
+        """Return all Adobe subscriptions for the customer indexed by partial SKU."""
+        adobe_client = get_adobe_client()
+        deployment_id = get_deployment_id(context.order)
+        all_subscriptions = adobe_client.get_subscriptions_by_deployment(
+            context.authorization_id,
+            context.adobe_customer_id,
+            deployment_id,
+        )
+        return {get_partial_sku(sub["offerId"]): sub for sub in all_subscriptions["items"]}
+
+    def _process_renewal_line(self, context, line, adobe_subscription) -> None:
+        """Register a line as a manual renewal and split off any excess quantity."""
+        sku = line["item"]["externalIds"]["vendor"]
+        adobe_sub_id = adobe_subscription["subscriptionId"]
+        requested_qty = line["quantity"]
+        current_qty = adobe_subscription[Param.CURRENT_QUANTITY.value]
+        renewal_qty = min(requested_qty, current_qty)
+        excess_qty = requested_qty - renewal_qty
+
+        logger.info(
+            "%s: subscription %s (%s) requires manual renewal. "
+            "requested_qty=%s, current_qty=%s, renewal_qty=%s, excess_qty=%s",
+            context,
+            sku,
+            adobe_sub_id,
+            requested_qty,
+            current_qty,
+            renewal_qty,
+            excess_qty,
+        )
+
+        context.manual_renewal_lines[sku] = {
+            "line": line,
+            "adobe_subscription_id": adobe_sub_id,
+            "offer_id": adobe_subscription["offerId"],
+            "renewal_qty": renewal_qty,
+            "excess_qty": excess_qty,
+        }
+
+        for lst in (context.upsize_lines, context.new_lines):
+            if line in lst:
+                lst.remove(line)
+                break
+
+        if excess_qty > 0:
+            context.new_lines.append({**line, "quantity": excess_qty, "oldQuantity": 0})
+            logger.info(
+                "%s: excess quantity %s for sku %s will be purchased as a new order",
+                context,
+                excess_qty,
+                sku,
+            )
+
+
+class PreviewRenewalOrders(Step):
+    """Preview renewal orders."""
+
+    def __call__(self, client, context, next_step):
+        """Preview renewal orders."""
+        if not context.manual_renewal_lines:
+            next_step(client, context)
+            return
+
+        adobe_client = get_adobe_client()
+        ext_ref = f"{context.order_id}_RENEWAL"
+
+        existing_order = get_existing_renewal_order(adobe_client, context, ext_ref)
+        if existing_order:
+            logger.info("%s: renewal order %s already exists", context, existing_order["orderId"])
+            next_step(client, context)
+            return
+
+        preview = self._validate_preview(
+            adobe_client, client, context, f"{context.order_id}_RENEWAL"
+        )
+        if preview is None:
+            return
+
+        context.preview_late_renewal_order = preview
+        next_step(client, context)
+
+    def _validate_preview(self, adobe_client, client, context, ext_ref):
+        """Validate all subscriptions via a single PREVIEW_RENEWAL request."""
+        line_items = self._build_line_items(context)
+        try:
+            preview = adobe_client.create_renewal_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                ext_ref,
+                line_items,
+                order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+            )
+            logger.info(
+                "%s: preview renewal validated for %s subscription(s)",
+                context,
+                len(line_items),
+            )
+        except AdobeAPIError:
+            logger.exception("%s: preview renewal failed", context)
+            return None
+        return preview
+
+    def _build_line_items(self, context):
+        """Build all line items from all manual renewal subscriptions."""
+        return [
+            {
+                "extLineItemNumber": line_item,
+                "offerId": info["offer_id"],
+                "quantity": info["renewal_qty"],
+                "subscriptionId": info["adobe_subscription_id"],
+            }
+            for line_item, info in enumerate(context.manual_renewal_lines.values(), start=1)
+        ]
+
+
+class SubmitRenewalOrders(Step):
+    """
+    Submits a single RENEWAL order for subscriptions identified by CheckManualRenewalSubscriptions.
+
+    1. Validates all subscriptions via a single PREVIEW_RENEWAL order with all line items.
+    2. Creates a single actual RENEWAL order using the preview line items.
+    3. Waits for the order to reach PROCESSED status (retries if PENDING).
+    The existing renewal order is detected by its externalReferenceId to ensure idempotency.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Submit a single RENEWAL order for all manual renewal subscriptions."""
+        if not context.manual_renewal_lines:
+            next_step(client, context)
+            return
+
+        adobe_client = get_adobe_client()
+        ext_ref = f"{context.order_id}_RENEWAL"
+
+        order = self.create_renewal_order(adobe_client, client, context, ext_ref)
+        if order is None:
+            return
+
+        if order["status"] == AdobeStatus.PENDING:
+            logger.info("%s: renewal order %s is still pending", context, order["orderId"])
+            return
+
+        if order["status"] != AdobeStatus.PROCESSED:
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_MANUAL_RENEWAL_ORDER_FAILED.to_dict(
+                    subscription_id=ext_ref,
+                    error=f"unexpected status {order['status']}",
+                ),
+            )
+            return
+
+        context.adobe_renewal_orders[ext_ref] = order
+        next_step(client, context)
+
+    def create_renewal_order(self, adobe_client, client, context, ext_ref) -> dict | None:
+        """Return an existing renewal order or create a new one after preview validation."""
+        existing_order = get_existing_renewal_order(adobe_client, context, ext_ref)
+        if existing_order:
+            logger.info("%s: renewal order %s already exists", context, existing_order["orderId"])
+            return existing_order
+
+        order = self._submit_order(
+            adobe_client, client, context, ext_ref, context.preview_late_renewal_order
+        )
+        if order is None:
+            return None
+
+        context.order = set_adobe_order_ids_created_parameter(context, [order["orderId"]])
+        update_order(
+            client,
+            context.order_id,
+            parameters=context.order["parameters"],
+        )
+        return order
+
+    def _submit_order(self, adobe_client, client, context, ext_ref, preview):
+        """Create a single actual RENEWAL order with all line items."""
+        try:
+            order = adobe_client.create_renewal_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                ext_ref,
+                preview["lineItems"],
+            )
+            logger.info("%s: renewal order %s created", context, order.get("orderId"))
+        except AdobeAPIError as error:
+            logger.exception("%s: renewal order failed", context)
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_MANUAL_RENEWAL_ORDER_FAILED.to_dict(
+                    subscription_id=ext_ref,
+                    error=error.message,
+                ),
+            )
+            return None
+        return order
