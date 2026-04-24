@@ -413,6 +413,17 @@ def order_parameters_factory():
                 "value": adobe_order_ids or "",
                 "error": None,
             },
+            {
+                "id": "PAR-0000-0009",
+                "name": "Late Renewals Info",
+                "externalId": Param.LATE_RENEWALS_INFO.value,
+                "type": "DataObject",
+                "value": "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+            },
         ]
 
     return _order_parameters
