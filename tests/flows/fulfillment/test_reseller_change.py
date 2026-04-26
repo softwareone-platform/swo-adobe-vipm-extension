@@ -15,15 +15,18 @@ from adobe_vipm.flows.fulfillment.reseller_transfer import (
     fulfill_reseller_change_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
+    CheckManualRenewalSubscriptions,
     CompleteOrder,
     CreateOrUpdateAssets,
     CreateOrUpdateSubscriptions,
     GetPreviewOrder,
     NullifyFlexDiscountParam,
+    PreviewRenewalOrders,
     SetOrUpdateCotermDate,
     SetupDueDate,
     StartOrderProcessing,
     SubmitNewOrder,
+    SubmitRenewalOrders,
     SyncAgreement,
     UpdateAgreementParamsVisibility,
 )
@@ -532,10 +535,13 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client):
 
     fulfill_purchase_order(mock_mpt_client, mocked_context)  # act
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 10
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 13
     expected_steps = [
+        CheckManualRenewalSubscriptions,
         GetPreviewOrder,
         UpdatePrices,
+        PreviewRenewalOrders,
+        SubmitRenewalOrders,
         SubmitNewOrder,
         CreateOrUpdateAssets,
         CreateOrUpdateSubscriptions,

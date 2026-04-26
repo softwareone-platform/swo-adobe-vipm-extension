@@ -31,6 +31,9 @@ class Context:
     adobe_new_order: dict | None = None
     adobe_returnable_orders: dict = field(default_factory=dict)
     adobe_return_orders: dict = field(default_factory=dict)
+    manual_renewal_lines: dict = field(default_factory=dict)
+    adobe_renewal_orders: dict = field(default_factory=dict)
+    preview_late_renewal_order: dict | None = None
     membership_id: str | None = None
     adobe_transfer: dict | None = None
     adobe_transfer_order: dict = field(default_factory=dict)

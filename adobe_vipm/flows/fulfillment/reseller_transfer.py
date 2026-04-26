@@ -312,8 +312,11 @@ class CompleteResellerTransferOrder(Step):
 def fulfill_purchase_order(client, context):
     """Purchase order pipeline."""
     pipeline = Pipeline(
+        shared.CheckManualRenewalSubscriptions(),
         shared.GetPreviewOrder(),
         UpdatePrices(is_validation=False),
+        shared.PreviewRenewalOrders(),
+        shared.SubmitRenewalOrders(),
         shared.SubmitNewOrder(),
         shared.CreateOrUpdateAssets(),
         shared.CreateOrUpdateSubscriptions(),
