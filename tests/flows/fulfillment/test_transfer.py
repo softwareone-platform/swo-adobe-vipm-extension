@@ -635,7 +635,7 @@ def test_transfer(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -643,7 +643,7 @@ def test_transfer(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -651,7 +651,7 @@ def test_transfer(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -917,7 +917,7 @@ def test_transfer(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -925,7 +925,7 @@ def test_transfer(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -933,7 +933,7 @@ def test_transfer(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -1340,7 +1340,7 @@ def test_transfer_with_no_profile_address(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -1348,7 +1348,7 @@ def test_transfer_with_no_profile_address(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -1356,7 +1356,7 @@ def test_transfer_with_no_profile_address(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -1615,7 +1615,7 @@ def test_transfer_with_no_profile_address(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -1623,7 +1623,7 @@ def test_transfer_with_no_profile_address(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -1631,7 +1631,7 @@ def test_transfer_with_no_profile_address(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -3254,7 +3254,7 @@ def test_transfer_3yc_customer(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -3262,7 +3262,7 @@ def test_transfer_3yc_customer(
                     "value": "COMMITTED",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -3270,7 +3270,7 @@ def test_transfer_3yc_customer(
                     "value": "2024-01-01",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -3522,7 +3522,7 @@ def test_transfer_3yc_customer(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -3530,7 +3530,7 @@ def test_transfer_3yc_customer(
                     "value": "COMMITTED",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -3538,7 +3538,7 @@ def test_transfer_3yc_customer(
                     "value": "2024-01-01",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -3909,7 +3909,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -3917,7 +3917,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "value": "COMMITTED",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -3925,7 +3925,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "value": "2024-01-01",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -4166,7 +4166,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -4174,7 +4174,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "value": "COMMITTED",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -4182,7 +4182,7 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "value": "2024-01-01",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -5085,7 +5085,7 @@ def test_transfer_gc_account_all_deployments_created(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -5093,7 +5093,7 @@ def test_transfer_gc_account_all_deployments_created(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -5101,7 +5101,7 @@ def test_transfer_gc_account_all_deployments_created(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -5367,7 +5367,7 @@ def test_transfer_gc_account_all_deployments_created(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -5375,7 +5375,7 @@ def test_transfer_gc_account_all_deployments_created(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -5383,7 +5383,7 @@ def test_transfer_gc_account_all_deployments_created(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -5886,7 +5886,7 @@ def test_transfer_gc_account_no_deployments(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -5894,7 +5894,7 @@ def test_transfer_gc_account_no_deployments(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -5902,7 +5902,7 @@ def test_transfer_gc_account_no_deployments(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -7492,7 +7492,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -7500,7 +7500,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -7508,7 +7508,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -7772,7 +7772,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -7780,7 +7780,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -7788,7 +7788,7 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -8725,7 +8725,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -8733,7 +8733,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -8741,7 +8741,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -8954,7 +8954,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -8962,7 +8962,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -8970,7 +8970,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
@@ -9236,7 +9236,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": None,
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -9244,7 +9244,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCStartDate",
                     "id": "PAR-2266-4848",
                     "name": "3YC Start Date",
@@ -9252,7 +9252,7 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "value": "",
                 },
                 {
-                    "constraints": {"hidden": True},
+                    "constraints": {"hidden": False},
                     "externalId": "3YCEndDate",
                     "id": "PAR-3528-2927",
                     "name": "3YC End Date",
