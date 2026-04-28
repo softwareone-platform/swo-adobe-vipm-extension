@@ -10,6 +10,7 @@ from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.adobe.mixins.customer import CustomerClientMixin
 from adobe_vipm.adobe.mixins.deployment import DeploymentClientMixin
 from adobe_vipm.adobe.mixins.order import OrderClientMixin
+from adobe_vipm.adobe.mixins.pricing import PricingClientMixin
 from adobe_vipm.adobe.mixins.reseller import ResellerClientMixin
 from adobe_vipm.adobe.mixins.subscription import SubscriptionClientMixin
 from adobe_vipm.adobe.mixins.transfer import TransferClientMixin
@@ -28,6 +29,7 @@ class AdobeClient(
     TransferClientMixin,
     DeploymentClientMixin,
     OrderClientMixin,
+    PricingClientMixin,
 ):
     """Adobe API Client."""
 

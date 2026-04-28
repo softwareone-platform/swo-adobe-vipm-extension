@@ -130,3 +130,34 @@ CANCELLATION_WINDOW_DAYS = 14
 MPT_NOTIFY_CATEGORIES = json.loads(
     os.getenv("MPT_NOTIFY_CATEGORIES", '{"ORDERS": "NTC-0000-0006"}')
 )
+
+
+class PriceListRegion(StrEnum):
+    """Adobe VIP Marketplace price list regions."""
+
+    AP = "AP"
+    EE = "EE"
+    JP = "JP"
+    LA = "LA"
+    MX = "MX"
+    NA = "NA"
+    PA = "PA"
+    WE = "WE"
+
+
+class PriceListCurrency(StrEnum):
+    """Currencies supported by the price list endpoint."""
+
+    AUD = "AUD"
+    EUR = "EUR"
+    GBP = "GBP"
+    JPY = "JPY"
+    USD = "USD"
+
+
+class PriceListType(StrEnum):
+    """Price list types."""
+
+    STANDARD = "STANDARD"
+    THREE_YC = "3YC"
+    STD_LGA = "STD-LGA"

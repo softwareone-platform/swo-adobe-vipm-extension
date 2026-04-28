@@ -34,7 +34,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
-    UpdatePrices,
+    UpdatePricesFromPriceList,
     ValidateGovernmentTransfer,
     ValidateResellerChange,
 )
@@ -56,7 +56,6 @@ from adobe_vipm.flows.utils import (
     split_downsizes_upsizes_new,
 )
 from adobe_vipm.flows.utils.validation import validate_government_lga_data
-from adobe_vipm.flows.validation.shared import GetPreviewOrder
 from adobe_vipm.notifications import send_error
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
@@ -520,14 +519,13 @@ def validate_transfer(mpt_client, order):
 
 
 def validate_reseller_change(mpt_client, order):
-    """Validate reseller change pipeline."""
+    """Validate a reseller change pipeline."""
     pipeline = Pipeline(
         SetupTransferContext(),
         FetchResellerChangeData(is_validation=True),
         ValidateResellerChange(is_validation=True),
         AddResellerChangeLinesToOrder(),
-        GetPreviewOrder(),
-        UpdatePrices(is_validation=True),
+        UpdatePricesFromPriceList(is_validation=True),
     )
     context = Context(order=order)
     pipeline.run(mpt_client, context)

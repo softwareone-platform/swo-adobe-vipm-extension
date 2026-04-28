@@ -17,11 +17,16 @@ def mock_get_product_items_by_skus(mocker, items_factory):
 
 @pytest.fixture
 def mock_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping_model):
-    def get_adobe_product_by_marketplace_sku(sku):
-        return mock_get_sku_adobe_mapping_model.from_short_id(sku, "COM")
+    def get_adobe_product_by_marketplace_sku(sku, market_segment):
+        return mock_get_sku_adobe_mapping_model.from_short_id(sku, market_segment)
 
     mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        new=get_adobe_product_by_marketplace_sku,
+        spec=True,
+    )
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_adobe_product_by_marketplace_sku",
         new=get_adobe_product_by_marketplace_sku,
         spec=True,
     )

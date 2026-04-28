@@ -9,11 +9,14 @@ from django.conf import settings
 from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_licensee, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
+from adobe_vipm.adobe.config import get_config
 from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.dataclasses import PriceListPayload
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request, get_item_by_partial_sku
 from adobe_vipm.airtable.models import (
     get_adobe_product_by_marketplace_sku,
+    get_adobe_sku,
     get_skus_with_available_prices,
     get_skus_with_available_prices_3yc,
 )
@@ -30,6 +33,7 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_SKU_AVAILABILITY,
     ERR_SKU_NOT_FOUND,
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC,
     TEMPLATE_NAME_QUERY_3YC,
     MarketSegment,
@@ -670,6 +674,96 @@ class UpdatePrices(Step):
         """Update the order with new prices."""
         update_order(self._client, self._context.order_id, lines=lines)
         logger.info("%s: order lines prices updated successfully", self._context)
+
+
+class UpdatePricesFromPriceList(UpdatePrices):
+    """Update prices using Adobe's price list API instead of a PREVIEW order.
+
+    Used by reseller transfers, where many customers own end-of-sale items that
+    cause Adobe to reject PREVIEW orders (error 3123).
+    """
+
+    def __call__(self, client, context, next_step):
+        """Update prices using Adobe's price list API."""
+        if context.adobe_new_order:
+            next_step(client, context)
+            return
+
+        if not (context.upsize_lines or context.new_lines):
+            next_step(client, context)
+            return
+
+        self._client = client
+        self._context = context
+        requested_skus = self._get_requested_skus()
+        logger.info("Requested SKUs: %s", requested_skus)
+        try:
+            prices = self._fetch_price_list_prices(requested_skus)
+        except Exception as ex:
+            logger.exception(
+                "%s: failed to fetch price list prices for SKUs %s",
+                context,
+                requested_skus,
+            )
+            manage_order_error(
+                client,
+                context,
+                ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(ex)),
+                is_validation=self.is_validation,
+            )
+            return
+        if not prices:
+            logger.warning(
+                "%s: no matching offers found in Adobe price list for SKUs %s, "
+                "skipping price update",
+                context,
+                requested_skus,
+            )
+            next_step(client, context)
+            return
+
+        self._actual_skus = [sku for sku in requested_skus if sku in prices]
+        updated_lines = self._create_updated_lines(prices)
+        self._context.order["lines"] = updated_lines
+        if not self.is_validation:
+            self._update_order(updated_lines)
+
+        next_step(self._client, self._context)
+
+    def _get_requested_skus(self):
+        """Build full Adobe SKUs from MPT order upsize/new lines using customer discount level."""
+        market_segment = self._context.market_segment
+        skus = []
+        for line in self._context.upsize_lines + self._context.new_lines:
+            vendor_id = line["item"]["externalIds"]["vendor"]
+            skus.append(get_adobe_sku(vendor_id, market_segment))
+        return skus
+
+    def _fetch_price_list_prices(self, requested_skus):
+        """Fetch prices via Adobe price list API and return mapping of sku to price."""
+        adobe_client = get_adobe_client()
+        config = get_config()
+        authorization = config.get_authorization(self._context.authorization_id)
+        country_code = self._context.order["agreement"]["seller"]["address"][
+            "country"
+        ]  # TODO: temporary hack until Adobe to includes the country in the reseller transfer
+        country = config.get_country(country_code)
+        payload = PriceListPayload(
+            region=country.pricelist_region,
+            market_segment=self._context.market_segment,
+            currency=authorization.currency,
+            price_list_month=dt.datetime.now(tz=dt.UTC).strftime("%Y%m"),
+        )
+        logger.info("Fetching Adobe price list with payload: %s", payload)
+        price_list = adobe_client.get_price_list(authorization, payload)
+        offer_prices = {
+            offer["offerId"]: offer["partnerPrice"]
+            for offer in price_list.get("offers", [])
+            if offer.get("partnerPrice") is not None
+        }
+        prices = {sku: offer_prices[sku] for sku in requested_skus if sku in offer_prices}
+        logger.info("Adobe price list prices: %s", prices)
+        return prices
 
 
 class FetchResellerChangeData(Step):
