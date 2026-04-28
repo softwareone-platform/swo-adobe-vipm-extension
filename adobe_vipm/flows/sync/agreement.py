@@ -19,12 +19,12 @@ from adobe_vipm.airtable import models
 from adobe_vipm.flows import utils as flows_utils
 from adobe_vipm.flows.benefits import send_3yc_expiration_notification
 from adobe_vipm.flows.constants import (
-    MARKET_SEGMENT_EDUCATION,
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
     AgreementStatus,
     ItemTermsModel,
+    MarketSegment,
     Param,
     SubscriptionStatus,
 )
@@ -481,7 +481,7 @@ class AgreementSyncer:  # noqa: WPS214
             "value": self._adobe_customer.get("cotermDate", ""),
         })
 
-        if get_market_segment(self.product_id) == MARKET_SEGMENT_EDUCATION:
+        if get_market_segment(self.product_id) == MarketSegment.EDUCATION:
             self._add_education_market_sub_segments(parameters)
 
         self._execute_agreement_update(agreement, parameters)

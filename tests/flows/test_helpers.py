@@ -23,9 +23,8 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_CUSTOMER_LOST_EXCEPTION,
-    MARKET_SEGMENT_COMMERCIAL,
-    MARKET_SEGMENT_GOVERNMENT,
     TEMPLATE_NAME_QUERY_3YC,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -2310,14 +2309,14 @@ def test_validate_sku_availability_with_commited_3yc_continues_validation(
         downsize_lines=[],
         product_id="PRD-123",
         currency="USD",
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
+        market_segment=MarketSegment.COMMERCIAL,
     )
     step = ValidateSkuAvailability(is_validation=True)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should continue with SKU validation
-    mocked_get_adobe_product.assert_called_once_with("65304578CA", MARKET_SEGMENT_COMMERCIAL)
+    mocked_get_adobe_product.assert_called_once_with("65304578CA", MarketSegment.COMMERCIAL)
     mocked_get_prices.assert_called_once_with(
         "PRD-123", "USD", dt.date.fromisoformat(commitment["startDate"]), ["65304578CA"]
     )
@@ -2364,14 +2363,14 @@ def test_validate_sku_availability_with_expired_3yc_commitment_continues_validat
         downsize_lines=[],
         product_id="PRD-123",
         currency="USD",
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
+        market_segment=MarketSegment.COMMERCIAL,
     )
     step = ValidateSkuAvailability(is_validation=True)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should continue with SKU validation
-    mocked_get_adobe_product.assert_called_once_with("65304578CA", MARKET_SEGMENT_COMMERCIAL)
+    mocked_get_adobe_product.assert_called_once_with("65304578CA", MarketSegment.COMMERCIAL)
     mocked_get_prices.assert_called_once_with("PRD-123", "USD", ["65304578CA"])
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
@@ -2660,7 +2659,7 @@ def test_validate_government_transfer_success_when_validation_passes(
     mock_adobe_client,
 ):
     mocked_get_market_segment = mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocked_get_adobe_client = mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client
@@ -2699,7 +2698,7 @@ def test_validate_government_transfer_government_lga_error_fulfillment_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
@@ -2738,7 +2737,7 @@ def test_validate_government_transfer_government_lga_error_validation_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
@@ -2780,7 +2779,7 @@ def test_validate_government_transfer_government_error_fulfillment_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
@@ -2817,7 +2816,7 @@ def test_validate_government_transfer_government_error_validation_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(

@@ -7,9 +7,7 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
-    MARKET_SEGMENT_COMMERCIAL,
-    MARKET_SEGMENT_EDUCATION,
-    MARKET_SEGMENT_GOVERNMENT,
+    MarketSegment,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.validation.shared import (
@@ -73,7 +71,7 @@ def test_validate_duplicate_lines_step_no_lines(mocker, mock_mpt_client, mock_or
 
 @pytest.mark.parametrize(
     "segment",
-    [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
+    [MarketSegment.GOVERNMENT, MarketSegment.EDUCATION, MarketSegment.COMMERCIAL],
 )
 def test_get_preview_order_step(
     mocker, mock_adobe_client, order_factory, adobe_order_factory, segment, mock_mpt_client
@@ -104,7 +102,7 @@ def test_get_preview_order_step(
 
 @pytest.mark.parametrize(
     "segment",
-    [MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_EDUCATION, MARKET_SEGMENT_COMMERCIAL],
+    [MarketSegment.GOVERNMENT, MarketSegment.EDUCATION, MarketSegment.COMMERCIAL],
 )
 def test_get_preview_order_step_no_deployment(
     mocker, mock_adobe_client, order_factory, adobe_order_factory, mock_mpt_client, segment
@@ -161,7 +159,7 @@ def test_get_preview_order_step_api_error(
         order=mock_order,
         upsize_lines=mock_order["lines"],
         authorization_id="auth-id",
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
+        market_segment=MarketSegment.COMMERCIAL,
     )
     step = GetPreviewOrder()
 
@@ -183,7 +181,7 @@ def test_get_preview_order_step_product_not_found_error(
         order=mock_order,
         upsize_lines=mock_order["lines"],
         authorization_id="auth-id",
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
+        market_segment=MarketSegment.COMMERCIAL,
     )
     step = GetPreviewOrder()
 

@@ -30,10 +30,9 @@ from adobe_vipm.flows.constants import (
     ERR_DOWNSIZE_MINIMUM_3YC_GENERIC,
     ERR_SKU_AVAILABILITY,
     ERR_SKU_NOT_FOUND,
-    MARKET_SEGMENT_GOVERNMENT,
-    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC,
     TEMPLATE_NAME_QUERY_3YC,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
@@ -761,8 +760,8 @@ class ValidateResellerChange(Step):
 
     def _validate_government_reseller_change(self, mpt_client, context):
         if get_market_segment(context.order["product"]["id"]) in {
-            MARKET_SEGMENT_GOVERNMENT,
-            MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
+            MarketSegment.GOVERNMENT,
+            MarketSegment.LARGE_GOVERNMENT_AGENCY,
         }:
             try:
                 validate_government_lga_data(context.order, context.adobe_transfer)
@@ -864,8 +863,8 @@ class ValidateGovernmentTransfer(Step):
     def __call__(self, mpt_client, context, next_step):
         """Validate the government transfer."""
         if get_market_segment(context.order["product"]["id"]) not in {
-            MARKET_SEGMENT_GOVERNMENT,
-            MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
+            MarketSegment.GOVERNMENT,
+            MarketSegment.LARGE_GOVERNMENT_AGENCY,
         }:
             next_step(mpt_client, context)
             return

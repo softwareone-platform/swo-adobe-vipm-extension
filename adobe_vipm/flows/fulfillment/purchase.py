@@ -22,11 +22,11 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_VIPM_UNHANDLED_EXCEPTION,
-    MARKET_SEGMENT_EDUCATION,
     MARKET_SEGMENTS,
     TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
     TEMPLATE_NAME_PURCHASE,
     VALID_GOVERNMENT_AGENCY_TYPES,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -128,7 +128,7 @@ class ValidateEducationSubSegments(Step):
 
     def _requires_education_subsegment_query(self, context):
         """Check if education segment requires subsegment query."""
-        if context.market_segment != MARKET_SEGMENT_EDUCATION:
+        if context.market_segment != MarketSegment.EDUCATION:
             return False
 
         company_profile = context.adobe_customer.get("companyProfile", {})

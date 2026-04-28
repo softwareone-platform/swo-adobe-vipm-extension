@@ -10,9 +10,9 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_COMPANY_NAME,
     ERR_ADOBE_CONTACT,
     ERR_VIPM_UNHANDLED_EXCEPTION,
-    MARKET_SEGMENT_COMMERCIAL,
     TEMPLATE_EDUCATION_QUERY_SUBSEGMENT,
     TEMPLATE_NAME_PURCHASE,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -108,7 +108,7 @@ def test_validate_market_segment_eligibility_commercial(
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     context = Context(
-        order=order, product_id="PRD-1111-1111", market_segment=MARKET_SEGMENT_COMMERCIAL
+        order=order, product_id="PRD-1111-1111", market_segment=MarketSegment.COMMERCIAL
     )
     step = ValidateEducationSubSegments()
 

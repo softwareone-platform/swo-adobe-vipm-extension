@@ -45,10 +45,10 @@ from adobe_vipm.flows.constants import (
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UPDATING_TRANSFER_ITEMS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
-    MARKET_SEGMENT_COMMERCIAL,
     TEMPLATE_NAME_BULK_MIGRATE,
     TEMPLATE_NAME_TRANSFER,
     ItemTermsModel,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -1076,7 +1076,7 @@ def get_main_agreement(product_id, authorization_id, membership_id):
     Returns:
         GCMainAgreement or None: The main agreement in Airtable if found, None otherwise.
     """
-    if get_market_segment(product_id) == MARKET_SEGMENT_COMMERCIAL:
+    if get_market_segment(product_id) == MarketSegment.COMMERCIAL:
         return get_gc_main_agreement(product_id, authorization_id, membership_id)
     return None
 
@@ -1092,7 +1092,7 @@ def get_agreement_deployments(product_id, agreement_id):
     Returns:
         list or None: The agreement deployments in Airtable if found, None otherwise
     """
-    if get_market_segment(product_id) == MARKET_SEGMENT_COMMERCIAL:
+    if get_market_segment(product_id) == MarketSegment.COMMERCIAL:
         return get_gc_agreement_deployments_by_main_agreement(product_id, agreement_id)
     return None
 
