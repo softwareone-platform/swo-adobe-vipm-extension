@@ -7,7 +7,7 @@ from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
-from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
+from adobe_vipm.flows.constants import MarketSegment
 from adobe_vipm.flows.context import Context
 
 
@@ -366,7 +366,7 @@ def test_get_preview_order_line_item(
     }
 
     result = mocked_client._get_preview_order_line_item(
-        line, "65304578CA", 2, "FLEX_DISCOUNT", MARKET_SEGMENT_COMMERCIAL
+        line, "65304578CA", 2, "FLEX_DISCOUNT", MarketSegment.COMMERCIAL
     )
 
     assert result == {

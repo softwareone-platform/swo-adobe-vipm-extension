@@ -1,6 +1,13 @@
 import datetime as dt
 from dataclasses import dataclass
 
+from adobe_vipm.adobe.constants import (
+    PriceListCurrency,
+    PriceListRegion,
+    PriceListType,
+)
+from adobe_vipm.flows.constants import MarketSegment
+
 
 @dataclass(frozen=True)
 class Authorization:
@@ -73,6 +80,57 @@ class ReturnableOrderInfo:
     order: dict
     line: dict
     quantity: int
+
+
+@dataclass(frozen=True)
+class PriceListFilters:
+    """Optional filters for the Fetch Price List API."""
+
+    offer_id: str | None = None
+    product_family: str | None = None
+    first_order_date: str | None = None
+    last_order_date: str | None = None
+    discount_code: str | None = None
+
+    def to_dict(self) -> dict:
+        """Serialize to the camelCase dict expected by the API, omitting None values."""
+        raw = {
+            "offerId": self.offer_id,
+            "productFamily": self.product_family,
+            "firstOrderDate": self.first_order_date,
+            "lastOrderDate": self.last_order_date,
+            "discountCode": self.discount_code,
+        }
+        return {key: attr for key, attr in raw.items() if attr is not None}
+
+
+@dataclass(frozen=True)
+class PriceListPayload:
+    """Request body for the Fetch Price List API (POST /v3/pricelist)."""
+
+    region: PriceListRegion
+    market_segment: MarketSegment
+    currency: PriceListCurrency
+    price_list_month: str  # YYYYMM format
+    price_list_type: PriceListType | None = None
+    filters: PriceListFilters | None = None
+    include_offer_attributes: list[str] | None = None
+
+    def to_dict(self) -> dict:
+        """Serialize to the camelCase dict expected by the API."""
+        result = {
+            "region": self.region,
+            "marketSegment": self.market_segment,
+            "currency": self.currency,
+            "priceListMonth": self.price_list_month,
+        }
+        if self.price_list_type is not None:
+            result["priceListType"] = self.price_list_type
+        if self.filters is not None:
+            result["filters"] = self.filters.to_dict()
+        if self.include_offer_attributes is not None:
+            result["includeOfferAttributes"] = self.include_offer_attributes
+        return result
 
 
 def _wrap_secret(secret: str) -> str:

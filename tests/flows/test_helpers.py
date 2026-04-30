@@ -12,6 +12,7 @@ from adobe_vipm.adobe.constants import (
     ResellerChangeAction,
     ThreeYearCommitmentStatus,
 )
+from adobe_vipm.adobe.dataclasses import PriceListPayload
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AdobeError,
@@ -23,9 +24,9 @@ from adobe_vipm.flows.constants import (
     ERR_ADOBE_GOVERNMENT_VALIDATE_IS_NOT_LGA,
     ERR_ADOBE_RESSELLER_CHANGE_PREVIEW,
     ERR_CUSTOMER_LOST_EXCEPTION,
-    MARKET_SEGMENT_COMMERCIAL,
-    MARKET_SEGMENT_GOVERNMENT,
+    ERR_VIPM_UNHANDLED_EXCEPTION,
     TEMPLATE_NAME_QUERY_3YC,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -35,6 +36,7 @@ from adobe_vipm.flows.helpers import (
     PrepareCustomerData,
     SetupContext,
     UpdatePrices,
+    UpdatePricesFromPriceList,
     Validate3YCCommitment,
     ValidateGovernmentTransfer,
     ValidateResellerChange,
@@ -797,6 +799,284 @@ def test_update_prices_step_with_multiple_lines(
         ],
     )
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_from_price_list_updates_lines(
+    mocker,
+    mock_mpt_client,
+    mock_next_step,
+    mock_order,
+    mock_update_order,
+    mock_adobe_client,
+    mock_adobe_config,
+    adobe_customer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_sku",
+        return_value="65304578CA01A12",
+    )
+    mock_adobe_client.get_price_list.return_value = {
+        "offers": [
+            {"offerId": "65304578CA01A12", "partnerPrice": 999.99},
+        ],
+    }
+    upsize_lines = mock_order["lines"]
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        authorization_id="AUT-1234-4567",
+        market_segment=MarketSegment.COMMERCIAL,
+        currency="USD",
+        adobe_customer=adobe_customer_factory(),
+        upsize_lines=upsize_lines,
+    )
+    step = UpdatePricesFromPriceList(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_adobe_client.get_price_list.assert_called_once()
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        lines=[
+            {
+                "id": mock_order["lines"][0]["id"],
+                "price": {"unitPP": 999.99},
+            },
+        ],
+    )
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_from_price_list_validation_only_does_not_update_order(
+    mocker,
+    mock_mpt_client,
+    mock_next_step,
+    mock_order,
+    mock_update_order,
+    mock_adobe_client,
+    mock_adobe_config,
+    adobe_customer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_sku",
+        return_value="65304578CA01A12",
+    )
+    mock_adobe_client.get_price_list.return_value = {
+        "offers": [
+            {"offerId": "65304578CA01A12", "partnerPrice": 999.99},
+        ],
+    }
+    upsize_lines = mock_order["lines"]
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        authorization_id="AUT-1234-4567",
+        market_segment=MarketSegment.COMMERCIAL,
+        currency="USD",
+        adobe_customer=adobe_customer_factory(),
+        upsize_lines=upsize_lines,
+    )
+    step = UpdatePricesFromPriceList(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_update_order.assert_not_called()
+    assert mock_order["lines"][0]["price"] == {"unitPP": 999.99}
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_from_price_list_skips_when_adobe_new_order_exists(
+    mock_mpt_client, mock_next_step, mock_order, mock_update_order, mock_adobe_client
+):
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        adobe_new_order={"orderId": "ORD-EXISTING"},
+    )
+    step = UpdatePricesFromPriceList(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_adobe_client.get_price_list.assert_not_called()
+    mock_update_order.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_from_price_list_skips_without_upsize_or_new_lines(
+    mock_mpt_client, mock_next_step, mock_order, mock_update_order, mock_adobe_client
+):
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+    )
+    step = UpdatePricesFromPriceList(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_adobe_client.get_price_list.assert_not_called()
+    mock_update_order.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_from_price_list_skips_when_no_matching_offers(
+    mocker,
+    mock_mpt_client,
+    mock_next_step,
+    mock_order,
+    mock_update_order,
+    mock_adobe_client,
+    mock_adobe_config,
+    adobe_customer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_sku",
+        return_value="65304578CA01A12",
+    )
+    mock_adobe_client.get_price_list.return_value = {
+        "offers": [
+            {"offerId": "DIFFERENT-SKU", "partnerPrice": 999.99},
+        ],
+    }
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        authorization_id="AUT-1234-4567",
+        market_segment=MarketSegment.COMMERCIAL,
+        currency="USD",
+        adobe_customer=adobe_customer_factory(),
+        upsize_lines=mock_order["lines"],
+    )
+    step = UpdatePricesFromPriceList(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_update_order.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_from_price_list_builds_payload_from_customer_and_authorization(
+    mocker,
+    mock_mpt_client,
+    mock_next_step,
+    mock_order,
+    mock_update_order,
+    mock_adobe_client,
+    mock_adobe_config,
+    adobe_customer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_sku",
+        return_value="65304578CA01A12",
+    )
+    mock_adobe_client.get_price_list.return_value = {
+        "offers": [
+            {"offerId": "65304578CA01A12", "partnerPrice": 999.99},
+        ],
+    }
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        authorization_id="AUT-1234-4567",
+        market_segment=MarketSegment.COMMERCIAL,
+        currency="USD",
+        adobe_customer=adobe_customer_factory(country="US"),
+        upsize_lines=mock_order["lines"],
+    )
+    step = UpdatePricesFromPriceList(is_validation=False)
+
+    with freeze_time("2026-04-29"):
+        step(mock_mpt_client, context, mock_next_step)  # act
+
+    call_args = mock_adobe_client.get_price_list.call_args
+    payload = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs.get("payload")
+    assert isinstance(payload, PriceListPayload)
+    assert payload.region == "NA"
+    assert payload.market_segment == MarketSegment.COMMERCIAL
+    assert payload.currency == "USD"
+    assert payload.price_list_month == "202604"
+
+
+def test_update_prices_from_price_list_fails_order_when_price_list_raises(
+    mocker,
+    mock_mpt_client,
+    mock_next_step,
+    mock_order,
+    mock_update_order,
+    mock_adobe_client,
+    mock_adobe_config,
+    adobe_customer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_sku",
+        return_value="65304578CA01A12",
+    )
+    http_error = AdobeHttpError(500, "Internal Server Error")
+    mock_adobe_client.get_price_list.side_effect = http_error
+    mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        authorization_id="AUT-1234-4567",
+        market_segment=MarketSegment.COMMERCIAL,
+        currency="USD",
+        adobe_customer=adobe_customer_factory(),
+        upsize_lines=mock_order["lines"],
+    )
+    step = UpdatePricesFromPriceList(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    mock_update_order.assert_not_called()
+    mocked_switch_order_to_failed.assert_called_once_with(
+        mock_mpt_client,
+        context.order,
+        ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(http_error)),
+    )
+
+
+def test_update_prices_from_price_list_fails_validation_when_price_list_raises(
+    mocker,
+    mock_mpt_client,
+    mock_next_step,
+    mock_order,
+    mock_update_order,
+    mock_adobe_client,
+    mock_adobe_config,
+    adobe_customer_factory,
+):
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_sku",
+        return_value="65304578CA01A12",
+    )
+    http_error = AdobeHttpError(500, "Internal Server Error")
+    mock_adobe_client.get_price_list.side_effect = http_error
+    mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
+    mocked_set_order_error = mocker.patch("adobe_vipm.flows.helpers.set_order_error")
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        product_id=mock_order["agreement"]["product"]["id"],
+        authorization_id="AUT-1234-4567",
+        market_segment=MarketSegment.COMMERCIAL,
+        currency="USD",
+        adobe_customer=adobe_customer_factory(),
+        upsize_lines=mock_order["lines"],
+    )
+    step = UpdatePricesFromPriceList(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_next_step.assert_not_called()
+    mock_update_order.assert_not_called()
+    mocked_switch_order_to_failed.assert_not_called()
+    mocked_set_order_error.assert_called_once()
 
 
 def test_validate_3yc_commitment_without_adobe_customer(
@@ -2310,14 +2590,14 @@ def test_validate_sku_availability_with_commited_3yc_continues_validation(
         downsize_lines=[],
         product_id="PRD-123",
         currency="USD",
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
+        market_segment=MarketSegment.COMMERCIAL,
     )
     step = ValidateSkuAvailability(is_validation=True)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should continue with SKU validation
-    mocked_get_adobe_product.assert_called_once_with("65304578CA", MARKET_SEGMENT_COMMERCIAL)
+    mocked_get_adobe_product.assert_called_once_with("65304578CA", MarketSegment.COMMERCIAL)
     mocked_get_prices.assert_called_once_with(
         "PRD-123", "USD", dt.date.fromisoformat(commitment["startDate"]), ["65304578CA"]
     )
@@ -2364,14 +2644,14 @@ def test_validate_sku_availability_with_expired_3yc_commitment_continues_validat
         downsize_lines=[],
         product_id="PRD-123",
         currency="USD",
-        market_segment=MARKET_SEGMENT_COMMERCIAL,
+        market_segment=MarketSegment.COMMERCIAL,
     )
     step = ValidateSkuAvailability(is_validation=True)
 
     step(mock_mpt_client, context, mock_next_step)  # act
 
     # Should continue with SKU validation
-    mocked_get_adobe_product.assert_called_once_with("65304578CA", MARKET_SEGMENT_COMMERCIAL)
+    mocked_get_adobe_product.assert_called_once_with("65304578CA", MarketSegment.COMMERCIAL)
     mocked_get_prices.assert_called_once_with("PRD-123", "USD", ["65304578CA"])
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
@@ -2660,7 +2940,7 @@ def test_validate_government_transfer_success_when_validation_passes(
     mock_adobe_client,
 ):
     mocked_get_market_segment = mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocked_get_adobe_client = mocker.patch(
         "adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client
@@ -2699,7 +2979,7 @@ def test_validate_government_transfer_government_lga_error_fulfillment_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
@@ -2738,7 +3018,7 @@ def test_validate_government_transfer_government_lga_error_validation_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
@@ -2780,7 +3060,7 @@ def test_validate_government_transfer_government_error_fulfillment_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(
@@ -2817,7 +3097,7 @@ def test_validate_government_transfer_government_error_validation_mode(
     mock_adobe_client,
 ):
     mocker.patch(
-        "adobe_vipm.flows.helpers.get_market_segment", return_value=MARKET_SEGMENT_GOVERNMENT
+        "adobe_vipm.flows.helpers.get_market_segment", return_value=MarketSegment.GOVERNMENT
     )
     mocker.patch("adobe_vipm.flows.helpers.get_adobe_client", return_value=mock_adobe_client)
     mocked_validate_government_lga_data = mocker.patch(

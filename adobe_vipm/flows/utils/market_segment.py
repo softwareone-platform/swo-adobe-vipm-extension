@@ -4,8 +4,8 @@ from django.conf import settings
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.flows.constants import (
-    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     STATUS_MARKET_SEGMENT_PENDING,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
@@ -38,7 +38,7 @@ def is_large_government_agency_type(product_id: str) -> bool:
     """
     return (
         get_for_product(settings, "PRODUCT_SEGMENT", product_id)
-        == MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY
+        == MarketSegment.LARGE_GOVERNMENT_AGENCY
     )
 
 

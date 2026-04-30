@@ -3,7 +3,6 @@ from copy import deepcopy
 
 import pytest
 
-from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import ERR_PROCESSING_TRANSFER_LINES, Param
 from adobe_vipm.flows.utils import get_ordering_parameter
@@ -21,12 +20,8 @@ def test_validate_reseller_change_success(
     adobe_reseller_change_preview_factory,
     lines_factory,
     adobe_order_factory,
-    mock_get_preview_order,
 ):
     """Test successful reseller change validation with transfer items."""
-    mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=""
-    )
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory()
     order = order_factory(lines=[], order_parameters=reseller_change_order_parameters_factory())
 
@@ -45,7 +40,6 @@ def test_validate_reseller_change_success(
             "quantity": 170,
         }
     ]
-    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -57,7 +51,7 @@ def test_validate_reseller_change_success_reviving(
     adobe_reseller_change_preview_factory,
     lines_factory,
     adobe_order_factory,
-    mock_get_preview_order,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     """Test successful reseller change validation when reviving a reseller."""
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
@@ -79,9 +73,6 @@ def test_validate_reseller_change_success_reviving(
             },
         }
     ]
-    mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=""
-    )
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=[]
     )
@@ -90,7 +81,6 @@ def test_validate_reseller_change_success_reviving(
 
     assert has_errors is False
     assert validated_order["lines"] == order["lines"]
-    mock_get_preview_order.return_value.assert_called_once()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -171,7 +161,7 @@ def test_validate_reseller_change_no_subscriptions(
     reseller_change_order_parameters_factory,
     adobe_reseller_change_preview_factory,
     adobe_customer_factory,
-    mock_get_preview_order,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     """Test validation succeeds when customer has no subscriptions."""
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
@@ -184,7 +174,6 @@ def test_validate_reseller_change_no_subscriptions(
     has_errors, _ = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is False
-    mock_get_preview_order.return_value.assert_called_once()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -198,12 +187,8 @@ def test_validate_reseller_change_lines_mismatch(
     adobe_customer_factory,
     lines_factory,
     adobe_order_factory,
-    mock_get_preview_order,
 ):
     """Test validation fails when order lines don't match transfer lines."""
-    mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=""
-    )
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=adobe_transfer_items_factory(deployment_id="", quantity=170)
     )
@@ -239,7 +224,6 @@ def test_validate_reseller_change_lines_mismatch(
             "quantity": 150,
         }
     ]
-    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -249,7 +233,6 @@ def test_validate_reseller_change_no_lines_and_empty_transfer(
     order_factory,
     reseller_change_order_parameters_factory,
     adobe_reseller_change_preview_factory,
-    mock_get_preview_order,
 ):
     """Test validation fails when both order and transfer have no lines."""
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
@@ -260,12 +243,10 @@ def test_validate_reseller_change_no_lines_and_empty_transfer(
     has_errors, _ = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is True
-    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
 def test_validate_reseller_change_filters_items_with_deployment(
-    mocker,
     mock_mpt_client,
     mock_adobe_client,
     order_factory,
@@ -275,7 +256,6 @@ def test_validate_reseller_change_filters_items_with_deployment(
     items_factory,
     adobe_order_factory,
     mock_get_product_items_by_skus,
-    mock_get_preview_order,
 ):
     """Test that items with deploymentId are filtered out."""
     adobe_items_no_deployment = adobe_transfer_items_factory(line_number=1, deployment_id="")
@@ -285,9 +265,6 @@ def test_validate_reseller_change_filters_items_with_deployment(
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=adobe_items_no_deployment + adobe_items_with_deployment
     )
-    mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=""
-    )
     mock_get_product_items_by_skus.return_value = items_factory()
     order = order_factory(lines=[], order_parameters=reseller_change_order_parameters_factory())
 
@@ -295,7 +272,6 @@ def test_validate_reseller_change_filters_items_with_deployment(
 
     assert has_errors is False
     assert len(validated_order["lines"]) == 1
-    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -308,7 +284,7 @@ def test_validate_reseller_change_multiple_lines_match(
     adobe_customer_factory,
     adobe_order_factory,
     mock_get_product_items_by_skus,
-    mock_get_preview_order,
+    mock_get_adobe_product_by_marketplace_sku,
 ):
     """Test validation succeeds with multiple matching lines."""
     adobe_items = [
@@ -322,7 +298,7 @@ def test_validate_reseller_change_multiple_lines_match(
         },
         {
             "lineItemNumber": 2,
-            "offerId": "65304579CA01A12",
+            "offerId": "77777777CA01A12",
             "quantity": 50,
             "subscriptionId": "sub-2",
             "deploymentId": "",
@@ -332,9 +308,6 @@ def test_validate_reseller_change_multiple_lines_match(
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=adobe_items
     )
-    mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=""
-    )
     mock_adobe_client.get_customer.return_value = adobe_customer_factory()
     mock_get_product_items_by_skus.return_value = [
         {
@@ -343,7 +316,7 @@ def test_validate_reseller_change_multiple_lines_match(
             "name": "Product 1",
         },
         {
-            "externalIds": {"vendor": "65304579CA"},
+            "externalIds": {"vendor": "77777777CA"},
             "id": "ITM-002",
             "name": "Product 2",
         },
@@ -364,7 +337,7 @@ def test_validate_reseller_change_multiple_lines_match(
         {
             "id": "ALI-002",
             "item": {
-                "externalIds": {"vendor": "65304579CA"},
+                "externalIds": {"vendor": "77777777CA"},
                 "id": "ITM-002",
                 "name": "Product 2",
             },
@@ -378,7 +351,6 @@ def test_validate_reseller_change_multiple_lines_match(
 
     assert has_errors is False
     assert len(validated_order["lines"]) == 2
-    mock_get_preview_order.return_value.assert_called_once()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -391,7 +363,6 @@ def test_validate_reseller_change_lines_different_vendor_id(
     adobe_transfer_items_factory,
     adobe_customer_factory,
     adobe_order_factory,
-    mock_get_preview_order,
 ):
     """Test validation fails when order line has different vendor ID than transfer."""
     order = order_factory(order_parameters=reseller_change_order_parameters_factory())
@@ -410,9 +381,6 @@ def test_validate_reseller_change_lines_different_vendor_id(
     ]
     updated_order = deepcopy(order)
     updated_order["lines"][0]["item"]["externalIds"]["vendor"] = "65304578CA"
-    mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=""
-    )
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=adobe_transfer_items_factory(
             subscription_id="1234567890",
@@ -427,7 +395,6 @@ def test_validate_reseller_change_lines_different_vendor_id(
 
     assert has_errors is True
     assert len(validated_order["lines"]) == 1
-    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")
@@ -442,12 +409,8 @@ def test_validate_reseller_change_lines_different_line_count(
     items_factory,
     adobe_order_factory,
     mock_get_product_items_by_skus,
-    mock_get_preview_order,
 ):
     """Test validation fails when order has different number of lines than transfer."""
-    mock_adobe_client.create_preview_order.return_value = adobe_order_factory(
-        ORDER_TYPE_PREVIEW, deployment_id=""
-    )
     mock_adobe_client.reseller_change_request.return_value = adobe_reseller_change_preview_factory(
         items=adobe_transfer_items_factory(deployment_id="", quantity=170)
     )
@@ -482,7 +445,6 @@ def test_validate_reseller_change_lines_different_line_count(
     has_errors, _ = validate_reseller_change(mock_mpt_client, order)  # act
 
     assert has_errors is True
-    mock_get_preview_order.return_value.assert_not_called()
 
 
 @pytest.mark.usefixtures("mock_get_product_items_by_skus", "mock_get_agreement")

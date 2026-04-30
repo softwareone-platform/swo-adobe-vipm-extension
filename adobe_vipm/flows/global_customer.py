@@ -35,12 +35,12 @@ from adobe_vipm.airtable.models import (
 )
 from adobe_vipm.flows.constants import (
     GLOBAL_SUFFIX,
-    MARKET_SEGMENT_COMMERCIAL,
     MPT_ORDER_STATUS_COMPLETED,
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_NAME_TRANSFER,
     AgreementType,
     ItemTermsModel,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.utils import (
@@ -809,7 +809,7 @@ def check_gc_agreement_deployments():
     mpt_o_client = setup_operations_client()
 
     for product_id in settings.MPT_PRODUCTS_IDS:
-        if get_market_segment(product_id) != MARKET_SEGMENT_COMMERCIAL:
+        if get_market_segment(product_id) != MarketSegment.COMMERCIAL:
             continue
         logger.info("Checking GC agreement deployments for product %s", product_id)
         try:

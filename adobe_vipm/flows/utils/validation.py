@@ -1,8 +1,7 @@
 from adobe_vipm.flows.constants import (
-    MARKET_SEGMENT_GOVERNMENT,
-    MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY,
     PARAM_REQUIRED_CUSTOMER_ORDER,
     AgreementType,
+    MarketSegment,
     Param,
 )
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
@@ -134,7 +133,7 @@ def validate_government_lga_data(order: dict, adobe_data: dict):
     """
     product_id = order["product"]["id"]
     market_segment = get_market_segment(product_id)
-    if market_segment not in {MARKET_SEGMENT_GOVERNMENT, MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY}:
+    if market_segment not in {MarketSegment.GOVERNMENT, MarketSegment.LARGE_GOVERNMENT_AGENCY}:
         return
 
     benefits_type = next(

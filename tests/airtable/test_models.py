@@ -42,7 +42,7 @@ from adobe_vipm.airtable.models import (
     get_transfers_to_check,
     get_transfers_to_process,
 )
-from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
+from adobe_vipm.flows.constants import MarketSegment
 
 
 def test_airtable_base_info_for_migrations(settings):
@@ -855,9 +855,9 @@ def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     )
 
     with pytest.raises(AdobeProductNotFoundError):
-        get_adobe_product_by_marketplace_sku("vendor_external_id", MARKET_SEGMENT_COMMERCIAL)
+        get_adobe_product_by_marketplace_sku("vendor_external_id", MarketSegment.COMMERCIAL)
 
-    result = get_adobe_product_by_marketplace_sku("65304578CA", MARKET_SEGMENT_COMMERCIAL)
+    result = get_adobe_product_by_marketplace_sku("65304578CA", MarketSegment.COMMERCIAL)
 
     assert result.vendor_external_id == "65304578CA"
     assert result.sku == "65304578CA01A12"

@@ -109,6 +109,7 @@ per-file-ignores = [
   "adobe_vipm/adobe/mixins/customer.py: WPS114 WPS210 WPS214",
   "adobe_vipm/adobe/errors.py: WPS202",
   "adobe_vipm/adobe/constants.py: WPS114",
+  "adobe_vipm/adobe/dataclasses.py: WPS202",
   "adobe_vipm/adobe/config.py: WPS122 WPS121 WPS214",
   "adobe_vipm/adobe/client.py: WPS122 WPS121 WPS215",
   "adobe_vipm/airtable/models.py: WPS110 WPS114 WPS118 WPS202 WPS204 WPS210 WPS229 WPS235 WPS347 WPS426 WPS431 WPS432 WPS441 WPS602",
