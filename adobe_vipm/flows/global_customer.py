@@ -280,6 +280,7 @@ def get_listing(mpt_client, authorization_id, price_list_id, agreement_deploymen
             "seller": {"id": agreement_deployment.seller_id},
             "notes": "",
             "primary": False,
+            "eligibility": {"client": True, "partner": False},
         }
         try:
             listing = create_listing(mpt_client, listing)
