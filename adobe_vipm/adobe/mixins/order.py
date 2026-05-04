@@ -249,6 +249,48 @@ class OrderClientMixin:
         response.raise_for_status()
         return response.json()
 
+    @wrap_http_error
+    def create_renewal_order(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        external_reference_id: str,
+        line_items: list[dict],
+        order_type: str = adobe_constants.ORDER_TYPE_RENEWAL,
+    ) -> dict:
+        """
+        Create a RENEWAL order for specific subscriptions.
+
+        Used for manually renewing expired subscriptions (allowedActions: ["MANUAL_RENEWAL"]).
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer.
+            external_reference_id: External reference ID for the order.
+            line_items: List of line items with offerId, quantity, and subscriptionId.
+            order_type: Type of the order.
+
+        Returns:
+            dict: The Renewal order.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        payload = {
+            "externalReferenceId": external_reference_id,
+            "currencyCode": authorization.currency,
+            "orderType": order_type,
+            "lineItems": line_items,
+        }
+        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        response = requests.post(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            headers=headers,
+            json=payload,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+
     def get_returnable_orders_by_subscription_id(
         self,
         authorization_id: str,

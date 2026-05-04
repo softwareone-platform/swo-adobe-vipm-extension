@@ -180,6 +180,13 @@ def test_transfer(
                     "value": "2024-01-31",
                 },
                 {
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -340,6 +347,14 @@ def test_transfer(
                     "type": "SingleLineText",
                     "value": "STATE",
                 },
+                {
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
+                },
             ],
         },
     }
@@ -399,6 +414,13 @@ def test_transfer(
                     "name": "Due Date",
                     "type": "Date",
                     "value": "2024-01-31",
+                },
+                {
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
                 },
                 {
                     "externalId": "3YCEnrollStatus",
@@ -573,6 +595,14 @@ def test_transfer(
                     "type": "SingleLineText",
                     "value": "STATE",
                 },
+                {
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
+                },
             ],
         },
     }
@@ -594,6 +624,14 @@ def test_transfer(
                     "id": "PAR-7771-1777",
                     "name": "Due Date",
                     "type": "Date",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
                     "value": None,
                 },
                 {
@@ -779,6 +817,17 @@ def test_transfer(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         }
@@ -861,6 +910,14 @@ def test_transfer(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -1042,6 +1099,15 @@ def test_transfer(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -1267,6 +1333,14 @@ def test_transfer_with_no_profile_address(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -1442,6 +1516,17 @@ def test_transfer_with_no_profile_address(
                     "type": "SingleLineText",
                     "value": "STATE",
                 },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
+                },
             ],
         }
     }
@@ -1519,6 +1604,14 @@ def test_transfer_with_no_profile_address(
                     "id": "PAR-7771-1777",
                     "name": "Due Date",
                     "type": "Date",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
                     "value": None,
                 },
                 {
@@ -1697,6 +1790,17 @@ def test_transfer_with_no_profile_address(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -3143,6 +3247,14 @@ def test_transfer_3yc_customer(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -3324,6 +3436,17 @@ def test_transfer_3yc_customer(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         }
@@ -3389,6 +3512,16 @@ def test_transfer_3yc_customer(
                     "value": None,
                 },
                 {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
                     "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
@@ -3571,6 +3704,17 @@ def test_transfer_3yc_customer(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -3758,6 +3902,14 @@ def test_transfer_3yc_customer_with_no_profile_address(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -3932,6 +4084,15 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -3998,6 +4159,14 @@ def test_transfer_3yc_customer_with_no_profile_address(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -4172,6 +4341,15 @@ def test_transfer_3yc_customer_with_no_profile_address(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -4246,6 +4424,7 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
                     adobe_customer_address["country"],
                 ),
             },
+            adobe_order_ids="P0123456789",
         ),
         external_ids={"vendor": "transfer-id"},
     )
@@ -4308,20 +4487,22 @@ def test_fulfill_transfer_order_already_migrated_all_items_expired_create_new_or
         membership_id_param["value"],
     )
     mocked_process_order.assert_called_once_with(mock_mpt_client, order["id"], {"id": "TPL-0000"})
+    order_parameters = order["parameters"]["ordering"]
     assert mocked_update_order.mock_calls[0].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[0].kwargs == {
         "parameters": {
             "fulfillment": fulfillment_parameters_factory(
                 due_date="2012-02-13",
             ),
-            "ordering": order["parameters"]["ordering"],
+            "ordering": order_parameters,
         },
     }
     assert mocked_update_order.mock_calls[2].args == (mock_mpt_client, order["id"])
     assert mocked_update_order.mock_calls[2].kwargs == {
         "externalIds": {"vendor": new_order["orderId"]},
         "parameters": {
-            "fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]
+            "fulfillment": updated_order["parameters"]["fulfillment"],
+            "ordering": updated_order["parameters"]["ordering"],
         },
     }
 
@@ -4378,6 +4559,7 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
                     adobe_customer_address["country"],
                 ),
             },
+            adobe_order_ids="P0123456789",
         ),
         external_ids={"vendor": "transfer-id"},
     )
@@ -4449,7 +4631,8 @@ def test_fulfill_transfer_order_already_migrated_empty_adobe_items(
     assert mocked_update_order.mock_calls[2].kwargs == {
         "externalIds": {"vendor": new_order["orderId"]},
         "parameters": {
-            "fulfillment": [{"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None}]
+            "fulfillment": updated_order["parameters"]["fulfillment"],
+            "ordering": updated_order["parameters"]["ordering"],
         },
     }
 
@@ -4683,6 +4866,13 @@ def test_transfer_gc_account_all_deployments_created(
                     "value": "2024-01-31",
                 },
                 {
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -4854,6 +5044,14 @@ def test_transfer_gc_account_all_deployments_created(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -4880,6 +5078,14 @@ def test_transfer_gc_account_all_deployments_created(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -5061,6 +5267,17 @@ def test_transfer_gc_account_all_deployments_created(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         }
@@ -5139,6 +5356,14 @@ def test_transfer_gc_account_all_deployments_created(
                     "id": "PAR-7771-1777",
                     "name": "Due Date",
                     "type": "Date",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
                     "value": None,
                 },
                 {
@@ -5324,6 +5549,17 @@ def test_transfer_gc_account_all_deployments_created(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -5643,6 +5879,14 @@ def test_transfer_gc_account_no_deployments(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -5824,6 +6068,15 @@ def test_transfer_gc_account_no_deployments(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -7232,6 +7485,14 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -7414,6 +7675,15 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "type": "SingleLineText",
                     "value": "STATE",
                 },
+                {
+                    "constraints": {"hidden": True},
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
+                },
             ],
         },
     }
@@ -7491,6 +7761,14 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "id": "PAR-7771-1777",
                     "name": "Due Date",
                     "type": "Date",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
                     "value": None,
                 },
                 {
@@ -7676,6 +7954,15 @@ def test_transfer_gc_account_no_deployments_gc_parameters_updated(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },
@@ -8431,6 +8718,14 @@ def test_transfer_lga_product_with_lga_agency_type(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -8613,6 +8908,17 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "type": "SingleLineText",
                     "value": "STATE",
                 },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
+                },
             ],
         }
     }
@@ -8637,6 +8943,14 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "id": "PAR-7771-1777",
                     "name": "Due Date",
                     "type": "Date",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
                     "value": None,
                 },
                 {
@@ -8822,6 +9136,17 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         }
@@ -8904,6 +9229,14 @@ def test_transfer_lga_product_with_lga_agency_type(
                 },
                 {
                     "constraints": {"hidden": True},
+                    "externalId": "flexibleDiscounts",
+                    "id": "PAR-7771-1778",
+                    "name": "Flexible Discounts",
+                    "type": "Object",
+                    "value": None,
+                },
+                {
+                    "constraints": {"hidden": True},
                     "externalId": "3YCEnrollStatus",
                     "id": "PAR-9876-5432",
                     "name": "3YC Enroll Status",
@@ -9085,6 +9418,17 @@ def test_transfer_lga_product_with_lga_agency_type(
                     "name": "Agency type",
                     "type": "SingleLineText",
                     "value": "STATE",
+                },
+                {
+                    "constraints": {
+                        "hidden": True,
+                    },
+                    "error": None,
+                    "externalId": "adobeOrderIds",
+                    "id": "PAR-0000-0010",
+                    "name": "Adobe Order IDs",
+                    "type": "SingleLineText",
+                    "value": "",
                 },
             ],
         },

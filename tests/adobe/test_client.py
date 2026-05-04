@@ -1306,6 +1306,106 @@ def test_create_preview_renewal_bad_request(
     assert repr(cv.value) == str(error)
 
 
+def test_create_renewal_order(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_authorizations_file,
+    adobe_client_factory,
+    adobe_order_factory,
+):
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    external_reference_id = "mpt-order-id"
+    line_items = [
+        {
+            "offerId": "65304578CA01A12",
+            "quantity": 10,
+            "subscriptionId": "a-sub-id",
+        },
+    ]
+    client, authorization, api_token = adobe_client_factory()
+    expected_payload = {
+        "externalReferenceId": external_reference_id,
+        "currencyCode": authorization.currency,
+        "orderType": ORDER_TYPE_RENEWAL,
+        "lineItems": line_items,
+    }
+    correlation_id = sha256(json.dumps(expected_payload).encode()).hexdigest()
+    adobe_order = adobe_order_factory(ORDER_TYPE_RENEWAL)
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=202,
+        json=adobe_order,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": correlation_id,
+                },
+            ),
+            matchers.json_params_matcher(expected_payload),
+        ],
+    )
+
+    result = client.create_renewal_order(
+        authorization_uk,
+        customer_id,
+        external_reference_id,
+        line_items,
+    )
+
+    assert result == adobe_order
+
+
+def test_create_renewal_order_bad_request(
+    requests_mocker,
+    settings,
+    adobe_authorizations_file,
+    adobe_api_error_factory,
+    adobe_client_factory,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    client, _, _ = adobe_client_factory()
+    error = adobe_api_error_factory("1234", "An error")
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=400,
+        json=error,
+    )
+
+    with pytest.raises(AdobeError) as cv:
+        client.create_renewal_order(
+            authorization_uk,
+            customer_id,
+            "mpt-order-id",
+            [
+                {
+                    "offerId": "65304578CA01A12",
+                    "quantity": 10,
+                    "subscriptionId": "a-sub-id",
+                },
+            ],
+        )
+
+    assert repr(cv.value) == str(error)
+
+
 def test_get_order(requests_mocker, settings, adobe_client_factory, adobe_authorizations_file):
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"

@@ -295,6 +295,7 @@ def order_parameters_factory():
         p3yc=None,
         p3yc_licenses="",
         p3yc_consumables="",
+        adobe_order_ids="",
     ):
         if address is None:
             address = {
@@ -404,6 +405,25 @@ def order_parameters_factory():
                     "required": False,
                 },
             },
+            {
+                "id": "PAR-0000-0010",
+                "name": "Adobe Order IDs",
+                "externalId": Param.ADOBE_ORDER_IDS.value,
+                "type": "SingleLineText",
+                "value": adobe_order_ids or "",
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0009",
+                "name": "Late Renewals Info",
+                "externalId": Param.LATE_RENEWALS_INFO.value,
+                "type": "DataObject",
+                "value": "",
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+            },
         ]
 
     return _order_parameters
@@ -420,6 +440,7 @@ def transfer_order_parameters_factory():
         p3yc_licenses=None,
         p3yc_consumables=None,
         agency_type="STATE",
+        adobe_order_ids=None,
     ):
         return [
             {
@@ -528,6 +549,14 @@ def transfer_order_parameters_factory():
                     "hidden": True,
                     "required": False,
                 },
+                "error": None,
+            },
+            {
+                "id": "PAR-0000-0010",
+                "name": "Adobe Order IDs",
+                "externalId": Param.ADOBE_ORDER_IDS.value,
+                "type": "SingleLineText",
+                "value": adobe_order_ids or "",
                 "error": None,
             },
         ]
@@ -693,6 +722,13 @@ def fulfillment_parameters_factory():
                 "externalId": Param.DUE_DATE.value,
                 "type": "Date",
                 "value": due_date,
+            },
+            {
+                "id": "PAR-7771-1778",
+                "name": "Flexible Discounts",
+                "externalId": Param.FLEXIBLE_DISCOUNTS.value,
+                "type": "Object",
+                "value": None,
             },
             {
                 "id": "PAR-9876-5432",
