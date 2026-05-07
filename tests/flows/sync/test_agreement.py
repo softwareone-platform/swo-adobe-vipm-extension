@@ -219,7 +219,7 @@ def test_sync_agreement_prices(
                     {"externalId": "lastSyncDate", "value": "2025-06-23"},
                 ]
             },
-            commitmentDate="2025-04-04",
+            commitmentDate=adobe_subscription["renewalDate"],
             autoRenew=adobe_subscription["autoRenewal"]["enabled"],
             template={"id": "TPL-1234", "name": "Renewing"},
         ),
@@ -252,7 +252,7 @@ def test_sync_agreement_prices(
                     {"externalId": "lastSyncDate", "value": "2025-06-23"},
                 ]
             },
-            commitmentDate="2025-04-04",
+            commitmentDate=another_adobe_subscription["renewalDate"],
             autoRenew=another_adobe_subscription["autoRenewal"]["enabled"],
             template={"id": "TPL-1234", "name": "Renewing"},
         ),
@@ -388,7 +388,7 @@ def test_sync_agreement_not_prices(
         mock_mpt_client,
         "SUB-1000-2000-3000",
         autoRenew=True,
-        commitmentDate="2025-04-04",
+        commitmentDate="2026-10-11",
         lines=[{"id": "ALI-2119-4550-8674-5962-0001", "quantity": 10}],
         parameters={
             "fulfillment": [
@@ -780,7 +780,7 @@ def test_sync_agreement_prices_with_3yc(
                     {"externalId": "lastSyncDate", "value": "2024-11-09"},
                 ]
             },
-            commitmentDate="2025-04-04",
+            commitmentDate=adobe_subscription["renewalDate"],
             autoRenew=adobe_subscription["autoRenewal"]["enabled"],
             template={"id": "TPL-1234", "name": TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE},
         ),
@@ -902,7 +902,7 @@ def test_sync_agreement_prices_large_government_agency(
                     {"externalId": "lastSyncDate", "value": "2024-11-09"},
                 ]
             },
-            commitmentDate="2025-04-04",
+            commitmentDate=adobe_subscription["renewalDate"],
             autoRenew=adobe_subscription["autoRenewal"]["enabled"],
             template={"id": "TPL-1234", "name": TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE},
         ),
@@ -2066,7 +2066,7 @@ def test_sync_agreement_prices_with_missing_prices(
                     {"externalId": Param.LAST_SYNC_DATE.value, "value": "2025-06-19"},
                 ]
             },
-            commitmentDate="2025-04-04",
+            commitmentDate="2026-10-11",
             autoRenew=True,
             template={"id": "TPL-1234", "name": "Renewing"},
         ),
