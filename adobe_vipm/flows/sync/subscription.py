@@ -74,7 +74,6 @@ class SubscriptionSyncer:
             prices = price_manager.get_sku_prices_for_agreement_lines(
                 skus, self._product_id, self._currency
             )
-            coterm_date = self._adobe_customer["cotermDate"]
 
             for subscription, adobe_subscription, actual_sku in self._subscriptions_for_update:
                 if actual_sku not in prices:
@@ -88,7 +87,6 @@ class SubscriptionSyncer:
                 self._update_subscription(
                     actual_sku,
                     adobe_subscription,
-                    coterm_date,
                     prices,
                     subscription,
                     sync_prices=sync_prices,
@@ -103,7 +101,6 @@ class SubscriptionSyncer:
         self,
         actual_sku: str,
         adobe_subscription: dict,
-        coterm_date: str,
         prices: dict,
         subscription: dict,
         *,
@@ -157,7 +154,7 @@ class SubscriptionSyncer:
                 subscription["id"],
                 lines,
                 fulfillment_params,
-                coterm_date,
+                adobe_subscription["renewalDate"],
                 auto_renewal_enabled,
                 template_data,
             )
@@ -167,7 +164,7 @@ class SubscriptionSyncer:
                 subscription["id"],
                 lines=lines,
                 parameters=fulfillment_params,
-                commitmentDate=coterm_date,
+                commitmentDate=adobe_subscription["renewalDate"],
                 autoRenew=auto_renewal_enabled,
                 template=template_data,
             )
