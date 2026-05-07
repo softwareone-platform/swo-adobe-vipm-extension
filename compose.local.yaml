@@ -1,6 +1,6 @@
 services:
   app:
-    command: "uv run swoext run --local"
+    command: "uv run mpt-ext run --local"
     depends_on:
       jaeger:
         condition: service_started

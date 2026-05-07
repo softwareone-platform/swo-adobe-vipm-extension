@@ -25,7 +25,7 @@ FROM build AS dev
 
 RUN uv sync --frozen --no-cache --dev
 
-CMD ["swoext", "run"]
+CMD ["mpt-ext", "run"]
 
 FROM build AS prod
 
@@ -39,4 +39,4 @@ ENV UV_CACHE_DIR=/home/appuser/.cache/uv
 
 USER appuser
 
-CMD ["swoext", "run", "--no-color"]
+CMD ["mpt-ext", "run", "--no-color"]

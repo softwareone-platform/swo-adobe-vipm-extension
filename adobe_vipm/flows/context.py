@@ -2,8 +2,9 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Self
 
+from mpt_extension_sdk.context import ContextAdapter
 from mpt_extension_sdk.errors.runtime import ConfigError
-from mpt_extension_sdk.pipeline import ContextAdapter, OrderContext
+from mpt_extension_sdk.pipeline import OrderContext
 
 from adobe_vipm.adobe.models import AdobeCustomer, AdobeOrder, AdobePreviewOrder
 from adobe_vipm.flows.constants import MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY, Param
@@ -21,7 +22,7 @@ class AdobeContext:
 
 
 @dataclass
-class AdobeOrderContext(AdobeContext, OrderContext, ContextAdapter):
+class AdobeOrderContext(AdobeContext, OrderContext, ContextAdapter):  # noqa: WPS214
     """Order context enriched with Adobe-specific data and helpers."""
 
     @property
@@ -79,10 +80,11 @@ class AdobeOrderContext(AdobeContext, OrderContext, ContextAdapter):
     @property
     def market_segment(self):
         """Return the market segment for the current product."""
+        product_id = self.order.product_id
         try:
-            return self.ext_settings.product_segment[self.order.product_id]
+            return self.ext_settings.product_segment[product_id]
         except KeyError:
-            raise ConfigError(f"No market segment found for product {self.order.product_id}")
+            raise ConfigError(f"No market segment found for product {product_id}")
 
     @classmethod
     def from_context(cls, ctx: OrderContext) -> Self:

@@ -568,7 +568,7 @@ The SDK provides a CLI for extension development and runtime operations.
 Commands:
 
 ```text
-swoext run
+mpt-ext run
 ```
 
 The CLI supports:
@@ -576,7 +576,7 @@ The CLI supports:
 * Local runtime execution
 * Production runtime execution
 
-`swoext init` remains a possible future scaffold command, but it is not part of the current SDK CLI.
+`mpt-ext init` remains a possible future scaffold command, but it is not part of the current SDK CLI.
 
 ---
 

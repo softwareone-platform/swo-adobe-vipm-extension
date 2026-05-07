@@ -312,8 +312,8 @@ The following are explicitly deferred to a future version:
 - Webhook endpoints
 - Schedules and deferrable jobs
 - Plugs
-- `swoext init` scaffold command
-- Additional CLI surface beyond `swoext run`
+- `mpt-ext init` scaffold command
+- Additional CLI surface beyond `mpt-ext run`
 
 #### Why
 This scope is enough to implement a real flow and test the solution is working without spending too much time adding the business logic.
@@ -443,7 +443,7 @@ We chose **fail-fast validation via CLI and startup metadata generation**.
 
 The SDK derives metadata directly from `ExtensionApp` and route decorators at
 startup. The checked-in `meta.yaml` must be regenerated from the same source of
-truth and `swoext validate` must fail if the file does not match.
+truth and `mpt-ext validate` must fail if the file does not match.
 
 #### Why
 Silent inconsistencies cause runtime failures that are hard to diagnose. A

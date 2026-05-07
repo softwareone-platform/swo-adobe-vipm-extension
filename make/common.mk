@@ -23,7 +23,7 @@ run:  ## Run service
 	$(DC) up
 
 shell:  ## Open Django shell
-	$(RUN_IT) bash -c "swoext shell"
+	$(RUN_IT) bash -c "mpt-ext shell"
 
 test:  ## Run test
 	$(RUN) pytest $(if $(args),$(args),.)

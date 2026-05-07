@@ -1,17 +1,17 @@
 import logging
 
+from mpt_extension_sdk import EventRouter
 from mpt_extension_sdk.api.models.events import Event, TaskEvent
 from mpt_extension_sdk.errors.pipeline import CancelError
-from mpt_extension_sdk.extension_app import ExtensionRouter
 
 from adobe_vipm.flows.context import AdobeOrderContext
 from adobe_vipm.flows.pipelines.fulfillment.purchase import PurchasePipeline
 
 logger = logging.getLogger(__name__)
-orders_router = ExtensionRouter(prefix="/events/orders")
+orders_router = EventRouter(prefix="/events/orders", context_adapter_type=AdobeOrderContext)
 
 
-@orders_router.task_route(
+@orders_router.task(
     "/purchase",
     name="orders-purchase",
     event="platform.commerce.order.created",
@@ -29,7 +29,7 @@ async def handle_purchase_order(event: TaskEvent, context: AdobeOrderContext) ->
     await PurchasePipeline().execute(context)
 
 
-@orders_router.route(
+@orders_router.event(
     "/change",
     name="orders-change",
     event="platform.commerce.order.status_changed",

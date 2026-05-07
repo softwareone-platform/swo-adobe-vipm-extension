@@ -3,7 +3,7 @@
 ## 1. Initialize Extension (TBD)
 
 ```shell
-swoext init my-extension
+mpt-ext init my-extension
 ```
 
 This generates the base structure.
@@ -79,12 +79,12 @@ async def handle_change_order(event: Event, context: OrderContext) -> None:
 ext_app.include_router(orders_router)
 ```
 
-The runtime materializes `meta.yaml` automatically on `swoext run` and
-`swoext run --local`. If you want to write the file without starting the
+The runtime materializes `meta.yaml` automatically on `mpt-ext run` and
+`mpt-ext run --local`. If you want to write the file without starting the
 service, use:
 
 ```shell
-swoext meta generate
+mpt-ext meta generate
 ```
 
 Generated example:
@@ -657,22 +657,22 @@ The current observability-related settings are:
 ### 10.1 Run the extension locally
 
 ```shell
-swoext run --local
+mpt-ext run --local
 ```
 
 ### 10.2 Run the extension in the Marketplace
 
 ```shell
-swoext run
+mpt-ext run
 ```
 
 ### 10.3 CLI status
 
 Current SDK CLI commands:
 
-- `swoext meta generate`
-- `swoext run --local`
-- `swoext run`
-- `swoext validate`
+- `mpt-ext meta generate`
+- `mpt-ext run --local`
+- `mpt-ext run`
+- `mpt-ext validate`
 
-`swoext init` is still TBD and is not implemented in the current SDK CLI.
+`mpt-ext init` is still TBD and is not implemented in the current SDK CLI.

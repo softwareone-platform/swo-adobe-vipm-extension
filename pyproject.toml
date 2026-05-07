@@ -232,4 +232,4 @@ module = "pymsteams.*"
 ignore_missing_imports = true
 
 [tool.uv.sources]
-mpt-extension-sdk = { git = "https://github.com/softwareone-platform/mpt-extension-sdk", branch = "MPT-20337-add-sdk-v6" }
+mpt-extension-sdk = { git = "https://github.com/softwareone-platform/mpt-extension-sdk", branch = "codex/MPT-20733-auth-context" }
