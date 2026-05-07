@@ -1,5 +1,5 @@
 trigger:
-- main
+- release/5
 - azure-pipelines
 
 pool:
