@@ -1,4 +1,6 @@
+import json
 import logging
+import pathlib
 
 from django.conf import settings
 from mpt_extension_sdk.core.utils import setup_client, setup_operations_client
@@ -34,7 +36,6 @@ from adobe_vipm.airtable.models import (
     get_sku_price,
 )
 from adobe_vipm.flows.constants import (
-    GLOBAL_SUFFIX,
     MARKET_SEGMENT_COMMERCIAL,
     MPT_ORDER_STATUS_COMPLETED,
     TEMPLATE_ASSET_DEFAULT,
@@ -83,6 +84,16 @@ def get_adobe_subscriptions_by_deployment(adobe_client, authorization_id, agreem
         for item in adobe_subscriptions["items"]
         if item.get("deploymentId", "") == agreement_deployment.deployment_id
     ]
+
+
+def get_region_from_country(country):
+    """Get the region from the country."""
+    with pathlib.Path("adobe_vipm/region_country_mapping.json").open(encoding="utf-8") as file:
+        data = json.load(file)
+    for item in data:
+        if country in item["countries"]:
+            return item["region"].lower()
+    return None
 
 
 def get_authorization(mpt_client, agreement_deployment):
@@ -160,6 +171,8 @@ def get_price_list_id(mpt_client, agreement_deployment):
     Returns:
         str: The price list ID if found, None otherwise.
     """
+    region = get_region_from_country(agreement_deployment.deployment_country)
+
     if agreement_deployment.price_list_id:
         return agreement_deployment.price_list_id
 
@@ -176,30 +189,33 @@ def get_price_list_id(mpt_client, agreement_deployment):
         agreement_deployment.save()
         return None
 
-    global_price_lists = list(
+    local_price_lists = list(
         filter(
             lambda price_list: (
-                price_list.get("externalIds", {}).get("vendor", "").endswith(GLOBAL_SUFFIX)
+                f"{region}-{agreement_deployment.deployment_currency.lower()}"
+                in price_list.get("externalIds", {}).get("vendor", "")
             ),
             price_lists,
         )
     )
 
-    if not global_price_lists:
+    if not local_price_lists:
         logger.error(
-            "Global price list not found for agreement deployment %s",
+            "local price list not found for agreement deployment %s, region %s, currency %s",
             agreement_deployment.deployment_id,
+            region,
+            agreement_deployment.deployment_currency,
         )
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
-            f"There is no global price list for currency "
-            f"'{agreement_deployment.deployment_currency}'. "
+            f"There is no local price list for currency "
+            f"'{agreement_deployment.deployment_currency}' and region '{region}'. "
             "Please update the price list column with the selected value"
         )
         agreement_deployment.save()
         return None
 
-    if len(global_price_lists) > 1:
+    if len(local_price_lists) > 1:
         logger.error(
             "More than one price list found for agreement deployment %s",
             agreement_deployment.deployment_id,
@@ -207,14 +223,14 @@ def get_price_list_id(mpt_client, agreement_deployment):
         price_list_ids = [price_list["id"] for price_list in price_lists]
         agreement_deployment.status = STATUS_GC_ERROR
         agreement_deployment.error_description = (
-            f"There is more than one global price list available for currency "
-            f"'{agreement_deployment.deployment_currency}': {price_list_ids}. "
+            f"There is more than one price list available for currency "
+            f"'{agreement_deployment.deployment_currency}' and region '{region}':{price_list_ids}."
             "Please update the price list column with the selected value"
         )
         agreement_deployment.save()
         return None
 
-    price_list_id = global_price_lists[0]["id"]
+    price_list_id = local_price_lists[0]["id"]
 
     agreement_deployment.price_list_id = price_list_id
     agreement_deployment.save()
