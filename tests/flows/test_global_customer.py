@@ -261,8 +261,10 @@ def test_check_gc_agreement_deployments_get_listing_error(
     mocker, mock_adobe_client, mpt_error_factory, gc_agreement_deployment
 ):
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-    price_list = mocker.MagicMock()
-    price_list.externalIds = "price_list_global"
+    price_list = {
+        "id": "PRC-123-123-123",
+        "externalIds": {"vendor": "prc-adobe-com-t1-na-usd-01"},
+    }
     mocked_get_gc_price_list_by_currency = mocker.patch(
         "adobe_vipm.flows.global_customer.get_gc_price_list_by_currency",
         return_value=[price_list],
