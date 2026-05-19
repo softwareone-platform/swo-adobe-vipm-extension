@@ -12,7 +12,7 @@ from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import AdobeClient
-from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus
+from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus, OfferType
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable import models
@@ -434,36 +434,35 @@ class AgreementSyncer:  # noqa: WPS214
         return mpt_entitlements_external_ids
 
     def _update_agreement_customer_parameters(self, adobe_customer: dict, agreement: dict) -> None:
-        if adobe_customer.get("linkedMembership"):
-            parameters = {
-                Param.PHASE_FULFILLMENT.value: [
-                    {
-                        "externalId": Param.LINKED_MEMBERSHIP_ID.value,
-                        "value": adobe_customer.get("linkedMembership", {}).get("id"),
-                    },
-                    {
-                        "externalId": Param.LINKED_MEMBERSHIP_NAME.value,
-                        "value": adobe_customer.get("linkedMembership", {}).get("name"),
-                    },
-                    {
-                        "externalId": Param.LINKED_MEMBERSHIP_TYPE.value,
-                        "value": adobe_customer.get("linkedMembership", {}).get("type"),
-                    },
-                    {
-                        "externalId": Param.LINKED_MEMBERSHIP_ROLE.value,
-                        "value": adobe_customer.get("linkedMembership", {}).get(
-                            "linkedMembershipType"
-                        ),
-                    },
-                    {
-                        "externalId": Param.LINKED_MEMBERSHIP_CREATED.value,
-                        "value": adobe_customer.get("linkedMembership", {}).get("creationDate", "")[
-                            :10
-                        ],
-                    },
-                ]
-            }
-            self._execute_agreement_update(agreement, parameters)
+        linked_membership = adobe_customer.get("linkedMembership") or {}
+        creation_date_raw = linked_membership.get("creationDate")
+        creation_date_value = creation_date_raw[:10] if creation_date_raw else None
+
+        parameters = {
+            Param.PHASE_FULFILLMENT.value: [
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_ID.value,
+                    "value": adobe_customer.get("linkedMembership", {}).get("id"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_NAME.value,
+                    "value": adobe_customer.get("linkedMembership", {}).get("name"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_TYPE.value,
+                    "value": adobe_customer.get("linkedMembership", {}).get("type"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_ROLE.value,
+                    "value": adobe_customer.get("linkedMembership", {}).get("linkedMembershipType"),
+                },
+                {
+                    "externalId": Param.LINKED_MEMBERSHIP_CREATED.value,
+                    "value": creation_date_value,
+                },
+            ]
+        }
+        self._execute_agreement_update(agreement, parameters)
 
     def _update_agreement_bussiness_parameters(self, agreement: dict) -> None:
         parameters = {}
@@ -561,13 +560,21 @@ class AgreementSyncer:  # noqa: WPS214
 
     def _update_3yc_ordering_params(self, commitment_info: dict, parameters: dict):
         parameters.setdefault(Param.PHASE_ORDERING.value, [])
-        for mq in commitment_info.get("minimumQuantities", {}):
-            if mq["offerType"] == "LICENSE":
+
+        minimum_quantities = commitment_info.get("minimumQuantities")
+        if not minimum_quantities:
+            minimum_quantities = [
+                {"offerType": OfferType.LICENSE, "quantity": ""},
+                {"offerType": OfferType.CONSUMABLES, "quantity": ""},
+            ]
+
+        for mq in minimum_quantities:
+            if mq["offerType"] == OfferType.LICENSE:
                 parameters[Param.PHASE_ORDERING.value].append({
                     "externalId": Param.THREE_YC_LICENSES.value,
                     "value": str(mq.get("quantity")),
                 })
-            if mq["offerType"] == "CONSUMABLES":
+            if mq["offerType"] == OfferType.CONSUMABLES:
                 parameters[Param.PHASE_ORDERING.value].append({
                     "externalId": Param.THREE_YC_CONSUMABLES.value,
                     "value": str(mq.get("quantity")),

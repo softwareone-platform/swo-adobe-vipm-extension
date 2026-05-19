@@ -272,10 +272,9 @@ def test_sync_agreement_prices(
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
                 "ordering": [
-                    {
-                        "externalId": "3YC",
-                        "value": None,
-                    },
+                    {"externalId": "3YC", "value": None},
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
                 ],
             },
         ),
@@ -318,6 +317,20 @@ def test_sync_agreement_update_agreement_education(
         mock.call(
             mock_mpt_client,
             mocked_agreement_syncer._agreement["id"],
+            lines=[],
+            parameters={
+                "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ]
+            },
+        ),
+        mock.call(
+            mock_mpt_client,
+            mocked_agreement_syncer._agreement["id"],
             parameters={
                 "fulfillment": [
                     {"externalId": "3YCCommitmentRequestStatus", "value": None},
@@ -327,7 +340,11 @@ def test_sync_agreement_update_agreement_education(
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                     {"externalId": "educationSubSegment", "value": "EDU_1,EDU_2"},
                 ],
-                "ordering": [{"externalId": "3YC", "value": None}],
+                "ordering": [
+                    {"externalId": "3YC", "value": None},
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
+                ],
             },
             lines=[],
         ),
@@ -659,7 +676,20 @@ def test_sync_agreement_prices_exception(
         "SUB-1234-5678",
         template={"id": "TPL-1234", "name": "Expired"},
     )
-    mock_mpt_update_agreement.assert_not_called()
+    mock_mpt_update_agreement.assert_called_once_with(
+        mock_mpt_client,
+        agreement["id"],
+        lines=[],
+        parameters={
+            "fulfillment": [
+                {"externalId": "lmID", "value": None},
+                {"externalId": "lmName", "value": None},
+                {"externalId": "lmType", "value": None},
+                {"externalId": "lmRole", "value": None},
+                {"externalId": "lmCreated", "value": None},
+            ]
+        },
+    )
     mock_notify_agreement_unhandled_exception_in_teams.assert_called_once_with(
         agreement["id"], mocker.ANY
     )
@@ -793,6 +823,20 @@ def test_sync_agreement_prices_with_3yc(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "fulfillment": [
                     {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
                     {"externalId": "3YCStartDate", "value": "2024-01-01"},
@@ -909,6 +953,20 @@ def test_sync_agreement_prices_large_government_agency(
     ])
     expected_lines = lines_factory(external_vendor_id="77777777CA", unit_purchase_price=20.22)
     assert mock_mpt_update_agreement.call_args_list == [
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ],
+            },
+        ),
         mocker.call(
             mock_mpt_client,
             agreement["id"],
@@ -1146,13 +1204,31 @@ def test_sync_global_customer_parameter(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "fulfillment": [
                     {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
-                "ordering": [{"externalId": "3YC", "value": None}],
+                "ordering": [
+                    {"externalId": "3YC", "value": None},
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
+                ],
             },
         ),
         mocker.call(
@@ -1177,7 +1253,11 @@ def test_sync_global_customer_parameter(
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
-                "ordering": [{"externalId": "3YC", "value": None}],
+                "ordering": [
+                    {"externalId": "3YC", "value": None},
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
+                ],
             },
         ),
         mocker.call(
@@ -1609,13 +1689,31 @@ def test_sync_global_customer_update_not_required(
             lines=[],
             parameters={
                 "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
+            lines=[],
+            parameters={
+                "fulfillment": [
                     {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                 ],
-                "ordering": [{"externalId": "3YC", "value": None}],
+                "ordering": [
+                    {"externalId": "3YC", "value": None},
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
+                ],
             },
         ),
         mocker.call(
@@ -1664,13 +1762,31 @@ def test_sync_global_customer_no_active_deployments(
             lines=[],
             parameters={
                 "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
+            lines=[],
+            parameters={
+                "fulfillment": [
                     {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                 ],
-                "ordering": [{"externalId": "3YC", "value": None}],
+                "ordering": [
+                    {"externalId": "3YC", "value": None},
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
+                ],
             },
         ),
         mocker.call(
@@ -1861,6 +1977,20 @@ def test_sync_agreement_empty_discounts(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "fulfillment": [
                     {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -1872,6 +2002,8 @@ def test_sync_agreement_empty_discounts(
                         "externalId": "3YC",
                         "value": None,
                     },
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
                 ],
             },
         ),
@@ -2030,13 +2162,48 @@ def test_sync_agreement_prices_with_missing_prices(
             ],
             parameters={
                 "fulfillment": [
+                    {"externalId": "lmID", "value": None},
+                    {"externalId": "lmName", "value": None},
+                    {"externalId": "lmType", "value": None},
+                    {"externalId": "lmRole", "value": None},
+                    {"externalId": "lmCreated", "value": None},
+                ]
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=[
+                {
+                    "item": {
+                        "id": "ITM-1234-1234-1234-0001",
+                        "name": "Awesome product",
+                        "externalIds": {"vendor": "77777777CA"},
+                    },
+                    "subscription": {
+                        "id": "SUB-1000-2000-3000",
+                        "status": "Active",
+                        "name": "Subscription for Acrobat Pro for Teams; Multi Language",
+                    },
+                    "oldQuantity": 0,
+                    "quantity": 170,
+                    "price": {"unitPP": 20.22},
+                    "id": "ALI-2119-4550-8674-5962-0001",
+                }
+            ],
+            parameters={
+                "fulfillment": [
                     {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
-                "ordering": [{"externalId": "3YC", "value": None}],
+                "ordering": [
+                    {"externalId": "3YC", "value": None},
+                    {"externalId": "3YCLicenses", "value": ""},
+                    {"externalId": "3YCConsumables", "value": ""},
+                ],
             },
         ),
         mocker.call(
