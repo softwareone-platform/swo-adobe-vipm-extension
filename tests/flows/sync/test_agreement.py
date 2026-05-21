@@ -15,6 +15,7 @@ from adobe_vipm.flows.constants import (
     AgreementStatus,
     ItemTermsModel,
     Param,
+    SubscriptionStatus,
 )
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.sync.agreement import (
@@ -2694,6 +2695,51 @@ def test_add_missing_subscriptions_without_vendor_id(
     mock_get_product_items_by_period.assert_not_called()
     mock_mpt_create_asset.assert_not_called()
     mock_mpt_create_agreement_subscription.assert_not_called()
+
+
+@freeze_time("2025-07-24")
+def test_add_missing_subscriptions_recreates_when_mpt_subscription_is_expired(
+    items_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_get_product_items_by_period,
+    mock_mpt_create_asset,
+    mock_mpt_create_agreement_subscription,
+    mock_mpt_get_asset_template_by_name,
+    mock_get_template_data_by_adobe_subscription,
+    mocked_agreement_syncer,
+):
+    expired_external_id = "1e5b9c974c4ea1bcabdb0fe697a2f1NA"
+    adobe_subscriptions = [
+        adobe_subscription_factory(subscription_id=expired_external_id, offer_id="65304578CA01A12"),
+    ]
+    agreement = agreement_factory()
+    agreement["subscriptions"] = [agreement["subscriptions"][0]]
+    agreement["subscriptions"][0]["status"] = SubscriptionStatus.EXPIRED.value
+    agreement["assets"] = []
+    mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
+    mocked_agreement_syncer._agreement = agreement
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 12.14}
+    mock_item = items_factory()[0]
+    mock_get_product_items_by_skus.return_value = [mock_item]
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Renewing",
+    }
+
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
+
+    mock_mpt_get_asset_template_by_name.assert_not_called()
+    mock_mpt_create_asset.assert_not_called()
+    mock_mpt_create_agreement_subscription.assert_called_once()
+    create_payload = mock_mpt_create_agreement_subscription.call_args[0][1]
+    assert create_payload["externalIds"]["vendor"] == expired_external_id
 
 
 @freeze_time("2025-07-24")
