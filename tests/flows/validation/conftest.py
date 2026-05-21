@@ -64,3 +64,12 @@ def mock_update_prices(mocker):
 @pytest.fixture
 def mock_send_error(mocker):
     return mocker.patch("adobe_vipm.flows.validation.transfer.send_error", autospec=True)
+
+
+@pytest.fixture
+def mock_get_prices_for_skus(mocker):
+    return mocker.patch(
+        "adobe_vipm.flows.validation.transfer.get_prices_for_skus",
+        return_value={},
+        spec=True,
+    )
