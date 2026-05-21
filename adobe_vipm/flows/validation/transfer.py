@@ -34,7 +34,6 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.helpers import (
     FetchResellerChangeData,
-    UpdatePrices,
     ValidateGovernmentTransfer,
     ValidateResellerChange,
 )
@@ -56,7 +55,6 @@ from adobe_vipm.flows.utils import (
     split_downsizes_upsizes_new,
 )
 from adobe_vipm.flows.utils.validation import validate_government_lga_data
-from adobe_vipm.flows.validation.shared import GetPreviewOrder
 from adobe_vipm.notifications import send_error
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
@@ -526,8 +524,6 @@ def validate_reseller_change(mpt_client, order):
         FetchResellerChangeData(is_validation=True),
         ValidateResellerChange(is_validation=True),
         AddResellerChangeLinesToOrder(),
-        GetPreviewOrder(),
-        UpdatePrices(is_validation=True),
     )
     context = Context(order=order)
     pipeline.run(mpt_client, context)
@@ -595,6 +591,10 @@ class AddResellerChangeLinesToOrder(Step):
         no_deployment_transfer_items = [
             item for item in context.adobe_transfer["lineItems"] if not item.get("deploymentId", "")
         ]
+        commitment = get_3yc_commitment(context.adobe_transfer)
+        sku_list = [item["offerId"] for item in no_deployment_transfer_items]
+        prices = get_prices(context.order, commitment, sku_list)
+
         if not no_deployment_transfer_items:
             logger.info("No transfer items without deployment ID")
             return [], []
@@ -623,7 +623,11 @@ class AddResellerChangeLinesToOrder(Step):
                 logger.error(error_msg)
                 send_error("Transfer Validation - Missing reseller item", error_msg)
                 errors.append(error_msg)
-            order_lines_from_transfer.append({"item": mapped_item, "quantity": item["quantity"]})
+            order_lines_from_transfer.append({
+                "item": mapped_item,
+                "quantity": item["quantity"],
+                "price": {"unitPP": prices.get(item["offerId"], 0)},
+            })
 
         logger.info("Created %d order lines from transfer items", len(order_lines_from_transfer))
         return order_lines_from_transfer, errors
