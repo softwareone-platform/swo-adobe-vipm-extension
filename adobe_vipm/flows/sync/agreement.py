@@ -411,7 +411,7 @@ class AgreementSyncer:  # noqa: WPS214
         mpt_entitlements_external_ids = set()
         entitlements_without_external_ids = set()
         for entitlement in self._agreement["subscriptions"] + self._agreement["assets"]:
-            if entitlement["status"] == SubscriptionStatus.TERMINATED:
+            if entitlement["status"] in {SubscriptionStatus.TERMINATED, SubscriptionStatus.EXPIRED}:
                 continue
 
             try:
