@@ -236,6 +236,7 @@ ignore = [
   "PLR09", # we have our own complexity rules
   "PLR2004", # do not report magic numbers
   "PLR6301", # do not require classmethod / staticmethod when self not used
+  "PLW0717", # allow existing broad try blocks
   "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
   "TRY003", # long exception messages from `tryceratops`
 ]
