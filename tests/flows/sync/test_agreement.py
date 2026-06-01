@@ -2886,36 +2886,88 @@ def test_add_missing_subscriptions_fail_recovery_skus(
 ):
     adobe_subscriptions = [
         adobe_subscription_factory(
-            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A10"
-        ),
-        adobe_subscription_factory(
-            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A13"
-        ),
-        adobe_subscription_factory(
-            subscription_id="ae5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="75322572CAT1A11"
-        ),
+            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CAT1A13"
+        )
     ]
-    mock_get_consumable_discount_level = mocker.patch(
-        "adobe_vipm.flows.utils.subscription.get_customer_consumables_discount_level"
-    )
-    mock_get_consumable_discount_level.side_effect = Exception("Test Exception")
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
     mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
-    mock_get_prices_for_skus.side_effect = [
-        {
-            "65322572CAT1A10": 12.14,
-            "65322572CAT1A11": 11.14,
-            "65322572CAT1A12": 10.14,
-            "65322572CAT1A13": 9.14,
-        },
-        {"75322572CAT1A11": 22.14},
-    ]
+    mocked_agreement_syncer._adobe_customer["discounts"] = []
+    mock_get_prices_for_skus.return_value = {
+        "65304578CAT1A10": 12.14,
+        "65304578CAT1A11": 11.14,
+        "65304578CAT1A12": 10.14,
+        "65304578CAT1A13": 9.14,
+    }
 
-    with pytest.raises(Exception, match="Test Exception"):
-        mocked_agreement_syncer._add_missing_subscriptions_and_assets()
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
 
     mock_get_product_items_by_skus.assert_called_once()
-    mock_notify_missing_discount_levels.assert_called_once()
+    assert (
+        mock_notify_missing_discount_levels.mock_calls
+        == [
+            mocker.call(
+                "65304578CAT1A13",
+                {
+                    "customerId": "a-client-id",
+                    "companyProfile": {
+                        "companyName": "Migrated Company",
+                        "preferredLanguage": "en-US",
+                        "contacts": [
+                            {
+                                "firstName": "firstName",
+                                "lastName": "lastName",
+                                "email": "email",
+                                "phoneNumber": "+18004449890",
+                            }
+                        ],
+                        "address": {
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "city": "city",
+                            "region": "region",
+                            "postalCode": "postalCode",
+                            "country": "US",
+                            "phoneNumber": "+18004449890",
+                        },
+                    },
+                    "discounts": [],
+                    "cotermDate": "2024-01-23",
+                    "globalSalesEnabled": False,
+                },
+            ),
+            mocker.call(
+                "65304578CAT1A13",
+                {
+                    "customerId": "a-client-id",
+                    "companyProfile": {
+                        "companyName": "Migrated Company",
+                        "preferredLanguage": "en-US",
+                        "contacts": [
+                            {
+                                "firstName": "firstName",
+                                "lastName": "lastName",
+                                "email": "email",
+                                "phoneNumber": "+18004449890",
+                            }
+                        ],
+                        "address": {
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "city": "city",
+                            "region": "region",
+                            "postalCode": "postalCode",
+                            "country": "US",
+                            "phoneNumber": "+18004449890",
+                        },
+                    },
+                    "discounts": [],
+                    "cotermDate": "2024-01-23",
+                    "globalSalesEnabled": False,
+                },
+            ),
+        ]
+        != []
+    )
 
 
 @freeze_time("2025-07-24")
