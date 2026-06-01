@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 
 from mpt_extension_sdk.mpt_http.utils import find_first
 
@@ -14,6 +15,8 @@ from adobe_vipm.flows.utils.customer import (
     get_customer_licenses_discount_level,
 )
 from adobe_vipm.flows.utils.notification import notify_discount_level_error
+
+logger = logging.getLogger(__name__)
 
 
 def get_subscription_by_line_and_item_id(
@@ -143,15 +146,25 @@ def get_sku_with_discount_level(sku: str, customer: dict) -> str:
     Returns:
         Sku with proper discount level based on Adobe customer's discount level.
     """
-    try:
-        discount_level = (
-            get_customer_licenses_discount_level(customer)
-            if not is_consumables_sku(sku)
-            else get_customer_consumables_discount_level(customer)
+    is_consumable = is_consumables_sku(sku)
+    discount_level = (
+        get_customer_consumables_discount_level(customer)
+        if is_consumable
+        else get_customer_licenses_discount_level(customer)
+    )
+    # FIXME: Workaround for MPT-18860. Adobe does not always return the discount level
+    #  (e.g. consumables when 3YC is applied only for licenses). Default to the base level for
+    #  the offer type ("T1" for consumables, "01" for licenses) so the agreement sync does not
+    #  fail. Should be removed after Adobe side fix the issue.
+    if not discount_level:
+        discount_level = "T1" if is_consumable else "01"
+        logger.warning(
+            "Customer %s has no discount level, defaulting to level %s",
+            customer.get("customerId"),
+            discount_level,
         )
-    except Exception:
         notify_discount_level_error(sku, customer)
-        raise
+
     return f"{sku[0:10]}{discount_level}{sku[12:]}"
 
 

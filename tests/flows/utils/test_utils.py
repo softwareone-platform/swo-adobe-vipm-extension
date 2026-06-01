@@ -325,5 +325,6 @@ def test_notify_discount_level_error(mocker, adobe_customer_factory):
         "Error getting discount level",
         f"An error occurred while getting the discount level for SKU **{sku}**.\n\n"
         f"Customer: {customer.get('customerId')}\n\n"
-        f"discounts: {customer.get('discounts')}",
+        f"discounts: {customer.get('discounts')}\n\n"
+        "defaulting to a default level.",
     )
