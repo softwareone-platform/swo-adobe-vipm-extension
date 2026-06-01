@@ -175,3 +175,5 @@ make/local.mk
 
 # mpt-tool
 .migrations-state.json
+
+.claude
