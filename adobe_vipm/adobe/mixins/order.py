@@ -14,7 +14,6 @@ from adobe_vipm.adobe import constants as adobe_constants
 from adobe_vipm.adobe.constants import AdobeStatus
 from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, wrap_http_error
-from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError, ProcessingUpsizeLinesError
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
     get_item_by_subcription_id,
@@ -173,9 +172,6 @@ class OrderClientMixin:
 
         Returns:
             dict: The Preview order.
-
-        Raises:
-            AdobeCreatePreviewError
         """
         authorization = self._config.get_authorization(context.authorization_id)
         offer_ids = tuple(
@@ -195,18 +191,15 @@ class OrderClientMixin:
         deployment_id = get_deployment_id(context.order)
         self._process_new_lines(context, flex_discounts, payload)
         if context.upsize_lines:
-            try:
-                self._process_upsize_lines(
-                    context.authorization_id,
-                    context.adobe_customer_id,
-                    context.upsize_lines,
-                    flex_discounts,
-                    payload,
-                    context.market_segment,
-                    deployment_id,
-                )
-            except ProcessingUpsizeLinesError as error:
-                raise AdobeCreatePreviewError(error) from error
+            self._process_upsize_lines(
+                context.authorization_id,
+                context.adobe_customer_id,
+                context.upsize_lines,
+                flex_discounts,
+                payload,
+                context.market_segment,
+                deployment_id,
+            )
 
         self._update_payload_by_deployment(authorization, deployment_id, payload)
         if not payload["lineItems"]:
@@ -620,9 +613,23 @@ class OrderClientMixin:
             try:
                 adobe_subscription = map_by_base_offer_subscriptions[adobe_base_sku]
             except KeyError:
-                raise ProcessingUpsizeLinesError(
-                    "Subscription has not been found in Adobe for sku %s.", adobe_base_sku
+                self._logger.info(
+                    "No active Adobe subscription found for sku %s, "
+                    "purchasing the full quantity %s as a new line.",
+                    adobe_base_sku,
+                    line["quantity"],
                 )
+                line_item = self._get_preview_order_line_item(
+                    line,
+                    adobe_base_sku,
+                    line["quantity"],
+                    discounts.get(
+                        get_adobe_product_by_marketplace_sku(adobe_base_sku, market_segment).sku
+                    ),
+                    market_segment,
+                )
+                payload["lineItems"].append(line_item)
+                continue
 
             renewal_quantity = adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
             current_quantity = adobe_subscription[Param.CURRENT_QUANTITY.value]

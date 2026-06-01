@@ -5,22 +5,18 @@ from responses import matchers
 
 from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
-from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
 from adobe_vipm.flows.context import Context
 
 
-def test_create_preview_order_processing_upsize_lines_error(
+def test_create_preview_order_upsize_without_active_subscription_buys_full_quantity(
     mocker,
     mock_get_adobe_product_by_marketplace_sku,
     mock_order,
-    mock_mpt_client,
     adobe_authorizations_file,
-    adobe_api_error_factory,
     adobe_client_factory,
     flex_discounts_factory,
-    requests_mocker,
 ):
     mocked_client, _, _ = adobe_client_factory()
     mock_get_flex_discounts_per_base_offer = mocker.patch.object(
@@ -38,6 +34,10 @@ def test_create_preview_order_processing_upsize_lines_error(
             }
         ],
     )
+    mock_get_preview_order = mocker.patch.object(
+        mocked_client, "get_preview_order", return_value={"externalReferenceId": "order-id"}
+    )
+    upsize_line = mock_order["lines"][0]
     context = Context(
         order=mock_order,
         order_id="order-id",
@@ -47,11 +47,82 @@ def test_create_preview_order_processing_upsize_lines_error(
         adobe_customer_id="fake-customer-id",
     )
 
-    with pytest.raises(AdobeCreatePreviewError, match="Subscription has not been found in Adobe"):
-        mocked_client.create_preview_order(context)
+    result = mocked_client.create_preview_order(context)
 
+    assert result == {"externalReferenceId": "order-id"}
     mock_get_flex_discounts_per_base_offer.assert_called_once()
     mock_get_subscriptions_for_offers.assert_called_once()
+    payload = mock_get_preview_order.call_args.args[2]
+    assert payload["lineItems"] == [
+        {
+            "extLineItemNumber": to_adobe_line_id(upsize_line["id"]),
+            "offerId": "65304578CA01A12",
+            "quantity": upsize_line["quantity"],
+        }
+    ]
+
+
+def test_create_preview_order_mixes_active_upsize_and_terminated_new_purchase(
+    mocker,
+    mock_get_adobe_product_by_marketplace_sku,
+    order_factory,
+    lines_factory,
+    adobe_authorizations_file,
+    adobe_client_factory,
+    flex_discounts_factory,
+):
+    active_line = lines_factory(
+        line_id=1, item_id=1, external_vendor_id="65304578CA", quantity=170, old_quantity=100
+    )[0]
+    terminated_line = lines_factory(
+        line_id=2, item_id=2, external_vendor_id="77777777CA", quantity=50, old_quantity=30
+    )[0]
+    order = order_factory(lines=[active_line, terminated_line])
+    mocked_client, _, _ = adobe_client_factory()
+    mocker.patch.object(
+        mocked_client, "get_flex_discounts_per_base_offer", return_value=flex_discounts_factory()
+    )
+    mocker.patch.object(
+        mocked_client,
+        "get_subscriptions_for_offers",
+        return_value=[
+            {
+                "subscriptionId": "active-sub",
+                "status": "1000",
+                "offerId": "65304578CA01A12",
+                "currentQuantity": 100,
+                "autoRenewal": {"enabled": True, "renewalQuantity": 100},
+            }
+        ],
+    )
+    mock_get_preview_order = mocker.patch.object(
+        mocked_client, "get_preview_order", return_value={"externalReferenceId": "order-id"}
+    )
+    context = Context(
+        order=order,
+        order_id="order-id",
+        authorization_id=adobe_authorizations_file["authorizations"][0]["authorization_uk"],
+        new_lines=[],
+        upsize_lines=[active_line, terminated_line],
+        adobe_customer_id="fake-customer-id",
+    )
+
+    result = mocked_client.create_preview_order(context)
+
+    assert result == {"externalReferenceId": "order-id"}
+    payload = mock_get_preview_order.call_args.args[2]
+    assert payload["lineItems"] == [
+        {
+            "extLineItemNumber": to_adobe_line_id(active_line["id"]),
+            "offerId": "65304578CA01A12",
+            "quantity": 70,
+        },
+        {
+            "extLineItemNumber": to_adobe_line_id(terminated_line["id"]),
+            "offerId": "77777777CA01A12",
+            "quantity": 50,
+        },
+    ]
 
 
 def test_get_preview_order(
