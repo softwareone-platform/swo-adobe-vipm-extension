@@ -748,7 +748,7 @@ def test_get_gc_agreement_deployments_to_check(mocker, settings):
 
     assert result == [gc_agreement_deployments]
     mocked_gc_agreement_deployments_model.all.assert_called_once_with(
-        formula=OR(EQ(Field("status"), "pending"), EQ(Field("status"), "error")),
+        formula=EQ(Field("status"), "pending"),
     )
 
 
