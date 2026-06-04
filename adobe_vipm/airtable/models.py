@@ -707,7 +707,7 @@ def get_gc_agreement_deployments_to_check(product_id: str):
     Retrieves Global Customer (gc) agreement deployments that require verification or review.
 
     This method retrieve the list of GCAgreementDeployment objects associated with the
-    specified product that are in pending or error state
+    specified product that are in pending state
 
     Args:
         product_id: The ID of the product used to determine the AirTable base.
@@ -719,10 +719,7 @@ def get_gc_agreement_deployments_to_check(product_id: str):
         AirTableBaseInfo.for_migrations(product_id)
     )
     return gc_agreement_deployment_model.all(
-        formula=OR(
-            EQ(Field("status"), STATUS_GC_PENDING),
-            EQ(Field("status"), STATUS_GC_ERROR),
-        ),
+        formula=EQ(Field("status"), STATUS_GC_PENDING),
     )
 
 
