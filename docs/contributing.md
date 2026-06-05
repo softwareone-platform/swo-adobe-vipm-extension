@@ -53,3 +53,5 @@ See [testing.md](testing.md) for repository-specific testing expectations.
 Documentation rules live in [documentation.md](documentation.md).
 
 When changing docs, update the smallest relevant file instead of duplicating policy across multiple documents.
+
+Open the pull request with its complete description in place from the start so automated reviewers evaluate the final content.
