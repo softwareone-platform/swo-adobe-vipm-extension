@@ -46,6 +46,8 @@ make test
 
 Use `make check-all` when you want the combined workflow.
 
+Write a clear, complete PR description so automated reviewers (for example CodeRabbit) can interpret the change correctly and avoid false-positive findings.
+
 See [testing.md](testing.md) for repository-specific testing expectations.
 
 ## Documentation Changes
