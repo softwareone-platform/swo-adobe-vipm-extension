@@ -472,7 +472,7 @@ class AgreementSyncer:  # noqa: WPS214
         if not is_large_government_agency_type(self.product_id):
             self._notify_if_3yc_commitment_expired(agreement, commitment_info)
             self._update_3yc_fulfillment_params(agreement, commitment_info, parameters)
-            self._update_3yc_ordering_params(commitment_info, parameters)
+            self._update_3yc_quantities_params(commitment_info, parameters)
 
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
         parameters[Param.PHASE_FULFILLMENT.value].append({
@@ -526,12 +526,6 @@ class AgreementSyncer:  # noqa: WPS214
             if not is_recommitment
             else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
         )
-        request_type_param_ext_id = (
-            Param.THREE_YC.value if not is_recommitment else Param.THREE_YC_RECOMMITMENT.value
-        )
-        request_type_param_phase = (
-            Param.PHASE_ORDERING.value if not is_recommitment else Param.PHASE_FULFILLMENT.value
-        )
         request_info = get_3yc_commitment_request(
             self._adobe_customer, is_recommitment=is_recommitment
         )
@@ -539,10 +533,6 @@ class AgreementSyncer:  # noqa: WPS214
             "externalId": status_param_ext_id,
             "value": request_info.get("status"),
         })
-        parameters.setdefault(request_type_param_phase, [])
-        parameters[request_type_param_phase].append(
-            {"externalId": request_type_param_ext_id, "value": None},
-        )
         parameters[Param.PHASE_FULFILLMENT.value] += [
             {
                 "externalId": Param.THREE_YC_ENROLL_STATUS.value,
@@ -558,8 +548,8 @@ class AgreementSyncer:  # noqa: WPS214
             },
         ]
 
-    def _update_3yc_ordering_params(self, commitment_info: dict, parameters: dict):
-        parameters.setdefault(Param.PHASE_ORDERING.value, [])
+    def _update_3yc_quantities_params(self, commitment_info: dict, parameters: dict):
+        parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
 
         minimum_quantities = commitment_info.get("minimumQuantities")
         if not minimum_quantities:
@@ -570,12 +560,12 @@ class AgreementSyncer:  # noqa: WPS214
 
         for mq in minimum_quantities:
             if mq["offerType"] == OfferType.LICENSE:
-                parameters[Param.PHASE_ORDERING.value].append({
+                parameters[Param.PHASE_FULFILLMENT.value].append({
                     "externalId": Param.THREE_YC_LICENSES.value,
                     "value": str(mq.get("quantity")),
                 })
             if mq["offerType"] == OfferType.CONSUMABLES:
-                parameters[Param.PHASE_ORDERING.value].append({
+                parameters[Param.PHASE_FULFILLMENT.value].append({
                     "externalId": Param.THREE_YC_CONSUMABLES.value,
                     "value": str(mq.get("quantity")),
                 })
