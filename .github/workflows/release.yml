@@ -94,7 +94,12 @@ jobs:
         run: |
           set -euo pipefail
           if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
-            echo "Tag '${VERSION}' already exists; skipping creation."
+            TAG_SHA="$(git rev-list -n1 "${VERSION}")"
+            if [ "${TAG_SHA}" != "${GITHUB_SHA}" ]; then
+              echo "::error::Tag '${VERSION}' already exists at '${TAG_SHA}', expected '${GITHUB_SHA}'."
+              exit 1
+            fi
+            echo "Tag '${VERSION}' already exists at current commit; skipping creation."
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
