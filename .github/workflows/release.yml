@@ -1,39 +1,132 @@
 name: Release
 
+# Manually-triggered release pipeline. Runs against the branch selected at
+# dispatch time (main -> pre-release, release/* -> latest). No branch input is
+# needed: the dispatch ref is the single source of truth.
+#
+# This pipeline only creates the tag and the GitHub release. The container
+# image is built and published by a separate external system, so this workflow
+# does not need to trigger any downstream GitHub workflow and the default
+# GITHUB_TOKEN is sufficient.
+
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version in X.Y.Z format (no 'v' prefix)"
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write # push the annotated tag and create the release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build:
-
+  release:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
-    - name: "Checkout"
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
+      - name: "Checkout"
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-    - name: "Get the version"
-      id: get_version
-      run: echo  "VERSION=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_OUTPUT"
+      - name: "Validate version and branch"
+        id: validate
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
 
-    - name: "Build and push image"
-      uses: azure/docker-login@v2
-      with:
-        login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-        username: ${{ secrets.REGISTRY_USERNAME }}
-        password: ${{ secrets.REGISTRY_PASSWORD }}
-    - run: |
-        docker build --target prod -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-vipm:${{ steps.get_version.outputs.VERSION }} .
-        docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-vipm:${{ steps.get_version.outputs.VERSION }}
+          # 1. Format must be strict semver X.Y.Z without a 'v' prefix.
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '${VERSION}' must be in X.Y.Z format (no 'v' prefix)."
+            exit 1
+          fi
+
+          # 2. Releases are only allowed from main or release/*.
+          BRANCH="${GITHUB_REF_NAME}"
+          case "${BRANCH}" in
+            main)       PRERELEASE=true ;;
+            release/*)  PRERELEASE=false ;;
+            *)
+              echo "::error::Releases are only allowed from 'main' or 'release/*' (got '${BRANCH}')."
+              exit 1
+              ;;
+          esac
+
+          git fetch --tags --force origin
+
+          # 3. A published release for this version must not already exist. A bare
+          #    tag without a release is treated as an interrupted previous run and
+          #    is allowed to resume, keeping the pipeline idempotent.
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            echo "::error::A GitHub release for '${VERSION}' already exists."
+            exit 1
+          fi
+
+          # 4. The version must be strictly greater than the highest tag reachable
+          #    from the dispatched ref (monotonic increase per branch). The version
+          #    itself is excluded so a leftover tag from an interrupted run does not
+          #    block its own completion.
+          LATEST="$(git tag --merged HEAD --sort=-v:refname \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "${VERSION}" | head -n1 || true)"
+          if [ -n "${LATEST}" ]; then
+            HIGHEST="$(printf '%s\n%s\n' "${LATEST}" "${VERSION}" | sort -V | tail -n1)"
+            if [ "${HIGHEST}" != "${VERSION}" ]; then
+              echo "::error::Version '${VERSION}' must be greater than the latest reachable tag '${LATEST}'."
+              exit 1
+            fi
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${PRERELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "Validated version '${VERSION}' on branch '${BRANCH}' (prerelease=${PRERELEASE})."
+
+      - name: "Create annotated tag"
+        env:
+          VERSION: ${{ steps.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
+            echo "Tag '${VERSION}' already exists; skipping creation."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${VERSION}" -m "Release ${VERSION}"
+            git push origin "refs/tags/${VERSION}"
+          fi
+
+      - name: "Create GitHub release"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.validate.outputs.version }}
+          PRERELEASE: ${{ steps.validate.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            echo "Release '${VERSION}' already exists; skipping creation."
+            exit 0
+          fi
+          if [ "${PRERELEASE}" = "true" ]; then
+            RELEASE_FLAG="--prerelease"
+          else
+            RELEASE_FLAG="--latest"
+          fi
+          gh release create "${VERSION}" \
+            --title "v${VERSION}" \
+            --target "${GITHUB_SHA}" \
+            --generate-notes \
+            --verify-tag \
+            ${RELEASE_FLAG}
 
   dtrack:
+    needs: release
     uses: softwareone-platform/ops-template/.github/workflows/dependency-track-python-uv.yml@v2
     with:
       projectName: 'swo-extension-adobe-vipm'
