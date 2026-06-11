@@ -51,7 +51,7 @@ Deployed workloads receive configuration through Helm config maps, secrets, and 
 | `EXT_AIRTABLE_BASES` | - | `{"PRD-1111-1111":"app..."}` | Per-product Airtable base mapping for migration and transfer data |
 | `EXT_AIRTABLE_PRICING_BASES` | - | `{"PRD-1111-1111":"app..."}` | Per-product Airtable base mapping for pricing data |
 | `EXT_AIRTABLE_SKU_MAPPING_BASE` | - | `appXXXXXXXX` | Airtable base id for SKU mapping |
-| `EXT_MIGRATION_RUNNING_MAX_RETRIES` | `10` | `10` | Retry limit for migration-running logic |
+| `EXT_MIGRATION_RUNNING_MAX_RETRIES` | `15` | `15` | Retry limit for migration-running logic |
 
 ## NAV Settings
 
