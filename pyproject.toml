@@ -34,7 +34,7 @@ dev = [
   "ipython==9.*",
   "mypy==2.1.*",
   "pre-commit==4.6.*",
-  "pytest==9.0.*",
+  "pytest==9.1.*",
   "pytest-cov==7.1.*",
   "pytest-deadfixtures==3.1.*",
   "pytest-django==4.12.*",
@@ -261,6 +261,7 @@ convention = "google"
 "tests/flows/fulfillment/test_transfer.py" = ["F601"]
 "tests/*.py" = [
   "D103", # missing docstring in public function
+  "RUF076", # allow autouse=True in test fixtures
   "S101", # asserts
   "S105", # hardcoded passwords
   "S404", # subprocess calls are for tests
