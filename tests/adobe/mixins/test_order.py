@@ -452,3 +452,68 @@ def test_get_flex_discounts_per_base_offer_error(
             context,
             ("99999999CA01A12", "99999999CA01A12"),
         )  # act
+
+
+def test_get_flex_discounts_per_base_offer_collects_all_pages(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    mock_order,
+    flex_discounts_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    full = flex_discounts_factory()
+    base_url = urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts")
+    page_one = {
+        **full,
+        "flexDiscounts": full["flexDiscounts"][:1],
+        "links": {
+            "next": {
+                "uri": "/v3/flex-discounts?market-segment=COM&country=US"
+                "&offer-ids=99999999CA01A12,99999999CA01A12&offset=50",
+                "method": "GET",
+                "headers": [],
+            }
+        },
+    }
+    page_two = {
+        **full,
+        "flexDiscounts": full["flexDiscounts"][1:],
+        "links": {"self": full["links"]["self"]},
+    }
+    requests_mocker.get(
+        base_url,
+        json=page_one,
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "COM",
+                "country": "US",
+                "offer-ids": "99999999CA01A12,99999999CA01A12",
+            })
+        ],
+    )
+    requests_mocker.get(
+        base_url,
+        json=page_two,
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "COM",
+                "country": "US",
+                "offer-ids": "99999999CA01A12,99999999CA01A12",
+                "offset": "50",
+            })
+        ],
+    )
+    context = Context(order=mock_order, market_segment="COM")
+
+    result = mocked_client.get_flex_discounts_per_base_offer(
+        authorization,
+        context,
+        ("99999999CA01A12", "99999999CA01A12"),
+    )  # act
+
+    assert result == {
+        "65304768CA01A12": "BLACK_FRIDAY_22_FAILURE_3",
+        "65304769CA01A12": "EASTER_26",
+        "65304770CA01A12": "ADOBE_ALL_PROMOTION",
+    }

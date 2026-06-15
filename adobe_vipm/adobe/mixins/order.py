@@ -542,6 +542,17 @@ class OrderClientMixin:
             )
             if match:
                 country = match.group(1)
+                logger.info(
+                    "Flex discounts: using deployment %s country override %s",
+                    context.customer_data[Param.DEPLOYMENT_ID],
+                    country,
+                )
+        logger.info(
+            "Flex discounts: requesting from Adobe market_segment=%s country=%s offer_ids=%s",
+            MARKET_SEGMENTS[context.market_segment],
+            country,
+            offer_ids,
+        )
         try:
             flex_discounts = self._get_flex_discounts(
                 authorization,
@@ -557,11 +568,21 @@ class OrderClientMixin:
                 flex_discounts = ()
             else:
                 raise
+        logger.debug(
+            "Flex discounts: Adobe returned %s discount(s): %s",
+            len(flex_discounts),
+            flex_discounts,
+        )
         base_offers_with_discounts = {}
         for flex_discount in filter(lambda fd: fd["status"] == "ACTIVE", flex_discounts):
             base_offers_with_discounts.update(
                 dict.fromkeys(flex_discount["qualification"]["baseOfferIds"], flex_discount["code"])
             )
+        logger.info(
+            "Flex discounts: resolved %s base offer(s) with active discounts: %s",
+            len(base_offers_with_discounts),
+            base_offers_with_discounts,
+        )
         return base_offers_with_discounts
 
     def _get_fail_discounts_for_cust_not_qualified(self, ex: AdobeError, payload: dict) -> set:
@@ -743,20 +764,25 @@ class OrderClientMixin:
     @wrap_http_error
     def _get_flex_discounts(
         self, authorization: Authorization, segment: str, country: str, offer_ids: tuple[str, ...]
-    ) -> dict:
+    ) -> list:
         headers = self._get_headers(authorization)
         offer_ids = ",".join(offer_ids)
-        response = requests.get(
-            urljoin(
-                self._config.api_base_url,
-                "v3/flex-discounts",
-            ),
-            headers=headers,
-            params={"market-segment": {segment}, "country": {country}, "offer-ids": {offer_ids}},
-            timeout=self._TIMEOUT,
-        )
-        response.raise_for_status()
-        return response.json()["flexDiscounts"]
+        query_params = {"market-segment": {segment}, "country": {country}, "offer-ids": {offer_ids}}
+        next_url = "v3/flex-discounts"
+        flex_discounts = []
+        while next_url:
+            response = requests.get(
+                urljoin(self._config.api_base_url, next_url),
+                headers=headers,
+                params=query_params,
+                timeout=self._TIMEOUT,
+            )
+            response.raise_for_status()
+            page = response.json()
+            flex_discounts.extend(page["flexDiscounts"])
+            next_url = page.get("links", {}).get("next", {}).get("uri")
+            query_params = None
+        return flex_discounts
 
     def _update_payload_by_deployment(
         self, authorization: Authorization, deployment_id: str | None, payload: dict[str, Any]
