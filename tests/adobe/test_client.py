@@ -3181,3 +3181,57 @@ def test_get_flex_discounts(
     )
 
     assert result == flex_discount_resp["flexDiscounts"]
+
+
+def test_get_flex_discounts_follows_pagination_links(
+    requests_mocker, adobe_client_factory, settings, flex_discounts_factory
+):
+    client, authorization, _ = adobe_client_factory()
+    full = flex_discounts_factory()
+    base_url = urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "v3/flex-discounts")
+    page_one = {
+        **full,
+        "flexDiscounts": full["flexDiscounts"][:1],
+        "links": {
+            "next": {
+                "uri": "/v3/flex-discounts?market-segment=COM&country=US"
+                "&offer-ids=65304768CA01A12,65304768CA01A12&offset=50",
+                "method": "GET",
+                "headers": [],
+            }
+        },
+    }
+    page_two = {
+        **full,
+        "flexDiscounts": full["flexDiscounts"][1:],
+        "links": {"self": full["links"]["self"]},
+    }
+    requests_mocker.get(
+        base_url,
+        json=page_one,
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "COM",
+                "country": "US",
+                "offer-ids": "65304768CA01A12,65304768CA01A12",
+            })
+        ],
+    )
+    requests_mocker.get(
+        base_url,
+        json=page_two,
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "COM",
+                "country": "US",
+                "offer-ids": "65304768CA01A12,65304768CA01A12",
+                "offset": "50",
+            })
+        ],
+    )
+
+    result = client._get_flex_discounts(
+        authorization, "COM", "US", ("65304768CA01A12", "65304768CA01A12")
+    )
+
+    assert result == full["flexDiscounts"]
