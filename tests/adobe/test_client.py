@@ -2920,7 +2920,7 @@ def test_get_customer_deployments(
     customer_id = "a-customer-id"
     client, authorization, api_token = adobe_client_factory()
     expected_response = {
-        "totalCount": 1,
+        "totalCount": 2,
         "items": [
             {
                 "deploymentId": "deployment-id-1",
@@ -2937,7 +2937,7 @@ def test_get_customer_deployments(
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
-            f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
+            f"/v3/customers/{customer_id}/deployments",
         ),
         status=200,
         json=expected_response,
@@ -2955,7 +2955,7 @@ def test_get_customer_deployments(
 
     result = client.get_customer_deployments(authorization_uk, customer_id)
 
-    assert result == expected_response
+    assert result == {"items": expected_response["items"], "totalCount": 2}
 
 
 def test_get_customer_deployments_active_status(
@@ -2965,6 +2965,7 @@ def test_get_customer_deployments_active_status(
     customer_id = "a-customer-id"
     client, authorization, api_token = adobe_client_factory()
     deployments_response = {
+        "totalCount": 3,
         "items": [
             {
                 "deploymentId": "deployment-1",
@@ -2981,7 +2982,7 @@ def test_get_customer_deployments_active_status(
                 "status": "1000",
                 "companyProfile": {"address": {"country": "ES"}},
             },
-        ]
+        ],
     }
     active_deployments_response = [
         {
@@ -2998,7 +2999,7 @@ def test_get_customer_deployments_active_status(
     requests_mocker.get(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
-            f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
+            f"/v3/customers/{customer_id}/deployments",
         ),
         status=200,
         json=deployments_response,
@@ -3018,6 +3019,70 @@ def test_get_customer_deployments_active_status(
 
     assert len(result) == 2
     assert result == active_deployments_response
+
+
+def test_get_customer_deployments_follows_pagination_links(
+    requests_mocker, settings, adobe_client_factory, adobe_authorizations_file
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer-id"
+    client, authorization, api_token = adobe_client_factory()
+    expected_headers = {
+        "X-Api-Key": authorization.client_id,
+        "Authorization": f"Bearer {api_token.token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    base_url = urljoin(
+        settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+        f"/v3/customers/{customer_id}/deployments",
+    )
+    requests_mocker.get(
+        base_url,
+        status=200,
+        json={
+            "totalCount": 3,
+            "items": [
+                {"deploymentId": "deployment-1", "status": "1000"},
+                {"deploymentId": "deployment-2", "status": "1000"},
+            ],
+            "links": {
+                "next": {
+                    "uri": f"/v3/customers/{customer_id}/deployments?offset=2",
+                    "method": "GET",
+                    "headers": [],
+                }
+            },
+        },
+        match=[
+            matchers.query_param_matcher({}),
+            matchers.header_matcher(expected_headers),
+        ],
+    )
+    requests_mocker.get(
+        base_url,
+        status=200,
+        json={
+            "totalCount": 3,
+            "items": [{"deploymentId": "deployment-3", "status": "1000"}],
+            "links": {"self": {"uri": "", "method": "GET", "headers": []}},
+        },
+        match=[
+            matchers.query_param_matcher({"offset": "2"}),
+            matchers.header_matcher(expected_headers),
+        ],
+    )
+
+    result = client.get_customer_deployments(authorization_uk, customer_id)
+
+    assert result == {
+        "items": [
+            {"deploymentId": "deployment-1", "status": "1000"},
+            {"deploymentId": "deployment-2", "status": "1000"},
+            {"deploymentId": "deployment-3", "status": "1000"},
+        ],
+        "totalCount": 3,
+    }
 
 
 def test_preview_reseller_change(
