@@ -293,6 +293,81 @@ def test_get_prices_for_skus_empty(mocker, settings):
     assert result == {}
 
 
+def test_get_prices_for_skus_falls_back_to_historical_for_missing(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    current_item = mocker.MagicMock()
+    current_item.sku = "sku-1"
+    current_item.unit_pp = 12.44
+    historical_item = mocker.MagicMock()
+    historical_item.sku = "sku-2"
+    historical_item.unit_pp = 9.99
+    mocked_pricelist_model.all.side_effect = [[current_item], [historical_item]]
+
+    result = get_prices_for_skus("product_id", "currency", ["sku-1", "sku-2"])
+
+    assert result == {"sku-1": 12.44, "sku-2": 9.99}
+    assert mocked_pricelist_model.all.call_count == 2
+    # the fallback queries historical rows (populated valid_until) for the missing SKU only
+    assert mocked_pricelist_model.all.call_args_list[1] == mocker.call(
+        formula=AND(
+            EQ(Field("currency"), "currency"),
+            NE(Field("valid_until"), BLANK()),
+            OR(EQ(Field("sku"), "sku-2")),
+        ),
+        sort=["-valid_until"],
+    )
+
+
+def test_get_prices_for_skus_historical_fallback_uses_newest(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    newest = mocker.MagicMock()
+    newest.sku = "sku-1"
+    newest.unit_pp = 8.00
+    older = mocker.MagicMock()
+    older.sku = "sku-1"
+    older.unit_pp = 5.00
+    # sorted by -valid_until, so the newest row comes first
+    mocked_pricelist_model.all.side_effect = [[], [newest, older]]
+
+    result = get_prices_for_skus("product_id", "currency", ["sku-1"])
+
+    assert result == {"sku-1": 8.00}
+
+
+def test_get_prices_for_skus_missing_everywhere(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    mocked_pricelist_model.all.side_effect = [[], []]
+
+    result = get_prices_for_skus("product_id", "currency", ["sku-1"])
+
+    assert result == {}
+    assert mocked_pricelist_model.all.call_count == 2
+
+
 def test_get_skus_with_available_prices(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",

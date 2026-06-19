@@ -450,11 +450,29 @@ def _get_prices_for_skus_from_airtable(
     )
 
 
+def _get_historical_prices_for_skus_from_airtable(
+    product_id: str, currency: str, skus: list[str], column_name: str
+) -> dict:
+    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    return pricelist_model.all(
+        formula=AND(
+            EQ(Field("currency"), currency),
+            NE(Field("valid_until"), BLANK()),
+            OR(
+                *[EQ(Field(column_name), sku) for sku in skus],
+            ),
+        ),
+        sort=["-valid_until"],
+    )
+
+
 def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict:
     """
     Given a currency and a list of SKUs it retrieves the purchase price.
 
-    For each SKU in the given currency.
+    For each SKU in the given currency. SKUs without a current price (i.e. end-of-sale
+    items, which no longer have an open-ended pricelist row) fall back to their most
+    recent historical price.
 
     Args:
         product_id: The ID of the product used to determine the AirTable base.
@@ -467,7 +485,19 @@ def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict
     if not skus:
         return {}
     items = _get_prices_for_skus_from_airtable(product_id, currency, skus, "sku")
-    return {item.sku: item.unit_pp for item in items}
+    prices = {item.sku: item.unit_pp for item in items}
+
+    missing = sorted(set(skus) - set(prices))
+    if not missing:
+        return prices
+
+    historical_items = _get_historical_prices_for_skus_from_airtable(
+        product_id, currency, missing, "sku"
+    )
+    for item in historical_items:
+        # results are sorted by -valid_until, so the first row seen per SKU is the newest
+        prices.setdefault(item.sku, item.unit_pp)
+    return prices
 
 
 def get_skus_with_available_prices(product_id: str, currency: str, skus: list[str]) -> set:
