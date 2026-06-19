@@ -26,18 +26,20 @@ class DeploymentClientMixin:
             dict: Deployments.
 
         """
-        authorization = self._config.get_authorization(authorization_id)
-        headers = self._get_headers(authorization)
-        response = requests.get(
-            urljoin(
-                self._config.api_base_url,
-                f"/v3/customers/{customer_id}/deployments?limit=100&offset=0",
-            ),
-            headers=headers,
-            timeout=self._TIMEOUT,
-        )
-        response.raise_for_status()
-        return response.json()
+        headers = self._get_headers(self._config.get_authorization(authorization_id))
+        next_url = f"/v3/customers/{customer_id}/deployments"
+        deployments = []
+        while next_url:
+            response = requests.get(
+                urljoin(self._config.api_base_url, next_url),
+                headers=headers,
+                timeout=self._TIMEOUT,
+            )
+            response.raise_for_status()
+            page = response.json()
+            deployments.extend(page.get("items", []))
+            next_url = page.get("links", {}).get("next", {}).get("uri")
+        return {"items": deployments, "totalCount": len(deployments)}
 
     def get_customer_deployments_active_status(
         self,
