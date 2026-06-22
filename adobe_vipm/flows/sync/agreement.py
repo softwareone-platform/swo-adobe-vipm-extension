@@ -83,12 +83,12 @@ class AgreementSyncer:  # noqa: WPS214
 
     @property
     def agreement_id(self) -> str:
-        """Return agreement id."""
+        """Agreement id."""
         return self._agreement["id"]
 
     @property
     def product_id(self) -> str:
-        """Return agreement product id."""
+        """Agreement product id."""
         return self._agreement["product"]["id"]
 
     def sync(self, *, sync_prices: bool) -> None:  # noqa: C901
