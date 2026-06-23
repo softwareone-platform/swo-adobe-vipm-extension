@@ -60,7 +60,12 @@ class Command(AdobeBaseCommand):
                 sync_prices=options["sync_prices"],
             )
         elif options["all"]:
-            sync_all_agreements(mpt_client, adobe_client, dry_run=options["dry_run"])
+            sync_all_agreements(
+                mpt_client,
+                adobe_client,
+                dry_run=options["dry_run"],
+                sync_prices=options["sync_prices"],
+            )
         else:
             sync_agreements_by_3yc_end_date(mpt_client, adobe_client, dry_run=options["dry_run"])
             sync_agreements_by_coterm_date(mpt_client, adobe_client, dry_run=options["dry_run"])

@@ -1137,7 +1137,9 @@ def sync_agreements_by_3yc_enroll_status(
             )
 
 
-def sync_all_agreements(mpt_client: MPTClient, adobe_client: AdobeClient, *, dry_run: bool) -> None:
+def sync_all_agreements(
+    mpt_client: MPTClient, adobe_client: AdobeClient, *, dry_run: bool, sync_prices: bool = False
+) -> None:
     """
     Get all the active agreements to update the prices for them.
 
@@ -1146,10 +1148,13 @@ def sync_all_agreements(mpt_client: MPTClient, adobe_client: AdobeClient, *, dry
         adobe_client: The Adobe API client.
         dry_run: if True, it just simulate the prices update but doesn't
         perform it.
+        sync_prices: if True also sync prices.
     """
     agreements = mpt.get_all_agreements(mpt_client)
     for agreement in agreements:
-        sync_agreement(mpt_client, adobe_client, agreement, dry_run=dry_run, sync_prices=False)
+        sync_agreement(
+            mpt_client, adobe_client, agreement, dry_run=dry_run, sync_prices=sync_prices
+        )
 
 
 def sync_agreement(
