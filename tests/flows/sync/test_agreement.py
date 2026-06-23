@@ -3840,6 +3840,7 @@ def test_sync_agreements_by_agreement_ids(
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
+@pytest.mark.parametrize("sync_prices", [True, False])
 def test_sync_all_agreements(
     mocker,
     mock_mpt_client,
@@ -3848,13 +3849,16 @@ def test_sync_all_agreements(
     mock_adobe_client,
     mock_agreement,
     dry_run,
+    sync_prices,
 ):
     mocker.patch("mpt_extension_sdk.mpt_http.mpt.get_all_agreements", return_value=[mock_agreement])
 
-    sync_all_agreements(mock_mpt_client, mock_adobe_client, dry_run=dry_run)  # act
+    sync_all_agreements(
+        mock_mpt_client, mock_adobe_client, dry_run=dry_run, sync_prices=sync_prices
+    )  # act
 
     mock_sync_agreement.assert_called_once_with(
-        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=False
+        mock_mpt_client, mock_adobe_client, mock_agreement, dry_run=dry_run, sync_prices=sync_prices
     )
 
 
