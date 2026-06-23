@@ -50,4 +50,6 @@ def test_process_all(mocker, dry_run, mock_mpt_client, mock_adobe_client):
 
     call_command("sync_agreements", all=True, dry_run=dry_run, sync_prices=True)  # act
 
-    mocked.assert_called_once_with(mock_mpt_client, mock_adobe_client, dry_run=dry_run)
+    mocked.assert_called_once_with(
+        mock_mpt_client, mock_adobe_client, dry_run=dry_run, sync_prices=True
+    )
