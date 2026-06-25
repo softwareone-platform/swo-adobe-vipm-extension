@@ -2145,11 +2145,6 @@ def mock_settings(settings):
 
 
 @pytest.fixture
-def mock_pymsteams(mocker):
-    return mocker.patch("pymsteams.connectorcard", autospec=True)
-
-
-@pytest.fixture
 def mock_mpt_update_agreement(mocker):
     mock = mocker.patch("mpt_extension_sdk.mpt_http.mpt.update_agreement", autospec=True)
     mocker.patch("adobe_vipm.flows.fulfillment.shared.update_agreement", new=mock)
