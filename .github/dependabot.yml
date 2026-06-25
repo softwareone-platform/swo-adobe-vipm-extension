@@ -20,6 +20,16 @@ updates:
     ignore:
       - dependency-name: "django"
         versions: ["*"]
+      # This repo must stay on mpt-extension-sdk 5.x: the 6.x line requires
+      # mpt-api-client 6.3.* which is incompatible with mpt-tool 6.0.* (needs
+      # mpt-api-client 5.4.*), so a 6.x bump is unresolvable and must never be
+      # selected.
+      - dependency-name: "mpt-extension-sdk"
+        versions: [">=6"]
+      # mpt-extension-sdk 5.21.* pins requests==2.32.*, so a newer requests is
+      # unresolvable until the sdk lifts that cap.
+      - dependency-name: "requests"
+        versions: [">=2.33"]
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
