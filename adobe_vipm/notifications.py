@@ -1,9 +1,10 @@
 import datetime as dt
+import enum
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import pymsteams
+import requests
 from django.conf import settings
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mpt_extension_sdk.mpt_http.base import MPTClient
@@ -12,6 +13,18 @@ from mpt_extension_sdk.mpt_http.mpt import notify
 from adobe_vipm.adobe.constants import MPT_NOTIFY_CATEGORIES
 
 logger = logging.getLogger(__name__)
+
+_REQUEST_TIMEOUT = 10
+
+
+class Style(enum.Enum):
+    """Adaptive Card style token, used for both Container.style and TextBlock.color.
+
+    Values are the case-sensitive lower-case Adaptive Card enum tokens.
+    """
+
+    WARNING = "warning"
+    ATTENTION = "attention"
 
 
 def dateformat(date_string: str) -> str:
@@ -45,30 +58,89 @@ class FactsSection:
     data: dict
 
 
+def _build_card(
+    title: str,
+    text: str,
+    style: Style,
+    button: Button | None,
+    facts: FactsSection | None,
+) -> dict:
+    """Builds the Adaptive Card payload wrapped in the Workflows envelope."""
+    body: list[dict] = [
+        {
+            "type": "Container",
+            "style": style.value,
+            "bleed": True,
+            "items": [
+                {
+                    "type": "TextBlock",
+                    "text": title,
+                    "weight": "bolder",
+                    "size": "large",
+                    "color": style.value,
+                    "wrap": True,
+                },
+            ],
+        },
+        {"type": "TextBlock", "text": text, "wrap": True},
+    ]
+
+    if facts:
+        if facts.title:
+            body.append(
+                {"type": "TextBlock", "text": facts.title, "weight": "bolder", "wrap": True},
+            )
+        body.append(
+            {
+                "type": "FactSet",
+                "facts": [
+                    {"title": str(key), "value": str(fact_value)}
+                    for key, fact_value in facts.data.items()
+                ],
+            },
+        )
+
+    card: dict = {
+        "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "msteams": {"width": "Full"},
+        "body": body,
+    }
+
+    if button:
+        card["actions"] = [
+            {"type": "Action.OpenUrl", "title": button.label, "url": button.url},
+        ]
+
+    return {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": card,
+            },
+        ],
+    }
+
+
 def send_notification(
     title: str,
     text: str,
-    color: str,
+    style: Style,
     button: Button | None = None,
     facts: FactsSection | None = None,
 ) -> None:
-    """Send notification to the Teams channel."""
-    message = pymsteams.connectorcard(settings.EXTENSION_CONFIG["MSTEAMS_WEBHOOK_URL"])
-    message.color(color)
-    message.title(title)
-    message.text(text)
-    if button:
-        message.addLinkButton(button.label, button.url)
-    if facts:
-        facts_section = pymsteams.cardsection()
-        facts_section.title(facts.title)
-        for key, value in facts.data.items():
-            facts_section.addFact(key, value)
-        message.addSection(facts_section)
+    """Sends an Adaptive Card to the MS Teams Workflow webhook."""
+    payload = _build_card(title, text, style, button, facts)
 
     try:
-        message.send()
-    except pymsteams.TeamsWebhookException:
+        requests.post(
+            settings.EXTENSION_CONFIG["MSTEAMS_WEBHOOK_URL"],
+            json=payload,
+            timeout=_REQUEST_TIMEOUT,
+        ).raise_for_status()
+    except requests.RequestException:
         logger.exception("Error sending notification to MSTeams!")
 
 
@@ -82,7 +154,7 @@ def send_warning(
     send_notification(
         f"\u2622 {title}",
         text,
-        "#ffa500",
+        Style.WARNING,
         button=button,
         facts=facts,
     )
@@ -98,7 +170,7 @@ def send_error(
     send_notification(
         f"\U0001f4a3 {title}",
         text,
-        "#df3422",
+        Style.ATTENTION,
         button=button,
         facts=facts,
     )
@@ -114,7 +186,7 @@ def send_exception(
     send_notification(
         f"\U0001f525 {title}",
         text,
-        "#541c2e",
+        Style.ATTENTION,
         button=button,
         facts=facts,
     )
