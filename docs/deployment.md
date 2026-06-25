@@ -67,7 +67,7 @@ Deployed workloads receive configuration through Helm config maps, secrets, and 
 
 | Environment Variable | Default | Example | Description |
 | --- | --- | --- | --- |
-| `EXT_MSTEAMS_WEBHOOK_URL` | - | `https://...office.com/...` | Microsoft Teams webhook used by notification helpers |
+| `EXT_MSTEAMS_WEBHOOK_URL` | - | `https://<env>.environment.api.powerplatform.com/.../triggers/manual/paths/invoke?...` | Microsoft Teams **Power Automate Workflow** webhook URL used by notification helpers. Must be the new Workflow webhook URL; the deprecated incoming-webhook connector URL is no longer supported |
 | `EXT_EMAIL_NOTIFICATIONS_ENABLED` | - | `true` | Enables email notification flows where configured |
 | `EXT_EMAIL_NOTIFICATIONS_SENDER` | - | `noreply@example.com` | Sender address for email notifications |
 | `EXT_AWS_SES_REGION` | - | `eu-west-1` | AWS SES region |

@@ -46,7 +46,7 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
 | `adobe_vipm/adobe/client.py` + `adobe/mixins/` | Adobe VIPM API client (customer, order, subscription, transfer, deployment, reseller mixins) |
 | `adobe_vipm/adobe/config.py` | `Config` singleton: authorizations, resellers, countries |
 | `adobe_vipm/airtable/models.py` | `pyairtable` models for migration, pricing, and SKU-mapping data |
-| `adobe_vipm/notifications.py` | Microsoft Teams alerts (`pymsteams`) and MPT notifications (Jinja2 templates) |
+| `adobe_vipm/notifications.py` | Microsoft Teams alerts (Adaptive Cards via `requests`) and MPT notifications (Jinja2 templates) |
 | `adobe_vipm/management/commands/` | Worker commands for transfers, 3YC, resellers, and sync |
 
 ## Management commands
