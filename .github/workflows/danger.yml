@@ -19,6 +19,6 @@ jobs:
           fetch-depth: 0
 
       - name: Run Danger
-        uses: softwareone-platform/one-danger@1.1.0
+        uses: softwareone-platform/one-danger@1.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
