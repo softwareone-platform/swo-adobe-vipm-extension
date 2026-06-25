@@ -390,7 +390,7 @@ def check_running_transfers_for_product(product_id):  # noqa: C901
                         button=get_transfer_link_button(filled_tranfer),
                         facts=FactsSection(
                             "Error from checking running transfers",
-                            str(error),
+                            {error.__class__.__name__: str(error)},
                         ),
                     )
         if filled_tranfer.customer_benefits_3yc_status != ThreeYearCommitmentStatus.COMMITTED:
