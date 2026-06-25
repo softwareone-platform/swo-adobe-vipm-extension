@@ -1,12 +1,13 @@
+import json
 import logging
 
-import pymsteams
 import pytest
+import requests
 
-from adobe_vipm.adobe.constants import MPT_NOTIFY_CATEGORIES
 from adobe_vipm.notifications import (
     Button,
     FactsSection,
+    Style,
     dateformat,
     mpt_notify,
     send_error,
@@ -16,92 +17,150 @@ from adobe_vipm.notifications import (
 )
 
 
-def test_send_notification_full(mocker, settings):
+def test_send_notification_full(settings, requests_mocker):
     settings.EXTENSION_CONFIG = {
         "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
     }
-    mocked_message = mocker.MagicMock()
-    mocked_section = mocker.MagicMock()
-    mocked_card = mocker.patch(
-        "adobe_vipm.notifications.pymsteams.connectorcard", return_value=mocked_message
-    )
-    mocker.patch("adobe_vipm.notifications.pymsteams.cardsection", return_value=mocked_section)
+    requests_mocker.post("https://teams.webhook", status=200)
     button = Button("button-label", "button-url")
     facts_section = FactsSection("section-title", {"key": "value"})
 
     send_notification(
         "not-title",
         "not-text",
-        "not-color",
+        Style.WARNING,
         button=button,
         facts=facts_section,
     )  # act
 
-    mocked_message.title.assert_called_once_with("not-title")
-    mocked_message.text.assert_called_once_with("not-text")
-    mocked_message.color.assert_called_once_with("not-color")
-    mocked_message.addLinkButton.assert_called_once_with(button.label, button.url)
-    mocked_section.title.assert_called_once_with(facts_section.title)
-    mocked_section.addFact.assert_called_once_with(
-        next(iter(facts_section.data.keys())),
-        next(iter(facts_section.data.values())),
+    payload = json.loads(requests_mocker.calls[0].request.body)
+    card = payload["attachments"][0]["content"]
+    card_body = card["body"]
+    title_container = card_body[0]["items"][0]
+    fact_sets = [block for block in card_body if block.get("type") == "FactSet"]
+    assert (
+        payload["type"],
+        card["type"],
+        card_body[1]["text"],
+        card["actions"],
+        fact_sets[0]["facts"],
+    ) == (
+        "message",
+        "AdaptiveCard",
+        "not-text",
+        [{"type": "Action.OpenUrl", "title": "button-label", "url": "button-url"}],
+        [{"title": "key", "value": "value"}],
     )
-    mocked_message.addSection.assert_called_once_with(mocked_section)
-    mocked_message.send.assert_called_once()
-    mocked_card.assert_called_once_with("https://teams.webhook")
+    assert title_container["text"] == "not-title"
+    assert (
+        card_body[0]["style"],
+        title_container["weight"],
+        title_container["size"],
+        title_container["color"],
+    ) == ("warning", "bolder", "large", "warning")
+    assert any(block.get("text") == "section-title" for block in card_body)
 
 
-def test_send_notification_simple(mocker, settings):
+def test_send_notification_coerces_facts_to_strings(settings, requests_mocker):
     settings.EXTENSION_CONFIG = {
         "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
     }
-    mocked_message = mocker.MagicMock()
-    mocker.patch("adobe_vipm.notifications.pymsteams.connectorcard", return_value=mocked_message)
-    mocked_cardsection = mocker.patch("adobe_vipm.notifications.pymsteams.cardsection")
+    requests_mocker.post("https://teams.webhook", status=200)
 
-    send_notification("not-title", "not-text", "not-color")  # act
+    send_notification(
+        "not-title",
+        "not-text",
+        Style.WARNING,
+        facts=FactsSection("section-title", {9999: 123}),
+    )  # act
 
-    mocked_message.title.assert_called_once_with("not-title")
-    mocked_message.text.assert_called_once_with("not-text")
-    mocked_message.color.assert_called_once_with("not-color")
-    mocked_message.addLinkButton.assert_not_called()
-    mocked_cardsection.assert_not_called()
-    mocked_message.send.assert_called_once()
+    payload = json.loads(requests_mocker.calls[0].request.body)
+    card_body = payload["attachments"][0]["content"]["body"]
+    fact_sets = [block for block in card_body if block.get("type") == "FactSet"]
+    assert fact_sets[0]["facts"] == [{"title": "9999", "value": "123"}]
 
 
-def test_send_notification_exception(mocker, settings, caplog):
+def test_send_notification_simple(settings, requests_mocker):
     settings.EXTENSION_CONFIG = {
         "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
     }
-    mocked_message = mocker.MagicMock()
-    mocked_message.send.side_effect = pymsteams.TeamsWebhookException("error")
-    mocker.patch("adobe_vipm.notifications.pymsteams.connectorcard", return_value=mocked_message)
+    requests_mocker.post("https://teams.webhook", status=200)
+
+    send_notification("not-title", "not-text", Style.WARNING)  # act
+
+    payload = json.loads(requests_mocker.calls[0].request.body)
+    card = payload["attachments"][0]["content"]
+    assert "actions" not in card
+    assert len(card["body"]) == 2
+
+
+def test_send_notification_exception(settings, requests_mocker, caplog):
+    settings.EXTENSION_CONFIG = {
+        "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
+    }
+    requests_mocker.post("https://teams.webhook", body=requests.ConnectionError("error"))
 
     with caplog.at_level(logging.ERROR):
-        send_notification("not-title", "not-text", "not-color")  # act
+        send_notification("not-title", "not-text", Style.WARNING)  # act
 
     assert "Error sending notification to MSTeams!" in caplog.text
 
 
-@pytest.mark.parametrize(
-    ("function", "color", "icon"),
-    [
-        (send_warning, "#ffa500", "\u2622"),
-        (send_error, "#df3422", "\U0001f4a3"),
-        (send_exception, "#541c2e", "\U0001f525"),
-    ],
-)
-def test_send_others(function, color, icon, mocker):
+def test_send_notification_exception_on_raise_for_status(settings, requests_mocker, caplog):
+    settings.EXTENSION_CONFIG = {
+        "MSTEAMS_WEBHOOK_URL": "https://teams.webhook",
+    }
+    requests_mocker.post("https://teams.webhook", status=500)
+
+    with caplog.at_level(logging.ERROR):
+        send_notification("not-title", "not-text", Style.WARNING)  # act
+
+    assert "Error sending notification to MSTeams!" in caplog.text
+
+
+def test_send_warning(mocker):
     mock_send_notification = mocker.patch("adobe_vipm.notifications.send_notification")
     mocked_button = mocker.MagicMock()
     mocked_facts_section = mocker.MagicMock()
 
-    function("title", "text", button=mocked_button, facts=mocked_facts_section)  # act
+    send_warning("title", "text", button=mocked_button, facts=mocked_facts_section)  # act
 
     mock_send_notification.assert_called_once_with(
-        f"{icon} title",
+        "\u2622 title",
         "text",
-        color,
+        Style.WARNING,
+        button=mocked_button,
+        facts=mocked_facts_section,
+    )
+
+
+def test_send_error(mocker):
+    mock_send_notification = mocker.patch("adobe_vipm.notifications.send_notification")
+    mocked_button = mocker.MagicMock()
+    mocked_facts_section = mocker.MagicMock()
+
+    send_error("title", "text", button=mocked_button, facts=mocked_facts_section)  # act
+
+    mock_send_notification.assert_called_once_with(
+        "\U0001f4a3 title",
+        "text",
+        Style.ATTENTION,
+        button=mocked_button,
+        facts=mocked_facts_section,
+    )
+
+
+def test_send_exception(mocker):
+    mock_send_notification = mocker.patch("adobe_vipm.notifications.send_notification")
+    mocked_button = mocker.MagicMock()
+    mocked_facts_section = mocker.MagicMock()
+
+    send_exception("title", "text", button=mocked_button, facts=mocked_facts_section)  # act
+
+    mock_send_notification.assert_called_once_with(
+        "\U0001f525 title",
+        "text",
+        Style.ATTENTION,
         button=mocked_button,
         facts=mocked_facts_section,
     )
@@ -159,12 +218,12 @@ def test_mpt_notify_exception(mocker, mock_mpt_client, caplog):
         )  # act
 
     assert (
-        f"Cannot send MPT API notification:"
-        f" Category: '{MPT_NOTIFY_CATEGORIES['ORDERS']}',"
-        f" Account ID: 'account_id',"
-        f" Buyer ID: 'buyer_id',"
-        f" Subject: 'email-subject',"
-        f" Message: 'rendered-template'"
+        "Cannot send MPT API notification:"
+        " Category: 'NTC-0000-0006',"
+        " Account ID: 'account_id',"
+        " Buyer ID: 'buyer_id',"
+        " Subject: 'email-subject',"
+        " Message: 'rendered-template'"
     ) in caplog.text
 
 

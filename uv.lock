@@ -1553,18 +1553,6 @@ crypto = [
 ]
 
 [[package]]
-name = "pymsteams"
-version = "0.2.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/f5/8b9b9572d4f582e5a3a135110c07218cd43ad6d067a986576d0467bf6251/pymsteams-0.2.5.tar.gz", hash = "sha256:9f76ca3a3de17b49ce3c5c314ee0e88b8bd2be78fc66f693ade1b7cabf23af70", size = 88943, upload-time = "2025-01-07T23:59:10.763Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/55/2f83baa2a9d1eada20f41dcced4d4fb7ba14d864b160be812786802e39c3/pymsteams-0.2.5-py3-none-any.whl", hash = "sha256:bda78f36c4a59baa10fa21928980349a841b03c78dc7d6020f230aea4aeab2b7", size = 14684, upload-time = "2025-01-07T23:59:08.351Z" },
-]
-
-[[package]]
 name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1935,7 +1923,6 @@ dependencies = [
     { name = "openpyxl" },
     { name = "phonenumbers" },
     { name = "pyairtable" },
-    { name = "pymsteams" },
     { name = "python-dateutil" },
     { name = "regex" },
     { name = "requests" },
@@ -1975,7 +1962,6 @@ requires-dist = [
     { name = "openpyxl", specifier = "==3.1.*" },
     { name = "phonenumbers", specifier = "==9.0.*" },
     { name = "pyairtable", specifier = "==3.3.*" },
-    { name = "pymsteams", specifier = "==0.2.*" },
     { name = "python-dateutil", specifier = "==2.9.*" },
     { name = "regex", specifier = "==2026.*" },
     { name = "requests", specifier = "==2.32.*" },
