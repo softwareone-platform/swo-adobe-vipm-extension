@@ -4,12 +4,13 @@ import pytest
 
 from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.airtable.models import get_sku_price
+from adobe_vipm.airtable.models import STATUS_GC_ERROR, get_sku_price
 from adobe_vipm.flows.constants import TEMPLATE_ASSET_DEFAULT, ItemTermsModel, Param
 from adobe_vipm.flows.errors import AirTableAPIError, MPTAPIError
 from adobe_vipm.flows.global_customer import (
     check_gc_agreement_deployments,
     create_gc_agreement_asset,
+    get_region_from_country,
 )
 
 
@@ -240,9 +241,13 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
     mocker, mock_adobe_client, settings, mpt_error_factory, gc_agreement_deployment
 ):
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
+    price_lists = [
+        {"id": "PRC-111-111-111", "externalIds": {"vendor": "prc-adobe-com-t1-na-usd-01"}},
+        {"id": "PRC-222-222-222", "externalIds": {"vendor": "prc-adobe-com-t1-na-usd-02"}},
+    ]
     mocked_get_gc_price_list_by_currency = mocker.patch(
         "adobe_vipm.flows.global_customer.get_gc_price_list_by_currency",
-        return_value=[mocker.MagicMock(), mocker.MagicMock()],
+        return_value=price_lists,
     )
     mocker.patch(
         "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
@@ -255,14 +260,20 @@ def test_check_gc_agreement_deployments_get_price_more_than_one(
 
     mocked_gc_agreement_deployments_model.all.assert_called_once()
     mocked_get_gc_price_list_by_currency.assert_called_once()
+    assert gc_agreement_deployment.status == STATUS_GC_ERROR
+    assert "PRC-111-111-111" in gc_agreement_deployment.error_description
+    assert "PRC-222-222-222" in gc_agreement_deployment.error_description
+    gc_agreement_deployment.save.assert_called()
 
 
 def test_check_gc_agreement_deployments_get_listing_error(
     mocker, mock_adobe_client, mpt_error_factory, gc_agreement_deployment
 ):
     mocked_gc_agreement_deployments_model = mocker.MagicMock()
-    price_list = mocker.MagicMock()
-    price_list.externalIds = "price_list_global"
+    price_list = {
+        "id": "PRC-123-123-123",
+        "externalIds": {"vendor": "prc-adobe-com-t1-na-usd-01"},
+    }
     mocked_get_gc_price_list_by_currency = mocker.patch(
         "adobe_vipm.flows.global_customer.get_gc_price_list_by_currency",
         return_value=[price_list],
@@ -1238,3 +1249,19 @@ def test_create_gc_agreement_asset(
         mock_mpt_client, "PRD-123-123-123", TEMPLATE_ASSET_DEFAULT
     )
     mock_create_asset.assert_called_once_with(mock_mpt_client, expected_asset)
+
+
+@pytest.mark.parametrize(
+    ("country", "expected_region"),
+    [
+        ("JP", "jp"),
+        ("US", "na"),
+        ("IN", "ap"),
+    ],
+)
+def test_get_region_from_country(country, expected_region):
+    assert get_region_from_country(country) == expected_region  # act
+
+
+def test_get_region_from_country_returns_none_when_country_not_mapped():
+    assert get_region_from_country("XX") is None  # act

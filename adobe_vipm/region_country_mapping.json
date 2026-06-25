@@ -1,0 +1,53 @@
+[
+    {
+      "region": "AP",
+      "countries": [
+        "BD", "BT", "BN", "CV", "KH", "CN", "CX", "CC", "CK", "FJ", "TF", "HK", "IN", "ID", "KI", "KR", "LA", "MO", "MY", "MV",
+        "MH", "FM", "MN", "NR", "NP", "NU", "NF", "KP", "PK", "PW", "PG", "PH", "WS", "ST", "SG", "SB", "LK", "TW", "TH", "TL",
+        "TK", "TO", "TV", "VU", "VN", "WF"
+      ]
+    },
+    {
+      "region": "EE",
+      "countries": [
+        "AF", "AL", "DZ", "AO", "AM", "AZ", "BH", "BY", "BJ", "BA", "BW", "BF", "BI", "CM", "CF", "TD", "CG", "CI", "CD", "DJ",
+        "EG", "GQ", "ER", "SZ", "ET", "PF", "GA", "GM", "GE", "GH", "GN", "GW", "IQ", "IL", "JO", "KZ", "KE", "KW", "KG", "LB",
+        "LS", "LR", "LY", "MK", "MG", "MW", "ML", "MR", "MU", "YT", "MD", "ME", "MS", "MA", "MZ", "NA", "NC", "NE", "NG", "OM",
+        "PS", "QA", "RE", "RU", "RW", "PM", "SA", "SN", "RS", "SC", "SL", "SO", "ZA", "SS", "SH", "TJ", "TZ", "TG", "TN", "TR",
+        "TM", "UG", "UA", "AE", "UZ", "YE", "ZM", "ZW"
+      ]
+    },
+    {
+      "region": "JP",
+      "countries": [ "JP" ]
+    },
+    {
+      "region": "LA",
+      "countries": [
+        "AI", "AG", "AR", "AW", "BS", "BB", "BZ", "BM", "BO", "BQ", "BR", "KY", "CL", "CO", "CR", "CU", "CW", "DM", "DO", "EC",
+        "SV", "FK", "GF", "GD", "GP", "GT", "GY", "HT", "HN", "JM", "MQ", "AN", "NI", "PA", "PY", "PE", "SX", "KN", "LC", "VC",
+        "SR", "TT", "TC", "UY", "VE", "VG"
+      ]
+    },
+    {
+      "region": "MX",
+      "countries": [ "MX" ]
+    },
+    {
+      "region": "NA",
+      "countries": [ "AS", "CA", "GU", "MP", "PR", "US", "UM", "VI" ]
+    },
+    {
+      "region": "PA",
+      "countries": [ "AU", "NZ" ]
+    },
+    {
+      "region": "WE",
+      "countries": [
+        "AD", "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FO", "FI", "FR", "DE", "GI", "GB", "GR", "GL", "HU", "IS", "IE",
+        "IT", "JE", "LV", "LI", "LT", "LU", "MT", "MC", "NL", "NO", "PL", "PT", "RO", "SM", "SK", "SI", "ES", "SE", "CH", "IM",
+        "VA"
+      ]
+    }
+  ]
+  
