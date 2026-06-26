@@ -1308,7 +1308,10 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
             "Error saving Global Customer Main Agreement",
             "An error occurred while saving the Global Customer Main Agreement.",
             button=get_transfer_link_button(mock_transfer),
-            facts=FactsSection("Error from checking running transfers", "400 - Bad Request"),
+            facts=FactsSection(
+                "Error from checking running transfers",
+                {"AirTableAPIError": "400 - Bad Request"},
+            ),
         )
 
 
@@ -1416,7 +1419,10 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
             "Error saving Global Customer Main Agreement",
             "An error occurred while saving the Global Customer Main Agreement.",
             button=get_transfer_link_button(mock_transfer),
-            facts=FactsSection("Error from checking running transfers", "400 - Bad Request"),
+            facts=FactsSection(
+                "Error from checking running transfers",
+                {"AirTableAPIError": "400 - Bad Request"},
+            ),
         )
 
 
