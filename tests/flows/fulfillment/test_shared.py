@@ -21,6 +21,7 @@ from adobe_vipm.flows.constants import (
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
     ERR_MANUAL_RENEWAL_ORDER_FAILED,
+    ERR_MANUAL_RENEWAL_PREVIEW_FAILED,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
@@ -2873,13 +2874,16 @@ def test_check_manual_renewal_subscriptions_upsize_line_full_renewal(
         )["value"]
     )
     assert stored == {
-        "65304578CA": {
-            "line": order["lines"][0],
-            "adobe_subscription_id": "a-sub-id",
-            "offer_id": "65304578CA01A12",
-            "renewal_qty": 5,
-            "excess_qty": 0,
-        }
+        "renewals": {
+            "65304578CA": {
+                "line": order["lines"][0],
+                "adobe_subscription_id": "a-sub-id",
+                "offer_id": "65304578CA01A12",
+                "renewal_qty": 5,
+                "excess_qty": 0,
+            }
+        },
+        "diverted": {},
     }
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
@@ -3130,6 +3134,324 @@ def test_check_manual_renewal_subscriptions_restore_from_stored_with_excess(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+def test_check_manual_renewal_subscriptions_batched_preview_ok(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_subscription_factory
+):
+    """When the batched preview succeeds, nothing is diverted and the preview is stored."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    adobe_subscription = {
+        **adobe_subscription_factory(current_quantity=10, subscription_id="a-sub-id"),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [adobe_subscription]}
+    preview_order = {"orderId": "preview-1", "lineItems": []}
+    mock_adobe_client.create_renewal_order.return_value = preview_order
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+        new_lines=[],
+    )
+
+    CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_renewal_order.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        f"{order['id']}_RENEWAL",
+        [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 5,
+                "subscriptionId": "a-sub-id",
+            }
+        ],
+        order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+    )
+    assert context.diverted_renewal_lines == {}
+    assert "65304578CA" in context.manual_renewal_lines
+    assert context.preview_late_renewal_order == preview_order
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def _renewal_preview_side_effect(
+    authorization_id, customer_id, ext_ref, line_items, order_type=None
+):
+    """Reject any PREVIEW_RENEWAL containing the unsupported offer 65304579CA01A12."""
+    if any(item["offerId"] == "65304579CA01A12" for item in line_items):
+        raise AdobeAPIError(400, {"code": "1122", "message": "Request is Missing Required Fields"})
+    return {"orderId": "preview-survivors", "lineItems": line_items}
+
+
+def test_check_manual_renewal_subscriptions_isolates_unsupported_offer(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_subscription_factory
+):
+    """On a 1122 batched failure, probe per line: renew the survivor, divert the offender."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    good_lines = lines_factory(quantity=5, line_id=1)
+    bad_lines = lines_factory(quantity=5, line_id=2, item_id=2, external_vendor_id="65304579CA")
+    order = order_factory(lines=good_lines + bad_lines)
+    good_sub = {
+        **adobe_subscription_factory(current_quantity=10, subscription_id="good-sub"),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+    bad_sub = {
+        **adobe_subscription_factory(
+            offer_id="65304579CA01A12", current_quantity=10, subscription_id="bad-sub"
+        ),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [good_sub, bad_sub]}
+    mock_adobe_client.create_renewal_order.side_effect = _renewal_preview_side_effect
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+        new_lines=[],
+    )
+
+    CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+
+    # Survivor stays a renewal, offender is gone from renewals.
+    assert list(context.manual_renewal_lines) == ["65304578CA"]
+    assert context.diverted_renewal_lines == {"65304579CA": {"line": bad_lines[0], "quantity": 5}}
+    # Offender is purchased as a fresh new order.
+    assert len(context.new_lines) == 1
+    assert context.new_lines[0]["id"] == bad_lines[0]["id"]
+    assert context.new_lines[0]["quantity"] == 5
+    assert context.new_lines[0]["oldQuantity"] == 0
+    # Survivors' preview is stored for SubmitRenewalOrders.
+    assert context.preview_late_renewal_order == {
+        "orderId": "preview-survivors",
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 5,
+                "subscriptionId": "good-sub",
+            }
+        ],
+    }
+    # Persisted split records both renewals and diverted.
+    stored = json.loads(
+        next(
+            p
+            for p in context.order["parameters"]["ordering"]
+            if p["externalId"] == "lateRenewalsInfo"
+        )["value"]
+    )
+    assert set(stored["renewals"]) == {"65304578CA"}
+    assert set(stored["diverted"]) == {"65304579CA"}
+    mocked_update_order.assert_called_once()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_check_manual_renewal_subscriptions_all_offers_unsupported(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    """When no offer can be renewed, all lines become new orders and the flow continues."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    adobe_subscription = {
+        **adobe_subscription_factory(current_quantity=10, subscription_id="a-sub-id"),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("1122", "Request is Missing Required Fields")
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+        new_lines=[],
+    )
+
+    CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+
+    assert context.manual_renewal_lines == {}
+    assert set(context.diverted_renewal_lines) == {"65304578CA"}
+    assert len(context.new_lines) == 1
+    assert context.new_lines[0]["oldQuantity"] == 0
+    assert context.preview_late_renewal_order is None
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_check_manual_renewal_subscriptions_non_1122_error_propagates(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    """A non-1122 Adobe error must not trigger per-line probing; it propagates."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    adobe_subscription = {
+        **adobe_subscription_factory(current_quantity=10, subscription_id="a-sub-id"),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("9999", "internal error")
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+        new_lines=[],
+    )
+
+    with pytest.raises(AdobeAPIError):
+        CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+
+    # Only the batched preview was attempted (no per-line probing).
+    assert mock_adobe_client.create_renewal_order.call_count == 1
+    assert context.diverted_renewal_lines == {}
+    mocked_next_step.assert_not_called()
+
+
+def test_check_manual_renewal_subscriptions_per_line_non_1122_propagates(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    """A non-1122 error raised during per-line probing propagates instead of diverting."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    adobe_subscription = {
+        **adobe_subscription_factory(current_quantity=10, subscription_id="a-sub-id"),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [adobe_subscription]}
+    mock_adobe_client.create_renewal_order.side_effect = [
+        AdobeAPIError(400, adobe_api_error_factory("1122", "Request is Missing Required Fields")),
+        AdobeAPIError(400, adobe_api_error_factory("9999", "internal error")),
+    ]
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+        new_lines=[],
+    )
+
+    with pytest.raises(AdobeAPIError):
+        CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+
+    assert context.diverted_renewal_lines == {}
+    assert mock_adobe_client.create_renewal_order.call_count == 2
+    mocked_next_step.assert_not_called()
+
+
+def test_check_manual_renewal_subscriptions_divert_zero_quantity(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_api_error_factory
+):
+    """Diverting a zero-quantity renewal records it without emitting a new line."""
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("1122", "Request is Missing Required Fields")
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=[],
+        new_lines=[],
+        manual_renewal_lines={
+            "65304578CA": {
+                "line": order["lines"][0],
+                "adobe_subscription_id": "a-sub-id",
+                "offer_id": "65304578CA01A12",
+                "renewal_qty": 0,
+                "excess_qty": 0,
+            }
+        },
+    )
+
+    CheckManualRenewalSubscriptions()._isolate_unsupported_renewals(context)  # act
+
+    assert context.manual_renewal_lines == {}
+    assert context.diverted_renewal_lines == {
+        "65304578CA": {"line": order["lines"][0], "quantity": 0}
+    }
+    assert context.new_lines == []
+    assert context.preview_late_renewal_order is None
+
+
+def test_check_manual_renewal_subscriptions_restore_with_diverted(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    """A persisted diverted entry is rebuilt as a new order on a later run."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    line = order["lines"][0]
+    stored_data = {
+        "renewals": {},
+        "diverted": {
+            "65304578CA": {"line": line, "quantity": 5},
+            # A zero-quantity diverted entry must be recorded without emitting a new line.
+            "65304579CA": {"line": {"id": "ALI-OTHER"}, "quantity": 0},
+        },
+    }
+    for p in order["parameters"]["ordering"]:
+        if p["externalId"] == "lateRenewalsInfo":
+            p["value"] = json.dumps(stored_data)
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+        new_lines=[],
+    )
+
+    CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_renewal_order.assert_not_called()
+    mocked_update_order.assert_not_called()
+    assert context.manual_renewal_lines == {}
+    assert context.upsize_lines == []
+    assert len(context.new_lines) == 1
+    assert context.new_lines[0]["id"] == line["id"]
+    assert context.new_lines[0]["quantity"] == 5
+    assert context.new_lines[0]["oldQuantity"] == 0
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
 def test_preview_renewal_orders_no_manual_renewal_lines(mocker, mock_adobe_client, order_factory):
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -3219,6 +3541,9 @@ def test_preview_renewal_orders_preview_creation_failed(
 ):
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
     order = order_factory(lines=lines_factory(quantity=5))
     mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
         400, adobe_api_error_factory("9999", "preview error")
@@ -3240,8 +3565,48 @@ def test_preview_renewal_orders_preview_creation_failed(
 
     PreviewRenewalOrders()(mocked_client, context, mocked_next_step)  # act
 
+    # The order must fail loudly (VIPM0043) instead of silently stalling.
+    mocked_switch_to_failed.assert_called_once_with(
+        mocked_client,
+        context.order,
+        ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
+            subscription_id=f"{order['id']}_RENEWAL", error="preview error"
+        ),
+    )
     assert context.preview_late_renewal_order is None
     mocked_next_step.assert_not_called()
+
+
+def test_preview_renewal_orders_reuses_isolation_preview(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    """When isolation already produced the survivors' preview, no new Adobe call is made."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_orders.return_value = []
+    existing_preview = {"orderId": "preview-from-isolation", "lineItems": []}
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        manual_renewal_lines={
+            "65304578CA": {
+                "line": order["lines"][0],
+                "adobe_subscription_id": "a-sub-id",
+                "offer_id": "65304578CA01A12",
+                "renewal_qty": 5,
+            }
+        },
+    )
+    context.preview_late_renewal_order = existing_preview
+
+    PreviewRenewalOrders()(mocked_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_renewal_order.assert_not_called()
+    assert context.preview_late_renewal_order == existing_preview
+    mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
 def test_preview_renewal_orders_existing_order_skips_preview(
