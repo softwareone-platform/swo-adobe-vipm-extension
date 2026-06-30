@@ -1,4 +1,5 @@
 name: Release
+run-name: Release (v${{ inputs.version }})
 
 # Manually-triggered release pipeline. Runs against the branch selected at
 # dispatch time (main -> pre-release, release/* -> latest). No branch input is
