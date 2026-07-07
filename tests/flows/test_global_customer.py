@@ -371,6 +371,70 @@ def test_check_gc_agreement_deployments_create_listing(
     mocked_update_agreement.assert_called_once()
 
 
+def test_check_gc_agreement_deployments_create_listing_uses_deployment_own_address(
+    mocker,
+    mock_adobe_client,
+    adobe_customer_factory,
+    adobe_deployment_factory,
+    adobe_subscription_factory,
+    agreement_factory,
+    created_agreement_factory,
+    provisioning_agreement,
+    gc_agreement_deployment,
+    listing,
+    licensee,
+    template,
+):
+    """The deployment's own address must be used, not the main customer's address."""
+    agreement = agreement_factory()
+    deployment = adobe_deployment_factory(deployment_id="deployment_id", country="DE")
+    expected_created_agreement_arg = created_agreement_factory(
+        deployments="deployment_id - DE", is_profile_address_exists=True
+    )
+    for param in expected_created_agreement_arg["parameters"]["ordering"]:
+        if param["externalId"] == "address":
+            param["value"] = {
+                "country": "DE",
+                "state": "SN",
+                "city": "Berlin",
+                "addressLine1": "Marienallee 12",
+                "addressLine2": "",
+                "postCode": "01067",
+            }
+    mocked_gc_agreement_deployments_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.global_customer.get_listings_by_price_list_and_seller_and_authorization",
+        return_value=[],
+    )
+    mocker.patch("adobe_vipm.flows.global_customer.create_listing", return_value=listing)
+    mocker.patch("adobe_vipm.flows.global_customer.get_licensee", return_value=licensee)
+    mocker.patch(
+        "adobe_vipm.flows.global_customer.get_product_template_or_default", return_value=template
+    )
+    mocked_create_agreement = mocker.patch(
+        "adobe_vipm.flows.global_customer.create_agreement", return_value=agreement
+    )
+    mocker.patch("adobe_vipm.flows.global_customer.update_agreement", return_value=agreement)
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_gc_agreement_deployment_model",
+        return_value=mocked_gc_agreement_deployments_model,
+    )
+    adobe_customer = adobe_customer_factory(company_profile_address_exists=True, country="US")
+    mock_adobe_client.get_customer.return_value = adobe_customer
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [deployment]
+    mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription_factory()]}
+    gc_agreement_deployment.listing_id = None
+    gc_agreement_deployment.agreement_id = None
+    mocked_gc_agreement_deployments_model.all.return_value = [gc_agreement_deployment]
+    mocker.patch(
+        "adobe_vipm.flows.global_customer.get_agreement", return_value=provisioning_agreement
+    )
+
+    check_gc_agreement_deployments()  # act
+
+    assert mocked_create_agreement.call_args_list[0].args[1] == expected_created_agreement_arg
+
+
 def test_check_gc_agreement_deployments_create_listing_with_no_address(
     mocker,
     mock_adobe_client,
