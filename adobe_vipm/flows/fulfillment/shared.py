@@ -614,15 +614,19 @@ def get_existing_renewal_order(adobe_client, context, ext_ref) -> dict | None:
 
 def build_renewal_line_items(manual_renewal_lines: dict) -> list[dict]:
     """Build PREVIEW_RENEWAL/RENEWAL line items from manual renewal lines."""
-    return [
-        {
+    line_items = []
+    for line_item, info in enumerate(manual_renewal_lines.values(), start=1):
+        entry = {
             "extLineItemNumber": line_item,
             "offerId": info["offer_id"],
             "quantity": info["renewal_qty"],
             "subscriptionId": info["adobe_subscription_id"],
         }
-        for line_item, info in enumerate(manual_renewal_lines.values(), start=1)
-    ]
+        if info.get("deployment_id"):
+            entry["deploymentId"] = info["deployment_id"]
+            entry["currencyCode"] = info["currency_code"]
+        line_items.append(entry)
+    return line_items
 
 
 def is_renewal_unsupported_error(error: AdobeAPIError) -> bool:
@@ -1606,6 +1610,8 @@ class CheckManualRenewalSubscriptions(Step):
             "offer_id": adobe_subscription["offerId"],
             "renewal_qty": renewal_qty,
             "excess_qty": excess_qty,
+            "deployment_id": adobe_subscription.get("deploymentId"),
+            "currency_code": adobe_subscription.get("currencyCode"),
         }
 
         for lst in (context.upsize_lines, context.new_lines):
