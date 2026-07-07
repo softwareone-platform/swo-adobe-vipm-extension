@@ -54,6 +54,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     add_asset,
+    build_renewal_line_items,
     check_processing_template,
     send_gc_mpt_notification,
     set_customer_coterm_date_if_null,
@@ -2859,6 +2860,8 @@ def test_check_manual_renewal_subscriptions_upsize_line_full_renewal(
             "offer_id": "65304578CA01A12",
             "renewal_qty": 5,
             "excess_qty": 0,
+            "deployment_id": "",
+            "currency_code": "USD",
         }
     }
     assert "subscription 65304578CA (a-sub-id) requires manual renewal" in caplog.text
@@ -2881,6 +2884,8 @@ def test_check_manual_renewal_subscriptions_upsize_line_full_renewal(
                 "offer_id": "65304578CA01A12",
                 "renewal_qty": 5,
                 "excess_qty": 0,
+                "deployment_id": "",
+                "currency_code": "USD",
             }
         },
         "diverted": {},
@@ -2920,6 +2925,8 @@ def test_check_manual_renewal_subscriptions_new_line_full_renewal(
             "offer_id": "65304578CA01A12",
             "renewal_qty": 5,
             "excess_qty": 0,
+            "deployment_id": "",
+            "currency_code": "USD",
         }
     }
     mocked_next_step.assert_called_once_with(mocked_client, context)
@@ -2957,6 +2964,8 @@ def test_check_manual_renewal_subscriptions_upsize_line_with_excess(
             "offer_id": "65304578CA01A12",
             "renewal_qty": 10,
             "excess_qty": 5,
+            "deployment_id": "",
+            "currency_code": "USD",
         }
     }
     assert len(context.new_lines) == 1
@@ -2999,6 +3008,8 @@ def test_check_manual_renewal_subscriptions_new_line_with_excess(
             "offer_id": "65304578CA01A12",
             "renewal_qty": 10,
             "excess_qty": 5,
+            "deployment_id": "",
+            "currency_code": "USD",
         }
     }
     assert len(context.new_lines) == 1
@@ -3046,6 +3057,98 @@ def test_check_manual_renewal_subscriptions_mixed_lines(
     assert context.upsize_lines == [order["lines"][1]]
     assert context.new_lines == []
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_check_manual_renewal_subscriptions_deployment_scoped(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_subscription_factory
+):
+    """Deployment/currency data from the Adobe subscription is captured onto the renewal line."""
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    adobe_subscription = {
+        **adobe_subscription_factory(
+            current_quantity=10,
+            subscription_id="a-sub-id",
+            deployment_id="1400000194",
+            currency_code="USD",
+        ),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [adobe_subscription]}
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+        new_lines=[],
+    )
+
+    CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+
+    assert context.manual_renewal_lines == {
+        "65304578CA": {
+            "line": order["lines"][0],
+            "adobe_subscription_id": "a-sub-id",
+            "offer_id": "65304578CA01A12",
+            "renewal_qty": 5,
+            "excess_qty": 0,
+            "deployment_id": "1400000194",
+            "currency_code": "USD",
+        }
+    }
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_build_renewal_line_items_without_deployment():
+    """A falsy deployment_id (no deployment) omits deploymentId/currencyCode from the line item."""
+    manual_renewal_lines = {
+        "65304578CA": {
+            "offer_id": "65304578CA01A12",
+            "renewal_qty": 5,
+            "adobe_subscription_id": "a-sub-id",
+            "deployment_id": "",
+            "currency_code": "USD",
+        }
+    }
+
+    line_items = build_renewal_line_items(manual_renewal_lines)  # act
+
+    assert line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "quantity": 5,
+            "subscriptionId": "a-sub-id",
+        }
+    ]
+
+
+def test_build_renewal_line_items_with_deployment():
+    manual_renewal_lines = {
+        "65304578CA": {
+            "offer_id": "65304578CA01A12",
+            "renewal_qty": 5,
+            "adobe_subscription_id": "a-sub-id",
+            "deployment_id": "1400000194",
+            "currency_code": "USD",
+        }
+    }
+
+    line_items = build_renewal_line_items(manual_renewal_lines)  # act
+
+    assert line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "quantity": 5,
+            "subscriptionId": "a-sub-id",
+            "deploymentId": "1400000194",
+            "currencyCode": "USD",
+        }
+    ]
 
 
 def test_check_manual_renewal_subscriptions_restore_from_stored(
