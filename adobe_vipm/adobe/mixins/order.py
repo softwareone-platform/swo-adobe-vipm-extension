@@ -276,10 +276,12 @@ class OrderClientMixin:
         authorization = self._config.get_authorization(authorization_id)
         payload = {
             "externalReferenceId": external_reference_id,
-            "currencyCode": authorization.currency,
             "orderType": order_type,
             "lineItems": line_items,
         }
+        if not any(line_item.get("deploymentId") for line_item in line_items):
+            payload["currencyCode"] = authorization.currency
+
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
         headers = self._get_headers(authorization, correlation_id=correlation_id)
         response = requests.post(
@@ -475,16 +477,17 @@ class OrderClientMixin:
         """
         external_reference_id = f"{order_created['externalReferenceId']}_{order_created['orderId']}"
         adobe_order_id = order_created["orderId"]
-        currency_code = self._config.get_authorization(authorization_id).currency
         adobe_line_items = order_created["lineItems"]
 
         payload = {
             "externalReferenceId": external_reference_id,
             "referenceOrderId": adobe_order_id,
             "orderType": adobe_constants.ORDER_TYPE_RETURN,
-            "currencyCode": currency_code,
             "lineItems": adobe_line_items,
         }
+        if not any(line_item.get("deploymentId") for line_item in adobe_line_items):
+            payload["currencyCode"] = self._config.get_authorization(authorization_id).currency
+
         return self._create_return_order_base(authorization_id, customer_id, payload)
 
     def get_preview_order(  # noqa: WPS231
