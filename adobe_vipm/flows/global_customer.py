@@ -22,6 +22,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
     get_product_template_or_default,
     update_agreement,
 )
+from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import AdobeStatus
@@ -319,6 +320,7 @@ def create_gc_agreement_deployment(
     mpt_o_client,
     agreement_deployment,
     adobe_customer,
+    customer_deployments,
     customer_deployment_ids,
     main_agreement,
     listing,
@@ -331,6 +333,7 @@ def create_gc_agreement_deployment(
         mpt_o_client (MPTClient): The MPT Operations client instance.
         agreement_deployment (AgreementDeployment): The agreement deployment instance.
         adobe_customer (dict): The Adobe customer data.
+        customer_deployments (list): List of the customer's Adobe deployments.
         customer_deployment_ids (list): List of customer deployment IDs.
         main_agreement (dict): Main Agreement representation from MPT API
         listing (dict): The listing data.
@@ -348,7 +351,12 @@ def create_gc_agreement_deployment(
         return agreement_deployment.agreement_id
 
     try:
-        address = adobe_customer["companyProfile"].get("address", {})
+        deployment = find_first(
+            lambda item: item.get("deploymentId") == agreement_deployment.deployment_id,
+            customer_deployments,
+        )
+        deployment_address = deployment["companyProfile"].get("address", {}) if deployment else {}
+        address = deployment_address or adobe_customer["companyProfile"].get("address", {})
         contact = adobe_customer["companyProfile"]["contacts"][0]
         param_address = get_address(address)
 
@@ -655,6 +663,7 @@ def process_agreement_deployment(  # noqa: C901
             mpt_o_client,
             agreement_deployment,
             adobe_customer,
+            customer_deployments,
             customer_deployment_ids,
             main_agreement,
             listing,
