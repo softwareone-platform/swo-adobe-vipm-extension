@@ -914,7 +914,40 @@ class AgreementSyncer:  # noqa: WPS214
 
             self._update_agreement_bussiness_parameters(deployment_agreement)
 
+            self._update_deployment_agreement_address(deployment_agreement, adobe_deployments)
+
             self._sync_gc_3yc_agreements(deployment_agreement)
+
+    def _update_deployment_agreement_address(
+        self, deployment_agreement: dict, adobe_deployments: list[dict]
+    ) -> None:
+        """
+        Refresh a deployment agreement's address ordering parameter from Adobe.
+
+        Args:
+            deployment_agreement: MPT deployment agreement.
+            adobe_deployments: Adobe customer deployments.
+        """
+        deployment_id = flows_utils.get_deployment_id(deployment_agreement)
+        deployment = find_first(
+            lambda item: item.get("deploymentId") == deployment_id, adobe_deployments
+        )
+        if not deployment:
+            return
+
+        deployment_address = deployment["companyProfile"].get("address", {})
+        if not deployment_address:
+            return
+
+        parameters = {
+            Param.PHASE_ORDERING.value: [
+                {
+                    "externalId": Param.ADDRESS.value,
+                    "value": flows_utils.get_address(deployment_address),
+                }
+            ]
+        }
+        self._execute_agreement_update(deployment_agreement, parameters)
 
     def _sync_gc_3yc_agreements(self, deployment_agreement: dict) -> None:
         """
