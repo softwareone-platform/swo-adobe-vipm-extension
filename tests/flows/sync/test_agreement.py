@@ -1550,6 +1550,104 @@ def test_sync_deployment_agreement(
     ]
 
 
+def test_update_deployment_agreement_address(
+    mock_mpt_update_agreement,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    mocked_agreement_syncer,
+):
+    deployment_agreement = agreement_factory(
+        agreement_id="AGR-deployment-1",
+        fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deployment-1"),
+    )
+    adobe_deployments = [
+        {
+            "deploymentId": "deployment-1",
+            "status": "1000",
+            "companyProfile": {
+                "address": {
+                    "country": "DE",
+                    "region": "SN",
+                    "city": "Berlin",
+                    "addressLine1": "Marienallee 12",
+                    "postalCode": "01067",
+                }
+            },
+        }
+    ]
+
+    mocked_agreement_syncer._update_deployment_agreement_address(  # act
+        deployment_agreement, adobe_deployments
+    )
+
+    mock_mpt_update_agreement.assert_called_once_with(
+        mocked_agreement_syncer._mpt_client,
+        deployment_agreement["id"],
+        lines=deployment_agreement["lines"],
+        parameters={
+            "ordering": [
+                {
+                    "externalId": "address",
+                    "value": {
+                        "country": "DE",
+                        "state": "SN",
+                        "city": "Berlin",
+                        "addressLine1": "Marienallee 12",
+                        "addressLine2": "",
+                        "postCode": "01067",
+                    },
+                }
+            ]
+        },
+    )
+
+
+def test_update_deployment_agreement_address_no_matching_deployment(
+    mock_mpt_update_agreement,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    mocked_agreement_syncer,
+):
+    deployment_agreement = agreement_factory(
+        agreement_id="AGR-deployment-1",
+        fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deployment-1"),
+    )
+    adobe_deployments = [
+        {
+            "deploymentId": "deployment-2",
+            "status": "1000",
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+
+    mocked_agreement_syncer._update_deployment_agreement_address(  # act
+        deployment_agreement, adobe_deployments
+    )
+
+    mock_mpt_update_agreement.assert_not_called()
+
+
+def test_update_deployment_agreement_address_no_address_data(
+    mock_mpt_update_agreement,
+    agreement_factory,
+    fulfillment_parameters_factory,
+    mocked_agreement_syncer,
+):
+    deployment_agreement = agreement_factory(
+        agreement_id="AGR-deployment-1",
+        fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deployment-1"),
+    )
+    adobe_deployments = [
+        {"deploymentId": "deployment-1", "status": "1000", "companyProfile": {}},
+    ]
+
+    mocked_agreement_syncer._update_deployment_agreement_address(  # act
+        deployment_agreement, adobe_deployments
+    )
+
+    mock_mpt_update_agreement.assert_not_called()
+
+
 @freeze_time("2025-06-19")
 def test_sync_global_customer_parameter_dry_run(
     mocker,
