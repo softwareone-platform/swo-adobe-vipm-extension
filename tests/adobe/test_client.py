@@ -1331,7 +1331,72 @@ def test_create_renewal_order(
     client, authorization, api_token = adobe_client_factory()
     expected_payload = {
         "externalReferenceId": external_reference_id,
+        "orderType": ORDER_TYPE_RENEWAL,
+        "lineItems": line_items,
         "currencyCode": authorization.currency,
+    }
+    correlation_id = sha256(json.dumps(expected_payload).encode()).hexdigest()
+    adobe_order = adobe_order_factory(ORDER_TYPE_RENEWAL)
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=202,
+        json=adobe_order,
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": correlation_id,
+                },
+            ),
+            matchers.json_params_matcher(expected_payload),
+        ],
+    )
+
+    result = client.create_renewal_order(
+        authorization_uk,
+        customer_id,
+        external_reference_id,
+        line_items,
+    )
+
+    assert result == adobe_order
+
+
+def test_create_renewal_order_with_deployment(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_authorizations_file,
+    adobe_client_factory,
+    adobe_order_factory,
+):
+    """When a line item carries a deploymentId, currencyCode must live only on that item."""
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    external_reference_id = "mpt-order-id"
+    line_items = [
+        {
+            "offerId": "65304578CA01A12",
+            "quantity": 10,
+            "subscriptionId": "a-sub-id",
+            "deploymentId": "1400000194",
+            "currencyCode": "USD",
+        },
+    ]
+    client, authorization, api_token = adobe_client_factory()
+    expected_payload = {
+        "externalReferenceId": external_reference_id,
         "orderType": ORDER_TYPE_RENEWAL,
         "lineItems": line_items,
     }
@@ -1648,6 +1713,64 @@ def test_create_return_order_by_adobe_order(
         "referenceOrderId": order_created["orderId"],
         "orderType": ORDER_TYPE_RETURN,
         "currencyCode": "USD",
+        "lineItems": order_created["lineItems"],
+    }
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=202,
+        json={
+            "orderId": "adobe-order-id",
+        },
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": "uuid-1",
+                },
+            ),
+            matchers.json_params_matcher(expected_body),
+        ],
+    )
+
+    result = client.create_return_order_by_adobe_order(authorization_uk, customer_id, order_created)
+
+    assert result == {"orderId": "adobe-order-id"}
+
+
+def test_create_return_order_by_adobe_order_with_deployment(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+):
+    """When the returned order's line items carry a deploymentId, skip order-level currency."""
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    client, authorization, api_token = adobe_client_factory()
+    order_created = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        external_id="ORD-1234",
+        order_id="order-id",
+        status=AdobeStatus.PROCESSED.value,
+        deployment_id="1400000194",
+    )
+    expected_body = {
+        "externalReferenceId": f"{order_created['externalReferenceId']}_{order_created['orderId']}",
+        "referenceOrderId": order_created["orderId"],
+        "orderType": ORDER_TYPE_RETURN,
         "lineItems": order_created["lineItems"],
     }
     requests_mocker.post(
