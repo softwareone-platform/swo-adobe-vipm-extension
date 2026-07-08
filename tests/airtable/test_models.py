@@ -538,6 +538,72 @@ def test_get_prices_for_3yc_skus(mocker, settings, mocked_pricelist_cache):
     }
 
 
+def test_get_prices_for_3yc_skus_falls_back_to_most_recent_when_no_window_match(
+    mocker, settings, mocked_pricelist_cache
+):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    newest_historical = mocker.MagicMock()
+    newest_historical.sku = "sku-1"
+    newest_historical.unit_pp = 8.00
+    older_historical = mocker.MagicMock()
+    older_historical.sku = "sku-1"
+    older_historical.unit_pp = 5.00
+    # first call: no row covers the start date; second call: fallback historical lookup,
+    # sorted by -valid_until, so the newest row comes first
+    mocked_pricelist_model.all.side_effect = [[], [newest_historical, older_historical]]
+
+    result = get_prices_for_3yc_skus(
+        "product_id",
+        "currency",
+        dt.date.fromisoformat("2024-03-03"),
+        ["sku-1"],
+    )
+
+    assert result == {"sku-1": 8.00}
+    assert mocked_pricelist_model.all.call_count == 2
+    assert mocked_pricelist_model.all.call_args_list[1] == mocker.call(
+        formula=AND(
+            EQ(Field("currency"), "currency"),
+            NE(Field("valid_until"), BLANK()),
+            OR(EQ(Field("sku"), "sku-1")),
+        ),
+        sort=["-valid_until"],
+    )
+    # fallback prices aren't guaranteed correct at future lookups, so they're not cached
+    assert mocked_pricelist_cache == {"sku-1": []}
+
+
+def test_get_prices_for_3yc_skus_missing_everywhere(mocker, settings, mocked_pricelist_cache):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_PRICING_BASES": {"product_id": "base_id"},
+    }
+    mocked_pricelist_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_pricelist_model",
+        return_value=mocked_pricelist_model,
+    )
+    mocked_pricelist_model.all.side_effect = [[], []]
+
+    result = get_prices_for_3yc_skus(
+        "product_id",
+        "currency",
+        dt.date.fromisoformat("2024-03-03"),
+        ["sku-1"],
+    )
+
+    assert result == {}
+    assert mocked_pricelist_model.all.call_count == 2
+
+
 def test_get_prices_for_3yc_skus_hit_cache(mocker, settings, mock_pricelist_cache_factory):
     cache = defaultdict(list)
     cache["sku-1"].append({

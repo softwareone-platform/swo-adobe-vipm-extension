@@ -78,11 +78,11 @@ class SubscriptionSyncer:
             for subscription, adobe_subscription, actual_sku in self._subscriptions_for_update:
                 if actual_sku not in prices:
                     logger.error(
-                        "Skipping subscription %s because the sku %s is not in the prices",
+                        "No price found for subscription %s sku %s; "
+                        "updating other properties without changing the price.",
                         subscription["id"],
                         actual_sku,
                     )
-                    continue
 
                 self._update_subscription(
                     actual_sku,
@@ -138,10 +138,14 @@ class SubscriptionSyncer:
                 "quantity": adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value],
             }
         ]
-        if sync_prices:
+        if sync_prices and actual_sku in prices:
             lines[0]["price"] = {"unitPP": prices[actual_sku]}
         else:
-            logger.info("Skipping price sync - sync_prices %s.", sync_prices)
+            logger.info(
+                "Skipping price sync - sync_prices %s, price available %s.",
+                sync_prices,
+                actual_sku in prices,
+            )
 
         template_data = get_template_data_by_adobe_subscription(
             adobe_subscription, self._product_id
