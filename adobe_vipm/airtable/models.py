@@ -560,47 +560,19 @@ def _get_prices_3yc_for_skus_from_airtable(
     )
 
 
-def get_prices_for_3yc_skus(  # noqa: C901
-    product_id: str, currency: str, start_date: dt.date, skus: list[str]
-) -> dict:
-    """
-    Given a currency and a list of SKUs and the 3YC start date it retrieves the purchase price.
-
-    For each SKU in the given currency from the pricelist that was valid
-    when the 3YC started.
-    Such prices are cached since they will not change ever to reduce the amount of API calls
-    to the AirTable API.
-
-    Args:
-        product_id: The ID of the product used to determine the AirTable base.
-        currency: The currency for which the price must be retrieved.
-        start_date: The date in which the 3YC started.
-        skus: List of SKUs which purchase prices must be retrieved.
-
-    Returns:
-        dict: A dictionary with SKU, purchase price items.
-    """
-    prices = {}
-    for sku in skus:
-        pricelist_item = find_first(
-            lambda item: (
-                item["currency"] == currency
-                and item["valid_from"] <= start_date
-                and item["valid_until"] > start_date
-            ),
-            PRICELIST_CACHE[sku],
-        )
-        if pricelist_item:
-            prices[sku] = pricelist_item["unit_pp"]
-
-    skus_to_lookup = sorted(set(skus) - set(prices.keys()))
-    if not skus_to_lookup:
-        return prices
-
-    items = _get_prices_3yc_for_skus_from_airtable(
-        product_id, currency, start_date, skus_to_lookup, "sku"
+def _find_cached_3yc_price(sku: str, currency: str, start_date: dt.date) -> float | None:
+    pricelist_item = find_first(
+        lambda item: (
+            item["currency"] == currency
+            and item["valid_from"] <= start_date
+            and item["valid_until"] > start_date
+        ),
+        PRICELIST_CACHE[sku],
     )
+    return pricelist_item["unit_pp"] if pricelist_item else None
 
+
+def _collect_3yc_prices_from_items(items, prices: dict) -> None:
     for item in items:
         if item.valid_until:
             PRICELIST_CACHE[item.sku].append(
@@ -613,6 +585,56 @@ def get_prices_for_3yc_skus(  # noqa: C901
             )
         if item.sku not in prices:
             prices[item.sku] = item.unit_pp
+
+
+def get_prices_for_3yc_skus(
+    product_id: str, currency: str, start_date: dt.date, skus: list[str]
+) -> dict:
+    """
+    Given a currency and a list of SKUs and the 3YC start date it retrieves the purchase price.
+
+    For each SKU in the given currency from the pricelist that was valid
+    when the 3YC started. SKUs with no pricelist row covering the start date
+    (e.g. a gap between historical windows) fall back to their most recent price.
+    Prices valid at the start date are cached since they will not change ever, to
+    reduce the amount of API calls to the AirTable API.
+
+    Args:
+        product_id: The ID of the product used to determine the AirTable base.
+        currency: The currency for which the price must be retrieved.
+        start_date: The date in which the 3YC started.
+        skus: List of SKUs which purchase prices must be retrieved.
+
+    Returns:
+        dict: A dictionary with SKU, purchase price items.
+    """
+    prices = {}
+    for sku in skus:
+        cached_price = _find_cached_3yc_price(sku, currency, start_date)
+        if cached_price is not None:
+            prices[sku] = cached_price
+
+    skus_to_lookup = sorted(set(skus) - set(prices.keys()))
+    if not skus_to_lookup:
+        return prices
+
+    items = _get_prices_3yc_for_skus_from_airtable(
+        product_id, currency, start_date, skus_to_lookup, "sku"
+    )
+    _collect_3yc_prices_from_items(items, prices)
+
+    still_missing = sorted(set(skus_to_lookup) - set(prices.keys()))
+    if not still_missing:
+        return prices
+
+    # No row covers the 3YC start date for these SKUs (e.g. a gap between historical
+    # windows). Fall back to the most recent price rather than leaving them unpriced.
+    # Not cached: unlike a start-date match, this price isn't guaranteed to stay correct.
+    historical_items = _get_historical_prices_for_skus_from_airtable(
+        product_id, currency, still_missing, "sku"
+    )
+    for item in historical_items:
+        prices.setdefault(item.sku, item.unit_pp)
     return prices
 
 

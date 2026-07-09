@@ -2232,7 +2232,7 @@ def test_sync_agreement_prices_with_missing_prices(
     with caplog.at_level(logging.ERROR):
         mocked_agreement_syncer.sync(sync_prices=True)  # act
 
-    assert "Skipping subscription" in caplog.text
+    assert "No price found for subscription" in caplog.text
     assert "65304578CA01A12" in caplog.text
     mock_notify_missing_prices.assert_called_once_with(
         "AGR-2119-4550-8674-5962", ["65304578CA01A12"], "PRD-1111-1111", "USD", None
@@ -2316,6 +2316,23 @@ def test_sync_agreement_prices_with_missing_prices(
             mock_mpt_client,
             terminated_mpt_subscription["id"],
             template={"id": "TPL-2345", "name": "Expired"},
+        ),
+        mocker.call(
+            mock_mpt_client,
+            mpt_subscription["id"],
+            lines=[{"id": "ALI-2119-4550-8674-5962-0001", "quantity": 10}],
+            parameters={
+                "fulfillment": [
+                    {"externalId": Param.ADOBE_SKU.value, "value": "65304578CA01A12"},
+                    {"externalId": Param.CURRENT_QUANTITY.value, "value": "10"},
+                    {"externalId": Param.RENEWAL_QUANTITY.value, "value": "10"},
+                    {"externalId": Param.RENEWAL_DATE.value, "value": "2026-10-11"},
+                    {"externalId": Param.LAST_SYNC_DATE.value, "value": "2025-06-19"},
+                ]
+            },
+            commitmentDate="2026-10-11",
+            autoRenew=True,
+            template={"id": "TPL-1234", "name": "Renewing"},
         ),
         mocker.call(
             mock_mpt_client,
