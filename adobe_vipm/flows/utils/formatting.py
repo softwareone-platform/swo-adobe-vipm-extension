@@ -3,6 +3,8 @@ import re
 import phonenumbers
 from markdown_it import MarkdownIt
 
+from adobe_vipm.adobe.utils import sanitize_first_last_name
+
 TRACE_ID_REGEX = re.compile(r"(\(00-[0-9a-f]{32}-[0-9a-f]{16}-01\))")
 
 
@@ -65,4 +67,23 @@ def get_address(address: dict) -> dict:
         "addressLine1": address.get("addressLine1", ""),
         "addressLine2": address.get("addressLine2", ""),
         "postCode": address.get("postalCode", ""),
+    }
+
+
+def get_contact(contact: dict, country: str) -> dict:
+    """
+    Set the contact fields in the contact object.
+
+    Args:
+        contact: The Adobe contact to map.
+        country: Country code used to parse the contact's phone number.
+
+    Returns:
+        Mapped dictionary of the Adobe contact following MPT Contact type parameter format.
+    """
+    return {
+        "firstName": sanitize_first_last_name(contact.get("firstName", "")),
+        "lastName": sanitize_first_last_name(contact.get("lastName", "")),
+        "email": contact.get("email", ""),
+        "phone": split_phone_number(contact.get("phoneNumber"), country),
     }
