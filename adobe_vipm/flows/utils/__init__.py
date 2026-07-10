@@ -26,6 +26,7 @@ from .deployment import (
 )
 from .formatting import (
     get_address,
+    get_contact,
     md2html,
     split_phone_number,
     strip_trace_id,

@@ -14,7 +14,11 @@ from mpt_extension_sdk.mpt_http.utils import find_first
 from adobe_vipm.adobe.client import AdobeClient
 from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus, OfferType
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
-from adobe_vipm.adobe.utils import get_3yc_commitment_request
+from adobe_vipm.adobe.utils import (
+    get_3yc_commitment_request,
+    sanitize_company_name,
+    sanitize_first_last_name,
+)
 from adobe_vipm.airtable import models
 from adobe_vipm.flows import utils as flows_utils
 from adobe_vipm.flows.benefits import send_3yc_expiration_notification
@@ -134,6 +138,10 @@ class AgreementSyncer:  # noqa: WPS214
             self._update_agreement_line_prices(self._agreement, self._currency, self.product_id)
 
             self._update_agreement_bussiness_parameters(self._agreement)
+
+            self._update_agreement_profile_parameters(
+                self._agreement, self._adobe_customer.get("companyProfile", {}).get("address", {})
+            )
 
             if self._adobe_customer.get("globalSalesEnabled", False):
                 adobe_deployments = self._adobe_client.get_customer_deployments_active_status(
@@ -485,6 +493,60 @@ class AgreementSyncer:  # noqa: WPS214
 
         self._execute_agreement_update(agreement, parameters)
         logger.info("Agreement updated %s", agreement["id"])
+
+    def _update_agreement_profile_parameters(self, agreement: dict, address_source: dict) -> None:
+        company_profile = self._adobe_customer.get("companyProfile", {})
+        parameters = {Param.PHASE_ORDERING.value: []}
+
+        parameters[Param.PHASE_ORDERING.value].append({
+            "externalId": Param.COMPANY_NAME.value,
+            "value": sanitize_company_name(company_profile.get("companyName", "")),
+        })
+
+        if address_source:
+            parameters[Param.PHASE_ORDERING.value].append({
+                "externalId": Param.ADDRESS.value,
+                "value": flows_utils.get_address(address_source),
+            })
+
+        contact_value = self._resolve_contact_parameter(agreement, company_profile)
+        if contact_value is not None:
+            parameters[Param.PHASE_ORDERING.value].append({
+                "externalId": Param.CONTACT.value,
+                "value": contact_value,
+            })
+
+        self._execute_agreement_update(agreement, parameters)
+
+    def _resolve_contact_parameter(self, agreement: dict, company_profile: dict) -> dict | None:
+        contacts = company_profile.get("contacts", [])
+        if not contacts:
+            return None
+
+        country = company_profile.get("address", {}).get("country", "")
+        current_contact = (
+            flows_utils.get_ordering_parameter(agreement, Param.CONTACT.value).get("value") or {}
+        )
+        current_email = current_contact.get("email")
+
+        matched = (
+            find_first(lambda contact: contact.get("email") == current_email, contacts)
+            if current_email
+            else None
+        )
+
+        if not matched:
+            return flows_utils.get_contact(contacts[0], country)
+
+        new_first = sanitize_first_last_name(matched.get("firstName", ""))
+        new_last = sanitize_first_last_name(matched.get("lastName", ""))
+        if (
+            current_contact.get("firstName") == new_first
+            and current_contact.get("lastName") == new_last
+        ):
+            return None
+
+        return {**current_contact, "firstName": new_first, "lastName": new_last}
 
     def _execute_agreement_update(self, agreement: dict, parameters: dict) -> None:
         if self._dry_run:
@@ -902,40 +964,14 @@ class AgreementSyncer:  # noqa: WPS214
 
             self._update_agreement_bussiness_parameters(deployment_agreement)
 
-            self._update_deployment_agreement_address(deployment_agreement, adobe_deployments)
+            deployment_id = flows_utils.get_deployment_id(deployment_agreement)
+            deployment = find_first(
+                partial(_check_adobe_deployment_id, deployment_id), adobe_deployments
+            )
+            address_source = deployment["companyProfile"].get("address", {}) if deployment else {}
+            self._update_agreement_profile_parameters(deployment_agreement, address_source)
 
             self._sync_gc_3yc_agreements(deployment_agreement)
-
-    def _update_deployment_agreement_address(
-        self, deployment_agreement: dict, adobe_deployments: list[dict]
-    ) -> None:
-        """
-        Refresh a deployment agreement's address ordering parameter from Adobe.
-
-        Args:
-            deployment_agreement: MPT deployment agreement.
-            adobe_deployments: Adobe customer deployments.
-        """
-        deployment_id = flows_utils.get_deployment_id(deployment_agreement)
-        deployment = find_first(
-            lambda item: item.get("deploymentId") == deployment_id, adobe_deployments
-        )
-        if not deployment:
-            return
-
-        deployment_address = deployment["companyProfile"].get("address", {})
-        if not deployment_address:
-            return
-
-        parameters = {
-            Param.PHASE_ORDERING.value: [
-                {
-                    "externalId": Param.ADDRESS.value,
-                    "value": flows_utils.get_address(deployment_address),
-                }
-            ]
-        }
-        self._execute_agreement_update(deployment_agreement, parameters)
 
     def _sync_gc_3yc_agreements(self, deployment_agreement: dict) -> None:
         """
