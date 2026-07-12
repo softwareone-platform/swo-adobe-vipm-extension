@@ -282,6 +282,36 @@ def test_sync_agreement_prices(
         mocker.call(
             mock_mpt_client,
             agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
         ),
     ])
@@ -348,6 +378,36 @@ def test_sync_agreement_update_agreement_education(
                 ],
             },
             lines=[],
+        ),
+        mock.call(
+            mock_mpt_client,
+            mocked_agreement_syncer._agreement["id"],
+            lines=[],
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
+                ],
+            },
         ),
         mock.call(
             mock_mpt_client,
@@ -854,6 +914,36 @@ def test_sync_agreement_prices_with_3yc(
         mocker.call(
             mock_mpt_client,
             agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2024-11-09"}]},
         ),
     ]
@@ -975,6 +1065,36 @@ def test_sync_agreement_prices_large_government_agency(
             parameters={
                 "fulfillment": [
                     {"externalId": "cotermDate", "value": "2025-04-04"},
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
                 ],
             },
         ),
@@ -1235,6 +1355,36 @@ def test_sync_global_customer_parameter(
         mocker.call(
             mock_mpt_client,
             agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
             parameters={
                 "fulfillment": [
                     {"externalId": "globalCustomer", "value": ["Yes"]},
@@ -1258,6 +1408,25 @@ def test_sync_global_customer_parameter(
                     {"externalId": "3YC", "value": None},
                     {"externalId": "3YCLicenses", "value": ""},
                     {"externalId": "3YCConsumables", "value": ""},
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            deployment_agreements[0]["id"],
+            lines=expected_lines,
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
                 ],
             },
         ),
@@ -1550,7 +1719,7 @@ def test_sync_deployment_agreement(
     ]
 
 
-def test_update_deployment_agreement_address(
+def test_update_agreement_profile_parameters_with_address(
     mock_mpt_update_agreement,
     agreement_factory,
     fulfillment_parameters_factory,
@@ -1560,24 +1729,16 @@ def test_update_deployment_agreement_address(
         agreement_id="AGR-deployment-1",
         fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deployment-1"),
     )
-    adobe_deployments = [
-        {
-            "deploymentId": "deployment-1",
-            "status": "1000",
-            "companyProfile": {
-                "address": {
-                    "country": "DE",
-                    "region": "SN",
-                    "city": "Berlin",
-                    "addressLine1": "Marienallee 12",
-                    "postalCode": "01067",
-                }
-            },
-        }
-    ]
+    address_source = {
+        "country": "DE",
+        "region": "SN",
+        "city": "Berlin",
+        "addressLine1": "Marienallee 12",
+        "postalCode": "01067",
+    }
 
-    mocked_agreement_syncer._update_deployment_agreement_address(  # act
-        deployment_agreement, adobe_deployments
+    mocked_agreement_syncer._update_agreement_profile_parameters(  # act
+        deployment_agreement, address_source
     )
 
     mock_mpt_update_agreement.assert_called_once_with(
@@ -1586,6 +1747,7 @@ def test_update_deployment_agreement_address(
         lines=deployment_agreement["lines"],
         parameters={
             "ordering": [
+                {"externalId": "companyName", "value": "Migrated Company"},
                 {
                     "externalId": "address",
                     "value": {
@@ -1596,13 +1758,22 @@ def test_update_deployment_agreement_address(
                         "addressLine2": "",
                         "postCode": "01067",
                     },
-                }
+                },
+                {
+                    "externalId": "contact",
+                    "value": {
+                        "firstName": "firstName",
+                        "lastName": "lastName",
+                        "email": "email",
+                        "phone": {"prefix": "+1", "number": "8004449890"},
+                    },
+                },
             ]
         },
     )
 
 
-def test_update_deployment_agreement_address_no_matching_deployment(
+def test_update_agreement_profile_parameters_no_address_source(
     mock_mpt_update_agreement,
     agreement_factory,
     fulfillment_parameters_factory,
@@ -1612,40 +1783,102 @@ def test_update_deployment_agreement_address_no_matching_deployment(
         agreement_id="AGR-deployment-1",
         fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deployment-1"),
     )
-    adobe_deployments = [
-        {
-            "deploymentId": "deployment-2",
-            "status": "1000",
-            "companyProfile": {"address": {"country": "DE"}},
-        }
-    ]
 
-    mocked_agreement_syncer._update_deployment_agreement_address(  # act
-        deployment_agreement, adobe_deployments
+    mocked_agreement_syncer._update_agreement_profile_parameters(  # act
+        deployment_agreement, {}
     )
 
-    mock_mpt_update_agreement.assert_not_called()
+    mock_mpt_update_agreement.assert_called_once_with(
+        mocked_agreement_syncer._mpt_client,
+        deployment_agreement["id"],
+        lines=deployment_agreement["lines"],
+        parameters={
+            "ordering": [
+                {"externalId": "companyName", "value": "Migrated Company"},
+                {
+                    "externalId": "contact",
+                    "value": {
+                        "firstName": "firstName",
+                        "lastName": "lastName",
+                        "email": "email",
+                        "phone": {"prefix": "+1", "number": "8004449890"},
+                    },
+                },
+            ]
+        },
+    )
 
 
-def test_update_deployment_agreement_address_no_address_data(
-    mock_mpt_update_agreement,
-    agreement_factory,
-    fulfillment_parameters_factory,
-    mocked_agreement_syncer,
+def test_resolve_contact_parameter_no_match_overwrites_with_first_contact(
+    agreement_factory, mocked_agreement_syncer
 ):
-    deployment_agreement = agreement_factory(
-        agreement_id="AGR-deployment-1",
-        fulfillment_parameters=fulfillment_parameters_factory(deployment_id="deployment-1"),
-    )
-    adobe_deployments = [
-        {"deploymentId": "deployment-1", "status": "1000", "companyProfile": {}},
-    ]
+    agreement = agreement_factory()
+    company_profile = mocked_agreement_syncer._adobe_customer["companyProfile"]
 
-    mocked_agreement_syncer._update_deployment_agreement_address(  # act
-        deployment_agreement, adobe_deployments
-    )
+    result = mocked_agreement_syncer._resolve_contact_parameter(agreement, company_profile)  # act
 
-    mock_mpt_update_agreement.assert_not_called()
+    assert result == {
+        "firstName": "firstName",
+        "lastName": "lastName",
+        "email": "email",
+        "phone": {"prefix": "+1", "number": "8004449890"},
+    }
+
+
+def test_resolve_contact_parameter_match_updates_differing_names(
+    agreement_factory, order_parameters_factory, mocked_agreement_syncer
+):
+    agreement = agreement_factory(
+        ordering_parameters=order_parameters_factory(
+            contact={
+                "firstName": "Old",
+                "lastName": "Name",
+                "email": "email",
+                "phone": {"prefix": "+1", "number": "5551234567"},
+            }
+        )
+    )
+    company_profile = mocked_agreement_syncer._adobe_customer["companyProfile"]
+
+    result = mocked_agreement_syncer._resolve_contact_parameter(agreement, company_profile)  # act
+
+    assert result == {
+        "firstName": "firstName",
+        "lastName": "lastName",
+        "email": "email",
+        "phone": {"prefix": "+1", "number": "5551234567"},
+    }
+
+
+def test_resolve_contact_parameter_match_no_changes_returns_none(
+    agreement_factory, order_parameters_factory, mocked_agreement_syncer
+):
+    agreement = agreement_factory(
+        ordering_parameters=order_parameters_factory(
+            contact={
+                "firstName": "firstName",
+                "lastName": "lastName",
+                "email": "email",
+                "phone": {"prefix": "+1", "number": "5551234567"},
+            }
+        )
+    )
+    company_profile = mocked_agreement_syncer._adobe_customer["companyProfile"]
+
+    result = mocked_agreement_syncer._resolve_contact_parameter(agreement, company_profile)  # act
+
+    assert result is None
+
+
+def test_resolve_contact_parameter_no_contacts_returns_none(
+    agreement_factory, mocked_agreement_syncer
+):
+    agreement = agreement_factory()
+    company_profile = {"contacts": []}
+
+    result = mocked_agreement_syncer._resolve_contact_parameter(agreement, company_profile)  # act
+
+    assert result is None
 
 
 @freeze_time("2025-06-19")
@@ -1818,6 +2051,36 @@ def test_sync_global_customer_update_not_required(
         mocker.call(
             mock_mpt_client,
             "AGR-2119-4550-8674-5962",
+            lines=[],
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-30"}]},
         ),
     ])
@@ -1885,6 +2148,36 @@ def test_sync_global_customer_no_active_deployments(
                     {"externalId": "3YC", "value": None},
                     {"externalId": "3YCLicenses", "value": ""},
                     {"externalId": "3YCConsumables", "value": ""},
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            "AGR-2119-4550-8674-5962",
+            lines=[],
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
                 ],
             },
         ),
@@ -2109,6 +2402,36 @@ def test_sync_agreement_empty_discounts(
         mocker.call(
             mock_mpt_client,
             agreement["id"],
+            lines=expected_lines,
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
         ),
     ])
@@ -2302,6 +2625,53 @@ def test_sync_agreement_prices_with_missing_prices(
                     {"externalId": "3YC", "value": None},
                     {"externalId": "3YCLicenses", "value": ""},
                     {"externalId": "3YCConsumables", "value": ""},
+                ],
+            },
+        ),
+        mocker.call(
+            mock_mpt_client,
+            agreement["id"],
+            lines=[
+                {
+                    "item": {
+                        "id": "ITM-1234-1234-1234-0001",
+                        "name": "Awesome product",
+                        "externalIds": {"vendor": "77777777CA"},
+                    },
+                    "subscription": {
+                        "id": "SUB-1000-2000-3000",
+                        "status": "Active",
+                        "name": "Subscription for Acrobat Pro for Teams; Multi Language",
+                    },
+                    "oldQuantity": 0,
+                    "quantity": 170,
+                    "price": {"unitPP": 20.22},
+                    "id": "ALI-2119-4550-8674-5962-0001",
+                }
+            ],
+            parameters={
+                "ordering": [
+                    {"externalId": "companyName", "value": "Migrated Company"},
+                    {
+                        "externalId": "address",
+                        "value": {
+                            "country": "US",
+                            "state": "region",
+                            "city": "city",
+                            "addressLine1": "addressLine1",
+                            "addressLine2": "addressLine2",
+                            "postCode": "postalCode",
+                        },
+                    },
+                    {
+                        "externalId": "contact",
+                        "value": {
+                            "firstName": "firstName",
+                            "lastName": "lastName",
+                            "email": "email",
+                            "phone": {"prefix": "+1", "number": "8004449890"},
+                        },
+                    },
                 ],
             },
         ),
