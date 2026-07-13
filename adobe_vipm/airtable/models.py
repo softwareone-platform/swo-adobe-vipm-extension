@@ -6,6 +6,7 @@ from functools import cache
 from django.conf import settings
 from mpt_extension_sdk.mpt_http.utils import find_first
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
+from pyairtable.api.retrying import retry_strategy
 from pyairtable.formulas import (
     AND,
     BLANK,
@@ -35,6 +36,8 @@ STATUS_GC_PENDING = "pending"
 STATUS_GC_TRANSFERRED = "transferred"
 TYPE_3YC_CONSUMABLE = "Consumable"
 TYPE_3YC_LICENSE = "License"
+
+AIRTABLE_RETRY_STRATEGY = retry_strategy(status_forcelist=(429, 500, 502, 503, 504))
 
 PRICELIST_CACHE = defaultdict(list)
 
@@ -161,6 +164,7 @@ def get_transfer_model(base_info: AirTableBaseInfo):
             table_name = "Transfers"
             api_key = base_info.api_key
             base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
 
     return Transfer
 
@@ -197,6 +201,7 @@ def get_gc_main_agreement_model(base_info: AirTableBaseInfo):
             table_name = "Global Customer Main Agreements"
             api_key = base_info.api_key
             base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
 
     return GCMainAgreement
 
@@ -244,6 +249,7 @@ def get_gc_agreement_deployment_model(base_info: AirTableBaseInfo):
             table_name = "Global Customer Agreement Deployments"
             api_key = base_info.api_key
             base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
 
     return GCAgreementDeployment
 
@@ -274,6 +280,7 @@ def get_offer_model(base_info: AirTableBaseInfo):
             table_name = "Offers"
             api_key = base_info.api_key
             base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
 
     return Offer
 
@@ -431,6 +438,7 @@ def get_pricelist_model(base_info: AirTableBaseInfo):
             table_name = "PriceList"
             api_key = base_info.api_key
             base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
 
     return PriceList
 
@@ -829,6 +837,7 @@ def get_sku_adobe_mapping_model(base_info: AirTableBaseInfo):
             table_name = "SKU Mapping"
             api_key = base_info.api_key
             base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
 
         @classmethod
         def from_short_id(cls, vendor_external_id: str, market_segment: str):
