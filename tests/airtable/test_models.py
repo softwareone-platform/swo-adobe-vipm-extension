@@ -1005,3 +1005,46 @@ def test_get_adobe_product_by_marketplace_sku(mocker, mock_get_sku_adobe_mapping
     assert not result.is_consumable()
     assert result.is_license()
     assert result.is_valid_3yc_type()
+
+
+def test_adobe_product_mapping_retry_strategy_configured():
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+
+    result = get_sku_adobe_mapping_model(base_info)
+
+    assert set(result.meta.retry_strategy.status_forcelist) == {429, 500, 502, 503, 504}
+
+
+def test_adobe_product_mapping_from_short_id_retries_on_transient_server_error(requests_mocker):
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+    adobe_product_mapping_model = get_sku_adobe_mapping_model(base_info)
+    records_url = "https://api.airtable.com/v0/base-id/SKU%20Mapping"
+    requests_mocker.get(
+        records_url,
+        status=500,
+        json={"type": "SERVER_ERROR", "message": "Server encountered an error"},
+    )
+    requests_mocker.get(
+        records_url,
+        status=200,
+        json={
+            "records": [
+                {
+                    "id": "rec123",
+                    "createdTime": "2024-01-01T00:00:00.000Z",
+                    "fields": {
+                        "vendor_external_id": "65304578CA",
+                        "sku": "65304578CA01A12",
+                        "segment": "COM",
+                        "name": "Some Adobe Product",
+                        "type_3yc": "License",
+                    },
+                }
+            ]
+        },
+    )
+
+    result = adobe_product_mapping_model.from_short_id("65304578CA", "COM")
+
+    assert result.vendor_external_id == "65304578CA"
+    assert result.sku == "65304578CA01A12"
