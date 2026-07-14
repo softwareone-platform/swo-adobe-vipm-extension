@@ -3701,7 +3701,7 @@ def test_process_orphaned_deployment_subscriptions_error(
 
 @pytest.mark.parametrize(
     "subscription_status",
-    [AdobeStatus.SUBSCRIPTION_INACTIVE.value, AdobeStatus.PENDING.value],
+    [AdobeStatus.SUBSCRIPTION_TERMINATED.value, AdobeStatus.PENDING.value],
 )
 def test_process_orphaned_deployment_subscriptions_skip_on_status(
     subscription_status,
@@ -3717,7 +3717,7 @@ def test_process_orphaned_deployment_subscriptions_skip_on_status(
     adobe_customer_factory,
     caplog,
 ):
-    """Test that orphaned subscriptions with SUBSCRIPTION_INACTIVE or PENDING status are skipped."""
+    """Test that orphaned subscriptions with inactive/1004 or pending/1002 status are skipped."""
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
             "deploymentId": "deployment-id",
