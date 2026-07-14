@@ -17,7 +17,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
     ORDER_TYPE_RETURN,
-    AdobeStatus,
+    AdobeOrderStatus,
     ResellerChangeAction,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
@@ -1604,7 +1604,7 @@ def test_create_return_order(
         ORDER_TYPE_NEW,
         external_id="ORD-1234",
         order_id="returning-order-id",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         deployment_id=deployment_id,
     )
     returning_item = returning_order["lineItems"][0]
@@ -1673,7 +1673,7 @@ def test_create_return_order_bad_request(
         status=400,
         json=error,
     )
-    returning_order = adobe_order_factory(ORDER_TYPE_NEW, status=AdobeStatus.PROCESSED.value)
+    returning_order = adobe_order_factory(ORDER_TYPE_NEW, status=AdobeOrderStatus.COMPLETE.value)
 
     with pytest.raises(AdobeError) as cv:
         client.create_return_order(
@@ -1706,7 +1706,7 @@ def test_create_return_order_by_adobe_order(
         ORDER_TYPE_NEW,
         external_id="ORD-1234",
         order_id="order-id",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     expected_body = {
         "externalReferenceId": f"{order_created['externalReferenceId']}_{order_created['orderId']}",
@@ -1764,7 +1764,7 @@ def test_create_return_order_by_adobe_order_with_deployment(
         ORDER_TYPE_NEW,
         external_id="ORD-1234",
         order_id="order-id",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         deployment_id="1400000194",
     )
     expected_body = {
@@ -1822,7 +1822,7 @@ def test_create_return_order_by_adobe_order_bad_request(
         status=400,
         json=error,
     )
-    order_created = adobe_order_factory(ORDER_TYPE_NEW, status=AdobeStatus.PROCESSED.value)
+    order_created = adobe_order_factory(ORDER_TYPE_NEW, status=AdobeOrderStatus.COMPLETE.value)
 
     with pytest.raises(AdobeError) as cv:
         client.create_return_order_by_adobe_order(authorization_uk, customer_id, order_created)
@@ -2651,45 +2651,45 @@ def test_get_returnable_orders_by_subscription_id(
         order_id="order_ko_0",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3001", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-06T00:00:00Z",
     )
     order_ok_1 = adobe_order_factory(
         order_id="order_ok_1",
         order_type=ORDER_TYPE_RENEWAL,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-07T00:00:00Z",
     )
     order_ok_2 = adobe_order_factory(
         order_id="order_ok_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-08T00:00:00Z",
     )
     order_ko_1 = adobe_order_factory(
         order_id="order_ko_1",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.ORDER_CANCELLED.value
+            subscription_id="SUB-1000-2000-3001", status=AdobeOrderStatus.CANCELLED.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-09T00:00:00Z",
     )
     order_ko_2 = adobe_order_factory(
         order_id="order_ko_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.ORDER_CANCELLED.value,
+        status=AdobeOrderStatus.CANCELLED.value,
     )
     # for another sku
     order_ko_3 = adobe_order_factory(
@@ -2698,9 +2698,9 @@ def test_get_returnable_orders_by_subscription_id(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3002",
             offer_id="99999999CA01A12",
-            status=AdobeStatus.PROCESSED.value,
+            status=AdobeOrderStatus.COMPLETE.value,
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-10T00:00:00Z",
     )
     mocked_get_orders = mocker.patch.object(
@@ -2761,45 +2761,45 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         order_id="order_ko_0",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3001", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-06T00:00:00Z",
     )
     order_ok_1 = adobe_order_factory(
         order_id="order_ok_1",
         order_type=ORDER_TYPE_RENEWAL,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-07T00:00:00Z",
     )
     order_ok_2 = adobe_order_factory(
         order_id="order_ok_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-08T00:00:00Z",
     )
     order_ok_3 = adobe_order_factory(
         order_id="order_ok_3",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.ORDER_CANCELLED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.CANCELLED.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-09T00:00:00Z",
     )
     order_ok_4 = adobe_order_factory(
         order_id="order_ok_4",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.ORDER_CANCELLED.value,
+        status=AdobeOrderStatus.CANCELLED.value,
         creation_date="2024-01-10T00:00:00Z",
     )
     order_ko_1 = adobe_order_factory(
@@ -2808,9 +2808,9 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3002",
             offer_id="99999999CA01A12",
-            status=AdobeStatus.PROCESSED.value,
+            status=AdobeOrderStatus.COMPLETE.value,
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-11T00:00:00Z",
     )
     ret_order_1 = adobe_order_factory(reference_order_id="order_ok_3", order_type=ORDER_TYPE_RETURN)
@@ -2881,20 +2881,20 @@ def test_get_return_orders_by_external_reference(
 ):
     order_ok_1 = adobe_order_factory(
         order_type=ORDER_TYPE_RETURN,
-        items=adobe_items_factory(status=AdobeStatus.PROCESSED.value),
-        status=AdobeStatus.PROCESSED.value,
+        items=adobe_items_factory(status=AdobeOrderStatus.COMPLETE.value),
+        status=AdobeOrderStatus.COMPLETE.value,
         external_id="returning-mpt-order-123_returned-mpt-order-456_line1",
     )
     order_ok_2 = adobe_order_factory(
         order_type=ORDER_TYPE_RETURN,
-        items=adobe_items_factory(status=AdobeStatus.PROCESSED.value),
-        status=AdobeStatus.PENDING.value,
+        items=adobe_items_factory(status=AdobeOrderStatus.COMPLETE.value),
+        status=AdobeOrderStatus.OPEN.value,
         external_id="returning-mpt-order-123_returned-mpt-order-789_line1",
     )
     order_ko_1 = adobe_order_factory(
         order_type=ORDER_TYPE_RETURN,
-        items=adobe_items_factory(status=AdobeStatus.PROCESSED.value),
-        status=AdobeStatus.PROCESSED.value,
+        items=adobe_items_factory(status=AdobeOrderStatus.COMPLETE.value),
+        status=AdobeOrderStatus.COMPLETE.value,
         external_id="returning-mpt-order-987_returned-mpt-order-456_line1",
     )
     mocked_get_orders = mocker.patch.object(
@@ -2916,7 +2916,7 @@ def test_get_return_orders_by_external_reference(
         customer_id,
         filters={
             "order-type": ORDER_TYPE_RETURN,
-            "status": [AdobeStatus.PROCESSED.value, AdobeStatus.PENDING.value],
+            "status": [AdobeOrderStatus.COMPLETE.value, AdobeOrderStatus.OPEN.value],
         },
     )
 
@@ -2933,45 +2933,45 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         order_id="order_ko_0",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-06T00:00:00Z",
     )
     order_ok_1 = adobe_order_factory(
         order_id="order_ok_1",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-07T00:00:00Z",
     )
     order_ok_2 = adobe_order_factory(
         order_id="order_ok_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3000", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3000", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-08T00:00:00Z",
     )
     order_ko_1 = adobe_order_factory(
         order_id="order_ko_1",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3001", status=AdobeStatus.ORDER_CANCELLED.value
+            subscription_id="SUB-1000-2000-3001", status=AdobeOrderStatus.CANCELLED.value
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-09T00:00:00Z",
     )
     order_ko_2 = adobe_order_factory(
         order_id="order_ko_2",
         order_type=ORDER_TYPE_NEW,
         items=adobe_items_factory(
-            subscription_id="SUB-1000-2000-3002", status=AdobeStatus.PROCESSED.value
+            subscription_id="SUB-1000-2000-3002", status=AdobeOrderStatus.COMPLETE.value
         ),
-        status=AdobeStatus.ORDER_CANCELLED.value,
+        status=AdobeOrderStatus.CANCELLED.value,
     )
     # for another sku
     order_ko_3 = adobe_order_factory(
@@ -2980,9 +2980,9 @@ def test_get_returnable_orders_by_subscription_id_no_renewal_for_period(
         items=adobe_items_factory(
             subscription_id="SUB-1000-2000-3003",
             offer_id="99999999CA01A12",
-            status=AdobeStatus.PROCESSED.value,
+            status=AdobeOrderStatus.COMPLETE.value,
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         creation_date="2024-01-10T00:00:00Z",
     )
     mocked_get_orders = mocker.patch.object(

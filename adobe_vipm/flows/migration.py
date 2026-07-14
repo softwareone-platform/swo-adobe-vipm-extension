@@ -4,7 +4,12 @@ import logging
 from django.conf import settings
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import (
+    AdobeErrorCode,
+    AdobeOrderStatus,
+    AdobeSubscriptionStatus,
+    ThreeYearCommitmentStatus,
+)
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AuthorizationNotFoundError,
@@ -163,7 +168,7 @@ def populate_offers_for_transfer(product_id, transfer, transfer_preview):
 
 def handle_preview_error(transfer, api_err):
     """Handle Adobe API errors during transfer preview."""
-    if api_err.code == AdobeStatus.TRANSFER_ALREADY_TRANSFERRED:
+    if api_err.code == AdobeErrorCode.CUSTOMER_ALREADY_TRANSFERRED:
         return True
 
     transfer.adobe_error_code = api_err.code
@@ -331,11 +336,11 @@ def check_running_transfers_for_product(product_id):  # noqa: C901
             transfer.save()
             continue
 
-        if adobe_transfer["status"] == AdobeStatus.PENDING:
+        if adobe_transfer["status"] == AdobeOrderStatus.OPEN:
             check_retries(transfer)
             continue
 
-        if adobe_transfer["status"] != AdobeStatus.PROCESSED:
+        if adobe_transfer["status"] != AdobeOrderStatus.COMPLETE:
             transfer.migration_error_description = (
                 f"Unexpected status ({adobe_transfer['status']}) "
                 "received from Adobe while retrieving transfer."
@@ -420,7 +425,7 @@ def check_running_transfers_for_product(product_id):  # noqa: C901
 
 def _update_subscriptions(client, subscriptions, transfer):
     for subscription in subscriptions["items"]:
-        if subscription["status"] != AdobeStatus.PROCESSED:
+        if subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
             continue
         client.update_subscription(
             transfer.authorization_uk,

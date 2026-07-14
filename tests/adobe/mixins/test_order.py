@@ -3,7 +3,7 @@ from urllib.parse import urljoin
 import pytest
 from responses import matchers
 
-from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus
+from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeErrorCode
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
@@ -272,7 +272,7 @@ def test_get_preview_order_not_qualified(
             payload,
             {
                 "body": AdobeAPIError(
-                    status_code=int(AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
+                    status_code=int(AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
                     payload={
                         "code": "2141",
                         "message": "Customer is not qualified for the Flexible Discount",
@@ -325,7 +325,7 @@ def test_get_preview_order_unexpected_message(
             matchers.query_param_matcher({"fetch-price": "true"}),
         ],
         body=AdobeAPIError(
-            status_code=int(AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
+            status_code=int(AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
             payload={
                 "code": "2141",
                 "message": "Customer is not qualified for the Flexible Discount",
@@ -396,7 +396,7 @@ def test_get_flex_discounts_per_base_offer_invalid_country(
         urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
         status=400,
         json=adobe_api_error_factory(
-            AdobeStatus.INVALID_COUNTRY_FOR_PARTNER, "Invalid Country for Partner"
+            AdobeErrorCode.INVALID_COUNTRY_FOR_PARTNER, "Invalid Country for Partner"
         ),
         match=[
             matchers.query_param_matcher({
@@ -435,7 +435,7 @@ def test_get_flex_discounts_per_base_offer_error(
     requests_mocker.get(
         urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
         status=400,
-        json=adobe_api_error_factory(AdobeStatus.INTERNAL_SERVER_ERROR, "Internal server error"),
+        json=adobe_api_error_factory(AdobeErrorCode.INTERNAL_SERVER_ERROR, "Internal server error"),
         match=[
             matchers.query_param_matcher({
                 "market-segment": "COM",

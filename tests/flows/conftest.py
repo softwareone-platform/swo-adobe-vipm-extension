@@ -1,7 +1,7 @@
 import pytest
 from mpt_extension_sdk.mpt_http.mpt import get_agreements_by_query
 
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeSubscriptionStatus
 from adobe_vipm.flows.sync.agreement import AgreementSyncer
 from adobe_vipm.flows.sync.price_manager import PriceManager
 from adobe_vipm.flows.sync.subscription import SubscriptionSyncer
@@ -179,7 +179,7 @@ def mocked_agreement_syncer(
         adobe_subscription_factory(
             subscription_id="55feb5038045e0b1ebf026e7522e17NA",
             offer_id="65304578CA01A12",
-            status=AdobeStatus.SUBSCRIPTION_TERMINATED,
+            status=AdobeSubscriptionStatus.INACTIVE,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"

@@ -6,40 +6,57 @@ from enum import StrEnum
 import regex as re
 
 
-class AdobeStatus(StrEnum):
-    """Adobe Order Statuses."""
+class AdobeOrderStatus(StrEnum):
+    """Adobe order statuses. A transfer is an order of type TRANSFER and shares this enum."""
 
-    PROCESSED = "1000"
+    COMPLETE = "1000"
+    OPEN = "1002"
+    FAILED = "1004"
+    CANCELLED = "1008"
+    FAILED_INVALID_ADDRESS = "1010"
+    FAILED_INACTIVE_DISTRIBUTOR = "1020"
+    FAILED_INACTIVE_RESELLER = "1022"
+    FAILED_INACTIVE_CUSTOMER = "1024"
+    FAILED_INVALID_CUSTOMER_ID = "1026"
+
+
+class AdobeSubscriptionStatus(StrEnum):
+    """Adobe subscription statuses."""
+
+    ACTIVE = "1000"
     PENDING = "1002"
-    INACTIVE_OR_GENERIC_FAILURE = "1004"
-    ORDER_CANCELLED = "1008"
-    ORDER_INACTIVE_DISTRIBUTOR = "1020"
-    ORDER_INACTIVE_RESELLER = "1022"
-    ORDER_INACTIVE_CUSTOMER = "1024"
-    ORDER_INVALID_CUSTOMER_ID = "1026"
+    INACTIVE = "1004"
+    SCHEDULED = "1009"
+
+
+class AdobeDeploymentStatus(StrEnum):
+    """Adobe deployment statuses."""
+
+    ACTIVE = "1000"
+    INACTIVE = "1004"
+
+
+class AdobeErrorCode(StrEnum):
+    """Adobe API error response codes."""
+
+    INVALID_CUSTOMER = "1116"
     INVALID_FIELDS = "1117"
     INVALID_ADDRESS = "1118"
     REQUEST_IS_MISSING_REQUIRED_FIELDS = "1122"
+    INTERNAL_SERVER_ERROR = "1124"
     INVALID_MINIMUM_QUANTITY = "1135"
-    ACCOUNT_ALREADY_EXISTS = "1127"
-    TRANSFER_INVALID_MEMBERSHIP = "5115"
-    TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS = "5116"
-    TRANSFER_INELIGIBLE = "5117"
-    TRANSFER_ALREADY_TRANSFERRED = "5118"
-    TRANSFER_INACTIVE_RESELLER = "5119"
-    TRANSFER_NO_ADMIN_CONTACTS = "5120"
-    TRANSFER_IN_PROGRESS = "5121"
-    TRANSFER_INACTIVE_ACCOUNT = "1010"
-    SUBSCRIPTION_INACTIVE = "3119"  # PATCH error code, not a subscription status value
+    INVALID_COUNTRY_FOR_PARTNER = "1178"
+    CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT = "2141"
+    INACTIVE_SUBSCRIPTION_NOT_EDITABLE = "3119"
     INVALID_RENEWAL_STATE = "3120"
     LINE_ITEM_OFFER_ID_EXPIRED = "3123"
-    INTERNAL_SERVER_ERROR = "1124"
-    GC_DEPLOYMENT_ACTIVE = "1000"
-    SUBSCRIPTION_TERMINATED = "1004"
-    SUBSCRIPTION_ACTIVE = "1000"
-    INVALID_CUSTOMER = "1116"
-    CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT = "2141"
-    INVALID_COUNTRY_FOR_PARTNER = "1178"
+    INVALID_MEMBERSHIP_ID = "5115"
+    INVALID_MEMBERSHIP_OR_TRANSFER_ID = "5116"
+    INELIGIBLE_TRANSFER = "5117"
+    CUSTOMER_ALREADY_TRANSFERRED = "5118"
+    RESELLER_INACTIVE_FOR_TRANSFER = "5119"
+    NO_ADMIN_CONTACTS_FOR_TRANSFER = "5120"
+    TRANSFER_IN_PROGRESS = "5121"
 
 
 class ResellerChangeAction(StrEnum):
@@ -50,28 +67,19 @@ class ResellerChangeAction(StrEnum):
 
 
 ORDER_STATUS_DESCRIPTION = types.MappingProxyType({
-    AdobeStatus.INACTIVE_OR_GENERIC_FAILURE: "Inactive account, failed order or inactive "
-    "subscription.",
-    AdobeStatus.ORDER_CANCELLED: "Order has been cancelled.",
-    AdobeStatus.ORDER_INACTIVE_DISTRIBUTOR: "Distributor is inactive.",
-    AdobeStatus.ORDER_INACTIVE_RESELLER: "Reseller is inactive.",
-    AdobeStatus.ORDER_INACTIVE_CUSTOMER: "Customer is inactive.",
-    AdobeStatus.ORDER_INVALID_CUSTOMER_ID: "The provided customer identifier is invalid.",
+    AdobeOrderStatus.FAILED: "Order has failed.",
+    AdobeOrderStatus.CANCELLED: "Order has been cancelled.",
+    AdobeOrderStatus.FAILED_INACTIVE_DISTRIBUTOR: "Distributor is inactive.",
+    AdobeOrderStatus.FAILED_INACTIVE_RESELLER: "Reseller is inactive.",
+    AdobeOrderStatus.FAILED_INACTIVE_CUSTOMER: "Customer is inactive.",
+    AdobeOrderStatus.FAILED_INVALID_CUSTOMER_ID: "The provided customer identifier is invalid.",
 })
 
 SUBSCRIPTION_STATUS_DESCRIPTION = types.MappingProxyType({
-    AdobeStatus.SUBSCRIPTION_TERMINATED: "Subscription is terminated.",
+    AdobeSubscriptionStatus.INACTIVE: "Subscription is inactive.",
 })
 
 UNRECOVERABLE_ORDER_STATUSES = tuple(ORDER_STATUS_DESCRIPTION.keys())
-
-UNRECOVERABLE_TRANSFER_STATUSES = (
-    AdobeStatus.TRANSFER_INELIGIBLE,
-    AdobeStatus.TRANSFER_ALREADY_TRANSFERRED,
-    AdobeStatus.TRANSFER_INACTIVE_RESELLER,
-    AdobeStatus.TRANSFER_NO_ADMIN_CONTACTS,
-    AdobeStatus.TRANSFER_IN_PROGRESS,
-)
 
 ORDER_TYPE_NEW = "NEW"
 ORDER_TYPE_PREVIEW = "PREVIEW"

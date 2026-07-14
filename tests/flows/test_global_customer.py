@@ -2,7 +2,7 @@ import datetime as dt
 
 import pytest
 
-from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import AdobeSubscriptionStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import STATUS_GC_ERROR, get_sku_price
 from adobe_vipm.flows.constants import TEMPLATE_ASSET_DEFAULT, ItemTermsModel, Param
@@ -746,7 +746,7 @@ def test_check_gc_agreement_deployments_create_asset(
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
             adobe_subscription_factory(
-                deployment_id="deployment_id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+                deployment_id="deployment_id", status=AdobeSubscriptionStatus.INACTIVE.value
             ),
         ]
     }
@@ -827,7 +827,7 @@ def test_check_gc_agreement_deployments_agreement_asset_exists(
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
             adobe_subscription_factory(
-                deployment_id="deployment_id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+                deployment_id="deployment_id", status=AdobeSubscriptionStatus.INACTIVE.value
             ),
         ]
     }
@@ -904,7 +904,7 @@ def test_check_gc_agreement_deployments_create_agreement_subscription(
             adobe_subscription_factory(deployment_id="deployment_id"),
             adobe_subscription_factory(deployment_id=""),
             adobe_subscription_factory(
-                deployment_id="deployment_id", status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
+                deployment_id="deployment_id", status=AdobeSubscriptionStatus.INACTIVE.value
             ),
         ]
     }

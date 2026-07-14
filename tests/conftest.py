@@ -10,7 +10,12 @@ from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
 from adobe_vipm.adobe import config
 from adobe_vipm.adobe.client import AdobeClient
-from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeStatus, OfferType
+from adobe_vipm.adobe.constants import (
+    ORDER_TYPE_PREVIEW,
+    AdobeOrderStatus,
+    AdobeSubscriptionStatus,
+    OfferType,
+)
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
 from adobe_vipm.airtable.models import (
     AdobeProductNotFoundError,
@@ -1582,7 +1587,7 @@ def adobe_order_factory(adobe_items_factory, adobe_pricing_factory):  # noqa: C9
             order["referenceOrderId"] = reference_order_id
         if status:
             order["status"] = status
-        if status in {AdobeStatus.PENDING.value, AdobeStatus.PROCESSED.value} or order_id:
+        if status in {AdobeOrderStatus.OPEN.value, AdobeOrderStatus.COMPLETE.value} or order_id:
             order["orderId"] = order_id or "P0123456789"
         if creation_date:
             order["creationDate"] = creation_date
@@ -1602,7 +1607,7 @@ def adobe_subscription_factory():
         currency_code="USD",
         autorenewal_enabled=True,  # noqa: FBT002
         deployment_id="",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeSubscriptionStatus.ACTIVE.value,
         renewal_date=None,
     ):
         default_renewal_date = dt.date.fromisoformat("2025-10-10") + dt.timedelta(days=366)
@@ -1688,7 +1693,7 @@ def adobe_transfer_factory(adobe_items_factory):
     def _transfer(
         transfer_id="a-transfer-id",
         customer_id="",
-        status=AdobeStatus.PENDING.value,
+        status=AdobeOrderStatus.OPEN.value,
         items=None,
         membership_id="membership-id",
     ):

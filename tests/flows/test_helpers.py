@@ -8,7 +8,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
-    AdobeStatus,
+    AdobeErrorCode,
     ResellerChangeAction,
     ThreeYearCommitmentStatus,
 )
@@ -188,7 +188,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_internal_server_e
     adobe_client, _, _ = adobe_client_factory()
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_api_error = adobe_api_error_factory(
-        code=AdobeStatus.INTERNAL_SERVER_ERROR.value,
+        code=AdobeErrorCode.INTERNAL_SERVER_ERROR.value,
         message="Internal Server Error",
     )
     requests_mocker.get(
@@ -252,7 +252,7 @@ def test_setup_context_step_when_adobe_get_customer_fails_with_lost_customer(  #
     adobe_client, _, _ = adobe_client_factory()
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     adobe_api_error = adobe_api_error_factory(
-        code=AdobeStatus.INVALID_CUSTOMER.value,
+        code=AdobeErrorCode.INVALID_CUSTOMER.value,
         message="Invalid Customer",
     )
     requests_mocker.get(

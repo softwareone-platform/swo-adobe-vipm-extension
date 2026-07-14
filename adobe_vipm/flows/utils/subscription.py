@@ -3,7 +3,7 @@ import logging
 
 from mpt_extension_sdk.mpt_http.utils import find_first
 
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeSubscriptionStatus
 from adobe_vipm.adobe.utils import get_item_by_partial_sku
 from adobe_vipm.flows.constants import (
     TEMPLATE_SUBSCRIPTION_AUTORENEWAL_DISABLE,
@@ -70,7 +70,7 @@ def is_transferring_item_expired(item: dict) -> bool:
     Returns:
         True if the item is expired.
     """
-    if "status" in item and item["status"] == AdobeStatus.INACTIVE_OR_GENERIC_FAILURE:
+    if "status" in item and item["status"] == AdobeSubscriptionStatus.INACTIVE:
         return True
 
     renewal_date = dt.date.fromisoformat(item["renewalDate"])
@@ -104,7 +104,7 @@ def is_line_item_active_subscription(subscriptions: list[dict], line: dict) -> b
     adobe_item = get_item_by_partial_sku(
         subscriptions["items"], line["item"]["externalIds"]["vendor"]
     )
-    return adobe_item["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE
+    return adobe_item["status"] == AdobeSubscriptionStatus.ACTIVE
 
 
 def get_transfer_item_sku_by_subscription(trf: dict, sub_id: str) -> str | None:
@@ -209,7 +209,7 @@ def get_template_name_by_subscription(adobe_subscription):
     Returns:
         The template name.
     """
-    if adobe_subscription.get("status") == AdobeStatus.SUBSCRIPTION_TERMINATED:
+    if adobe_subscription.get("status") == AdobeSubscriptionStatus.INACTIVE:
         return TEMPLATE_SUBSCRIPTION_EXPIRED
 
     if adobe_subscription.get("autoRenewal", {}).get("enabled"):
