@@ -1,6 +1,5 @@
 import copy
 import functools
-import json
 from typing import Any
 
 from django.conf import settings
@@ -399,8 +398,9 @@ def set_flex_discounts_parameter(order: dict, adobe_order: dict) -> dict:
         for line in adobe_order["lineItems"]
         if line.get("flexDiscounts")
     ]
-    flex_discounts = json.dumps(flex_discounts) if flex_discounts else None
-    return update_fulfillment_parameter_value(order, Param.FLEXIBLE_DISCOUNTS.value, flex_discounts)
+    return update_fulfillment_parameter_value(
+        order, Param.FLEXIBLE_DISCOUNTS.value, flex_discounts or None
+    )
 
 
 def set_adobe_order_ids_created_parameter(context, order_ids: list[str | None]) -> dict:

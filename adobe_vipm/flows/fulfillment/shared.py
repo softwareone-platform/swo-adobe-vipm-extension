@@ -1410,7 +1410,6 @@ class NullifyFlexDiscountParam(Step):
                         {
                             "externalId": Param.FLEXIBLE_DISCOUNTS,
                             "value": None,
-                            #  The Prop is a JSON type, but MPT API accepts only string here
                         },
                     ]
                 },
