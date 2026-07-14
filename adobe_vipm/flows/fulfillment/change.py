@@ -12,7 +12,7 @@ from functools import partial
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeErrorCode, AdobeOrderStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
@@ -169,7 +169,7 @@ def _is_invalid_renewal_state_ok(context, line):
         check_item_in_order, context.adobe_new_order["lineItems"]
     ):
         invalid_renewal_state_allowed = (
-            context.adobe_new_order["status"] == AdobeStatus.PROCESSED.value
+            context.adobe_new_order["status"] == AdobeOrderStatus.COMPLETE.value
         )
         if invalid_renewal_state_allowed:
             logger.info("> Vendor order with the item has status PROCESSED")
@@ -235,7 +235,7 @@ class UpdateRenewalQuantities(Step):
                 )
             except AdobeAPIError as error:
                 invalid_renewal_state_allowed = False
-                if error.code == AdobeStatus.INVALID_RENEWAL_STATE and old_qty < qty:
+                if error.code == AdobeErrorCode.INVALID_RENEWAL_STATE and old_qty < qty:
                     logger.info(
                         "Got invalid renewal state error for subscription %s while updating"
                         " quantity %s -> %s",
@@ -247,7 +247,7 @@ class UpdateRenewalQuantities(Step):
                 if not (
                     invalid_renewal_state_allowed
                     or (
-                        error.code == AdobeStatus.LINE_ITEM_OFFER_ID_EXPIRED
+                        error.code == AdobeErrorCode.LINE_ITEM_OFFER_ID_EXPIRED
                         and context.adobe_new_order
                     )
                 ):
@@ -283,8 +283,8 @@ class UpdateRenewalQuantities(Step):
     def _handle_subscription_update_error(self, adobe_client, client, context, error):
         self._rollback_updated_subscriptions(adobe_client, context)
         if error.code in {
-            AdobeStatus.INVALID_RENEWAL_STATE,
-            AdobeStatus.SUBSCRIPTION_INACTIVE,
+            AdobeErrorCode.INVALID_RENEWAL_STATE,
+            AdobeErrorCode.INACTIVE_SUBSCRIPTION_NOT_EDITABLE,
         }:
             switch_order_to_failed(
                 client,

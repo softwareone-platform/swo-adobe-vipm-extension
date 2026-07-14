@@ -1,7 +1,7 @@
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeErrorCode, AdobeOrderStatus
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
@@ -521,7 +521,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state(
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            AdobeStatus.SUBSCRIPTION_INACTIVE.value,
+            AdobeErrorCode.INACTIVE_SUBSCRIPTION_NOT_EDITABLE.value,
             "Inactive Subscription or Pending Renewal is not Editable",
         ),
     )
@@ -570,7 +570,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_ok(
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            AdobeStatus.INVALID_RENEWAL_STATE.value,
+            AdobeErrorCode.INVALID_RENEWAL_STATE.value,
             "Update could not be performed because it would create an invalid renewal state",
         ),
     )
@@ -610,7 +610,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_ok(
         adobe_customer_id="adobe-customer-id",
         adobe_new_order=adobe_order_factory(
             order_type="NEW",
-            status=AdobeStatus.PROCESSED.value,
+            status=AdobeOrderStatus.COMPLETE.value,
         ),
     )
     adobe_sub = adobe_subscription_factory(renewal_quantity=10)
@@ -618,7 +618,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_ok(
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            AdobeStatus.INVALID_RENEWAL_STATE.value,
+            AdobeErrorCode.INVALID_RENEWAL_STATE.value,
             "Update could not be performed because it would create an invalid renewal state",
         ),
     )
@@ -658,7 +658,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_failed(
         adobe_customer_id="adobe-customer-id",
         adobe_new_order=adobe_order_factory(
             order_type="NEW",
-            status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value,
+            status=AdobeOrderStatus.FAILED.value,
         ),
     )
     adobe_sub = adobe_subscription_factory(renewal_quantity=10)
@@ -666,7 +666,7 @@ def test_validate_update_renewal_quantity_invalid_renewal_state_order_failed(
     mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            AdobeStatus.INVALID_RENEWAL_STATE.value,
+            AdobeErrorCode.INVALID_RENEWAL_STATE.value,
             "Update could not be performed because it would create an invalid renewal state",
         ),
     )

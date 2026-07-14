@@ -11,7 +11,7 @@ from urllib.parse import urljoin
 import requests
 
 from adobe_vipm.adobe import constants as adobe_constants
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeErrorCode
 from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, wrap_http_error
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError, ProcessingUpsizeLinesError
@@ -393,8 +393,8 @@ class OrderClientMixin:
             filters={
                 "order-type": adobe_constants.ORDER_TYPE_RETURN,
                 "status": [
-                    adobe_constants.AdobeStatus.PROCESSED,
-                    adobe_constants.AdobeStatus.PENDING,
+                    adobe_constants.AdobeOrderStatus.COMPLETE,
+                    adobe_constants.AdobeOrderStatus.OPEN,
                 ],
             },
         )
@@ -564,7 +564,7 @@ class OrderClientMixin:
                 offer_ids,
             )
         except AdobeAPIError as error:
-            if error.code == AdobeStatus.INVALID_COUNTRY_FOR_PARTNER:
+            if error.code == AdobeErrorCode.INVALID_COUNTRY_FOR_PARTNER:
                 logger.warning(
                     "Invalid country %s for partner when getting flex discounts.", country
                 )
@@ -589,7 +589,7 @@ class OrderClientMixin:
         return base_offers_with_discounts
 
     def _get_fail_discounts_for_cust_not_qualified(self, ex: AdobeError, payload: dict) -> set:
-        if ex.code == adobe_constants.AdobeStatus.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
+        if ex.code == adobe_constants.AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
             logger.warning("%s", ex)
             matched = self.flex_discount_not_qualify_re.match(ex.details[0])
             if not matched:
@@ -760,8 +760,8 @@ class OrderClientMixin:
         order, mpt_item = order_item
 
         return (
-            order["status"] == adobe_constants.AdobeStatus.PROCESSED
-            and mpt_item["status"] == adobe_constants.AdobeStatus.PROCESSED
+            order["status"] == adobe_constants.AdobeOrderStatus.COMPLETE
+            and mpt_item["status"] == adobe_constants.AdobeOrderStatus.COMPLETE
         )
 
     @wrap_http_error
