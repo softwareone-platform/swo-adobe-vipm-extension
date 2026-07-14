@@ -916,7 +916,7 @@ class AgreementSyncer:  # noqa: WPS214
             partial(_is_subscription_in_set, orphaned_subscription_ids), self._adobe_subscriptions
         ):
             if subscription["autoRenewal"]["enabled"] is False or subscription["status"] in {
-                AdobeStatus.SUBSCRIPTION_INACTIVE.value,
+                AdobeStatus.SUBSCRIPTION_TERMINATED.value,
                 AdobeStatus.PENDING.value,
             }:
                 logger.info(
