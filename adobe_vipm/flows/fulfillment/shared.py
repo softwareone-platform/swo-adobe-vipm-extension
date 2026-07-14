@@ -33,7 +33,9 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
     UNRECOVERABLE_ORDER_STATUSES,
-    AdobeStatus,
+    AdobeErrorCode,
+    AdobeOrderStatus,
+    AdobeSubscriptionStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
@@ -631,7 +633,7 @@ def build_renewal_line_items(manual_renewal_lines: dict) -> list[dict]:
 
 def is_renewal_unsupported_error(error: AdobeAPIError) -> bool:
     """Return True when Adobe rejected a renewal because an offer can't be renewed."""
-    return error.code == AdobeStatus.REQUEST_IS_MISSING_REQUIRED_FIELDS
+    return error.code == AdobeErrorCode.REQUEST_IS_MISSING_REQUIRED_FIELDS
 
 
 class SetupDueDate(Step):
@@ -912,7 +914,7 @@ class SubmitReturnOrders(Step):
         pending_orders = [
             return_order["orderId"]
             for return_order in all_return_orders
-            if return_order["status"] != AdobeStatus.PROCESSED
+            if return_order["status"] != AdobeOrderStatus.COMPLETE
         ]
         if pending_orders:
             logger.info(
@@ -1001,7 +1003,7 @@ class SubmitNewOrder(Step):
             )
         context.adobe_new_order = adobe_order
         context.adobe_new_order_id = adobe_order["orderId"]
-        if adobe_order["status"] == AdobeStatus.PENDING:
+        if adobe_order["status"] == AdobeOrderStatus.OPEN:
             logger.info("%s: adobe order %s is still pending.", context, context.adobe_new_order_id)
             return
 
@@ -1017,7 +1019,7 @@ class SubmitNewOrder(Step):
             logger.warning("%s: The adobe order has been failed %s.", context, error["message"])
             return
 
-        if adobe_order["status"] != AdobeStatus.PROCESSED:
+        if adobe_order["status"] != AdobeOrderStatus.COMPLETE:
             error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status=adobe_order["status"])
             switch_order_to_failed(client, context.order, error)
             logger.warning("%s: the order has been failed due to %s.", context, error["message"])
@@ -1048,7 +1050,7 @@ class CreateOrUpdateAssets(Step):
                 context.authorization_id, context.adobe_customer_id, line["subscriptionId"]
             )
 
-            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+            if adobe_subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
                 logger.info(
                     "%s: subscription %s for customer %s is in status %s, skip it",
                     context,
@@ -1158,7 +1160,7 @@ class CreateOrUpdateSubscriptions(Step):
             line["subscriptionId"],
         )
 
-        if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+        if adobe_subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
             logger.warning(
                 "%s: subscription %s for customer %s is in status %s, skip it",
                 context,
@@ -1784,11 +1786,11 @@ class SubmitRenewalOrders(Step):
         if order is None:
             return
 
-        if order["status"] == AdobeStatus.PENDING:
+        if order["status"] == AdobeOrderStatus.OPEN:
             logger.info("%s: renewal order %s is still pending", context, order["orderId"])
             return
 
-        if order["status"] != AdobeStatus.PROCESSED:
+        if order["status"] != AdobeOrderStatus.COMPLETE:
             switch_order_to_failed(
                 client,
                 context.order,

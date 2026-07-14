@@ -12,7 +12,12 @@ from mpt_extension_sdk.mpt_http.base import MPTClient
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import AdobeClient
-from adobe_vipm.adobe.constants import THREE_YC_TEMP_3YC_STATUSES, AdobeStatus, OfferType
+from adobe_vipm.adobe.constants import (
+    THREE_YC_TEMP_3YC_STATUSES,
+    AdobeErrorCode,
+    AdobeSubscriptionStatus,
+    OfferType,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
@@ -244,7 +249,7 @@ class AgreementSyncer:  # noqa: WPS214
             subsc
             for subsc in adobe_subscriptions
             if subsc["subscriptionId"] not in mpt_entitlements_external_ids
-            and subsc["status"] == AdobeStatus.SUBSCRIPTION_ACTIVE.value
+            and subsc["status"] == AdobeSubscriptionStatus.ACTIVE.value
         )
         if not missing_adobe_subscriptions:
             logger.info("> No missing subscriptions found")
@@ -717,7 +722,7 @@ class AgreementSyncer:  # noqa: WPS214
 
             actual_sku = adobe_subscription["offerId"]
 
-            if adobe_subscription["status"] == AdobeStatus.SUBSCRIPTION_TERMINATED:
+            if adobe_subscription["status"] == AdobeSubscriptionStatus.INACTIVE:
                 logger.info("Processing terminated Adobe subscription %s.", adobe_subscription_id)
                 self._update_subscription_template(mpt_subscription, TEMPLATE_SUBSCRIPTION_EXPIRED)
                 if self._dry_run:
@@ -729,7 +734,7 @@ class AgreementSyncer:  # noqa: WPS214
                     mpt.terminate_subscription(
                         self._mpt_client,
                         mpt_subscription["id"],
-                        f"Adobe subscription status {AdobeStatus.SUBSCRIPTION_TERMINATED}.",
+                        f"Adobe subscription status {AdobeSubscriptionStatus.INACTIVE}.",
                     )
                 continue
 
@@ -904,8 +909,8 @@ class AgreementSyncer:  # noqa: WPS214
             partial(_is_subscription_in_set, orphaned_subscription_ids), self._adobe_subscriptions
         ):
             if subscription["autoRenewal"]["enabled"] is False or subscription["status"] in {
-                AdobeStatus.SUBSCRIPTION_TERMINATED.value,
-                AdobeStatus.PENDING.value,
+                AdobeSubscriptionStatus.INACTIVE.value,
+                AdobeSubscriptionStatus.PENDING.value,
             }:
                 logger.info(
                     "> Skipping orphaned subscription %s (auto-renewal: %s, status: %s)",
@@ -1314,7 +1319,7 @@ def get_customer_or_process_lost_customer(
     try:
         return adobe_client.get_customer(agreement["authorization"]["id"], customer_id)
     except AdobeAPIError as error:
-        if error.code == AdobeStatus.INVALID_CUSTOMER:
+        if error.code == AdobeErrorCode.INVALID_CUSTOMER:
             logger.info(
                 "Received Adobe error %s - %s, assuming lost customer "
                 "and proceeding with lost customer procedure.",

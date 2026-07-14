@@ -5,7 +5,7 @@ from typing import Any
 from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_product_items_by_skus
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import AdobeOrderStatus, ThreeYearCommitmentStatus
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_RUNNING,
@@ -374,7 +374,7 @@ class ValidateTransferStatus(Step):
             self._set_transfer_error(context, order, "Membership has already been migrated")
             return
 
-        if context.adobe_transfer["status"] == AdobeStatus.TRANSFER_INACTIVE_ACCOUNT:
+        if context.adobe_transfer["status"] == AdobeOrderStatus.FAILED_INVALID_ADDRESS:
             context.order = set_ordering_parameter_error(
                 context.order,
                 Param.MEMBERSHIP_ID.value,

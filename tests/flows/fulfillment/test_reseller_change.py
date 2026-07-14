@@ -1,4 +1,4 @@
-from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction
+from adobe_vipm.adobe.constants import AdobeOrderStatus, ResellerChangeAction
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import TEMPLATE_NAME_TRANSFER
 from adobe_vipm.flows.context import Context
@@ -146,7 +146,7 @@ def test_check_adobe_reseller_transfer_step_success(
     mock_adobe_client,
 ):
     adobe_transfer_order = adobe_reseller_change_factory()
-    adobe_transfer_order["status"] = AdobeStatus.PROCESSED
+    adobe_transfer_order["status"] = AdobeOrderStatus.COMPLETE
     mock_adobe_client.get_reseller_transfer.return_value = adobe_transfer_order
     mocker.patch(
         "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
@@ -181,7 +181,7 @@ def test_check_adobe_reseller_transfer_step_pending_status(
     mock_adobe_client,
 ):
     adobe_transfer_order = adobe_reseller_change_factory()
-    adobe_transfer_order["status"] = AdobeStatus.PENDING
+    adobe_transfer_order["status"] = AdobeOrderStatus.OPEN
     mock_adobe_client.get_reseller_transfer.return_value = adobe_transfer_order
     mocker.patch(
         "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
@@ -239,7 +239,7 @@ def test_check_adobe_reseller_transfer_step_no_line_items_fallback_to_purchase(
     mock_fulfill_purchase_order,
 ):
     adobe_transfer_order = adobe_reseller_change_preview_factory()
-    adobe_transfer_order["status"] = AdobeStatus.PROCESSED
+    adobe_transfer_order["status"] = AdobeOrderStatus.COMPLETE
     adobe_transfer_order["lineItems"] = []
     order = order_factory(
         order_parameters=reseller_change_order_parameters_factory(),
@@ -266,7 +266,7 @@ def test_check_adobe_reseller_transfer_step_reset_order_id_when_ids_match(
     mock_fulfill_purchase_order,
 ):
     adobe_transfer_order = adobe_reseller_change_preview_factory()
-    adobe_transfer_order["status"] = AdobeStatus.PROCESSED
+    adobe_transfer_order["status"] = AdobeOrderStatus.COMPLETE
     adobe_transfer_order["lineItems"] = []
     adobe_transfer_order["transferId"] = "TRANSFER-123"
     mocked_save_adobe_order_id = mocker.patch(

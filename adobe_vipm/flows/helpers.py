@@ -9,7 +9,11 @@ from django.conf import settings
 from mpt_extension_sdk.mpt_http.mpt import get_agreement, get_licensee, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import (
+    AdobeErrorCode,
+    ResellerChangeAction,
+    ThreeYearCommitmentStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import get_3yc_commitment_request, get_item_by_partial_sku
 from adobe_vipm.airtable.models import (
@@ -176,7 +180,7 @@ class SetupContext(Step):
                     context.adobe_customer_id,
                 )
             except AdobeAPIError as ex:
-                if ex.code == AdobeStatus.INVALID_CUSTOMER:
+                if ex.code == AdobeErrorCode.INVALID_CUSTOMER:
                     error = f"Received Adobe error {ex.code} - {ex.message}"
                     logger.info(
                         "Received Adobe error %s - %s, assuming lost customer "

@@ -18,7 +18,12 @@ from mpt_extension_sdk.mpt_http.mpt import (
 )
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ThreeYearCommitmentStatus
+from adobe_vipm.adobe.constants import (
+    AdobeErrorCode,
+    AdobeOrderStatus,
+    AdobeSubscriptionStatus,
+    ThreeYearCommitmentStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.airtable.models import (
     STATUS_GC_CREATED,
@@ -113,8 +118,8 @@ def _handle_transfer_preview_error(client, order, error):
         isinstance(error, AdobeAPIError)
         and error.code
         in {
-            AdobeStatus.TRANSFER_INVALID_MEMBERSHIP,
-            AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS,
+            AdobeErrorCode.INVALID_MEMBERSHIP_ID,
+            AdobeErrorCode.INVALID_MEMBERSHIP_OR_TRANSFER_ID,
         }
     ) or (isinstance(error, AdobeHttpError) and error.status_code == 404):
         error_msg = (
@@ -243,10 +248,10 @@ def _check_adobe_transfer_order_fulfilled(mpt_client, order, membership_id, adob
         membership_id,
         adobe_transfer_id,
     )
-    if adobe_order["status"] == AdobeStatus.PENDING:
+    if adobe_order["status"] == AdobeOrderStatus.OPEN:
         handle_retries(mpt_client, order, adobe_transfer_id)
         return None
-    if adobe_order["status"] != AdobeStatus.PROCESSED:
+    if adobe_order["status"] != AdobeOrderStatus.COMPLETE:
         error = ERR_UNEXPECTED_ADOBE_ERROR_STATUS.to_dict(status=adobe_order["status"])
         switch_order_to_failed(mpt_client, order, error)
         logger.warning("Transfer %s has been failed: %s.", order["id"], error["message"])
@@ -302,7 +307,7 @@ def _fulfill_transfer_migrated(  # noqa: C901
         adobe_subscription = adobe_client.get_subscription(
             authorization_id, transfer.customer_id, line["subscriptionId"]
         )
-        if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+        if adobe_subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
             logger.info(
                 SUBSCRIPTION_SKIP_LOG,
                 adobe_subscription["subscriptionId"],
@@ -906,7 +911,7 @@ def create_agreement_subscriptions(adobe_transfer_order, mpt_client, order, adob
             customer_id,
             item["subscriptionId"],
         )
-        if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+        if adobe_subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
             logger.info(
                 SUBSCRIPTION_SKIP_LOG,
                 adobe_subscription["subscriptionId"],
@@ -1332,7 +1337,7 @@ class CreateTransferAssets(Step):
             adobe_subscription = adobe_client.get_subscription(
                 context.order["authorization"]["id"], customer_id, item["subscriptionId"]
             )
-            if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+            if adobe_subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
                 logger.info(
                     SUBSCRIPTION_SKIP_LOG,
                     adobe_subscription["subscriptionId"],
