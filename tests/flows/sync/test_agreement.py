@@ -3222,7 +3222,10 @@ def test_add_missing_subscriptions(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A10"
         ),
         adobe_subscription_factory(
-            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65322572CAT1A13"
+            subscription_id="2e5b9c974c4ea1bcabdb0fe697a2f1NA",
+            offer_id="65322572CAT1A13",
+            current_quantity=7,
+            renewal_quantity=10,
         ),
         adobe_subscription_factory(
             subscription_id="ae5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="75322572CAT1A11"
@@ -3303,7 +3306,7 @@ def test_add_missing_subscriptions(
             "parameters": {
                 "fulfillment": [
                     {"externalId": "adobeSKU", "value": "65322572CAT1A13"},
-                    {"externalId": "currentQuantity", "value": "10"},
+                    {"externalId": "currentQuantity", "value": "7"},
                     {"externalId": "renewalQuantity", "value": "10"},
                     {"externalId": "renewalDate", "value": "2026-10-11"},
                 ]

@@ -380,7 +380,7 @@ class AgreementSyncer:  # noqa: WPS214
             "seller": {"id": self._seller_id},
             "lines": [
                 {
-                    "quantity": adobe_subscription[Param.CURRENT_QUANTITY.value],
+                    "quantity": adobe_subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value],
                     "item": item,
                     **unit_price,
                 }
