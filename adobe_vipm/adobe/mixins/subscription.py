@@ -2,7 +2,7 @@ from urllib.parse import urljoin
 
 import requests
 
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeSubscriptionStatus
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.utils import get_partial_sku
@@ -114,7 +114,7 @@ class SubscriptionClientMixin:
             authorization_id, customer_id, deployment_id
         )["items"]
         active_subscriptions = filter(
-            lambda sub: sub["status"] == AdobeStatus.PROCESSED,
+            lambda sub: sub["status"] == AdobeSubscriptionStatus.ACTIVE,
             subscriptions,
         )
 

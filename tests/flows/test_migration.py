@@ -3,7 +3,7 @@ import datetime as dt
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeErrorCode, AdobeOrderStatus, AdobeSubscriptionStatus
 from adobe_vipm.adobe.errors import (
     AdobeAPIError,
     AuthorizationNotFoundError,
@@ -101,7 +101,7 @@ def test_start_transfers_for_product_preview_already_transferred(
     mock_adobe_client.preview_transfer.side_effect = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_ALREADY_TRANSFERRED.value,
+            code=AdobeErrorCode.CUSTOMER_ALREADY_TRANSFERRED.value,
             message="Already transferred",
         ),
     )
@@ -140,7 +140,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
+            code=AdobeErrorCode.INELIGIBLE_TRANSFER.value,
             message="Cannot be transferred",
             details=[f"Reason: {reason}"],
         ),
@@ -154,7 +154,7 @@ def test_start_transfers_for_product_preview_recoverable_error(
         mock_transfer.membership_id,
     )
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
+    assert mock_transfer.adobe_error_code == AdobeErrorCode.INELIGIBLE_TRANSFER.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "rescheduled"
     assert mock_transfer.migration_error_description == (
@@ -179,7 +179,7 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
+            code=AdobeErrorCode.INELIGIBLE_TRANSFER.value,
             message="Cannot be transferred",
             details=["Reason: BAD_MARKET_SEGMENT"],
         ),
@@ -192,7 +192,7 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
         mock_transfer.authorization_uk, mock_transfer.membership_id
     )
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
+    assert mock_transfer.adobe_error_code == AdobeErrorCode.INELIGIBLE_TRANSFER.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "failed"
     assert mock_transfer.migration_error_description == (
@@ -205,7 +205,11 @@ def test_start_transfers_for_product_preview_unrecoverable_error(
         "for preview of transfer for Membership **membership-id**.",
         facts=FactsSection(
             title="Last error from Adobe",
-            data={"5117": "5117 - Cannot be transferred: Reason: BAD_MARKET_SEGMENT"},
+            data={
+                AdobeErrorCode.INELIGIBLE_TRANSFER.value: (
+                    "5117 - Cannot be transferred: Reason: BAD_MARKET_SEGMENT"
+                ),
+            },
         ),
         button=Button(label="membership-id", url="https://link.to.transfer"),
     )
@@ -390,7 +394,7 @@ def test_checking_running_transfers_for_product(
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -416,7 +420,7 @@ def test_checking_running_transfers_for_product(
         }
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -482,7 +486,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -499,7 +503,7 @@ def test_checking_running_transfers_for_product_with_no_profile_address(
         }
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -555,7 +559,7 @@ def test_checking_running_transfers_for_product_3yc(
     mocker.patch("adobe_vipm.flows.migration.terminate_contract", return_value=(True, ""))
     mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     commitment = adobe_commitment_factory(licenses=10, consumables=30)
     customer = adobe_customer_factory(commitment=commitment)
@@ -612,7 +616,7 @@ def test_checking_running_transfers_for_product_get_customer_error_retry(
     mock_transfer.reschedule_count = 0
     mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     error = AdobeAPIError(400, adobe_api_error_factory(code="9999", message="Unexpected error"))
     mock_adobe_client.get_transfer.return_value = adobe_transfer
@@ -642,7 +646,7 @@ def test_checking_running_transfers_for_product_update_subs_error_retry(
     mock_transfer.customer_benefits_3yc_status = None
     mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     error = AdobeAPIError(400, adobe_api_error_factory(code="9999", message="Unexpected error"))
     customer = {
@@ -730,7 +734,7 @@ def test_checking_running_transfers_for_product_pending_retry(
     mock_transfer.reschedule_count = 0
     mocker.patch("adobe_vipm.flows.migration.get_transfers_to_check", return_value=[mock_transfer])
     mock_adobe_client.get_transfer.return_value = adobe_transfer_factory(
-        status=AdobeStatus.PENDING.value
+        status=AdobeOrderStatus.OPEN.value
     )
 
     check_running_transfers_for_product("product-id")  # act
@@ -813,7 +817,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -847,7 +851,7 @@ def test_checking_running_transfers_with_gc_exists_for_product(
         "error_description": "",
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -916,7 +920,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -941,7 +945,7 @@ def test_checking_running_transfers_with_gc_exists_for_product_with_no_profile_a
         "error_description": "",
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -1009,7 +1013,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -1043,7 +1047,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product(
         "status": STATUS_GC_PENDING,
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -1116,7 +1120,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -1141,7 +1145,7 @@ def test_checking_running_transfers_with_gc_not_exists_for_product_with_no_profi
         "status": STATUS_GC_PENDING,
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -1218,7 +1222,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -1252,7 +1256,7 @@ def test_checking_running_transfers_with_gc_not_exists_and_airtable_error_for_pr
         "status": STATUS_GC_PENDING,
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -1340,7 +1344,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         return_value=(True, '200 - {"id": "whatever"}'),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = {
         "companyProfile": {
@@ -1365,7 +1369,7 @@ def test_checking_running_transfers_with_gc_not_exists_no_address_and_airtable_e
         "status": STATUS_GC_PENDING,
     }
     sub_active = adobe_subscription_factory()
-    sub_inactive = adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+    sub_inactive = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     mock_adobe_client.get_transfer.return_value = adobe_transfer
     mock_adobe_client.get_customer.return_value = customer
     mock_adobe_client.get_subscriptions.return_value = {"items": [sub_active, sub_inactive]}
@@ -1469,7 +1473,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
     error = AdobeAPIError(
         400,
         adobe_api_error_factory(
-            code=AdobeStatus.TRANSFER_INELIGIBLE.value,
+            code=AdobeErrorCode.INELIGIBLE_TRANSFER.value,
             message="Cannot be transferred",
             details=["Reason: RETURNABLE_PURCHASE"],
         ),
@@ -1482,7 +1486,7 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
         mock_transfer.authorization_uk, mock_transfer.membership_id
     )
     mock_transfer.save.assert_called_once()
-    assert mock_transfer.adobe_error_code == AdobeStatus.TRANSFER_INELIGIBLE.value
+    assert mock_transfer.adobe_error_code == AdobeErrorCode.INELIGIBLE_TRANSFER.value
     assert mock_transfer.adobe_error_description == str(error)
     assert mock_transfer.status == "failed"
     assert mock_transfer.reschedule_count == 15
@@ -1494,7 +1498,11 @@ def test_start_transfers_for_product_preview_recoverable_error_max_reschedules_e
         button=Button(label="membership-id", url="https://link.to.transfer"),
         facts=FactsSection(
             title="Last error from Adobe",
-            data={"5117": "5117 - Cannot be transferred: Reason: RETURNABLE_PURCHASE"},
+            data={
+                AdobeErrorCode.INELIGIBLE_TRANSFER.value: (
+                    "5117 - Cannot be transferred: Reason: RETURNABLE_PURCHASE"
+                ),
+            },
         ),
     )
 
@@ -1516,7 +1524,7 @@ def test_checking_running_transfers_for_product_terminate_contract_error(
         return_value=(False, "internal server error"),
     )
     adobe_transfer = adobe_transfer_factory(
-        status=AdobeStatus.PROCESSED.value, customer_id="customer-id"
+        status=AdobeOrderStatus.COMPLETE.value, customer_id="customer-id"
     )
     customer = adobe_customer_factory()
     mock_adobe_client.get_transfer.return_value = adobe_transfer

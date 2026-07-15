@@ -11,7 +11,8 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
-    AdobeStatus,
+    AdobeOrderStatus,
+    AdobeSubscriptionStatus,
 )
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
@@ -581,7 +582,7 @@ def test_submit_return_orders_step(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -590,7 +591,7 @@ def test_submit_return_orders_step(
     )
     sku = adobe_order_1["lineItems"][0]["offerId"][:10]
     mock_adobe_client.create_return_order.return_value = adobe_order_factory(
-        order_type="RETURN", status=AdobeStatus.PENDING.value
+        order_type="RETURN", status=AdobeOrderStatus.OPEN.value
     )
     context = Context(
         order=mock_order,
@@ -637,7 +638,7 @@ def test_submit_return_orders_step_change_order_persists_adobe_order_ids(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -648,7 +649,7 @@ def test_submit_return_orders_step_change_order_persists_adobe_order_ids(
     mock_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
         order_id="return-order-id",
-        status=AdobeStatus.PENDING.value,
+        status=AdobeOrderStatus.OPEN.value,
     )
     order = order_factory(
         order_type="Change", fulfillment_parameters=fulfillment_parameters_factory()
@@ -700,7 +701,7 @@ def test_submit_return_orders_step_with_deployment_id(
             deployment_id=deployment_id,
             deployment_currency_code="USD",
         ),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         deployment_id=deployment_id,
     )
     ret_info_1 = ReturnableOrderInfo(
@@ -710,7 +711,7 @@ def test_submit_return_orders_step_with_deployment_id(
     )
     sku = adobe_order_1["lineItems"][0]["offerId"][:10]
     mock_adobe_client.create_return_order.return_value = adobe_order_factory(
-        order_type="RETURN", status=AdobeStatus.PENDING.value, deployment_id=deployment_id
+        order_type="RETURN", status=AdobeOrderStatus.OPEN.value, deployment_id=deployment_id
     )
     order = order_factory(deployment_id=deployment_id)
     context = Context(
@@ -757,7 +758,7 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         deployment_id=deployment_id,
     )
     ret_info_1 = ReturnableOrderInfo(
@@ -768,7 +769,7 @@ def test_submit_return_orders_step_with_only_main_deployment_id(
     sku = adobe_order_1["lineItems"][0]["offerId"][:10]
     mock_adobe_client.create_return_order.return_value = adobe_order_factory(
         order_type="RETURN",
-        status=AdobeStatus.PENDING.value,
+        status=AdobeOrderStatus.OPEN.value,
     )
     order = order_factory(deployment_id="deployment-id_return")
     context = Context(
@@ -804,7 +805,7 @@ def test_submit_return_orders_step_order_processed(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -814,7 +815,7 @@ def test_submit_return_orders_step_order_processed(
     sku = adobe_order_1["lineItems"][0]["offerId"][:10]
     return_order = adobe_order_factory(
         order_type="RETURN",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         reference_order_id=adobe_order_1["orderId"],
     )
     context = Context(
@@ -856,7 +857,7 @@ def test_submit_return_orders_step_error_creating_return_order(
     adobe_order_1 = adobe_order_factory(
         order_type="NEW",
         items=adobe_items_factory(quantity=1),
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     ret_info_1 = ReturnableOrderInfo(
         adobe_order_1,
@@ -898,7 +899,7 @@ def test_submit_new_order_step(
 ):
     order = order_factory(deployment_id=None)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
-    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.PENDING.value)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeOrderStatus.OPEN.value)
     mock_adobe_client.create_new_order.return_value = new_order
     mocked_update = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     mocked_next_step = mocker.MagicMock()
@@ -943,7 +944,7 @@ def test_submit_new_order_step_change_order_persists_adobe_order_ids(
     new_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
         order_id="new-order-id",
-        status=AdobeStatus.PENDING.value,
+        status=AdobeOrderStatus.OPEN.value,
     )
     mock_adobe_client.create_new_order.return_value = new_order
     mocked_next_step = mocker.MagicMock()
@@ -978,7 +979,9 @@ def test_submit_new_order_step_flex_discount(
 ):
     order = order_factory(deployment_id=None)
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
-    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeStatus.PROCESSED.value)
+    new_order = adobe_order_factory(
+        order_type=ORDER_TYPE_NEW, status=AdobeOrderStatus.COMPLETE.value
+    )
     new_order["lineItems"][0].update({"flexDiscounts": [{"code": "BLACK"}]})
     mock_adobe_client.create_new_order.return_value = new_order
     mocked_next_step = mocker.MagicMock()
@@ -1019,7 +1022,7 @@ def test_submit_new_order_step_with_deployment_id(
     preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW, deployment_id=deployment_id)
     new_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
-        status=AdobeStatus.PENDING.value,
+        status=AdobeOrderStatus.OPEN.value,
         deployment_id=deployment_id,
     )
     mock_adobe_client.create_new_order.return_value = new_order
@@ -1064,7 +1067,7 @@ def test_submit_new_order_step_order_created_and_processed(
 ):
     new_order = adobe_order_factory(
         order_type="NEW",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     order = order_factory(external_ids={"vendor": new_order["orderId"]})
     mock_adobe_client.get_order.return_value = new_order
@@ -1110,7 +1113,7 @@ def test_submit_new_order_step_change_order_skips_ids_update_if_already_present(
     mock_adobe_client.get_order.return_value = adobe_order_factory(
         order_type=ORDER_TYPE_NEW,
         order_id=adobe_order_id,
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
@@ -1138,7 +1141,7 @@ def test_submit_new_order_step_order_created_and_processed_with_deployment_id(
     deployment_id = "deployment-id"
     new_order = adobe_order_factory(
         order_type="NEW",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
     )
     order = order_factory(
         external_ids={"vendor": new_order["orderId"]}, deployment_id=deployment_id
@@ -1298,7 +1301,7 @@ def test_submit_new_order_step_order_created_unexpected_status(
 def test_get_return_orders_step(mocker, mock_adobe_client, mock_order, adobe_order_factory):
     return_order = adobe_order_factory(
         order_type="RETURN",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         reference_order_id="new-order-id",
     )
     mock_adobe_client.get_return_orders_by_external_reference.return_value = {
@@ -1568,7 +1571,7 @@ def test_create_or_update_asset_step_subscription_not_processed(
     adobe_order = adobe_order_factory(
         order_type=ORDER_TYPE_NEW, items=adobe_items_factory(subscription_id="adobe-sub-id")
     )
-    adobe_subscription = adobe_subscription_factory(status=AdobeStatus.PENDING.value)
+    adobe_subscription = adobe_subscription_factory(status=AdobeSubscriptionStatus.PENDING.value)
     mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch(
         "adobe_vipm.flows.fulfillment.shared.get_one_time_skus",
@@ -1775,7 +1778,7 @@ def test_create_or_update_subscriptions_step_sub_expired(
         items=adobe_items_factory(subscription_id="adobe-sub-id"),
     )
     adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.ORDER_CANCELLED.value,
+        status=AdobeSubscriptionStatus.INACTIVE.value,
     )
     mock_adobe_client.get_subscription.return_value = adobe_subscription
     mocker.patch("adobe_vipm.flows.fulfillment.shared.get_one_time_skus", return_value=[])
@@ -3582,7 +3585,7 @@ def test_preview_renewal_orders_preview_created(
     ext_ref = f"{order['id']}_RENEWAL"
     preview_order = adobe_order_factory(
         order_type="PREVIEW_RENEWAL",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         external_id=ext_ref,
     )
     mock_adobe_client.create_renewal_order.return_value = preview_order
@@ -3722,7 +3725,7 @@ def test_preview_renewal_orders_existing_order_skips_preview(
     existing_order = {
         "externalReferenceId": ext_ref,
         "orderId": "EXISTING-ORDER-001",
-        "status": AdobeStatus.PROCESSED.value,
+        "status": AdobeOrderStatus.COMPLETE.value,
         "orderType": "RENEWAL",
         "lineItems": [],
     }
@@ -3777,18 +3780,18 @@ def test_submit_renewal_orders_renewal_completed(
     ext_ref = f"{order['id']}_RENEWAL"
     preview_order = adobe_order_factory(
         order_type="PREVIEW_RENEWAL",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         external_id=ext_ref,
     )
     renewal_order = adobe_order_factory(
         order_type="RENEWAL",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         external_id=ext_ref,
     )
     # Unrelated order that does not match the exact ext_ref
     unrelated_order = adobe_order_factory(
         order_type="RENEWAL",
-        status=AdobeStatus.PROCESSED.value,
+        status=AdobeOrderStatus.COMPLETE.value,
         external_id="OTHER_ORDER_RENEWAL",
     )
     mock_adobe_client.get_orders.return_value = [unrelated_order]
@@ -3844,7 +3847,7 @@ def test_submit_renewal_orders_order_creation_failed(
     )
     order = order_factory(lines=lines_factory(quantity=5))
     preview_order = adobe_order_factory(
-        order_type="PREVIEW_RENEWAL", status=AdobeStatus.PROCESSED.value
+        order_type="PREVIEW_RENEWAL", status=AdobeOrderStatus.COMPLETE.value
     )
     mock_adobe_client.get_orders.return_value = []
     mock_adobe_client.create_renewal_order.return_value = preview_order
@@ -3886,9 +3889,9 @@ def test_submit_renewal_orders_pending(
     mocked_next_step = mocker.MagicMock()
     order = order_factory(lines=lines_factory(quantity=5))
     preview_order = adobe_order_factory(
-        order_type="PREVIEW_RENEWAL", status=AdobeStatus.PROCESSED.value
+        order_type="PREVIEW_RENEWAL", status=AdobeOrderStatus.COMPLETE.value
     )
-    renewal_order = adobe_order_factory(order_type="RENEWAL", status=AdobeStatus.PENDING.value)
+    renewal_order = adobe_order_factory(order_type="RENEWAL", status=AdobeOrderStatus.OPEN.value)
     mock_adobe_client.get_orders.return_value = []
     mock_adobe_client.create_renewal_order.return_value = preview_order
     mock_adobe_client.create_renewal_order.return_value = renewal_order
@@ -3924,7 +3927,7 @@ def test_submit_renewal_orders_unexpected_status(
     order = order_factory(lines=lines_factory(quantity=5))
     ext_ref = f"{order['id']}_RENEWAL"
     preview_order = adobe_order_factory(
-        order_type="PREVIEW_RENEWAL", status=AdobeStatus.PROCESSED.value
+        order_type="PREVIEW_RENEWAL", status=AdobeOrderStatus.COMPLETE.value
     )
     # Create a renewal order manually with an unexpected status (not PROCESSED, not PENDING)
     renewal_order = {
@@ -3976,7 +3979,7 @@ def test_submit_renewal_orders_existing_order_reused(
     existing_order = {
         "externalReferenceId": ext_ref,
         "orderId": "EXISTING-ORDER-001",
-        "status": AdobeStatus.PROCESSED.value,
+        "status": AdobeOrderStatus.COMPLETE.value,
         "orderType": "RENEWAL",
         "lineItems": [],
     }

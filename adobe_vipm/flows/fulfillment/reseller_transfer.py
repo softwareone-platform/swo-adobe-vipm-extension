@@ -3,7 +3,7 @@ import logging
 from mpt_extension_sdk.mpt_http.mpt import update_agreement, update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus, ResellerChangeAction
+from adobe_vipm.adobe.constants import AdobeOrderStatus, ResellerChangeAction
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import get_transfer_by_authorization_membership_or_customer
 from adobe_vipm.flows.constants import ERR_ADOBE_RESSELLER_CHANGE_PREVIEW, TEMPLATE_NAME_TRANSFER
@@ -113,7 +113,7 @@ class CheckAdobeResellerTransfer(Step):
             context.adobe_transfer_order.get("status"),
         )
 
-        if context.adobe_transfer_order.get("status") == AdobeStatus.PENDING:
+        if context.adobe_transfer_order.get("status") == AdobeOrderStatus.OPEN:
             return
 
         next_step(mpt_client, context)

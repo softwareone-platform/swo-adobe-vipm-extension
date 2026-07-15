@@ -8,7 +8,7 @@ processing.
 import logging
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeErrorCode
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
@@ -115,7 +115,7 @@ class SwitchAutoRenewalOff(Step):
                         subscription["id"],
                         adobe_subscription["subscriptionId"],
                     )
-                    if error.code == AdobeStatus.INVALID_RENEWAL_STATE:
+                    if error.code == AdobeErrorCode.INVALID_RENEWAL_STATE:
                         switch_order_to_failed(
                             client,
                             context.order,

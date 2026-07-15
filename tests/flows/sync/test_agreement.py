@@ -5,7 +5,11 @@ import pytest
 from freezegun import freeze_time
 
 from adobe_vipm.adobe import constants
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import (
+    AdobeDeploymentStatus,
+    AdobeErrorCode,
+    AdobeSubscriptionStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
 from adobe_vipm.flows.constants import (
@@ -2330,7 +2334,7 @@ def test_sync_agreement_empty_discounts(
     adobe_subscription = adobe_subscription_factory(
         subscription_id="terminated-sub-id",
         offer_id="77777777CA01A12",
-        status=AdobeStatus.SUBSCRIPTION_TERMINATED,
+        status=AdobeSubscriptionStatus.INACTIVE,
     )
     mocked_agreement_syncer._adobe_subscriptions = [adobe_subscription]
     mock_adobe_client.get_subscriptions.return_value = {"items": [adobe_subscription]}
@@ -2778,7 +2782,7 @@ def test_sync_agreement_lost_customer(
     mock_mpt_get_agreement,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.INVALID_CUSTOMER.value),
+        status_code=int(AdobeErrorCode.INVALID_CUSTOMER.value),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
     agreement = agreement_factory()
@@ -2822,7 +2826,7 @@ def test_sync_agreement_lost_customer_error(
     mock_mpt_get_agreement,
 ):
     mock_adobe_client.get_customer.side_effect = AdobeAPIError(
-        status_code=int(AdobeStatus.INVALID_CUSTOMER.value),
+        status_code=int(AdobeErrorCode.INVALID_CUSTOMER.value),
         payload={"code": "1116", "message": "Invalid Customer", "additionalDetails": []},
     )
     mock_mpt_terminate_subscription.side_effect = MPTAPIError(
@@ -2902,7 +2906,7 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     mocked_agreement_syncer,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
-        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     ]
 
     result = mocked_agreement_syncer._get_subscriptions_for_update(agreement_factory())
@@ -2926,7 +2930,7 @@ def test_get_subscriptions_for_update_terminated(
     mocked_agreement_syncer,
 ):
     adobe_subscriptions = [
-        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     ]
     mock_mpt_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
     mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
@@ -2971,7 +2975,7 @@ def test_get_subscriptions_for_update_terminated_with_expired_template(
     mocked_agreement_syncer,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
-        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     ]
     mock_mpt_get_template_by_name.return_value = {"id": "TPL-1234", "name": "Expired"}
 
@@ -3015,7 +3019,7 @@ def test_get_subscriptions_for_update_terminated_without_template(
     mocked_agreement_syncer,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
-        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     ]
     mock_mpt_get_template_by_name.side_effect = [{"id": "TPL-1234", "name": "Expired"}, None]
 
@@ -3053,7 +3057,7 @@ def test_get_subscriptions_for_update_terminated_with_assigned_template(
     mocked_agreement_syncer,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
-        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_TERMINATED.value)
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     ]
     mock_get_template_data_by_adobe_subscription.side_effect = [
         {"id": "TPL-1234", "name": "Expired"}
@@ -3084,7 +3088,7 @@ def test_get_subscriptions_for_update_with_no_lines(
     mock_send_warning,
 ):
     mocked_agreement_syncer._adobe_subscriptions = [
-        adobe_subscription_factory(status=AdobeStatus.SUBSCRIPTION_ACTIVE.value)
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.ACTIVE.value)
     ]
     mock_get_template_data_by_adobe_subscription.side_effect = [
         {"id": "TPL-1234", "name": "Expired"}
@@ -3123,7 +3127,7 @@ def test_add_missing_subscriptions_none(
         adobe_subscription_factory(
             subscription_id="55feb5038045e0b1ebf026e7522e17NA",
             offer_id="65304578CA01A12",
-            status=AdobeStatus.SUBSCRIPTION_TERMINATED.value,
+            status=AdobeSubscriptionStatus.INACTIVE.value,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -3158,7 +3162,7 @@ def test_add_missing_subscriptions_without_vendor_id(
         adobe_subscription_factory(
             subscription_id="55feb5038045e0b1ebf026e7522e17NA",
             offer_id="65304578CA01A12",
-            status=AdobeStatus.SUBSCRIPTION_TERMINATED.value,
+            status=AdobeSubscriptionStatus.INACTIVE.value,
         ),
         adobe_subscription_factory(
             subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA", offer_id="65304578CA01A12"
@@ -3734,7 +3738,7 @@ def test_process_orphaned_deployment_subscriptions_error(
 
 @pytest.mark.parametrize(
     "subscription_status",
-    [AdobeStatus.SUBSCRIPTION_TERMINATED.value, AdobeStatus.PENDING.value],
+    [AdobeSubscriptionStatus.INACTIVE.value, AdobeSubscriptionStatus.PENDING.value],
 )
 def test_process_orphaned_deployment_subscriptions_skip_on_status(
     subscription_status,
@@ -3816,7 +3820,7 @@ def test_process_orphaned_deployment_subscriptions_skip_autorenewal_false_with_l
             subscription_id="no_autorenewal_subscription_id",
             deployment_id="deployment-id",
             autorenewal_enabled=False,
-            status=AdobeStatus.PROCESSED.value,
+            status=AdobeSubscriptionStatus.ACTIVE.value,
         ),
     ]
     mocked_agreement_syncer._adobe_customer = adobe_customer_factory(global_sales_enabled=True)
@@ -4405,7 +4409,7 @@ def test_get_customer_or_process_lost_customer_error(
     adobe_customer_factory,
 ):
     mock_adobe_client.get_customer.side_effect = [
-        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER.value, "message": "Test error"})
+        AdobeAPIError(400, {"code": AdobeErrorCode.INVALID_CUSTOMER.value, "message": "Test error"})
     ]
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {
@@ -4441,13 +4445,13 @@ def test_get_customer_or_process_lost_customer_deployment_error(
     adobe_customer_factory,
 ):
     mock_adobe_client.get_customer.side_effect = [
-        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER.value, "message": "Test error"})
+        AdobeAPIError(400, {"code": AdobeErrorCode.INVALID_CUSTOMER.value, "message": "Test error"})
     ]
     mock_adobe_client.get_customer_deployments_active_status.side_effect = [
         AdobeAPIError(
             500,
             {
-                "code": AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value,
+                "code": AdobeDeploymentStatus.INACTIVE.value,
                 "message": "Inactive or generic failure",
             },
         )
@@ -4473,7 +4477,7 @@ def test_get_customer_or_process_lost_customer_dry_run(
     adobe_customer_factory,
 ):
     mock_adobe_client.get_customer.side_effect = [
-        AdobeAPIError(400, {"code": AdobeStatus.INVALID_CUSTOMER.value, "message": "Test error"})
+        AdobeAPIError(400, {"code": AdobeErrorCode.INVALID_CUSTOMER.value, "message": "Test error"})
     ]
     mock_adobe_client.get_customer_deployments_active_status.return_value = [
         {

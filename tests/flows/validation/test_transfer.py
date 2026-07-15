@@ -5,7 +5,9 @@ import pytest
 from mpt_extension_sdk.mpt_http.wrap_http_error import MPTAPIError
 
 from adobe_vipm.adobe.constants import (
-    AdobeStatus,
+    AdobeErrorCode,
+    AdobeOrderStatus,
+    AdobeSubscriptionStatus,
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError
@@ -147,13 +149,13 @@ def test_validate_transfer_lines_exist(
 @pytest.mark.parametrize(
     "status_code",
     [
-        AdobeStatus.TRANSFER_INVALID_MEMBERSHIP.value,
-        AdobeStatus.TRANSFER_INVALID_MEMBERSHIP_OR_TRANSFER_IDS.value,
-        AdobeStatus.TRANSFER_INELIGIBLE.value,
-        AdobeStatus.TRANSFER_ALREADY_TRANSFERRED.value,
-        AdobeStatus.TRANSFER_INACTIVE_RESELLER.value,
-        AdobeStatus.TRANSFER_NO_ADMIN_CONTACTS.value,
-        AdobeStatus.TRANSFER_IN_PROGRESS.value,
+        AdobeErrorCode.INVALID_MEMBERSHIP_ID.value,
+        AdobeErrorCode.INVALID_MEMBERSHIP_OR_TRANSFER_ID.value,
+        AdobeErrorCode.INELIGIBLE_TRANSFER.value,
+        AdobeErrorCode.CUSTOMER_ALREADY_TRANSFERRED.value,
+        AdobeErrorCode.RESELLER_INACTIVE_FOR_TRANSFER.value,
+        AdobeErrorCode.NO_ADMIN_CONTACTS_FOR_TRANSFER.value,
+        AdobeErrorCode.TRANSFER_IN_PROGRESS.value,
     ],
 )
 def test_validate_transfer_membership_error(
@@ -421,7 +423,7 @@ def test_validate_transfer_account_inactive(
     adobe_subscription_factory,
 ):
     adobe_subscription = adobe_subscription_factory()
-    adobe_transfer = adobe_transfer_factory(status=AdobeStatus.TRANSFER_INACTIVE_ACCOUNT.value)
+    adobe_transfer = adobe_transfer_factory(status=AdobeOrderStatus.FAILED_INVALID_ADDRESS.value)
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params)
     mocked_transfer = mocker.MagicMock(customer_id="customer-id", status="completed")
@@ -437,7 +439,7 @@ def test_validate_transfer_account_inactive(
     assert has_errors is True
     param = get_ordering_parameter(validated_order, Param.MEMBERSHIP_ID.value)
     assert param["error"] == ERR_ADOBE_MEMBERSHIP_ID_INACTIVE_ACCOUNT.to_dict(
-        status=AdobeStatus.TRANSFER_INACTIVE_ACCOUNT.value,
+        status=AdobeOrderStatus.FAILED_INVALID_ADDRESS.value,
     )
     assert param["constraints"]["hidden"] is False
     assert param["constraints"]["required"] is True
@@ -508,9 +510,7 @@ def test_validate_transfer_already_migrated_all_items_expired(
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
-    adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
-    )
+    adobe_subscription = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
     ) + items_factory(
@@ -576,9 +576,7 @@ def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
-    adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
-    )
+    adobe_subscription = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304578CA"
@@ -659,10 +657,10 @@ def test_validate_transfer_already_migrated_all_items_expired_delete_existing_li
     mocked_transfer = mocker.MagicMock()
     mocked_transfer.customer_id = "customer-id"
     adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304990CA"
     )
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304991CA"
     )
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
@@ -756,10 +754,10 @@ def test_validate_transfer_already_migrated_all_items_expired_update_existing_li
     order = order_factory(order_parameters=order_params, lines=order_lines)
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304990CA"
     )
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304991CA"
     )
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
@@ -873,10 +871,10 @@ def test_validate_transfer_already_migrated_all_items_expired_add_new_line(
     order = order_factory(order_parameters=order_params, lines=order_lines)
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304990CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304990CA"
     )
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304991CA"
     )
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
@@ -976,9 +974,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     order_params = transfer_order_parameters_factory()
     order = order_factory(order_parameters=order_params, lines=[])
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
-    adobe_subscription = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value
-    )
+    adobe_subscription = adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
     adobe_subscription_1 = adobe_subscription_factory(offer_id="65304578CA")
     adobe_one_time_subscription = adobe_subscription_factory(offer_id="99999999CA")
     product_items = items_factory(
@@ -1100,7 +1096,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304991CA"
     )
     product_items = items_factory(
         item_id=1, name="Awesome product 1", external_vendor_id="65304990CA"
@@ -1174,7 +1170,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
     mocked_transfer = mocker.MagicMock(customer_id="customer-id")
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304991CA"
     )
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"
@@ -1245,7 +1241,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_remove_line_er
     adobe_subscription = adobe_subscription_factory(offer_id="65304990CA")
     adobe_subscription_2 = adobe_subscription_factory(offer_id="65304991CA")
     adobe_subscription_3 = adobe_subscription_factory(
-        status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value, offer_id="65304991CA"
+        status=AdobeSubscriptionStatus.INACTIVE.value, offer_id="65304991CA"
     )
     product_items = items_factory(
         item_id=1, name="Awesome Expired product 1", external_vendor_id="65304990CA"

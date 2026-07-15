@@ -3,7 +3,7 @@ import datetime as dt
 import pytest
 from freezegun import freeze_time
 
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeSubscriptionStatus
 from adobe_vipm.flows.utils import (
     get_customer_consumables_discount_level,
     get_customer_licenses_discount_level,
@@ -213,14 +213,14 @@ def test_is_transferring_item_expired(adobe_subscription_factory, adobe_items_fa
     assert (
         is_transferring_item_expired(
             adobe_subscription_factory(
-                status=AdobeStatus.PROCESSED.value, renewal_date=today.isoformat()
+                status=AdobeSubscriptionStatus.ACTIVE.value, renewal_date=today.isoformat()
             )
         )
         is False
     )
     assert (
         is_transferring_item_expired(
-            adobe_subscription_factory(status=AdobeStatus.INACTIVE_OR_GENERIC_FAILURE.value)
+            adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value)
         )
         is True
     )

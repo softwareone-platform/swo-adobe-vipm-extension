@@ -25,7 +25,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeStatus
+from adobe_vipm.adobe.constants import AdobeSubscriptionStatus
 from adobe_vipm.adobe.utils import (
     sanitize_company_name,
     sanitize_first_last_name,
@@ -746,7 +746,7 @@ def process_adobe_subscriptions_from_agreement(
     ]
     for adobe_subscription in adobe_subscriptions:
         adobe_subscription_id = adobe_subscription["subscriptionId"]
-        if adobe_subscription["status"] != AdobeStatus.PROCESSED:
+        if adobe_subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
             logger.warning(
                 "Subscription %s is in status %s, skip it",
                 adobe_subscription_id,
