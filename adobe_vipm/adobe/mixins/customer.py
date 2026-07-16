@@ -2,8 +2,6 @@ import json
 from hashlib import sha256
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe.constants import OfferType
 from adobe_vipm.adobe.dataclasses import Reseller
 from adobe_vipm.adobe.errors import wrap_http_error
@@ -103,7 +101,7 @@ class CustomerClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._session.get(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}",
@@ -163,7 +161,7 @@ class CustomerClientMixin:
             ],
         }
 
-        response = requests.patch(
+        response = self._session.patch(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}"),
             headers=self._get_headers(
                 self._config.get_authorization(authorization_id),
@@ -232,7 +230,7 @@ class CustomerClientMixin:
         reseller_id: str,
     ) -> dict:
         """Create customer via API and return the created customer."""
-        response = requests.post(
+        response = self._session.post(
             urljoin(self._config.api_base_url, "/v3/customers"),
             headers=self._get_headers(
                 authorization,
