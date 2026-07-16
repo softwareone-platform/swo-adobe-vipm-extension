@@ -631,9 +631,18 @@ def build_renewal_line_items(manual_renewal_lines: dict) -> list[dict]:
     return line_items
 
 
+# Adobe stamps MANUAL_RENEWAL on inactive (status 1004) subscriptions, including one-time
+# offers that cannot actually be renewed. A PREVIEW_RENEWAL for such an offer is rejected with
+# one of these codes; both mean "this line can't be renewed" and trigger diversion to a new order.
+RENEWAL_UNSUPPORTED_ERROR_CODES = frozenset((
+    AdobeErrorCode.REQUEST_IS_MISSING_REQUIRED_FIELDS,
+    AdobeErrorCode.RENEWAL_NOT_IN_WINDOW,
+))
+
+
 def is_renewal_unsupported_error(error: AdobeAPIError) -> bool:
     """Return True when Adobe rejected a renewal because an offer can't be renewed."""
-    return error.code == AdobeErrorCode.REQUEST_IS_MISSING_REQUIRED_FIELDS
+    return error.code in RENEWAL_UNSUPPORTED_ERROR_CODES
 
 
 class SetupDueDate(Step):
@@ -1464,7 +1473,19 @@ class CheckManualRenewalSubscriptions(Step):
         else:
             self._compute_from_adobe(context)
             if context.manual_renewal_lines:
-                self._isolate_unsupported_renewals(context)
+                try:
+                    self._isolate_unsupported_renewals(context)
+                except AdobeAPIError as error:
+                    logger.exception("%s: manual renewal preview failed", context)
+                    switch_order_to_failed(
+                        client,
+                        context.order,
+                        ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
+                            subscription_id=f"{context.order_id}_RENEWAL",
+                            error=error.message,
+                        ),
+                    )
+                    return
             if context.manual_renewal_lines or context.diverted_renewal_lines:
                 self._persist_late_renewals_info(client, context)
 
@@ -1634,10 +1655,12 @@ class CheckManualRenewalSubscriptions(Step):
         Validate the renewal preview and divert offers Adobe can't renew to new orders.
 
         Adobe stamps MANUAL_RENEWAL onto some offers that don't actually support
-        auto-renewal, and rejects the whole batched PREVIEW_RENEWAL with code 1122 when one
-        is present, without naming the offender. We probe: one batched preview first, then a
-        per-line preview on failure. Survivors stay as renewals (their preview is stored for
-        SubmitRenewalOrders); offenders are moved to the normal new-order path.
+        auto-renewal, and rejects the whole batched PREVIEW_RENEWAL (see
+        RENEWAL_UNSUPPORTED_ERROR_CODES) when one is present, without naming the offender.
+        We probe: one batched preview first, then a per-line preview on failure. Survivors
+        stay as renewals (their preview is stored for SubmitRenewalOrders); offenders are
+        moved to the normal new-order path. Any other Adobe error propagates to the caller,
+        which fails the order with a clear message.
         """
         adobe_client = get_adobe_client()
         ext_ref = f"{context.order_id}_RENEWAL"
