@@ -11,6 +11,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
+    AdobeErrorCode,
     AdobeOrderStatus,
     AdobeSubscriptionStatus,
 )
@@ -35,6 +36,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
+    RENEWAL_UNSUPPORTED_ERROR_CODES,
     CheckManualRenewalSubscriptions,
     CompleteOrder,
     CreateOrUpdateAssets,
@@ -57,6 +59,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     add_asset,
     build_renewal_line_items,
     check_processing_template,
+    is_renewal_unsupported_error,
     send_gc_mpt_notification,
     set_customer_coterm_date_if_null,
 )
@@ -3286,19 +3289,22 @@ def test_check_manual_renewal_subscriptions_batched_preview_ok(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def _renewal_preview_side_effect(
-    authorization_id, customer_id, ext_ref, line_items, order_type=None
-):
-    """Reject any PREVIEW_RENEWAL containing the unsupported offer 65304579CA01A12."""
-    if any(item["offerId"] == "65304579CA01A12" for item in line_items):
-        raise AdobeAPIError(400, {"code": "1122", "message": "Request is Missing Required Fields"})
-    return {"orderId": "preview-survivors", "lineItems": line_items}
+def _make_renewal_preview_side_effect(error_code):
+    """Build a side effect that rejects any PREVIEW_RENEWAL containing offer 65304579CA01A12."""
+
+    def _side_effect(authorization_id, customer_id, ext_ref, line_items, order_type=None):
+        if any(item["offerId"] == "65304579CA01A12" for item in line_items):
+            raise AdobeAPIError(400, {"code": error_code, "message": "renewal not possible"})
+        return {"orderId": "preview-survivors", "lineItems": line_items}
+
+    return _side_effect
 
 
+@pytest.mark.parametrize("error_code", sorted(RENEWAL_UNSUPPORTED_ERROR_CODES))
 def test_check_manual_renewal_subscriptions_isolates_unsupported_offer(
-    mocker, mock_adobe_client, order_factory, lines_factory, adobe_subscription_factory
+    error_code, mocker, mock_adobe_client, order_factory, lines_factory, adobe_subscription_factory
 ):
-    """On a 1122 batched failure, probe per line: renew the survivor, divert the offender."""
+    """On an unsupported-renewal batched failure, probe per line: renew survivor, divert bad one."""
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
@@ -3316,7 +3322,9 @@ def test_check_manual_renewal_subscriptions_isolates_unsupported_offer(
         "allowedActions": ["MANUAL_RENEWAL"],
     }
     mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [good_sub, bad_sub]}
-    mock_adobe_client.create_renewal_order.side_effect = _renewal_preview_side_effect
+    mock_adobe_client.create_renewal_order.side_effect = _make_renewal_preview_side_effect(
+        error_code
+    )
     context = Context(
         order=order,
         order_id=order["id"],
@@ -3362,7 +3370,9 @@ def test_check_manual_renewal_subscriptions_isolates_unsupported_offer(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
+@pytest.mark.parametrize("error_code", sorted(RENEWAL_UNSUPPORTED_ERROR_CODES))
 def test_check_manual_renewal_subscriptions_all_offers_unsupported(
+    error_code,
     mocker,
     mock_adobe_client,
     order_factory,
@@ -3381,7 +3391,7 @@ def test_check_manual_renewal_subscriptions_all_offers_unsupported(
     }
     mock_adobe_client.get_subscriptions_by_deployment.return_value = {"items": [adobe_subscription]}
     mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
-        400, adobe_api_error_factory("1122", "Request is Missing Required Fields")
+        400, adobe_api_error_factory(error_code, "renewal not possible")
     )
     context = Context(
         order=order,
@@ -3402,7 +3412,7 @@ def test_check_manual_renewal_subscriptions_all_offers_unsupported(
     mocked_next_step.assert_called_once_with(mocked_client, context)
 
 
-def test_check_manual_renewal_subscriptions_non_1122_error_propagates(
+def test_check_manual_renewal_subscriptions_unrecognized_error_fails_order(
     mocker,
     mock_adobe_client,
     order_factory,
@@ -3410,10 +3420,13 @@ def test_check_manual_renewal_subscriptions_non_1122_error_propagates(
     adobe_subscription_factory,
     adobe_api_error_factory,
 ):
-    """A non-1122 Adobe error must not trigger per-line probing; it propagates."""
+    """An unrecognized Adobe error fails the order instead of crashing the pipeline."""
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
     order = order_factory(lines=lines_factory(quantity=5))
     adobe_subscription = {
         **adobe_subscription_factory(current_quantity=10, subscription_id="a-sub-id"),
@@ -3432,16 +3445,22 @@ def test_check_manual_renewal_subscriptions_non_1122_error_propagates(
         new_lines=[],
     )
 
-    with pytest.raises(AdobeAPIError):
-        CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+    CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
 
     # Only the batched preview was attempted (no per-line probing).
     assert mock_adobe_client.create_renewal_order.call_count == 1
     assert context.diverted_renewal_lines == {}
+    mocked_switch_to_failed.assert_called_once_with(
+        mocked_client,
+        context.order,
+        ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
+            subscription_id=f"{order['id']}_RENEWAL", error="internal error"
+        ),
+    )
     mocked_next_step.assert_not_called()
 
 
-def test_check_manual_renewal_subscriptions_per_line_non_1122_propagates(
+def test_check_manual_renewal_subscriptions_per_line_unrecognized_error_fails_order(
     mocker,
     mock_adobe_client,
     order_factory,
@@ -3449,10 +3468,13 @@ def test_check_manual_renewal_subscriptions_per_line_non_1122_propagates(
     adobe_subscription_factory,
     adobe_api_error_factory,
 ):
-    """A non-1122 error raised during per-line probing propagates instead of diverting."""
+    """An unrecognized error during per-line probing fails the order instead of diverting."""
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
     mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
     order = order_factory(lines=lines_factory(quantity=5))
     adobe_subscription = {
         **adobe_subscription_factory(current_quantity=10, subscription_id="a-sub-id"),
@@ -3472,12 +3494,36 @@ def test_check_manual_renewal_subscriptions_per_line_non_1122_propagates(
         new_lines=[],
     )
 
-    with pytest.raises(AdobeAPIError):
-        CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
+    CheckManualRenewalSubscriptions()(mocked_client, context, mocked_next_step)  # act
 
     assert context.diverted_renewal_lines == {}
     assert mock_adobe_client.create_renewal_order.call_count == 2
+    mocked_switch_to_failed.assert_called_once_with(
+        mocked_client,
+        context.order,
+        ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
+            subscription_id=f"{order['id']}_RENEWAL", error="internal error"
+        ),
+    )
     mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        (AdobeErrorCode.REQUEST_IS_MISSING_REQUIRED_FIELDS, True),
+        (AdobeErrorCode.RENEWAL_NOT_IN_WINDOW, True),
+        (AdobeErrorCode.INVALID_RENEWAL_STATE, False),
+        ("9999", False),
+    ],
+)
+def test_is_renewal_unsupported_error(code, expected, adobe_api_error_factory):
+    """Only 1122 and 3122 mark a renewal preview as unsupported; other codes do not."""
+    error = AdobeAPIError(400, adobe_api_error_factory(code, "message"))  # arrange
+
+    result = is_renewal_unsupported_error(error)  # act
+
+    assert result is expected
 
 
 def test_check_manual_renewal_subscriptions_divert_zero_quantity(
