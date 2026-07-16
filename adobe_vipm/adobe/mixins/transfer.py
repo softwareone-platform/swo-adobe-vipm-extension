@@ -1,7 +1,5 @@
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe.constants import ResellerChangeAction
 from adobe_vipm.adobe.dataclasses import Reseller
 from adobe_vipm.adobe.errors import wrap_http_error
@@ -30,7 +28,7 @@ class TransferClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._session.get(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/memberships/{membership_id}/offers",
@@ -67,7 +65,7 @@ class TransferClientMixin:
         authorization = self._config.get_authorization(authorization_id)
         reseller: Reseller = self._config.get_reseller(authorization, seller_id)
         headers = self._get_headers(authorization, correlation_id=order_id)
-        response = requests.post(
+        response = self._session.post(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/memberships/{membership_id}/transfers",
@@ -102,7 +100,7 @@ class TransferClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._session.get(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/memberships/{membership_id}/transfers/{transfer_id}",
@@ -122,7 +120,7 @@ class TransferClientMixin:
         """Retrieve a transfer object by the membership and transfer identifiers."""
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._session.get(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/transfers/{transfer_id}",
@@ -158,7 +156,7 @@ class TransferClientMixin:
         authorization = self._config.get_authorization(authorization_id)
         reseller: Reseller = self._config.get_reseller(authorization, seller_id)
         headers = self._get_headers(authorization)
-        response = requests.post(
+        response = self._session.post(
             urljoin(
                 self._config.api_base_url,
                 "/v3/transfers",

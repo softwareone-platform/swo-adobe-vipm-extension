@@ -1,7 +1,5 @@
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe.constants import AdobeSubscriptionStatus
 from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.flows.constants import Param
@@ -28,7 +26,7 @@ class SubscriptionClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._session.get(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}/subscriptions/{subscription_id}",
@@ -52,7 +50,7 @@ class SubscriptionClientMixin:
             The retrieved subscriptions.
         """
         authorization = self._config.get_authorization(authorization_id)
-        response = requests.get(
+        response = self._session.get(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/subscriptions"),
             headers=self._get_headers(authorization),
             timeout=self._TIMEOUT,
@@ -161,7 +159,7 @@ class SubscriptionClientMixin:
         if quantity:
             payload["autoRenewal"][Param.RENEWAL_QUANTITY.value] = quantity
 
-        response = requests.patch(
+        response = self._session.patch(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}/subscriptions/{subscription_id}",
