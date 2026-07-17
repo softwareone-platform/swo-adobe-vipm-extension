@@ -301,6 +301,7 @@ def order_parameters_factory():
         p3yc_licenses="",
         p3yc_consumables="",
         adobe_order_ids="",
+        switch_payload=None,
     ):
         if address is None:
             address = {
@@ -321,7 +322,7 @@ def order_parameters_factory():
                     "number": "4082954078",
                 },
             }
-        return [
+        parameters = [
             {
                 "id": "PAR-0000-0001",
                 "name": "Company Name",
@@ -430,8 +431,45 @@ def order_parameters_factory():
                 },
             },
         ]
+        if switch_payload is not None:
+            parameters.append({
+                "id": "PAR-0000-0011",
+                "name": "Mid-term upgrade switch payload",
+                "externalId": Param.SWITCH_PAYLOAD.value,
+                "type": "DataObject",
+                "value": switch_payload,
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+            })
+        return parameters
 
     return _order_parameters
+
+
+@pytest.fixture
+def switch_payload():
+    return {
+        "recommendationTrackerId": "8fe13fb6-72a1-451b-901b-d92da956282d",
+        "orderType": "SWITCH",
+        "currencyCode": "USD",
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65322651CA01A12",
+                "quantity": 25,
+            },
+        ],
+        "cancellingItems": [
+            {
+                "extLineItemNumber": 1,
+                "referenceLineItemNumber": 1,
+                "subscriptionId": "2409029d1344028fe34b1a8cc09e8fNA",
+                "quantity": 25,
+            },
+        ],
+    }
 
 
 @pytest.fixture
@@ -1451,6 +1489,7 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.fulfillment.change",
         "adobe_vipm.flows.fulfillment.purchase",
         "adobe_vipm.flows.fulfillment.shared",
+        "adobe_vipm.flows.fulfillment.switch",
         "adobe_vipm.flows.fulfillment.configuration",
         "adobe_vipm.flows.fulfillment.termination",
         "adobe_vipm.flows.fulfillment.transfer",
