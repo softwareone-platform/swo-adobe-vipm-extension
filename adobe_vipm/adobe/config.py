@@ -242,7 +242,7 @@ _CONFIG = None
 
 def get_config() -> Config:
     """Returns global Adobe configuration."""
-    global _CONFIG  # noqa: PLW0603 WPS420
+    global _CONFIG  # ruff:ignore[global-statement]  # noqa: WPS420
     if not _CONFIG:
         _CONFIG = Config()
     return _CONFIG

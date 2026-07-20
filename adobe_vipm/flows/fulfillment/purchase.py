@@ -167,7 +167,7 @@ class CreateCustomer(Step):
             externalIds={"vendor": context.adobe_customer_id},
         )
 
-    def handle_error(self, client, context, error):  # noqa: C901
+    def handle_error(self, client, context, error):  # ruff:ignore[complex-structure]
         """
         Process error from Adobe API.
 

@@ -12,7 +12,7 @@ def test_authorization():  # noqa: AAA02
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",  # noqa: S106
+        client_secret="client_secret",  # ruff:ignore[hardcoded-password-func-arg]
         currency="EUR",
         distributor_id="distributor_id",
     )
@@ -30,7 +30,7 @@ def test_authorization_repr():
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",  # noqa: S106
+        client_secret="client_secret",  # ruff:ignore[hardcoded-password-func-arg]
         currency="EUR",
         distributor_id="distributor_id",
     )
@@ -51,7 +51,7 @@ def test_reseller():  # noqa: AAA02
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",  # noqa: S106
+        client_secret="client_secret",  # ruff:ignore[hardcoded-password-func-arg]
         currency="EUR",
         distributor_id="distributor_id",
     )

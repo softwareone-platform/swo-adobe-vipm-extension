@@ -100,7 +100,7 @@ class AgreementSyncer:  # noqa: WPS214
         """Agreement product id."""
         return self._agreement["product"]["id"]
 
-    def sync(self, *, sync_prices: bool) -> None:  # noqa: C901
+    def sync(self, *, sync_prices: bool) -> None:  # ruff:ignore[complex-structure]
         """
         Sync agreement with parameters, prices from Adobe API, airtable to MPT agreement.
 
@@ -683,7 +683,7 @@ class AgreementSyncer:  # noqa: WPS214
         return agreement_lines
 
     # REFACTOR: get method must not update subscriptions in mpt or terminate a subscription
-    def _get_subscriptions_for_update(self, agreement: dict) -> list[tuple[dict, dict, str]]:  # noqa: C901
+    def _get_subscriptions_for_update(self, agreement: dict) -> list[tuple[dict, dict, str]]:  # ruff:ignore[complex-structure]
         logger.info("Getting subscriptions for update for agreement %s", agreement["id"])
         for_update = []
         for subscription in agreement["subscriptions"]:
@@ -770,7 +770,7 @@ class AgreementSyncer:  # noqa: WPS214
                 self._mpt_client, subscription["id"], template=template_data
             )
 
-    def _check_update_airtable_missing_deployments(self, adobe_deployments: list[dict]) -> None:  # noqa: C901
+    def _check_update_airtable_missing_deployments(self, adobe_deployments: list[dict]) -> None:  # ruff:ignore[complex-structure]
         logger.info("Checking airtable for missing deployments for agreement %s", self.agreement_id)
         customer_deployment_ids = {cd["deploymentId"] for cd in adobe_deployments}
         airtable_deployment_ids = {
@@ -1340,7 +1340,7 @@ def get_customer_or_process_lost_customer(
         raise
 
 
-def _process_lost_customer(  # noqa: C901
+def _process_lost_customer(  # ruff:ignore[complex-structure]
     mpt_client: MPTClient,
     adobe_client: AdobeClient,
     agreement: dict,

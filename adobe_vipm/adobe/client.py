@@ -140,7 +140,7 @@ def get_adobe_client() -> AdobeClient:
     Returns:
         AdobeClient: An instance of the `AdobeClient`.
     """
-    global _ADOBE_CLIENT  # noqa: PLW0603 WPS420
+    global _ADOBE_CLIENT  # ruff:ignore[global-statement]  # noqa: WPS420
     if not _ADOBE_CLIENT:
         _ADOBE_CLIENT = AdobeClient()
     return _ADOBE_CLIENT

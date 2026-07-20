@@ -159,7 +159,7 @@ class Command(AdobeBaseCommand):
         with authorizations_file.open("w", encoding="utf-8") as auth_file:
             json.dump(authorizations_data, auth_file, indent=4)
 
-    def handle(self, *args, **options):  # noqa: C901
+    def handle(self, *args, **options):  # ruff:ignore[complex-structure]
         """Run command."""
         adobe_config = get_config()
         adobe_client = get_adobe_client()

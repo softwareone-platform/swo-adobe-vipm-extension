@@ -119,7 +119,7 @@ class CustomerClientMixin:
         authorization_id: str,
         customer_id: str,
         commitment_request: dict,
-        is_recommitment: bool = False,  # noqa: FBT001, FBT002
+        is_recommitment: bool = False,  # ruff:ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument]
     ) -> dict:
         """
         Create 3YC request for account.

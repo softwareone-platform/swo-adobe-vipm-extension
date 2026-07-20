@@ -157,7 +157,7 @@ class ValidateCustomerData(Step):
                 ERR_COMPANY_NAME_CHARS.to_dict(title=param["name"]),
             )
 
-    def validate_address(self, context):  # noqa: C901
+    def validate_address(self, context):  # ruff:ignore[complex-structure]
         """
         Validates address parameter in MPT order.
 
@@ -237,7 +237,7 @@ class ValidateCustomerData(Step):
             address,
         )
 
-    def validate_contact(self, context):  # noqa: C901
+    def validate_contact(self, context):  # ruff:ignore[complex-structure]
         """
         Validates contact parameter in MPT order.
 

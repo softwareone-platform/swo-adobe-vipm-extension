@@ -43,7 +43,7 @@ class ValidateDownsizes(Step):
                 returnable_by_quantity[sum(line_item.quantity for line_item in sub)] = sub
         return returnable_by_quantity
 
-    def __call__(self, client, context, next_step):  # noqa: C901
+    def __call__(self, client, context, next_step):  # ruff:ignore[complex-structure]
         """Validates downsize items in order. Checks if it is possible to return them."""
         if is_within_coterm_window(context.adobe_customer):
             logger.info(

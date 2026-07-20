@@ -105,11 +105,11 @@ MAXLEN_NAME = 35
 MINQTY_LICENSES = 10
 MINQTY_CONSUMABLES = 1000
 
-REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")  # noqa: RUF001
+REGEX_COMPANY_NAME = re.compile(r"^[\w ,.＆&・\'()（）\\\"/-]*$")  # ruff:ignore[ambiguous-unicode-character-string]
 REGEX_EMAIL = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
-REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")  # noqa: RUF001
-REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")  # noqa: RUF001
-REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")  # noqa: RUF001
+REGEX_FIRST_LAST_NAME = re.compile(r"^[\w ,.＆&'\\\"]*$")  # ruff:ignore[ambiguous-unicode-character-string]
+REGEX_SANITIZE_COMPANY_NAME = re.compile(r"[^\w ,.＆&・\'()（）\\\"/-]")  # ruff:ignore[ambiguous-unicode-character-string]
+REGEX_SANITIZE_FIRST_LAST_NAME = re.compile(r"[^\p{L} 0-9,.＆&' \-\\\"]")  # ruff:ignore[ambiguous-unicode-character-string]
 
 
 class ThreeYearCommitmentStatus(StrEnum):

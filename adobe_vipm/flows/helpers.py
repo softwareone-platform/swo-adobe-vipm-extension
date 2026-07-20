@@ -508,7 +508,7 @@ class Validate3YCCommitment(Step):
                     return False, f"Item {vendor_id} not found in Adobe subscriptions"
         return True, None
 
-    def validate_minimum_quantity(  # noqa: C901
+    def validate_minimum_quantity(  # ruff:ignore[complex-structure]
         self,
         context,
         commitment,
