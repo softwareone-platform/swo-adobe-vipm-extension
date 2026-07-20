@@ -31,7 +31,7 @@ dev = [
   "freezegun==1.5.*",
   "ipdb==0.13.*",
   "ipython==9.*",
-  "mypy==2.2.*",
+  "mypy==2.3.*",
   "pre-commit==4.6.*",
   "pytest==9.1.*",
   "pytest-cov==7.1.*",
@@ -238,6 +238,8 @@ ignore = [
   "PLR6301", # do not require classmethod / staticmethod when self not used
   "PLW0717", # allow existing broad try blocks
   "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
+  "RUF105", # preview: keep `# noqa` comments instead of `# ruff:ignore`
+  "RUF201", # preview: allow rule codes (not names) in lint selectors
   "TRY003", # long exception messages from `tryceratops`
 ]
 external = ["AAA", "WPS"]
