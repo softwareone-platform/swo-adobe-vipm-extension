@@ -269,7 +269,10 @@ class Validate3YCCommitment(Step):
         return commitment_status == ThreeYearCommitmentStatus.REQUESTED and not self.is_validation
 
     def _validate_commitment_requirements(self, client, context, commitment):
-        if not commitment or commitment["status"] == ThreeYearCommitmentStatus.REQUESTED:
+        if not commitment or commitment["status"] in {
+            ThreeYearCommitmentStatus.REQUESTED,
+            ThreeYearCommitmentStatus.ACCEPTED,
+        }:
             return True
 
         if self._validate_3yc_commitment_date_before_coterm_date(context, commitment):
