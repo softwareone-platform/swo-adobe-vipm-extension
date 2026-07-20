@@ -1,9 +1,16 @@
+import json
+from hashlib import sha256
 from urllib.parse import urljoin
 
 import pytest
 from responses import matchers
 
-from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW, AdobeErrorCode
+from adobe_vipm.adobe.constants import (
+    ORDER_TYPE_PREVIEW,
+    ORDER_TYPE_PREVIEW_SWITCH,
+    ORDER_TYPE_SWITCH,
+    AdobeErrorCode,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
@@ -517,3 +524,119 @@ def test_get_flex_discounts_per_base_offer_collects_all_pages(
         "65304769CA01A12": "EASTER_26",
         "65304770CA01A12": "ADOBE_ALL_PROMOTION",
     }
+
+
+def test_create_switch_preview_order(
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+    requests_mocker,
+    settings,
+    switch_payload,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    mocked_client, _, _ = adobe_client_factory()
+    adobe_preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW_SWITCH)
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/a-customer/orders",
+        ),
+        status=200,
+        json=adobe_preview_order,
+        match=[
+            matchers.json_params_matcher({
+                **switch_payload,
+                "externalReferenceId": "mpt-order-id",
+                "orderType": ORDER_TYPE_PREVIEW_SWITCH,
+            }),
+            matchers.query_param_matcher({"fetch-price": "true"}),
+        ],
+    )
+
+    result = mocked_client.create_switch_preview_order(
+        authorization_uk,
+        "a-customer",
+        "mpt-order-id",
+        switch_payload,
+    )  # act
+
+    assert result == adobe_preview_order
+
+
+def test_create_switch_order(
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+    requests_mocker,
+    settings,
+    switch_payload,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    mocked_client, _, _ = adobe_client_factory()
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_SWITCH, order_id="an-order-id")
+    expected_payload = {
+        **switch_payload,
+        "externalReferenceId": "mpt-order-id",
+        "orderType": ORDER_TYPE_SWITCH,
+    }
+    correlation_id = sha256(json.dumps(expected_payload).encode()).hexdigest()
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/a-customer/orders",
+        ),
+        status=202,
+        json=adobe_order,
+        match=[
+            matchers.header_matcher({"x-correlation-id": correlation_id}),
+            matchers.json_params_matcher(expected_payload),
+        ],
+    )
+
+    result = mocked_client.create_switch_order(
+        authorization_uk,
+        "a-customer",
+        "mpt-order-id",
+        switch_payload,
+    )  # act
+
+    assert result == adobe_order
+
+
+def test_create_switch_order_without_currency_code(
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+    requests_mocker,
+    settings,
+    switch_payload,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    mocked_client, authorization, _ = adobe_client_factory()
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_SWITCH, order_id="an-order-id")
+    del switch_payload["currencyCode"]
+    expected_payload = {
+        **switch_payload,
+        "externalReferenceId": "mpt-order-id",
+        "orderType": ORDER_TYPE_SWITCH,
+        "currencyCode": authorization.currency,
+    }
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/a-customer/orders",
+        ),
+        status=202,
+        json=adobe_order,
+        match=[matchers.json_params_matcher(expected_payload)],
+    )
+
+    result = mocked_client.create_switch_order(
+        authorization_uk,
+        "a-customer",
+        "mpt-order-id",
+        switch_payload,
+    )  # act
+
+    assert result == adobe_order

@@ -10,7 +10,11 @@ from adobe_vipm.flows.utils.market_segment import (
     get_market_segment,
     is_large_government_agency_type,
 )
-from adobe_vipm.flows.utils.parameter import get_ordering_parameter, is_ordering_param_required
+from adobe_vipm.flows.utils.parameter import (
+    get_ordering_parameter,
+    get_switch_payload,
+    is_ordering_param_required,
+)
 from adobe_vipm.flows.utils.subscription import is_line_item_active_subscription
 
 
@@ -115,6 +119,19 @@ def is_reseller_change(order: dict) -> bool:
     return agreement_type == AgreementType.TRANSFER.value and is_ordering_param_required(
         order, Param.CHANGE_RESELLER_CODE
     )
+
+
+def is_switch_order(order: dict) -> bool:
+    """
+    Checks if order is a change order for a mid-term upgrade (SWITCH).
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        if the switch payload ordering parameter is set.
+    """
+    return bool(get_switch_payload(order))
 
 
 def validate_government_lga_data(order: dict, adobe_data: dict):
