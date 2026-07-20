@@ -1,5 +1,6 @@
 import copy
 import functools
+import json
 from typing import Any
 
 from django.conf import settings
@@ -276,6 +277,24 @@ def get_change_reseller_admin_email(source):
         Param.ADOBE_CUSTOMER_ADMIN_EMAIL,
     )
     return param.get("value")
+
+
+def get_switch_payload(source: dict) -> dict | None:
+    """
+    Get the mid-term upgrade (SWITCH) payload from the corresponding ordering parameter.
+
+    Args:
+        source: The business object from which the switch payload should be retrieved.
+
+    Returns:
+        The switch payload or None if it isn't set.
+    """
+    payload = get_ordering_parameter(source, Param.SWITCH_PAYLOAD.value).get("value")
+    if not payload:
+        return None
+    if isinstance(payload, str):
+        return json.loads(payload)
+    return payload
 
 
 def set_parameter_visible(order: dict, param_external_id: str) -> dict:
