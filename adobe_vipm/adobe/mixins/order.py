@@ -323,7 +323,7 @@ class OrderClientMixin:
             adobe_constants.ORDER_TYPE_PREVIEW_SWITCH,
         )
         headers = self._get_headers(authorization)
-        response = requests.post(
+        response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             params={"fetch-price": "true"},
             headers=headers,
@@ -366,7 +366,7 @@ class OrderClientMixin:
         )
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
         headers = self._get_headers(authorization, correlation_id=correlation_id)
-        response = requests.post(
+        response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
