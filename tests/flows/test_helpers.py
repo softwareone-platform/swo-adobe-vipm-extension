@@ -977,6 +977,58 @@ def test_validate_3yc_commitment_requested_status(
     mocked_next_step.assert_not_called()
 
 
+def test_validate_3yc_commitment_accepted_status(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    mocked_switch_to_query = mocker.patch(
+        "adobe_vipm.flows.helpers.switch_order_to_query",
+    )
+    mocked_switch_order_to_failed = mocker.patch("adobe_vipm.flows.helpers.switch_order_to_failed")
+    commitment = adobe_commitment_factory(
+        status=ThreeYearCommitmentStatus.ACCEPTED.value,
+        start_date="2024-01-01",
+        end_date="2027-01-01",
+    )
+    adobe_customer = adobe_customer_factory(commitment=commitment, commitment_request=commitment)
+    lines = [
+        {
+            "id": "line-1",
+            "item": {
+                "externalIds": {"vendor": "65304578CA"},
+            },
+            "quantity": 15,
+            "oldQuantity": 15,
+        }
+    ]
+    order = order_factory(lines=lines)
+    context = Context(
+        order=order,
+        adobe_customer=adobe_customer,
+        adobe_customer_id="test-customer-id",
+        authorization_id="test-auth-id",
+        upsize_lines=lines,
+    )
+    mocked_next_step = mocker.MagicMock()
+    mocked_client = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    step = Validate3YCCommitment()
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+    mocked_switch_to_query.assert_not_called()
+    mocked_switch_order_to_failed.assert_not_called()
+    mock_adobe_client.get_subscriptions.assert_not_called()
+
+
 def test_validate_3yc_commitment_expired_status(
     mocker,
     mock_adobe_client,
