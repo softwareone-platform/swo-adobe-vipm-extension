@@ -21,7 +21,7 @@ from adobe_vipm.adobe.constants import (
     ResellerChangeAction,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
-from adobe_vipm.adobe.errors import AdobeError, AdobeProductNotFoundError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
 from adobe_vipm.flows.constants import GOVERNMENT_AGENCY_TYPE_FEDERAL, Param
 from adobe_vipm.flows.context import Context
@@ -3423,3 +3423,79 @@ def test_get_flex_discounts_follows_pagination_links(
     )
 
     assert result == full["flexDiscounts"]
+
+
+def test_build_session_retry_policy_scoped_to_transient_get_requests():
+    session = adobe_client._build_retrying_session()
+
+    result = session.get_adapter("https://partners.adobe.io").max_retries
+
+    assert result.total == 3
+    assert result.backoff_factor == 1
+    assert result.raise_on_status is False
+    # 429 and 500 are the only transient statuses Adobe raises; 4xx client
+    # errors must never be retried.
+    assert set(result.status_forcelist) == {429, 500}
+    # Retries are scoped to idempotent GET; POST/PATCH are never retried.
+    assert result.allowed_methods == frozenset(("GET",))
+    # Retries are status-only: connection/read/other transport errors are not retried.
+    assert result.connect == 0
+    assert result.read == 0
+    assert result.other == 0
+
+
+def test_client_wires_retrying_session(settings, mock_adobe_config, adobe_config_file):
+    client = adobe_client.AdobeClient()
+
+    result = client._session.get_adapter("https://partners.adobe.io").max_retries
+
+    assert isinstance(client._session, requests.Session)
+    assert set(result.status_forcelist) == {429, 500}
+    assert result.allowed_methods == frozenset(("GET",))
+
+
+def test_get_request_retries_transient_500_then_succeeds(
+    requests_mocker, settings, adobe_client_factory
+):
+    client, authorization, _ = adobe_client_factory()
+    customer_id = "adobe-customer-id"
+    url = urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], f"/v3/customers/{customer_id}")
+    requests_mocker.get(url, status=500, json={"code": "1124", "message": "boom"})
+    requests_mocker.get(url, status=200, json={"customerId": customer_id})
+
+    result = client.get_customer(authorization.authorization_uk, customer_id)
+
+    assert result == {"customerId": customer_id}
+    assert len(requests_mocker.calls) == 2
+
+
+def test_get_request_raises_adobe_api_error_when_retries_exhausted(
+    requests_mocker, settings, adobe_client_factory, adobe_api_error_factory
+):
+    client, authorization, _ = adobe_client_factory()
+    customer_id = "adobe-customer-id"
+    url = urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], f"/v3/customers/{customer_id}")
+    adobe_api_error = adobe_api_error_factory(code="1124", message="Internal Server Error")
+    requests_mocker.get(url, status=500, json=adobe_api_error)
+
+    with pytest.raises(AdobeAPIError) as exc_info:
+        client.get_customer(authorization.authorization_uk, customer_id)
+
+    assert exc_info.value.code == "1124"
+    # One initial attempt plus the configured number of retries.
+    assert len(requests_mocker.calls) == adobe_client.ADOBE_RETRY_TOTAL + 1
+
+
+def test_get_request_does_not_retry_client_errors(
+    requests_mocker, settings, adobe_client_factory, adobe_api_error_factory
+):
+    client, authorization, _ = adobe_client_factory()
+    customer_id = "adobe-customer-id"
+    url = urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], f"/v3/customers/{customer_id}")
+    adobe_api_error = adobe_api_error_factory(code="1116", message="Invalid Customer")
+    requests_mocker.get(url, status=404, json=adobe_api_error)
+
+    with pytest.raises(AdobeAPIError):
+        client.get_customer(authorization.authorization_uk, customer_id)
+
+    assert len(requests_mocker.calls) == 1

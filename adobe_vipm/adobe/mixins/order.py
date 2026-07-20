@@ -8,8 +8,6 @@ from operator import itemgetter
 from typing import Any
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe import constants as adobe_constants
 from adobe_vipm.adobe.constants import AdobeErrorCode
 from adobe_vipm.adobe.dataclasses import Authorization, ReturnableOrderInfo
@@ -73,7 +71,7 @@ class OrderClientMixin:
         orders_base_url = f"/v3/customers/{customer_id}/orders"
         next_url = f"{orders_base_url}?limit=100&offset=0"
         while next_url:
-            response = requests.get(
+            response = self._session.get(
                 urljoin(self._config.api_base_url, next_url),
                 headers=headers,
                 params=filters,
@@ -105,7 +103,7 @@ class OrderClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization)
-        response = requests.get(
+        response = self._session.get(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{customer_id}/orders/{order_id}",
@@ -154,7 +152,7 @@ class OrderClientMixin:
             authorization,
             correlation_id=correlation_id,
         )
-        response = requests.post(
+        response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
@@ -240,7 +238,7 @@ class OrderClientMixin:
         authorization = self._config.get_authorization(authorization_id)
         payload = {"orderType": adobe_constants.ORDER_TYPE_PREVIEW_RENEWAL}
         headers = self._get_headers(authorization)
-        response = requests.post(
+        response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
@@ -284,7 +282,7 @@ class OrderClientMixin:
 
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
         headers = self._get_headers(authorization, correlation_id=correlation_id)
-        response = requests.post(
+        response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
@@ -816,7 +814,7 @@ class OrderClientMixin:
         """
         authorization = self._config.get_authorization(authorization_id)
         headers = self._get_headers(authorization, correlation_id=correlation_id)
-        response = requests.post(
+        response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
             json=payload,
@@ -830,7 +828,7 @@ class OrderClientMixin:
         self, authorization: Authorization, adobe_customer_id: str, payload: dict
     ) -> dict:
         headers = self._get_headers(authorization)
-        response = requests.post(
+        response = self._session.post(
             urljoin(
                 self._config.api_base_url,
                 f"/v3/customers/{adobe_customer_id}/orders",
@@ -874,7 +872,7 @@ class OrderClientMixin:
         next_url = "v3/flex-discounts"
         flex_discounts = []
         while next_url:
-            response = requests.get(
+            response = self._session.get(
                 urljoin(self._config.api_base_url, next_url),
                 headers=headers,
                 params=query_params,
