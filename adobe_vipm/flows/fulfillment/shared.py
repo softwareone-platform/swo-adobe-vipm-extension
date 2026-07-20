@@ -1499,9 +1499,14 @@ class CheckManualRenewalSubscriptions(Step):
         if not value:
             return None
 
+        # The parameter is stored as a native JSON value, so it is read back as a dict.
+        # Legacy in-flight orders may still hold a serialized string; decode those too.
+        if isinstance(value, dict):
+            return value
+
         try:
             payload = json.loads(value)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, TypeError):
             logger.warning(
                 "%s: invalid %s payload, recomputing from Adobe",
                 context,
@@ -1519,7 +1524,7 @@ class CheckManualRenewalSubscriptions(Step):
         context.order = update_ordering_parameter_value(
             context.order,
             Param.LATE_RENEWALS_INFO.value,
-            json.dumps(payload),
+            payload,
         )
         update_order(client, context.order_id, parameters=context.order["parameters"])
         logger.info(

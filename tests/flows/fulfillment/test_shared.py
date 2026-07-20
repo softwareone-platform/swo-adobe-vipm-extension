@@ -2875,13 +2875,9 @@ def test_check_manual_renewal_subscriptions_upsize_line_full_renewal(
     mocked_update_order.assert_called_once_with(
         mocked_client, order["id"], parameters=context.order["parameters"]
     )
-    stored = json.loads(
-        next(
-            p
-            for p in context.order["parameters"]["ordering"]
-            if p["externalId"] == "lateRenewalsInfo"
-        )["value"]
-    )
+    stored = next(
+        p for p in context.order["parameters"]["ordering"] if p["externalId"] == "lateRenewalsInfo"
+    )["value"]
     assert stored == {
         "renewals": {
             "65304578CA": {
@@ -3357,13 +3353,9 @@ def test_check_manual_renewal_subscriptions_isolates_unsupported_offer(
         ],
     }
     # Persisted split records both renewals and diverted.
-    stored = json.loads(
-        next(
-            p
-            for p in context.order["parameters"]["ordering"]
-            if p["externalId"] == "lateRenewalsInfo"
-        )["value"]
-    )
+    stored = next(
+        p for p in context.order["parameters"]["ordering"] if p["externalId"] == "lateRenewalsInfo"
+    )["value"]
     assert set(stored["renewals"]) == {"65304578CA"}
     assert set(stored["diverted"]) == {"65304579CA"}
     mocked_update_order.assert_called_once()
@@ -3571,6 +3563,7 @@ def test_check_manual_renewal_subscriptions_restore_with_diverted(
     mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
     order = order_factory(lines=lines_factory(quantity=5))
     line = order["lines"][0]
+    # The parameter is stored as a native JSON value, so it is read back as a dict.
     stored_data = {
         "renewals": {},
         "diverted": {
@@ -3581,7 +3574,7 @@ def test_check_manual_renewal_subscriptions_restore_with_diverted(
     }
     for p in order["parameters"]["ordering"]:
         if p["externalId"] == "lateRenewalsInfo":
-            p["value"] = json.dumps(stored_data)
+            p["value"] = stored_data
     context = Context(
         order=order,
         order_id=order["id"],
