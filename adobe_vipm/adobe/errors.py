@@ -81,7 +81,7 @@ class AdobeAPIError(AdobeHttpError):
         return str(self.payload)
 
 
-def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:  # noqa: UP047
+def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:  # ruff:ignore[non-pep695-generic-function]
     """
     Wrap HTTP error to Adobe API Error.
 
@@ -97,7 +97,7 @@ def wrap_http_error(func: Callable[Param, RetType]) -> Callable[Param, RetType]:
         try:
             return func(*args, **kwargs)
         except HTTPError as error:
-            logger.error(error)  # noqa: TRY400
+            logger.error(error)  # ruff:ignore[error-instead-of-exception]
             try:  # noqa: WPS328, WPS505
                 raise AdobeAPIError(error.response.status_code, error.response.json())
             except JSONDecodeError:

@@ -311,7 +311,7 @@ def start_transfers_for_product(product_id):
         transfer.save()
 
 
-def check_running_transfers_for_product(product_id):  # noqa: C901
+def check_running_transfers_for_product(product_id):  # ruff:ignore[complex-structure]
     """Checks if there are running transfers in airtable for product."""
     client = get_adobe_client()
 

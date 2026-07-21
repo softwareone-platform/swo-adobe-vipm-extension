@@ -259,7 +259,7 @@ def _check_adobe_transfer_order_fulfilled(mpt_client, order, membership_id, adob
     return adobe_order
 
 
-def _fulfill_transfer_migrated(  # noqa: C901
+def _fulfill_transfer_migrated(  # ruff:ignore[complex-structure]
     adobe_client,
     mpt_client,
     order,
@@ -474,7 +474,7 @@ def _create_new_adobe_order(mpt_client, order, transfer, gc_main_agreement):
     pipeline.run(mpt_client, context)
 
 
-def _transfer_migrated(  # noqa: C901
+def _transfer_migrated(  # ruff:ignore[complex-structure]
     mpt_client,
     order,
     transfer,

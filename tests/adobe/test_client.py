@@ -2134,7 +2134,7 @@ def test_get_auth_token(requests_mocker, settings, mock_adobe_config, adobe_conf
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",  # noqa: S106
+        client_secret="client_secret",  # ruff:ignore[hardcoded-password-func-arg]
         currency="USD",
         distributor_id="distributor_id",
     )
@@ -2172,7 +2172,7 @@ def test_get_auth_token_error(requests_mocker, settings, mock_adobe_config, adob
         authorization_id="auth_id",
         name="test",
         client_id="client_id",
-        client_secret="client_secret",  # noqa: S106
+        client_secret="client_secret",  # ruff:ignore[hardcoded-password-func-arg]
         currency="USD",
         distributor_id="distributor_id",
     )

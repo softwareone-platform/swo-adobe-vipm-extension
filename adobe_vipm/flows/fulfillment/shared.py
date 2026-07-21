@@ -971,7 +971,7 @@ class SubmitNewOrder(Step):
     the next step.
     """
 
-    def __call__(self, client, context, next_step):  # noqa: C901
+    def __call__(self, client, context, next_step):  # ruff:ignore[complex-structure]
         """Submit a new order if there are new/upsizing items to purchase."""
         if not (context.upsize_lines or context.new_lines):
             logger.info("%s: skip creating order. There are no upsize lines or new lines", context)

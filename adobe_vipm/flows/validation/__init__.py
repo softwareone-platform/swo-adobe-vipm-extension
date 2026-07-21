@@ -1,1 +1,1 @@
-from adobe_vipm.flows.validation.base import validate_order  # noqa: F401
+from adobe_vipm.flows.validation.base import validate_order  # ruff:ignore[unused-import]

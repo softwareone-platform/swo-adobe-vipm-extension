@@ -129,7 +129,7 @@ class SubscriptionClientMixin:
         authorization_id: str,
         customer_id: str,
         subscription_id: str,
-        auto_renewal: bool = True,  # noqa: FBT001 FBT002
+        auto_renewal: bool = True,  # ruff:ignore[boolean-type-hint-positional-argument, boolean-default-value-positional-argument]
         quantity: int | None = None,
     ) -> dict:
         """

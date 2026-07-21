@@ -601,7 +601,7 @@ def enable_subscription_auto_renewal(
     return adobe_subscription
 
 
-def process_agreement_deployment(  # noqa: C901
+def process_agreement_deployment(  # ruff:ignore[complex-structure]
     mpt_client, mpt_o_client, adobe_client, agreement_deployment, product_id
 ):
     """

@@ -74,7 +74,7 @@ class GetReturnableOrders(Step):
     quantity if a sum that match such quantity exists.
     """
 
-    def __call__(self, client, context, next_step):  # noqa: C901
+    def __call__(self, client, context, next_step):  # ruff:ignore[complex-structure]
         """Compute a map of returnable orders."""
         adobe_client = get_adobe_client()
         returnable_orders_count = 0

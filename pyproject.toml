@@ -210,37 +210,35 @@ select = [
   "SIM", # flake8-simpify
   "SLF", # flake8-self
   "SLOT", # flake8-slots
-  "T100", # flake8-debugger
+  "debugger", # flake8-debugger
   "TRY", # tryceratops
   "UP", # pyupgrade
   "W", # pycodestyle
   "YTT", # flake8-2020
 ]
 ignore = [
-  "A005", # allow to shadow stdlib and builtin module names
-  "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
-  "COM812", # trailing comma, conflicts with `ruff format`
+  "stdlib-module-shadowing", # allow to shadow stdlib and builtin module names
+  "raise-without-from-inside-except", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+  "missing-trailing-comma", # trailing comma, conflicts with `ruff format`
   # Different doc rules that we don't really care about:
-  "D100",
-  "D104",
-  "D105", # docstring for magic methods
-  "D106",
-  "D107",
-  "D203",
-  "D212",
-  "D401",
-  "D404",
-  "D405",
-  "ISC001", # implicit string concat conflicts with `ruff format`
-  "ISC003", # prefer explicit string concat over implicit concat
+  "undocumented-public-module",
+  "undocumented-public-package",
+  "undocumented-magic-method", # docstring for magic methods
+  "undocumented-public-nested-class",
+  "undocumented-public-init",
+  "incorrect-blank-line-before-class",
+  "multi-line-summary-first-line",
+  "non-imperative-mood",
+  "docstring-starts-with-this",
+  "non-capitalized-section-name",
+  "single-line-implicit-string-concatenation", # implicit string concat conflicts with `ruff format`
+  "explicit-string-concatenation", # prefer explicit string concat over implicit concat
   "PLR09", # we have our own complexity rules
-  "PLR2004", # do not report magic numbers
-  "PLR6301", # do not require classmethod / staticmethod when self not used
-  "PLW0717", # allow existing broad try blocks
-  "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
-  "RUF105", # preview: keep `# noqa` comments instead of `# ruff:ignore`
-  "RUF201", # preview: allow rule codes (not names) in lint selectors
-  "TRY003", # long exception messages from `tryceratops`
+  "magic-value-comparison", # do not report magic numbers
+  "no-self-use", # do not require classmethod / staticmethod when self not used
+  "too-many-statements-in-try-clause", # allow existing broad try blocks
+  "pytest-raises-too-broad", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
+  "raise-vanilla-args", # long exception messages from `tryceratops`
 ]
 external = ["AAA", "WPS"]
 
@@ -259,17 +257,17 @@ max-complexity = 6
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"adobe_vipm/flows/pipeline.py" = ["D101", "D102", "RSE102"]
-"tests/flows/fulfillment/test_transfer.py" = ["F601"]
+"adobe_vipm/flows/pipeline.py" = ["undocumented-public-class", "undocumented-public-method", "unnecessary-paren-on-raise-exception"]
+"tests/flows/fulfillment/test_transfer.py" = ["multi-value-repeated-key-literal"]
 "tests/*.py" = [
-  "D103", # missing docstring in public function
-  "RUF076", # allow autouse=True in test fixtures
-  "S101", # asserts
-  "S105", # hardcoded passwords
-  "S404", # subprocess calls are for tests
-  "S603", # do not require `shell=True`
-  "S607", # partial executable paths
-  "SLF001", # Private member accessed
+  "undocumented-public-function", # missing docstring in public function
+  "pytest-fixture-autouse", # allow autouse=True in test fixtures
+  "assert", # asserts
+  "hardcoded-password-string", # hardcoded passwords
+  "suspicious-subprocess-import", # subprocess calls are for tests
+  "subprocess-without-shell-equals-true", # do not require `shell=True`
+  "start-process-with-partial-path", # partial executable paths
+  "private-member-access", # Private member accessed
 ]
 
 [tool.ruff.lint.isort]

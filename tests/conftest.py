@@ -1015,7 +1015,7 @@ def subscriptions_factory(lines_factory, subscription_price_factory):
         start_date=None,
         commitment_date=None,
         lines=None,
-        auto_renew=True,  # noqa: FBT002
+        auto_renew=True,  # ruff:ignore[boolean-default-value-positional-argument]
         price=None,
     ):
         start_date = (
@@ -1061,7 +1061,7 @@ def agreement_factory(
         licensee_name="My beautiful licensee",
         licensee_address=None,
         licensee_contact=None,
-        use_buyer_address=False,  # noqa: FBT002
+        use_buyer_address=False,  # ruff:ignore[boolean-default-value-positional-argument]
         assets=None,
         subscriptions=None,
         fulfillment_parameters=None,
@@ -1515,8 +1515,8 @@ def mock_adobe_client(mocker):
 
 
 @pytest.fixture
-def adobe_items_factory():  # noqa: C901
-    def _items(  # noqa: C901
+def adobe_items_factory():  # ruff:ignore[complex-structure]
+    def _items(  # ruff:ignore[complex-structure]
         line_number=1,
         offer_id="65304578CA01A12",
         quantity=170,
@@ -1590,7 +1590,7 @@ def adobe_pricing_factory():
 
 
 @pytest.fixture
-def adobe_order_factory(adobe_items_factory, adobe_pricing_factory):  # noqa: C901
+def adobe_order_factory(adobe_items_factory, adobe_pricing_factory):  # ruff:ignore[complex-structure]
     def _order(
         order_type,
         currency_code="USD",
@@ -1644,7 +1644,7 @@ def adobe_subscription_factory():
         used_quantity=10,
         renewal_quantity=10,
         currency_code="USD",
-        autorenewal_enabled=True,  # noqa: FBT002
+        autorenewal_enabled=True,  # ruff:ignore[boolean-default-value-positional-argument]
         deployment_id="",
         status=AdobeSubscriptionStatus.ACTIVE.value,
         renewal_date=None,
@@ -1779,7 +1779,7 @@ def adobe_client_factory(
 @pytest.fixture
 def mpt_client(settings):
     settings.MPT_API_BASE_URL = "https://localhost"
-    from mpt_extension_sdk.core.utils import setup_client  # noqa: PLC0415
+    from mpt_extension_sdk.core.utils import setup_client  # ruff:ignore[import-outside-top-level]
 
     return setup_client()
 
