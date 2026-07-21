@@ -1,7 +1,5 @@
 from urllib.parse import urljoin
 
-import requests
-
 from adobe_vipm.adobe.constants import AdobeDeploymentStatus
 from adobe_vipm.adobe.errors import wrap_http_error
 
@@ -30,7 +28,7 @@ class DeploymentClientMixin:
         next_url = f"/v3/customers/{customer_id}/deployments"
         deployments = []
         while next_url:
-            response = requests.get(
+            response = self._session.get(
                 urljoin(self._config.api_base_url, next_url),
                 headers=headers,
                 timeout=self._TIMEOUT,
