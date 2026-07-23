@@ -93,6 +93,24 @@ def get_3yc_commitment_request(customer, *, is_recommitment=False):  # noqa: WPS
     return benefit_3yc.get(recommitment_or_commitment, {}) or {}
 
 
+def get_3yc_recommitment_request(customer):  # noqa: WPS114
+    """
+    Extract the recommitment request object from the customer object.
+
+    Args:
+        customer (dict): A customer object from which extract the recommitment request object.
+
+    Returns:
+        dict: The recommitment request object if it exists or an empty object.
+    """
+    benefit_3yc = find_first(  # noqa: WPS114
+        lambda benefit: benefit["type"] == "THREE_YEAR_COMMIT",
+        customer.get("benefits", []),
+        {},
+    )
+    return benefit_3yc.get("recommitmentRequest", {}) or {}
+
+
 def sanitize_company_name(company_name):
     """
     Replaces the characters not allowed by the Marketeplace platform.

@@ -270,12 +270,21 @@ def test_sync_agreement_prices(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
             },
@@ -365,12 +374,21 @@ def test_sync_agreement_update_agreement_education(
             mocked_agreement_syncer._agreement["id"],
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                     {"externalId": "educationSubSegment", "value": "EDU_1,EDU_2"},
                 ],
@@ -896,12 +914,21 @@ def test_sync_agreement_prices_with_3yc(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
                     {"externalId": "3YCStartDate", "value": "2024-01-01"},
                     {"externalId": "3YCEndDate", "value": "2025-01-01"},
-                    {"externalId": "3YCLicenses", "value": "9"},
-                    {"externalId": "3YCConsumables", "value": "1220"},
+                    {"externalId": "3YCMinLicenses", "value": "9"},
+                    {"externalId": "3YCMinConsumables", "value": "1220"},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": "ACCEPTED"},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": "2024-01-01"},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": "2025-01-01"},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
             },
@@ -1334,12 +1361,21 @@ def test_sync_global_customer_parameter(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
             },
@@ -1390,12 +1426,21 @@ def test_sync_global_customer_parameter(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
             },
@@ -2024,12 +2069,21 @@ def test_sync_global_customer_update_not_required(
             lines=[],
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                 ],
             },
@@ -2124,12 +2178,21 @@ def test_sync_global_customer_no_active_deployments(
             lines=[],
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2024-01-23"},
                 ],
             },
@@ -2366,12 +2429,21 @@ def test_sync_agreement_empty_discounts(
             lines=expected_lines,
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
             },
@@ -2592,12 +2664,21 @@ def test_sync_agreement_prices_with_missing_prices(
             ],
             parameters={
                 "fulfillment": [
-                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
                     {"externalId": "3YCEndDate", "value": None},
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
+                    {"externalId": "3YCMinLicenses", "value": ""},
+                    {"externalId": "3YCMinConsumables", "value": ""},
+                    {"externalId": "3YCCommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+                    {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+                    {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+                    {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
                     {"externalId": "cotermDate", "value": "2025-04-04"},
                 ],
             },
@@ -4465,3 +4546,198 @@ def test_get_customer_or_process_lost_customer_dry_run(
     mock_adobe_client.get_customer.assert_called_once_with("AUT-4785-7184", "fake_customer_id")
     mock_send_exception.assert_not_called()
     mock_mpt_terminate_subscription.assert_not_called()
+
+
+def _build_agreement_syncer(mock_mpt_client, mock_adobe_client, agreement_factory, adobe_customer):
+    return AgreementSyncer(
+        mock_mpt_client,
+        mock_adobe_client,
+        agreement_factory(),
+        adobe_customer,
+        [],
+        dry_run=False,
+    )
+
+
+def test_update_3yc_commitment_parameters_with_commitment(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    customer = adobe_customer_factory(
+        commitment=adobe_commitment_factory(licenses=9, consumables=1220)
+    )
+    syncer = _build_agreement_syncer(
+        mock_mpt_client, mock_adobe_client, agreement_factory, customer
+    )
+    parameters = {}
+
+    syncer._update_3yc_commitment_parameters(customer, parameters)  # act
+
+    assert parameters == {
+        "fulfillment": [
+            {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
+            {"externalId": "3YCStartDate", "value": "2024-01-01"},
+            {"externalId": "3YCEndDate", "value": "2025-01-01"},
+            {"externalId": "3YCMinLicenses", "value": "9"},
+            {"externalId": "3YCMinConsumables", "value": "1220"},
+        ],
+    }
+
+
+def test_update_3yc_commitment_parameters_without_commitment(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+):
+    customer = adobe_customer_factory()
+    syncer = _build_agreement_syncer(
+        mock_mpt_client, mock_adobe_client, agreement_factory, customer
+    )
+    parameters = {}
+
+    syncer._update_3yc_commitment_parameters(customer, parameters)  # act
+
+    assert parameters == {
+        "fulfillment": [
+            {"externalId": "3YCEnrollStatus", "value": None},
+            {"externalId": "3YCStartDate", "value": None},
+            {"externalId": "3YCEndDate", "value": None},
+            {"externalId": "3YCMinLicenses", "value": ""},
+            {"externalId": "3YCMinConsumables", "value": ""},
+        ],
+    }
+
+
+def test_update_3yc_commitment_parameters_preserves_existing_parameters(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    customer = adobe_customer_factory(
+        commitment=adobe_commitment_factory(licenses=5, consumables=10)
+    )
+    syncer = _build_agreement_syncer(
+        mock_mpt_client, mock_adobe_client, agreement_factory, customer
+    )
+    parameters = {
+        "ordering": [{"externalId": "companyName", "value": "ACME"}],
+        "fulfillment": [{"externalId": "cotermDate", "value": "2025-04-04"}],
+    }
+
+    syncer._update_3yc_commitment_parameters(customer, parameters)  # act
+
+    assert parameters["ordering"][0] == {"externalId": "companyName", "value": "ACME"}
+    assert parameters["fulfillment"][0] == {"externalId": "cotermDate", "value": "2025-04-04"}
+    assert {"externalId": "3YCEnrollStatus", "value": "COMMITTED"} in parameters["fulfillment"]
+
+
+def test_update_3yc_commitment_request_parameters_with_request(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    customer = adobe_customer_factory(
+        commitment_request=adobe_commitment_factory(licenses=4, consumables=8, status="REQUESTED")
+    )
+    syncer = _build_agreement_syncer(
+        mock_mpt_client, mock_adobe_client, agreement_factory, customer
+    )
+    parameters = {}
+
+    syncer._update_3yc_commitment_request_parameters(customer, parameters)  # act
+
+    assert parameters == {
+        "fulfillment": [
+            {"externalId": "3YCCommitmentRequestStatus", "value": "REQUESTED"},
+            {"externalId": "3YCCommitmentRequestStartDate", "value": "2024-01-01"},
+            {"externalId": "3YCCommitmentRequestEndDate", "value": "2025-01-01"},
+            {"externalId": "3YCCommitmentRequestLicenses", "value": "4"},
+            {"externalId": "3YCCommitmentRequestConsumables", "value": "8"},
+        ],
+    }
+
+
+def test_update_3yc_commitment_request_parameters_without_request(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+):
+    customer = adobe_customer_factory()
+    syncer = _build_agreement_syncer(
+        mock_mpt_client, mock_adobe_client, agreement_factory, customer
+    )
+    parameters = {}
+
+    syncer._update_3yc_commitment_request_parameters(customer, parameters)  # act
+
+    assert parameters == {
+        "fulfillment": [
+            {"externalId": "3YCCommitmentRequestStatus", "value": None},
+            {"externalId": "3YCCommitmentRequestStartDate", "value": None},
+            {"externalId": "3YCCommitmentRequestEndDate", "value": None},
+            {"externalId": "3YCCommitmentRequestLicenses", "value": ""},
+            {"externalId": "3YCCommitmentRequestConsumables", "value": ""},
+        ],
+    }
+
+
+def test_update_3yc_recommitment_request_parameters_with_request(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+):
+    customer = adobe_customer_factory(
+        recommitment_request=adobe_commitment_factory(licenses=6, consumables=12, status="ACCEPTED")
+    )
+    syncer = _build_agreement_syncer(
+        mock_mpt_client, mock_adobe_client, agreement_factory, customer
+    )
+    parameters = {}
+
+    syncer._update_3yc_recommitment_request_parameters(customer, parameters)  # act
+
+    assert parameters == {
+        "fulfillment": [
+            {"externalId": "3YCRecommitmentRequestStatus", "value": "ACCEPTED"},
+            {"externalId": "3YCRecommitmentRequestStartDate", "value": "2024-01-01"},
+            {"externalId": "3YCRecommitmentRequestEndDate", "value": "2025-01-01"},
+            {"externalId": "3YCRecommitmentRequestLicenses", "value": "6"},
+            {"externalId": "3YCRecommitmentRequestConsumables", "value": "12"},
+        ],
+    }
+
+
+def test_update_3yc_recommitment_request_parameters_without_request(
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+):
+    customer = adobe_customer_factory()
+    syncer = _build_agreement_syncer(
+        mock_mpt_client, mock_adobe_client, agreement_factory, customer
+    )
+    parameters = {}
+
+    syncer._update_3yc_recommitment_request_parameters(customer, parameters)  # act
+
+    assert parameters == {
+        "fulfillment": [
+            {"externalId": "3YCRecommitmentRequestStatus", "value": None},
+            {"externalId": "3YCRecommitmentRequestStartDate", "value": None},
+            {"externalId": "3YCRecommitmentRequestEndDate", "value": None},
+            {"externalId": "3YCRecommitmentRequestLicenses", "value": ""},
+            {"externalId": "3YCRecommitmentRequestConsumables", "value": ""},
+        ],
+    }

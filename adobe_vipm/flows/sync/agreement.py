@@ -21,6 +21,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.adobe.utils import (
     get_3yc_commitment_request,
+    get_3yc_recommitment_request,
     sanitize_company_name,
     sanitize_first_last_name,
 )
@@ -484,8 +485,9 @@ class AgreementSyncer:  # noqa: WPS214
 
         if not is_large_government_agency_type(self.product_id):
             self._notify_if_3yc_commitment_expired(agreement, commitment_info)
-            self._update_3yc_fulfillment_params(agreement, commitment_info, parameters)
-            self._update_3yc_quantities_params(commitment_info, parameters)
+            self._update_3yc_commitment_parameters(self._adobe_customer, parameters)
+            self._update_3yc_commitment_request_parameters(self._adobe_customer, parameters)
+            self._update_3yc_recommitment_request_parameters(self._adobe_customer, parameters)
 
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
         parameters[Param.PHASE_FULFILLMENT.value].append({
@@ -580,26 +582,10 @@ class AgreementSyncer:  # noqa: WPS214
 
         send_3yc_expiration_notification(self._mpt_client, agreement, 0, "notification_3yc_expired")
 
-    def _update_3yc_fulfillment_params(
-        self, agreement: dict, commitment_info: dict, parameters: dict
-    ) -> None:
+    def _update_3yc_commitment_parameters(self, adobe_customer: dict, parameters: dict) -> None:
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
-        three_yc_recommitment_par = flows_utils.get_parameter(
-            Param.PHASE_FULFILLMENT.value, agreement, Param.THREE_YC_RECOMMITMENT.value
-        )
-        is_recommitment = three_yc_recommitment_par.get("value") == ["Yes"]
-        status_param_ext_id = (
-            Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value
-            if not is_recommitment
-            else Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value
-        )
-        request_info = get_3yc_commitment_request(
-            self._adobe_customer, is_recommitment=is_recommitment
-        )
-        parameters[Param.PHASE_FULFILLMENT.value].append({
-            "externalId": status_param_ext_id,
-            "value": request_info.get("status"),
-        })
+        commitment_info = get_3yc_commitment(adobe_customer)
+
         parameters[Param.PHASE_FULFILLMENT.value] += [
             {
                 "externalId": Param.THREE_YC_ENROLL_STATUS.value,
@@ -615,9 +601,6 @@ class AgreementSyncer:  # noqa: WPS214
             },
         ]
 
-    def _update_3yc_quantities_params(self, commitment_info: dict, parameters: dict):
-        parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
-
         minimum_quantities = commitment_info.get("minimumQuantities")
         if not minimum_quantities:
             minimum_quantities = [
@@ -628,12 +611,92 @@ class AgreementSyncer:  # noqa: WPS214
         for mq in minimum_quantities:
             if mq["offerType"] == OfferType.LICENSE:
                 parameters[Param.PHASE_FULFILLMENT.value].append({
-                    "externalId": Param.THREE_YC_LICENSES.value,
+                    "externalId": Param.THREE_YC_MIN_LICENSES.value,
                     "value": str(mq.get("quantity")),
                 })
             if mq["offerType"] == OfferType.CONSUMABLES:
                 parameters[Param.PHASE_FULFILLMENT.value].append({
-                    "externalId": Param.THREE_YC_CONSUMABLES.value,
+                    "externalId": Param.THREE_YC_MIN_CONSUMABLES.value,
+                    "value": str(mq.get("quantity")),
+                })
+
+    def _update_3yc_commitment_request_parameters(
+        self, adobe_customer: dict, parameters: dict
+    ) -> None:
+        parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
+        commitment_request_info = get_3yc_commitment_request(adobe_customer)
+
+        parameters[Param.PHASE_FULFILLMENT.value] += [
+            {
+                "externalId": Param.THREE_YC_COMMITMENT_REQUEST_STATUS.value,
+                "value": commitment_request_info.get("status"),
+            },
+            {
+                "externalId": Param.THREE_YC_COMMITMENT_REQUEST_START_DATE.value,
+                "value": commitment_request_info.get("startDate"),
+            },
+            {
+                "externalId": Param.THREE_YC_COMMITMENT_REQUEST_END_DATE.value,
+                "value": commitment_request_info.get("endDate"),
+            },
+        ]
+
+        minimum_quantities = commitment_request_info.get("minimumQuantities")
+        if not minimum_quantities:
+            minimum_quantities = [
+                {"offerType": OfferType.LICENSE, "quantity": ""},
+                {"offerType": OfferType.CONSUMABLES, "quantity": ""},
+            ]
+
+        for mq in minimum_quantities:
+            if mq["offerType"] == OfferType.LICENSE:
+                parameters[Param.PHASE_FULFILLMENT.value].append({
+                    "externalId": Param.THREE_YC_COMMITMENT_REQUEST_LICENSES.value,
+                    "value": str(mq.get("quantity")),
+                })
+            if mq["offerType"] == OfferType.CONSUMABLES:
+                parameters[Param.PHASE_FULFILLMENT.value].append({
+                    "externalId": Param.THREE_YC_COMMITMENT_REQUEST_CONSUMABLES.value,
+                    "value": str(mq.get("quantity")),
+                })
+
+    def _update_3yc_recommitment_request_parameters(
+        self, adobe_customer: dict, parameters: dict
+    ) -> None:
+        parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
+        recommitment_request_info = get_3yc_recommitment_request(adobe_customer)
+
+        parameters[Param.PHASE_FULFILLMENT.value] += [
+            {
+                "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_STATUS.value,
+                "value": recommitment_request_info.get("status"),
+            },
+            {
+                "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_START_DATE.value,
+                "value": recommitment_request_info.get("startDate"),
+            },
+            {
+                "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_END_DATE.value,
+                "value": recommitment_request_info.get("endDate"),
+            },
+        ]
+
+        minimum_quantities = recommitment_request_info.get("minimumQuantities")
+        if not minimum_quantities:
+            minimum_quantities = [
+                {"offerType": OfferType.LICENSE, "quantity": ""},
+                {"offerType": OfferType.CONSUMABLES, "quantity": ""},
+            ]
+
+        for mq in minimum_quantities:
+            if mq["offerType"] == OfferType.LICENSE:
+                parameters[Param.PHASE_FULFILLMENT.value].append({
+                    "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_LICENSES.value,
+                    "value": str(mq.get("quantity")),
+                })
+            if mq["offerType"] == OfferType.CONSUMABLES:
+                parameters[Param.PHASE_FULFILLMENT.value].append({
+                    "externalId": Param.THREE_YC_RECOMMITMENT_REQUEST_CONSUMABLES.value,
                     "value": str(mq.get("quantity")),
                 })
 
@@ -1198,6 +1261,7 @@ def sync_agreements_by_3yc_enroll_status(
     except Exception:
         logger.exception("Unknown exception getting agreements by 3YC enroll status.")
         raise
+
     for agreement in agreements:
         try:
             sync_agreement(mpt_client, adobe_client, agreement, dry_run=dry_run, sync_prices=True)
