@@ -269,10 +269,6 @@ def test_sync_agreement_prices(
             agreement["id"],
             lines=expected_lines,
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -377,10 +373,6 @@ def test_sync_agreement_update_agreement_education(
             mock_mpt_client,
             mocked_agreement_syncer._agreement["id"],
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -921,10 +913,6 @@ def test_sync_agreement_prices_with_3yc(
             agreement["id"],
             lines=expected_lines,
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": "9"},
-                    {"externalId": "3YCConsumables", "value": "1220"},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
                     {"externalId": "3YCStartDate", "value": "2024-01-01"},
@@ -1372,10 +1360,6 @@ def test_sync_global_customer_parameter(
             agreement["id"],
             lines=expected_lines,
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -1441,10 +1425,6 @@ def test_sync_global_customer_parameter(
             deployment_agreements[0]["id"],
             lines=expected_lines,
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -2088,10 +2068,6 @@ def test_sync_global_customer_update_not_required(
             "AGR-2119-4550-8674-5962",
             lines=[],
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -2201,10 +2177,6 @@ def test_sync_global_customer_no_active_deployments(
             "AGR-2119-4550-8674-5962",
             lines=[],
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -2456,10 +2428,6 @@ def test_sync_agreement_empty_discounts(
             agreement["id"],
             lines=expected_lines,
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -2695,10 +2663,6 @@ def test_sync_agreement_prices_with_missing_prices(
                 }
             ],
             parameters={
-                "ordering": [
-                    {"externalId": "3YCLicenses", "value": ""},
-                    {"externalId": "3YCConsumables", "value": ""},
-                ],
                 "fulfillment": [
                     {"externalId": "3YCEnrollStatus", "value": None},
                     {"externalId": "3YCStartDate", "value": None},
@@ -4613,10 +4577,6 @@ def test_update_3yc_commitment_parameters_with_commitment(
     syncer._update_3yc_commitment_parameters(customer, parameters)  # act
 
     assert parameters == {
-        "ordering": [
-            {"externalId": "3YCLicenses", "value": "9"},
-            {"externalId": "3YCConsumables", "value": "1220"},
-        ],
         "fulfillment": [
             {"externalId": "3YCEnrollStatus", "value": "COMMITTED"},
             {"externalId": "3YCStartDate", "value": "2024-01-01"},
@@ -4642,10 +4602,6 @@ def test_update_3yc_commitment_parameters_without_commitment(
     syncer._update_3yc_commitment_parameters(customer, parameters)  # act
 
     assert parameters == {
-        "ordering": [
-            {"externalId": "3YCLicenses", "value": ""},
-            {"externalId": "3YCConsumables", "value": ""},
-        ],
         "fulfillment": [
             {"externalId": "3YCEnrollStatus", "value": None},
             {"externalId": "3YCStartDate", "value": None},
@@ -4678,7 +4634,6 @@ def test_update_3yc_commitment_parameters_preserves_existing_parameters(
 
     assert parameters["ordering"][0] == {"externalId": "companyName", "value": "ACME"}
     assert parameters["fulfillment"][0] == {"externalId": "cotermDate", "value": "2025-04-04"}
-    assert {"externalId": "3YCLicenses", "value": "5"} in parameters["ordering"]
     assert {"externalId": "3YCEnrollStatus", "value": "COMMITTED"} in parameters["fulfillment"]
 
 
