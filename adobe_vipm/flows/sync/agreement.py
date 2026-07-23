@@ -583,7 +583,6 @@ class AgreementSyncer:  # noqa: WPS214
         send_3yc_expiration_notification(self._mpt_client, agreement, 0, "notification_3yc_expired")
 
     def _update_3yc_commitment_parameters(self, adobe_customer: dict, parameters: dict) -> None:
-        parameters.setdefault(Param.PHASE_ORDERING.value, [])
         parameters.setdefault(Param.PHASE_FULFILLMENT.value, [])
         commitment_info = get_3yc_commitment(adobe_customer)
 
@@ -611,19 +610,11 @@ class AgreementSyncer:  # noqa: WPS214
 
         for mq in minimum_quantities:
             if mq["offerType"] == OfferType.LICENSE:
-                parameters[Param.PHASE_ORDERING.value].append({
-                    "externalId": Param.THREE_YC_LICENSES.value,
-                    "value": str(mq.get("quantity")),
-                })
                 parameters[Param.PHASE_FULFILLMENT.value].append({
                     "externalId": Param.THREE_YC_MIN_LICENSES.value,
                     "value": str(mq.get("quantity")),
                 })
             if mq["offerType"] == OfferType.CONSUMABLES:
-                parameters[Param.PHASE_ORDERING.value].append({
-                    "externalId": Param.THREE_YC_CONSUMABLES.value,
-                    "value": str(mq.get("quantity")),
-                })
                 parameters[Param.PHASE_FULFILLMENT.value].append({
                     "externalId": Param.THREE_YC_MIN_CONSUMABLES.value,
                     "value": str(mq.get("quantity")),
@@ -1268,6 +1259,7 @@ def sync_agreements_by_3yc_enroll_status(
     except Exception:
         logger.exception("Unknown exception getting agreements by 3YC enroll status.")
         raise
+
     for agreement in agreements:
         try:
             sync_agreement(mpt_client, adobe_client, agreement, dry_run=dry_run, sync_prices=True)
