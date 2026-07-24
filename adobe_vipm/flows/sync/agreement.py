@@ -214,11 +214,18 @@ class AgreementSyncer:  # noqa: WPS214
             )
             return False
 
-        if not self._adobe_customer.get("discounts", []):
-            # Adobe discounts are not set for the customer when the subscriptions expired.
-            # In that case we should continue the sync process to terminate the subscriptions.
-            # There is another scenario when the 3YC is only for licenses.
-            # The discounts are not correctly returned by the API for the consumables.
+        active_subscriptions = [
+            subscription
+            for subscription in self._adobe_subscriptions
+            if subscription["status"] == AdobeSubscriptionStatus.ACTIVE.value
+        ]
+        if active_subscriptions and not self._adobe_customer.get("discounts", []):
+            # Discounts only matter when there are active subscriptions to price.
+            # Adobe returns no discounts for a customer without active subscriptions
+            # (e.g. all subscriptions expired, or a 3YC commitment request still in
+            # REQUESTED status). In that case there is nothing to price-sync, so the
+            # missing discounts are expected and must not raise a warning. The sync still
+            # continues so the termination flow for expired subscriptions is unaffected.
             msg = (
                 f"Error synchronizing agreement {self.agreement_id}. Customer "
                 f"{self._adobe_customer_id} does not have discounts information."

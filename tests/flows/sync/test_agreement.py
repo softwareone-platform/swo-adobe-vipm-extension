@@ -2337,7 +2337,7 @@ def test_sync_agreement_updates_linked_membership_params(
 
 
 @freeze_time("2025-06-23")
-def test_sync_agreement_empty_discounts(
+def test_sync_agreement_empty_discounts_no_active_subscriptions(
     mocker,
     agreement_factory,
     subscriptions_factory,
@@ -2484,12 +2484,44 @@ def test_sync_agreement_empty_discounts(
             parameters={"fulfillment": [{"externalId": "lastSyncDate", "value": "2025-06-23"}]},
         ),
     ])
+    # No active subscriptions means there is nothing to price-sync, so empty discounts
+    # are expected and must not raise a warning, while termination still proceeds.
+    mock_send_warning.assert_not_called()
+
+
+def test_is_sync_possible_warns_on_empty_discounts_with_active_subscriptions(
+    mocked_agreement_syncer, adobe_customer_factory, mock_send_warning
+):
+    # The default fixture provides active Adobe subscriptions.
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
+    mocked_agreement_syncer._adobe_customer["discounts"] = []
+
+    result = mocked_agreement_syncer._is_sync_possible()  # act
+
+    assert result is True
     mock_send_warning.assert_called_once_with(
         "Customer does not have discounts information",
         "Error synchronizing agreement AGR-2119-4550-8674-5962. Customer a-client-id "
-        "does not have discounts information. Cannot proceed with price "
-        "synchronization.",
+        "does not have discounts information. Cannot proceed with price synchronization.",
     )
+
+
+def test_is_sync_possible_silent_on_empty_discounts_without_active_subscriptions(
+    mocked_agreement_syncer,
+    adobe_customer_factory,
+    adobe_subscription_factory,
+    mock_send_warning,
+):
+    mocked_agreement_syncer._adobe_subscriptions = [
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.INACTIVE.value),
+    ]
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
+    mocked_agreement_syncer._adobe_customer["discounts"] = []
+
+    result = mocked_agreement_syncer._is_sync_possible()  # act
+
+    assert result is True
+    mock_send_warning.assert_not_called()
 
 
 @freeze_time("2025-06-19")
