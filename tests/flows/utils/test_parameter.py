@@ -1,10 +1,14 @@
+import json
 from typing import Any
 
 import pytest
 from pytest_mock import MockerFixture
 
 from adobe_vipm.flows.constants import Param
-from adobe_vipm.flows.utils.parameter import update_agreement_params_visibility
+from adobe_vipm.flows.utils.parameter import (
+    get_switch_payload,
+    update_agreement_params_visibility,
+)
 
 
 @pytest.mark.parametrize(
@@ -112,3 +116,44 @@ def test_update_agreement_params_visibility(
     for param in all_params:
         is_visible = param["externalId"] in expected_visible
         assert param["constraints"]["hidden"] is not is_visible
+
+
+def test_get_switch_payload(order_factory, order_parameters_factory, switch_payload):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(switch_payload=switch_payload),
+    )
+
+    result = get_switch_payload(order)  # act
+
+    assert result == switch_payload
+
+
+def test_get_switch_payload_json_string(order_factory, order_parameters_factory, switch_payload):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(switch_payload=json.dumps(switch_payload)),
+    )
+
+    result = get_switch_payload(order)  # act
+
+    assert result == switch_payload
+
+
+def test_get_switch_payload_empty_string(order_factory, order_parameters_factory):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(switch_payload=""),
+    )
+
+    result = get_switch_payload(order)  # act
+
+    assert result is None
+
+
+def test_get_switch_payload_not_set(order_factory):
+    order = order_factory(order_type="Change")
+
+    result = get_switch_payload(order)  # act
+
+    assert result is None

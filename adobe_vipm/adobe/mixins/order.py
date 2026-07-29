@@ -291,6 +291,90 @@ class OrderClientMixin:
         response.raise_for_status()
         return response.json()
 
+    @wrap_http_error
+    def create_switch_preview_order(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        external_reference_id: str,
+        switch_payload: dict,
+    ) -> dict:
+        """
+        Create a PREVIEW_SWITCH order for a mid-term upgrade.
+
+        Used to validate that a SWITCH order can be processed and to retrieve
+        its pricing before placing the actual order.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that places the SWITCH order.
+            external_reference_id: External reference ID for the order.
+            switch_payload: Switch payload containing the lineItems to purchase
+            and the cancellingItems of the subscriptions to switch from.
+
+        Returns:
+            dict: The Preview Switch order.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        payload = self._build_switch_order_payload(
+            authorization,
+            external_reference_id,
+            switch_payload,
+            adobe_constants.ORDER_TYPE_PREVIEW_SWITCH,
+        )
+        headers = self._get_headers(authorization)
+        response = self._session.post(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            params={"fetch-price": "true"},
+            headers=headers,
+            json=payload,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    @wrap_http_error
+    def create_switch_order(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        external_reference_id: str,
+        switch_payload: dict,
+    ) -> dict:
+        """
+        Create a SWITCH order for a mid-term upgrade.
+
+        It purchases the lineItems and cancels the quantities of the
+        cancellingItems subscriptions in a single Adobe order.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that places the SWITCH order.
+            external_reference_id: External reference ID for the order.
+            switch_payload: Switch payload containing the lineItems to purchase
+            and the cancellingItems of the subscriptions to switch from.
+
+        Returns:
+            dict: The Switch order.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        payload = self._build_switch_order_payload(
+            authorization,
+            external_reference_id,
+            switch_payload,
+            adobe_constants.ORDER_TYPE_SWITCH,
+        )
+        correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
+        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        response = self._session.post(
+            urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
+            headers=headers,
+            json=payload,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()
+
     def get_returnable_orders_by_subscription_id(
         self,
         authorization_id: str,
@@ -678,6 +762,22 @@ class OrderClientMixin:
                 market_segment,
             )
             payload["lineItems"].append(line_item)
+
+    def _build_switch_order_payload(
+        self,
+        authorization: Authorization,
+        external_reference_id: str,
+        switch_payload: dict,
+        order_type: str,
+    ) -> dict:
+        payload = {
+            **switch_payload,
+            "externalReferenceId": external_reference_id,
+            "orderType": order_type,
+        }
+        if not payload.get("currencyCode"):
+            payload["currencyCode"] = authorization.currency
+        return payload
 
     def _build_line_item(self, adobe_line_item: dict) -> dict:
         line_item = {

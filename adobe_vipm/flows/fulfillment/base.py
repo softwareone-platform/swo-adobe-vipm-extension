@@ -6,10 +6,15 @@ from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.configuration import fulfill_configuration_order
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
 from adobe_vipm.flows.fulfillment.reseller_transfer import fulfill_reseller_change_order
+from adobe_vipm.flows.fulfillment.switch import fulfill_switch_order
 from adobe_vipm.flows.fulfillment.termination import fulfill_termination_order
 from adobe_vipm.flows.fulfillment.transfer import fulfill_transfer_order
 from adobe_vipm.flows.utils import notify_unhandled_exception_in_teams, strip_trace_id
-from adobe_vipm.flows.utils.validation import is_migrate_customer, is_reseller_change
+from adobe_vipm.flows.utils.validation import (
+    is_migrate_customer,
+    is_reseller_change,
+    is_switch_order,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +25,12 @@ def _fulfill_purchase_order_router(client, order):
     if is_reseller_change(order):
         return fulfill_reseller_change_order(client, order)
     return fulfill_purchase_order(client, order)
+
+
+def _fulfill_change_order_router(client, order):
+    if is_switch_order(order):
+        return fulfill_switch_order(client, order)
+    return fulfill_change_order(client, order)
 
 
 def fulfill_order(client, order):
@@ -37,7 +48,7 @@ def fulfill_order(client, order):
 
     validators = {
         OrderType.PURCHASE: _fulfill_purchase_order_router,
-        OrderType.CHANGE: fulfill_change_order,
+        OrderType.CHANGE: _fulfill_change_order_router,
         OrderType.TERMINATION: fulfill_termination_order,
         OrderType.CONFIGURATION: fulfill_configuration_order,
     }

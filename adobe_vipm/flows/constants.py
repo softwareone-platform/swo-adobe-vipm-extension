@@ -78,6 +78,7 @@ class Param(StrEnum):
     LINKED_MEMBERSHIP_CREATED = "lmCreated"
     ADOBE_ORDER_IDS = "adobeOrderIds"
     LATE_RENEWALS_INFO = "lateRenewalsInfo"
+    SWITCH_PAYLOAD = "switchPayload"
 
 
 PARAM_REQUIRED_CUSTOMER_ORDER = (
