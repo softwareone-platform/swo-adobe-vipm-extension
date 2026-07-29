@@ -173,7 +173,7 @@ def fulfill_switch_order(client, order):
         SetupContext(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
         SetupDueDate(),
-        ValidateDuplicateLines(),
+        ValidateDuplicateLines(is_switch=True),
         SetOrUpdateCotermDate(),
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),

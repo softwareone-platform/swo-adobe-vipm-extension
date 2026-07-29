@@ -4043,3 +4043,56 @@ def test_submit_renewal_orders_existing_order_reused(
     mock_adobe_client.create_renewal_order.assert_not_called()
     assert context.adobe_renewal_orders == {ext_ref: existing_order}
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_validate_duplicate_lines_step_switch_allows_existing_item(
+    mocker,
+    order_factory,
+    lines_factory,
+):
+    # A switch order targeting an item that already exists in the agreement must not be
+    # failed: the existing agreement subscription is updated later instead.
+    order = order_factory(
+        order_type="Change",
+        lines=lines_factory(line_id=2, item_id=10),
+    )
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order, order_id=order["id"])
+    step = ValidateDuplicateLines(is_switch=True)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    mocked_fail.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_validate_duplicate_lines_step_switch_still_fails_intra_order_duplicates(
+    mocker,
+    order_factory,
+    lines_factory,
+):
+    # The intra-order duplicate check still applies to switch orders.
+    order = order_factory(
+        order_type="Change",
+        lines=lines_factory() + lines_factory(),
+    )
+    mocked_fail = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed",
+    )
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    context = Context(order=order, order_id=order["id"])
+    step = ValidateDuplicateLines(is_switch=True)
+
+    step(mocked_client, context, mocked_next_step)  # act
+
+    mocked_fail.assert_called_once_with(
+        mocked_client,
+        context.order,
+        ERR_DUPLICATED_ITEMS.to_dict(duplicates="ITM-1234-1234-1234-0001"),
+    )
+    mocked_next_step.assert_not_called()

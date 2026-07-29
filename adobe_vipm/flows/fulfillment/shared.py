@@ -1329,6 +1329,13 @@ class SyncAgreement(Step):
 class ValidateDuplicateLines(Step):
     """Validates if Adobe Order contains duplicated items, with the same sku."""
 
+    def __init__(self, *, is_switch=False):
+        # Switch (mid-term upgrade) orders may legitimately target an item that already
+        # exists in the agreement (e.g. a previous switch order already switched to the
+        # same Adobe product). For those orders the "existing item" check is skipped and
+        # the existing agreement subscription is updated later instead of being failed.
+        self.is_switch = is_switch
+
     def __call__(self, client, context, next_step):
         """Validates if Adobe Order contains duplicated items, with the same sku."""
         items = [line["item"]["id"] for line in context.order["lines"]]
@@ -1341,22 +1348,23 @@ class ValidateDuplicateLines(Step):
             )
             return
 
-        items = []
-        for subscription in context.order["agreement"]["subscriptions"]:
-            for line in subscription["lines"]:
-                items.append(line["item"]["id"])
+        if not self.is_switch:
+            items = []
+            for subscription in context.order["agreement"]["subscriptions"]:
+                for line in subscription["lines"]:
+                    items.append(line["item"]["id"])
 
-        items.extend([
-            line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0
-        ])
-        duplicates = [item for item, count in Counter(items).items() if count > 1]
-        if duplicates:
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_EXISTING_ITEMS.to_dict(duplicates=",".join(duplicates)),
-            )
-            return
+            items.extend([
+                line["item"]["id"] for line in context.order["lines"] if line["oldQuantity"] == 0
+            ])
+            duplicates = [item for item, count in Counter(items).items() if count > 1]
+            if duplicates:
+                switch_order_to_failed(
+                    client,
+                    context.order,
+                    ERR_EXISTING_ITEMS.to_dict(duplicates=",".join(duplicates)),
+                )
+                return
 
         next_step(client, context)
 
