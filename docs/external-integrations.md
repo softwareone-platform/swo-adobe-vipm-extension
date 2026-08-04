@@ -21,5 +21,12 @@ index and does not duplicate those tables.
 - Adobe credentials (`EXT_ADOBE_CREDENTIALS_FILE`) and authorizations
   (`EXT_ADOBE_AUTHORIZATIONS_FILE`) are JSON files that must stay consistent;
   their formats are documented in [deployment.md](deployment.md).
+- An Adobe call that fails before any HTTP response arrives (dropped connection,
+  timeout) raises `AdobeTransportError`, which sits outside the `AdobeError`
+  hierarchy on purpose so flows that fail an order on an Adobe business rejection
+  do not fail it on a network fault. Fulfillment logs these as warnings and does
+  not raise a Teams alert: the order stays in processing and is re-dispatched, and
+  a run of failures that outlives the order due date fails the order through the
+  normal due-date path.
 - Email notifications (AWS SES) are optional and only active when
   `EXT_EMAIL_NOTIFICATIONS_ENABLED` is set.

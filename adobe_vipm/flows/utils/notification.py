@@ -5,7 +5,9 @@ from adobe_vipm.notifications import send_exception
 
 
 @functools.cache
-def notify_unhandled_exception_in_teams(process: str, order_id: str, traceback: str) -> None:
+def notify_unhandled_exception_in_teams(
+    process: str, order_id: str, traceback: str, step: str | None = None
+) -> None:
     """
     Notify unhandled exception when processing the order to teams channel.
 
@@ -13,11 +15,13 @@ def notify_unhandled_exception_in_teams(process: str, order_id: str, traceback: 
         process: Name of the process or action.
         order_id: MPT order id.
         traceback: Traceback to report in the notification.
+        step: Pipeline step that raised the exception, when known.
     """
+    failed_step = f" in step **{step}**" if step else ""
     send_exception(
         f"Order {process} unhandled exception!",
         f"An unhandled exception has been raised while performing {process} "
-        f"of the order **{order_id}**:\n\n"
+        f"of the order **{order_id}**{failed_step}:\n\n"
         f"```{traceback}```",
     )
 

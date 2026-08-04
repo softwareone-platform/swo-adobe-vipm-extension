@@ -21,7 +21,12 @@ from adobe_vipm.adobe.constants import (
     ResellerChangeAction,
 )
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization, ReturnableOrderInfo
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
+from adobe_vipm.adobe.errors import (
+    AdobeAPIError,
+    AdobeError,
+    AdobeProductNotFoundError,
+    AdobeTransportError,
+)
 from adobe_vipm.adobe.utils import join_phone_number, to_adobe_line_id
 from adobe_vipm.flows.constants import GOVERNMENT_AGENCY_TYPE_FEDERAL, Param
 from adobe_vipm.flows.context import Context
@@ -2179,11 +2184,38 @@ def test_get_auth_token_error(requests_mocker, settings, mock_adobe_config, adob
     requests_mocker.post(
         settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"],
         status=403,
+        json={"error": "invalid_client", "error_description": "Invalid credentials"},
     )
     client = adobe_client.AdobeClient()
 
-    with pytest.raises(requests.HTTPError):
+    with pytest.raises(AdobeAPIError) as cv:
         client._get_auth_token(authorization)
+
+    assert cv.value.code == "invalid_client"
+
+
+def test_get_auth_token_transport_error(
+    requests_mocker, settings, mock_adobe_config, adobe_config_file
+):
+    authorization = Authorization(
+        authorization_uk="auth_uk",
+        authorization_id="auth_id",
+        name="test",
+        client_id="client_id",
+        client_secret="client_secret",  # ruff:ignore[hardcoded-password-func-arg]
+        currency="USD",
+        distributor_id="distributor_id",
+    )
+    requests_mocker.post(
+        settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"],
+        body=requests.ConnectionError("Connection aborted."),
+    )
+    client = adobe_client.AdobeClient()
+
+    with pytest.raises(AdobeTransportError) as cv:
+        client._get_auth_token(authorization)
+
+    assert settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"] in str(cv.value)
 
 
 def test_get_adobe_client(mocker):
