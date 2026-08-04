@@ -55,6 +55,7 @@ Repository-specific guidance:
 - prefer existing fixtures from [`tests/conftest.py`](../tests/conftest.py) and domain-specific `conftest.py` files under `tests/`
 - add or update tests next to the affected domain area instead of creating catch-all test files
 - keep external service calls mocked; do not make live Adobe, Marketplace, Airtable, NAV, or notification calls in tests
+- the `requests_mocker` fixture (backed by `responses`) emulates retries for HTTP statuses only, and re-raises a registered exception body without retry emulation; cover transport-level retry behavior such as dropped connections by asserting the adapter's `urllib3` retry policy instead of driving a live retry through the mock
 - cover action-specific behavior in the matching fulfillment or validation test module when changing those flows
 - cover command behavior in [`tests/management/commands/`](../tests/management/commands) when changing scheduled or operational commands
 

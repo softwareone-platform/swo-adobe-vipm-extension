@@ -2,12 +2,14 @@ import copy
 import datetime as dt
 import json
 from hashlib import sha256
+from http.client import RemoteDisconnected
 from urllib.parse import urljoin
 
 import pytest
 import requests
 from freezegun import freeze_time
 from responses import matchers
+from urllib3.exceptions import ProtocolError
 
 from adobe_vipm.adobe import client as adobe_client
 from adobe_vipm.adobe.config import REQUIRED_API_SCOPES
@@ -3426,7 +3428,7 @@ def test_get_flex_discounts_follows_pagination_links(
 
 
 def test_build_session_retry_policy_scoped_to_transient_get_requests():
-    session = adobe_client._build_retrying_session()
+    session = adobe_client._build_retrying_session("https://auth.adobe.io/token")
 
     result = session.get_adapter("https://partners.adobe.io").max_retries
 
@@ -3436,12 +3438,23 @@ def test_build_session_retry_policy_scoped_to_transient_get_requests():
     # 429 and 500 are the only transient statuses Adobe raises; 4xx client
     # errors must never be retried.
     assert set(result.status_forcelist) == {429, 500}
-    # Retries are scoped to idempotent GET; POST/PATCH are never retried.
+    # Status and read retries are scoped to idempotent GET; POST/PATCH that
+    # already reached Adobe are never resent.
     assert result.allowed_methods == frozenset(("GET",))
-    # Retries are status-only: connection/read/other transport errors are not retried.
-    assert result.connect == 0
-    assert result.read == 0
+    # Dropped pooled connections are read errors and connection refusals are
+    # connect errors; both must be retried.
+    assert result.connect == 3
+    assert result.read == 3
+    # Transport errors urllib3 cannot classify stay unretried.
     assert result.other == 0
+
+
+def test_build_session_retry_policy_retries_token_post_on_auth_endpoint():
+    session = adobe_client._build_retrying_session("https://auth.adobe.io/token")
+
+    result = session.get_adapter("https://auth.adobe.io/token").max_retries
+
+    assert result.allowed_methods == frozenset(("GET", "POST"))
 
 
 def test_client_wires_retrying_session(settings, mock_adobe_config, adobe_config_file):
@@ -3452,6 +3465,52 @@ def test_client_wires_retrying_session(settings, mock_adobe_config, adobe_config
     assert isinstance(client._session, requests.Session)
     assert set(result.status_forcelist) == {429, 500}
     assert result.allowed_methods == frozenset(("GET",))
+
+
+def test_client_wires_auth_endpoint_retrying_adapter(
+    settings, mock_adobe_config, adobe_config_file
+):
+    client = adobe_client.AdobeClient()
+
+    result = client._session.get_adapter(
+        settings.EXTENSION_CONFIG["ADOBE_AUTH_ENDPOINT_URL"]
+    ).max_retries
+
+    assert result.allowed_methods == frozenset(("GET", "POST"))
+
+
+@pytest.mark.parametrize(
+    ("adapter_url", "method"),
+    [
+        ("https://partners.adobe.io", "GET"),
+        ("https://auth.adobe.io/token", "GET"),
+        ("https://auth.adobe.io/token", "POST"),
+    ],
+)
+def test_dropped_connection_is_retried(adapter_url, method):
+    session = adobe_client._build_retrying_session("https://auth.adobe.io/token")
+    retry = session.get_adapter(adapter_url).max_retries
+
+    result = retry.increment(
+        method=method,
+        url=adapter_url,
+        error=ProtocolError("Connection aborted.", RemoteDisconnected("dropped")),
+    )
+
+    assert result.read == adobe_client.ADOBE_RETRY_TOTAL - 1
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+def test_dropped_connection_is_not_retried_for_api_write_requests(method):
+    session = adobe_client._build_retrying_session("https://auth.adobe.io/token")
+    retry = session.get_adapter("https://partners.adobe.io").max_retries
+
+    with pytest.raises(ProtocolError):
+        retry.increment(
+            method=method,
+            url="https://partners.adobe.io",
+            error=ProtocolError("Connection aborted.", RemoteDisconnected("dropped")),
+        )
 
 
 def test_get_request_retries_transient_500_then_succeeds(
