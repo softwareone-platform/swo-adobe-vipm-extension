@@ -1,6 +1,7 @@
 import logging
 import traceback
 
+from adobe_vipm.adobe.errors import AdobeTransportError
 from adobe_vipm.flows.constants import OrderType
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.configuration import fulfill_configuration_order
@@ -9,6 +10,7 @@ from adobe_vipm.flows.fulfillment.reseller_transfer import fulfill_reseller_chan
 from adobe_vipm.flows.fulfillment.switch import fulfill_switch_order
 from adobe_vipm.flows.fulfillment.termination import fulfill_termination_order
 from adobe_vipm.flows.fulfillment.transfer import fulfill_transfer_order
+from adobe_vipm.flows.pipeline import get_failed_step
 from adobe_vipm.flows.utils import notify_unhandled_exception_in_teams, strip_trace_id
 from adobe_vipm.flows.utils.validation import (
     is_migrate_customer,
@@ -58,10 +60,26 @@ def fulfill_order(client, order):
             validators[order.get("type")](client, order)
         else:
             logger.info("Order %s is not a valid order type", order["id"])
-    except Exception:
+    except AdobeTransportError as error:
+        # A transport fault is transient and self-recovering: the order stays in processing
+        # and is re-dispatched, and a run of failures that outlives the due date fails the
+        # order through SetupDueDate. Log it for the dashboards instead of alerting on a
+        # network blip; the error is re-raised so the failed pass stays visible.
+        logger.warning(
+            "%s order %s: transient Adobe transport failure in %s for authorization %s: %s. "
+            "The order stays in processing and will be retried.",
+            order["type"],
+            order["id"],
+            get_failed_step(error) or "fulfillment",
+            order.get("authorization", {}).get("id", "unknown"),
+            error,
+        )
+        raise
+    except Exception as error:
         notify_unhandled_exception_in_teams(
             "fulfillment",
             order["id"],
             strip_trace_id(traceback.format_exc()),
+            step=get_failed_step(error),
         )
         raise

@@ -1,6 +1,6 @@
 import pytest
 
-from adobe_vipm.flows.pipeline import Cursor, Pipeline, Step
+from adobe_vipm.flows.pipeline import Cursor, Pipeline, Step, get_failed_step
 
 
 def test_pipeline_completes(mocker, mock_mpt_client):
@@ -65,3 +65,28 @@ def test_pipeline_exception_default_handler(mocker, mock_mpt_client):
 
     with pytest.raises(Exception, match="exception!"):
         pipeline.run(mock_mpt_client, mocked_context)
+
+
+def test_pipeline_records_the_step_that_raised(mocker, mock_mpt_client):
+    class PassingStep(Step):
+        def __call__(self, client, context, next_step):
+            next_step(client, context)
+
+    # BL
+    class FailingStep(Step):
+        def __call__(self, client, context, next_step):
+            raise ValueError("boom")
+
+    # BL
+    pipeline = Pipeline(PassingStep(), FailingStep())
+
+    with pytest.raises(ValueError) as cv:
+        pipeline.run(mock_mpt_client, mocker.MagicMock())
+
+    assert get_failed_step(cv.value) == "FailingStep"
+
+
+def test_get_failed_step_returns_none_outside_a_pipeline():
+    result = get_failed_step(ValueError("boom"))
+
+    assert result is None
