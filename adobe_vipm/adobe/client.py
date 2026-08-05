@@ -9,6 +9,7 @@ from urllib3.util.retry import Retry
 
 from adobe_vipm.adobe.config import Config, get_config
 from adobe_vipm.adobe.dataclasses import APIToken, Authorization
+from adobe_vipm.adobe.errors import wrap_http_error
 from adobe_vipm.adobe.mixins.customer import CustomerClientMixin
 from adobe_vipm.adobe.mixins.deployment import DeploymentClientMixin
 from adobe_vipm.adobe.mixins.order import OrderClientMixin
@@ -123,10 +124,13 @@ class AdobeClient(
             "x-correlation-id": correlation_id or str(uuid4()),
         }
 
+    @wrap_http_error
     def _refresh_auth_token(self, authorization: Authorization):
         """Request an authentication token for the Adobe VIPM API.
 
-        Using the credentials associated to a given the reseller.
+        Using the credentials associated to a given the reseller. Wrapped so a failure of the
+        auth endpoint is reported against the token request instead of being caught by the
+        calling method's wrapper and attributed to the Adobe API call that triggered it.
         """
         response = self._session.post(
             url=self._config.auth_endpoint_url,

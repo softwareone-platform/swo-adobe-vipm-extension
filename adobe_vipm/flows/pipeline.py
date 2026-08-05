@@ -24,6 +24,24 @@ def _default_error_handler(error: Exception, context: Context, next_step: NextSt
     raise error
 
 
+# Attribute used to record which step an error came from. Set on the exception instead of
+# wrapping it, so the exception type the flows and error handlers match on stays unchanged.
+FAILED_STEP_ATTRIBUTE = "mpt_failed_step"
+
+
+def get_failed_step(error: Exception) -> str | None:
+    """
+    Return the name of the pipeline step that raised the error.
+
+    Args:
+        error: An exception raised while a pipeline was running.
+
+    Returns:
+        The step class name, or None when the error did not come from a pipeline step.
+    """
+    return getattr(error, FAILED_STEP_ATTRIBUTE, None)
+
+
 class Cursor:
     def __init__(self, steps, error_handler):
         self.queue = steps
@@ -38,6 +56,10 @@ class Cursor:
         try:
             current_step(client, context, next_step)
         except Exception as error:
+            # The innermost cursor annotates first, so the step that actually raised wins
+            # over the outer steps the error propagates through.
+            if not get_failed_step(error):
+                setattr(error, FAILED_STEP_ATTRIBUTE, type(current_step).__name__)
             self.error_handler(error, context, next_step)
 
 

@@ -1,7 +1,9 @@
 import pytest
 
+from adobe_vipm.adobe.errors import AdobeTransportError
 from adobe_vipm.flows.errors import MPTAPIError
 from adobe_vipm.flows.fulfillment.base import fulfill_order
+from adobe_vipm.flows.pipeline import FAILED_STEP_ATTRIBUTE
 from adobe_vipm.flows.utils import strip_trace_id
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
@@ -26,6 +28,41 @@ def test_fulfill_order_exception(mocker, mpt_error_factory, order_factory, mock_
     assert process == "fulfillment"
     assert order_id == order["id"]
     assert strip_trace_id(str(error)) in tb
+
+
+def test_fulfill_order_exception_reports_the_failed_step(
+    mocker, mpt_error_factory, order_factory, mock_mpt_client
+):
+    error = MPTAPIError(500, mpt_error_factory(500, "Internal Server Error", "Oops!"))
+    setattr(error, FAILED_STEP_ATTRIBUTE, "CompleteOrder")
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.notify_unhandled_exception_in_teams"
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.fulfill_purchase_order",
+        side_effect=error,
+    )
+
+    with pytest.raises(MPTAPIError):
+        fulfill_order(mock_mpt_client, order_factory(order_id="ORD-FFFF"))
+
+    assert mocked_notify.mock_calls[0].kwargs == {"step": "CompleteOrder"}
+
+
+def test_fulfill_order_transport_error_is_not_notified(mocker, order_factory, mock_mpt_client):
+    error = AdobeTransportError("GET https://partners.adobe.io/v3", "Connection aborted.")
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.notify_unhandled_exception_in_teams"
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.fulfill_purchase_order",
+        side_effect=error,
+    )
+
+    with pytest.raises(AdobeTransportError):
+        fulfill_order(mock_mpt_client, order_factory(order_id="ORD-FFFF"))
+
+    mocked_notify.assert_not_called()
 
 
 @pytest.mark.parametrize("order_type", ["purchase", "change", "configuration", "termination"])
