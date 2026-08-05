@@ -79,6 +79,7 @@ class Param(StrEnum):
     ADOBE_ORDER_IDS = "adobeOrderIds"
     LATE_RENEWALS_INFO = "lateRenewalsInfo"
     SWITCH_PAYLOAD = "switchPayload"
+    RENEWAL_PAYLOAD = "renewalPayload"
 
 
 PARAM_REQUIRED_CUSTOMER_ORDER = (
@@ -473,6 +474,26 @@ ERR_MANUAL_RENEWAL_PREVIEW_FAILED = ValidationError(
 ERR_MANUAL_RENEWAL_ORDER_FAILED = ValidationError(
     "VIPM0044",
     "Manual renewal order failed for subscription {subscription_id}: {error}.",
+)
+
+ERR_RENEWAL_SUBSCRIPTION_NOT_FOUND = ValidationError(
+    "VIPM0045",
+    "The Adobe subscription {subscription_id} referenced by the renewal plan was not found.",
+)
+
+ERR_RENEWAL_PREVIEW_FAILED = ValidationError(
+    "VIPM0046",
+    "The renewal preview validation failed: {error}.",
+)
+
+ERR_RENEWAL_NET_NEW_FAILED = ValidationError(
+    "VIPM0047",
+    "Failed to create the scheduled subscription for offer {offer_id}: {error}.",
+)
+
+ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED = ValidationError(
+    "VIPM0048",
+    "Failed to update the auto-renewal preference of subscription {subscription_id}: {error}.",
 )
 
 

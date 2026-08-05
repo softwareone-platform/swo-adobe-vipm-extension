@@ -38,6 +38,12 @@ class Context:
     membership_id: str | None = None
     adobe_transfer: dict | None = None
     adobe_transfer_order: dict = field(default_factory=dict)
+    renewal_payload: dict | None = None
+    renewal_plan_subscriptions: list = field(default_factory=list)
+    renewal_net_new_subscriptions: dict = field(default_factory=dict)
+    renewal_created_net_new_subscriptions: dict = field(default_factory=dict)
+    adobe_customer_subscriptions: list = field(default_factory=list)
+    preview_renewal_order: dict | None = None
 
     def __str__(self):
         due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else "-"

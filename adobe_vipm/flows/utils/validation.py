@@ -12,6 +12,7 @@ from adobe_vipm.flows.utils.market_segment import (
 )
 from adobe_vipm.flows.utils.parameter import (
     get_ordering_parameter,
+    get_renewal_payload,
     get_switch_payload,
     is_ordering_param_required,
 )
@@ -132,6 +133,19 @@ def is_switch_order(order: dict) -> bool:
         if the switch payload ordering parameter is set.
     """
     return bool(get_switch_payload(order))
+
+
+def is_renewal_order(order: dict) -> bool:
+    """
+    Checks if order is a change order for an at-anniversary renewal.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        if the renewal payload ordering parameter is set.
+    """
+    return bool(get_renewal_payload(order))
 
 
 def validate_government_lga_data(order: dict, adobe_data: dict):

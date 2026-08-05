@@ -100,3 +100,17 @@ def test_fulfill_order_switch(
     fulfill_order(mock_mpt_client, order)  # act
 
     mocked_fulfill.assert_called_once_with(mock_mpt_client, order)
+
+
+def test_fulfill_order_renewal(
+    mocker, order_factory, mock_mpt_client, order_parameters_factory, renewal_payload
+):
+    mocked_fulfill = mocker.patch("adobe_vipm.flows.fulfillment.base.fulfill_renewal_order")
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(renewal_payload=renewal_payload),
+    )
+
+    fulfill_order(mock_mpt_client, order)  # act
+
+    mocked_fulfill.assert_called_once_with(mock_mpt_client, order)

@@ -30,7 +30,10 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
 1. **Entry layer** (`extension.py`) — receives order events and validation requests.
 2. **Fulfilment** (`flows/fulfillment/`) — `fulfill_order()` in `base.py` routes by
    order type to `purchase.py`, `change.py`, `transfer.py`, `reseller_transfer.py`,
-   `termination.py`, and `configuration.py`; `shared.py` holds common utilities.
+   `termination.py`, and `configuration.py`; change orders carrying a
+   `switchPayload` or `renewalPayload` ordering parameter are routed to
+   `switch.py` (mid-term upgrades) and `renewal.py` (at-anniversary renewals);
+   `shared.py` holds common utilities.
 3. **Validation** (`flows/validation/`) — `validate_order()` in `base.py` routes to
    per-type validators (`purchase.py`, `change.py`, `transfer.py`, `termination.py`).
 4. **Sync** (`flows/sync/`) — Adobe-to-MPT synchronisation for `agreement.py`,
