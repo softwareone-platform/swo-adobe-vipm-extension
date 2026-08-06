@@ -302,6 +302,7 @@ def order_parameters_factory():
         p3yc_consumables="",
         adobe_order_ids="",
         switch_payload=None,
+        renewal_payload=None,
     ):
         if address is None:
             address = {
@@ -443,9 +444,51 @@ def order_parameters_factory():
                     "required": False,
                 },
             })
+        if renewal_payload is not None:
+            parameters.append({
+                "id": "PAR-0000-0012",
+                "name": "At-anniversary renewal payload",
+                "externalId": Param.RENEWAL_PAYLOAD.value,
+                "type": "DataObject",
+                "value": renewal_payload,
+                "constraints": {
+                    "hidden": True,
+                    "required": False,
+                },
+            })
         return parameters
 
     return _order_parameters
+
+
+@pytest.fixture
+def renewal_payload():
+    return {
+        "recommendationTrackerId": "8fe13fb6-72a1-451b-901b-d92da956282d",
+        "currencyCode": "USD",
+        "subscriptions": [
+            {
+                "subscriptionId": "renewing-sub-id",
+                "offerId": "65304578CA01A12",
+                "renew": True,
+                "renewalQuantity": 15,
+                "flexDiscountCodes": ["CODE-1"],
+            },
+            {
+                "subscriptionId": "lapsing-sub-id",
+                "offerId": "77777777CA01A12",
+                "renew": False,
+                "renewalQuantity": 0,
+                "flexDiscountCodes": [],
+            },
+        ],
+        "netNewItems": [
+            {
+                "offerId": "65322651CA01A12",
+                "quantity": 5,
+            },
+        ],
+    }
 
 
 @pytest.fixture
@@ -1488,6 +1531,7 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.benefits",
         "adobe_vipm.flows.fulfillment.change",
         "adobe_vipm.flows.fulfillment.purchase",
+        "adobe_vipm.flows.fulfillment.renewal",
         "adobe_vipm.flows.fulfillment.shared",
         "adobe_vipm.flows.fulfillment.switch",
         "adobe_vipm.flows.fulfillment.configuration",

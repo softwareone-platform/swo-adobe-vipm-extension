@@ -6,6 +6,7 @@ from pytest_mock import MockerFixture
 
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import (
+    get_renewal_payload,
     get_switch_payload,
     update_agreement_params_visibility,
 )
@@ -155,5 +156,46 @@ def test_get_switch_payload_not_set(order_factory):
     order = order_factory(order_type="Change")
 
     result = get_switch_payload(order)  # act
+
+    assert result is None
+
+
+def test_get_renewal_payload(order_factory, order_parameters_factory, renewal_payload):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(renewal_payload=renewal_payload),
+    )
+
+    result = get_renewal_payload(order)  # act
+
+    assert result == renewal_payload
+
+
+def test_get_renewal_payload_json_string(order_factory, order_parameters_factory, renewal_payload):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(renewal_payload=json.dumps(renewal_payload)),
+    )
+
+    result = get_renewal_payload(order)  # act
+
+    assert result == renewal_payload
+
+
+def test_get_renewal_payload_empty_string(order_factory, order_parameters_factory):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(renewal_payload=""),
+    )
+
+    result = get_renewal_payload(order)  # act
+
+    assert result is None
+
+
+def test_get_renewal_payload_not_set(order_factory):
+    order = order_factory(order_type="Change")
+
+    result = get_renewal_payload(order)  # act
 
     assert result is None
