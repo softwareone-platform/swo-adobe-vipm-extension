@@ -41,6 +41,11 @@ Deployed workloads receive configuration through Helm config maps, secrets, and 
 
 ## Airtable And Tool Storage Settings
 
+`MPT_TOOL_STORAGE_AIRTABLE_API_KEY` and `EXT_AIRTABLE_API_TOKEN` are both fed by
+the Helm secret `AirTableApiToken`, which carries the shared Airtable
+service-account token. DevOps provisions and rotates that token; a rotation is a
+secret swap only, with no manifest changes.
+
 | Environment Variable | Default | Example | Description |
 | --- | --- | --- | --- |
 | `MPT_TOOL_STORAGE_TYPE` | `local` | `airtable` | `mpt-tool` storage backend |
