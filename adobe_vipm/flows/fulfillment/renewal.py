@@ -198,7 +198,9 @@ class CreateNetNewSubscriptions(Step):
     Runs before any auto-renewal update so the additive operations always
     precede the subtractive ones and the renewing aggregate never dips below
     the 3YC committed minimum. The step is idempotent: a scheduled (1009)
-    subscription already holding the offer is reused instead of re-created.
+    subscription already holding the offer is reused instead of re-created,
+    and its auto-renewal is restored to the plan state when a previous
+    reversal disabled it.
     """
 
     def __call__(self, client, context, next_step):
@@ -221,8 +223,9 @@ class CreateNetNewSubscriptions(Step):
                 existing["subscriptionId"],
                 offer_id,
             )
-            context.renewal_net_new_subscriptions[offer_id] = existing
-            return True
+            return self._reuse_scheduled_subscription(
+                adobe_client, client, context, net_new_item, existing
+            )
 
         try:
             subscription = adobe_client.create_customer_subscription(
@@ -255,6 +258,60 @@ class CreateNetNewSubscriptions(Step):
             context,
             subscription["subscriptionId"],
             offer_id,
+        )
+        context.renewal_net_new_subscriptions[offer_id] = subscription
+        context.renewal_created_net_new_subscriptions[offer_id] = subscription
+        return True
+
+    def _reuse_scheduled_subscription(self, adobe_client, client, context, net_new_item, existing):
+        """
+        Reuse a scheduled subscription, restoring its auto-renewal plan state when needed.
+
+        A scheduled subscription neutralized by a previous reversal (auto-renewal
+        disabled) or holding a stale renewal quantity is patched back to the plan
+        state; one already in place is reused as-is. A re-enabled subscription is
+        tracked as mutated-by-this-run so a later reversal neutralizes it again.
+        """
+        offer_id = net_new_item["offerId"]
+        auto_renewal = existing.get("autoRenewal", {})
+        quantity = net_new_item["quantity"]
+        if (
+            auto_renewal.get("enabled", False)
+            and auto_renewal.get(Param.RENEWAL_QUANTITY.value) == quantity
+        ):
+            context.renewal_net_new_subscriptions[offer_id] = existing
+            return True
+
+        try:
+            subscription = adobe_client.update_subscription(
+                context.authorization_id,
+                context.adobe_customer_id,
+                existing["subscriptionId"],
+                auto_renewal=True,
+                quantity=quantity,
+            )
+        except AdobeAPIError as error:
+            logger.warning(
+                "%s: failed to restore scheduled subscription %s for offer %s: %s",
+                context,
+                existing["subscriptionId"],
+                offer_id,
+                error,
+            )
+            disable_net_new_subscriptions(adobe_client, context)
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_NET_NEW_FAILED.to_dict(offer_id=offer_id, error=error.message),
+            )
+            return False
+
+        logger.info(
+            "%s: scheduled subscription %s re-enabled for offer %s (quantity=%s)",
+            context,
+            existing["subscriptionId"],
+            offer_id,
+            quantity,
         )
         context.renewal_net_new_subscriptions[offer_id] = subscription
         context.renewal_created_net_new_subscriptions[offer_id] = subscription
@@ -382,7 +439,7 @@ class UpdateRenewalSubscriptions(Step):
             operation["subscription_id"],
             auto_renewal=operation["enabled"],
             quantity=operation["quantity"],
-            flex_discount_codes=operation["flex_discount_codes"],
+            flex_discount_codes=operation["flex_discount_codes"] or None,
         )
         logger.info(
             "%s: auto-renewal set for subscription %s (enabled=%s, quantity=%s)",
@@ -435,10 +492,10 @@ def disable_net_new_subscriptions(adobe_client, context):
 
     A scheduled (1009) subscription cannot be deleted: disabling its
     auto-renewal prevents it from activating at the anniversary, which is the
-    documented reversal path. Only the subscriptions created during this run
-    are touched: a reused scheduled subscription was not created by this
-    reversal's mutations, so its auto-renewal is preserved. Failures are
-    logged and skipped (best effort).
+    documented reversal path. Only the subscriptions created or re-enabled
+    during this run are touched: a reused scheduled subscription whose
+    auto-renewal was already in place was not mutated by this run, so its
+    auto-renewal is preserved. Failures are logged and skipped (best effort).
     """
     for offer_id, subscription in context.renewal_created_net_new_subscriptions.items():
         try:
@@ -612,7 +669,6 @@ def fulfill_renewal_order(client, order):
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
         SetupRenewalPlan(),
-        PreviewRenewal(),
         CreateNetNewSubscriptions(),
         UpdateRenewalSubscriptions(),
         CreateNetNewMptSubscriptions(),

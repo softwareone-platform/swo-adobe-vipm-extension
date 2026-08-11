@@ -290,9 +290,89 @@ def test_create_net_new_subscriptions_step_reuses_scheduled_subscription(
     step(mock_mpt_client, renewal_context, mocked_next_step)  # act
 
     mock_adobe_client.create_customer_subscription.assert_not_called()
+    mock_adobe_client.update_subscription.assert_not_called()
     assert renewal_context.renewal_net_new_subscriptions == {"65322651CA01A12": scheduled_sub}
     assert renewal_context.renewal_created_net_new_subscriptions == {}
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_create_net_new_subscriptions_step_restores_neutralized_scheduled_subscription(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context, adobe_subscription_factory
+):
+    neutralized_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        current_quantity=0,
+        renewal_quantity=0,
+        autorenewal_enabled=False,
+        status=AdobeSubscriptionStatus.SCHEDULED.value,
+    )
+    restored_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        current_quantity=0,
+        renewal_quantity=5,
+        status=AdobeSubscriptionStatus.SCHEDULED.value,
+    )
+    renewal_context.adobe_customer_subscriptions = [neutralized_sub]
+    mock_adobe_client.update_subscription.return_value = restored_sub
+    mocked_next_step = mocker.MagicMock()
+    step = CreateNetNewSubscriptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_customer_subscription.assert_not_called()
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        renewal_context.authorization_id,
+        renewal_context.adobe_customer_id,
+        "net-new-sub-id",
+        auto_renewal=True,
+        quantity=5,
+    )
+    assert renewal_context.renewal_net_new_subscriptions == {"65322651CA01A12": restored_sub}
+    assert renewal_context.renewal_created_net_new_subscriptions == {
+        "65322651CA01A12": restored_sub
+    }
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_create_net_new_subscriptions_step_restore_adobe_error(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_context,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    neutralized_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        current_quantity=0,
+        renewal_quantity=0,
+        autorenewal_enabled=False,
+        status=AdobeSubscriptionStatus.SCHEDULED.value,
+    )
+    renewal_context.adobe_customer_subscriptions = [neutralized_sub]
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.INVALID_FIELDS.value,
+            message="Ineligible product or orderType",
+        ),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = CreateNetNewSubscriptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_customer_subscription.assert_not_called()
+    mocked_switch_to_failed.assert_called_once()
+    assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert renewal_context.renewal_net_new_subscriptions == {}
+    mocked_next_step.assert_not_called()
 
 
 def test_create_net_new_subscriptions_step_no_net_new_items(
@@ -398,7 +478,7 @@ def test_update_renewal_subscriptions_step_additive_before_subtractive(
             "enable-sub-id",
             auto_renewal=True,
             quantity=5,
-            flex_discount_codes=[],
+            flex_discount_codes=None,
         ),
         mocker.call(
             renewal_context.authorization_id,
@@ -414,7 +494,7 @@ def test_update_renewal_subscriptions_step_additive_before_subtractive(
             "decrease-sub-id",
             auto_renewal=True,
             quantity=3,
-            flex_discount_codes=[],
+            flex_discount_codes=None,
         ),
         mocker.call(
             renewal_context.authorization_id,
@@ -689,7 +769,6 @@ def test_fulfill_renewal_order(mocker):
         UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
         SetupRenewalPlan,
-        PreviewRenewal,
         CreateNetNewSubscriptions,
         UpdateRenewalSubscriptions,
         CreateNetNewMptSubscriptions,
@@ -703,6 +782,6 @@ def test_fulfill_renewal_order(mocker):
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[13].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[12].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
