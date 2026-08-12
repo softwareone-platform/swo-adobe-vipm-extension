@@ -18,11 +18,13 @@ from requests import HTTPError
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
 from adobe_vipm.airtable.models import (
     AirTableBaseInfo,
+    create_discount_redemptions,
     create_gc_agreement_deployments,
     create_gc_main_agreement,
     create_offers,
     get_adobe_product_by_marketplace_sku,
     get_agreement_deployment_view_link,
+    get_discount_redemption_model,
     get_gc_agreement_deployment_model,
     get_gc_agreement_deployments_by_main_agreement,
     get_gc_agreement_deployments_to_check,
@@ -125,6 +127,60 @@ def test_create_offers(mocker, settings):
         offer_id=offers[0]["offer_id"],
         quantity=offers[0]["quantity"],
         renewal_date=offers[0]["renewal_date"],
+    )
+
+
+def test_airtable_base_info_for_discounts(settings):
+    api_key = "airtable-token"
+    base_id = "discounts-base-id"
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": api_key,
+        "AIRTABLE_DISCOUNTS_ID": base_id,
+    }
+
+    result = AirTableBaseInfo.for_discounts()
+
+    assert result.api_key == api_key
+    assert result.base_id == base_id
+
+
+def test_get_discount_redemption_model():
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+
+    result = get_discount_redemption_model(base_info)
+
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
+
+
+def test_create_discount_redemptions(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
+    }
+    mocked_redemption = mocker.MagicMock()
+    mocked_redemption_model = mocker.MagicMock(return_value=mocked_redemption)
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_redemption_model",
+        return_value=mocked_redemption_model,
+    )
+    redemptions = [
+        {
+            "code": "CODE-1",
+            "customer_id": "customer-id",
+            "order_id": "ORD-1234-5678",
+            "redeemed_at": dt.datetime(2026, 8, 12, 10, 0, tzinfo=dt.UTC),
+        }
+    ]
+
+    create_discount_redemptions(redemptions)  # act
+
+    mocked_redemption_model.batch_save.assert_called_once_with([mocked_redemption])
+    mocked_redemption_model.assert_called_once_with(
+        code=redemptions[0]["code"],
+        customer_id=redemptions[0]["customer_id"],
+        order_id=redemptions[0]["order_id"],
+        redeemed_at=redemptions[0]["redeemed_at"],
     )
 
 

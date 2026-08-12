@@ -22,6 +22,7 @@ data:
   EXT_AIRTABLE_BASES: {{ .Values.global.AirTableBases | quote }}
   EXT_AIRTABLE_SKU_MAPPING_BASE: {{ .Values.global.AirTableSkuMappingBase | quote }}
   EXT_AIRTABLE_PRICING_BASES: {{ .Values.global.AirTablePricingBases | quote }}
+  EXT_AIRTABLE_DISCOUNTS_ID: {{ .Values.global.AirTableDiscountsId | quote }}
   EXT_NAV_API_BASE_URL: {{ .Values.global.NavApiBaseUrl | quote }}
   EXT_NAV_AUTH_ENDPOINT_URL: {{ .Values.global.NavAuthEndpointUrl | quote }}
   EXT_NAV_AUTH_AUDIENCE: {{ .Values.global.NavAuthAudience | quote }}

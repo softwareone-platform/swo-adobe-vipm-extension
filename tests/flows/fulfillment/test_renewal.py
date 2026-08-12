@@ -1,4 +1,7 @@
+import datetime as dt
+
 import pytest
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
@@ -12,6 +15,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     CreateNetNewMptSubscriptions,
     CreateNetNewSubscriptions,
     PreviewRenewal,
+    RecordDiscountRedemptions,
     RecordFlexDiscounts,
     SetupRenewalPlan,
     UpdateRenewalSubscriptions,
@@ -745,6 +749,85 @@ def test_record_flex_discounts_step_without_codes(mocker, mock_mpt_client, renew
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
 
 
+@freeze_time("2026-08-12 10:00:00")
+def test_record_discount_redemptions_step(mocker, mock_mpt_client, renewal_context):
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["CODE-1", "CODE-2"]),
+        plan_entry(
+            subscription_id="another-renewing-sub-id",
+            offer_id="65322651CA01A12",
+            flex_discount_codes=["CODE-2"],
+        ),
+        plan_entry(
+            subscription_id="lapsing-sub-id",
+            offer_id="77777777CA01A12",
+            renew=False,
+            renewal_quantity=0,
+            flex_discount_codes=["CODE-3"],
+        ),
+    ]
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    redeemed_at = dt.datetime(2026, 8, 12, 10, 0, tzinfo=dt.UTC)
+    mocked_create_redemptions.assert_called_once_with([
+        {
+            "code": "CODE-1",
+            "customer_id": "customer-id",
+            "order_id": renewal_context.order_id,
+            "redeemed_at": redeemed_at,
+        },
+        {
+            "code": "CODE-2",
+            "customer_id": "customer-id",
+            "order_id": renewal_context.order_id,
+            "redeemed_at": redeemed_at,
+        },
+    ])
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_discount_redemptions_step_without_codes(mocker, mock_mpt_client, renewal_context):
+    renewal_context.renewal_plan_subscriptions = [plan_entry()]
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_create_redemptions.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_discount_redemptions_step_airtable_error(mocker, mock_mpt_client, renewal_context):
+    renewal_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+        side_effect=Exception("airtable is down"),
+    )
+    mocked_send_exception = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.send_exception",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_send_exception.assert_called_once()
+    notification_text = mocked_send_exception.mock_calls[0].args[1]
+    assert "customer-id" in notification_text
+    assert renewal_context.order_id in notification_text
+    assert "CODE-1" in notification_text
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
 def test_fulfill_renewal_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
     mocked_pipeline_ctor = mocker.patch(
@@ -774,6 +857,7 @@ def test_fulfill_renewal_order(mocker):
         CreateNetNewMptSubscriptions,
         RecordFlexDiscounts,
         CompleteOrder,
+        RecordDiscountRedemptions,
         SetSubscriptionTemplate,
         SyncAgreement,
     ]

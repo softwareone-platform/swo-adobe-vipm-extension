@@ -180,6 +180,7 @@ EXTENSION_CONFIG = {
     },
     "AIRTABLE_API_TOKEN": "api_key",
     "AIRTABLE_BASES": {"PRD-1111-1111": "some-bases", "PRD-3333-3333": "some-bases"},
+    "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
     "PRODUCT_SEGMENT": {
         "PRD-1111-1111": "COM",
         "PRD-2222-2222": "GOV",
