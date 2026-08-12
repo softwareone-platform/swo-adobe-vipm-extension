@@ -21,6 +21,7 @@ global:
   AirTableBases: '{}'
   AirTablePricingBases: '{}'
   AirTableSkuMappingBase: ''
+  AirTableDiscountsId: ''
   MigrationRunningMaxRetries: 10
   NavApiBaseUrl: default
   NavAuthEndpointUrl: default

@@ -13,6 +13,7 @@ subscriptions are created first, then the existing subscriptions are patched
 (enable, increase, decrease, disable, in that order).
 """
 
+import datetime as dt
 import logging
 
 from mpt_extension_sdk.mpt_http.mpt import create_subscription
@@ -23,6 +24,7 @@ from adobe_vipm.adobe.constants import (
     AdobeSubscriptionStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.airtable.models import create_discount_redemptions
 from adobe_vipm.flows.constants import (
     ERR_RENEWAL_NET_NEW_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
@@ -54,6 +56,7 @@ from adobe_vipm.flows.utils import (
 )
 from adobe_vipm.flows.utils.deployment import get_deployment_id
 from adobe_vipm.flows.utils.parameter import update_fulfillment_parameter_value
+from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -641,6 +644,68 @@ class RecordFlexDiscounts(Step):
         next_step(client, context)
 
 
+class RecordDiscountRedemptions(Step):
+    """
+    Record the flex discount codes redeemed by the plan on the AirTable redemptions table.
+
+    Runs after the order has been completed, so a fulfillment retry of an
+    earlier failure never duplicates rows. One row is written per unique code
+    applied by the plan. The write is best effort: the order is already
+    completed, so an AirTable failure is logged and notified for a manual
+    backfill instead of failing the order.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Record the redeemed flex discount codes on the AirTable redemptions table."""
+        redeemed_codes = list(
+            dict.fromkeys(
+                code
+                for plan in context.renewal_plan_subscriptions
+                if plan["renew"]
+                for code in plan["flex_discount_codes"]
+            )
+        )
+        if redeemed_codes:
+            self._record_redemptions(context, redeemed_codes)
+        next_step(client, context)
+
+    def _record_redemptions(self, context, redeemed_codes):
+        redeemed_at = dt.datetime.now(tz=dt.UTC)
+        redemptions = [
+            {
+                "code": code,
+                "customer_id": context.adobe_customer_id,
+                "order_id": context.order_id,
+                "redeemed_at": redeemed_at,
+            }
+            for code in redeemed_codes
+        ]
+        try:
+            create_discount_redemptions(redemptions)
+        except Exception:
+            logger.exception(
+                "%s: failed to record %s discount redemption(s) on AirTable",
+                context,
+                len(redemptions),
+            )
+            joined_codes = ", ".join(redeemed_codes)
+            send_exception(
+                f"Error recording the discount redemptions of order {context.order_id}",
+                "The renewal order has been completed but the redeemed flex discount "
+                "codes could not be recorded on the AirTable Discount Redemptions "
+                "table and must be backfilled manually:\n"
+                f"- Customer ID: {context.adobe_customer_id}\n"
+                f"- Order ID: {context.order_id}\n"
+                f"- Codes: {joined_codes}\n",
+            )
+            return
+        logger.info(
+            "%s: recorded %s discount redemption(s) on AirTable",
+            context,
+            len(redemptions),
+        )
+
+
 def fulfill_renewal_order(client, order):
     """
     Fulfills a change order that carries an at-anniversary renewal payload.
@@ -674,6 +739,7 @@ def fulfill_renewal_order(client, order):
         CreateNetNewMptSubscriptions(),
         RecordFlexDiscounts(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
+        RecordDiscountRedemptions(),
         SetSubscriptionTemplate(),
         SyncAgreement(),
     )

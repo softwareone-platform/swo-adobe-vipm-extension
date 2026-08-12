@@ -56,6 +56,7 @@ secret swap only, with no manifest changes.
 | `EXT_AIRTABLE_BASES` | - | `{"PRD-1111-1111":"app..."}` | Per-product Airtable base mapping for migration and transfer data |
 | `EXT_AIRTABLE_PRICING_BASES` | - | `{"PRD-1111-1111":"app..."}` | Per-product Airtable base mapping for pricing data |
 | `EXT_AIRTABLE_SKU_MAPPING_BASE` | - | `appXXXXXXXX` | Airtable base id for SKU mapping |
+| `EXT_AIRTABLE_DISCOUNTS_ID` | - | `appXXXXXXXX` | Airtable base id for the flex discount redemptions recorded by renewal orders |
 | `EXT_MIGRATION_RUNNING_MAX_RETRIES` | `15` | `15` | Retry limit for migration-running logic (code default `15`; the bundled Helm chart ships `10` via `MigrationRunningMaxRetries`) |
 
 ## NAV Settings
