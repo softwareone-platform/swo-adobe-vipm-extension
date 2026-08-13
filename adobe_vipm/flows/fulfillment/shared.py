@@ -51,6 +51,7 @@ from adobe_vipm.flows.constants import (
     ERR_EXISTING_ITEMS,
     ERR_MANUAL_RENEWAL_ORDER_FAILED,
     ERR_MANUAL_RENEWAL_PREVIEW_FAILED,
+    ERR_RENEWAL_SUBSCRIPTION_NOT_FOUND,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
@@ -73,6 +74,7 @@ from adobe_vipm.flows.utils import (
     get_due_date,
     get_one_time_skus,
     get_order_line_by_sku,
+    get_renewal_payload,
     get_subscription_by_line_and_item_id,
     is_coterm_date_within_order_creation_window,
     map_returnable_to_return_orders,
@@ -1728,6 +1730,78 @@ class CheckManualRenewalSubscriptions(Step):
             sku,
             full_qty,
         )
+
+
+class SetupRenewalPlan(Step):
+    """
+    Resolve the renewal payload against the customer's Adobe subscriptions.
+
+    Shared by the at-anniversary and renew-now renewal fulfillment flows.
+    Each subscription referenced by the plan is matched to its Adobe
+    representation and its current auto-renewal state is snapshotted before
+    any mutation, so a reversal is always a restore-to-known-good. The full
+    subscription list is kept on the context so the net-new creation step can
+    detect scheduled subscriptions created by a previous attempt (idempotency).
+    """
+
+    def __call__(self, client, context, next_step):
+        """Resolve the renewal payload against the customer's Adobe subscriptions."""
+        context.renewal_payload = get_renewal_payload(context.order)
+        adobe_client = get_adobe_client()
+        subscriptions = adobe_client.get_subscriptions(
+            context.authorization_id,
+            context.adobe_customer_id,
+        )
+        context.adobe_customer_subscriptions = subscriptions["items"]
+        subscriptions_by_id = {
+            subscription["subscriptionId"]: subscription
+            for subscription in context.adobe_customer_subscriptions
+        }
+
+        context.renewal_plan_subscriptions = []
+        for entry in context.renewal_payload.get("subscriptions", []):
+            adobe_subscription = subscriptions_by_id.get(entry["subscriptionId"])
+            if not adobe_subscription:
+                switch_order_to_failed(
+                    client,
+                    context.order,
+                    ERR_RENEWAL_SUBSCRIPTION_NOT_FOUND.to_dict(
+                        subscription_id=entry["subscriptionId"],
+                    ),
+                )
+                logger.warning(
+                    "%s: subscription %s from the renewal plan not found in Adobe",
+                    context,
+                    entry["subscriptionId"],
+                )
+                return
+
+            context.renewal_plan_subscriptions.append(
+                self._build_plan_entry(entry, adobe_subscription)
+            )
+
+        logger.info(
+            "%s: renewal plan resolved (%s subscription(s), %s net-new item(s))",
+            context,
+            len(context.renewal_plan_subscriptions),
+            len(context.renewal_payload.get("netNewItems", [])),
+        )
+        next_step(client, context)
+
+    def _build_plan_entry(self, entry, adobe_subscription):
+        auto_renewal = adobe_subscription.get("autoRenewal", {})
+        return {
+            "subscription_id": entry["subscriptionId"],
+            "offer_id": entry.get("offerId") or adobe_subscription["offerId"],
+            "renew": entry["renew"],
+            "renewal_quantity": entry.get(Param.RENEWAL_QUANTITY.value) or 0,
+            "flex_discount_codes": entry.get("flexDiscountCodes") or [],
+            "snapshot": {
+                "enabled": auto_renewal.get("enabled", False),
+                "renewal_quantity": auto_renewal.get(Param.RENEWAL_QUANTITY.value),
+                "flex_discount_codes": auto_renewal.get("flexDiscountCodes") or [],
+            },
+        }
 
 
 class PreviewRenewalOrders(Step):

@@ -4,6 +4,7 @@ from adobe_vipm.flows.constants import (
     PARAM_REQUIRED_CUSTOMER_ORDER,
     AgreementType,
     Param,
+    RenewalPath,
 )
 from adobe_vipm.flows.errors import GovernmentLGANotValidOrderError, GovernmentNotValidOrderError
 from adobe_vipm.flows.utils.market_segment import (
@@ -146,6 +147,20 @@ def is_renewal_order(order: dict) -> bool:
         if the renewal payload ordering parameter is set.
     """
     return bool(get_renewal_payload(order))
+
+
+def is_renew_now_order(order: dict) -> bool:
+    """
+    Checks if order is a change order for a renew-now (early) renewal.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        if the renewal payload ordering parameter is set with renewalPath "now".
+    """
+    payload = get_renewal_payload(order)
+    return bool(payload) and payload.get("renewalPath") == RenewalPath.NOW
 
 
 def validate_government_lga_data(order: dict, adobe_data: dict):

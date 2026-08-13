@@ -29,6 +29,7 @@ from adobe_vipm.airtable import models
 from adobe_vipm.flows import utils as flows_utils
 from adobe_vipm.flows.benefits import send_3yc_expiration_notification
 from adobe_vipm.flows.constants import (
+    ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
     MARKET_SEGMENT_EDUCATION,
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_EXPIRED,
@@ -746,9 +747,16 @@ class AgreementSyncer:  # noqa: WPS214
                     line.get("id"),
                 )
                 continue
-            else:
-                actual_sku = models.get_adobe_sku(vendor_id, get_market_segment(self.product_id))
-                agreement_lines.append((line, actual_sku))
+
+            if vendor_id == ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE:
+                logger.info(
+                    "Skipping agreement line %s: early-renewal no-change placeholder item",
+                    line.get("id"),
+                )
+                continue
+
+            actual_sku = models.get_adobe_sku(vendor_id, get_market_segment(self.product_id))
+            agreement_lines.append((line, actual_sku))
 
         return agreement_lines
 

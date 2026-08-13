@@ -114,3 +114,59 @@ def test_fulfill_order_renewal(
     fulfill_order(mock_mpt_client, order)  # act
 
     mocked_fulfill.assert_called_once_with(mock_mpt_client, order)
+
+
+def test_fulfill_order_renewal_now(
+    mocker, order_factory, mock_mpt_client, order_parameters_factory, renewal_payload
+):
+    mocked_fulfill = mocker.patch("adobe_vipm.flows.fulfillment.base.fulfill_renewal_now_order")
+    mocked_fulfill_anniversary = mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.fulfill_renewal_order"
+    )
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(
+            renewal_payload={**renewal_payload, "renewalPath": "now"}
+        ),
+    )
+
+    fulfill_order(mock_mpt_client, order)  # act
+
+    mocked_fulfill.assert_called_once_with(mock_mpt_client, order)
+    mocked_fulfill_anniversary.assert_not_called()
+
+
+def test_fulfill_order_configuration_renew_now(
+    mocker, order_factory, mock_mpt_client, order_parameters_factory, renewal_payload
+):
+    mocked_fulfill = mocker.patch("adobe_vipm.flows.fulfillment.base.fulfill_renewal_now_order")
+    mocked_fulfill_configuration = mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.fulfill_configuration_order"
+    )
+    order = order_factory(
+        order_type="Configuration",
+        order_parameters=order_parameters_factory(
+            renewal_payload={**renewal_payload, "renewalPath": "now"}
+        ),
+    )
+
+    fulfill_order(mock_mpt_client, order)  # act
+
+    mocked_fulfill.assert_called_once_with(mock_mpt_client, order)
+    mocked_fulfill_configuration.assert_not_called()
+
+
+def test_fulfill_order_configuration_without_renewal_payload(
+    mocker, order_factory, mock_mpt_client
+):
+    """A plain Configuration order (no renewalPayload) still uses the standard flow."""
+    mocked_fulfill = mocker.patch("adobe_vipm.flows.fulfillment.base.fulfill_configuration_order")
+    mocked_fulfill_renewal_now = mocker.patch(
+        "adobe_vipm.flows.fulfillment.base.fulfill_renewal_now_order"
+    )
+    order = order_factory(order_type="Configuration")
+
+    fulfill_order(mock_mpt_client, order)  # act
+
+    mocked_fulfill.assert_called_once_with(mock_mpt_client, order)
+    mocked_fulfill_renewal_now.assert_not_called()
