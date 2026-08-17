@@ -28,7 +28,6 @@ from adobe_vipm.airtable.models import create_discount_redemptions
 from adobe_vipm.flows.constants import (
     ERR_RENEWAL_NET_NEW_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
-    ERR_RENEWAL_SUBSCRIPTION_NOT_FOUND,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     TEMPLATE_NAME_CHANGE,
     Param,
@@ -39,6 +38,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
+    SetupRenewalPlan,
     StartOrderProcessing,
     SyncAgreement,
     UpdateAgreementParamsVisibility,
@@ -50,7 +50,6 @@ from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_order_line_by_sku,
-    get_renewal_payload,
     get_subscription_by_line_and_item_id,
     notify_not_updated_subscriptions,
 )
@@ -60,77 +59,6 @@ from adobe_vipm.notifications import send_exception
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
-
-
-class SetupRenewalPlan(Step):
-    """
-    Resolve the renewal payload against the customer's Adobe subscriptions.
-
-    Each subscription referenced by the plan is matched to its Adobe
-    representation and its current auto-renewal state is snapshotted before
-    any mutation, so a reversal is always a restore-to-known-good. The full
-    subscription list is kept on the context so the net-new creation step can
-    detect scheduled subscriptions created by a previous attempt (idempotency).
-    """
-
-    def __call__(self, client, context, next_step):
-        """Resolve the renewal payload against the customer's Adobe subscriptions."""
-        context.renewal_payload = get_renewal_payload(context.order)
-        adobe_client = get_adobe_client()
-        subscriptions = adobe_client.get_subscriptions(
-            context.authorization_id,
-            context.adobe_customer_id,
-        )
-        context.adobe_customer_subscriptions = subscriptions["items"]
-        subscriptions_by_id = {
-            subscription["subscriptionId"]: subscription
-            for subscription in context.adobe_customer_subscriptions
-        }
-
-        context.renewal_plan_subscriptions = []
-        for entry in context.renewal_payload.get("subscriptions", []):
-            adobe_subscription = subscriptions_by_id.get(entry["subscriptionId"])
-            if not adobe_subscription:
-                switch_order_to_failed(
-                    client,
-                    context.order,
-                    ERR_RENEWAL_SUBSCRIPTION_NOT_FOUND.to_dict(
-                        subscription_id=entry["subscriptionId"],
-                    ),
-                )
-                logger.warning(
-                    "%s: subscription %s from the renewal plan not found in Adobe",
-                    context,
-                    entry["subscriptionId"],
-                )
-                return
-
-            context.renewal_plan_subscriptions.append(
-                self._build_plan_entry(entry, adobe_subscription)
-            )
-
-        logger.info(
-            "%s: renewal plan resolved (%s subscription(s), %s net-new item(s))",
-            context,
-            len(context.renewal_plan_subscriptions),
-            len(context.renewal_payload.get("netNewItems", [])),
-        )
-        next_step(client, context)
-
-    def _build_plan_entry(self, entry, adobe_subscription):
-        auto_renewal = adobe_subscription.get("autoRenewal", {})
-        return {
-            "subscription_id": entry["subscriptionId"],
-            "offer_id": entry.get("offerId") or adobe_subscription["offerId"],
-            "renew": entry["renew"],
-            "renewal_quantity": entry.get(Param.RENEWAL_QUANTITY.value) or 0,
-            "flex_discount_codes": entry.get("flexDiscountCodes") or [],
-            "snapshot": {
-                "enabled": auto_renewal.get("enabled", False),
-                "renewal_quantity": auto_renewal.get(Param.RENEWAL_QUANTITY.value),
-                "flex_discount_codes": auto_renewal.get("flexDiscountCodes") or [],
-            },
-        }
 
 
 class PreviewRenewal(Step):

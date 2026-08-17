@@ -1532,6 +1532,7 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.fulfillment.change",
         "adobe_vipm.flows.fulfillment.purchase",
         "adobe_vipm.flows.fulfillment.renewal",
+        "adobe_vipm.flows.fulfillment.renewal_now",
         "adobe_vipm.flows.fulfillment.shared",
         "adobe_vipm.flows.fulfillment.switch",
         "adobe_vipm.flows.fulfillment.configuration",

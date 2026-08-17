@@ -23,6 +23,13 @@ class OrderType(StrEnum):
     CONFIGURATION = "Configuration"
 
 
+class RenewalPath(StrEnum):
+    """Values of the renewalPath property carried by the renewal payload."""
+
+    ANNIVERSARY = "anniversary"
+    NOW = "now"
+
+
 class Param(StrEnum):
     """Parameters external ids."""
 
@@ -59,6 +66,7 @@ class Param(StrEnum):
     CURRENT_QUANTITY = "currentQuantity"
     USED_QUANTITY = "usedQuantity"
     RENEWAL_QUANTITY = "renewalQuantity"
+    RENEWED_QUANTITY = "renewedQuantity"
     RENEWAL_DATE = "renewalDate"
     DUE_DATE = "dueDate"
     RETRY_COUNT = "retryCount"
@@ -496,6 +504,11 @@ ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED = ValidationError(
     "Failed to update the auto-renewal preference of subscription {subscription_id}: {error}.",
 )
 
+ERR_RENEWAL_ORDER_FAILED = ValidationError(
+    "VIPM0049",
+    "The renewal order failed: {error}.",
+)
+
 
 class AssetStatus(StrEnum):
     """MPT asset statuses."""
@@ -538,6 +551,13 @@ class ItemTermsModel(StrEnum):
     ONE_TIME = "one-time"
     USAGE = "usage"
     QUANTITY = "quantity"
+
+
+# Placeholder one-time item used to carry an early renewal ("renew now") that
+# has no quantity/discount changes. It has no counterpart in the Adobe/Airtable
+# SKU catalog, so it must be skipped wherever agreement lines are resolved
+# against Adobe SKUs.
+ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE = "adobe-early-renewal-no-change"
 
 
 class AgreementType(StrEnum):

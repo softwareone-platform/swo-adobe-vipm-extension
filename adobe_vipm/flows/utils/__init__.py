@@ -100,6 +100,7 @@ from .three_yc import (
 from .validation import (
     is_migrate_customer,
     is_purchase_validation_enabled,
+    is_renew_now_order,
     is_renewal_order,
     is_reseller_change,
     is_switch_order,

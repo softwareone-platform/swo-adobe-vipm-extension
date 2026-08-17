@@ -155,7 +155,7 @@ def test_setup_renewal_plan_step_subscription_not_found(
         "totalCount": 1,
     }
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
     mocked_next_step = mocker.MagicMock()
     step = SetupRenewalPlan()
