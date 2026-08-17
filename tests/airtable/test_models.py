@@ -2,11 +2,13 @@ import datetime as dt
 from collections import defaultdict
 
 import pytest
+from freezegun import freeze_time
 from pyairtable.formulas import (
     AND,
     BLANK,
     EQ,
     GT,
+    GTE,
     LOWER,
     LTE,
     NE,
@@ -368,6 +370,7 @@ def test_get_prices_for_skus_missing_everywhere(mocker, settings):
     assert mocked_pricelist_model.all.call_count == 2
 
 
+@freeze_time("2024-06-01")
 def test_get_skus_with_available_prices(mocker, settings):
     settings.EXTENSION_CONFIG = {
         "AIRTABLE_API_TOKEN": "api_key",
@@ -386,10 +389,15 @@ def test_get_skus_with_available_prices(mocker, settings):
     result = get_skus_with_available_prices("product_id", "currency", ["sku-1", "sku-2"])
 
     assert result == {"sku-1", "sku-2"}
+    # A SKU is available when its price row is open-ended or its valid_until is
+    # today or later; a future valid_until is a scheduled change, not an expiry.
     mocked_pricelist_model.all.assert_called_once_with(
         formula=AND(
             EQ(Field("currency"), "currency"),
-            EQ(Field("valid_until"), BLANK()),
+            OR(
+                EQ(Field("valid_until"), BLANK()),
+                GTE(Field("valid_until"), dt.date(2024, 6, 1)),
+            ),
             OR(EQ(Field("partial_sku"), "sku-1"), EQ(Field("partial_sku"), "sku-2")),
         ),
     )
