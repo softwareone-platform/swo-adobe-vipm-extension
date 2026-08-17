@@ -12,6 +12,7 @@ from pyairtable.formulas import (
     BLANK,
     EQ,
     GT,
+    GTE,
     LOWER,
     LTE,
     NE,
@@ -474,6 +475,28 @@ def _get_historical_prices_for_skus_from_airtable(
     )
 
 
+def _get_current_prices_for_skus_from_airtable(
+    product_id: str, currency: str, skus: list[str], column_name: str
+) -> dict:
+    # A price is current when it has no end date (open-ended) or its end date is
+    # today or later. A future valid_until means a scheduled price change, not an
+    # expired SKU, so the row must still count as available.
+    today = dt.datetime.now(tz=dt.UTC).date()
+    pricelist_model = get_pricelist_model(AirTableBaseInfo.for_pricing(product_id))
+    return pricelist_model.all(
+        formula=AND(
+            EQ(Field("currency"), currency),
+            OR(
+                EQ(Field("valid_until"), BLANK()),
+                GTE(Field("valid_until"), today),
+            ),
+            OR(
+                *[EQ(Field(column_name), sku) for sku in skus],
+            ),
+        ),
+    )
+
+
 def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict:
     """
     Given a currency and a list of SKUs it retrieves the purchase price.
@@ -510,7 +533,11 @@ def get_prices_for_skus(product_id: str, currency: str, skus: list[str]) -> dict
 
 def get_skus_with_available_prices(product_id: str, currency: str, skus: list[str]) -> set:
     """
-    Given a currency and a list of SKUs it retrieves the skus if the price is available.
+    Given a currency and a list of SKUs it retrieves the skus that have a current price.
+
+    A price is current when its pricelist row is open-ended (no valid_until) or its
+    valid_until is today or later. A future valid_until represents a scheduled price
+    change, so the SKU is still available and must not be treated as expired.
 
     Args:
         product_id: The ID of the product used to determine the AirTable base.
@@ -522,7 +549,7 @@ def get_skus_with_available_prices(product_id: str, currency: str, skus: list[st
     """
     if not skus:
         return set()
-    items = _get_prices_for_skus_from_airtable(product_id, currency, skus, "partial_sku")
+    items = _get_current_prices_for_skus_from_airtable(product_id, currency, skus, "partial_sku")
     return {item.partial_sku for item in items}
 
 
