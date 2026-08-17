@@ -65,12 +65,13 @@ def renewal_context(renewal_order, renewal_payload):
 
 
 def plan_entry(
+    *,
     subscription_id="renewing-sub-id",
     offer_id="65304578CA01A12",
-    renew=True,  # ruff:ignore[boolean-default-value-positional-argument]
+    renew=True,
     renewal_quantity=15,
     flex_discount_codes=None,
-    snapshot_enabled=True,  # ruff:ignore[boolean-default-value-positional-argument]
+    snapshot_enabled=True,
     snapshot_quantity=10,
     snapshot_codes=None,
 ):
@@ -155,7 +156,7 @@ def test_setup_renewal_plan_step_subscription_not_found(
         "totalCount": 1,
     }
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
     )
     mocked_next_step = mocker.MagicMock()
     step = SetupRenewalPlan()

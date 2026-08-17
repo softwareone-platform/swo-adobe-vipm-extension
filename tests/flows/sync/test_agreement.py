@@ -13,6 +13,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AuthorizationNotFoundError
 from adobe_vipm.airtable.models import AirTableBaseInfo, get_gc_agreement_deployment_model
 from adobe_vipm.flows.constants import (
+    ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
     TEMPLATE_ASSET_DEFAULT,
     TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
     TEMPLATE_SUBSCRIPTION_TERMINATION,
@@ -2995,6 +2996,29 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     result = mocked_agreement_syncer._get_subscriptions_for_update(agreement_factory())
 
     assert result == []
+
+
+def test_get_processable_agreement_lines_skip_early_renewal_no_change(
+    mocker,
+    agreement_factory,
+    lines_factory,
+    mocked_agreement_syncer,
+):
+    mock_get_adobe_sku = mocker.patch(
+        "adobe_vipm.airtable.models.get_adobe_sku", return_value="65304578CA01A12"
+    )
+    lines = lines_factory(line_id=1, item_id=1, external_vendor_id="65304578CA") + lines_factory(
+        line_id=2,
+        item_id=2,
+        external_vendor_id=ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
+    )
+    agreement = agreement_factory(lines=lines)
+
+    result = mocked_agreement_syncer._get_processable_agreement_lines(agreement)
+
+    assert len(result) == 1
+    assert result[0][0]["item"]["externalIds"]["vendor"] == "65304578CA"
+    mock_get_adobe_sku.assert_called_once_with("65304578CA", "COM")
 
 
 @freeze_time("2025-07-23")
