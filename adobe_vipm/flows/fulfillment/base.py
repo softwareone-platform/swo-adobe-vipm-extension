@@ -6,6 +6,8 @@ from adobe_vipm.flows.constants import OrderType
 from adobe_vipm.flows.fulfillment.change import fulfill_change_order
 from adobe_vipm.flows.fulfillment.configuration import fulfill_configuration_order
 from adobe_vipm.flows.fulfillment.purchase import fulfill_purchase_order
+from adobe_vipm.flows.fulfillment.renewal import fulfill_renewal_order
+from adobe_vipm.flows.fulfillment.renewal_now import fulfill_renewal_now_order
 from adobe_vipm.flows.fulfillment.reseller_transfer import fulfill_reseller_change_order
 from adobe_vipm.flows.fulfillment.switch import fulfill_switch_order
 from adobe_vipm.flows.fulfillment.termination import fulfill_termination_order
@@ -14,6 +16,8 @@ from adobe_vipm.flows.pipeline import get_failed_step
 from adobe_vipm.flows.utils import notify_unhandled_exception_in_teams, strip_trace_id
 from adobe_vipm.flows.utils.validation import (
     is_migrate_customer,
+    is_renew_now_order,
+    is_renewal_order,
     is_reseller_change,
     is_switch_order,
 )
@@ -32,7 +36,17 @@ def _fulfill_purchase_order_router(client, order):
 def _fulfill_change_order_router(client, order):
     if is_switch_order(order):
         return fulfill_switch_order(client, order)
+    if is_renew_now_order(order):
+        return fulfill_renewal_now_order(client, order)
+    if is_renewal_order(order):
+        return fulfill_renewal_order(client, order)
     return fulfill_change_order(client, order)
+
+
+def _fulfill_configuration_order_router(client, order):
+    if is_renew_now_order(order):
+        return fulfill_renewal_now_order(client, order)
+    return fulfill_configuration_order(client, order)
 
 
 def fulfill_order(client, order):
@@ -52,7 +66,7 @@ def fulfill_order(client, order):
         OrderType.PURCHASE: _fulfill_purchase_order_router,
         OrderType.CHANGE: _fulfill_change_order_router,
         OrderType.TERMINATION: fulfill_termination_order,
-        OrderType.CONFIGURATION: fulfill_configuration_order,
+        OrderType.CONFIGURATION: _fulfill_configuration_order_router,
     }
 
     try:

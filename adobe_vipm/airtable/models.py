@@ -104,6 +104,21 @@ class AirTableBaseInfo:
             base_id=settings.EXTENSION_CONFIG["AIRTABLE_SKU_MAPPING_BASE"],
         )
 
+    @staticmethod
+    def for_discounts():
+        """
+        Returns an AirTableBaseInfo object with the base identifier of the base.
+
+        That contains the discount redemptions table and the API key.
+
+        Returns:
+            AirTableBaseInfo: The base info.
+        """
+        return AirTableBaseInfo(
+            api_key=settings.EXTENSION_CONFIG["AIRTABLE_API_TOKEN"],
+            base_id=settings.EXTENSION_CONFIG["AIRTABLE_DISCOUNTS_ID"],
+        )
+
 
 @cache
 def get_transfer_model(base_info: AirTableBaseInfo):
@@ -921,6 +936,45 @@ def get_adobe_product_by_marketplace_sku(vendor_external_id: str, market_segment
     return adobe_item_model.from_short_id(
         vendor_external_id, MARKET_SEGMENT_TO_AIRTABLE_SEGMENT[market_segment]
     )
+
+
+@cache
+def get_discount_redemption_model(base_info: AirTableBaseInfo):
+    """
+    Returns the DiscountRedemption model class connected to the right base.
+
+    Args:
+        base_info: The base info instance.
+
+    Returns:
+        DiscountRedemption: The AirTable DiscountRedemption model.
+    """
+
+    class DiscountRedemption(Model):
+        code = fields.TextField("code")
+        customer_id = fields.TextField("customer_id")
+        order_id = fields.TextField("order_id")
+        redeemed_at = fields.DatetimeField("redeemed_at")
+
+        class Meta:
+            table_name = "Discount Redemptions"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
+
+    return DiscountRedemption
+
+
+def create_discount_redemptions(redemptions: list):
+    """
+    Creates a list of DiscountRedemption objects in batch.
+
+    Args:
+        redemptions: List of discount redemption dictionaries to create, each
+        carrying the code, customer_id, order_id and redeemed_at values.
+    """
+    redemption_model = get_discount_redemption_model(AirTableBaseInfo.for_discounts())
+    redemption_model.batch_save([redemption_model(**redemption) for redemption in redemptions])
 
 
 @cache

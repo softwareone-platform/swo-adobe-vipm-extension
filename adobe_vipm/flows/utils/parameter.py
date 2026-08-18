@@ -297,6 +297,24 @@ def get_switch_payload(source: dict) -> dict | None:
     return payload
 
 
+def get_renewal_payload(source: dict) -> dict | None:
+    """
+    Get the at-anniversary renewal payload from the corresponding ordering parameter.
+
+    Args:
+        source: The business object from which the renewal payload should be retrieved.
+
+    Returns:
+        The renewal payload or None if it isn't set.
+    """
+    payload = get_ordering_parameter(source, Param.RENEWAL_PAYLOAD.value).get("value")
+    if not payload:
+        return None
+    if isinstance(payload, str):
+        return json.loads(payload)
+    return payload
+
+
 def set_parameter_visible(order: dict, param_external_id: str) -> dict:
     """
     Sets ordering parameter visibility.

@@ -66,6 +66,7 @@ from .parameter import (
     get_fulfillment_parameter,
     get_ordering_parameter,
     get_parameter,
+    get_renewal_payload,
     get_retry_count,
     get_switch_payload,
     is_ordering_param_required,
@@ -99,6 +100,8 @@ from .three_yc import (
 from .validation import (
     is_migrate_customer,
     is_purchase_validation_enabled,
+    is_renew_now_order,
+    is_renewal_order,
     is_reseller_change,
     is_switch_order,
     validate_government_lga_data,
