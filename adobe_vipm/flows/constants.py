@@ -509,6 +509,11 @@ ERR_RENEWAL_ORDER_FAILED = ValidationError(
     "The renewal order failed: {error}.",
 )
 
+ERR_RENEWAL_RETURN_FAILED = ValidationError(
+    "VIPM0050",
+    "Failed to return the previous renewal order for subscription {subscription_id}: {error}.",
+)
+
 
 class AssetStatus(StrEnum):
     """MPT asset statuses."""

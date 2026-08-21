@@ -7,16 +7,23 @@ carry a renewal payload built by the renewal wizard with renewalPath "now"
 renewing subscriptions are committed as an actual Adobe RENEWAL order,
 invoiced immediately, mirroring how the PURCHASE flow turns its PREVIEW
 order into a NEW order: validate with PREVIEW_RENEWAL, then resubmit the
-line items it returns as the real order. Once the order completes, the
+line items it returns as the real order. A renewing subscription already
+committed in a previous renewal order (renewedQuantity populated) with no
+requested quantity change is excluded from both. Once the order completes, the
 renewed subscriptions (renew = true) have their autoRenewal normalised
 (enabled=on, renewalQuantity taken from Adobe's post-renewal
 renewedQuantity) and the plan's lapsing subscriptions (renew = false)
-have their auto-renewal disabled.
+have their auto-renewal disabled. A lapsing subscription that was already
+committed in a previous RENEWAL order (its pre-mutation snapshot carries a
+renewedQuantity) additionally has that order's line returned via a RETURN
+order, so the customer is not left paying for a renewal that is being
+toggled off.
 
-Net-new items and RETURN orders for toggled-off lines are not handled yet.
+Net-new items are not handled yet.
 """
 
 import logging
+from operator import itemgetter
 
 from mpt_extension_sdk.mpt_http.mpt import update_order
 
@@ -24,6 +31,7 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_PREVIEW_RENEWAL,
+    ORDER_TYPE_RENEWAL,
     UNRECOVERABLE_ORDER_STATUSES,
     AdobeOrderStatus,
 )
@@ -31,6 +39,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_RENEWAL_ORDER_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
+    ERR_RENEWAL_RETURN_FAILED,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
@@ -55,14 +64,37 @@ from adobe_vipm.flows.fulfillment.shared import (
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
+from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
 
+def _is_already_renewed(plan):
+    """
+    Return True for a renewing entry already committed in a previous renewal order.
+
+    A plan entry with renew=true but no requested renewal quantity whose
+    Adobe subscription already carries a renewedQuantity (snapshotted by
+    SetupRenewalPlan before any mutation) was committed by a previous
+    RENEWAL order and requests no change, so there is nothing to submit
+    for it.
+    """
+    return not plan["renewal_quantity"] and plan["snapshot"]["renewed_quantity"] is not None
+
+
 def _build_renewing_line_items(context):
-    """Build PREVIEW_RENEWAL/RENEWAL line items for the plan's renewing subscriptions."""
+    """
+    Build PREVIEW_RENEWAL/RENEWAL line items for the plan's renewing subscriptions.
+
+    Renewing subscriptions already committed in a previous renewal order
+    with no requested quantity change are excluded — see _is_already_renewed.
+    """
     line_items = []
-    renewing = [plan for plan in context.renewal_plan_subscriptions if plan["renew"]]
+    renewing = [
+        plan
+        for plan in context.renewal_plan_subscriptions
+        if plan["renew"] and not _is_already_renewed(plan)
+    ]
     for number, plan in enumerate(renewing, start=1):
         line_item = {
             "extLineItemNumber": number,
@@ -170,8 +202,7 @@ class SubmitRenewalNowOrder(Step):
     Adobe RENEWAL order is detected by its external reference id, so a
     retry of this step is idempotent.
 
-    Net-new items and RETURN orders for toggled-off lines are not handled
-    by this step.
+    Net-new items are not handled by this step.
     """
 
     def __call__(self, client, context, next_step):
@@ -250,6 +281,173 @@ class SubmitRenewalNowOrder(Step):
         )
 
 
+class ReturnPreviousRenewalOrders(Step):
+    """
+    Return the previous RENEWAL order lines of the plan's lapsing subscriptions.
+
+    A lapsing subscription (renew = false) whose pre-mutation snapshot
+    (taken by SetupRenewalPlan, before this order commits anything) carries
+    a renewedQuantity was already committed in a previous RENEWAL order
+    placed within the renewal window. Disabling its auto-renewal is not
+    enough — the already-paid renewal must be undone, so this step submits
+    a RETURN order referencing that previous RENEWAL order, returning only
+    the lapsing subscription's line (other lines of that order stay
+    renewed). Runs after SubmitRenewalNowOrder so the additive operation
+    always precedes the subtractive one.
+
+    Idempotent: RETURN orders created by this MPT order are detected by
+    their external reference prefix and reused instead of re-submitted. A
+    RETURN order still pending on Adobe's side keeps the MPT order in
+    Processing to be retried on the next fulfillment attempt.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Return the previous RENEWAL order lines of the plan's lapsing subscriptions."""
+        lapsing_renewed = [
+            plan
+            for plan in context.renewal_plan_subscriptions
+            if not plan["renew"] and plan["snapshot"]["renewed_quantity"] is not None
+        ]
+        if not lapsing_renewed:
+            next_step(client, context)
+            return
+
+        adobe_client = get_adobe_client()
+        renewal_orders = self._get_completed_renewal_orders(adobe_client, context)
+        existing_return_orders = adobe_client.get_return_orders_by_external_reference(
+            context.authorization_id,
+            context.adobe_customer_id,
+            context.order_id,
+        )
+
+        return_orders = []
+        for plan in lapsing_renewed:
+            return_order = self._return_previous_renewal(
+                client, adobe_client, context, plan, renewal_orders, existing_return_orders
+            )
+            if return_order is None:
+                return
+            return_orders.append(return_order)
+
+        if not self._ensure_not_pending_return_orders(context, return_orders):
+            return
+
+        next_step(client, context)
+
+    def _get_completed_renewal_orders(self, adobe_client, context):
+        orders = adobe_client.get_orders(
+            context.authorization_id,
+            context.adobe_customer_id,
+            filters={
+                "order-type": ORDER_TYPE_RENEWAL,
+                "status": AdobeOrderStatus.COMPLETE,
+            },
+        )
+        return sorted(orders, key=itemgetter("creationDate"), reverse=True)
+
+    def _return_previous_renewal(  # noqa: WPS211
+        self, client, adobe_client, context, plan, renewal_orders, existing_return_orders
+    ):
+        subscription_id = plan["subscription_id"]
+        existing_returns = existing_return_orders.get(get_partial_sku(plan["offer_id"]))
+        if existing_returns:
+            logger.info(
+                "%s: return order %s already exists for subscription %s",
+                context,
+                existing_returns[0]["orderId"],
+                subscription_id,
+            )
+            return existing_returns[0]
+
+        returning_order, returning_line = self._find_previous_renewal_line(
+            context, renewal_orders, subscription_id
+        )
+        if returning_order is None:
+            logger.warning(
+                "%s: no previous renewal order found for subscription %s",
+                context,
+                subscription_id,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_RETURN_FAILED.to_dict(
+                    subscription_id=subscription_id,
+                    error="previous renewal order not found",
+                ),
+            )
+            return None
+
+        return self._create_return_order(
+            client, adobe_client, context, subscription_id, returning_order, returning_line
+        )
+
+    def _find_previous_renewal_line(self, context, renewal_orders, subscription_id):
+        for order in renewal_orders:
+            if order["externalReferenceId"] == context.order_id:
+                continue
+            for line_item in order["lineItems"]:
+                if line_item.get("subscriptionId") == subscription_id:
+                    return order, line_item
+        return None, None
+
+    def _create_return_order(  # noqa: WPS211
+        self, client, adobe_client, context, subscription_id, returning_order, returning_line
+    ):
+        try:
+            return_order = adobe_client.create_return_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                returning_order,
+                returning_line,
+                context.order_id,
+                returning_line.get("deploymentId"),
+            )
+        except AdobeAPIError as error:
+            logger.warning(
+                "%s: failed to return renewal order %s for subscription %s: %s",
+                context,
+                returning_order["orderId"],
+                subscription_id,
+                error,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_RETURN_FAILED.to_dict(
+                    subscription_id=subscription_id,
+                    error=error.message,
+                ),
+            )
+            return None
+
+        logger.info(
+            "%s: return order %s created for subscription %s against renewal order %s",
+            context,
+            return_order["orderId"],
+            subscription_id,
+            returning_order["orderId"],
+        )
+        context.order = set_adobe_order_ids_created_parameter(context, [return_order["orderId"]])
+        update_order(client, context.order_id, parameters=context.order["parameters"])
+        return return_order
+
+    def _ensure_not_pending_return_orders(self, context, return_orders):
+        pending_orders = [
+            return_order["orderId"]
+            for return_order in return_orders
+            if return_order["status"] != AdobeOrderStatus.COMPLETE
+        ]
+        if pending_orders:
+            logger.info(
+                "%s: return order(s) %s still pending",
+                context,
+                ", ".join(pending_orders),
+            )
+            return False
+        return True
+
+
 class NormalizeRenewedSubscriptions(Step):
     """
     Normalise autoRenewal for the plan's renewed subscriptions (renew = true).
@@ -268,12 +466,21 @@ class NormalizeRenewedSubscriptions(Step):
     auto-renewal preference a customer explicitly turned off on another
     subscription. Idempotent: a retry re-fetches and reapplies the same
     value.
+
+    Renewing subscriptions already committed in a previous renewal order
+    with no requested quantity change (see _is_already_renewed) are
+    excluded: this order did not renew them, so they keep whatever that
+    previous renewal order set.
     """
 
     def __call__(self, client, context, next_step):
         """Normalise autoRenewal for the plan's renewed subscriptions."""
         adobe_client = get_adobe_client()
-        renewing = [plan for plan in context.renewal_plan_subscriptions if plan["renew"]]
+        renewing = [
+            plan
+            for plan in context.renewal_plan_subscriptions
+            if plan["renew"] and not _is_already_renewed(plan)
+        ]
         for plan in renewing:
             if not self._normalize(client, adobe_client, context, plan):
                 return
@@ -396,9 +603,11 @@ def fulfill_renewal_now_order(client, order):
 
     The plan's renewing subscriptions are validated with a PREVIEW_RENEWAL
     and committed as an actual Adobe RENEWAL order, invoiced immediately.
-    Once it completes, the renewed subscriptions (renew = true) have their
-    autoRenewal normalised and the plan's lapsing subscriptions
-    (renew = false) have their auto-renewal disabled.
+    Once it completes, lapsing subscriptions that were already committed in
+    a previous RENEWAL order have that order's line returned, the renewed
+    subscriptions (renew = true) have their autoRenewal normalised and the
+    plan's lapsing subscriptions (renew = false) have their auto-renewal
+    disabled.
 
     Args:
         client (MPTClient): An instance of the MPT client used for communication
@@ -419,6 +628,7 @@ def fulfill_renewal_now_order(client, order):
         SetupRenewalPlan(),
         PreviewRenewalNowOrder(),
         SubmitRenewalNowOrder(),
+        ReturnPreviousRenewalOrders(),
         NormalizeRenewedSubscriptions(),
         DisableLapsingSubscriptions(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
