@@ -97,11 +97,15 @@ def test_setup_renewal_plan_step(
         offer_id="65304578CA01A12",
         renewal_quantity=10,
     )
-    lapsing_sub = adobe_subscription_factory(
-        subscription_id="lapsing-sub-id",
-        offer_id="77777777CA01A12",
-        renewal_quantity=10,
-    )
+    # Already committed in a previous renewal order: renewedQuantity is populated.
+    lapsing_sub = {
+        **adobe_subscription_factory(
+            subscription_id="lapsing-sub-id",
+            offer_id="77777777CA01A12",
+            renewal_quantity=10,
+        ),
+        "renewedQuantity": 8,
+    }
     mock_adobe_client.get_subscriptions.return_value = {
         "items": [renewing_sub, lapsing_sub],
         "totalCount": 2,
@@ -125,6 +129,7 @@ def test_setup_renewal_plan_step(
                 "enabled": True,
                 "renewal_quantity": 10,
                 "flex_discount_codes": [],
+                "renewed_quantity": None,
             },
         },
         {
@@ -137,6 +142,7 @@ def test_setup_renewal_plan_step(
                 "enabled": True,
                 "renewal_quantity": 10,
                 "flex_discount_codes": [],
+                "renewed_quantity": 8,
             },
         },
     ]
