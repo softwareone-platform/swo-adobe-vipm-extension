@@ -1800,6 +1800,7 @@ class SetupRenewalPlan(Step):
                 "enabled": auto_renewal.get("enabled", False),
                 "renewal_quantity": auto_renewal.get(Param.RENEWAL_QUANTITY.value),
                 "flex_discount_codes": auto_renewal.get("flexDiscountCodes") or [],
+                "renewed_quantity": adobe_subscription.get(Param.RENEWED_QUANTITY.value),
             },
         }
 
