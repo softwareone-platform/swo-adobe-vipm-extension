@@ -1,4 +1,7 @@
+import datetime as dt
+
 import pytest
+from freezegun import freeze_time
 
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
@@ -9,6 +12,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.renewal_now import (
     DisableLapsingSubscriptions,
     NormalizeRenewedSubscriptions,
@@ -966,6 +970,54 @@ def test_return_previous_renewal_orders_step_picks_most_recent_order(
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
 
+@freeze_time("2026-08-28 10:00:00")
+def test_record_discount_redemptions_step_renew_now(mocker, mock_mpt_client, renewal_now_context):
+    renewal_now_context.renewal_plan_subscriptions = [
+        plan_entry(
+            subscription_id="9d6f8c818d4ae8807910f889cbab8fNA",
+            offer_id="65304520CA01A12",
+            renewal_quantity=5,
+            flex_discount_codes=["SB7U6WLG8R4N0IGODRZ191ZD"],
+        ),
+        plan_entry(
+            subscription_id="424d33184346eabbdd0dfce7294cf2NA",
+            offer_id="65324861CA01A12",
+            renewal_quantity=7,
+            flex_discount_codes=["HOU3BNCONXV7WOTAQ4032KSM"],
+        ),
+        plan_entry(
+            subscription_id="e4b0e7332a4b82b81f4d897c1b9816NA",
+            offer_id="65324819CA01A12",
+            renew=False,
+            renewal_quantity=0,
+        ),
+    ]
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    redeemed_at = dt.datetime(2026, 8, 28, 10, 0, tzinfo=dt.UTC)
+    mocked_create_redemptions.assert_called_once_with([
+        {
+            "code": "SB7U6WLG8R4N0IGODRZ191ZD",
+            "customer_id": "customer-id",
+            "order_id": renewal_now_context.order_id,
+            "redeemed_at": redeemed_at,
+        },
+        {
+            "code": "HOU3BNCONXV7WOTAQ4032KSM",
+            "customer_id": "customer-id",
+            "order_id": renewal_now_context.order_id,
+            "redeemed_at": redeemed_at,
+        },
+    ])
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
 def test_fulfill_renewal_now_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
     mocked_pipeline_ctor = mocker.patch(
@@ -996,6 +1048,7 @@ def test_fulfill_renewal_now_order(mocker):
         NormalizeRenewedSubscriptions,
         DisableLapsingSubscriptions,
         CompleteOrder,
+        RecordDiscountRedemptions,
         SetSubscriptionTemplate,
         SyncAgreement,
     ]
