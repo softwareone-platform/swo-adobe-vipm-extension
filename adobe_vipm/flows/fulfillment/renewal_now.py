@@ -17,7 +17,8 @@ have their auto-renewal disabled. A lapsing subscription that was already
 committed in a previous RENEWAL order (its pre-mutation snapshot carries a
 renewedQuantity) additionally has that order's line returned via a RETURN
 order, so the customer is not left paying for a renewal that is being
-toggled off.
+toggled off. Once the order is completed, the flex discount codes redeemed
+by the plan are recorded on the AirTable redemptions table.
 
 Net-new items are not handled yet.
 """
@@ -47,6 +48,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     SetOrUpdateCotermDate,
@@ -632,6 +634,7 @@ def fulfill_renewal_now_order(client, order):
         NormalizeRenewedSubscriptions(),
         DisableLapsingSubscriptions(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
+        RecordDiscountRedemptions(),
         SetSubscriptionTemplate(),
         SyncAgreement(),
     )
