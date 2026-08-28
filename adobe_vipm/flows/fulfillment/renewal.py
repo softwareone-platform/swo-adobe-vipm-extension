@@ -595,9 +595,21 @@ class RecordDiscountRedemptions(Step):
         )
         if redeemed_codes:
             self._record_redemptions(context, redeemed_codes)
+        else:
+            logger.info(
+                "%s: no flex discount codes redeemed by the plan, "
+                "skipping the redemptions recording",
+                context,
+            )
         next_step(client, context)
 
     def _record_redemptions(self, context, redeemed_codes):
+        logger.info(
+            "%s: recording %s discount redemption(s) on AirTable: %s",
+            context,
+            len(redeemed_codes),
+            ", ".join(redeemed_codes),
+        )
         redeemed_at = dt.datetime.now(tz=dt.UTC)
         redemptions = [
             {
