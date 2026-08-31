@@ -44,7 +44,7 @@ dev = [
   "ruff==0.16.*", # force ruff version to have same formatting everywhere, also update in pre-commit config
   "types-openpyxl==3.1.*",
   "types-requests==2.33.*",
-  "wemake-python-styleguide==1.7.*", # also update pre-commit config
+  "wemake-python-styleguide==1.8.*", # also update pre-commit config
 ]
 
 [tool.hatch.build.targets.sdist]
