@@ -178,6 +178,9 @@ class PreviewRenewalNowOrder(Step):
                 context.order_id,
                 line_items,
                 order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+                recommendation_tracker_id=(
+                    context.renewal_payload.get("recommendationTrackerId") or None
+                ),
             )
         except AdobeAPIError as error:
             logger.warning("%s: renewal preview failed: %s", context, error)
@@ -238,6 +241,9 @@ class SubmitRenewalNowOrder(Step):
                 context.adobe_customer_id,
                 context.order_id,
                 _build_committed_line_items(context.preview_renewal_order["lineItems"]),
+                recommendation_tracker_id=(
+                    context.renewal_payload.get("recommendationTrackerId") or None
+                ),
             )
         except AdobeAPIError as error:
             logger.warning("%s: renewal order failed: %s", context, error)

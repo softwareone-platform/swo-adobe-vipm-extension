@@ -160,6 +160,7 @@ def test_preview_renewal_now_order_step_validates_preview(
             },
         ],
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     assert renewal_now_context.preview_renewal_order == preview_order
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
@@ -192,6 +193,7 @@ def test_preview_renewal_now_order_step_includes_already_renewed_subscription(
             },
         ],
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
@@ -231,6 +233,7 @@ def test_preview_renewal_now_order_step_excludes_already_renewed_without_change(
             },
         ],
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
@@ -399,6 +402,7 @@ def test_submit_renewal_now_order_step_commits_order(
                 "flexDiscountCodes": ["CODE-1"],
             },
         ],
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     mocked_update_order.assert_called_once_with(
         mock_mpt_client,
