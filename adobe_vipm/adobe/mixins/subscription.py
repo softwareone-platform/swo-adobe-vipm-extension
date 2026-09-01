@@ -211,9 +211,9 @@ class SubscriptionClientMixin:
             dict: The created subscription.
         """
         authorization = self._config.get_authorization(authorization_id)
-        headers = self._get_headers(authorization)
-        if recommendation_tracker_id:
-            headers["x-recommendation-tracker-id"] = recommendation_tracker_id
+        headers = self._get_headers(
+            authorization, recommendation_tracker_id=recommendation_tracker_id
+        )
         payload = {
             "offerId": offer_id,
             "autoRenewal": {

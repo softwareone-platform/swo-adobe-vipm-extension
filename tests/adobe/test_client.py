@@ -1360,6 +1360,7 @@ def test_create_renewal_order(
                     "Content-Type": "application/json",
                     "X-Request-Id": "uuid-1",
                     "x-correlation-id": correlation_id,
+                    "x-recommendation-tracker-id": "a-tracker-id",
                 },
             ),
             matchers.json_params_matcher(expected_payload),
@@ -1371,6 +1372,7 @@ def test_create_renewal_order(
         customer_id,
         external_reference_id,
         line_items,
+        recommendation_tracker_id="a-tracker-id",
     )
 
     assert result == adobe_order

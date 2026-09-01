@@ -89,6 +89,9 @@ class PreviewRenewal(Step):
                 context.order_id,
                 line_items,
                 order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+                recommendation_tracker_id=(
+                    context.renewal_payload.get("recommendationTrackerId") or None
+                ),
             )
         except AdobeAPIError as error:
             logger.warning("%s: renewal preview failed: %s", context, error)
