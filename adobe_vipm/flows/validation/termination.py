@@ -14,7 +14,7 @@ from adobe_vipm.flows.utils import (
     validate_subscription_and_returnable_orders,
 )
 from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
-from adobe_vipm.flows.validation.shared import ValidateDuplicateLines
+from adobe_vipm.flows.validation.shared import ValidateDuplicateLines, ValidateNoEarlyRenewal
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ def validate_termination_order(client, order):
         ValidateDuplicateLines(),
         SetOrUpdateCotermDate(),
         ValidateRenewalWindow(is_validation=True),
+        ValidateNoEarlyRenewal(),
         ValidateDownsizes(),
         Validate3YCCommitment(is_validation=True),
     )

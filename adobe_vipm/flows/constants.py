@@ -126,6 +126,7 @@ GOVERNMENT_AGENCY_TYPE_STATE = "STATE"
 VALID_GOVERNMENT_AGENCY_TYPES = {GOVERNMENT_AGENCY_TYPE_FEDERAL, GOVERNMENT_AGENCY_TYPE_STATE}
 
 CANCELLATION_WINDOW_DAYS = 14
+EARLY_RENEWAL_LOOKBACK_DAYS = 30
 GLOBAL_SUFFIX = "_global"
 LAST_TWO_WEEKS_DAYS = 13
 NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC = 365
@@ -512,6 +513,14 @@ ERR_RENEWAL_ORDER_FAILED = ValidationError(
 ERR_RENEWAL_RETURN_FAILED = ValidationError(
     "VIPM0050",
     "Failed to return the previous renewal order for subscription {subscription_id}: {error}.",
+)
+
+ERR_EARLY_RENEWAL_IN_PROGRESS = ValidationError(
+    "VIPM0051",
+    "An early renewal has already been placed for this agreement, so Change, "
+    "Configuration and Termination orders are locked until it takes effect at "
+    "the anniversary date. Please re-open the renewal wizard to make "
+    "renewal-affecting changes.",
 )
 
 

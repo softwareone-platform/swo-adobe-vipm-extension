@@ -28,6 +28,7 @@ from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
+    ValidateNoEarlyRenewal,
 )
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ def validate_change_order(client, order):
         ValidateDuplicateLines(),
         SetOrUpdateCotermDate(),
         ValidateRenewalWindow(is_validation=True),
+        ValidateNoEarlyRenewal(),
         ValidateSkuAvailability(is_validation=True),
         ValidateDownsizes(),
         Validate3YCCommitment(is_validation=True),
