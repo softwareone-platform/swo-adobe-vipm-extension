@@ -10,6 +10,7 @@ from adobe_vipm.flows.validation.base import (
     validate_order,
 )
 from adobe_vipm.flows.validation.change import validate_change_order
+from adobe_vipm.flows.validation.configuration import validate_configuration_order
 from adobe_vipm.flows.validation.purchase import validate_purchase_order
 from adobe_vipm.flows.validation.termination import validate_termination_order
 from adobe_vipm.flows.validation.transfer import validate_reseller_change, validate_transfer
@@ -81,6 +82,7 @@ def test_get_purchase_order_validator_validate_purchase_order(mocker, mock_order
     [
         (OrderType.CHANGE, validate_change_order),
         (OrderType.TERMINATION, validate_termination_order),
+        (OrderType.CONFIGURATION, validate_configuration_order),
         ("no_type", None),
     ],
 )

@@ -15,6 +15,7 @@ from adobe_vipm.flows.utils.order import reset_order_error
 from adobe_vipm.flows.utils.parameter import reset_ordering_parameters_error
 from adobe_vipm.flows.utils.validation import is_migrate_customer, is_reseller_change
 from adobe_vipm.flows.validation.change import validate_change_order
+from adobe_vipm.flows.validation.configuration import validate_configuration_order
 from adobe_vipm.flows.validation.purchase import validate_purchase_order
 from adobe_vipm.flows.validation.termination import validate_termination_order
 from adobe_vipm.flows.validation.transfer import validate_reseller_change, validate_transfer
@@ -71,6 +72,8 @@ def get_validator_by_order_type(order: dict[str, Any]) -> Callable | None:
             return validate_change_order
         case OrderType.TERMINATION:
             return validate_termination_order
+        case OrderType.CONFIGURATION:
+            return validate_configuration_order
         case _:
             return None
 
