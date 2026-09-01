@@ -2998,6 +2998,26 @@ def test_get_subscriptions_for_update_skip_adobe_inactive(
     assert result == []
 
 
+def test_get_subscriptions_for_update_skips_scheduled(
+    mock_mpt_client,
+    mock_adobe_client,
+    adobe_customer_factory,
+    agreement_factory,
+    adobe_subscription_factory,
+    mock_mpt_terminate_subscription,
+    mock_mpt_get_agreement_subscription,
+    mocked_agreement_syncer,
+):
+    mocked_agreement_syncer._adobe_subscriptions = [
+        adobe_subscription_factory(status=AdobeSubscriptionStatus.SCHEDULED.value)
+    ]
+
+    result = mocked_agreement_syncer._get_subscriptions_for_update(agreement_factory())
+
+    assert result == []
+    mock_mpt_terminate_subscription.assert_not_called()
+
+
 def test_get_processable_agreement_lines_skip_early_renewal_no_change(
     mocker,
     agreement_factory,
@@ -3336,6 +3356,89 @@ def test_add_missing_subscriptions_recreates_when_mpt_subscription_is_expired(
     mock_mpt_create_agreement_subscription.assert_called_once()
     create_payload = mock_mpt_create_agreement_subscription.call_args[0][1]
     assert create_payload["externalIds"]["vendor"] == expired_external_id
+
+
+@freeze_time("2025-07-24")
+def test_add_missing_subscriptions_scheduled(
+    items_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_get_product_items_by_period,
+    mock_mpt_create_asset,
+    mock_mpt_create_agreement_subscription,
+    mock_mpt_get_asset_template_by_name,
+    mock_get_template_data_by_adobe_subscription,
+    mocked_agreement_syncer,
+):
+    scheduled_external_id = "9e5b9c974c4ea1bcabdb0fe697a2f1NA"
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id=scheduled_external_id,
+            offer_id="65304578CA01A12",
+            current_quantity=0,
+            renewal_quantity=10,
+            status=AdobeSubscriptionStatus.SCHEDULED.value,
+            renewal_date="2025-08-05",
+        ),
+    ]
+    agreement = agreement_factory()
+    agreement["subscriptions"] = []
+    agreement["assets"] = []
+    mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
+    mocked_agreement_syncer._agreement = agreement
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 12.14}
+    mock_get_product_items_by_skus.return_value = items_factory()
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Renewing",
+    }
+
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
+
+    mock_mpt_get_asset_template_by_name.assert_not_called()
+    mock_mpt_create_asset.assert_not_called()
+    mock_mpt_create_agreement_subscription.assert_called_once()
+    create_payload = mock_mpt_create_agreement_subscription.call_args[0][1]
+    assert create_payload["status"] == "Active"
+    assert create_payload["startDate"] == "2025-08-05"
+    assert create_payload["commitmentDate"] == "2025-08-05"
+    assert create_payload["externalIds"]["vendor"] == scheduled_external_id
+    assert create_payload["lines"][0]["quantity"] == 10
+
+
+@freeze_time("2025-07-24")
+def test_add_missing_subscriptions_scheduled_already_in_mpt(
+    agreement_factory,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_mpt_create_asset,
+    mock_mpt_create_agreement_subscription,
+    mocked_agreement_syncer,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="1e5b9c974c4ea1bcabdb0fe697a2f1NA",
+            offer_id="65304578CA01A12",
+            current_quantity=0,
+            renewal_quantity=10,
+            status=AdobeSubscriptionStatus.SCHEDULED.value,
+        ),
+    ]
+    agreement = agreement_factory()
+    agreement["assets"] = []
+    mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
+    mocked_agreement_syncer._agreement = agreement
+
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
+
+    mock_mpt_create_asset.assert_not_called()
+    mock_mpt_create_agreement_subscription.assert_not_called()
 
 
 @freeze_time("2025-07-24")
