@@ -258,7 +258,8 @@ class AgreementSyncer:  # noqa: WPS214
             subsc
             for subsc in adobe_subscriptions
             if subsc["subscriptionId"] not in mpt_entitlements_external_ids
-            and subsc["status"] == AdobeSubscriptionStatus.ACTIVE.value
+            and subsc["status"]
+            in {AdobeSubscriptionStatus.ACTIVE.value, AdobeSubscriptionStatus.SCHEDULED.value}
         )
         if not missing_adobe_subscriptions:
             logger.info("> No missing subscriptions found")
@@ -362,6 +363,13 @@ class AgreementSyncer:  # noqa: WPS214
         prices: dict[str, Any],
         unit_price: dict[str, Any],
     ) -> None:
+        # A scheduled (1009) subscription activates and is invoiced only at the
+        # anniversary, so its start date is the renewal date, not the Adobe creation date.
+        start_date = (
+            adobe_subscription["renewalDate"]
+            if adobe_subscription["status"] == AdobeSubscriptionStatus.SCHEDULED
+            else adobe_subscription["creationDate"]
+        )
         subscription_payload = {
             "status": SubscriptionStatus.ACTIVE.value,
             "commitmentDate": adobe_subscription["renewalDate"],
@@ -400,7 +408,7 @@ class AgreementSyncer:  # noqa: WPS214
                 }
             ],
             "name": f"Subscription for {item.get('name')}",
-            "startDate": adobe_subscription["creationDate"],
+            "startDate": start_date,
             "externalIds": {"vendor": adobe_subscription["subscriptionId"]},
             "product": {"id": self.product_id},
             "autoRenew": adobe_subscription["autoRenewal"]["enabled"],
@@ -814,6 +822,16 @@ class AgreementSyncer:  # noqa: WPS214
                         mpt_subscription["id"],
                         f"Adobe subscription status {AdobeSubscriptionStatus.INACTIVE}.",
                     )
+                continue
+
+            if adobe_subscription["status"] == AdobeSubscriptionStatus.SCHEDULED:
+                # A scheduled (1009) subscription carries pre-activation data (e.g.
+                # currentQuantity 0), so it must not feed quantity/price updates until
+                # it activates at the anniversary.
+                logger.info(
+                    "Skipping scheduled Adobe subscription %s until it activates.",
+                    adobe_subscription_id,
+                )
                 continue
 
             for_update.append((
