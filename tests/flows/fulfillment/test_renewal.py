@@ -204,6 +204,7 @@ def test_preview_renewal_step(mocker, mock_adobe_client, mock_mpt_client, renewa
             },
         ],
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_context.renewal_payload["recommendationTrackerId"],
     )
     assert renewal_context.preview_renewal_order == preview
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)

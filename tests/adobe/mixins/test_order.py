@@ -537,6 +537,12 @@ def test_create_switch_preview_order(
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     mocked_client, _, _ = adobe_client_factory()
     adobe_preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW_SWITCH)
+    expected_payload = {
+        **switch_payload,
+        "externalReferenceId": "mpt-order-id",
+        "orderType": ORDER_TYPE_PREVIEW_SWITCH,
+    }
+    expected_payload.pop("recommendationTrackerId")
     requests_mocker.post(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -545,11 +551,10 @@ def test_create_switch_preview_order(
         status=200,
         json=adobe_preview_order,
         match=[
-            matchers.json_params_matcher({
-                **switch_payload,
-                "externalReferenceId": "mpt-order-id",
-                "orderType": ORDER_TYPE_PREVIEW_SWITCH,
+            matchers.header_matcher({
+                "x-recommendation-tracker-id": switch_payload["recommendationTrackerId"],
             }),
+            matchers.json_params_matcher(expected_payload),
             matchers.query_param_matcher({"fetch-price": "true"}),
         ],
     )
@@ -580,6 +585,7 @@ def test_create_switch_order(
         "externalReferenceId": "mpt-order-id",
         "orderType": ORDER_TYPE_SWITCH,
     }
+    expected_payload.pop("recommendationTrackerId")
     correlation_id = sha256(json.dumps(expected_payload).encode()).hexdigest()
     requests_mocker.post(
         urljoin(
@@ -589,7 +595,10 @@ def test_create_switch_order(
         status=202,
         json=adobe_order,
         match=[
-            matchers.header_matcher({"x-correlation-id": correlation_id}),
+            matchers.header_matcher({
+                "x-correlation-id": correlation_id,
+                "x-recommendation-tracker-id": switch_payload["recommendationTrackerId"],
+            }),
             matchers.json_params_matcher(expected_payload),
         ],
     )
@@ -622,6 +631,7 @@ def test_create_switch_order_without_currency_code(
         "orderType": ORDER_TYPE_SWITCH,
         "currencyCode": authorization.currency,
     }
+    expected_payload.pop("recommendationTrackerId")
     requests_mocker.post(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -629,7 +639,57 @@ def test_create_switch_order_without_currency_code(
         ),
         status=202,
         json=adobe_order,
-        match=[matchers.json_params_matcher(expected_payload)],
+        match=[
+            matchers.header_matcher({
+                "x-recommendation-tracker-id": switch_payload["recommendationTrackerId"],
+            }),
+            matchers.json_params_matcher(expected_payload),
+        ],
+    )
+
+    result = mocked_client.create_switch_order(
+        authorization_uk,
+        "a-customer",
+        "mpt-order-id",
+        switch_payload,
+    )  # act
+
+    assert result == adobe_order
+
+
+def _without_tracker_header(request):
+    absent = "x-recommendation-tracker-id" not in request.headers
+    return absent, "x-recommendation-tracker-id header must not be sent"
+
+
+def test_create_switch_order_without_recommendation_tracker_id(
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+    requests_mocker,
+    settings,
+    switch_payload,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    mocked_client, _, _ = adobe_client_factory()
+    adobe_order = adobe_order_factory(order_type=ORDER_TYPE_SWITCH, order_id="an-order-id")
+    del switch_payload["recommendationTrackerId"]
+    expected_payload = {
+        **switch_payload,
+        "externalReferenceId": "mpt-order-id",
+        "orderType": ORDER_TYPE_SWITCH,
+    }
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/a-customer/orders",
+        ),
+        status=202,
+        json=adobe_order,
+        match=[
+            _without_tracker_header,
+            matchers.json_params_matcher(expected_payload),
+        ],
     )
 
     result = mocked_client.create_switch_order(

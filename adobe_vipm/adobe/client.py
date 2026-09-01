@@ -113,9 +113,11 @@ class AdobeClient(
         self._TIMEOUT = 60
         self._session = _build_retrying_session(self._config.auth_endpoint_url)
 
-    def _get_headers(self, authorization: Authorization, correlation_id=None):
+    def _get_headers(
+        self, authorization: Authorization, correlation_id=None, recommendation_tracker_id=None
+    ):
         token = self._get_auth_token(authorization).token
-        return {
+        headers = {
             "X-Api-Key": authorization.client_id,
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
@@ -123,6 +125,9 @@ class AdobeClient(
             "X-Request-Id": str(uuid4()),
             "x-correlation-id": correlation_id or str(uuid4()),
         }
+        if recommendation_tracker_id:
+            headers["x-recommendation-tracker-id"] = recommendation_tracker_id
+        return headers
 
     @wrap_http_error
     def _refresh_auth_token(self, authorization: Authorization):
