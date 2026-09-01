@@ -1,11 +1,17 @@
 import pytest
+from freezegun import freeze_time
 
-from adobe_vipm.adobe.constants import ORDER_TYPE_PREVIEW
+from adobe_vipm.adobe.constants import (
+    ORDER_TYPE_PREVIEW,
+    ORDER_TYPE_RENEWAL,
+    AdobeOrderStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
     ERR_DUPLICATED_ITEMS,
+    ERR_EARLY_RENEWAL_IN_PROGRESS,
     ERR_EXISTING_ITEMS,
     MARKET_SEGMENT_COMMERCIAL,
     MARKET_SEGMENT_EDUCATION,
@@ -15,6 +21,7 @@ from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
+    ValidateNoEarlyRenewal,
 )
 
 
@@ -217,3 +224,178 @@ def test_get_preview_order_step_adobe_create_preview_order_error(
     assert context.validation_succeeded is False
     assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details="error message")
     assert context.adobe_preview_order is None
+
+
+@pytest.fixture
+def early_renewal_context(order_factory):
+    return Context(
+        order=order_factory(),
+        authorization_id="AUT-1234-5678",
+        adobe_customer_id="a-client-id",
+        adobe_customer={"cotermDate": "2027-09-25"},
+    )
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_early_renewal_blocks_pending_early_renewal(
+    mock_adobe_client, mock_mpt_client, mock_next_step, adobe_order_factory, early_renewal_context
+):
+    mock_adobe_client.get_orders.return_value = [
+        adobe_order_factory(
+            ORDER_TYPE_RENEWAL,
+            status=AdobeOrderStatus.COMPLETE.value,
+            creation_date="2026-09-05T10:00:00Z",
+        )
+    ]
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, early_renewal_context, mock_next_step)  # act
+
+    assert early_renewal_context.validation_succeeded is False
+    assert early_renewal_context.order["error"] == ERR_EARLY_RENEWAL_IN_PROGRESS.to_dict()
+    mock_adobe_client.get_orders.assert_called_once_with(
+        "AUT-1234-5678",
+        "a-client-id",
+        filters={"order-type": ORDER_TYPE_RENEWAL},
+    )
+    mock_next_step.assert_not_called()
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_early_renewal_blocks_open_renewal_order(
+    mock_adobe_client, mock_mpt_client, mock_next_step, adobe_order_factory, early_renewal_context
+):
+    early_renewal_context.adobe_customer = {"cotermDate": "2026-09-25"}
+    mock_adobe_client.get_orders.return_value = [
+        adobe_order_factory(
+            ORDER_TYPE_RENEWAL,
+            status=AdobeOrderStatus.OPEN.value,
+            creation_date="2026-09-08T10:00:00Z",
+        )
+    ]
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, early_renewal_context, mock_next_step)  # act
+
+    assert early_renewal_context.validation_succeeded is False
+    assert early_renewal_context.order["error"] == ERR_EARLY_RENEWAL_IN_PROGRESS.to_dict()
+    mock_next_step.assert_not_called()
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_early_renewal_ignores_anniversary_auto_renewal(
+    mock_adobe_client, mock_mpt_client, mock_next_step, adobe_order_factory, early_renewal_context
+):
+    early_renewal_context.adobe_customer = {"cotermDate": "2027-09-01"}
+    mock_adobe_client.get_orders.return_value = [
+        adobe_order_factory(
+            ORDER_TYPE_RENEWAL,
+            status=AdobeOrderStatus.COMPLETE.value,
+            creation_date="2026-09-01T00:10:00Z",
+        )
+    ]
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, early_renewal_context, mock_next_step)  # act
+
+    assert early_renewal_context.validation_succeeded is True
+    mock_next_step.assert_called_once_with(mock_mpt_client, early_renewal_context)
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_early_renewal_ignores_orders_outside_lookback(
+    mock_adobe_client, mock_mpt_client, mock_next_step, adobe_order_factory, early_renewal_context
+):
+    mock_adobe_client.get_orders.return_value = [
+        adobe_order_factory(
+            ORDER_TYPE_RENEWAL,
+            status=AdobeOrderStatus.COMPLETE.value,
+            creation_date="2026-07-01T10:00:00Z",
+        )
+    ]
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, early_renewal_context, mock_next_step)  # act
+
+    assert early_renewal_context.validation_succeeded is True
+    mock_next_step.assert_called_once_with(mock_mpt_client, early_renewal_context)
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_early_renewal_unlocks_after_the_anniversary(
+    mock_adobe_client, mock_mpt_client, mock_next_step, adobe_order_factory, early_renewal_context
+):
+    early_renewal_context.adobe_customer = {"cotermDate": "2027-09-05"}
+    mock_adobe_client.get_orders.return_value = [
+        adobe_order_factory(
+            ORDER_TYPE_RENEWAL,
+            status=AdobeOrderStatus.COMPLETE.value,
+            creation_date="2026-08-20T10:00:00Z",
+        )
+    ]
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, early_renewal_context, mock_next_step)  # act
+
+    assert early_renewal_context.validation_succeeded is True
+    mock_next_step.assert_called_once_with(mock_mpt_client, early_renewal_context)
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_early_renewal_skips_renewal_orders(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    order_factory,
+    order_parameters_factory,
+    renewal_payload,
+):
+    context = Context(
+        order=order_factory(
+            order_parameters=order_parameters_factory(renewal_payload=renewal_payload)
+        ),
+        authorization_id="AUT-1234-5678",
+        adobe_customer_id="a-client-id",
+        adobe_customer={"cotermDate": "2027-09-25"},
+    )
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.validation_succeeded is True
+    mock_adobe_client.get_orders.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_validate_no_early_renewal_skips_without_adobe_customer(
+    mock_adobe_client, mock_mpt_client, mock_next_step, order_factory
+):
+    context = Context(order=order_factory())
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.validation_succeeded is True
+    mock_adobe_client.get_orders.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+@freeze_time("2027-02-20 12:30:00")
+def test_validate_no_early_renewal_handles_leap_day_coterm(
+    mock_adobe_client, mock_mpt_client, mock_next_step, adobe_order_factory, early_renewal_context
+):
+    early_renewal_context.adobe_customer = {"cotermDate": "2028-02-29"}
+    mock_adobe_client.get_orders.return_value = [
+        adobe_order_factory(
+            ORDER_TYPE_RENEWAL,
+            status=AdobeOrderStatus.COMPLETE.value,
+            creation_date="2027-02-15T10:00:00Z",
+        )
+    ]
+    step = ValidateNoEarlyRenewal()
+
+    step(mock_mpt_client, early_renewal_context, mock_next_step)  # act
+
+    assert early_renewal_context.validation_succeeded is False
+    assert early_renewal_context.order["error"] == ERR_EARLY_RENEWAL_IN_PROGRESS.to_dict()
+    mock_next_step.assert_not_called()
