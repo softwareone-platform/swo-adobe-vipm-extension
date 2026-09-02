@@ -92,6 +92,7 @@ from .subscription import (
 )
 from .three_yc import (
     get_3yc_fulfillment_parameters,
+    is_3yc_commitment_ending_before_coterm,
     set_adobe_3yc_commitment_request_status,
     set_adobe_3yc_end_date,
     set_adobe_3yc_enroll_status,

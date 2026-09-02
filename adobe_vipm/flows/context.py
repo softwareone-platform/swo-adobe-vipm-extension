@@ -40,6 +40,7 @@ class Context:
     adobe_transfer_order: dict = field(default_factory=dict)
     renewal_payload: dict | None = None
     renewal_plan_subscriptions: list = field(default_factory=list)
+    renewal_return_candidates: list = field(default_factory=list)
     renewal_net_new_subscriptions: dict = field(default_factory=dict)
     renewal_created_net_new_subscriptions: dict = field(default_factory=dict)
     adobe_customer_subscriptions: list = field(default_factory=list)

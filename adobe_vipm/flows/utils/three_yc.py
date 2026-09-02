@@ -1,4 +1,5 @@
 import copy
+import datetime as dt
 
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import get_fulfillment_parameter, get_ordering_parameter
@@ -129,3 +130,24 @@ def get_3yc_fulfillment_parameters(order_or_agreement: dict) -> list[str]:
         get_fulfillment_parameter(order_or_agreement, param_external_id)
         for param_external_id in three_yc_fulfillment_parameters
     ]
+
+
+def is_3yc_commitment_ending_before_coterm(adobe_customer: dict, commitment: dict) -> bool:
+    """
+    Check whether the 3YC commitment ends before the customer's coterm date.
+
+    A commitment that expires before the next anniversary no longer binds the
+    quantities renewing at that anniversary, so its committed minimum is not
+    enforced. Without a coterm date the check is not applicable.
+
+    Args:
+        adobe_customer: Adobe customer.
+        commitment: 3YC commitment (or commitment request) object.
+
+    Returns:
+        True when the commitment end date is strictly before the coterm date.
+    """
+    coterm_date = adobe_customer.get("cotermDate")
+    if not coterm_date:
+        return False
+    return dt.date.fromisoformat(commitment["endDate"]) < dt.date.fromisoformat(coterm_date)

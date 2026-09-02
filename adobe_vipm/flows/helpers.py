@@ -57,6 +57,7 @@ from adobe_vipm.flows.utils import (
     get_ordering_parameter,
     get_price_item_by_line_sku,
     get_retry_count,
+    is_3yc_commitment_ending_before_coterm,
     reset_order_error,
     reset_ordering_parameters_error,
     set_customer_data,
@@ -333,28 +334,7 @@ class Validate3YCCommitment(Step):
         return False
 
     def _validate_3yc_commitment_date_before_coterm_date(self, context, commitment):
-        if not context.adobe_customer["cotermDate"]:
-            return False
-
-        threeyc_end_date = (
-            dt.datetime
-            .strptime(
-                commitment["endDate"],
-                "%Y-%m-%d",
-            )
-            .replace(tzinfo=dt.UTC)
-            .date()
-        )
-        coterm_date = (
-            dt.datetime
-            .strptime(
-                context.adobe_customer["cotermDate"],
-                "%Y-%m-%d",
-            )
-            .replace(tzinfo=dt.UTC)
-            .date()
-        )
-        return threeyc_end_date < coterm_date
+        return is_3yc_commitment_ending_before_coterm(context.adobe_customer, commitment)
 
     def get_quantities(self, context, subscriptions) -> tuple[float, float]:
         """Calculates licensees and consumables quantities of subscriptions."""
