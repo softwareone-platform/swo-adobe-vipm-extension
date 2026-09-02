@@ -515,6 +515,12 @@ ERR_RENEWAL_RETURN_FAILED = ValidationError(
     "Failed to return the previous renewal order for subscription {subscription_id}: {error}.",
 )
 
+ERR_RENEWAL_RETURN_WINDOW_CLOSED = ValidationError(
+    "VIPM0053",
+    "The previous renewal order {order_id} of subscription {subscription_id} was placed on "
+    "{creation_date}, outside the {window_days}-day return window, so it cannot be returned.",
+)
+
 ERR_EARLY_RENEWAL_IN_PROGRESS = ValidationError(
     "VIPM0051",
     "An early renewal has already been placed for this agreement, so Change, "

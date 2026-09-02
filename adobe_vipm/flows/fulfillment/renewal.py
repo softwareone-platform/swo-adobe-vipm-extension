@@ -10,7 +10,10 @@ The plan is applied in a fixed additive-before-subtractive order so the
 running renewing aggregate never dips below the 3YC committed minimum:
 the plan is validated with a single PREVIEW_RENEWAL, the net-new scheduled
 subscriptions are created first, then the existing subscriptions are patched
-(enable, increase, decrease, disable, in that order).
+(enable, increase, decrease, disable, in that order). The ordering only
+protects the intermediate states, so before any mutation the resulting
+renewing aggregate is also validated numerically against the committed
+minimum (Validate3YCRenewalFloor, shared with the renew-now flow).
 """
 
 import datetime as dt
@@ -22,10 +25,12 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     AdobeSubscriptionStatus,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.airtable.models import create_discount_redemptions
 from adobe_vipm.flows.constants import (
+    ERR_COMMITMENT_3YC_VALIDATION,
     ERR_RENEWAL_NET_NEW_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
@@ -47,19 +52,39 @@ from adobe_vipm.flows.fulfillment.shared import (
     get_flex_discount_limit_error,
     switch_order_to_failed,
 )
-from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
     get_order_line_by_sku,
     get_subscription_by_line_and_item_id,
+    is_3yc_commitment_ending_before_coterm,
     notify_not_updated_subscriptions,
 )
 from adobe_vipm.flows.utils.deployment import get_deployment_id
 from adobe_vipm.flows.utils.parameter import update_fulfillment_parameter_value
 from adobe_vipm.notifications import send_exception
-from adobe_vipm.utils import get_partial_sku
+from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
+
+# The committed minimum binds only while the commitment is in force.
+IN_FORCE_COMMITMENT_STATUSES = frozenset((
+    ThreeYearCommitmentStatus.COMMITTED,
+    ThreeYearCommitmentStatus.ACTIVE,
+))
+
+
+def find_scheduled_subscription(subscriptions, offer_id):
+    """Return the scheduled (1009) subscription holding the offer, or None."""
+    return next(
+        (
+            subscription
+            for subscription in subscriptions
+            if subscription.get("status") == AdobeSubscriptionStatus.SCHEDULED
+            and get_partial_sku(subscription["offerId"]) == get_partial_sku(offer_id)
+        ),
+        None,
+    )
 
 
 class PreviewRenewal(Step):
@@ -125,6 +150,147 @@ class PreviewRenewal(Step):
                 line_item["flexDiscountCodes"] = plan["flex_discount_codes"]
             line_items.append(line_item)
         return line_items
+
+
+class Validate3YCRenewalFloor(Step):
+    """
+    Validate the resulting renewing aggregate against the 3YC committed minimum.
+
+    The additive-before-subtractive ordering of the renewal flows only
+    protects the intermediate states: nothing compares the plan's end state
+    with the committed floor, and the renewal orders are created directly in
+    Processing so the draft validation guard never runs for them. This step
+    projects the plan onto the customer's Adobe subscriptions snapshotted by
+    SetupRenewalPlan (a renewing entry takes the plan's renewal quantity, a
+    lapsing entry stops renewing, a subscription outside the plan keeps its
+    current auto-renewal and inactive subscriptions never count), adds the
+    net-new items when the flow creates them, and validates the resulting
+    licenses and consumables aggregate with the same 3YC guard used by the
+    other order types. It runs before any mutation, so a breach fails the
+    order with nothing to reverse. The floor is enforced only for a
+    COMMITTED/ACTIVE commitment that does not end before the coterm date.
+    """
+
+    def __init__(self, *, include_net_new_items=True):
+        self.include_net_new_items = include_net_new_items
+        self.commitment_validator = Validate3YCCommitment()
+
+    def __call__(self, client, context, next_step):
+        """Validate the resulting renewing aggregate against the 3YC committed minimum."""
+        commitment = get_3yc_commitment(context.adobe_customer or {})
+        if not self._is_floor_enforced(context, commitment):
+            next_step(client, context)
+            return
+
+        projected_subscriptions = self._project_plan(context)
+        count_licenses, count_consumables = (
+            self.commitment_validator.get_licenses_and_consumables_count(
+                context.market_segment, {"items": projected_subscriptions}
+            )
+        )
+        error = self.commitment_validator.validate_minimum_quantity(
+            context, commitment, count_licenses, count_consumables
+        )
+        if error:
+            logger.warning(
+                "%s: the renewal plan breaches the 3YC committed minimum: %s", context, error
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_COMMITMENT_3YC_VALIDATION.to_dict(error=error),
+            )
+            return
+
+        logger.info(
+            "%s: the renewal plan respects the 3YC committed minimum (licenses=%s, consumables=%s)",
+            context,
+            count_licenses,
+            count_consumables,
+        )
+        next_step(client, context)
+
+    def _is_floor_enforced(self, context, commitment):
+        if not commitment or commitment.get("status") not in IN_FORCE_COMMITMENT_STATUSES:
+            logger.info(
+                "%s: no 3YC commitment in force, skipping the renewal floor validation", context
+            )
+            return False
+        if is_3yc_commitment_ending_before_coterm(context.adobe_customer, commitment):
+            logger.info(
+                "%s: the 3YC commitment ends before the coterm date, "
+                "skipping the renewal floor validation",
+                context,
+            )
+            return False
+        return True
+
+    def _project_plan(self, context):
+        """Return the Adobe subscriptions as they will renew once the plan is applied."""
+        plans_by_subscription_id = {
+            plan["subscription_id"]: plan for plan in context.renewal_plan_subscriptions
+        }
+        projected = [
+            self._project_subscription(
+                subscription, plans_by_subscription_id.get(subscription["subscriptionId"])
+            )
+            for subscription in context.adobe_customer_subscriptions
+            if subscription.get("status") != AdobeSubscriptionStatus.INACTIVE
+        ]
+        if self.include_net_new_items:
+            self._project_net_new_items(context, projected)
+        return projected
+
+    def _project_subscription(self, subscription, plan):
+        auto_renewal = subscription.get("autoRenewal", {})
+        if plan is None:
+            enabled = auto_renewal.get("enabled", False)
+            quantity = auto_renewal.get(Param.RENEWAL_QUANTITY.value) or 0
+        elif plan["renew"]:
+            enabled, quantity = True, self._renewing_quantity(plan)
+        else:
+            enabled, quantity = False, 0
+        return {
+            **subscription,
+            "autoRenewal": {"enabled": enabled, Param.RENEWAL_QUANTITY.value: quantity},
+        }
+
+    def _renewing_quantity(self, plan):
+        """
+        Return the quantity a renewing plan entry will renew.
+
+        An entry already committed by a previous renewal order with no
+        requested quantity change keeps that order's renewedQuantity (the
+        renew-now flow submits nothing for it); otherwise the plan's
+        renewal quantity applies.
+        """
+        renewed_quantity = plan["snapshot"].get("renewed_quantity")
+        if not plan["renewal_quantity"] and renewed_quantity is not None:
+            return renewed_quantity
+        return plan["renewal_quantity"]
+
+    def _project_net_new_items(self, context, projected):
+        """
+        Add the plan's net-new items to the projection.
+
+        Mirrors CreateNetNewSubscriptions: a scheduled subscription already
+        holding the offer (created by a previous attempt) is reused instead
+        of being counted twice.
+        """
+        for net_new_item in context.renewal_payload.get("netNewItems", []):
+            auto_renewal = {
+                "enabled": True,
+                Param.RENEWAL_QUANTITY.value: net_new_item["quantity"],
+            }
+            scheduled = find_scheduled_subscription(projected, net_new_item["offerId"])
+            if scheduled:
+                scheduled["autoRenewal"] = auto_renewal
+            else:
+                projected.append({
+                    "offerId": net_new_item["offerId"],
+                    "status": AdobeSubscriptionStatus.SCHEDULED,
+                    "autoRenewal": auto_renewal,
+                })
 
 
 class CreateNetNewSubscriptions(Step):
@@ -254,15 +420,7 @@ class CreateNetNewSubscriptions(Step):
         return True
 
     def _find_scheduled_subscription(self, context, offer_id):
-        return next(
-            (
-                subscription
-                for subscription in context.adobe_customer_subscriptions
-                if subscription["status"] == AdobeSubscriptionStatus.SCHEDULED
-                and get_partial_sku(subscription["offerId"]) == get_partial_sku(offer_id)
-            ),
-            None,
-        )
+        return find_scheduled_subscription(context.adobe_customer_subscriptions, offer_id)
 
 
 class UpdateRenewalSubscriptions(Step):
@@ -271,7 +429,10 @@ class UpdateRenewalSubscriptions(Step):
 
     The PATCH operations run in a fixed additive-before-subtractive order
     (enable, increase, decrease, disable) so the renewing aggregate never
-    dips below the 3YC committed minimum. Each subscription state was
+    dips below the 3YC committed minimum. A plan entry without discount
+    codes leaves the codes Adobe already holds on the subscription
+    (inherited reusables) untouched, while an explicitly selected code
+    replaces them. Each subscription state was
     snapshotted before mutating; on a confirmed Adobe failure the applied
     operations are reversed (restore-to-known-good, best effort) and the
     scheduled net-new subscriptions are neutralized by disabling their
@@ -361,11 +522,20 @@ class UpdateRenewalSubscriptions(Step):
         }
 
     def _is_renewal_in_place(self, plan, snapshot):
-        """Return True when the subscription already holds the target renewal state."""
+        """
+        Return True when the subscription already holds the target renewal state.
+
+        A plan entry without codes leaves the subscription's codes untouched
+        (the PATCH sends none), so inherited codes on the snapshot do not
+        make the state differ.
+        """
+        codes_in_place = not plan["flex_discount_codes"] or sorted(
+            snapshot["flex_discount_codes"]
+        ) == sorted(plan["flex_discount_codes"])
         return (
             snapshot["enabled"]
             and snapshot["renewal_quantity"] == plan["renewal_quantity"]
-            and sorted(snapshot["flex_discount_codes"]) == sorted(plan["flex_discount_codes"])
+            and codes_in_place
         )
 
     def _apply_operation(self, adobe_client, context, operation):
@@ -583,21 +753,17 @@ class RecordDiscountRedemptions(Step):
 
     Runs after the order has been completed, so a fulfillment retry of an
     earlier failure never duplicates rows. One row is written per unique code
-    applied by the plan. The write is best effort: the order is already
-    completed, so an AirTable failure is logged and notified for a manual
-    backfill instead of failing the order.
+    applied by the plan. A code the subscription already carried before this
+    order (inherited discount snapshotted by SetupRenewalPlan) was not
+    redeemed by it, so it is skipped: an auto-applied reusable is never
+    recorded as a fresh once-per-customer redemption. The write is best
+    effort: the order is already completed, so an AirTable failure is logged
+    and notified for a manual backfill instead of failing the order.
     """
 
     def __call__(self, client, context, next_step):
         """Record the redeemed flex discount codes on the AirTable redemptions table."""
-        redeemed_codes = list(
-            dict.fromkeys(
-                code
-                for plan in context.renewal_plan_subscriptions
-                if plan["renew"]
-                for code in plan["flex_discount_codes"]
-            )
-        )
+        redeemed_codes = self._get_redeemed_codes(context)
         if redeemed_codes:
             self._record_redemptions(context, redeemed_codes)
         else:
@@ -607,6 +773,24 @@ class RecordDiscountRedemptions(Step):
                 context,
             )
         next_step(client, context)
+
+    def _get_redeemed_codes(self, context):
+        """Return the unique codes newly applied by the plan, skipping inherited ones."""
+        redeemed_codes, inherited_codes = [], []
+        for plan in context.renewal_plan_subscriptions:
+            if not plan["renew"]:
+                continue
+            for code in plan["flex_discount_codes"]:
+                is_inherited = code in plan["snapshot"]["flex_discount_codes"]
+                (inherited_codes if is_inherited else redeemed_codes).append(code)
+        if inherited_codes:
+            logger.info(
+                "%s: skipping inherited flex discount code(s) already held by the "
+                "subscriptions, not redeemed by this order: %s",
+                context,
+                ", ".join(dict.fromkeys(inherited_codes)),
+            )
+        return list(dict.fromkeys(redeemed_codes))
 
     def _record_redemptions(self, context, redeemed_codes):
         logger.info(
@@ -655,12 +839,12 @@ def fulfill_renewal_order(client, order):
     """
     Fulfills a change order that carries an at-anniversary renewal payload.
 
-    It validates the plan with a PREVIEW_RENEWAL order, creates the scheduled
-    net-new subscriptions first (additive before subtractive, so the 3YC
-    committed minimum is never breached) and then applies the auto-renewal
-    preferences to the existing subscriptions (enable, increase, decrease,
-    disable). Nothing is invoiced and no Adobe order is placed: the plan
-    takes effect at the coterm date.
+    It validates the resulting renewing aggregate against the 3YC committed
+    minimum, creates the scheduled net-new subscriptions first (additive
+    before subtractive, so the 3YC committed minimum is never breached) and
+    then applies the auto-renewal preferences to the existing subscriptions
+    (enable, increase, decrease, disable). Nothing is invoiced and no Adobe
+    order is placed: the plan takes effect at the coterm date.
 
     Args:
         client (MPTClient): An instance of the MPT client used for communication
@@ -679,6 +863,7 @@ def fulfill_renewal_order(client, order):
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
         SetupRenewalPlan(),
+        Validate3YCRenewalFloor(),
         CreateNetNewSubscriptions(),
         UpdateRenewalSubscriptions(),
         CreateNetNewMptSubscriptions(),
