@@ -116,6 +116,72 @@ def test_get_switch_preview_order_step_adobe_error(
     mocked_next_step.assert_not_called()
 
 
+def test_get_switch_preview_order_step_multiple_flex_discount_codes(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    order_parameters_factory,
+    switch_payload,
+):
+    switch_payload["lineItems"][0]["flexDiscountCodes"] = ["CODE-1", "CODE-2"]
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(switch_payload=switch_payload),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+    )
+    step = GetSwitchPreviewOrder()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_switch_preview_order.assert_not_called()
+    mocked_switch_to_failed.assert_called_once()
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "Only one flexible discount code per line item is allowed" in message
+    assert "CODE-1, CODE-2" in message
+    mocked_next_step.assert_not_called()
+
+
+def test_get_switch_preview_order_step_flex_discount_limit_adobe_error(
+    mocker, mock_adobe_client, mock_mpt_client, switch_order, adobe_api_error_factory
+):
+    error = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED.value,
+            message="Line Item: 1, Reason: Invalid Flexible Discount",
+        ),
+    )
+    mock_adobe_client.create_switch_preview_order.side_effect = error
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=switch_order,
+        order_id=switch_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+    )
+    step = GetSwitchPreviewOrder()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "Only one flexible discount code per line item is allowed" in message
+    mocked_next_step.assert_not_called()
+
+
 def test_submit_switch_order_step_creates_order_still_pending(
     mocker,
     mock_adobe_client,
@@ -248,6 +314,63 @@ def test_submit_switch_order_step_unexpected_status(
 
     mocked_switch_to_failed.assert_called_once()
     assert "9999" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_switch_order_step_flex_discount_limit_error(
+    mocker, mock_adobe_client, mock_mpt_client, switch_order, adobe_api_error_factory
+):
+    mock_adobe_client.create_switch_order.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED.value,
+            message="Line Item: 1, Reason: Invalid Flexible Discount",
+        ),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=switch_order,
+        order_id=switch_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+    )
+    step = SubmitSwitchOrder()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "Only one flexible discount code per line item is allowed" in message
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_switch_order_step_other_adobe_error_reraised(
+    mocker, mock_adobe_client, mock_mpt_client, switch_order, adobe_api_error_factory
+):
+    error = AdobeAPIError(
+        400,
+        adobe_api_error_factory(code="9999", message="Something else went wrong"),
+    )
+    mock_adobe_client.create_switch_order.side_effect = error
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=switch_order,
+        order_id=switch_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+    )
+    step = SubmitSwitchOrder()
+
+    with pytest.raises(AdobeAPIError):
+        step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
     mocked_next_step.assert_not_called()
 
 
