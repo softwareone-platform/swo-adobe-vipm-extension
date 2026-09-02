@@ -7,9 +7,12 @@ carry a renewal payload built by the renewal wizard with renewalPath "now"
 renewing subscriptions are committed as an actual Adobe RENEWAL order,
 invoiced immediately, mirroring how the PURCHASE flow turns its PREVIEW
 order into a NEW order: validate with PREVIEW_RENEWAL, then resubmit the
-line items it returns as the real order. A renewing subscription already
-committed in a previous renewal order (renewedQuantity populated) with no
-requested quantity change is excluded from both. Once the order completes, the
+line items it returns as the real order, committing only the flex discount
+codes the plan explicitly selected (reusable discounts Adobe auto-applies
+are never echoed back, and an explicit code takes precedence over them). A
+renewing subscription already committed in a previous renewal order
+(renewedQuantity populated) with no requested quantity change is excluded
+from both. Once the order completes, the
 renewed subscriptions (renew = true) have their autoRenewal normalised
 (enabled=on, renewalQuantity taken from Adobe's post-renewal
 renewedQuantity) and the plan's lapsing subscriptions (renew = false)
@@ -17,12 +20,18 @@ have their auto-renewal disabled. A lapsing subscription that was already
 committed in a previous RENEWAL order (its pre-mutation snapshot carries a
 renewedQuantity) additionally has that order's line returned via a RETURN
 order, so the customer is not left paying for a renewal that is being
-toggled off. Once the order is completed, the flex discount codes redeemed
-by the plan are recorded on the AirTable redemptions table.
+toggled off; that previous line is located and checked against Adobe's
+14-day return window before anything is committed, so an order that cannot
+be undone fails with nothing to reverse. Once the order is completed, the
+flex discount codes redeemed by the plan are recorded on the AirTable
+redemptions table. Before anything is committed, the resulting renewing
+aggregate is validated against the 3YC committed minimum
+(Validate3YCRenewalFloor, shared with the at-anniversary flow).
 
 Net-new items are not handled yet.
 """
 
+import datetime as dt
 import logging
 from operator import itemgetter
 
@@ -30,6 +39,7 @@ from mpt_extension_sdk.mpt_http.mpt import update_order
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    CANCELLATION_WINDOW_DAYS,
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
@@ -41,6 +51,7 @@ from adobe_vipm.flows.constants import (
     ERR_RENEWAL_ORDER_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_RETURN_FAILED,
+    ERR_RENEWAL_RETURN_WINDOW_CLOSED,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
@@ -48,7 +59,10 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
-from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
+from adobe_vipm.flows.fulfillment.renewal import (
+    RecordDiscountRedemptions,
+    Validate3YCRenewalFloor,
+)
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     SetOrUpdateCotermDate,
@@ -111,38 +125,61 @@ def _build_renewing_line_items(context):
     return line_items
 
 
-def _get_committed_flex_discount_codes(preview_line_item):
-    """
-    Extract the flex discount code to commit from a PREVIEW_RENEWAL response line item.
+def _get_requested_flex_discount_codes(context):
+    """Map each renewing subscription of the plan to the codes explicitly selected for it."""
+    return {
+        plan["subscription_id"]: plan["flex_discount_codes"]
+        for plan in context.renewal_plan_subscriptions
+        if plan["renew"]
+    }
 
-    Adobe accepts at most one flexible discount code per line item (it rejects
-    more with error 2147), so instead of blindly taking the first element the
-    discounts the preview did not apply successfully are dropped and only one
-    surviving code is submitted, logging what is being discarded.
+
+def _get_committed_flex_discount_codes(preview_line_item, requested_codes):
+    """
+    Pick the flex discount code to commit for a PREVIEW_RENEWAL response line item.
+
+    Only a code the plan explicitly selected for the line is committed, and
+    only once the preview confirmed it (result SUCCESS). Reusable discounts
+    the customer already holds are auto-applied by Adobe at renewal without
+    any opt-in: the preview reports them alongside the requested ones, but
+    they are never echoed back, so the commit does not double-apply them and
+    an explicitly selected code takes precedence over them. Adobe accepts at
+    most one code per line (it rejects more with error 2147), so a single
+    surviving code is submitted.
     """
     flex_discounts = preview_line_item.get("flexDiscounts") or []
+    line_number = preview_line_item.get("extLineItemNumber")
     successful = (fd for fd in flex_discounts if fd.get("result", "SUCCESS") == "SUCCESS")
-    codes = [fd["code"] for fd in successful]
-    discarded = [fd["code"] for fd in flex_discounts if fd["code"] not in codes]
-    if discarded:
+    confirmed = {fd["code"] for fd in successful}
+    committed = [code for code in requested_codes if code in confirmed]
+    dropped = [code for code in requested_codes if code not in confirmed]
+    if dropped:
         logger.warning(
             "Dropping flex discount code(s) not applied successfully by the renewal "
             "preview for line %s: %s",
-            preview_line_item.get("extLineItemNumber"),
-            ", ".join(discarded),
+            line_number,
+            ", ".join(dropped),
         )
-    if len(codes) > 1:
+    auto_applied = sorted(confirmed.difference(requested_codes))
+    if auto_applied:
+        logger.info(
+            "Leaving the discount(s) auto-applied by Adobe for line %s out of the renewal "
+            "order, they apply without opt-in: %s",
+            line_number,
+            ", ".join(auto_applied),
+        )
+    if len(committed) > 1:
         logger.warning(
-            "Renewal preview returned %s flex discounts for line %s, submitting only "
+            "Renewal plan selected %s flex discounts for line %s, submitting only "
             "the first one (%s) to honour Adobe's one-code-per-line rule",
-            len(codes),
-            preview_line_item.get("extLineItemNumber"),
-            codes[0],
+            len(committed),
+            line_number,
+            committed[0],
         )
-    return codes[:1]
+    return committed[:1]
 
 
-def _build_committed_line_items(preview_line_items):
+def _build_committed_line_items(preview_line_items, requested_codes_by_subscription):
     """
     Build RENEWAL order line items from a PREVIEW_RENEWAL response's line items.
 
@@ -152,7 +189,10 @@ def _build_committed_line_items(preview_line_items):
     response-shaped (e.g. flexDiscounts is a list of discount result
     objects, not the flexDiscountCodes the create-order request expects) and
     carries pricing fields the create-order request doesn't need, so it is
-    re-shaped into a request line item rather than forwarded as-is.
+    re-shaped into a request line item rather than forwarded as-is. The
+    flex discount codes come from the plan's explicit selection per
+    subscription, confirmed by the preview (see
+    _get_committed_flex_discount_codes).
     """
     line_items = []
     for preview_line_item in preview_line_items:
@@ -162,7 +202,10 @@ def _build_committed_line_items(preview_line_items):
             "subscriptionId": preview_line_item["subscriptionId"],
             "quantity": preview_line_item["quantity"],
         }
-        flex_discount_codes = _get_committed_flex_discount_codes(preview_line_item)
+        requested_codes = requested_codes_by_subscription.get(preview_line_item["subscriptionId"])
+        flex_discount_codes = _get_committed_flex_discount_codes(
+            preview_line_item, requested_codes or []
+        )
         if flex_discount_codes:
             line_item["flexDiscountCodes"] = flex_discount_codes
         if preview_line_item.get("deploymentId"):
@@ -273,7 +316,10 @@ class SubmitRenewalNowOrder(Step):
                 context.authorization_id,
                 context.adobe_customer_id,
                 context.order_id,
-                _build_committed_line_items(context.preview_renewal_order["lineItems"]),
+                _build_committed_line_items(
+                    context.preview_renewal_order["lineItems"],
+                    _get_requested_flex_discount_codes(context),
+                ),
                 recommendation_tracker_id=(
                     context.renewal_payload.get("recommendationTrackerId") or None
                 ),
@@ -323,28 +369,41 @@ class SubmitRenewalNowOrder(Step):
         )
 
 
-class ReturnPreviousRenewalOrders(Step):
+def _get_creation_date(order):
+    creation_date = dt.datetime.fromisoformat(order["creationDate"])
+    return creation_date.replace(tzinfo=dt.UTC).date()
+
+
+def _is_within_return_window(order):
+    """Return True when the Adobe order was placed within the return window (inclusive)."""
+    today = dt.datetime.now(tz=dt.UTC).date()
+    window_start = today - dt.timedelta(days=CANCELLATION_WINDOW_DAYS)
+    return _get_creation_date(order) >= window_start
+
+
+class ResolvePreviousRenewalReturns(Step):
     """
-    Return the previous RENEWAL order lines of the plan's lapsing subscriptions.
+    Resolve, before anything is committed, the previous RENEWAL order lines to return.
 
     A lapsing subscription (renew = false) whose pre-mutation snapshot
-    (taken by SetupRenewalPlan, before this order commits anything) carries
-    a renewedQuantity was already committed in a previous RENEWAL order
-    placed within the renewal window. Disabling its auto-renewal is not
-    enough — the already-paid renewal must be undone, so this step submits
-    a RETURN order referencing that previous RENEWAL order, returning only
-    the lapsing subscription's line (other lines of that order stay
-    renewed). Runs after SubmitRenewalNowOrder so the additive operation
-    always precedes the subtractive one.
-
-    Idempotent: RETURN orders created by this MPT order are detected by
-    their external reference prefix and reused instead of re-submitted. A
-    RETURN order still pending on Adobe's side keeps the MPT order in
-    Processing to be retried on the next fulfillment attempt.
+    (taken by SetupRenewalPlan) carries a renewedQuantity was already
+    committed in a previous RENEWAL order, so ReturnPreviousRenewalOrders
+    has to return that order's line once this order's RENEWAL commits.
+    Adobe only accepts a RETURN within CANCELLATION_WINDOW_DAYS of the order
+    placement, so the previous order is located here and its creation date
+    checked against the window while nothing has been committed yet: a line
+    outside the window, or a previous order that cannot be found, fails the
+    MPT order with nothing to reverse instead of leaving a committed and
+    invoiced RENEWAL behind a Failed order. A RETURN already created by a
+    previous attempt of this MPT order (detected by its external reference
+    prefix) is reused as-is, whatever the window says today, so retries stay
+    idempotent. The resolved candidates are stored on the context for
+    ReturnPreviousRenewalOrders.
     """
 
     def __call__(self, client, context, next_step):
-        """Return the previous RENEWAL order lines of the plan's lapsing subscriptions."""
+        """Resolve the previous RENEWAL order lines of the plan's lapsing subscriptions."""
+        context.renewal_return_candidates = []
         lapsing_renewed = [
             plan
             for plan in context.renewal_plan_subscriptions
@@ -355,25 +414,25 @@ class ReturnPreviousRenewalOrders(Step):
             return
 
         adobe_client = get_adobe_client()
-        renewal_orders = self._get_completed_renewal_orders(adobe_client, context)
         existing_return_orders = adobe_client.get_return_orders_by_external_reference(
             context.authorization_id,
             context.adobe_customer_id,
             context.order_id,
         )
-
-        return_orders = []
+        renewal_orders = self._get_completed_renewal_orders(adobe_client, context)
         for plan in lapsing_renewed:
-            return_order = self._return_previous_renewal(
-                client, adobe_client, context, plan, renewal_orders, existing_return_orders
+            candidate = self._resolve_candidate(
+                client, context, plan, renewal_orders, existing_return_orders
             )
-            if return_order is None:
+            if candidate is None:
                 return
-            return_orders.append(return_order)
+            context.renewal_return_candidates.append(candidate)
 
-        if not self._ensure_not_pending_return_orders(context, return_orders):
-            return
-
+        logger.info(
+            "%s: %s previous renewal line(s) resolved for return",
+            context,
+            len(context.renewal_return_candidates),
+        )
         next_step(client, context)
 
     def _get_completed_renewal_orders(self, adobe_client, context):
@@ -387,10 +446,16 @@ class ReturnPreviousRenewalOrders(Step):
         )
         return sorted(orders, key=itemgetter("creationDate"), reverse=True)
 
-    def _return_previous_renewal(  # noqa: WPS211
-        self, client, adobe_client, context, plan, renewal_orders, existing_return_orders
+    def _resolve_candidate(  # noqa: WPS211
+        self, client, context, plan, renewal_orders, existing_return_orders
     ):
         subscription_id = plan["subscription_id"]
+        candidate = {
+            "subscription_id": subscription_id,
+            "return_order": None,
+            "returning_order": None,
+            "returning_line": None,
+        }
         existing_returns = existing_return_orders.get(get_partial_sku(plan["offer_id"]))
         if existing_returns:
             logger.info(
@@ -399,7 +464,7 @@ class ReturnPreviousRenewalOrders(Step):
                 existing_returns[0]["orderId"],
                 subscription_id,
             )
-            return existing_returns[0]
+            return {**candidate, "return_order": existing_returns[0]}
 
         returning_order, returning_line = self._find_previous_renewal_line(
             context, renewal_orders, subscription_id
@@ -420,9 +485,34 @@ class ReturnPreviousRenewalOrders(Step):
             )
             return None
 
-        return self._create_return_order(
-            client, adobe_client, context, subscription_id, returning_order, returning_line
-        )
+        if not _is_within_return_window(returning_order):
+            creation_date = _get_creation_date(returning_order).isoformat()
+            logger.warning(
+                "%s: previous renewal order %s for subscription %s was placed on %s, "
+                "outside the %s-day return window",
+                context,
+                returning_order["orderId"],
+                subscription_id,
+                creation_date,
+                CANCELLATION_WINDOW_DAYS,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_RETURN_WINDOW_CLOSED.to_dict(
+                    order_id=returning_order["orderId"],
+                    subscription_id=subscription_id,
+                    creation_date=creation_date,
+                    window_days=CANCELLATION_WINDOW_DAYS,
+                ),
+            )
+            return None
+
+        return {
+            **candidate,
+            "returning_order": returning_order,
+            "returning_line": returning_line,
+        }
 
     def _find_previous_renewal_line(self, context, renewal_orders, subscription_id):
         for order in renewal_orders:
@@ -433,9 +523,50 @@ class ReturnPreviousRenewalOrders(Step):
                     return order, line_item
         return None, None
 
-    def _create_return_order(  # noqa: WPS211
-        self, client, adobe_client, context, subscription_id, returning_order, returning_line
-    ):
+
+class ReturnPreviousRenewalOrders(Step):
+    """
+    Return the previous RENEWAL order lines resolved by ResolvePreviousRenewalReturns.
+
+    Each candidate is a lapsing subscription (renew = false) already
+    committed in a previous RENEWAL order placed within the return window.
+    Disabling its auto-renewal is not enough — the already-paid renewal must
+    be undone, so this step submits a RETURN order referencing that previous
+    RENEWAL order, returning only the lapsing subscription's line (other
+    lines of that order stay renewed). Runs after SubmitRenewalNowOrder so
+    the additive operation always precedes the subtractive one.
+
+    Idempotent: a RETURN order already created by this MPT order is carried
+    by the candidate and reused instead of re-submitted. A RETURN order
+    still pending on Adobe's side keeps the MPT order in Processing to be
+    retried on the next fulfillment attempt.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Return the previous RENEWAL order lines of the plan's lapsing subscriptions."""
+        if not context.renewal_return_candidates:
+            next_step(client, context)
+            return
+
+        adobe_client = get_adobe_client()
+        return_orders = []
+        for candidate in context.renewal_return_candidates:
+            return_order = candidate["return_order"] or self._create_return_order(
+                client, adobe_client, context, candidate
+            )
+            if return_order is None:
+                return
+            return_orders.append(return_order)
+
+        if not self._ensure_not_pending_return_orders(context, return_orders):
+            return
+
+        next_step(client, context)
+
+    def _create_return_order(self, client, adobe_client, context, candidate):
+        subscription_id = candidate["subscription_id"]
+        returning_order = candidate["returning_order"]
+        returning_line = candidate["returning_line"]
         try:
             return_order = adobe_client.create_return_order(
                 context.authorization_id,
@@ -645,8 +776,10 @@ def fulfill_renewal_now_order(client, order):
 
     The plan's renewing subscriptions are validated with a PREVIEW_RENEWAL
     and committed as an actual Adobe RENEWAL order, invoiced immediately.
-    Once it completes, lapsing subscriptions that were already committed in
-    a previous RENEWAL order have that order's line returned, the renewed
+    Before that, the previous RENEWAL order lines of the lapsing
+    subscriptions already committed are resolved and checked against the
+    return window, so nothing is committed that cannot be undone. Once it
+    completes, those lines are returned, the renewed
     subscriptions (renew = true) have their autoRenewal normalised and the
     plan's lapsing subscriptions (renew = false) have their auto-renewal
     disabled.
@@ -668,6 +801,8 @@ def fulfill_renewal_now_order(client, order):
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
         SetupRenewalPlan(),
+        Validate3YCRenewalFloor(include_net_new_items=False),
+        ResolvePreviousRenewalReturns(),
         PreviewRenewalNowOrder(),
         SubmitRenewalNowOrder(),
         ReturnPreviousRenewalOrders(),
