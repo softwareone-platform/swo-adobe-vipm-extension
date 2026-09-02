@@ -255,6 +255,7 @@ class OrderClientMixin:
         external_reference_id: str,
         line_items: list[dict],
         order_type: str = adobe_constants.ORDER_TYPE_RENEWAL,
+        recommendation_tracker_id: str | None = None,
     ) -> dict:
         """
         Create a RENEWAL order for specific subscriptions.
@@ -267,6 +268,8 @@ class OrderClientMixin:
             external_reference_id: External reference ID for the order.
             line_items: List of line items with offerId, quantity, and subscriptionId.
             order_type: Type of the order.
+            recommendation_tracker_id: The tracker id captured from the Adobe
+            recommendations call, replayed so Adobe can attribute the outcome.
 
         Returns:
             dict: The Renewal order.
@@ -281,7 +284,11 @@ class OrderClientMixin:
             payload["currencyCode"] = authorization.currency
 
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
-        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        headers = self._get_headers(
+            authorization,
+            correlation_id=correlation_id,
+            recommendation_tracker_id=recommendation_tracker_id,
+        )
         response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -322,7 +329,10 @@ class OrderClientMixin:
             switch_payload,
             adobe_constants.ORDER_TYPE_PREVIEW_SWITCH,
         )
-        headers = self._get_headers(authorization)
+        headers = self._get_headers(
+            authorization,
+            recommendation_tracker_id=switch_payload.get("recommendationTrackerId"),
+        )
         response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             params={"fetch-price": "true"},
@@ -365,7 +375,11 @@ class OrderClientMixin:
             adobe_constants.ORDER_TYPE_SWITCH,
         )
         correlation_id = sha256(json.dumps(payload).encode()).hexdigest()
-        headers = self._get_headers(authorization, correlation_id=correlation_id)
+        headers = self._get_headers(
+            authorization,
+            correlation_id=correlation_id,
+            recommendation_tracker_id=switch_payload.get("recommendationTrackerId"),
+        )
         response = self._session.post(
             urljoin(self._config.api_base_url, f"/v3/customers/{customer_id}/orders"),
             headers=headers,
@@ -775,6 +789,9 @@ class OrderClientMixin:
             "externalReferenceId": external_reference_id,
             "orderType": order_type,
         }
+        # Adobe expects the tracker id of the originating recommendation as the
+        # x-recommendation-tracker-id header, not as an order body field.
+        payload.pop("recommendationTrackerId", None)
         if not payload.get("currencyCode"):
             payload["currencyCode"] = authorization.currency
         return payload

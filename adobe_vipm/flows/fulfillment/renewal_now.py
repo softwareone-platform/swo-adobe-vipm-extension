@@ -61,6 +61,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     get_existing_renewal_order,
+    get_flex_discount_limit_error,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.helpers import SetupContext
@@ -110,6 +111,37 @@ def _build_renewing_line_items(context):
     return line_items
 
 
+def _get_committed_flex_discount_codes(preview_line_item):
+    """
+    Extract the flex discount code to commit from a PREVIEW_RENEWAL response line item.
+
+    Adobe accepts at most one flexible discount code per line item (it rejects
+    more with error 2147), so instead of blindly taking the first element the
+    discounts the preview did not apply successfully are dropped and only one
+    surviving code is submitted, logging what is being discarded.
+    """
+    flex_discounts = preview_line_item.get("flexDiscounts") or []
+    successful = (fd for fd in flex_discounts if fd.get("result", "SUCCESS") == "SUCCESS")
+    codes = [fd["code"] for fd in successful]
+    discarded = [fd["code"] for fd in flex_discounts if fd["code"] not in codes]
+    if discarded:
+        logger.warning(
+            "Dropping flex discount code(s) not applied successfully by the renewal "
+            "preview for line %s: %s",
+            preview_line_item.get("extLineItemNumber"),
+            ", ".join(discarded),
+        )
+    if len(codes) > 1:
+        logger.warning(
+            "Renewal preview returned %s flex discounts for line %s, submitting only "
+            "the first one (%s) to honour Adobe's one-code-per-line rule",
+            len(codes),
+            preview_line_item.get("extLineItemNumber"),
+            codes[0],
+        )
+    return codes[:1]
+
+
 def _build_committed_line_items(preview_line_items):
     """
     Build RENEWAL order line items from a PREVIEW_RENEWAL response's line items.
@@ -130,9 +162,9 @@ def _build_committed_line_items(preview_line_items):
             "subscriptionId": preview_line_item["subscriptionId"],
             "quantity": preview_line_item["quantity"],
         }
-        flex_discounts = preview_line_item.get("flexDiscounts")
-        if flex_discounts:
-            line_item["flexDiscountCodes"] = [flex_discounts[0]["code"]]
+        flex_discount_codes = _get_committed_flex_discount_codes(preview_line_item)
+        if flex_discount_codes:
+            line_item["flexDiscountCodes"] = flex_discount_codes
         if preview_line_item.get("deploymentId"):
             line_item["deploymentId"] = preview_line_item["deploymentId"]
             line_item["currencyCode"] = preview_line_item["currencyCode"]
@@ -178,13 +210,17 @@ class PreviewRenewalNowOrder(Step):
                 context.order_id,
                 line_items,
                 order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+                recommendation_tracker_id=(
+                    context.renewal_payload.get("recommendationTrackerId") or None
+                ),
             )
         except AdobeAPIError as error:
             logger.warning("%s: renewal preview failed: %s", context, error)
             switch_order_to_failed(
                 client,
                 context.order,
-                ERR_RENEWAL_PREVIEW_FAILED.to_dict(error=error.message),
+                get_flex_discount_limit_error(error)
+                or ERR_RENEWAL_PREVIEW_FAILED.to_dict(error=error.message),
             )
             return False
 
@@ -238,13 +274,17 @@ class SubmitRenewalNowOrder(Step):
                 context.adobe_customer_id,
                 context.order_id,
                 _build_committed_line_items(context.preview_renewal_order["lineItems"]),
+                recommendation_tracker_id=(
+                    context.renewal_payload.get("recommendationTrackerId") or None
+                ),
             )
         except AdobeAPIError as error:
             logger.warning("%s: renewal order failed: %s", context, error)
             switch_order_to_failed(
                 client,
                 context.order,
-                ERR_RENEWAL_ORDER_FAILED.to_dict(error=error.message),
+                get_flex_discount_limit_error(error)
+                or ERR_RENEWAL_ORDER_FAILED.to_dict(error=error.message),
             )
             return None
 

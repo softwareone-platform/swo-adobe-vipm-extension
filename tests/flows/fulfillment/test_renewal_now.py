@@ -160,6 +160,7 @@ def test_preview_renewal_now_order_step_validates_preview(
             },
         ],
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     assert renewal_now_context.preview_renewal_order == preview_order
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
@@ -192,6 +193,7 @@ def test_preview_renewal_now_order_step_includes_already_renewed_subscription(
             },
         ],
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
@@ -231,6 +233,7 @@ def test_preview_renewal_now_order_step_excludes_already_renewed_without_change(
             },
         ],
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
@@ -399,6 +402,7 @@ def test_submit_renewal_now_order_step_commits_order(
                 "flexDiscountCodes": ["CODE-1"],
             },
         ],
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
     mocked_update_order.assert_called_once_with(
         mock_mpt_client,
@@ -407,6 +411,93 @@ def test_submit_renewal_now_order_step_commits_order(
     )
     assert renewal_now_context.adobe_renewal_order == renewal_order
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+def test_submit_renewal_now_order_step_commits_only_one_successful_flex_discount_code(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    # The preview can report discounts Adobe did not apply (result != SUCCESS) and,
+    # defensively, more than one entry: only one successful code may be committed
+    # (Adobe rejects more than one code per line with error 2147).
+    renewal_now_context.preview_renewal_order = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+                "flexDiscounts": [
+                    {"code": "FAILED-CODE", "result": "FAILURE"},
+                    {"code": "CODE-1", "result": "SUCCESS"},
+                    {"code": "CODE-2", "result": "SUCCESS"},
+                ],
+            },
+        ],
+    )
+    mocker.patch("adobe_vipm.flows.fulfillment.renewal_now.update_order")
+    renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+    )
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = renewal_order
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    committed_line_items = mock_adobe_client.create_renewal_order.mock_calls[0].args[3]
+    assert committed_line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "renewing-sub-id",
+            "quantity": 15,
+            "flexDiscountCodes": ["CODE-1"],
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+def test_submit_renewal_now_order_step_flex_discount_limit_error(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_api_error_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [plan_entry()]
+    renewal_now_context.preview_renewal_order = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+            },
+        ],
+    }
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED.value,
+            message="Line Item: 1, Reason: Invalid Flexible Discount",
+        ),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "Only one flexible discount code per line item is allowed" in message
+    assert renewal_now_context.adobe_renewal_order is None
+    mocked_next_step.assert_not_called()
 
 
 def test_submit_renewal_now_order_step_order_failed(

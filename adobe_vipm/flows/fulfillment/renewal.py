@@ -44,6 +44,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
+    get_flex_discount_limit_error,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.helpers import SetupContext
@@ -89,13 +90,17 @@ class PreviewRenewal(Step):
                 context.order_id,
                 line_items,
                 order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+                recommendation_tracker_id=(
+                    context.renewal_payload.get("recommendationTrackerId") or None
+                ),
             )
         except AdobeAPIError as error:
             logger.warning("%s: renewal preview failed: %s", context, error)
             switch_order_to_failed(
                 client,
                 context.order,
-                ERR_RENEWAL_PREVIEW_FAILED.to_dict(error=error.message),
+                get_flex_discount_limit_error(error)
+                or ERR_RENEWAL_PREVIEW_FAILED.to_dict(error=error.message),
             )
             return False
 
