@@ -33,7 +33,8 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    `termination.py`, and `configuration.py`; change orders carrying a
    `switchPayload` or `renewalPayload` ordering parameter are routed to
    `switch.py` (mid-term upgrades) and `renewal.py` (at-anniversary renewals);
-   `shared.py` holds common utilities.
+   `shared.py` holds common utilities and the flexible-discount-code-per-line
+   validation used by switch/renewal fulfillment.
 3. **Validation** (`flows/validation/`) — `validate_order()` in `base.py` routes to
    per-type validators (`purchase.py`, `change.py`, `transfer.py`, `termination.py`).
 4. **Sync** (`flows/sync/`) — Adobe-to-MPT synchronisation for `agreement.py`,

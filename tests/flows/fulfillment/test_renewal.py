@@ -173,6 +173,42 @@ def test_setup_renewal_plan_step_subscription_not_found(
     mocked_next_step.assert_not_called()
 
 
+def test_setup_renewal_plan_step_multiple_flex_discount_codes(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    order_parameters_factory,
+    renewal_payload,
+):
+    renewal_payload["subscriptions"][0]["flexDiscountCodes"] = ["CODE-1", "CODE-2"]
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(renewal_payload=renewal_payload),
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SetupRenewalPlan()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "Only one flexible discount code per line item is allowed" in message
+    assert "renewing-sub-id" in message
+    assert "CODE-1, CODE-2" in message
+    mock_adobe_client.get_subscriptions.assert_not_called()
+    mocked_next_step.assert_not_called()
+
+
 def test_preview_renewal_step(mocker, mock_adobe_client, mock_mpt_client, renewal_context):
     renewal_context.renewal_plan_subscriptions = [
         plan_entry(flex_discount_codes=["CODE-1"]),
@@ -252,6 +288,31 @@ def test_preview_renewal_step_adobe_error(
 
     mocked_switch_to_failed.assert_called_once()
     assert "Invalid discount code" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+def test_preview_renewal_step_flex_discount_limit_error(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context, adobe_api_error_factory
+):
+    renewal_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400,
+        adobe_api_error_factory(
+            code=AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED.value,
+            message="Line Item: 1, Reason: Invalid Flexible Discount",
+        ),
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = PreviewRenewal()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "Only one flexible discount code per line item is allowed" in message
     mocked_next_step.assert_not_called()
 
 

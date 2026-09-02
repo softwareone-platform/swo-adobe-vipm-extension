@@ -16,8 +16,9 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_ORDER_STATUSES,
     AdobeOrderStatus,
 )
-from adobe_vipm.adobe.errors import AdobeError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.flows.constants import (
+    ERR_FLEX_DISCOUNT_CODE_LIMIT,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
@@ -35,6 +36,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
+    get_flex_discount_limit_error,
     switch_order_to_failed,
 )
 from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateSkuAvailability
@@ -43,6 +45,31 @@ from adobe_vipm.flows.utils import get_switch_payload, set_adobe_order_id
 from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
 
 logger = logging.getLogger(__name__)
+
+
+def _describe_flex_discount_violation(line_item):
+    line_number = line_item.get("extLineItemNumber")
+    codes = line_item["flexDiscountCodes"]
+    code_count = len(codes)
+    joined_codes = ", ".join(codes)
+    return f"line {line_number} carries {code_count} codes ({joined_codes})"
+
+
+def _get_flex_discount_limit_violation(switch_payload):
+    """
+    Describe the switch payload lines that violate Adobe's one-code-per-line rule.
+
+    The switch payload is external input forwarded verbatim to Adobe: a line
+    item carrying more than one flexible discount code would be rejected by
+    Adobe with error 2147 at submission, so it is caught upfront instead.
+    Returns None when every line item carries at most one code.
+    """
+    violations = [
+        _describe_flex_discount_violation(line_item)
+        for line_item in switch_payload.get("lineItems", [])
+        if len(line_item.get("flexDiscountCodes") or []) > 1
+    ]
+    return "; ".join(violations) or None
 
 
 class GetSwitchPreviewOrder(Step):
@@ -67,19 +94,35 @@ class GetSwitchPreviewOrder(Step):
             next_step(mpt_client, context)
             return
 
+        switch_payload = get_switch_payload(context.order)
+        violation = _get_flex_discount_limit_violation(switch_payload)
+        if violation:
+            logger.warning(
+                "%s: switch payload violates the one-flex-discount-code-per-line rule: %s",
+                context,
+                violation,
+            )
+            switch_order_to_failed(
+                mpt_client,
+                context.order,
+                ERR_FLEX_DISCOUNT_CODE_LIMIT.to_dict(error=violation),
+            )
+            return
+
         adobe_client = get_adobe_client()
         try:
             context.adobe_preview_order = adobe_client.create_switch_preview_order(
                 context.authorization_id,
                 context.adobe_customer_id,
                 context.order_id,
-                get_switch_payload(context.order),
+                switch_payload,
             )
         except AdobeError as error:
             switch_order_to_failed(
                 mpt_client,
                 context.order,
-                ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
+                get_flex_discount_limit_error(error)
+                or ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
             )
             logger.warning("%s: switch preview failed: %s", context, error)
             return
@@ -107,12 +150,9 @@ class SubmitSwitchOrder(Step):
                 context.adobe_new_order_id,
             )
         else:
-            adobe_order = adobe_client.create_switch_order(
-                context.authorization_id,
-                context.adobe_customer_id,
-                context.order_id,
-                get_switch_payload(context.order),
-            )
+            adobe_order = self._create_switch_order(client, adobe_client, context)
+            if adobe_order is None:
+                return
             logger.info("%s: new adobe switch order created: %s", context, adobe_order["orderId"])
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
             context.order = set_adobe_order_ids_created_parameter(context, [adobe_order["orderId"]])
@@ -149,6 +189,30 @@ class SubmitSwitchOrder(Step):
             return
 
         next_step(client, context)
+
+    def _create_switch_order(self, client, adobe_client, context):
+        """
+        Submit the Adobe SWITCH order, or None when the submission was rejected.
+
+        Adobe's 2147 (more than one flex discount code on a line) is a
+        deterministic rejection: retrying can never succeed, so the order is
+        failed instead of being left to the retry loop. Any other Adobe error
+        keeps the current retry semantics.
+        """
+        try:
+            return adobe_client.create_switch_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                context.order_id,
+                get_switch_payload(context.order),
+            )
+        except AdobeAPIError as error:
+            flex_discount_error = get_flex_discount_limit_error(error)
+            if not flex_discount_error:
+                raise
+            logger.warning("%s: switch order submission failed: %s", context, error)
+            switch_order_to_failed(client, context.order, flex_discount_error)
+            return None
 
 
 def fulfill_switch_order(client, order):

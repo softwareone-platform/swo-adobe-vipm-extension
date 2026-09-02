@@ -49,6 +49,7 @@ from adobe_vipm.flows.constants import (
     ERR_DUE_DATE_REACHED,
     ERR_DUPLICATED_ITEMS,
     ERR_EXISTING_ITEMS,
+    ERR_FLEX_DISCOUNT_CODE_LIMIT,
     ERR_MANUAL_RENEWAL_ORDER_FAILED,
     ERR_MANUAL_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_SUBSCRIPTION_NOT_FOUND,
@@ -218,6 +219,29 @@ def switch_order_to_failed(mpt_client, order, error):
         mpt_client, adobe_client, [agreement["id"]], dry_run=False, sync_prices=False
     )
     return order
+
+
+def get_flex_discount_limit_error(error: Exception) -> dict | None:
+    """
+    Map Adobe's one-code-per-line rejection (error 2147) to its MPT validation error.
+
+    Adobe accepts at most one flexible discount code per line item and rejects
+    the submission with error 2147 otherwise. The limit is enforced before
+    submitting, so this mapping is a defensive net for the case where Adobe
+    still rejects the order.
+
+    Args:
+        error: The error raised by an Adobe order submission.
+
+    Returns:
+        The validation error dict when the error is Adobe's 2147, None otherwise.
+    """
+    if (
+        isinstance(error, AdobeAPIError)
+        and error.code == AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED
+    ):
+        return ERR_FLEX_DISCOUNT_CODE_LIMIT.to_dict(error=error.message)
+    return None
 
 
 def switch_order_to_query(client, order, template_name=None):
@@ -1747,6 +1771,11 @@ class SetupRenewalPlan(Step):
     def __call__(self, client, context, next_step):
         """Resolve the renewal payload against the customer's Adobe subscriptions."""
         context.renewal_payload = get_renewal_payload(context.order)
+        plan_entries = context.renewal_payload.get("subscriptions", [])
+        for entry in plan_entries:
+            if not self._enforce_one_flex_discount_code(client, context, entry):
+                return
+
         adobe_client = get_adobe_client()
         subscriptions = adobe_client.get_subscriptions(
             context.authorization_id,
@@ -1759,7 +1788,7 @@ class SetupRenewalPlan(Step):
         }
 
         context.renewal_plan_subscriptions = []
-        for entry in context.renewal_payload.get("subscriptions", []):
+        for entry in plan_entries:
             adobe_subscription = subscriptions_by_id.get(entry["subscriptionId"])
             if not adobe_subscription:
                 switch_order_to_failed(
@@ -1787,6 +1816,36 @@ class SetupRenewalPlan(Step):
             len(context.renewal_payload.get("netNewItems", [])),
         )
         next_step(client, context)
+
+    def _enforce_one_flex_discount_code(self, client, context, entry):
+        """
+        Enforce Adobe's one-flex-discount-code-per-line rule on a renewal plan entry.
+
+        The renewal payload is external input: a plan entry carrying more than
+        one code would be rejected by Adobe with error 2147 at submission, so
+        the order is failed upfront with a clear message instead. Returns True
+        when the entry is valid.
+        """
+        flex_discount_codes = entry.get("flexDiscountCodes") or []
+        if len(flex_discount_codes) <= 1:
+            return True
+
+        joined_codes = ", ".join(flex_discount_codes)
+        error = (
+            f"subscription {entry['subscriptionId']} carries "
+            f"{len(flex_discount_codes)} codes ({joined_codes})"
+        )
+        logger.warning(
+            "%s: renewal plan entry violates the one-flex-discount-code-per-line rule: %s",
+            context,
+            error,
+        )
+        switch_order_to_failed(
+            client,
+            context.order,
+            ERR_FLEX_DISCOUNT_CODE_LIMIT.to_dict(error=error),
+        )
+        return False
 
     def _build_plan_entry(self, entry, adobe_subscription):
         auto_renewal = adobe_subscription.get("autoRenewal", {})

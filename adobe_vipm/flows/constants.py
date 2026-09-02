@@ -523,6 +523,11 @@ ERR_EARLY_RENEWAL_IN_PROGRESS = ValidationError(
     "renewal-affecting changes.",
 )
 
+ERR_FLEX_DISCOUNT_CODE_LIMIT = ValidationError(
+    "VIPM0052",
+    "Only one flexible discount code per line item is allowed: {error}.",
+)
+
 
 class AssetStatus(StrEnum):
     """MPT asset statuses."""
