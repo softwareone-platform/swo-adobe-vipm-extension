@@ -16,6 +16,14 @@ index and does not duplicate those tables.
 | NAV | Customer/reseller validation against NAV | OAuth 2.0 client credentials | `EXT_NAV_API_BASE_URL`, `EXT_NAV_AUTH_ENDPOINT_URL`, `EXT_NAV_AUTH_AUDIENCE`, `EXT_NAV_AUTH_CLIENT_ID`, `EXT_NAV_AUTH_CLIENT_SECRET` | `adobe_vipm/flows/` |
 | AWS SES | Email notifications when enabled | AWS credentials | `EXT_EMAIL_NOTIFICATIONS_ENABLED`, `EXT_EMAIL_NOTIFICATIONS_SENDER`, `EXT_AWS_SES_REGION`, `EXT_AWS_SES_CREDENTIALS` | `adobe_vipm/notifications.py` / flows |
 
+## Adobe error code mappings
+
+The extension maps Adobe VIPM API error codes to VIPM validation errors:
+
+| Adobe error code | Adobe meaning | VIPM error | VIPM message | Enforcement |
+| --- | --- | --- | --- | --- |
+| `2147` ([`AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED`](../adobe_vipm/adobe/constants.py)) | Line item carries more than one flexible discount code | `VIPM0052` ([`ERR_FLEX_DISCOUNT_CODE_LIMIT`](../adobe_vipm/flows/constants.py)) | "Only one flexible discount code per line item is allowed" | Proactively enforced before submission in switch/renewal fulfillment; defensively mapped if Adobe rejects the order |
+
 ## Notes
 
 - Adobe credentials (`EXT_ADOBE_CREDENTIALS_FILE`) and authorizations
