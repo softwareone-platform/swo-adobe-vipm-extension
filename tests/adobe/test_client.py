@@ -1961,6 +1961,48 @@ def test_update_subscription_with_flex_discount_codes(
     assert result == {"b": "subscription"}
 
 
+def test_update_subscription_reset_flex_discount_codes(
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    sub_id = "a-sub-id"
+    client, _, _ = adobe_client_factory()
+    requests_mocker.patch(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
+        ),
+        status=200,
+        json={"a": "subscription"},
+        match=[
+            matchers.query_param_matcher({"reset-flex-discount-codes": "true"}),
+            matchers.json_params_matcher({"autoRenewal": {"enabled": True}}),
+        ],
+    )
+    requests_mocker.get(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
+        ),
+        status=200,
+        json={"b": "subscription"},
+    )
+
+    result = client.update_subscription(
+        authorization_uk,
+        customer_id,
+        sub_id,
+        auto_renewal=True,
+        reset_flex_discount_codes=True,
+    )
+
+    assert result == {"b": "subscription"}
+
+
 def test_create_customer_subscription(
     requests_mocker,
     settings,
@@ -2046,6 +2088,47 @@ def test_create_customer_subscription_with_deployment(
         "65322651CA01A12",
         5,
         deployment_id="a-deployment-id",
+    )
+
+    assert result == {"subscriptionId": "a-sub-id", "status": "1009"}
+
+
+def test_create_customer_subscription_with_flex_discount_codes(
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    client, authorization, _ = adobe_client_factory()
+    body_to_match = {
+        "offerId": "65322651CA01A12",
+        "autoRenewal": {
+            "enabled": True,
+            Param.RENEWAL_QUANTITY.value: 5,
+            "flexDiscountCodes": ["CODE-3"],
+        },
+        "currencyCode": authorization.currency,
+    }
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions",
+        ),
+        status=200,
+        json={"subscriptionId": "a-sub-id", "status": "1009"},
+        match=[
+            matchers.json_params_matcher(body_to_match),
+        ],
+    )
+
+    result = client.create_customer_subscription(
+        authorization_uk,
+        customer_id,
+        "65322651CA01A12",
+        5,
+        flex_discount_codes=["CODE-3"],
     )
 
     assert result == {"subscriptionId": "a-sub-id", "status": "1009"}
