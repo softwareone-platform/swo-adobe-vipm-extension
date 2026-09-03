@@ -14,6 +14,7 @@ from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.renewal import (
+    CreateNetNewMptSubscriptions,
     RecordDiscountRedemptions,
     Validate3YCRenewalFloor,
 )
@@ -21,9 +22,11 @@ from adobe_vipm.flows.fulfillment.renewal_now import (
     DisableLapsingSubscriptions,
     NormalizeRenewedSubscriptions,
     PreviewRenewalNowOrder,
+    ResolveNetNewRenewedSubscriptions,
     ResolvePreviousRenewalReturns,
     ReturnPreviousRenewalOrders,
     SubmitRenewalNowOrder,
+    ValidateNetNewOrderLines,
     fulfill_renewal_now_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -48,7 +51,9 @@ def renewal_now_order(order_factory, order_parameters_factory, lines_factory, re
     lines = lines_factory(
         line_id=1, item_id=1, external_vendor_id="65304578CA", quantity=15
     ) + lines_factory(line_id=2, item_id=2, external_vendor_id="77777777CA", quantity=10)
-    payload = {**renewal_payload, "renewalPath": "now"}
+    # Net-new handling is exercised by dedicated tests that add netNewItems and a
+    # matching order line; the default order carries none.
+    payload = {**renewal_payload, "renewalPath": "now", "netNewItems": []}
     return order_factory(
         order_type="Change",
         order_parameters=order_parameters_factory(renewal_payload=payload),
@@ -64,7 +69,41 @@ def renewal_now_context(renewal_now_order, renewal_payload):
         product_id="PRD-1111-1111",
         authorization_id="authorization-id",
         adobe_customer_id="customer-id",
-        renewal_payload={**renewal_payload, "renewalPath": "now"},
+        renewal_payload={**renewal_payload, "renewalPath": "now", "netNewItems": []},
+    )
+
+
+@pytest.fixture
+def net_new_item():
+    return {"offerId": "65322651CA01A12", "quantity": 5, "flexDiscountCodes": ["CODE-3"]}
+
+
+@pytest.fixture
+def renewal_now_order_net_new(
+    order_factory, order_parameters_factory, lines_factory, renewal_payload, net_new_item
+):
+    lines = (
+        lines_factory(line_id=1, item_id=1, external_vendor_id="65304578CA", quantity=15)
+        + lines_factory(line_id=2, item_id=2, external_vendor_id="77777777CA", quantity=10)
+        + lines_factory(line_id=3, item_id=3, external_vendor_id="65322651CA", quantity=5)
+    )
+    payload = {**renewal_payload, "renewalPath": "now", "netNewItems": [net_new_item]}
+    return order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(renewal_payload=payload),
+        lines=lines,
+    )
+
+
+@pytest.fixture
+def renewal_now_context_net_new(renewal_now_order_net_new, renewal_payload, net_new_item):
+    return Context(
+        order=renewal_now_order_net_new,
+        order_id=renewal_now_order_net_new["id"],
+        product_id="PRD-1111-1111",
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        renewal_payload={**renewal_payload, "renewalPath": "now", "netNewItems": [net_new_item]},
     )
 
 
@@ -1360,11 +1399,14 @@ def test_fulfill_renewal_now_order(mocker):
         UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
         SetupRenewalPlan,
+        ValidateNetNewOrderLines,
         Validate3YCRenewalFloor,
         ResolvePreviousRenewalReturns,
         PreviewRenewalNowOrder,
         SubmitRenewalNowOrder,
         ReturnPreviousRenewalOrders,
+        ResolveNetNewRenewedSubscriptions,
+        CreateNetNewMptSubscriptions,
         NormalizeRenewedSubscriptions,
         DisableLapsingSubscriptions,
         CompleteOrder,
@@ -1377,7 +1419,473 @@ def test_fulfill_renewal_now_order(mocker):
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[8].include_net_new_items is False
-    assert pipeline_args[15].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[9].include_net_new_items is True
+    assert pipeline_args[18].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
+
+
+def test_preview_renewal_now_order_step_appends_net_new_line(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
+):
+    """A net-new item is appended after the renewing lines with no subscriptionId."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["CODE-1"])
+    ]
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {"extLineItemNumber": 1, "offerId": "65304578CA01A12", "quantity": 15},
+            {"extLineItemNumber": 2, "offerId": "65322651CA01A12", "quantity": 5},
+        ],
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = PreviewRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    line_items = mock_adobe_client.create_renewal_order.mock_calls[0].args[3]
+    assert line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "renewing-sub-id",
+            "quantity": 15,
+            "flexDiscountCodes": ["CODE-1"],
+        },
+        {
+            "extLineItemNumber": 2,
+            "offerId": "65322651CA01A12",
+            "quantity": 5,
+            "flexDiscountCodes": ["CODE-3"],
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_preview_renewal_now_order_step_net_new_only(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
+):
+    """A net-new-only plan (no renewing subscriptions) still previews and submits."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = []
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[{"extLineItemNumber": 1, "offerId": "65322651CA01A12", "quantity": 5}],
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = PreviewRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    line_items = mock_adobe_client.create_renewal_order.mock_calls[0].args[3]
+    assert line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65322651CA01A12",
+            "quantity": 5,
+            "flexDiscountCodes": ["CODE-3"],
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_submit_renewal_now_order_step_commits_net_new_line(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
+):
+    """The committed order carries the net-new line keyed by extLineItemNumber.
+
+    A net-new line has no subscriptionId, and matching by extLineItemNumber keeps the
+    CA->EA offer shift and the confirmed flex code intact.
+    """
+    renewal_now_context_net_new.renewal_plan_subscriptions = [plan_entry()]
+    renewal_now_context_net_new.preview_renewal_order = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65322651EA01A12",
+                "quantity": 5,
+                "flexDiscounts": [{"code": "CODE-3", "result": "SUCCESS"}],
+            },
+        ],
+    )
+    mocker.patch("adobe_vipm.flows.fulfillment.renewal_now.update_order")
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="RENEWAL", status=AdobeOrderStatus.COMPLETE.value, order_id="ADOBE-RENEWAL-001"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    committed = mock_adobe_client.create_renewal_order.mock_calls[0].args[3]
+    assert committed == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "quantity": 15,
+            "subscriptionId": "renewing-sub-id",
+        },
+        {
+            "extLineItemNumber": 2,
+            "offerId": "65322651EA01A12",
+            "quantity": 5,
+            "flexDiscountCodes": ["CODE-3"],
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_resolve_net_new_renewed_subscriptions_step(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_now_context_net_new,
+    adobe_order_factory,
+    adobe_subscription_factory,
+):
+    """The committed net-new line is matched by extLineItemNumber and stored by payload offerId."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = [plan_entry()]
+    renewal_now_context_net_new.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65322651EA01A12",
+                "subscriptionId": "net-new-sub-id",
+                "quantity": 5,
+            },
+        ],
+    )
+    adobe_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id", offer_id="65322651EA01A12"
+    )
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mocked_next_step = mocker.MagicMock()
+    step = ResolveNetNewRenewedSubscriptions()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    mock_adobe_client.get_subscription.assert_called_once_with(
+        renewal_now_context_net_new.authorization_id,
+        renewal_now_context_net_new.adobe_customer_id,
+        "net-new-sub-id",
+    )
+    assert renewal_now_context_net_new.renewal_net_new_subscriptions == {
+        "65322651CA01A12": adobe_sub
+    }
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_resolve_net_new_renewed_subscriptions_step_no_net_new(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context
+):
+    """No net-new items (or no committed order): the step is a no-op."""
+    renewal_now_context.adobe_renewal_order = None
+    mocked_next_step = mocker.MagicMock()
+    step = ResolveNetNewRenewedSubscriptions()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mock_adobe_client.get_subscription.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+def test_resolve_net_new_renewed_subscriptions_step_adobe_error(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_now_context_net_new,
+    adobe_order_factory,
+    adobe_api_error_factory,
+):
+    """A get_subscription failure fails the order and stops the pipeline."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = [plan_entry()]
+    renewal_now_context_net_new.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65322651EA01A12",
+                "subscriptionId": "net-new-sub-id",
+                "quantity": 5,
+            },
+        ],
+    )
+    mock_adobe_client.get_subscription.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory(code="9999", message="boom")
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ResolveNetNewRenewedSubscriptions()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    mocked_next_step.assert_not_called()
+
+
+def test_preview_renewal_now_order_step_net_new_deployment_and_no_flex(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
+):
+    """A net-new line with no flex code carries the order's deploymentId when present."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = []
+    renewal_now_context_net_new.renewal_payload["netNewItems"] = [
+        {"offerId": "65322651CA01A12", "quantity": 5},
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.get_deployment_id",
+        return_value="deployment-123",
+    )
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[{"extLineItemNumber": 1, "offerId": "65322651CA01A12", "quantity": 5}],
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = PreviewRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    line_items = mock_adobe_client.create_renewal_order.mock_calls[0].args[3]
+    assert line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65322651CA01A12",
+            "quantity": 5,
+            "deploymentId": "deployment-123",
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_preview_renewal_now_order_step_fails_when_net_new_missing_from_preview(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
+):
+    """A preview that omits a requested net-new line fails the order before commit."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = [plan_entry()]
+    mock_adobe_client.get_orders.return_value = []
+    # The preview echoes only the renewing line; the net-new line (2) is absent.
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+            },
+        ],
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = PreviewRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+def test_resolve_net_new_renewed_subscriptions_step_missing_line(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_now_context_net_new,
+    adobe_order_factory,
+):
+    """A committed order that omits a requested net-new line fails the MPT order."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = [plan_entry()]
+    # Committed order carries only the renewing line; the net-new line (extLineItemNumber 2)
+    # is absent.
+    renewal_now_context_net_new.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+            },
+        ],
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ResolveNetNewRenewedSubscriptions()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    mock_adobe_client.get_subscription.assert_not_called()
+    mocked_switch_to_failed.assert_called_once()
+    assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+def test_resolve_net_new_renewed_subscriptions_step_numbering_stable_on_retry(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_now_context_net_new,
+    adobe_order_factory,
+    adobe_subscription_factory,
+):
+    """Net-new numbering counts every renew=True entry so retries keep the line stable."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = [
+        plan_entry(),
+        # renew=True but already committed by this order's first attempt (renewedQuantity
+        # populated), so _get_renewing_plans now excludes it — but it still occupied a line.
+        plan_entry(
+            subscription_id="already-renewed-sub-id",
+            offer_id="77777777CA01A12",
+            renewal_quantity=0,
+            snapshot_renewed_quantity=9,
+        ),
+    ]
+    renewal_now_context_net_new.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "77777777CA01A12",
+                "subscriptionId": "already-renewed-sub-id",
+                "quantity": 9,
+            },
+            {
+                "extLineItemNumber": 3,
+                "offerId": "65322651EA01A12",
+                "subscriptionId": "net-new-sub-id",
+                "quantity": 5,
+            },
+        ],
+    )
+    adobe_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id", offer_id="65322651EA01A12"
+    )
+    mock_adobe_client.get_subscription.return_value = adobe_sub
+    mocked_next_step = mocker.MagicMock()
+    step = ResolveNetNewRenewedSubscriptions()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    # The net-new line is number 3 (two renew=True entries + 1), so the net-new
+    # subscription is resolved — not the already-renewed line 2.
+    mock_adobe_client.get_subscription.assert_called_once_with(
+        renewal_now_context_net_new.authorization_id,
+        renewal_now_context_net_new.adobe_customer_id,
+        "net-new-sub-id",
+    )
+    assert renewal_now_context_net_new.renewal_net_new_subscriptions == {
+        "65322651CA01A12": adobe_sub
+    }
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_resolve_net_new_renewed_subscriptions_step_missing_subscription_id(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_now_context_net_new,
+    adobe_order_factory,
+):
+    """A committed net-new line without a subscriptionId fails the order (no KeyError)."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = [plan_entry()]
+    renewal_now_context_net_new.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "renewing-sub-id",
+                "quantity": 15,
+            },
+            {"extLineItemNumber": 2, "offerId": "65322651EA01A12", "quantity": 5},
+        ],
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ResolveNetNewRenewedSubscriptions()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    mock_adobe_client.get_subscription.assert_not_called()
+    mocked_switch_to_failed.assert_called_once()
+    assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_net_new_order_lines_step_passes_when_all_matched(
+    mocker, mock_mpt_client, renewal_now_context_net_new
+):
+    """Every net-new item has a matching order line, so the step proceeds."""
+    mocked_next_step = mocker.MagicMock()
+    step = ValidateNetNewOrderLines()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_validate_net_new_order_lines_step_fails_when_line_missing(
+    mocker, mock_mpt_client, renewal_now_context
+):
+    """A net-new item without a matching MPT order line fails the order before commit."""
+    # The default renewal_now_context order has no line for 65322651CA.
+    renewal_now_context.renewal_payload["netNewItems"] = [
+        {"offerId": "65322651CA01A12", "quantity": 5},
+    ]
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ValidateNetNewOrderLines()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
