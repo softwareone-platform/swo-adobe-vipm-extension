@@ -1771,11 +1771,10 @@ class SetupRenewalPlan(Step):
     def __call__(self, client, context, next_step):
         """Resolve the renewal payload against the customer's Adobe subscriptions."""
         context.renewal_payload = get_renewal_payload(context.order)
-        plan_entries = context.renewal_payload.get("subscriptions", [])
-        for entry in plan_entries:
-            if not self._enforce_one_flex_discount_code(client, context, entry):
-                return
+        if not self._enforce_flex_discount_codes(client, context):
+            return
 
+        plan_entries = context.renewal_payload.get("subscriptions", [])
         adobe_client = get_adobe_client()
         subscriptions = adobe_client.get_subscriptions(
             context.authorization_id,
@@ -1817,13 +1816,30 @@ class SetupRenewalPlan(Step):
         )
         next_step(client, context)
 
+    def _enforce_flex_discount_codes(self, client, context):
+        """
+        Enforce the one-flex-discount-code-per-line rule on every submitted line.
+
+        Covers both existing-subscription entries and net-new items. Returns False as
+        soon as one entry breaches the rule (the entry's handler has failed the order
+        by then); True when every entry is valid.
+        """
+        entries = context.renewal_payload.get("subscriptions", []) + context.renewal_payload.get(
+            "netNewItems", []
+        )
+        return all(
+            self._enforce_one_flex_discount_code(client, context, entry) for entry in entries
+        )
+
     def _enforce_one_flex_discount_code(self, client, context, entry):
         """
         Enforce Adobe's one-flex-discount-code-per-line rule on a renewal plan entry.
 
         The renewal payload is external input: a plan entry carrying more than
         one code would be rejected by Adobe with error 2147 at submission, so
-        the order is failed upfront with a clear message instead. Returns True
+        the order is failed upfront with a clear message instead. Applies to both
+        existing-subscription entries and net-new items; a net-new item has no
+        subscriptionId, so the message falls back to its offerId. Returns True
         when the entry is valid.
         """
         flex_discount_codes = entry.get("flexDiscountCodes") or []
@@ -1831,8 +1847,9 @@ class SetupRenewalPlan(Step):
             return True
 
         joined_codes = ", ".join(flex_discount_codes)
+        line_identifier = entry.get("subscriptionId") or entry.get("offerId")
         error = (
-            f"subscription {entry['subscriptionId']} carries "
+            f"subscription {line_identifier} carries "
             f"{len(flex_discount_codes)} codes ({joined_codes})"
         )
         logger.warning(

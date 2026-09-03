@@ -341,6 +341,7 @@ def test_create_net_new_subscriptions_step(
         5,
         deployment_id="",
         recommendation_tracker_id="8fe13fb6-72a1-451b-901b-d92da956282d",
+        flex_discount_codes=None,
     )
     assert renewal_context.renewal_net_new_subscriptions == {"65322651CA01A12": created_sub}
     assert renewal_context.renewal_created_net_new_subscriptions == {"65322651CA01A12": created_sub}
@@ -402,6 +403,8 @@ def test_create_net_new_subscriptions_step_restores_neutralized_scheduled_subscr
         "net-new-sub-id",
         auto_renewal=True,
         quantity=5,
+        flex_discount_codes=None,
+        reset_flex_discount_codes=False,
     )
     assert renewal_context.renewal_net_new_subscriptions == {"65322651CA01A12": restored_sub}
     assert renewal_context.renewal_created_net_new_subscriptions == {
@@ -1412,3 +1415,128 @@ def test_validate_3yc_renewal_floor_step_ignores_inactive_subscriptions(
         "commitment of 20 licenses for the three-year commitment."
     )
     mocked_next_step.assert_not_called()
+
+
+def test_setup_renewal_plan_step_net_new_multiple_flex_discount_codes(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    order_parameters_factory,
+    renewal_payload,
+):
+    """A net-new item carrying more than one flex code fails the order upfront."""
+    renewal_payload["netNewItems"][0]["flexDiscountCodes"] = ["CODE-1", "CODE-2"]
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(renewal_payload=renewal_payload),
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SetupRenewalPlan()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "Only one flexible discount code per line item is allowed" in message
+    mocked_next_step.assert_not_called()
+
+
+def test_create_net_new_subscriptions_step_forwards_flex_discount_codes(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context, adobe_subscription_factory
+):
+    """The net-new item's flex codes are forwarded to create_customer_subscription."""
+    renewal_context.renewal_payload["netNewItems"][0]["flexDiscountCodes"] = ["CODE-3"]
+    created_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        current_quantity=0,
+        renewal_quantity=5,
+        status=AdobeSubscriptionStatus.SCHEDULED.value,
+    )
+    mock_adobe_client.create_customer_subscription.return_value = created_sub
+    mocked_next_step = mocker.MagicMock()
+    step = CreateNetNewSubscriptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_customer_subscription.assert_called_once_with(
+        renewal_context.authorization_id,
+        renewal_context.adobe_customer_id,
+        "65322651CA01A12",
+        5,
+        deployment_id="",
+        recommendation_tracker_id="8fe13fb6-72a1-451b-901b-d92da956282d",
+        flex_discount_codes=["CODE-3"],
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+@freeze_time("2026-08-12 10:00:00")
+def test_record_discount_redemptions_step_records_net_new_codes(
+    mocker, mock_mpt_client, renewal_context
+):
+    """Codes on net-new items are recorded as fresh redemptions."""
+    renewal_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    renewal_context.renewal_payload["netNewItems"][0]["flexDiscountCodes"] = ["CODE-3"]
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    redeemed_codes = [
+        redemption["code"] for redemption in mocked_create_redemptions.mock_calls[0].args[0]
+    ]
+    assert redeemed_codes == ["CODE-1", "CODE-3"]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_create_net_new_subscriptions_step_resets_stale_flex_discount_codes(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context, adobe_subscription_factory
+):
+    """Reusing a scheduled subscription whose stored code the plan drops resets the code."""
+    renewal_context.renewal_payload["netNewItems"][0].pop("flexDiscountCodes", None)
+    scheduled_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        current_quantity=0,
+        renewal_quantity=5,
+        status=AdobeSubscriptionStatus.SCHEDULED.value,
+    )
+    scheduled_sub["autoRenewal"]["flexDiscountCodes"] = ["OLD-CODE"]
+    restored_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        current_quantity=0,
+        renewal_quantity=5,
+        status=AdobeSubscriptionStatus.SCHEDULED.value,
+    )
+    renewal_context.adobe_customer_subscriptions = [scheduled_sub]
+    mock_adobe_client.update_subscription.return_value = restored_sub
+    mocked_next_step = mocker.MagicMock()
+    step = CreateNetNewSubscriptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        renewal_context.authorization_id,
+        renewal_context.adobe_customer_id,
+        "net-new-sub-id",
+        auto_renewal=True,
+        quantity=5,
+        flex_discount_codes=None,
+        reset_flex_discount_codes=True,
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
