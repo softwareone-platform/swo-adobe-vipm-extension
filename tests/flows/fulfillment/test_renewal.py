@@ -7,6 +7,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW_RENEWAL,
     AdobeErrorCode,
     AdobeSubscriptionStatus,
+    ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE, Param
@@ -19,6 +20,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     RecordFlexDiscounts,
     SetupRenewalPlan,
     UpdateRenewalSubscriptions,
+    Validate3YCRenewalFloor,
     fulfill_renewal_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -586,6 +588,13 @@ def test_update_renewal_subscriptions_step_skips_operations_already_in_place(
 ):
     renewal_context.renewal_plan_subscriptions = [
         plan_entry(renewal_quantity=10, snapshot_quantity=10),
+        # No explicit code selected: the inherited code Adobe holds stays as it is.
+        plan_entry(
+            subscription_id="inherited-sub-id",
+            renewal_quantity=10,
+            snapshot_quantity=10,
+            snapshot_codes=["INHERITED"],
+        ),
         plan_entry(
             subscription_id="lapsed-sub-id",
             renew=False,
@@ -599,6 +608,56 @@ def test_update_renewal_subscriptions_step_skips_operations_already_in_place(
     step(mock_mpt_client, renewal_context, mocked_next_step)  # act
 
     mock_adobe_client.update_subscription.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_update_renewal_subscriptions_step_explicit_code_replaces_inherited_code(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context
+):
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(
+            renewal_quantity=10,
+            snapshot_quantity=10,
+            flex_discount_codes=["CODE-1"],
+            snapshot_codes=["INHERITED"],
+        ),
+    ]
+    mocked_next_step = mocker.MagicMock()
+    step = UpdateRenewalSubscriptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        "renewing-sub-id",
+        auto_renewal=True,
+        quantity=10,
+        flex_discount_codes=["CODE-1"],
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_update_renewal_subscriptions_step_keeps_inherited_code_without_explicit_selection(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context
+):
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(renewal_quantity=15, snapshot_quantity=10, snapshot_codes=["INHERITED"]),
+    ]
+    mocked_next_step = mocker.MagicMock()
+    step = UpdateRenewalSubscriptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    # flex_discount_codes=None leaves the inherited code untouched on Adobe's side.
+    mock_adobe_client.update_subscription.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        "renewing-sub-id",
+        auto_renewal=True,
+        quantity=15,
+        flex_discount_codes=None,
+    )
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
 
 
@@ -861,6 +920,69 @@ def test_record_discount_redemptions_step(mocker, mock_mpt_client, renewal_conte
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
 
 
+@freeze_time("2026-08-12 10:00:00")
+def test_record_discount_redemptions_step_skips_inherited_codes(
+    mocker, mock_mpt_client, renewal_context
+):
+    renewal_context.renewal_plan_subscriptions = [
+        # Already held by the subscription before this order: auto-applied, not redeemed.
+        plan_entry(flex_discount_codes=["INHERITED"], snapshot_codes=["INHERITED"]),
+        plan_entry(
+            subscription_id="another-renewing-sub-id",
+            offer_id="65322651CA01A12",
+            flex_discount_codes=["CODE-2"],
+        ),
+        # The same code newly selected on a subscription that did not hold it: redeemed.
+        plan_entry(
+            subscription_id="third-renewing-sub-id",
+            offer_id="65322651CA01A12",
+            flex_discount_codes=["INHERITED"],
+        ),
+    ]
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    redeemed_at = dt.datetime(2026, 8, 12, 10, 0, tzinfo=dt.UTC)
+    mocked_create_redemptions.assert_called_once_with([
+        {
+            "code": "CODE-2",
+            "customer_id": "customer-id",
+            "order_id": renewal_context.order_id,
+            "redeemed_at": redeemed_at,
+        },
+        {
+            "code": "INHERITED",
+            "customer_id": "customer-id",
+            "order_id": renewal_context.order_id,
+            "redeemed_at": redeemed_at,
+        },
+    ])
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_discount_redemptions_step_only_inherited_codes(
+    mocker, mock_mpt_client, renewal_context
+):
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["INHERITED"], snapshot_codes=["INHERITED"]),
+    ]
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_create_redemptions.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
 def test_record_discount_redemptions_step_without_codes(mocker, mock_mpt_client, renewal_context):
     renewal_context.renewal_plan_subscriptions = [plan_entry()]
     mocked_create_redemptions = mocker.patch(
@@ -921,6 +1043,7 @@ def test_fulfill_renewal_order(mocker):
         UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
         SetupRenewalPlan,
+        Validate3YCRenewalFloor,
         CreateNetNewSubscriptions,
         UpdateRenewalSubscriptions,
         CreateNetNewMptSubscriptions,
@@ -935,6 +1058,358 @@ def test_fulfill_renewal_order(mocker):
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[12].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[8].include_net_new_items is True
+    assert pipeline_args[13].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
+
+
+@pytest.fixture
+def floor_context(
+    mocker,
+    renewal_context,
+    renewal_payload,
+    adobe_subscription_factory,
+    mock_get_sku_adobe_mapping_model,
+):
+    """
+    Renewal context ready for the 3YC floor guard.
+
+    Adobe subscriptions: a renewing license (10 -> 15 per the plan), a lapsing
+    consumable (10 -> stops renewing) and a license outside the plan renewing
+    3. Projected aggregate: 18 licenses, 0 consumables.
+    """
+    mocker.patch(
+        "adobe_vipm.flows.helpers.get_adobe_product_by_marketplace_sku",
+        side_effect=mock_get_sku_adobe_mapping_model.from_id,
+    )
+    renewal_context.market_segment = "COM"
+    renewal_context.renewal_payload = {**renewal_payload, "netNewItems": []}
+    renewal_context.adobe_customer_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="renewing-sub-id", offer_id="65304578CA01A12", renewal_quantity=10
+        ),
+        adobe_subscription_factory(
+            subscription_id="lapsing-sub-id", offer_id="77777777CA01A12", renewal_quantity=10
+        ),
+        adobe_subscription_factory(
+            subscription_id="other-sub-id", offer_id="65304578CA01A12", renewal_quantity=3
+        ),
+    ]
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(renewal_quantity=15),
+        plan_entry(
+            subscription_id="lapsing-sub-id",
+            offer_id="77777777CA01A12",
+            renew=False,
+            renewal_quantity=0,
+        ),
+    ]
+    return renewal_context
+
+
+def set_3yc_customer(
+    context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    *,
+    licenses=None,
+    consumables=None,
+    status=ThreeYearCommitmentStatus.COMMITTED.value,
+    end_date="2027-06-01",
+    coterm_date="2026-12-01",
+):
+    commitment = adobe_commitment_factory(
+        licenses=licenses, consumables=consumables, status=status, end_date=end_date
+    )
+    context.adobe_customer = adobe_customer_factory(commitment=commitment, coterm_date=coterm_date)
+
+
+def test_validate_3yc_renewal_floor_step_without_adobe_customer(
+    mocker, mock_mpt_client, floor_context
+):
+    floor_context.adobe_customer = None
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+
+
+def test_validate_3yc_renewal_floor_step_without_commitment(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory
+):
+    floor_context.adobe_customer = adobe_customer_factory(coterm_date="2026-12-01")
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        ThreeYearCommitmentStatus.REQUESTED.value,
+        ThreeYearCommitmentStatus.ACCEPTED.value,
+        ThreeYearCommitmentStatus.EXPIRED.value,
+        ThreeYearCommitmentStatus.NONCOMPLIANT.value,
+        ThreeYearCommitmentStatus.DECLINED.value,
+    ],
+)
+def test_validate_3yc_renewal_floor_step_commitment_not_in_force(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    status,
+):
+    # The floor would be breached (18 licenses < 100) if the commitment were in force.
+    set_3yc_customer(
+        floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=100, status=status
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+
+
+def test_validate_3yc_renewal_floor_step_commitment_ending_before_coterm(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+):
+    set_3yc_customer(
+        floor_context,
+        adobe_customer_factory,
+        adobe_commitment_factory,
+        licenses=100,
+        end_date="2026-11-30",
+        coterm_date="2026-12-01",
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [ThreeYearCommitmentStatus.COMMITTED.value, ThreeYearCommitmentStatus.ACTIVE.value],
+)
+def test_validate_3yc_renewal_floor_step_plan_respects_floor(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    status,
+):
+    # Exactly at the floor: 15 (renewing) + 3 (outside the plan) = 18 licenses.
+    set_3yc_customer(
+        floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=18, status=status
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+
+
+def test_validate_3yc_renewal_floor_step_lapsing_breaches_floor(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+):
+    # The lapsing consumable stops renewing: 0 consumables < 5.
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, consumables=5)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    # Consumables-only breaches reuse the downsize wording of the shared 3YC guard.
+    assert error["message"] == (
+        "The order has failed. The reduction in quantity would place the account below "
+        "the minimum commitment of 5 consumables for the three-year commitment."
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_3yc_renewal_floor_step_decrease_breaches_floor(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+):
+    # The plan decreases the renewing license from 25 to 15: 15 + 3 = 18 < 20.
+    floor_context.adobe_customer_subscriptions[0]["autoRenewal"]["renewalQuantity"] = 25
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=20)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["message"] == (
+        "The quantity selected of 18 would place the account below the minimum "
+        "commitment of 20 licenses for the three-year commitment."
+    )
+    mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("include_net_new_items", "expected_failure"),
+    [(True, False), (False, True)],
+)
+def test_validate_3yc_renewal_floor_step_net_new_items(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    include_net_new_items,
+    expected_failure,
+):
+    # 18 licenses + 2 net-new licenses reach the floor of 20 only when net-new items count.
+    floor_context.renewal_payload["netNewItems"] = [{"offerId": "65304578CA01A12", "quantity": 2}]
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=20)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor(include_net_new_items=include_net_new_items)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    assert mocked_switch_to_failed.called is expected_failure
+    assert mocked_next_step.called is not expected_failure
+
+
+def test_validate_3yc_renewal_floor_step_net_new_reuses_scheduled_subscription(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+):
+    # A scheduled subscription created by a previous attempt already holds the
+    # net-new offer: it is counted once (18 + 2 = 20 < 21), not twice.
+    floor_context.adobe_customer_subscriptions.append(
+        adobe_subscription_factory(
+            subscription_id="scheduled-sub-id",
+            offer_id="65304578CA01A12",
+            renewal_quantity=2,
+            status=AdobeSubscriptionStatus.SCHEDULED.value,
+        )
+    )
+    floor_context.renewal_payload["netNewItems"] = [{"offerId": "65304578CA01A12", "quantity": 2}]
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=21)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["message"] == (
+        "The quantity selected of 20 would place the account below the minimum "
+        "commitment of 21 licenses for the three-year commitment."
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_3yc_renewal_floor_step_already_renewed_entry_keeps_renewed_quantity(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+):
+    # renew=true with no requested quantity and a renewedQuantity snapshot: the
+    # previous renewal order's 8 seats count (8 + 3 = 11 >= 11), not zero.
+    floor_context.renewal_plan_subscriptions[0] = {
+        **plan_entry(renewal_quantity=0),
+        "snapshot": {
+            "enabled": True,
+            "renewal_quantity": 10,
+            "flex_discount_codes": [],
+            "renewed_quantity": 8,
+        },
+    }
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=11)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+
+
+def test_validate_3yc_renewal_floor_step_ignores_inactive_subscriptions(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+):
+    # An inactive subscription never renews, whatever its auto-renewal says.
+    floor_context.adobe_customer_subscriptions.append(
+        adobe_subscription_factory(
+            subscription_id="inactive-sub-id",
+            offer_id="65304578CA01A12",
+            renewal_quantity=100,
+            status=AdobeSubscriptionStatus.INACTIVE.value,
+        )
+    )
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=20)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["message"] == (
+        "The quantity selected of 18 would place the account below the minimum "
+        "commitment of 20 licenses for the three-year commitment."
+    )
+    mocked_next_step.assert_not_called()

@@ -32,9 +32,13 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    order type to `purchase.py`, `change.py`, `transfer.py`, `reseller_transfer.py`,
    `termination.py`, and `configuration.py`; change orders carrying a
    `switchPayload` or `renewalPayload` ordering parameter are routed to
-   `switch.py` (mid-term upgrades) and `renewal.py` (at-anniversary renewals);
-   `shared.py` holds common utilities and the flexible-discount-code-per-line
-   validation used by switch/renewal fulfillment.
+   `switch.py` (mid-term upgrades), `renewal.py` (at-anniversary renewals) and
+   `renewal_now.py` (renew-now renewals, `renewalPath: "now"`, documented in
+   [renew-now.md](renew-now.md)); `renewal.py` also hosts the 3YC
+   committed-minimum floor guard (`Validate3YCRenewalFloor`)
+   that both renewal flows run before mutating Adobe; `shared.py` holds common
+   utilities and the flexible-discount-code-per-line validation used by
+   switch/renewal fulfillment.
 3. **Validation** (`flows/validation/`) — `validate_order()` in `base.py` routes to
    per-type validators (`purchase.py`, `change.py`, `transfer.py`, `termination.py`).
 4. **Sync** (`flows/sync/`) — Adobe-to-MPT synchronisation for `agreement.py`,
@@ -94,4 +98,6 @@ started via `swoext run`. See [deployment.md](deployment.md) for configuration.
 - [testing.md](testing.md) — test strategy and execution
 - [deployment.md](deployment.md) — configuration and deployment model
 - [external-integrations.md](external-integrations.md) — external systems
+- [renew-now.md](renew-now.md) — renew-now fulfilment flow: return window and
+  committed flex discount codes
 - [migrations.md](migrations.md) — migration workflow
