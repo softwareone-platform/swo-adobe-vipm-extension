@@ -28,7 +28,12 @@ redemptions table. Before anything is committed, the resulting renewing
 aggregate is validated against the 3YC committed minimum
 (Validate3YCRenewalFloor, shared with the at-anniversary flow).
 
-Net-new items are not handled yet.
+Net-new items (products the customer does not yet hold) are submitted as
+additional lines on the same RENEWAL order, carrying offerId + quantity and no
+subscriptionId: Adobe creates-and-renews the new subscription in one shot,
+invoiced immediately, and returns its new subscriptionId on the committed order.
+Their MPT subscriptions are created after the order commits
+(ResolveNetNewRenewedSubscriptions then CreateNetNewMptSubscriptions).
 """
 
 import datetime as dt
@@ -48,6 +53,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
+    ERR_RENEWAL_NET_NEW_FAILED,
     ERR_RENEWAL_ORDER_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_RETURN_FAILED,
@@ -60,6 +66,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.renewal import (
+    CreateNetNewMptSubscriptions,
     RecordDiscountRedemptions,
     Validate3YCRenewalFloor,
 )
@@ -80,6 +87,8 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
+from adobe_vipm.flows.utils import get_order_line_by_sku
+from adobe_vipm.flows.utils.deployment import get_deployment_id
 from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
 from adobe_vipm.utils import get_partial_sku
 
@@ -99,20 +108,73 @@ def _is_already_renewed(plan):
     return not plan["renewal_quantity"] and plan["snapshot"]["renewed_quantity"] is not None
 
 
-def _build_renewing_line_items(context):
+def _get_renewing_plans(context):
     """
-    Build PREVIEW_RENEWAL/RENEWAL line items for the plan's renewing subscriptions.
+    Return the plan's renewing subscriptions that still need a line submitted.
 
-    Renewing subscriptions already committed in a previous renewal order
-    with no requested quantity change are excluded — see _is_already_renewed.
+    Renewing subscriptions already committed in a previous renewal order with no
+    requested quantity change are excluded — see _is_already_renewed.
     """
-    line_items = []
-    renewing = [
+    return [
         plan
         for plan in context.renewal_plan_subscriptions
         if plan["renew"] and not _is_already_renewed(plan)
     ]
-    for number, plan in enumerate(renewing, start=1):
+
+
+def _iter_net_new_lines(context):
+    """
+    Yield (extLineItemNumber, net_new_item) for the plan's net-new items.
+
+    extLineItemNumber is a stable join key from the payload item to the committed
+    RENEWAL line (whose offerId can differ from the ordered one across the renewal
+    offer-type shift). The offset counts every renewing plan entry, not only the
+    ones _get_renewing_plans currently submits: after this order's first commit a
+    renewing entry can start matching _is_already_renewed (its renewedQuantity is
+    now populated) and drop out of the submitted set, and on a retry that would
+    shift the net-new numbers and misalign them against the existing committed
+    order. Counting all renew=True entries keeps the numbering identical across
+    retries.
+    """
+    offset = sum(1 for plan in context.renewal_plan_subscriptions if plan["renew"])
+    net_new_items = (
+        context.renewal_payload.get("netNewItems", []) if context.renewal_payload else []
+    )
+    for index, net_new_item in enumerate(net_new_items):
+        yield offset + 1 + index, net_new_item
+
+
+def _get_net_new_line_map(context):
+    """Map extLineItemNumber -> net_new_item, matching the numbering used to build lines."""
+    return dict(_iter_net_new_lines(context))
+
+
+def _missing_net_new_offers(context, present_line_numbers):
+    """
+    Return the offerIds of expected net-new lines absent from present_line_numbers.
+
+    The result is a comma-joined string (empty when every net-new line is present),
+    ready for a user-facing error message.
+    """
+    net_new_by_line = _get_net_new_line_map(context)
+    missing_numbers = sorted(set(net_new_by_line) - set(present_line_numbers))
+    missing = [net_new_by_line[number] for number in missing_numbers]
+    return ", ".join(net_new["offerId"] for net_new in missing)
+
+
+def _build_renewing_line_items(context):
+    """
+    Build PREVIEW_RENEWAL/RENEWAL line items for the renewing subscriptions and net-new items.
+
+    Renewing subscriptions already committed in a previous renewal order with no
+    requested quantity change are excluded — see _is_already_renewed. Net-new items
+    are appended after them, each carrying offerId + quantity and no subscriptionId:
+    Adobe creates-and-renews the new subscription in the same order. Their
+    extLineItemNumber continues after the renewing lines so the committed order can
+    be matched back to the payload item (see _get_net_new_line_map).
+    """
+    line_items = []
+    for number, plan in enumerate(_get_renewing_plans(context), start=1):
         line_item = {
             "extLineItemNumber": number,
             "offerId": plan["offer_id"],
@@ -122,16 +184,38 @@ def _build_renewing_line_items(context):
         if plan["flex_discount_codes"]:
             line_item["flexDiscountCodes"] = plan["flex_discount_codes"]
         line_items.append(line_item)
+
+    deployment_id = get_deployment_id(context.order)
+    for number, net_new_item in _iter_net_new_lines(context):
+        line_item = {
+            "extLineItemNumber": number,
+            "offerId": net_new_item["offerId"],
+            "quantity": net_new_item["quantity"],
+        }
+        flex_discount_codes = net_new_item.get("flexDiscountCodes")
+        if flex_discount_codes:
+            line_item["flexDiscountCodes"] = flex_discount_codes
+        if deployment_id:
+            line_item["deploymentId"] = deployment_id
+        line_items.append(line_item)
     return line_items
 
 
 def _get_requested_flex_discount_codes(context):
-    """Map each renewing subscription of the plan to the codes explicitly selected for it."""
-    return {
-        plan["subscription_id"]: plan["flex_discount_codes"]
-        for plan in context.renewal_plan_subscriptions
-        if plan["renew"]
+    """
+    Map each submitted line's extLineItemNumber to the flex codes selected for it.
+
+    Covers both renewing subscriptions and net-new items, keyed by the same
+    extLineItemNumber used to build the request lines, so the committed order can
+    recover the requested codes for a net-new line that has no subscriptionId.
+    """
+    requested = {
+        number: plan["flex_discount_codes"]
+        for number, plan in enumerate(_get_renewing_plans(context), start=1)
     }
+    for number, net_new_item in _iter_net_new_lines(context):
+        requested[number] = net_new_item.get("flexDiscountCodes") or []
+    return requested
 
 
 def _get_committed_flex_discount_codes(preview_line_item, requested_codes):
@@ -179,7 +263,7 @@ def _get_committed_flex_discount_codes(preview_line_item, requested_codes):
     return committed[:1]
 
 
-def _build_committed_line_items(preview_line_items, requested_codes_by_subscription):
+def _build_committed_line_items(preview_line_items, requested_codes_by_line):
     """
     Build RENEWAL order line items from a PREVIEW_RENEWAL response's line items.
 
@@ -189,9 +273,11 @@ def _build_committed_line_items(preview_line_items, requested_codes_by_subscript
     response-shaped (e.g. flexDiscounts is a list of discount result
     objects, not the flexDiscountCodes the create-order request expects) and
     carries pricing fields the create-order request doesn't need, so it is
-    re-shaped into a request line item rather than forwarded as-is. The
-    flex discount codes come from the plan's explicit selection per
-    subscription, confirmed by the preview (see
+    re-shaped into a request line item rather than forwarded as-is. A net-new
+    line carries no subscriptionId (Adobe assigns it on the committed order),
+    so it is only forwarded when present. The flex discount codes come from the
+    plan's explicit selection per line, keyed by extLineItemNumber (stable
+    across preview and commit) and confirmed by the preview (see
     _get_committed_flex_discount_codes).
     """
     line_items = []
@@ -199,10 +285,12 @@ def _build_committed_line_items(preview_line_items, requested_codes_by_subscript
         line_item = {
             "extLineItemNumber": preview_line_item["extLineItemNumber"],
             "offerId": preview_line_item["offerId"],
-            "subscriptionId": preview_line_item["subscriptionId"],
             "quantity": preview_line_item["quantity"],
         }
-        requested_codes = requested_codes_by_subscription.get(preview_line_item["subscriptionId"])
+        subscription_id = preview_line_item.get("subscriptionId")
+        if subscription_id:
+            line_item["subscriptionId"] = subscription_id
+        requested_codes = requested_codes_by_line.get(preview_line_item["extLineItemNumber"])
         flex_discount_codes = _get_committed_flex_discount_codes(
             preview_line_item, requested_codes or []
         )
@@ -267,10 +355,44 @@ class PreviewRenewalNowOrder(Step):
             )
             return False
 
+        if not self._ensure_net_new_previewed(client, context):
+            return False
+
         logger.info(
             "%s: renewal preview validated for %s subscription(s)", context, len(line_items)
         )
         return True
+
+    def _ensure_net_new_previewed(self, client, context):
+        """
+        Fail the order before commit when the preview omitted a requested net-new line.
+
+        The renew-now RENEWAL order is invoiced immediately, so a net-new line the
+        PREVIEW_RENEWAL did not accept must fail the order here — before anything is
+        committed — rather than after commit, leaving nothing to reverse.
+        """
+        previewed = {
+            line_item["extLineItemNumber"]
+            for line_item in context.preview_renewal_order["lineItems"]
+        }
+        missing_offers = _missing_net_new_offers(context, previewed)
+        if not missing_offers:
+            return True
+
+        logger.warning(
+            "%s: renewal preview omitted net-new line(s) for offer(s): %s",
+            context,
+            missing_offers,
+        )
+        switch_order_to_failed(
+            client,
+            context.order,
+            ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+                offer_id=missing_offers,
+                error="line not present on the renewal preview",
+            ),
+        )
+        return False
 
 
 class SubmitRenewalNowOrder(Step):
@@ -283,7 +405,9 @@ class SubmitRenewalNowOrder(Step):
     Adobe RENEWAL order is detected by its external reference id, so a
     retry of this step is idempotent.
 
-    Net-new items are not handled by this step.
+    Net-new lines (offerId + quantity, no subscriptionId) ride this same order;
+    their MPT subscriptions are created afterwards by
+    ResolveNetNewRenewedSubscriptions and CreateNetNewMptSubscriptions.
     """
 
     def __call__(self, client, context, next_step):
@@ -770,6 +894,154 @@ class DisableLapsingSubscriptions(Step):
         return True
 
 
+class ResolveNetNewRenewedSubscriptions(Step):
+    """
+    Resolve the Adobe subscriptions Adobe created for the plan's net-new items.
+
+    A net-new item is submitted as a RENEWAL line with no subscriptionId; Adobe
+    creates-and-renews the subscription in one shot and returns its new
+    subscriptionId on that line of the committed order. This step matches each
+    committed net-new line back to its payload item by extLineItemNumber (offerId
+    can shift between the ordered and the renewal offer variant, so it is not a
+    safe key), fetches the full Adobe subscription, and stores it on the context
+    keyed by the payload offerId so CreateNetNewMptSubscriptions can create the MPT
+    subscription. No-op when the plan has no net-new items or no RENEWAL order was
+    committed. Idempotent: a retry reuses the existing RENEWAL order and re-resolves
+    the same subscriptions.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Resolve the Adobe subscriptions created for the plan's net-new items."""
+        net_new_by_line = _get_net_new_line_map(context)
+        if not net_new_by_line or context.adobe_renewal_order is None:
+            next_step(client, context)
+            return
+
+        adobe_client = get_adobe_client()
+        resolved_lines = set()
+        for line_item in context.adobe_renewal_order.get("lineItems", []):
+            net_new_item = net_new_by_line.get(line_item["extLineItemNumber"])
+            if not net_new_item:
+                continue
+            if not self._resolve(client, adobe_client, context, line_item, net_new_item):
+                return
+            resolved_lines.add(line_item["extLineItemNumber"])
+
+        if not self._ensure_all_resolved(client, context, resolved_lines):
+            return
+
+        next_step(client, context)
+
+    def _ensure_all_resolved(self, client, context, resolved_lines):
+        """Fail the order when the committed order omitted a requested net-new line."""
+        missing_offers = _missing_net_new_offers(context, resolved_lines)
+        if not missing_offers:
+            return True
+
+        logger.warning(
+            "%s: committed renewal order is missing net-new line(s) for offer(s): %s",
+            context,
+            missing_offers,
+        )
+        switch_order_to_failed(
+            client,
+            context.order,
+            ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+                offer_id=missing_offers,
+                error="line not present on the committed renewal order",
+            ),
+        )
+        return False
+
+    def _resolve(self, client, adobe_client, context, line_item, net_new_item):
+        """Fetch and store the Adobe subscription of a committed net-new line, False on failure."""
+        offer_id = net_new_item["offerId"]
+        subscription_id = line_item.get("subscriptionId")
+        if not subscription_id:
+            logger.warning(
+                "%s: committed net-new line for offer %s has no subscriptionId",
+                context,
+                offer_id,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+                    offer_id=offer_id,
+                    error="committed renewal line has no subscriptionId",
+                ),
+            )
+            return False
+
+        try:
+            subscription = adobe_client.get_subscription(
+                context.authorization_id,
+                context.adobe_customer_id,
+                subscription_id,
+            )
+        except AdobeAPIError as error:
+            logger.warning(
+                "%s: failed to resolve net-new subscription %s for offer %s: %s",
+                context,
+                subscription_id,
+                offer_id,
+                error,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_NET_NEW_FAILED.to_dict(offer_id=offer_id, error=error.message),
+            )
+            return False
+
+        context.renewal_net_new_subscriptions[offer_id] = subscription
+        logger.info(
+            "%s: resolved net-new subscription %s for offer %s",
+            context,
+            subscription["subscriptionId"],
+            offer_id,
+        )
+        return True
+
+
+class ValidateNetNewOrderLines(Step):
+    """
+    Fail the order before any Adobe mutation when a net-new item has no MPT order line.
+
+    CreateNetNewMptSubscriptions matches each net-new item to its MPT order line by SKU
+    and skips an unmatched one. On the renew-now path that would leave Adobe having
+    created-and-invoiced the subscription while the MPT order completes without it, so
+    this step validates the mapping up front — before PREVIEW_RENEWAL — and fails the
+    order with nothing committed instead.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Fail the order when a net-new item has no matching MPT order line."""
+        unmatched = [
+            net_new_item["offerId"]
+            for _, net_new_item in _iter_net_new_lines(context)
+            if not get_order_line_by_sku(context.order, net_new_item["offerId"])
+        ]
+        if unmatched:
+            unmatched_offers = ", ".join(unmatched)
+            logger.warning(
+                "%s: net-new item(s) with no matching order line: %s",
+                context,
+                unmatched_offers,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+                    offer_id=unmatched_offers,
+                    error="no matching order line for the net-new item",
+                ),
+            )
+            return
+
+        next_step(client, context)
+
+
 def fulfill_renewal_now_order(client, order):
     """
     Fulfills a change order that carries a renew-now renewal payload.
@@ -778,8 +1050,10 @@ def fulfill_renewal_now_order(client, order):
     and committed as an actual Adobe RENEWAL order, invoiced immediately.
     Before that, the previous RENEWAL order lines of the lapsing
     subscriptions already committed are resolved and checked against the
-    return window, so nothing is committed that cannot be undone. Once it
-    completes, those lines are returned, the renewed
+    return window, so nothing is committed that cannot be undone. Net-new
+    items ride the same RENEWAL order as extra lines and their MPT
+    subscriptions are created after it commits. Once it
+    completes, the previous lines are returned, the renewed
     subscriptions (renew = true) have their autoRenewal normalised and the
     plan's lapsing subscriptions (renew = false) have their auto-renewal
     disabled.
@@ -801,11 +1075,14 @@ def fulfill_renewal_now_order(client, order):
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
         SetupRenewalPlan(),
-        Validate3YCRenewalFloor(include_net_new_items=False),
+        ValidateNetNewOrderLines(),
+        Validate3YCRenewalFloor(include_net_new_items=True),
         ResolvePreviousRenewalReturns(),
         PreviewRenewalNowOrder(),
         SubmitRenewalNowOrder(),
         ReturnPreviousRenewalOrders(),
+        ResolveNetNewRenewedSubscriptions(),
+        CreateNetNewMptSubscriptions(),
         NormalizeRenewedSubscriptions(),
         DisableLapsingSubscriptions(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),

@@ -9,22 +9,23 @@ at-anniversary path see `renewal.py`. For the surrounding layers and routing see
 ## Flow summary
 
 The resulting renewing aggregate of the plan is first validated against the 3YC
-committed minimum, then the renewing subscriptions are validated with an Adobe
-`PREVIEW_RENEWAL` order and committed as an actual Adobe `RENEWAL` order,
-invoiced immediately. After the commit, previous renewal lines are returned,
-renewed subscriptions have their auto-renewal normalised, lapsing subscriptions
-have their auto-renewal disabled, and the redeemed flex discount codes are
-recorded on the AirTable redemptions table.
+committed minimum, then the renewing subscriptions — and any net-new items — are
+validated with an Adobe `PREVIEW_RENEWAL` order and committed as an actual Adobe
+`RENEWAL` order, invoiced immediately. After the commit, previous renewal lines
+are returned, the MPT subscriptions for net-new items are created, renewed
+subscriptions have their auto-renewal normalised, lapsing subscriptions have
+their auto-renewal disabled, and the redeemed flex discount codes are recorded on
+the AirTable redemptions table.
 
 ## 3YC committed minimum floor (VIPM0034)
 
-`Validate3YCRenewalFloor(include_net_new_items=False)`, shared with the
+`Validate3YCRenewalFloor(include_net_new_items=True)`, shared with the
 at-anniversary flow, runs **before** return resolution and before any Adobe
 preview or commit operation. It projects the plan onto the customer's Adobe
 subscriptions snapshotted by `SetupRenewalPlan` and validates the resulting
 licenses and consumables aggregate with the same 3YC guard used by the other
-order types. Net-new items are excluded here because this flow does not create
-them.
+order types. Net-new items are included in the projection because this flow
+commits them on the same `RENEWAL` order (see [Net-new items](#net-new-items)).
 
 The floor is enforced only for a 3YC renewal, that is a customer with a
 `COMMITTED`/`ACTIVE` commitment that does not end before the coterm date;
@@ -72,6 +73,21 @@ and that the `PREVIEW_RENEWAL` response then **confirmed** with result
 - Adobe accepts at most one code per line and rejects more with error `2147`, so
   a single surviving code is submitted per line.
 
-## Known limitations
+## Net-new items
 
-Net-new items are not handled by this flow yet.
+A net-new item (a product the customer does not yet hold) is submitted as an
+additional line on the same immediate `RENEWAL` order, carrying `offerId` and
+`quantity` and **no** `subscriptionId`: Adobe creates-and-renews the new
+subscription in one shot and returns its assigned `subscriptionId` on the
+committed order. Net-new lines are validated by the same `PREVIEW_RENEWAL` as the
+renewing subscriptions and are numbered after them, so `extLineItemNumber` is the
+join key from the plan item back to the committed line — the committed line's
+`offerId` can differ from the ordered one across the renewal offer-type shift, so
+it is not a safe key. After the order commits,
+`ResolveNetNewRenewedSubscriptions` reads each new `subscriptionId` and
+`CreateNetNewMptSubscriptions` (shared with the at-anniversary flow) creates the
+corresponding MPT subscription. No separate Create Order is placed.
+
+A net-new item may carry a single flexible discount code (`flexDiscountCodes`),
+enforced (one code per line), preview-confirmed, and recorded on the AirTable
+redemptions table exactly like a renewing line.

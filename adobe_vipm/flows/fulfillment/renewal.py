@@ -339,6 +339,7 @@ class CreateNetNewSubscriptions(Step):
                 recommendation_tracker_id=(
                     context.renewal_payload.get("recommendationTrackerId") or None
                 ),
+                flex_discount_codes=net_new_item.get("flexDiscountCodes"),
             )
         except AdobeAPIError as error:
             logger.warning(
@@ -376,21 +377,24 @@ class CreateNetNewSubscriptions(Step):
         """
         offer_id = net_new_item["offerId"]
         auto_renewal = existing.get("autoRenewal", {})
-        quantity = net_new_item["quantity"]
-        if (
-            auto_renewal.get("enabled", False)
-            and auto_renewal.get(Param.RENEWAL_QUANTITY.value) == quantity
-        ):
+        if self._scheduled_matches_plan(net_new_item, auto_renewal):
             context.renewal_net_new_subscriptions[offer_id] = existing
             return True
 
+        requested_codes = net_new_item.get("flexDiscountCodes") or []
         try:
             subscription = adobe_client.update_subscription(
                 context.authorization_id,
                 context.adobe_customer_id,
                 existing["subscriptionId"],
                 auto_renewal=True,
-                quantity=quantity,
+                quantity=net_new_item["quantity"],
+                flex_discount_codes=requested_codes or None,
+                # An empty list does not clear a stored code; Adobe needs the reset flag
+                # when the plan drops a code the reused subscription still carries.
+                reset_flex_discount_codes=(
+                    not requested_codes and bool(auto_renewal.get("flexDiscountCodes"))
+                ),
             )
         except AdobeAPIError as error:
             logger.warning(
@@ -413,11 +417,20 @@ class CreateNetNewSubscriptions(Step):
             context,
             existing["subscriptionId"],
             offer_id,
-            quantity,
+            net_new_item["quantity"],
         )
         context.renewal_net_new_subscriptions[offer_id] = subscription
         context.renewal_created_net_new_subscriptions[offer_id] = subscription
         return True
+
+    def _scheduled_matches_plan(self, net_new_item, auto_renewal):
+        """True when the scheduled subscription already matches the plan (reuse as-is)."""
+        return (
+            auto_renewal.get("enabled", False)
+            and auto_renewal.get(Param.RENEWAL_QUANTITY.value) == net_new_item["quantity"]
+            and (net_new_item.get("flexDiscountCodes") or [])
+            == (auto_renewal.get("flexDiscountCodes") or [])
+        )
 
     def _find_scheduled_subscription(self, context, offer_id):
         return find_scheduled_subscription(context.adobe_customer_subscriptions, offer_id)
@@ -776,13 +789,11 @@ class RecordDiscountRedemptions(Step):
 
     def _get_redeemed_codes(self, context):
         """Return the unique codes newly applied by the plan, skipping inherited ones."""
-        redeemed_codes, inherited_codes = [], []
-        for plan in context.renewal_plan_subscriptions:
-            if not plan["renew"]:
-                continue
-            for code in plan["flex_discount_codes"]:
-                is_inherited = code in plan["snapshot"]["flex_discount_codes"]
-                (inherited_codes if is_inherited else redeemed_codes).append(code)
+        redeemed_codes, inherited_codes = self._split_plan_codes(context)
+        # Net-new items create a brand-new subscription, so they can hold no inherited
+        # code: every code on a net-new item is a fresh redemption by this order.
+        for net_new_item in (context.renewal_payload or {}).get("netNewItems", []):
+            redeemed_codes.extend(net_new_item.get("flexDiscountCodes") or [])
         if inherited_codes:
             logger.info(
                 "%s: skipping inherited flex discount code(s) already held by the "
@@ -791,6 +802,17 @@ class RecordDiscountRedemptions(Step):
                 ", ".join(dict.fromkeys(inherited_codes)),
             )
         return list(dict.fromkeys(redeemed_codes))
+
+    def _split_plan_codes(self, context):
+        """Split the renewing plan's codes into (redeemed, inherited)."""
+        redeemed_codes, inherited_codes = [], []
+        for plan in context.renewal_plan_subscriptions:
+            if not plan["renew"]:
+                continue
+            for code in plan["flex_discount_codes"]:
+                is_inherited = code in plan["snapshot"]["flex_discount_codes"]
+                (inherited_codes if is_inherited else redeemed_codes).append(code)
+        return redeemed_codes, inherited_codes
 
     def _record_redemptions(self, context, redeemed_codes):
         logger.info(

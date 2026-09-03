@@ -132,6 +132,7 @@ class SubscriptionClientMixin:
         auto_renewal: bool = True,  # noqa: FBT001 FBT002
         quantity: int | None = None,
         flex_discount_codes: list[str] | None = None,
+        reset_flex_discount_codes: bool = False,  # noqa: FBT001 FBT002
     ) -> dict:
         """
         Update a subscription.
@@ -148,6 +149,9 @@ class SubscriptionClientMixin:
             Default to None mean to leave it unchanged.
             flex_discount_codes: Flexible discount codes to apply at the renewal. Default
             to None mean to leave them unchanged.
+            reset_flex_discount_codes: When True, sends the `reset-flex-discount-codes=true`
+            query parameter so Adobe clears any stored flexible discount codes; sending an
+            empty list or omitting the field does not clear them. Default False.
 
         Returns:
             dict: The updated subscription.
@@ -166,6 +170,7 @@ class SubscriptionClientMixin:
         if flex_discount_codes is not None:
             payload["autoRenewal"]["flexDiscountCodes"] = flex_discount_codes
 
+        query_params = {"reset-flex-discount-codes": "true"} if reset_flex_discount_codes else None
         response = self._session.patch(
             urljoin(
                 self._config.api_base_url,
@@ -173,6 +178,7 @@ class SubscriptionClientMixin:
             ),
             headers=headers,
             json=payload,
+            params=query_params,
             timeout=self._TIMEOUT,
         )
         response.raise_for_status()
@@ -189,6 +195,7 @@ class SubscriptionClientMixin:
         renewal_quantity: int,
         deployment_id: str | None = None,
         recommendation_tracker_id: str | None = None,
+        flex_discount_codes: list[str] | None = None,
     ) -> dict:
         """
         Create a scheduled subscription for a product the customer does not currently hold.
@@ -206,6 +213,9 @@ class SubscriptionClientMixin:
             deployment_id: Identifier of the deployment to which the subscription belongs to.
             recommendation_tracker_id: The tracker id captured from the Adobe
             recommendations call, replayed so Adobe can attribute the outcome.
+            flex_discount_codes: The flexible discount codes selected for the net-new
+            offer, stored on the scheduled subscription's autoRenewal so they apply at
+            the anniversary renewal. None leaves the field off the request entirely.
 
         Returns:
             dict: The created subscription.
@@ -222,6 +232,8 @@ class SubscriptionClientMixin:
             },
             "currencyCode": authorization.currency,
         }
+        if flex_discount_codes is not None:
+            payload["autoRenewal"]["flexDiscountCodes"] = flex_discount_codes
         if deployment_id:
             payload["deploymentId"] = deployment_id
 
