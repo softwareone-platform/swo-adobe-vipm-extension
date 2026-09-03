@@ -769,9 +769,20 @@ class RecordDiscountRedemptions(Step):
     applied by the plan. A code the subscription already carried before this
     order (inherited discount snapshotted by SetupRenewalPlan) was not
     redeemed by it, so it is skipped: an auto-applied reusable is never
-    recorded as a fresh once-per-customer redemption. The write is best
-    effort: the order is already completed, so an AirTable failure is logged
-    and notified for a manual backfill instead of failing the order.
+    recorded as a fresh once-per-customer redemption.
+
+    On the renew-now flow a code is recorded only once the committed RENEWAL
+    order confirmed it: that flow drops a requested code the preview did not
+    confirm (result != SUCCESS) from the order without failing it, so
+    recording it would wrongly consume the customer's once-per-customer
+    eligibility. The at-anniversary flow places no RENEWAL order — its codes
+    ride create_customer_subscription / update_subscription, which Adobe
+    validates on the spot (a rejected code fails the order) — so its requested
+    codes are the applied ones and no committed-order filter applies.
+
+    The write is best effort: the order is already completed, so an AirTable
+    failure is logged and notified for a manual backfill instead of failing
+    the order.
     """
 
     def __call__(self, client, context, next_step):
@@ -789,11 +800,14 @@ class RecordDiscountRedemptions(Step):
 
     def _get_redeemed_codes(self, context):
         """Return the unique codes newly applied by the plan, skipping inherited ones."""
+        confirmed_codes = self._get_confirmed_codes(context)
         redeemed_codes, inherited_codes = self._split_plan_codes(context)
         # Net-new items create a brand-new subscription, so they can hold no inherited
         # code: every code on a net-new item is a fresh redemption by this order.
         for net_new_item in (context.renewal_payload or {}).get("netNewItems", []):
             redeemed_codes.extend(net_new_item.get("flexDiscountCodes") or [])
+        if confirmed_codes is not None:
+            redeemed_codes = self._drop_unconfirmed_codes(context, redeemed_codes, confirmed_codes)
         if inherited_codes:
             logger.info(
                 "%s: skipping inherited flex discount code(s) already held by the "
@@ -802,6 +816,40 @@ class RecordDiscountRedemptions(Step):
                 ", ".join(dict.fromkeys(inherited_codes)),
             )
         return list(dict.fromkeys(redeemed_codes))
+
+    def _get_confirmed_codes(self, context):
+        """
+        Return the codes confirmed on the committed RENEWAL order, or None when absent.
+
+        Only the renew-now flow places a RENEWAL order (context.adobe_renewal_order):
+        the confirmed set is the codes Adobe applied (result SUCCESS) on its committed
+        line items, used to drop requested codes the preview did not confirm. The
+        at-anniversary flow places no such order, so this returns None and no
+        committed-order filter applies. A discount object without an explicit SUCCESS
+        result is treated as unconfirmed, so an ambiguous entry never consumes the
+        customer's once-per-customer eligibility.
+        """
+        renewal_order = context.adobe_renewal_order
+        if renewal_order is None:
+            return None
+        return {
+            flex_discount["code"]
+            for line_item in renewal_order.get("lineItems", [])
+            for flex_discount in line_item.get("flexDiscounts") or []
+            if flex_discount.get("result") == "SUCCESS"
+        }
+
+    def _drop_unconfirmed_codes(self, context, redeemed_codes, confirmed_codes):
+        """Keep only the plan codes the committed RENEWAL order confirmed (renew-now)."""
+        dropped = [code for code in redeemed_codes if code not in confirmed_codes]
+        if dropped:
+            logger.warning(
+                "%s: skipping flex discount code(s) not confirmed on the committed "
+                "renewal order, not redeemed by this order: %s",
+                context,
+                ", ".join(dict.fromkeys(dropped)),
+            )
+        return [code for code in redeemed_codes if code in confirmed_codes]
 
     def _split_plan_codes(self, context):
         """Split the renewing plan's codes into (redeemed, inherited)."""
