@@ -8,7 +8,11 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
-from adobe_vipm.flows.validation.shared import ValidateDuplicateLines, ValidateNoEarlyRenewal
+from adobe_vipm.flows.validation.shared import (
+    ValidateDuplicateLines,
+    ValidateNoEarlyRenewal,
+    ValidateNoStagedRenewal,
+)
 from adobe_vipm.flows.validation.termination import (
     ValidateDownsizes,
     validate_termination_order,
@@ -234,13 +238,14 @@ def test_validate_termination_order(mocker):
 
     validate_termination_order(mocked_client, mocked_order)  # act
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 7
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 8
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
         SetOrUpdateCotermDate,
         ValidateRenewalWindow,
         ValidateNoEarlyRenewal,
+        ValidateNoStagedRenewal,
         ValidateDownsizes,
         Validate3YCCommitment,
     ]

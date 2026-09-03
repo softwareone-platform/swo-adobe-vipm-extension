@@ -3,7 +3,11 @@ import logging
 from collections import Counter
 
 from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import ORDER_TYPE_RENEWAL, AdobeOrderStatus
+from adobe_vipm.adobe.constants import (
+    ORDER_TYPE_RENEWAL,
+    AdobeOrderStatus,
+    AdobeSubscriptionStatus,
+)
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
@@ -12,6 +16,7 @@ from adobe_vipm.flows.constants import (
     ERR_DUPLICATED_ITEMS,
     ERR_EARLY_RENEWAL_IN_PROGRESS,
     ERR_EXISTING_ITEMS,
+    ERR_RENEWAL_STAGED,
 )
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.utils import (
@@ -142,6 +147,77 @@ class ValidateNoEarlyRenewal(Step):
             return coterm_date.replace(year=coterm_date.year - 1)
         except ValueError:  # Feb 29 on a non-leap target year
             return coterm_date.replace(year=coterm_date.year - 1, day=LAST_DAY_OF_FEBRUARY_NON_LEAP)
+
+
+class ValidateNoStagedRenewal(Step):
+    """
+    Reject native orders while an at-anniversary renewal is staged for the agreement.
+
+    An at-anniversary ("renew at anniversary") renewal completes its MPT order
+    immediately but places no Adobe order: the plan is applied to Adobe as deferred
+    auto-renewal preferences that only take effect at the coterm date. It therefore
+    leaves no Adobe RENEWAL order for ``ValidateNoEarlyRenewal`` to detect, so a
+    native Change / Configuration / Termination order placed before the anniversary
+    would silently fork the staged renewal.
+
+    The staged state is instead derived live from the customer's Adobe subscriptions,
+    which carry the deferred effect: a net-new item staged for the renewal appears as
+    a SCHEDULED subscription, and a staged quantity increase appears as an existing
+    subscription whose ``autoRenewal.renewalQuantity`` exceeds its ``currentQuantity``.
+    Only staged upsizes and additions are treated as blocking: a staged downsize
+    (``renewalQuantity`` below ``currentQuantity``) is the ordinary renewal-reduction
+    mechanism and does not lock native orders. The divergence self-clears once the
+    renewal takes effect at the anniversary, lifting the block without any bookkeeping.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Reject the order when a renewal is staged and pending effect for the agreement."""
+        if self._is_staged_renewal_pending(context):
+            logger.info(
+                "%s: a renewal is staged and pending effect for the agreement",
+                context,
+            )
+            context.validation_succeeded = False
+            context.order = set_order_error(
+                context.order,
+                ERR_RENEWAL_STAGED.to_dict(),
+            )
+            return
+
+        next_step(client, context)
+
+    def _is_staged_renewal_pending(self, context):
+        if is_renewal_order(context.order):
+            return False
+
+        coterm_date = (context.adobe_customer or {}).get("cotermDate")
+        if not context.adobe_customer_id or not coterm_date:
+            return False
+
+        if dt.datetime.now(tz=dt.UTC).date() > dt.date.fromisoformat(coterm_date):
+            return False
+
+        return self._has_staged_renewal(context)
+
+    def _has_staged_renewal(self, context):
+        adobe_client = get_adobe_client()
+        subscriptions = adobe_client.get_subscriptions(
+            context.authorization_id,
+            context.adobe_customer_id,
+        )
+        for subscription in subscriptions.get("items", []):
+            if subscription.get("status") == AdobeSubscriptionStatus.SCHEDULED:
+                return True
+            auto_renewal = subscription.get("autoRenewal") or {}
+            renewal_quantity = auto_renewal.get("renewalQuantity")
+            current_quantity = subscription.get("currentQuantity")
+            if (
+                renewal_quantity is not None
+                and current_quantity is not None
+                and renewal_quantity > current_quantity
+            ):
+                return True
+        return False
 
 
 class GetPreviewOrder(Step):
