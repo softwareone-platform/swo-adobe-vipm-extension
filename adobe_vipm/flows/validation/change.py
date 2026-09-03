@@ -29,6 +29,7 @@ from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
     ValidateNoEarlyRenewal,
+    ValidateNoStagedRenewal,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,7 @@ def validate_change_order(client, order):
         SetOrUpdateCotermDate(),
         ValidateRenewalWindow(is_validation=True),
         ValidateNoEarlyRenewal(),
+        ValidateNoStagedRenewal(),
         ValidateSkuAvailability(is_validation=True),
         ValidateDownsizes(),
         Validate3YCCommitment(is_validation=True),

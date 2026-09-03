@@ -5,6 +5,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW,
     ORDER_TYPE_RENEWAL,
     AdobeOrderStatus,
+    AdobeSubscriptionStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
@@ -13,6 +14,7 @@ from adobe_vipm.flows.constants import (
     ERR_DUPLICATED_ITEMS,
     ERR_EARLY_RENEWAL_IN_PROGRESS,
     ERR_EXISTING_ITEMS,
+    ERR_RENEWAL_STAGED,
     MARKET_SEGMENT_COMMERCIAL,
     MARKET_SEGMENT_EDUCATION,
     MARKET_SEGMENT_GOVERNMENT,
@@ -22,6 +24,7 @@ from adobe_vipm.flows.validation.shared import (
     GetPreviewOrder,
     ValidateDuplicateLines,
     ValidateNoEarlyRenewal,
+    ValidateNoStagedRenewal,
 )
 
 
@@ -399,3 +402,164 @@ def test_validate_no_early_renewal_handles_leap_day_coterm(
     assert early_renewal_context.validation_succeeded is False
     assert early_renewal_context.order["error"] == ERR_EARLY_RENEWAL_IN_PROGRESS.to_dict()
     mock_next_step.assert_not_called()
+
+
+@pytest.fixture
+def staged_renewal_context(order_factory):
+    return Context(
+        order=order_factory(),
+        authorization_id="AUT-1234-5678",
+        adobe_customer_id="a-client-id",
+        adobe_customer={"cotermDate": "2027-09-25"},
+    )
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_blocks_scheduled_subscription(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(status=AdobeSubscriptionStatus.SCHEDULED.value),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is False
+    assert staged_renewal_context.order["error"] == ERR_RENEWAL_STAGED.to_dict()
+    mock_adobe_client.get_subscriptions.assert_called_once_with(
+        "AUT-1234-5678",
+        "a-client-id",
+    )
+    mock_next_step.assert_not_called()
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_blocks_staged_upsize(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(current_quantity=10, renewal_quantity=15),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is False
+    assert staged_renewal_context.order["error"] == ERR_RENEWAL_STAGED.to_dict()
+    mock_next_step.assert_not_called()
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_ignores_staged_downsize(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(current_quantity=10, renewal_quantity=5),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is True
+    mock_next_step.assert_called_once_with(mock_mpt_client, staged_renewal_context)
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_ignores_unchanged_renewal(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(current_quantity=10, renewal_quantity=10),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is True
+    mock_next_step.assert_called_once_with(mock_mpt_client, staged_renewal_context)
+
+
+@freeze_time("2027-09-26 12:30:00")
+def test_validate_no_staged_renewal_unlocks_after_the_anniversary(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(current_quantity=10, renewal_quantity=15),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is True
+    mock_adobe_client.get_subscriptions.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, staged_renewal_context)
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_skips_renewal_orders(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    order_factory,
+    order_parameters_factory,
+    renewal_payload,
+):
+    context = Context(
+        order=order_factory(
+            order_parameters=order_parameters_factory(renewal_payload=renewal_payload)
+        ),
+        authorization_id="AUT-1234-5678",
+        adobe_customer_id="a-client-id",
+        adobe_customer={"cotermDate": "2027-09-25"},
+    )
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.validation_succeeded is True
+    mock_adobe_client.get_subscriptions.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_validate_no_staged_renewal_skips_without_adobe_customer(
+    mock_adobe_client, mock_mpt_client, mock_next_step, order_factory
+):
+    context = Context(order=order_factory())
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.validation_succeeded is True
+    mock_adobe_client.get_subscriptions.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)

@@ -14,7 +14,11 @@ from adobe_vipm.flows.validation.change import (
     ValidateDownsizes,
     validate_change_order,
 )
-from adobe_vipm.flows.validation.shared import ValidateDuplicateLines, ValidateNoEarlyRenewal
+from adobe_vipm.flows.validation.shared import (
+    ValidateDuplicateLines,
+    ValidateNoEarlyRenewal,
+    ValidateNoStagedRenewal,
+)
 
 
 @freeze_time("2024-11-09 12:30:00")
@@ -283,19 +287,20 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)  # act
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 10
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 11
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
         SetOrUpdateCotermDate,
         ValidateRenewalWindow,
         ValidateNoEarlyRenewal,
+        ValidateNoStagedRenewal,
         ValidateSkuAvailability,
         ValidateDownsizes,
         Validate3YCCommitment,
         GetPreviewOrder,
     ]
-    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:9]]
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:10]]
     assert actual_steps == expected_steps
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)

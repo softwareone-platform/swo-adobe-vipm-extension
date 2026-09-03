@@ -1,6 +1,9 @@
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.validation.configuration import validate_configuration_order
-from adobe_vipm.flows.validation.shared import ValidateNoEarlyRenewal
+from adobe_vipm.flows.validation.shared import (
+    ValidateNoEarlyRenewal,
+    ValidateNoStagedRenewal,
+)
 
 
 def test_validate_configuration_order(mocker):
@@ -21,6 +24,7 @@ def test_validate_configuration_order(mocker):
     expected_steps = [
         SetupContext,
         ValidateNoEarlyRenewal,
+        ValidateNoStagedRenewal,
     ]
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
