@@ -529,6 +529,13 @@ ERR_EARLY_RENEWAL_IN_PROGRESS = ValidationError(
     "renewal-affecting changes.",
 )
 
+ERR_RENEWAL_STAGED = ValidationError(
+    "VIPM0054",
+    "A renewal has been staged for this agreement, so Change, Configuration and "
+    "Termination orders are locked until it takes effect at the anniversary date. "
+    "Please re-open the renewal wizard to make renewal-affecting changes.",
+)
+
 ERR_FLEX_DISCOUNT_CODE_LIMIT = ValidationError(
     "VIPM0052",
     "Only one flexible discount code per line item is allowed: {error}.",
