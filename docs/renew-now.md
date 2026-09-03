@@ -73,6 +73,14 @@ and that the `PREVIEW_RENEWAL` response then **confirmed** with result
 - Adobe accepts at most one code per line and rejects more with error `2147`, so
   a single surviving code is submitted per line.
 
+The redemptions written to the AirTable table mirror this committed set:
+`RecordDiscountRedemptions` records only the codes confirmed (result `SUCCESS`)
+on the committed `RENEWAL` order, for both renewing and net-new lines. A
+requested code the preview dropped is not recorded, so it does not wrongly
+consume the customer's once-per-customer eligibility. (The at-anniversary flow
+places no `RENEWAL` order and records its requested codes directly, since Adobe
+validates them at subscription create/update time.)
+
 ## Net-new items
 
 A net-new item (a product the customer does not yet hold) is submitted as an

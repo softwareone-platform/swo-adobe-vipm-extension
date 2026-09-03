@@ -1329,7 +1329,9 @@ def test_return_previous_renewal_orders_step_return_failed(
 
 
 @freeze_time("2026-08-28 10:00:00")
-def test_record_discount_redemptions_step_renew_now(mocker, mock_mpt_client, renewal_now_context):
+def test_record_discount_redemptions_step_renew_now(
+    mocker, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
     renewal_now_context.renewal_plan_subscriptions = [
         plan_entry(
             subscription_id="9d6f8c818d4ae8807910f889cbab8fNA",
@@ -1350,6 +1352,27 @@ def test_record_discount_redemptions_step_renew_now(mocker, mock_mpt_client, ren
             renewal_quantity=0,
         ),
     ]
+    # Both requested codes were confirmed on the committed RENEWAL order, so both
+    # are recorded.
+    renewal_now_context.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304520CA01A12",
+                "quantity": 5,
+                "flexDiscounts": [{"code": "SB7U6WLG8R4N0IGODRZ191ZD", "result": "SUCCESS"}],
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65324861CA01A12",
+                "quantity": 7,
+                "flexDiscounts": [{"code": "HOU3BNCONXV7WOTAQ4032KSM", "result": "SUCCESS"}],
+            },
+        ],
+    )
     mocked_create_redemptions = mocker.patch(
         "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
     )
@@ -1374,6 +1397,144 @@ def test_record_discount_redemptions_step_renew_now(mocker, mock_mpt_client, ren
         },
     ])
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+@freeze_time("2026-08-28 10:00:00")
+def test_record_discount_redemptions_step_renew_now_skips_unconfirmed_code(
+    mocker, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        plan_entry(
+            subscription_id="9d6f8c818d4ae8807910f889cbab8fNA",
+            offer_id="65304520CA01A12",
+            renewal_quantity=5,
+            flex_discount_codes=["CONFIRMED-CODE"],
+        ),
+        # The preview did not confirm this code, so the renew-now flow dropped it from
+        # the committed order (result != SUCCESS): it must not be recorded as redeemed.
+        plan_entry(
+            subscription_id="424d33184346eabbdd0dfce7294cf2NA",
+            offer_id="65324861CA01A12",
+            renewal_quantity=7,
+            flex_discount_codes=["DROPPED-CODE"],
+        ),
+    ]
+    renewal_now_context.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304520CA01A12",
+                "quantity": 5,
+                "flexDiscounts": [{"code": "CONFIRMED-CODE", "result": "SUCCESS"}],
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65324861CA01A12",
+                "quantity": 7,
+                "flexDiscounts": [{"code": "DROPPED-CODE", "result": "FAILURE"}],
+            },
+        ],
+    )
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mocked_create_redemptions.assert_called_once_with([
+        {
+            "code": "CONFIRMED-CODE",
+            "customer_id": "customer-id",
+            "order_id": renewal_now_context.order_id,
+            "redeemed_at": dt.datetime(2026, 8, 28, 10, 0, tzinfo=dt.UTC),
+        },
+    ])
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+def test_record_discount_redemptions_step_renew_now_requires_explicit_success(
+    mocker, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        plan_entry(
+            subscription_id="9d6f8c818d4ae8807910f889cbab8fNA",
+            offer_id="65304520CA01A12",
+            renewal_quantity=5,
+            flex_discount_codes=["AMBIGUOUS-CODE"],
+        ),
+    ]
+    # A discount object carrying a code but no result is not an explicit confirmation, so
+    # it must not be recorded (and must not consume once-per-customer eligibility).
+    renewal_now_context.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304520CA01A12",
+                "quantity": 5,
+                "flexDiscounts": [{"code": "AMBIGUOUS-CODE"}],
+            },
+        ],
+    )
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mocked_create_redemptions.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+def test_record_discount_redemptions_step_renew_now_skips_unconfirmed_net_new_code(
+    mocker, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
+):
+    renewal_now_context_net_new.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["CONFIRMED-CODE"]),
+    ]
+    # The net-new item's code (CODE-3, from the net_new_item fixture) was omitted from
+    # the committed order (the line carries no flexDiscounts at all), so it must not be
+    # recorded as redeemed.
+    renewal_now_context_net_new.adobe_renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RENEWAL-001",
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 15,
+                "flexDiscounts": [{"code": "CONFIRMED-CODE", "result": "SUCCESS"}],
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65322651CA01A12",
+                "quantity": 5,
+            },
+        ],
+    )
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions()
+
+    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    recorded_codes = {
+        redemption["code"] for redemption in mocked_create_redemptions.mock_calls[0].args[0]
+    }
+    assert recorded_codes == {"CONFIRMED-CODE"}
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
 
 
 def test_fulfill_renewal_now_order(mocker):
