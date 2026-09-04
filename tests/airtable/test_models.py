@@ -20,13 +20,17 @@ from requests import HTTPError
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
 from adobe_vipm.airtable.models import (
     AirTableBaseInfo,
+    create_client_discount_codes,
     create_discount_redemptions,
     create_gc_agreement_deployments,
     create_gc_main_agreement,
     create_offers,
     get_adobe_product_by_marketplace_sku,
     get_agreement_deployment_view_link,
+    get_discount_code_model,
     get_discount_redemption_model,
+    get_discount_value_model,
+    get_existing_discount_codes,
     get_gc_agreement_deployment_model,
     get_gc_agreement_deployments_by_main_agreement,
     get_gc_agreement_deployments_to_check,
@@ -184,6 +188,217 @@ def test_create_discount_redemptions(mocker, settings):
         order_id=redemptions[0]["order_id"],
         redeemed_at=redemptions[0]["redeemed_at"],
     )
+
+
+def test_get_discount_code_model():
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+
+    result = get_discount_code_model(base_info)
+
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
+
+
+def test_get_discount_value_model():
+    base_info = AirTableBaseInfo(api_key="api-key", base_id="base-id")
+
+    result = get_discount_value_model(base_info)
+
+    assert result.meta.api.api_key == base_info.api_key
+    assert result.meta.base.id == base_info.base_id
+    assert result.meta.table_name == "Discount Values"
+
+
+def test_get_existing_discount_codes(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
+    }
+    mocked_discount_code_model = mocker.MagicMock()
+    mocked_discount_code_model.all.return_value = [mocker.MagicMock(code="CODE-1")]
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_code_model",
+        return_value=mocked_discount_code_model,
+    )
+
+    result = get_existing_discount_codes(["CODE-1", "CODE-2"], "COM")  # act
+
+    assert result == {"CODE-1"}
+    mocked_discount_code_model.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("market_segment"), "COM"),
+            OR(EQ(Field("Code"), "CODE-1"), EQ(Field("Code"), "CODE-2")),
+        )
+    )
+
+
+@freeze_time("2026-08-12 10:00:00")
+def test_create_client_discount_codes(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
+    }
+    mocked_discount_code = mocker.MagicMock()
+    mocked_discount_code_model = mocker.MagicMock(return_value=mocked_discount_code)
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_code_model",
+        return_value=mocked_discount_code_model,
+    )
+    mocked_discount_value = mocker.MagicMock()
+    mocked_discount_value_model = mocker.MagicMock(return_value=mocked_discount_value)
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_value_model",
+        return_value=mocked_discount_value_model,
+    )
+    discount = {
+        "id": "55555555-8768-4e8a-9a2f-fb6a6b08f563",
+        "name": "Easter Flexible Discount",
+        "description": "Exclusive 26 fixed off on Adobe Technical Communication Suite",
+        "code": "EASTER_26",
+        "category": "STANDARD",
+        "startDate": "2025-06-12T10:00:48Z",
+        "endDate": "2026-03-07T10:16Z",
+        "status": "ACTIVE",
+        "qualification": {"baseOfferIds": ["65304769CA01A12"]},
+        "outcomes": [
+            {
+                "type": "FIXED_DISCOUNT",
+                "discountValues": [{"country": "US", "currency": "USD", "value": 26.0}],
+            }
+        ],
+    }
+
+    create_client_discount_codes([discount], "COM")  # act
+
+    now = dt.datetime(2026, 8, 12, 10, 0, tzinfo=dt.UTC)
+    mocked_discount_code_model.batch_save.assert_called_once_with([mocked_discount_code])
+    mocked_discount_code_model.assert_called_once_with(
+        code="EASTER_26",
+        market_segment="COM",
+        source="Client",
+        name="Easter Flexible Discount",
+        description="Exclusive 26 fixed off on Adobe Technical Communication Suite",
+        adobe_discount_id="55555555-8768-4e8a-9a2f-fb6a6b08f563",
+        category="STANDARD",
+        status="ACTIVE",
+        discount_type="FIXED_DISCOUNT",
+        start_date=dt.datetime(2025, 6, 12, 10, 0, 48, tzinfo=dt.UTC),
+        end_date=dt.datetime(2026, 3, 7, 10, 16, tzinfo=dt.UTC),
+        reusable=False,
+        discount_lock_end_date=None,
+        target_offer_ids="65304769CA",
+        qualifying_offer_ids="",
+        enrichment_status="PENDING",
+        synchronized_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    # One Discount Values row per country of the fixed-type outcome.
+    mocked_discount_value_model.batch_save.assert_called_once_with([mocked_discount_value])
+    mocked_discount_value_model.assert_called_once_with(
+        code="EASTER_26",
+        market_segment="COM",
+        value=26.0,
+        country="US",
+        currency="USD",
+    )
+
+
+@freeze_time("2026-08-12 10:00:00")
+def test_create_client_discount_codes_reusable_intro(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
+    }
+    mocked_discount_code = mocker.MagicMock()
+    mocked_discount_code_model = mocker.MagicMock(return_value=mocked_discount_code)
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_code_model",
+        return_value=mocked_discount_code_model,
+    )
+    mocked_discount_value_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_value_model",
+        return_value=mocked_discount_value_model,
+    )
+    discount = {
+        "code": "INTRO_10",
+        "category": "INTRO",
+        "status": "ACTIVE",
+        "discountLockEndDate": "2027-03-07T10:16Z",
+        "outcomes": [{"type": "PERCENTAGE_DISCOUNT", "discountValues": [{"value": 10.0}]}],
+    }
+
+    create_client_discount_codes([discount], "COM")  # act
+
+    fields = mocked_discount_code_model.mock_calls[0].kwargs
+    assert fields["reusable"] is True
+    assert fields["discount_lock_end_date"] == dt.datetime(2027, 3, 7, 10, 16, tzinfo=dt.UTC)
+    assert fields["discount_type"] == "PERCENTAGE"
+    # The only order-type enrichment the TDR fixes: INTRO is net-new only.
+    assert fields["applicable_order_types"] == ["NEW"]
+    # A percentage is country-agnostic: a single row without country nor currency.
+    mocked_discount_value_model.assert_called_once_with(
+        code="INTRO_10", market_segment="COM", value=10.0
+    )
+    mocked_discount_value_model.batch_save.assert_called_once()
+
+
+def test_create_client_discount_codes_skips_incomplete_values(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
+    }
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_code_model",
+        return_value=mocker.MagicMock(),
+    )
+    mocked_discount_value_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_value_model",
+        return_value=mocked_discount_value_model,
+    )
+    discount = {
+        "code": "FIXED_199",
+        "outcomes": [
+            {
+                "type": "FIXED_PRICE",
+                "discountValues": [
+                    {"country": "US", "currency": "USD", "value": 199.0},
+                    {"currency": "EUR", "value": 180.0},
+                    {"country": "GB", "currency": "GBP"},
+                ],
+            },
+            {"type": "FIXED_PRICE"},
+        ],
+    }
+
+    create_client_discount_codes([discount], "COM")  # act
+
+    # Fixed-type values without a country or without an amount are skipped.
+    mocked_discount_value_model.assert_called_once_with(
+        code="FIXED_199", market_segment="COM", value=199.0, country="US", currency="USD"
+    )
+
+
+def test_create_client_discount_codes_without_values(mocker, settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
+    }
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_code_model",
+        return_value=mocker.MagicMock(),
+    )
+    mocked_discount_value_model = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_value_model",
+        return_value=mocked_discount_value_model,
+    )
+
+    create_client_discount_codes([{"code": "NO_VALUES", "outcomes": []}], "COM")  # act
+
+    mocked_discount_value_model.batch_save.assert_not_called()
 
 
 def test_get_transfers_to_process(mocker, settings):

@@ -15,6 +15,7 @@ from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.renewal import (
     CreateNetNewMptSubscriptions,
+    RecordClientDiscountCodes,
     RecordDiscountRedemptions,
     Validate3YCRenewalFloor,
 )
@@ -1571,6 +1572,7 @@ def test_fulfill_renewal_now_order(mocker):
         NormalizeRenewedSubscriptions,
         DisableLapsingSubscriptions,
         CompleteOrder,
+        RecordClientDiscountCodes,
         RecordDiscountRedemptions,
         SetSubscriptionTemplate,
         SyncAgreement,
