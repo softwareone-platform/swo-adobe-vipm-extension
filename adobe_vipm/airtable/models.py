@@ -2,6 +2,7 @@ import datetime as dt
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cache
+from types import MappingProxyType
 
 from django.conf import settings
 from mpt_extension_sdk.mpt_http.utils import find_first
@@ -24,7 +25,7 @@ from requests import HTTPError
 
 from adobe_vipm.adobe.errors import AdobeProductNotFoundError
 from adobe_vipm.flows.constants import MARKET_SEGMENT_TO_AIRTABLE_SEGMENT
-from adobe_vipm.utils import get_commitment_start_date
+from adobe_vipm.utils import get_commitment_start_date, get_partial_sku
 
 STATUS_INIT = "init"
 STATUS_RUNNING = "running"
@@ -37,6 +38,23 @@ STATUS_GC_PENDING = "pending"
 STATUS_GC_TRANSFERRED = "transferred"
 TYPE_3YC_CONSUMABLE = "Consumable"
 TYPE_3YC_LICENSE = "License"
+
+# Discount Codes store values (shared schema with the ef-extension discount store).
+DISCOUNT_CODE_FIELD = "Code"
+DISCOUNT_SOURCE_CLIENT = "Client"
+DISCOUNT_ENRICHMENT_PENDING = "PENDING"
+DISCOUNT_CATEGORY_INTRO = "INTRO"
+DISCOUNT_ORDER_TYPE_NEW = "NEW"
+DISCOUNT_OFFER_IDS_SEPARATOR = ","
+DISCOUNT_TYPE_PERCENTAGE = "PERCENTAGE"
+
+# Adobe's flex-discount outcome types keyed to the discount types the store uses.
+ADOBE_DISCOUNT_TYPES = MappingProxyType({
+    "PERCENTAGE_DISCOUNT": DISCOUNT_TYPE_PERCENTAGE,
+    "PERCENTAGE": DISCOUNT_TYPE_PERCENTAGE,
+    "FIXED_DISCOUNT": "FIXED_DISCOUNT",
+    "FIXED_PRICE": "FIXED_PRICE",
+})
 
 AIRTABLE_RETRY_STRATEGY = retry_strategy(status_forcelist=(429, 500, 502, 503, 504))
 
@@ -975,6 +993,221 @@ def create_discount_redemptions(redemptions: list):
     """
     redemption_model = get_discount_redemption_model(AirTableBaseInfo.for_discounts())
     redemption_model.batch_save([redemption_model(**redemption) for redemption in redemptions])
+
+
+@cache
+def get_discount_code_model(base_info: AirTableBaseInfo):
+    """
+    Returns the DiscountCode model class connected to the right base.
+
+    The table is the flexible discount store shared with the ef-extension
+    (Discount Management TDR): one row per discount code and market segment.
+
+    Args:
+        base_info: The base info instance.
+
+    Returns:
+        DiscountCode: The AirTable DiscountCode model.
+    """
+
+    class DiscountCode(Model):
+        code = fields.TextField(DISCOUNT_CODE_FIELD)
+        market_segment = fields.TextField("market_segment")
+        source = fields.TextField("source")
+        name = fields.TextField("name")
+        description = fields.TextField("description")
+        adobe_discount_id = fields.TextField("adobe_discount_id")
+        category = fields.TextField("category")
+        status = fields.TextField("status")
+        discount_type = fields.TextField("discount_type")
+        start_date = fields.DatetimeField("start_date")
+        end_date = fields.DatetimeField("end_date")
+        reusable = fields.CheckboxField("reusable")
+        discount_lock_end_date = fields.DatetimeField("discount_lock_end_date")
+        target_offer_ids = fields.TextField("target_offer_ids")
+        qualifying_offer_ids = fields.TextField("qualifying_offer_ids")
+        applicable_order_types = fields.MultipleSelectField("applicable_order_types")
+        enrichment_status = fields.TextField("enrichment_status")
+        synchronized_at = fields.DatetimeField("synchronized_at")
+        created_at = fields.DatetimeField("created_at")
+        updated_at = fields.DatetimeField("updated_at")
+
+        class Meta:
+            table_name = "Discount Codes"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
+
+    return DiscountCode
+
+
+@cache
+def get_discount_value_model(base_info: AirTableBaseInfo):
+    """
+    Returns the DiscountValue model class connected to the right base.
+
+    The table holds the amounts of the codes on the Discount Codes table: one
+    row per country for fixed types, a single country-less row for percentages.
+
+    Args:
+        base_info: The base info instance.
+
+    Returns:
+        DiscountValue: The AirTable DiscountValue model.
+    """
+
+    class DiscountValue(Model):
+        code = fields.TextField("code")
+        market_segment = fields.TextField("market_segment")
+        country = fields.TextField("country")
+        currency = fields.TextField("currency")
+        value = fields.NumberField("value")
+
+        class Meta:
+            table_name = "Discount Values"
+            api_key = base_info.api_key
+            base_id = base_info.base_id
+            retry = AIRTABLE_RETRY_STRATEGY
+
+    return DiscountValue
+
+
+def get_existing_discount_codes(codes: list[str], market_segment: str) -> set[str]:
+    """
+    Returns the subset of codes already stored on the Discount Codes table.
+
+    Args:
+        codes: The discount codes to look up.
+        market_segment: Adobe market segment the codes belong to (COM, GOV, EDU).
+
+    Returns:
+        set[str]: The codes found on the table, whatever their source or state.
+    """
+    discount_code_model = get_discount_code_model(AirTableBaseInfo.for_discounts())
+    rows = discount_code_model.all(
+        formula=AND(
+            EQ(Field("market_segment"), market_segment),
+            OR(*(EQ(Field(DISCOUNT_CODE_FIELD), code) for code in codes)),
+        )
+    )
+    return {row.code for row in rows}
+
+
+def create_client_discount_codes(discounts: list[dict], market_segment: str):
+    """
+    Stores Adobe flex discounts on the Discount Codes table with source "Client".
+
+    Only the attributes GET /v3/flex-discounts reports are written; the
+    enrichment fields stay PENDING for operations to curate, mirroring the
+    rows the ef-extension synchronization first creates. The amounts of each
+    outcome land on the Discount Values table, one row per country for fixed
+    types and a single country-less row for percentages.
+
+    Args:
+        discounts: Adobe flex discount objects, as returned by the flex-discounts API.
+        market_segment: Adobe market segment the codes belong to (COM, GOV, EDU).
+    """
+    now = dt.datetime.now(tz=dt.UTC)
+    base_info = AirTableBaseInfo.for_discounts()
+    discount_code_model = get_discount_code_model(base_info)
+    discount_code_model.batch_save([
+        discount_code_model(**_to_client_discount_code_fields(discount, market_segment, now))
+        for discount in discounts
+    ])
+    discount_value_model = get_discount_value_model(base_info)
+    value_rows = [
+        discount_value_model(**value_fields)
+        for discount in discounts
+        for value_fields in _to_client_discount_value_fields(discount, market_segment)
+    ]
+    if value_rows:
+        discount_value_model.batch_save(value_rows)
+
+
+def _to_client_discount_code_fields(discount: dict, market_segment: str, now: dt.datetime) -> dict:
+    """Maps an Adobe flex discount to the fields of a client-sourced code row."""
+    qualification = discount.get("qualification") or {}
+    lock_end_date = _read_adobe_datetime(discount.get("discountLockEndDate"))
+    fields_map = {
+        "code": str(discount.get("code") or ""),
+        "market_segment": market_segment,
+        "source": DISCOUNT_SOURCE_CLIENT,
+        "name": str(discount.get("name") or ""),
+        "description": str(discount.get("description") or ""),
+        "adobe_discount_id": str(discount.get("id") or ""),
+        "category": str(discount.get("category") or ""),
+        "status": str(discount.get("status") or ""),
+        "discount_type": _get_adobe_discount_type(discount),
+        "start_date": _read_adobe_datetime(discount.get("startDate")),
+        "end_date": _read_adobe_datetime(discount.get("endDate")),
+        # Reusability is derived from the discount lock presence (TDR rule).
+        "reusable": lock_end_date is not None,
+        "discount_lock_end_date": lock_end_date,
+        "target_offer_ids": _to_partial_sku_csv(qualification.get("baseOfferIds")),
+        "qualifying_offer_ids": _to_partial_sku_csv(qualification.get("qualifyingOfferIds")),
+        "enrichment_status": DISCOUNT_ENRICHMENT_PENDING,
+        "synchronized_at": now,
+        "created_at": now,
+        "updated_at": now,
+    }
+    if fields_map["category"] == DISCOUNT_CATEGORY_INTRO:
+        # The only order-type enrichment the TDR fixes: INTRO is net-new only.
+        fields_map["applicable_order_types"] = [DISCOUNT_ORDER_TYPE_NEW]
+    return fields_map
+
+
+def _get_adobe_discount_type(discount: dict) -> str:
+    """Maps the first Adobe outcome type to the discount type the store uses."""
+    outcomes = discount.get("outcomes") or []
+    if not outcomes:
+        return ""
+    adobe_type = str(outcomes[0].get("type") or "")
+    return ADOBE_DISCOUNT_TYPES.get(adobe_type, adobe_type)
+
+
+def _to_client_discount_value_fields(discount: dict, market_segment: str) -> list[dict]:  # noqa: WPS231
+    """
+    Maps the outcomes of an Adobe flex discount to Discount Values rows.
+
+    Fixed-type outcomes carry one value per country; percentage outcomes are
+    country-agnostic, reported by Adobe as a bare value without country or
+    currency. Incomplete values (no amount, or no country on a fixed type)
+    are skipped.
+    """
+    code = str(discount.get("code") or "")
+    rows = []
+    for outcome in discount.get("outcomes") or []:
+        adobe_type = str(outcome.get("type") or "")
+        is_percentage = ADOBE_DISCOUNT_TYPES.get(adobe_type, adobe_type) == DISCOUNT_TYPE_PERCENTAGE
+        for discount_value in outcome.get("discountValues") or []:
+            amount = discount_value.get("value")
+            country = discount_value.get("country")
+            if amount is None or (not is_percentage and not country):
+                continue
+            row = {"code": code, "market_segment": market_segment, "value": amount}
+            if country:
+                row["country"] = str(country)
+            if discount_value.get("currency"):
+                row["currency"] = str(discount_value["currency"])
+            rows.append(row)
+    return rows
+
+
+def _to_partial_sku_csv(offer_ids: list | None) -> str:
+    """Stores Adobe offer ids as their deduplicated 10-char partial SKUs."""
+    skus = (get_partial_sku(str(offer_id)) for offer_id in offer_ids or [])
+    return DISCOUNT_OFFER_IDS_SEPARATOR.join(sku for sku in dict.fromkeys(skus) if sku)
+
+
+def _read_adobe_datetime(raw_date) -> dt.datetime | None:
+    """Reads an Adobe ISO-8601 date string as an aware UTC datetime, or None."""
+    if not isinstance(raw_date, str) or not raw_date:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(raw_date)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
 
 
 @cache
