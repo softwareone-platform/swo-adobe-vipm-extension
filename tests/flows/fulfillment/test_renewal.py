@@ -16,6 +16,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     CreateNetNewMptSubscriptions,
     CreateNetNewSubscriptions,
     PreviewRenewal,
+    RecordClientDiscountCodes,
     RecordDiscountRedemptions,
     RecordFlexDiscounts,
     SetupRenewalPlan,
@@ -1021,6 +1022,126 @@ def test_record_discount_redemptions_step_airtable_error(mocker, mock_mpt_client
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
 
 
+def test_record_client_discount_codes_step(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context
+):
+    renewal_context.market_segment = "COM"
+    renewal_context.adobe_customer = {"companyProfile": {"address": {"country": "US"}}}
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["CODE-1", "CODE-2"]),
+    ]
+    mocked_get_existing_codes = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.get_existing_discount_codes",
+        return_value={"CODE-1"},
+    )
+    adobe_discount = {"code": "CODE-2", "status": "ACTIVE"}
+    mock_adobe_client.get_flex_discounts_by_code.return_value = [adobe_discount]
+    mocked_create_client_codes = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_client_discount_codes",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordClientDiscountCodes()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_get_existing_codes.assert_called_once_with(["CODE-1", "CODE-2"], "COM")
+    mock_adobe_client.get_flex_discounts_by_code.assert_called_once_with(
+        "authorization-id", "COM", "US", "CODE-2"
+    )
+    mocked_create_client_codes.assert_called_once_with([adobe_discount], "COM")
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_client_discount_codes_step_all_codes_known(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context
+):
+    renewal_context.market_segment = "COM"
+    renewal_context.adobe_customer = {"companyProfile": {"address": {"country": "US"}}}
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["CODE-1"]),
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.get_existing_discount_codes",
+        return_value={"CODE-1"},
+    )
+    mocked_create_client_codes = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_client_discount_codes",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordClientDiscountCodes()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mock_adobe_client.get_flex_discounts_by_code.assert_not_called()
+    mocked_create_client_codes.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_client_discount_codes_step_without_codes(mocker, mock_mpt_client, renewal_context):
+    renewal_context.renewal_plan_subscriptions = [plan_entry()]
+    mocked_get_existing_codes = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.get_existing_discount_codes",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordClientDiscountCodes()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_get_existing_codes.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_client_discount_codes_step_code_unknown_to_adobe(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context
+):
+    renewal_context.market_segment = "COM"
+    renewal_context.adobe_customer = {"companyProfile": {"address": {"country": "US"}}}
+    renewal_context.renewal_plan_subscriptions = [
+        plan_entry(flex_discount_codes=["CODE-1"]),
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.get_existing_discount_codes",
+        return_value=set(),
+    )
+    mock_adobe_client.get_flex_discounts_by_code.return_value = [{"code": "OTHER-CODE"}]
+    mocked_create_client_codes = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_client_discount_codes",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordClientDiscountCodes()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_create_client_codes.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_client_discount_codes_step_airtable_error(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context
+):
+    renewal_context.market_segment = "COM"
+    renewal_context.adobe_customer = {"companyProfile": {"address": {"country": "US"}}}
+    renewal_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.get_existing_discount_codes",
+        side_effect=Exception("airtable is down"),
+    )
+    mocked_send_exception = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.send_exception",
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = RecordClientDiscountCodes()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_send_exception.assert_called_once()
+    notification_text = mocked_send_exception.mock_calls[0].args[1]
+    assert "customer-id" in notification_text
+    assert renewal_context.order_id in notification_text
+    assert "CODE-1" in notification_text
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
 def test_fulfill_renewal_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
     mocked_pipeline_ctor = mocker.patch(
@@ -1051,6 +1172,7 @@ def test_fulfill_renewal_order(mocker):
         CreateNetNewMptSubscriptions,
         RecordFlexDiscounts,
         CompleteOrder,
+        RecordClientDiscountCodes,
         RecordDiscountRedemptions,
         SetSubscriptionTemplate,
         SyncAgreement,

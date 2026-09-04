@@ -28,12 +28,17 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.airtable.models import create_discount_redemptions
+from adobe_vipm.airtable.models import (
+    create_client_discount_codes,
+    create_discount_redemptions,
+    get_existing_discount_codes,
+)
 from adobe_vipm.flows.constants import (
     ERR_COMMITMENT_3YC_VALIDATION,
     ERR_RENEWAL_NET_NEW_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
+    MARKET_SEGMENTS,
     TEMPLATE_NAME_CHANGE,
     Param,
 )
@@ -760,6 +765,157 @@ class RecordFlexDiscounts(Step):
         next_step(client, context)
 
 
+def get_redeemed_codes(context):
+    """Return the unique codes newly applied by the plan, skipping inherited ones."""
+    confirmed_codes = get_confirmed_codes(context)
+    redeemed_codes, inherited_codes = _split_plan_codes(context)
+    # Net-new items create a brand-new subscription, so they can hold no inherited
+    # code: every code on a net-new item is a fresh redemption by this order.
+    for net_new_item in (context.renewal_payload or {}).get("netNewItems", []):
+        redeemed_codes.extend(net_new_item.get("flexDiscountCodes") or [])
+    if confirmed_codes is not None:
+        redeemed_codes = _drop_unconfirmed_codes(context, redeemed_codes, confirmed_codes)
+    if inherited_codes:
+        logger.info(
+            "%s: skipping inherited flex discount code(s) already held by the "
+            "subscriptions, not redeemed by this order: %s",
+            context,
+            ", ".join(dict.fromkeys(inherited_codes)),
+        )
+    return list(dict.fromkeys(redeemed_codes))
+
+
+def get_confirmed_codes(context):
+    """
+    Return the codes confirmed on the committed RENEWAL order, or None when absent.
+
+    Only the renew-now flow places a RENEWAL order (context.adobe_renewal_order):
+    the confirmed set is the codes Adobe applied (result SUCCESS) on its committed
+    line items, used to drop requested codes the preview did not confirm. The
+    at-anniversary flow places no such order, so this returns None and no
+    committed-order filter applies. A discount object without an explicit SUCCESS
+    result is treated as unconfirmed, so an ambiguous entry never consumes the
+    customer's once-per-customer eligibility.
+    """
+    renewal_order = context.adobe_renewal_order
+    if renewal_order is None:
+        return None
+    return {
+        flex_discount["code"]
+        for line_item in renewal_order.get("lineItems", [])
+        for flex_discount in line_item.get("flexDiscounts") or []
+        if flex_discount.get("result") == "SUCCESS"
+    }
+
+
+def _drop_unconfirmed_codes(context, redeemed_codes, confirmed_codes):
+    """Keep only the plan codes the committed RENEWAL order confirmed (renew-now)."""
+    dropped = [code for code in redeemed_codes if code not in confirmed_codes]
+    if dropped:
+        logger.warning(
+            "%s: skipping flex discount code(s) not confirmed on the committed "
+            "renewal order, not redeemed by this order: %s",
+            context,
+            ", ".join(dict.fromkeys(dropped)),
+        )
+    return [code for code in redeemed_codes if code in confirmed_codes]
+
+
+def _split_plan_codes(context):
+    """Split the renewing plan's codes into (redeemed, inherited)."""
+    redeemed_codes, inherited_codes = [], []
+    for plan in context.renewal_plan_subscriptions:
+        if not plan["renew"]:
+            continue
+        for code in plan["flex_discount_codes"]:
+            is_inherited = code in plan["snapshot"]["flex_discount_codes"]
+            (inherited_codes if is_inherited else redeemed_codes).append(code)
+    return redeemed_codes, inherited_codes
+
+
+class RecordClientDiscountCodes(Step):
+    """
+    Write the redeemed discount codes missing from the AirTable store back to it.
+
+    A code redeemed by the plan that the Discount Codes table does not know
+    yet was typed by the client in the wizard (never offered from the store),
+    and its use just succeeded on Adobe, so on this first successful use it is
+    fetched from Adobe by code and stored with source "Client". Runs after the
+    order has been completed and before RecordDiscountRedemptions, so the
+    redemption rows always point at a known code. The write is best effort:
+    the order is already completed, so a failure is logged and notified for a
+    manual backfill instead of failing the order.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Write the redeemed discount codes missing from the AirTable store back to it."""
+        redeemed_codes = get_redeemed_codes(context)
+        if redeemed_codes:
+            try:
+                self._store_missing_codes(context, redeemed_codes)
+            except Exception:
+                logger.exception(
+                    "%s: failed to write the client discount code(s) back to AirTable",
+                    context,
+                )
+                joined_codes = ", ".join(redeemed_codes)
+                send_exception(
+                    f"Error storing the client discount codes of order {context.order_id}",
+                    "The renewal order has been completed but the discount codes it "
+                    "redeemed could not be checked against or written back to the "
+                    "AirTable Discount Codes table and must be reviewed manually:\n"
+                    f"- Customer ID: {context.adobe_customer_id}\n"
+                    f"- Order ID: {context.order_id}\n"
+                    f"- Codes: {joined_codes}\n",
+                )
+        next_step(client, context)
+
+    def _store_missing_codes(self, context, redeemed_codes):
+        market_segment = MARKET_SEGMENTS[context.market_segment]
+        existing_codes = get_existing_discount_codes(redeemed_codes, market_segment)
+        missing_codes = [code for code in redeemed_codes if code not in existing_codes]
+        if not missing_codes:
+            logger.info(
+                "%s: every redeemed discount code is already on the AirTable store",
+                context,
+            )
+            return
+        discounts = self._fetch_adobe_discounts(context, market_segment, missing_codes)
+        if discounts:
+            create_client_discount_codes(discounts, market_segment)
+            logger.info(
+                "%s: stored %s client discount code(s) on the AirTable store: %s",
+                context,
+                len(discounts),
+                ", ".join(discount["code"] for discount in discounts),
+            )
+
+    def _fetch_adobe_discounts(self, context, market_segment, missing_codes):
+        country = context.adobe_customer["companyProfile"]["address"]["country"]
+        discounts = []
+        for code in missing_codes:
+            discount = self._fetch_adobe_discount(context, market_segment, country, code)
+            if discount:
+                discounts.append(discount)
+            else:
+                logger.warning(
+                    "%s: Adobe returned no flex discount for the redeemed code %s, "
+                    "it cannot be written back to the AirTable store",
+                    context,
+                    code,
+                )
+        return discounts
+
+    def _fetch_adobe_discount(self, context, market_segment, country, code):
+        flex_discounts = get_adobe_client().get_flex_discounts_by_code(
+            context.authorization_id,
+            market_segment,
+            country,
+            code,
+        )
+        return next((fd for fd in flex_discounts if fd.get("code") == code), None)
+
+
 class RecordDiscountRedemptions(Step):
     """
     Record the flex discount codes redeemed by the plan on the AirTable redemptions table.
@@ -787,7 +943,7 @@ class RecordDiscountRedemptions(Step):
 
     def __call__(self, client, context, next_step):
         """Record the redeemed flex discount codes on the AirTable redemptions table."""
-        redeemed_codes = self._get_redeemed_codes(context)
+        redeemed_codes = get_redeemed_codes(context)
         if redeemed_codes:
             self._record_redemptions(context, redeemed_codes)
         else:
@@ -797,70 +953,6 @@ class RecordDiscountRedemptions(Step):
                 context,
             )
         next_step(client, context)
-
-    def _get_redeemed_codes(self, context):
-        """Return the unique codes newly applied by the plan, skipping inherited ones."""
-        confirmed_codes = self._get_confirmed_codes(context)
-        redeemed_codes, inherited_codes = self._split_plan_codes(context)
-        # Net-new items create a brand-new subscription, so they can hold no inherited
-        # code: every code on a net-new item is a fresh redemption by this order.
-        for net_new_item in (context.renewal_payload or {}).get("netNewItems", []):
-            redeemed_codes.extend(net_new_item.get("flexDiscountCodes") or [])
-        if confirmed_codes is not None:
-            redeemed_codes = self._drop_unconfirmed_codes(context, redeemed_codes, confirmed_codes)
-        if inherited_codes:
-            logger.info(
-                "%s: skipping inherited flex discount code(s) already held by the "
-                "subscriptions, not redeemed by this order: %s",
-                context,
-                ", ".join(dict.fromkeys(inherited_codes)),
-            )
-        return list(dict.fromkeys(redeemed_codes))
-
-    def _get_confirmed_codes(self, context):
-        """
-        Return the codes confirmed on the committed RENEWAL order, or None when absent.
-
-        Only the renew-now flow places a RENEWAL order (context.adobe_renewal_order):
-        the confirmed set is the codes Adobe applied (result SUCCESS) on its committed
-        line items, used to drop requested codes the preview did not confirm. The
-        at-anniversary flow places no such order, so this returns None and no
-        committed-order filter applies. A discount object without an explicit SUCCESS
-        result is treated as unconfirmed, so an ambiguous entry never consumes the
-        customer's once-per-customer eligibility.
-        """
-        renewal_order = context.adobe_renewal_order
-        if renewal_order is None:
-            return None
-        return {
-            flex_discount["code"]
-            for line_item in renewal_order.get("lineItems", [])
-            for flex_discount in line_item.get("flexDiscounts") or []
-            if flex_discount.get("result") == "SUCCESS"
-        }
-
-    def _drop_unconfirmed_codes(self, context, redeemed_codes, confirmed_codes):
-        """Keep only the plan codes the committed RENEWAL order confirmed (renew-now)."""
-        dropped = [code for code in redeemed_codes if code not in confirmed_codes]
-        if dropped:
-            logger.warning(
-                "%s: skipping flex discount code(s) not confirmed on the committed "
-                "renewal order, not redeemed by this order: %s",
-                context,
-                ", ".join(dict.fromkeys(dropped)),
-            )
-        return [code for code in redeemed_codes if code in confirmed_codes]
-
-    def _split_plan_codes(self, context):
-        """Split the renewing plan's codes into (redeemed, inherited)."""
-        redeemed_codes, inherited_codes = [], []
-        for plan in context.renewal_plan_subscriptions:
-            if not plan["renew"]:
-                continue
-            for code in plan["flex_discount_codes"]:
-                is_inherited = code in plan["snapshot"]["flex_discount_codes"]
-                (inherited_codes if is_inherited else redeemed_codes).append(code)
-        return redeemed_codes, inherited_codes
 
     def _record_redemptions(self, context, redeemed_codes):
         logger.info(
@@ -939,6 +1031,7 @@ def fulfill_renewal_order(client, order):
         CreateNetNewMptSubscriptions(),
         RecordFlexDiscounts(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
+        RecordClientDiscountCodes(),
         RecordDiscountRedemptions(),
         SetSubscriptionTemplate(),
         SyncAgreement(),

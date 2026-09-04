@@ -684,6 +684,35 @@ class OrderClientMixin:
         )
         return base_offers_with_discounts
 
+    def get_flex_discounts_by_code(
+        self,
+        authorization_id: str,
+        market_segment: str,
+        country: str,
+        flex_discount_code: str,
+    ) -> list:
+        """
+        Fetches the flex discounts matching a single discount code from Adobe.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            market_segment: Adobe market segment (COM, GOV, EDU).
+            country: Customer country code.
+            flex_discount_code: The flexible discount code to look up.
+
+        Returns:
+            list: The flex discounts Adobe reports for the code.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        return self._fetch_flex_discounts(
+            authorization,
+            {
+                "market-segment": market_segment,
+                "country": country,
+                "flex-discount-code": flex_discount_code,
+            },
+        )
+
     def _get_fail_discounts_for_cust_not_qualified(self, ex: AdobeError, payload: dict) -> set:
         if ex.code == adobe_constants.AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT:
             logger.warning("%s", ex)
@@ -879,13 +908,19 @@ class OrderClientMixin:
             and mpt_item["status"] == adobe_constants.AdobeOrderStatus.COMPLETE
         )
 
-    @wrap_http_error
     def _get_flex_discounts(
         self, authorization: Authorization, segment: str, country: str, offer_ids: tuple[str, ...]
     ) -> list:
+        query_params = {
+            "market-segment": segment,
+            "country": country,
+            "offer-ids": ",".join(offer_ids),
+        }
+        return self._fetch_flex_discounts(authorization, query_params)
+
+    @wrap_http_error
+    def _fetch_flex_discounts(self, authorization: Authorization, query_params: dict) -> list:
         headers = self._get_headers(authorization)
-        offer_ids = ",".join(offer_ids)
-        query_params = {"market-segment": {segment}, "country": {country}, "offer-ids": {offer_ids}}
         next_url = "v3/flex-discounts"
         flex_discounts = []
         while next_url:
