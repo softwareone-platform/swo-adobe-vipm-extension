@@ -67,6 +67,7 @@ from adobe_vipm.flows.constants import (
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.renewal import (
     CreateNetNewMptSubscriptions,
+    RecordClientDiscountCodes,
     RecordDiscountRedemptions,
     Validate3YCRenewalFloor,
 )
@@ -1086,6 +1087,7 @@ def fulfill_renewal_now_order(client, order):
         NormalizeRenewedSubscriptions(),
         DisableLapsingSubscriptions(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
+        RecordClientDiscountCodes(),
         RecordDiscountRedemptions(),
         SetSubscriptionTemplate(),
         SyncAgreement(),

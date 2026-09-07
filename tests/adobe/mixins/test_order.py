@@ -526,6 +526,62 @@ def test_get_flex_discounts_per_base_offer_collects_all_pages(
     }
 
 
+def test_get_flex_discounts_by_code(
+    adobe_client_factory,
+    adobe_authorizations_file,
+    requests_mocker,
+    settings,
+    flex_discounts_factory,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    mocked_client, _, _ = adobe_client_factory()
+    response_json = flex_discounts_factory()
+    requests_mocker.get(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
+        json=response_json,
+        match=[
+            matchers.query_param_matcher({
+                "market-segment": "COM",
+                "country": "US",
+                "flex-discount-code": "EASTER_26",
+            })
+        ],
+    )
+
+    result = mocked_client.get_flex_discounts_by_code(
+        authorization_uk,
+        "COM",
+        "US",
+        "EASTER_26",
+    )  # act
+
+    assert result == response_json["flexDiscounts"]
+
+
+def test_get_flex_discounts_by_code_error(
+    adobe_client_factory,
+    adobe_authorizations_file,
+    requests_mocker,
+    settings,
+    adobe_api_error_factory,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    mocked_client, _, _ = adobe_client_factory()
+    requests_mocker.get(
+        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
+        status=400,
+        json=adobe_api_error_factory(AdobeErrorCode.INTERNAL_SERVER_ERROR, "Internal server error"),
+    )
+
+    with pytest.raises(AdobeError):
+        mocked_client.get_flex_discounts_by_code(
+            authorization_uk,
+            "COM",
+            "US",
+            "EASTER_26",
+        )  # act
+
+
 def test_create_switch_preview_order(
     adobe_client_factory,
     adobe_authorizations_file,

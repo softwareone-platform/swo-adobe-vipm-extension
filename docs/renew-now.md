@@ -14,8 +14,11 @@ validated with an Adobe `PREVIEW_RENEWAL` order and committed as an actual Adobe
 `RENEWAL` order, invoiced immediately. After the commit, previous renewal lines
 are returned, the MPT subscriptions for net-new items are created, renewed
 subscriptions have their auto-renewal normalised, lapsing subscriptions have
-their auto-renewal disabled, and the redeemed flex discount codes are recorded on
-the AirTable redemptions table.
+their auto-renewal disabled, and the MPT order is completed. After completion,
+the redeemed flex discount codes are persisted to the Airtable Discount Codes
+table (`RecordClientDiscountCodes`, first-successful-use backfill for previously
+unknown codes) and recorded on the Airtable Discount Redemptions table
+(`RecordDiscountRedemptions`).
 
 ## 3YC committed minimum floor (VIPM0034)
 
@@ -73,13 +76,36 @@ and that the `PREVIEW_RENEWAL` response then **confirmed** with result
 - Adobe accepts at most one code per line and rejects more with error `2147`, so
   a single surviving code is submitted per line.
 
-The redemptions written to the AirTable table mirror this committed set:
-`RecordDiscountRedemptions` records only the codes confirmed (result `SUCCESS`)
-on the committed `RENEWAL` order, for both renewing and net-new lines. A
-requested code the preview dropped is not recorded, so it does not wrongly
-consume the customer's once-per-customer eligibility. (The at-anniversary flow
-places no `RENEWAL` order and records its requested codes directly, since Adobe
-validates them at subscription create/update time.)
+## Discount code persistence and redemption tracking
+
+After the order completes, two steps run to persist discount code data to
+Airtable (both are best-effort: failures are logged and notified, not failed,
+since the order is already completed):
+
+1. **`RecordClientDiscountCodes`** (runs first, before redemption recording): For
+   each discount code the order successfully redeemed, checks whether it already
+   exists in the Airtable Discount Codes table. Previously unknown codes (typed
+   by the client in the renewal wizard, not pre-loaded from the store) are
+   fetched from Adobe by code (`get_flex_discounts_by_code`) and written to the
+   table with source "Client", so they become available for future orders. This
+   first-successful-use backfill ensures that redemption rows always point at a
+   known code.
+
+2. **`RecordDiscountRedemptions`** (runs second, after the codes are persisted):
+   Records only the codes confirmed (result `SUCCESS`) on the committed `RENEWAL`
+   order, for both renewing and net-new lines. A requested code the preview
+   dropped is not recorded, so it does not wrongly consume the customer's
+   once-per-customer eligibility. Each unique code redeemed by the order gets one
+   row on the Discount Redemptions table, carrying the customer ID, order ID, and
+   redemption timestamp. A code the subscription already held before this order
+   (inherited, auto-applied reusable discount) is not recorded as a fresh
+   redemption.
+
+Note: The at-anniversary flow (`renewal.py`, `fulfill_renewal_order`) also runs
+these same two steps after completing its order. That flow places no `RENEWAL`
+order (its codes ride `create_customer_subscription` / `update_subscription`,
+which Adobe validates on the spot), so its requested codes are the applied ones
+and no committed-order confirmation filter applies.
 
 ## Net-new items
 

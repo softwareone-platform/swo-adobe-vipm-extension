@@ -36,9 +36,12 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    `renewal_now.py` (renew-now renewals, `renewalPath: "now"`, documented in
    [renew-now.md](renew-now.md)); `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
-   that both renewal flows run before mutating Adobe; `shared.py` holds common
-   utilities and the flexible-discount-code-per-line validation used by
-   switch/renewal fulfillment.
+   that both renewal flows run before mutating Adobe, the discount-code
+   first-successful-use backfill step (`RecordClientDiscountCodes`) that persists
+   previously unknown, successfully used discount codes to Airtable, and the
+   discount-redemption recording step (`RecordDiscountRedemptions`) that tracks
+   each unique code used by a renewal; `shared.py` holds common utilities and the
+   flexible-discount-code-per-line validation used by switch/renewal fulfillment.
 3. **Validation** (`flows/validation/`) — `validate_order()` in `base.py` routes to
    per-type validators (`purchase.py`, `change.py`, `transfer.py`, `termination.py`).
 4. **Sync** (`flows/sync/`) — Adobe-to-MPT synchronisation for `agreement.py`,
@@ -53,7 +56,7 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
 | `adobe_vipm/flows/` | Order fulfilment, validation, and sync orchestration |
 | `adobe_vipm/adobe/client.py` + `adobe/mixins/` | Adobe VIPM API client (customer, order, subscription, transfer, deployment, reseller mixins) |
 | `adobe_vipm/adobe/config.py` | `Config` singleton: authorizations, resellers, countries |
-| `adobe_vipm/airtable/models.py` | `pyairtable` models for migration, pricing, and SKU-mapping data |
+| `adobe_vipm/airtable/models.py` | `pyairtable` models for migration, pricing, SKU-mapping data, and discount code/redemption persistence |
 | `adobe_vipm/notifications.py` | Microsoft Teams alerts (Adaptive Cards via `requests`) and MPT notifications (Jinja2 templates) |
 | `adobe_vipm/management/commands/` | Worker commands for transfers, 3YC, resellers, and sync |
 
