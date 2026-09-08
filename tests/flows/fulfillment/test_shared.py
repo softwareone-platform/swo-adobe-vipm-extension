@@ -70,6 +70,7 @@ from adobe_vipm.flows.utils import (
     set_coterm_date,
 )
 from adobe_vipm.flows.utils.parameter import (
+    get_adobe_order_ids_created_parameter,
     get_fulfillment_parameter,
     get_ordering_parameter,
     set_adobe_order_ids_created_parameter,
@@ -1933,6 +1934,31 @@ def test_complete_order_step_preserves_vendor_if_adobe_order_ids_is_empty(
         parameters=order["parameters"],
     )
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_get_adobe_order_ids_created_parameter_returns_list(
+    order_factory, order_parameters_factory
+):
+    order = order_factory(
+        order_type="Change",
+        order_parameters=order_parameters_factory(adobe_order_ids="id-1, id-2 ,"),
+    )
+
+    order_ids = get_adobe_order_ids_created_parameter(order)  # act
+
+    assert order_ids == ["id-1", "id-2"]
+
+
+def test_get_adobe_order_ids_created_parameter_returns_empty_when_unset(
+    order_factory, order_parameters_factory
+):
+    order_params = order_parameters_factory()
+    order_params = [p for p in order_params if p["externalId"] != Param.ADOBE_ORDER_IDS.value]
+    order = order_factory(order_type="Change", order_parameters=order_params)
+
+    order_ids = get_adobe_order_ids_created_parameter(order)  # act
+
+    assert order_ids == []
 
 
 def test_set_adobe_order_ids_created_parameter_ignores_empty_values(
