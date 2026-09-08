@@ -21,6 +21,7 @@ from adobe_vipm.flows.utils import exclude_items_with_deployment_id
 from adobe_vipm.flows.utils.customer import get_adobe_customer_id, set_adobe_customer_id
 from adobe_vipm.flows.utils.order import set_adobe_order_id, split_downsizes_upsizes_new
 from adobe_vipm.flows.utils.parameter import (
+    get_adobe_order_ids_created_parameter,
     get_change_reseller_admin_email,
     get_change_reseller_code,
     set_adobe_order_ids_created_parameter,
@@ -96,6 +97,14 @@ class CheckAdobeResellerTransfer(Step):
     def __call__(self, mpt_client, context, next_step):
         """Check if the Adobe reseller transfer order exists and it is active."""
         transfer_id = context.adobe_transfer_order.get("transferId")
+        if not transfer_id:
+            # On a re-processing run of an already-committed order, the commit step is
+            # skipped and context.adobe_transfer_order is left at its empty default, so it
+            # carries no transferId. The order's externalIds.vendor may also have been
+            # blanked (Account-Revival reset), but the adobeOrderIds parameter still holds
+            # the committed transfer id, so fall back to it to rehydrate the transfer.
+            created_order_ids = get_adobe_order_ids_created_parameter(context.order)
+            transfer_id = created_order_ids[0] if created_order_ids else None
         if not transfer_id:
             next_step(mpt_client, context)
             return

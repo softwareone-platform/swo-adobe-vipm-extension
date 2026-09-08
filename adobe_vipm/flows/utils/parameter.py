@@ -439,6 +439,16 @@ def set_flex_discounts_parameter(order: dict, adobe_order: dict) -> dict:
     return update_fulfillment_parameter_value(order, Param.FLEXIBLE_DISCOUNTS.value, flex_discounts)
 
 
+def get_adobe_order_ids_created_parameter(order: dict) -> list[str]:
+    """Return the Adobe order IDs persisted for Change orders as a list."""
+    order_ids_param = get_ordering_parameter(order, Param.ADOBE_ORDER_IDS.value)
+    return [
+        order_id.strip()
+        for order_id in (order_ids_param.get("value") or "").split(",")
+        if order_id.strip()
+    ]
+
+
 def set_adobe_order_ids_created_parameter(context, order_ids: list[str | None]) -> dict:
     """Persist Adobe order IDs for Change orders as comma-separated values."""
     sanitized_order_ids = [
