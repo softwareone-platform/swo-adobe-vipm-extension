@@ -1,6 +1,6 @@
 from adobe_vipm.adobe.constants import AdobeOrderStatus, ResellerChangeAction
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.flows.constants import TEMPLATE_NAME_TRANSFER
+from adobe_vipm.flows.constants import TEMPLATE_NAME_TRANSFER, Param
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment import transfer
 from adobe_vipm.flows.fulfillment.reseller_transfer import (
@@ -227,6 +227,50 @@ def test_check_adobe_reseller_transfer_step_no_transfer_id(
     step(mock_mpt_client, context, mock_next_step)  # act
 
     mock_adobe_client.get_reseller_transfer.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_check_adobe_reseller_transfer_step_rehydrates_from_order_ids_param(
+    mocker,
+    order_factory,
+    adobe_reseller_change_factory,
+    reseller_change_order_parameters_factory,
+    mock_next_step,
+    mock_mpt_client,
+    mock_adobe_client,
+):
+    """Re-processing an already-committed order rehydrates the transfer from adobeOrderIds.
+
+    On a re-run the commit step is skipped, so context.adobe_transfer_order is the empty
+    default and externalIds.vendor has been blanked. The transfer id is recovered from the
+    adobeOrderIds ordering parameter so the completed transfer (with line items) is fetched.
+    """
+    adobe_transfer_order = adobe_reseller_change_factory()
+    adobe_transfer_order["status"] = AdobeOrderStatus.COMPLETE
+    mock_adobe_client.get_reseller_transfer.return_value = adobe_transfer_order
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.reseller_transfer.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    order = order_factory(
+        order_parameters=reseller_change_order_parameters_factory(),
+        external_ids={"vendor": ""},
+    )
+    order["parameters"]["ordering"].append({
+        "externalId": Param.ADOBE_ORDER_IDS.value,
+        "value": "110014510",
+    })
+    context = Context(order=order, authorization_id="AUT-1234-4567")
+    context.adobe_transfer_order = {}
+    step = CheckAdobeResellerTransfer()
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_adobe_client.get_reseller_transfer.assert_called_once_with(
+        context.authorization_id, "110014510"
+    )
+    assert context.adobe_transfer_order["lineItems"]
+    assert context.adobe_transfer_order["membershipId"] == "88888888"
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
