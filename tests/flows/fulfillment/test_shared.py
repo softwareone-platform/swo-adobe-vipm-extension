@@ -45,6 +45,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     GetReturnOrders,
     NullifyFlexDiscountParam,
     PreviewRenewalOrders,
+    SelectFlexDiscounts,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -4069,3 +4070,88 @@ def test_submit_renewal_orders_existing_order_reused(
     mock_adobe_client.create_renewal_order.assert_not_called()
     assert context.adobe_renewal_orders == {ext_ref: existing_order}
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_select_flex_discounts_step(mocker, order_factory, mock_mpt_client):
+    order = order_factory()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="customer-id",
+        new_lines=order["lines"],
+    )
+    candidates = {order["lines"][0]["id"]: [mocker.MagicMock(code="CODE-1")]}
+    mocked_select = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_flex_discounts",
+        return_value=candidates,
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SelectFlexDiscounts()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    assert context.flex_discount_candidates == candidates
+    mocked_select.assert_called_once_with(context)
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_select_flex_discounts_step_without_candidates(mocker, order_factory, mock_mpt_client):
+    order = order_factory()
+    context = Context(order=order, order_id=order["id"], upsize_lines=order["lines"])
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.select_flex_discounts", return_value={})
+    mocked_next_step = mocker.MagicMock()
+    step = SelectFlexDiscounts()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    assert context.flex_discount_candidates == {}
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+@pytest.mark.parametrize(
+    ("lines_field", "adobe_new_order_id"),
+    [("downsize_lines", None), ("new_lines", "adobe-order-id")],
+)
+def test_select_flex_discounts_step_skipped(
+    mocker, order_factory, mock_mpt_client, lines_field, adobe_new_order_id
+):
+    order = order_factory()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_new_order_id=adobe_new_order_id,
+        **{lines_field: order["lines"]},
+    )
+    mocked_select = mocker.patch("adobe_vipm.flows.fulfillment.shared.select_flex_discounts")
+    mocked_next_step = mocker.MagicMock()
+    step = SelectFlexDiscounts()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    assert context.flex_discount_candidates == {}
+    mocked_select.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_select_flex_discounts_step_store_error(mocker, order_factory, mock_mpt_client):
+    order = order_factory()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        adobe_customer_id="customer-id",
+        new_lines=order["lines"],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_flex_discounts",
+        side_effect=RuntimeError("airtable down"),
+    )
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_exception")
+    mocked_next_step = mocker.MagicMock()
+    step = SelectFlexDiscounts()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    assert context.flex_discount_candidates == {}
+    mocked_send_exception.assert_called_once()
+    assert order["id"] in mocked_send_exception.call_args.args[0]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)

@@ -94,6 +94,7 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
+from adobe_vipm.flows.utils.flex_discounts import select_flex_discounts
 from adobe_vipm.flows.utils.parameter import (
     get_ordering_parameter,
     set_adobe_order_ids_created_parameter,
@@ -959,6 +960,51 @@ class SubmitReturnOrders(Step):
             )
             return False
         return True
+
+
+class SelectFlexDiscounts(Step):
+    """
+    Select the flexible discount candidates of the new/upsize lines from the store.
+
+    Reads the Airtable discount store and leaves, per line, the ranked list of
+    codes eligible for it on context.flex_discount_candidates (best first), for
+    the preview to propose and cascade through. Skipped when the order has no
+    new or upsize lines, or when the Adobe NEW order already exists (retry of a
+    later step). Best effort: Adobe's preview stays the authority and the order
+    is worth placing without a discount, so a store failure is logged and
+    notified and the order proceeds with no candidates.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Select the flexible discount candidates of the new/upsize lines."""
+        if (context.new_lines or context.upsize_lines) and not context.adobe_new_order_id:
+            context.flex_discount_candidates = self._select_candidates(context)
+        next_step(client, context)
+
+    def _select_candidates(self, context):
+        try:
+            candidates_by_line = select_flex_discounts(context)
+        except Exception:
+            logger.exception("%s: failed to select the flex discount candidates", context)
+            send_exception(
+                f"Error selecting the flex discount candidates of order {context.order_id}",
+                "The flexible discount store could not be read or the candidates could "
+                "not be ranked; the order proceeds without a proposed discount and "
+                "Adobe's preview decides the price:\n"
+                f"- Customer ID: {context.adobe_customer_id or '-'}\n"
+                f"- Order ID: {context.order_id}\n",
+            )
+            return {}
+        for line_id, candidates in candidates_by_line.items():
+            logger.info(
+                "%s: flex discount candidates for line %s: %s",
+                context,
+                line_id,
+                ", ".join(candidate.code for candidate in candidates),
+            )
+        if not candidates_by_line:
+            logger.info("%s: no flex discount candidates for the new/upsize lines", context)
+        return candidates_by_line
 
 
 class GetPreviewOrder(Step):

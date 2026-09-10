@@ -3,15 +3,19 @@ from types import SimpleNamespace
 
 import pytest
 
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.utils.flex_discounts import (
     CommitmentType,
     FlexDiscountCandidate,
     LineType,
+    compute_net_unit_price,
     filter_candidates,
     get_commitment_type,
     get_discount_country,
     get_flex_discount_candidates,
     matches_commitment,
+    rank_candidates,
+    select_flex_discounts,
 )
 
 TODAY = dt.date(2026, 9, 10)
@@ -403,3 +407,195 @@ def test_get_flex_discount_candidates_without_lines(mocker):
 
     assert result == {}
     mocked_codes.assert_not_called()
+
+
+def make_candidate(**overrides):
+    fields = {
+        "code": "CODE",
+        "source": "API",
+        "category": "STANDARD",
+        "discount_type": "PERCENTAGE",
+        "adobe_discount_id": "adobe-1",
+        "reusable": False,
+        "supports_annual": False,
+        "supports_three_yc": False,
+        "held": False,
+        "amount": 10,
+        "currency": None,
+    }
+    fields.update(overrides)
+    return FlexDiscountCandidate(**fields)
+
+
+@pytest.mark.parametrize(
+    ("candidate", "base_unit_price", "expected"),
+    [
+        (make_candidate(amount=15), 100.0, 85.0),
+        (make_candidate(amount=12.5), 99.99, 87.49),
+        (make_candidate(amount=15), None, None),
+        (make_candidate(amount=None), 100.0, None),
+        (make_candidate(discount_type="FIXED_DISCOUNT", amount=30, currency="USD"), 100.0, 70.0),
+        (make_candidate(discount_type="FIXED_DISCOUNT", amount=130, currency="USD"), 100.0, 0),
+        (make_candidate(discount_type="FIXED_DISCOUNT", amount=30, currency="EUR"), 100.0, None),
+        (make_candidate(discount_type="FIXED_DISCOUNT", amount=30, currency="USD"), None, None),
+        (make_candidate(discount_type="FIXED_PRICE", amount=42.126, currency="USD"), 100.0, 42.13),
+        (make_candidate(discount_type="FIXED_PRICE", amount=42, currency="USD"), None, 42),
+        (make_candidate(discount_type="FIXED_PRICE", amount=42, currency="EUR"), 100.0, None),
+        (make_candidate(discount_type="OTHER", amount=42, currency="USD"), 100.0, None),
+    ],
+)
+def test_compute_net_unit_price(candidate, base_unit_price, expected):
+    result = compute_net_unit_price(candidate, base_unit_price, "USD")  # act
+
+    assert result == expected
+
+
+def test_rank_candidates_by_net_price_then_tie_breaks():
+    candidates = [
+        make_candidate(code="OPEN_10", amount=10, adobe_discount_id="b"),
+        make_candidate(code="UNPRICED", amount=None, adobe_discount_id="a"),
+        make_candidate(code="FIXED_EUR", discount_type="FIXED_DISCOUNT", amount=50, currency="EUR"),
+        make_candidate(code="OPEN_20_B", amount=20, adobe_discount_id="b"),
+        make_candidate(code="OPEN_20_A", amount=20, adobe_discount_id="a"),
+        make_candidate(code="CLOSED_20", amount=20, source="Operations", adobe_discount_id="z"),
+        make_candidate(code="REUSABLE_20", amount=20, reusable=True, adobe_discount_id="z"),
+        make_candidate(
+            code="FIXED_PRICE_75", discount_type="FIXED_PRICE", amount=75, currency="USD"
+        ),
+    ]
+
+    result = rank_candidates(candidates, 100.0, "USD")  # act
+
+    assert [candidate.code for candidate in result] == [
+        "FIXED_PRICE_75",
+        "REUSABLE_20",
+        "CLOSED_20",
+        "OPEN_20_A",
+        "OPEN_20_B",
+        "OPEN_10",
+        "UNPRICED",
+        "FIXED_EUR",
+    ]
+    assert [candidate.net_unit_price for candidate in result] == [
+        75,
+        80.0,
+        80.0,
+        80.0,
+        80.0,
+        90.0,
+        None,
+        None,
+    ]
+
+
+def test_rank_candidates_without_base_price_ranks_percentages_by_amount():
+    candidates = [
+        make_candidate(code="FIXED_USD", discount_type="FIXED_DISCOUNT", amount=90, currency="USD"),
+        make_candidate(code="PCT_5", amount=5),
+        make_candidate(code="FIXED_PRICE_1", discount_type="FIXED_PRICE", amount=1, currency="USD"),
+        make_candidate(code="PCT_15", amount=15),
+    ]
+
+    result = rank_candidates(candidates, None, "USD")  # act
+
+    assert [candidate.code for candidate in result] == [
+        "FIXED_PRICE_1",
+        "PCT_15",
+        "PCT_5",
+        "FIXED_USD",
+    ]
+
+
+def test_rank_candidates_is_independent_of_input_order():
+    candidates = [
+        make_candidate(code="A", amount=20, adobe_discount_id="a"),
+        make_candidate(code="B", amount=20, adobe_discount_id="", reusable=True),
+        make_candidate(code="C", amount=30),
+    ]
+
+    result = rank_candidates(list(reversed(candidates)), 100.0, "USD")  # act
+
+    assert [candidate.code for candidate in result] == ["C", "B", "A"]
+
+
+def test_rank_candidates_falls_back_to_code_when_adobe_discount_id_is_empty():
+    candidates = [
+        make_candidate(code="ZZZ", amount=20, adobe_discount_id=""),
+        make_candidate(code="AAA", amount=20, adobe_discount_id=""),
+    ]
+
+    result = rank_candidates(candidates, 100.0, "USD")  # act
+
+    assert [candidate.code for candidate in result] == ["AAA", "ZZZ"]
+
+
+def test_select_flex_discounts(mocker, order_factory, lines_factory, adobe_customer_factory):
+    order = order_factory(lines=lines_factory(external_vendor_id="65304578CA"))
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id="PRD-1111-1111",
+        market_segment="COM",
+        currency="USD",
+        adobe_customer_id="P100",
+        adobe_customer=adobe_customer_factory(),
+        new_lines=order["lines"],
+        upsize_lines=[],
+    )
+    line_id = order["lines"][0]["id"]
+    candidates = [
+        make_candidate(code="PCT_10", amount=10),
+        make_candidate(code="PCT_20", amount=20),
+    ]
+    mocked_get_candidates = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_flex_discount_candidates",
+        return_value={line_id: candidates},
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_adobe_product_by_marketplace_sku",
+        return_value=mocker.MagicMock(sku="65304578CA01A12"),
+    )
+    mocked_get_sku_price = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_sku_price",
+        return_value={"65304578CA01A12": 200.0},
+    )
+
+    result = select_flex_discounts(context)  # act
+
+    assert [(c.code, c.net_unit_price) for c in result[line_id]] == [
+        ("PCT_20", 160.0),
+        ("PCT_10", 180.0),
+    ]
+    mocked_get_candidates.assert_called_once_with(
+        market_segment="COM",
+        customer_id="P100",
+        country=mocker.ANY,
+        commitment=mocker.ANY,
+        new_lines=order["lines"],
+        upsize_lines=[],
+    )
+    mocked_get_sku_price.assert_called_once_with(
+        context.adobe_customer, ["65304578CA01A12"], "PRD-1111-1111", "USD"
+    )
+
+
+def test_select_flex_discounts_without_candidates(mocker, order_factory):
+    order = order_factory()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        market_segment="COM",
+        currency="USD",
+        adobe_customer_id="P100",
+        new_lines=order["lines"],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_flex_discount_candidates",
+        return_value={},
+    )
+    mocked_get_sku_price = mocker.patch("adobe_vipm.flows.utils.flex_discounts.get_sku_price")
+
+    result = select_flex_discounts(context)  # act
+
+    assert result == {}
+    mocked_get_sku_price.assert_not_called()
