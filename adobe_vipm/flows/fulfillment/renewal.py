@@ -918,11 +918,16 @@ class RecordClientDiscountCodes(Step):
 
 class RecordDiscountRedemptions(Step):
     """
-    Record the flex discount codes redeemed by the plan on the AirTable redemptions table.
+    Record the flex discount codes redeemed by the order on the AirTable redemptions table.
 
     Runs after the order has been completed, so a fulfillment retry of an
     earlier failure never duplicates rows. One row is written per unique code
-    applied by the plan. A code the subscription already carried before this
+    the order redeemed, as reported by the code source the step is built with:
+    by default the renewal plan (get_redeemed_codes), or the completed NEW
+    order's flexibleDiscounts parameter for purchase/change orders
+    (flows.utils.flex_discounts.get_order_redeemed_codes).
+
+    On the renewal flows a code the subscription already carried before this
     order (inherited discount snapshotted by SetupRenewalPlan) was not
     redeemed by it, so it is skipped: an auto-applied reusable is never
     recorded as a fresh once-per-customer redemption.
@@ -941,14 +946,30 @@ class RecordDiscountRedemptions(Step):
     the order.
     """
 
+    def __init__(self, get_redeemed_codes=get_redeemed_codes):
+        self._get_redeemed_codes = get_redeemed_codes
+
     def __call__(self, client, context, next_step):
         """Record the redeemed flex discount codes on the AirTable redemptions table."""
-        redeemed_codes = get_redeemed_codes(context)
+        try:
+            redeemed_codes = self._get_redeemed_codes(context)
+        except Exception:
+            logger.exception("%s: failed to read the discount redemptions", context)
+            send_exception(
+                f"Error reading the discount redemptions of order {context.order_id}",
+                "The order has been completed but its discount redemptions could not "
+                "be determined. Review the order's flexibleDiscounts parameter and "
+                "backfill any missing AirTable Discount Redemptions manually:\n"
+                f"- Customer ID: {context.adobe_customer_id}\n"
+                f"- Order ID: {context.order_id}\n",
+            )
+            next_step(client, context)
+            return
         if redeemed_codes:
             self._record_redemptions(context, redeemed_codes)
         else:
             logger.info(
-                "%s: no flex discount codes redeemed by the plan, "
+                "%s: no flex discount codes redeemed by the order, "
                 "skipping the redemptions recording",
                 context,
             )
@@ -982,7 +1003,7 @@ class RecordDiscountRedemptions(Step):
             joined_codes = ", ".join(redeemed_codes)
             send_exception(
                 f"Error recording the discount redemptions of order {context.order_id}",
-                "The renewal order has been completed but the redeemed flex discount "
+                "The order has been completed but the redeemed flex discount "
                 "codes could not be recorded on the AirTable Discount Redemptions "
                 "table and must be backfilled manually:\n"
                 f"- Customer ID: {context.adobe_customer_id}\n"

@@ -93,6 +93,11 @@ ORDER_TYPE_SWITCH = "SWITCH"
 
 MANUAL_RENEWAL_ACTION = "MANUAL_RENEWAL"
 
+# Flexible discounts: Adobe reports the outcome of every code on a line item as
+# ``flexDiscounts[].result``; a preview cascades through the ranked candidates of a
+# line on rejection, bounded by the number of candidates in the order.
+FLEX_DISCOUNT_RESULT_SUCCESS = "SUCCESS"
+
 
 MINLEN_COMPANY_NAME = 4
 MINLEN_NAME = 1

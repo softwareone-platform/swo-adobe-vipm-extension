@@ -7,7 +7,7 @@ from adobe_vipm.adobe.constants import (
     AdobeOrderStatus,
     AdobeSubscriptionStatus,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeProductNotFoundError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
     ERR_ADOBE_ERROR,
@@ -644,3 +644,23 @@ def test_validate_no_staged_renewal_skips_without_adobe_customer(
     assert context.validation_succeeded is True
     mock_adobe_client.get_subscriptions.assert_not_called()
     mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_get_preview_order_step_adobe_error(mocker, mock_adobe_client, mock_mpt_client, mock_order):
+    error = AdobeError("Can't parse Adobe error message")
+    mock_adobe_client.create_preview_order.side_effect = error
+    mocked_next_step = mocker.MagicMock()
+    context = Context(
+        order=mock_order,
+        upsize_lines=mock_order["lines"],
+        authorization_id="auth-id",
+        market_segment=MARKET_SEGMENT_COMMERCIAL,
+    )
+    step = GetPreviewOrder()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_ADOBE_ERROR.to_dict(details=str(error))
+    assert context.adobe_preview_order is None
+    mocked_next_step.assert_not_called()

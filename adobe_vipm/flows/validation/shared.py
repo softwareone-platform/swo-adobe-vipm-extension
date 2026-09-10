@@ -8,7 +8,7 @@ from adobe_vipm.adobe.constants import (
     AdobeOrderStatus,
     AdobeSubscriptionStatus,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeProductNotFoundError
+from adobe_vipm.adobe.errors import AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.flows.constants import (
     EARLY_RENEWAL_LOOKBACK_DAYS,
@@ -256,7 +256,7 @@ class GetPreviewOrder(Step):
         adobe_client = get_adobe_client()
         try:
             context.adobe_preview_order = adobe_client.create_preview_order(context)
-        except (AdobeAPIError, AdobeProductNotFoundError, AdobeCreatePreviewError) as error:
+        except (AdobeError, AdobeCreatePreviewError) as error:
             context.validation_succeeded = False
             context.order = set_order_error(
                 context.order, ERR_ADOBE_ERROR.to_dict(details=str(error))

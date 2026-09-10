@@ -11,9 +11,10 @@ once-per-customer rule, then pre-filtered against the customer's commitment.
 Every gate keeps a code whose data is absent (the subsystem's asymmetry
 rule): an over-permissive set shows a code Adobe's preview later rejects,
 which is recoverable, while an over-restrictive one hides a code the
-customer was entitled to, with no backstop. Rows still pending enrichment
-are therefore kept too: their uncurated order types and commitment flags
-constrain nothing.
+customer was entitled to, with no backstop. The one exception is the
+enrichment gate: only rows operations curated (enrichment_status COMPLETE)
+are proposed, since the order types and commitment flags of a pending row
+are not trustworthy yet.
 
 The candidates of a line are then ranked by the net unit price they yield,
 computed locally from the store's Discount Values and the Airtable price
@@ -29,8 +30,10 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
+from adobe_vipm.adobe.utils import get_3yc_commitment_request
 from adobe_vipm.airtable.models import (
     DISCOUNT_CATEGORY_INTRO,
+    DISCOUNT_ENRICHMENT_COMPLETE,
     DISCOUNT_OFFER_IDS_SEPARATOR,
     DISCOUNT_ORDER_TYPE_NEW,
     DISCOUNT_SOURCE_OPEN,
@@ -42,6 +45,8 @@ from adobe_vipm.airtable.models import (
     get_visible_discount_codes,
 )
 from adobe_vipm.flows.constants import Param
+from adobe_vipm.flows.utils.parameter import get_flex_discounts_parameter
+from adobe_vipm.flows.utils.subscription import get_sku_with_discount_level
 from adobe_vipm.utils import get_3yc_commitment
 
 logger = logging.getLogger(__name__)
@@ -55,7 +60,8 @@ RANK_PRICED = 0
 RANK_PERCENTAGE_ONLY = 1
 RANK_UNPRICEABLE = 2
 
-# Commitment statuses under which the customer's lines are priced as 3YC.
+# Statuses of the customer's commitment (COMMITTED, ACTIVE) or of its pending
+# commitment request (REQUESTED, ACCEPTED) under which the lines are priced as 3YC.
 THREE_YC_COMMITMENT_STATUSES = frozenset((
     ThreeYearCommitmentStatus.COMMITTED,
     ThreeYearCommitmentStatus.ACTIVE,
@@ -160,10 +166,12 @@ def get_commitment_type(adobe_customer: dict | None, customer_data: dict) -> Com
     """
     Return the customer's commitment term for the 3YC pre-filter.
 
-    THREE_YC when the Adobe customer holds or has requested a three-year
-    commitment, or when the order requests one (3YC checkbox); ANNUAL when the
-    customer is known and neither holds nor requests one; UNKNOWN when the
-    Adobe customer is not available yet, so that no code is excluded.
+    THREE_YC when the Adobe customer holds a three-year commitment (benefit
+    commitment COMMITTED or ACTIVE) or has one pending (commitment request
+    REQUESTED or ACCEPTED), or when the order requests one (3YC checkbox);
+    ANNUAL when the customer is known and neither holds nor requests one;
+    UNKNOWN when the Adobe customer is not available yet, so that no code is
+    excluded.
 
     Args:
         adobe_customer: Adobe customer, None when not retrieved yet.
@@ -176,8 +184,11 @@ def get_commitment_type(adobe_customer: dict | None, customer_data: dict) -> Com
         return CommitmentType.THREE_YC
     if adobe_customer is None:
         return CommitmentType.UNKNOWN
-    status = get_3yc_commitment(adobe_customer).get("status")
-    if status in THREE_YC_COMMITMENT_STATUSES:
+    statuses = {
+        get_3yc_commitment(adobe_customer).get("status"),
+        get_3yc_commitment_request(adobe_customer).get("status"),
+    }
+    if statuses & THREE_YC_COMMITMENT_STATUSES:
         return CommitmentType.THREE_YC
     return CommitmentType.ANNUAL
 
@@ -306,16 +317,22 @@ def _is_eligible(  # noqa: WPS211
     today: dt.date,
 ) -> bool:
     gates = (
+        is_enriched(row),
         matches_target_sku(row, line_partial_sku),
         matches_qualifying_skus(row, owned_partial_skus),
         allows_order_type(row),
         allows_category(row, line_type),
-        is_within_window(row, today),
+        is_within_window(row, today, held=bool(row.reusable) and redeemed),
         is_offered_in_country(amounts, country),
         is_redeemable(row, redeemed=redeemed),
         matches_commitment(row, commitment),
     )
     return all(gates)
+
+
+def is_enriched(row) -> bool:
+    """Keep only a code operations finished curating (enrichment_status COMPLETE)."""
+    return row.enrichment_status == DISCOUNT_ENRICHMENT_COMPLETE
 
 
 def matches_target_sku(row, line_partial_sku: str) -> bool:
@@ -343,16 +360,20 @@ def allows_category(row, line_type: LineType) -> bool:
     return row.category != DISCOUNT_CATEGORY_INTRO or line_type is LineType.NEW
 
 
-def is_within_window(row, today: dt.date) -> bool:
+def is_within_window(row, today: dt.date, *, held: bool = False) -> bool:
     """
     Keep a code whose usable window contains today.
 
-    The window closes at end_date, extended to discount_lock_end_date for a
-    reusable code (the lock keeps a held code applicable past its end date).
-    A missing bound leaves that side of the window open.
+    The window closes at end_date. For a reusable code the customer already
+    holds (redeemed once) it is extended to discount_lock_end_date: the lock
+    keeps a held code applicable past its end date, but grants nothing to a
+    customer who never redeemed it. A missing bound leaves that side of the
+    window open.
     """
     start_date = _to_date(row.start_date)
-    usable_until = _to_date(row.discount_lock_end_date if row.reusable else row.end_date)
+    usable_until = _to_date(row.end_date)
+    if held:
+        usable_until = _to_date(row.discount_lock_end_date) or usable_until
     if start_date and today < start_date:
         return False
     return usable_until is None or today <= usable_until
@@ -475,6 +496,13 @@ def select_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
         ).sku
         for line_id in candidates_by_line
     }
+    if context.adobe_customer:
+        # Ranking is best effort and runs on every draft validation: a missing
+        # discount level falls back to the base level without alerting operations.
+        offer_ids_by_line = {
+            line_id: get_sku_with_discount_level(offer_id, context.adobe_customer, notify=False)
+            for line_id, offer_id in offer_ids_by_line.items()
+        }
     base_prices = get_sku_price(
         context.adobe_customer or {},
         list(offer_ids_by_line.values()),
@@ -586,3 +614,40 @@ def _unpriced_rank_key(candidate: FlexDiscountCandidate) -> tuple:
     if candidate.is_percentage and candidate.amount is not None:
         return (RANK_PERCENTAGE_ONLY, -candidate.amount)
     return (RANK_UNPRICEABLE, 0)
+
+
+def get_order_redeemed_codes(context) -> list[str]:
+    """
+    Return the flex discount codes a completed normal order redeemed, for the redemptions table.
+
+    The source is the order's flexibleDiscounts parameter, written by
+    SubmitNewOrder from the committed Adobe NEW order with the codes the order
+    requested and Adobe applied; it survives the fulfilment retries between the
+    order submission and its completion, unlike the in-memory selection. A code
+    the customer had already redeemed (a reusable discount applied again) is not
+    a fresh once-per-customer redemption, so codes with a redemption row for
+    the customer are left out.
+
+    Args:
+        context: Order processing context (order, adobe_customer_id).
+
+    Returns:
+        list[str]: The unique codes to record, in line order.
+    """
+    applied_codes = [
+        code
+        for entry in get_flex_discounts_parameter(context.order)
+        for code in entry.get("flexDiscountCode") or []
+    ]
+    unique_codes = list(dict.fromkeys(applied_codes))
+    if not unique_codes:
+        return []
+    redemptions = get_customer_discount_redemptions(context.adobe_customer_id, unique_codes)
+    already_redeemed = {redemption.code for redemption in redemptions}
+    if already_redeemed:
+        logger.info(
+            "%s: skipping flex discount code(s) the customer had already redeemed: %s",
+            context,
+            ", ".join(code for code in unique_codes if code in already_redeemed),
+        )
+    return [code for code in unique_codes if code not in already_redeemed]

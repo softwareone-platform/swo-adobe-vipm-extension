@@ -47,6 +47,8 @@ class Context:
     preview_renewal_order: dict | None = None
     adobe_renewal_order: dict | None = None
     flex_discount_candidates: dict = field(default_factory=dict)
+    flex_discount_selection: dict = field(default_factory=dict)
+    flex_discount_rejections: dict = field(default_factory=dict)
 
     def __str__(self):
         due_date = self.due_date.strftime("%Y-%m-%d") if self.due_date else "-"

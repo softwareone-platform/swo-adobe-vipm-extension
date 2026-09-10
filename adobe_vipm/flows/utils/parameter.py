@@ -7,6 +7,7 @@ from django.conf import settings
 from mpt_extension_sdk.mpt_http.utils import find_first
 from mpt_extension_sdk.runtime.djapp.conf import get_for_product
 
+from adobe_vipm.adobe.utils import is_flex_discount_applied
 from adobe_vipm.flows.constants import (
     AGREEMENT_VISIBLE_PARAMETERS,
     PARAM_NEW_CUSTOMER_PARAMETERS,
@@ -414,13 +415,43 @@ def update_agreement_params_visibility(
     return updated_order
 
 
-def set_flex_discounts_parameter(order: dict, adobe_order: dict) -> dict:
+def _get_applied_flex_discount_codes(line: dict, requested_codes: dict | None) -> list[str]:
     """
-    Save flex discounts to the order.
+    Codes Adobe applied on the line (a result other than SUCCESS was not applied).
+
+    When the codes the order requested per line are known, only the requested
+    code counts: a discount Adobe auto-applied on its own is not something the
+    order redeemed.
+    """
+    applied = [
+        flex_discount["code"]
+        for flex_discount in line.get("flexDiscounts") or []
+        if is_flex_discount_applied(flex_discount)
+    ]
+    if requested_codes is None:
+        return applied
+    requested_code = requested_codes.get(line.get("extLineItemNumber"))
+    return [code for code in applied if code == requested_code]
+
+
+def set_flex_discounts_parameter(
+    order: dict, adobe_order: dict, requested_codes: dict | None = None, *, pending: bool = False
+) -> dict:
+    """
+    Save the flex discount codes applied by an Adobe order to the order parameter.
+
+    The parameter is the per-order provenance record and the source of the
+    redemption recording: it lists, per Adobe line, the codes Adobe applied
+    (result SUCCESS), restricted to the code the order requested on the line
+    when the requested codes are given (context.flex_discount_selection).
 
     Args:
         order: MPT order.
         adobe_order: Adobe order.
+        requested_codes: Flex discount code requested per Adobe line number, None
+            to record every applied code.
+        pending: Store preview-confirmed proposals as requestedFlexDiscountCode
+            until the committed order completes. Pending proposals are not redemptions.
 
     Returns:
         Updated MPT order.
@@ -430,14 +461,50 @@ def set_flex_discounts_parameter(order: dict, adobe_order: dict) -> dict:
             "extLineItemNumber": line.get("extLineItemNumber"),
             "offerId": line.get("offerId"),
             "subscriptionId": line.get("subscriptionId"),
-            "flexDiscountCode": [flex_discount["code"] for flex_discount in line["flexDiscounts"]],
+            "flexDiscountCode": _get_applied_flex_discount_codes(line, requested_codes),
         }
         for line in adobe_order["lineItems"]
-        if line.get("flexDiscounts")
+        if _get_applied_flex_discount_codes(line, requested_codes)
     ]
+    if pending:
+        for entry in flex_discounts:
+            entry["requestedFlexDiscountCode"] = entry.pop("flexDiscountCode")[0]
     return update_fulfillment_parameter_value(
         order, Param.FLEXIBLE_DISCOUNTS.value, flex_discounts or None
     )
+
+
+def get_flex_discounts_parameter(order: dict) -> list[dict]:
+    """
+    Read the flex discounts recorded on the order parameter.
+
+    The parameter is a JSON parameter, so its value comes back either as the
+    stored list or as its JSON string depending on the source of the order.
+
+    Args:
+        order: MPT order.
+
+    Returns:
+        list[dict]: The recorded entries ({extLineItemNumber, offerId,
+        subscriptionId, flexDiscountCode}), empty when nothing was recorded.
+    """
+    value = get_fulfillment_parameter(order, Param.FLEXIBLE_DISCOUNTS.value).get("value")
+    if isinstance(value, str):
+        value = json.loads(value) if value.strip() else None
+    return list(value or [])
+
+
+def get_requested_flex_discount_codes(order: dict) -> dict[int, str]:
+    """Read pending proposals or previously recorded codes for completion reconciliation."""
+    requested_codes = {}
+    for entry in get_flex_discounts_parameter(order):
+        code = entry.get("requestedFlexDiscountCode")
+        if not code:
+            applied_codes = entry.get("flexDiscountCode") or []
+            code = next(iter(applied_codes), None)
+        if code:
+            requested_codes[entry["extLineItemNumber"]] = code
+    return requested_codes
 
 
 def get_adobe_order_ids_created_parameter(order: dict) -> list[str]:
