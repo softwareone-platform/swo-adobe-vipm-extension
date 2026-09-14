@@ -882,7 +882,7 @@ class RecordClientDiscountCodes(Step):
             return
         discounts = self._fetch_adobe_discounts(context, market_segment, missing_codes)
         if discounts:
-            create_client_discount_codes(discounts, market_segment)
+            create_client_discount_codes(discounts, market_segment, context.adobe_customer_id)
             logger.info(
                 "%s: stored %s client discount code(s) on the AirTable store: %s",
                 context,
