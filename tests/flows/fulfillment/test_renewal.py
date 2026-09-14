@@ -1048,7 +1048,7 @@ def test_record_client_discount_codes_step(
     mock_adobe_client.get_flex_discounts_by_code.assert_called_once_with(
         "authorization-id", "COM", "US", "CODE-2"
     )
-    mocked_create_client_codes.assert_called_once_with([adobe_discount], "COM")
+    mocked_create_client_codes.assert_called_once_with([adobe_discount], "COM", "customer-id")
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
 
 
