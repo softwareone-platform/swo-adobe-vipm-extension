@@ -268,7 +268,7 @@ def test_create_client_discount_codes(mocker, settings):
         ],
     }
 
-    create_client_discount_codes([discount], "COM")  # act
+    create_client_discount_codes([discount], "COM", "adobe-customer-id")  # act
 
     now = dt.datetime(2026, 8, 12, 10, 0, tzinfo=dt.UTC)
     mocked_discount_code_model.batch_save.assert_called_once_with([mocked_discount_code])
@@ -276,6 +276,7 @@ def test_create_client_discount_codes(mocker, settings):
         code="EASTER_26",
         market_segment="COM",
         source="Client",
+        target_customer_id="adobe-customer-id",
         name="Easter Flexible Discount",
         description="Exclusive 26 fixed off on Adobe Technical Communication Suite",
         adobe_discount_id="55555555-8768-4e8a-9a2f-fb6a6b08f563",
@@ -329,9 +330,10 @@ def test_create_client_discount_codes_reusable_intro(mocker, settings):
         "outcomes": [{"type": "PERCENTAGE_DISCOUNT", "discountValues": [{"value": 10.0}]}],
     }
 
-    create_client_discount_codes([discount], "COM")  # act
+    create_client_discount_codes([discount], "COM", "intro-customer-id")  # act
 
     fields = mocked_discount_code_model.mock_calls[0].kwargs
+    assert fields["target_customer_id"] == "intro-customer-id"
     assert fields["reusable"] is True
     assert fields["discount_lock_end_date"] == dt.datetime(2027, 3, 7, 10, 16, tzinfo=dt.UTC)
     assert fields["discount_type"] == "PERCENTAGE"
@@ -373,7 +375,7 @@ def test_create_client_discount_codes_skips_incomplete_values(mocker, settings):
         ],
     }
 
-    create_client_discount_codes([discount], "COM")  # act
+    create_client_discount_codes([discount], "COM", "adobe-customer-id")  # act
 
     # Fixed-type values without a country or without an amount are skipped.
     mocked_discount_value_model.assert_called_once_with(
@@ -396,7 +398,9 @@ def test_create_client_discount_codes_without_values(mocker, settings):
         return_value=mocked_discount_value_model,
     )
 
-    create_client_discount_codes([{"code": "NO_VALUES", "outcomes": []}], "COM")  # act
+    create_client_discount_codes(
+        [{"code": "NO_VALUES", "outcomes": []}], "COM", "adobe-customer-id"
+    )  # act
 
     mocked_discount_value_model.batch_save.assert_not_called()
 
