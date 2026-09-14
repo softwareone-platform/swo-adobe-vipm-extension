@@ -1014,6 +1014,7 @@ def get_discount_code_model(base_info: AirTableBaseInfo):
         code = fields.TextField(DISCOUNT_CODE_FIELD)
         market_segment = fields.TextField("market_segment")
         source = fields.TextField("source")
+        target_customer_id = fields.TextField("target_customer_id")
         name = fields.TextField("name")
         description = fields.TextField("description")
         adobe_discount_id = fields.TextField("adobe_discount_id")
@@ -1093,7 +1094,9 @@ def get_existing_discount_codes(codes: list[str], market_segment: str) -> set[st
     return {row.code for row in rows}
 
 
-def create_client_discount_codes(discounts: list[dict], market_segment: str):
+def create_client_discount_codes(
+    discounts: list[dict], market_segment: str, target_customer_id: str
+):
     """
     Stores Adobe flex discounts on the Discount Codes table with source "Client".
 
@@ -1106,12 +1109,16 @@ def create_client_discount_codes(discounts: list[dict], market_segment: str):
     Args:
         discounts: Adobe flex discount objects, as returned by the flex-discounts API.
         market_segment: Adobe market segment the codes belong to (COM, GOV, EDU).
+        target_customer_id: Adobe customer that redeemed the codes on first use, stamped
+            on each row so the code is visible in that customer's Discounts grid.
     """
     now = dt.datetime.now(tz=dt.UTC)
     base_info = AirTableBaseInfo.for_discounts()
     discount_code_model = get_discount_code_model(base_info)
     discount_code_model.batch_save([
-        discount_code_model(**_to_client_discount_code_fields(discount, market_segment, now))
+        discount_code_model(
+            **_to_client_discount_code_fields(discount, market_segment, target_customer_id, now)
+        )
         for discount in discounts
     ])
     discount_value_model = get_discount_value_model(base_info)
@@ -1124,7 +1131,9 @@ def create_client_discount_codes(discounts: list[dict], market_segment: str):
         discount_value_model.batch_save(value_rows)
 
 
-def _to_client_discount_code_fields(discount: dict, market_segment: str, now: dt.datetime) -> dict:
+def _to_client_discount_code_fields(
+    discount: dict, market_segment: str, target_customer_id: str, now: dt.datetime
+) -> dict:
     """Maps an Adobe flex discount to the fields of a client-sourced code row."""
     qualification = discount.get("qualification") or {}
     lock_end_date = _read_adobe_datetime(discount.get("discountLockEndDate"))
@@ -1132,6 +1141,9 @@ def _to_client_discount_code_fields(discount: dict, market_segment: str, now: dt
         "code": str(discount.get("code") or ""),
         "market_segment": market_segment,
         "source": DISCOUNT_SOURCE_CLIENT,
+        # The one customer that redeemed the typed code on first use; a Client row
+        # is only visible in that customer's Discounts grid when this is stamped.
+        "target_customer_id": target_customer_id,
         "name": str(discount.get("name") or ""),
         "description": str(discount.get("description") or ""),
         "adobe_discount_id": str(discount.get("id") or ""),
