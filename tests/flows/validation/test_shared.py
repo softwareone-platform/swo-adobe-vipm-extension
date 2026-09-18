@@ -463,6 +463,34 @@ def test_validate_no_staged_renewal_blocks_staged_upsize(
 
 
 @freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_blocks_active_disabled_upsize(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    # An active subscription is not filtered on autoRenewal.enabled: a native change
+    # order clobbers the renewal quantity regardless, so the staged upsize still locks.
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(
+                current_quantity=10,
+                renewal_quantity=15,
+                autorenewal_enabled=False,
+            ),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is False
+    assert staged_renewal_context.order["error"] == ERR_RENEWAL_STAGED.to_dict()
+    mock_next_step.assert_not_called()
+
+
+@freeze_time("2026-09-10 12:30:00")
 def test_validate_no_staged_renewal_ignores_staged_downsize(
     mock_adobe_client,
     mock_mpt_client,
@@ -494,6 +522,59 @@ def test_validate_no_staged_renewal_ignores_unchanged_renewal(
     mock_adobe_client.get_subscriptions.return_value = {
         "items": [
             adobe_subscription_factory(current_quantity=10, renewal_quantity=10),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is True
+    mock_next_step.assert_called_once_with(mock_mpt_client, staged_renewal_context)
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_ignores_inactive_upsize(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    # An inactive (expired or transferred-in) subscription keeps a stale
+    # renewalQuantity above currentQuantity that never describes a pending renewal.
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(
+                current_quantity=10,
+                renewal_quantity=23,
+                status=AdobeSubscriptionStatus.INACTIVE.value,
+            ),
+        ]
+    }
+    step = ValidateNoStagedRenewal()
+
+    step(mock_mpt_client, staged_renewal_context, mock_next_step)  # act
+
+    assert staged_renewal_context.validation_succeeded is True
+    mock_next_step.assert_called_once_with(mock_mpt_client, staged_renewal_context)
+
+
+@freeze_time("2026-09-10 12:30:00")
+def test_validate_no_staged_renewal_ignores_neutralised_scheduled_subscription(
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_next_step,
+    adobe_subscription_factory,
+    staged_renewal_context,
+):
+    # A rolled-back renewal disables the scheduled subscription's auto-renewal instead
+    # of deleting it; it keeps SCHEDULED status but will not activate, so it must not lock.
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [
+            adobe_subscription_factory(
+                status=AdobeSubscriptionStatus.SCHEDULED.value,
+                autorenewal_enabled=False,
+            ),
         ]
     }
     step = ValidateNoStagedRenewal()
