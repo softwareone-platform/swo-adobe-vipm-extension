@@ -7,6 +7,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_NEW,
     ORDER_TYPE_PREVIEW,
+    AdobeDeploymentStatus,
     AdobeErrorCode,
     AdobeOrderStatus,
     AdobeSubscriptionStatus,
@@ -43,7 +44,10 @@ from adobe_vipm.flows.fulfillment.transfer import (
     HandleMigratedTransfer,
     SyncGCMainAgreement,
     UpdateTransferStatus,
+    ValidateGCMainAgreement,
     ValidateTransfer,
+    are_deployments_already_synchronized,
+    build_customer_deployments_from_airtable,
 )
 from adobe_vipm.flows.utils import (
     get_ordering_parameter,
@@ -6956,6 +6960,158 @@ def test_sync_gc_main_agreement_step(
 
     assert mocked_gc_main_agreement.status == STATUS_GC_TRANSFERRED
     mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def _gc_deployment_record(
+    mocker, deployment_id="deployment-id", status=STATUS_GC_CREATED, country="DE"
+):
+    record = mocker.MagicMock()
+    record.deployment_id = deployment_id
+    record.status = status
+    record.deployment_country = country
+    return record
+
+
+def test_are_deployments_already_synchronized_true(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(global_customer="Yes"),
+    )
+
+    result = are_deployments_already_synchronized(order, [_gc_deployment_record(mocker)])
+
+    assert result is True
+
+
+def test_are_deployments_already_synchronized_false_when_not_global_customer(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(global_customer=None),
+    )
+
+    result = are_deployments_already_synchronized(order, [_gc_deployment_record(mocker)])
+
+    assert result is False
+
+
+def test_are_deployments_already_synchronized_false_when_no_existing_deployments(
+    order_factory, fulfillment_parameters_factory
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(global_customer="Yes"),
+    )
+
+    result = are_deployments_already_synchronized(order, [])
+
+    assert result is False
+
+
+def test_are_deployments_already_synchronized_false_when_a_deployment_is_not_created(
+    mocker, order_factory, fulfillment_parameters_factory
+):
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(global_customer="Yes"),
+    )
+    existing_deployments = [
+        _gc_deployment_record(mocker, deployment_id="d1"),
+        _gc_deployment_record(mocker, deployment_id="d2", status=STATUS_GC_PENDING),
+    ]
+
+    result = are_deployments_already_synchronized(order, existing_deployments)
+
+    assert result is False
+
+
+def test_build_customer_deployments_from_airtable(mocker):
+    existing_deployments = [
+        _gc_deployment_record(mocker, deployment_id="d1", country="DE"),
+        _gc_deployment_record(mocker, deployment_id="d2", country="US"),
+    ]
+
+    result = build_customer_deployments_from_airtable(existing_deployments)
+
+    assert result == [
+        {
+            "deploymentId": "d1",
+            "status": AdobeDeploymentStatus.ACTIVE,
+            "companyProfile": {"address": {"country": "DE"}},
+        },
+        {
+            "deploymentId": "d2",
+            "status": AdobeDeploymentStatus.ACTIVE,
+            "companyProfile": {"address": {"country": "US"}},
+        },
+    ]
+
+
+def test_validate_gc_main_agreement_reuses_airtable_deployments_when_synchronized(
+    mocker, order_factory, fulfillment_parameters_factory, mock_adobe_client
+):
+    """On a re-processing pass with all deployments created, Adobe must not be called."""
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(global_customer="Yes"),
+    )
+    gc_main_agreement = mocker.MagicMock()
+    gc_main_agreement.main_agreement_id = "main-agreement-id"
+    gc_main_agreement.status = STATUS_GC_PENDING
+    gc_main_agreement.customer_id = "customer-id"
+    context = Context(order=order, authorization_id=order["authorization"]["id"])
+    context.gc_main_agreement = gc_main_agreement
+    context.existing_deployments = [
+        _gc_deployment_record(mocker, deployment_id="deployment-id", country="DE")
+    ]
+    mocked_get_adobe_client = mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    ValidateGCMainAgreement()(mocker.MagicMock(), context, mocked_next_step)  # act
+
+    mocked_get_adobe_client.assert_not_called()
+    mock_adobe_client.get_customer_deployments_active_status.assert_not_called()
+    assert context.customer_deployments == [
+        {
+            "deploymentId": "deployment-id",
+            "status": AdobeDeploymentStatus.ACTIVE,
+            "companyProfile": {"address": {"country": "DE"}},
+        }
+    ]
+    mocked_next_step.assert_called_once()
+
+
+def test_validate_gc_main_agreement_fetches_from_adobe_when_not_synchronized(
+    mocker, order_factory, fulfillment_parameters_factory, mock_adobe_client
+):
+    """When deployments are not all created, the live Adobe call is still made."""
+    order = order_factory(
+        fulfillment_parameters=fulfillment_parameters_factory(global_customer="Yes"),
+    )
+    gc_main_agreement = mocker.MagicMock()
+    gc_main_agreement.main_agreement_id = "main-agreement-id"
+    gc_main_agreement.status = STATUS_GC_PENDING
+    gc_main_agreement.customer_id = "customer-id"
+    context = Context(order=order, authorization_id=order["authorization"]["id"])
+    context.gc_main_agreement = gc_main_agreement
+    context.existing_deployments = [
+        _gc_deployment_record(mocker, deployment_id="d1", status=STATUS_GC_PENDING)
+    ]
+    mock_adobe_client.get_customer_deployments_active_status.return_value = [
+        {"deploymentId": "d1", "status": "1000", "companyProfile": {"address": {"country": "DE"}}},
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.transfer.get_adobe_client",
+        return_value=mock_adobe_client,
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    ValidateGCMainAgreement()(mocker.MagicMock(), context, mocked_next_step)  # act
+
+    mock_adobe_client.get_customer_deployments_active_status.assert_called_once_with(
+        order["authorization"]["id"], "customer-id"
+    )
 
 
 @freeze_time("2024-01-01")
