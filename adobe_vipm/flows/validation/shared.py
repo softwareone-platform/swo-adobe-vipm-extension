@@ -168,6 +168,14 @@ class ValidateNoStagedRenewal(Step):
     (``renewalQuantity`` below ``currentQuantity``) is the ordinary renewal-reduction
     mechanism and does not lock native orders. The divergence self-clears once the
     renewal takes effect at the anniversary, lifting the block without any bookkeeping.
+
+    Only live subscriptions can carry a pending renewal, so the derivation ignores
+    every subscription that is not ACTIVE for the upsize signal: an INACTIVE (expired
+    or transferred-in) subscription keeps stale ``renewalQuantity`` values that never
+    describe a pending renewal. A SCHEDULED net-new subscription blocks only while it
+    is still armed (``autoRenewal.enabled``); the renewal rollback path neutralises a
+    scheduled subscription by disabling its auto-renewal instead of deleting it, and a
+    neutralised subscription will never activate, so it must not lock native orders.
     """
 
     def __call__(self, client, context, next_step):
@@ -205,19 +213,29 @@ class ValidateNoStagedRenewal(Step):
             context.authorization_id,
             context.adobe_customer_id,
         )
-        for subscription in subscriptions.get("items", []):
-            if subscription.get("status") == AdobeSubscriptionStatus.SCHEDULED:
-                return True
-            auto_renewal = subscription.get("autoRenewal") or {}
-            renewal_quantity = auto_renewal.get("renewalQuantity")
-            current_quantity = subscription.get("currentQuantity")
-            if (
-                renewal_quantity is not None
-                and current_quantity is not None
-                and renewal_quantity > current_quantity
-            ):
-                return True
-        return False
+        return any(
+            self._subscription_stages_renewal(subscription)
+            for subscription in subscriptions.get("items", [])
+        )
+
+    def _subscription_stages_renewal(self, subscription):
+        status = subscription.get("status")
+        auto_renewal = subscription.get("autoRenewal") or {}
+        if status == AdobeSubscriptionStatus.SCHEDULED:
+            # A neutralised (rolled-back) scheduled subscription keeps its SCHEDULED
+            # status but will not activate, so it does not lock native orders.
+            return bool(auto_renewal.get("enabled"))
+        if status != AdobeSubscriptionStatus.ACTIVE:
+            # Only a live subscription can carry a pending renewal; INACTIVE rows keep
+            # stale renewalQuantity values that never describe a real renewal.
+            return False
+        renewal_quantity = auto_renewal.get("renewalQuantity")
+        current_quantity = subscription.get("currentQuantity")
+        return (
+            renewal_quantity is not None
+            and current_quantity is not None
+            and renewal_quantity > current_quantity
+        )
 
 
 class GetPreviewOrder(Step):
