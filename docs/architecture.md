@@ -64,12 +64,11 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    changes first (`ReverseRenewalChangesOnError`), so a retry starts from the
    customer's own state; only the confirmed codes are recorded as redeemed; `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
-   that both renewal flows run before mutating Adobe, the discount-code
-   first-successful-use backfill step (`RecordClientDiscountCodes`) that persists
-   previously unknown, successfully used discount codes to Airtable, and the
-   discount-redemption recording step (`RecordDiscountRedemptions`) that tracks
-   each unique code used by a renewal; `shared.py` holds common utilities and the
-   flexible-discount-code-per-line validation used by switch/renewal fulfillment.
+   that both renewal flows run before mutating Adobe; `shared.py` holds common
+   utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
+   store and ranks the candidate codes of new/upsize lines (selection rules in
+   `flows/utils/flex_discounts.py`), and the flexible-discount-code-per-line validation used by
+   switch/renewal fulfillment.
 3. **Validation** (`flows/validation/`) — `validate_order()` in `base.py` routes to
    per-type validators (`purchase.py`, `change.py`, `transfer.py`, `termination.py`).
 4. **Sync** (`flows/sync/`) — Adobe-to-MPT synchronisation for `agreement.py`,

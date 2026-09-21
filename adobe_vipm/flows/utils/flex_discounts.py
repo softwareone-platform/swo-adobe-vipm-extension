@@ -15,13 +15,17 @@ customer was entitled to, with no backstop. Rows still pending enrichment
 are therefore kept too: their uncurated order types and commitment flags
 constrain nothing.
 
-The ranking by net price and the preview cascade are not part of this module.
+The candidates of a line are then ranked by the net unit price they yield,
+computed locally from the store's Discount Values and the Airtable price
+list, with a fixed tie-break (reusable, closed, Adobe discount id), so the
+code proposed first to Adobe's preview never depends on response ordering.
+The preview cascade itself is not part of this module.
 """
 
 import datetime as dt
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from adobe_vipm.adobe.constants import ThreeYearCommitmentStatus
@@ -30,14 +34,26 @@ from adobe_vipm.airtable.models import (
     DISCOUNT_OFFER_IDS_SEPARATOR,
     DISCOUNT_ORDER_TYPE_NEW,
     DISCOUNT_SOURCE_OPEN,
+    DISCOUNT_TYPE_PERCENTAGE,
+    get_adobe_product_by_marketplace_sku,
     get_customer_discount_redemptions,
     get_discount_values,
+    get_sku_price,
     get_visible_discount_codes,
 )
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.utils import get_3yc_commitment
 
 logger = logging.getLogger(__name__)
+
+DISCOUNT_TYPE_FIXED_DISCOUNT = "FIXED_DISCOUNT"
+DISCOUNT_TYPE_FIXED_PRICE = "FIXED_PRICE"
+PRICE_DECIMALS = 2
+# Ranking groups: priced candidates first, then percentages rankable by their
+# amount alone (base price unknown), then candidates that cannot be priced.
+RANK_PRICED = 0
+RANK_PERCENTAGE_ONLY = 1
+RANK_UNPRICEABLE = 2
 
 # Commitment statuses under which the customer's lines are priced as 3YC.
 THREE_YC_COMMITMENT_STATUSES = frozenset((
@@ -81,11 +97,17 @@ class FlexDiscountCandidate:
     held: bool
     amount: float | None
     currency: str | None
+    net_unit_price: float | None = None
 
     @property
     def is_closed(self) -> bool:
         """Whether the code is a closed (customer-specific) one."""
         return self.source != DISCOUNT_SOURCE_OPEN
+
+    @property
+    def is_percentage(self) -> bool:
+        """Whether the code discounts a percentage of the base price."""
+        return self.discount_type == DISCOUNT_TYPE_PERCENTAGE
 
 
 def get_discount_country(customer_data: dict) -> str:
@@ -417,3 +439,150 @@ def _to_date(raw_date) -> dt.date | None:
     if isinstance(raw_date, dt.date):
         return raw_date
     return dt.date.fromisoformat(str(raw_date)[:10])
+
+
+def select_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
+    """
+    Retrieve, filter and rank the candidate codes of every NEW and upsize line of an order.
+
+    Reads the store for the candidates (see get_flex_discount_candidates) and
+    the Airtable price list for the base partner price of each line SKU
+    (discount level and 3YC aware), then ranks the candidates of each line by
+    the net unit price they yield (see rank_candidates). The head of each
+    list is the code to propose first to Adobe's preview.
+
+    Args:
+        context: Order processing context (customer, lines, segment, currency).
+
+    Returns:
+        dict: Ranked candidates per MPT line id; lines without candidates are absent.
+    """
+    customer_data = context.customer_data
+    candidates_by_line = get_flex_discount_candidates(
+        market_segment=context.market_segment,
+        customer_id=context.adobe_customer_id,
+        country=get_discount_country(customer_data),
+        commitment=get_commitment_type(context.adobe_customer, customer_data),
+        new_lines=context.new_lines,
+        upsize_lines=context.upsize_lines,
+    )
+    if not candidates_by_line:
+        return {}
+    lines_by_id = {line["id"]: line for line in context.new_lines + context.upsize_lines}
+    offer_ids_by_line = {
+        line_id: get_adobe_product_by_marketplace_sku(
+            lines_by_id[line_id]["item"]["externalIds"]["vendor"], context.market_segment
+        ).sku
+        for line_id in candidates_by_line
+    }
+    base_prices = get_sku_price(
+        context.adobe_customer or {},
+        list(offer_ids_by_line.values()),
+        context.product_id,
+        context.currency,
+    )
+    return {
+        line_id: rank_candidates(
+            candidates, base_prices.get(offer_ids_by_line[line_id]), context.currency
+        )
+        for line_id, candidates in candidates_by_line.items()
+    }
+
+
+def rank_candidates(
+    candidates: list[FlexDiscountCandidate],
+    base_unit_price: float | None,
+    currency: str,
+) -> list[FlexDiscountCandidate]:
+    """
+    Rank the candidates of a line deterministically, best for the customer first.
+
+    Primary criterion: the net unit price each candidate yields, computed
+    locally (see compute_net_unit_price). Without a base price, percentage
+    candidates are still ranked among themselves by their amount, after the
+    priced ones; candidates that cannot be priced come last. Ties break on
+    reusable over single-use, closed over open, then the Adobe discount id
+    ascending (the code when empty), so the outcome never depends on the
+    order the store or Adobe returned the codes in.
+
+    Args:
+        candidates: The eligible codes of the line (see filter_candidates).
+        base_unit_price: The base partner unit price of the line SKU, None when unknown.
+        currency: The order currency fixed amounts must be expressed in.
+
+    Returns:
+        list[FlexDiscountCandidate]: The candidates, best first, with net_unit_price set.
+    """
+    priced = [
+        replace(
+            candidate,
+            net_unit_price=compute_net_unit_price(candidate, base_unit_price, currency),
+        )
+        for candidate in candidates
+    ]
+    return sorted(priced, key=_rank_key)
+
+
+def compute_net_unit_price(
+    candidate: FlexDiscountCandidate,
+    base_unit_price: float | None,
+    currency: str,
+) -> float | None:
+    """
+    Compute the net unit price a candidate yields on a line, None when it cannot be priced.
+
+    PERCENTAGE: base * (1 - amount / 100). FIXED_DISCOUNT: base - amount,
+    floored at zero. FIXED_PRICE: the amount itself. Fixed amounts must be
+    expressed in the order currency and, except for a fixed price, need the
+    base price; a candidate without an amount is never priceable.
+
+    Args:
+        candidate: The candidate code.
+        base_unit_price: The base partner unit price of the line SKU, None when unknown.
+        currency: The order currency.
+
+    Returns:
+        float | None: The net unit price rounded to cents, None when unpriceable.
+    """
+    if candidate.amount is None:
+        return None
+    if candidate.is_percentage:
+        return _percentage_net_price(candidate.amount, base_unit_price)
+    if candidate.currency != currency:
+        return None
+    return _fixed_net_price(candidate, base_unit_price)
+
+
+def _percentage_net_price(amount: float, base_unit_price: float | None) -> float | None:
+    if base_unit_price is None:
+        return None
+    return round(base_unit_price * (1 - amount / 100), PRICE_DECIMALS)
+
+
+def _fixed_net_price(
+    candidate: FlexDiscountCandidate, base_unit_price: float | None
+) -> float | None:
+    if candidate.discount_type == DISCOUNT_TYPE_FIXED_PRICE:
+        return round(candidate.amount, PRICE_DECIMALS)
+    if candidate.discount_type == DISCOUNT_TYPE_FIXED_DISCOUNT and base_unit_price is not None:
+        return round(max(base_unit_price - candidate.amount, 0), PRICE_DECIMALS)
+    return None
+
+
+def _rank_key(candidate: FlexDiscountCandidate) -> tuple:
+    if candidate.net_unit_price is None:
+        price_key = _unpriced_rank_key(candidate)
+    else:
+        price_key = (RANK_PRICED, candidate.net_unit_price)
+    return (
+        *price_key,
+        not candidate.reusable,
+        not candidate.is_closed,
+        candidate.adobe_discount_id or candidate.code,
+    )
+
+
+def _unpriced_rank_key(candidate: FlexDiscountCandidate) -> tuple:
+    if candidate.is_percentage and candidate.amount is not None:
+        return (RANK_PERCENTAGE_ONLY, -candidate.amount)
+    return (RANK_UNPRICEABLE, 0)
