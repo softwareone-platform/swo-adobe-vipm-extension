@@ -37,7 +37,9 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    [renew-now.md](renew-now.md)); `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
    that both renewal flows run before mutating Adobe; `shared.py` holds common
-   utilities and the flexible-discount-code-per-line validation used by
+   utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
+   store and ranks the candidate codes of new/upsize lines (selection rules in
+   `flows/utils/flex_discounts.py`), and the flexible-discount-code-per-line validation used by
    switch/renewal fulfillment.
 3. **Validation** (`flows/validation/`) — `validate_order()` in `base.py` routes to
    per-type validators (`purchase.py`, `change.py`, `transfer.py`, `termination.py`).

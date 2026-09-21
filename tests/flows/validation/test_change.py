@@ -5,6 +5,7 @@ from freezegun import freeze_time
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
+    SelectFlexDiscounts,
     SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
@@ -287,7 +288,7 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)  # act
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 11
+    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 12
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
@@ -298,9 +299,10 @@ def test_validate_change_order(mocker):
         ValidateSkuAvailability,
         ValidateDownsizes,
         Validate3YCCommitment,
+        SelectFlexDiscounts,
         GetPreviewOrder,
     ]
-    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:10]]
+    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:11]]
     assert actual_steps == expected_steps
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
