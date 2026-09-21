@@ -19,6 +19,7 @@ from mpt_extension_sdk.mpt_http.mpt import (
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    AdobeDeploymentStatus,
     AdobeErrorCode,
     AdobeOrderStatus,
     AdobeSubscriptionStatus,
@@ -758,6 +759,54 @@ def are_all_deployments_synchronized(existing_deployments, customer_deployments)
     return True
 
 
+def are_deployments_already_synchronized(order, existing_deployments):
+    """
+    Checks if the order's global customer deployments are already discovered and created.
+
+    Once the order has been flagged as a global customer and every deployment is present in
+    Airtable with the created status, re-fetching them from Adobe on a re-processing pass adds
+    nothing: the answer is already recorded. This lets the flow skip that live call, which can
+    transiently fail and stall the order.
+
+    Args:
+        order (dict): The MPT order to be fulfilled.
+        existing_deployments (list): The existing deployments in Airtable.
+
+    Returns:
+        bool: True if the global customer flag is set and all existing deployments are created.
+    """
+    return (
+        get_global_customer(order) == ["Yes"]
+        and bool(existing_deployments)
+        and all(deployment.status == STATUS_GC_CREATED for deployment in existing_deployments)
+    )
+
+
+def build_customer_deployments_from_airtable(existing_deployments):
+    """
+    Rebuilds the Adobe-shaped active deployment list from synchronized Airtable records.
+
+    Used on a re-processing pass of an already-synchronized global customer transfer so the
+    deployment checks run against known-good local data instead of a live Adobe call that can
+    transiently fail. The synchronized Airtable records represent the active deployments, so the
+    reconstructed entries carry the ACTIVE status.
+
+    Args:
+        existing_deployments (list): The existing deployments in Airtable.
+
+    Returns:
+        list: Deployments shaped like the Adobe get_customer_deployments response items.
+    """
+    return [
+        {
+            "deploymentId": deployment.deployment_id,
+            "status": AdobeDeploymentStatus.ACTIVE,
+            "companyProfile": {"address": {"country": deployment.deployment_country}},
+        }
+        for deployment in existing_deployments
+    ]
+
+
 def add_gc_main_agreement(order, adobe_transfer_order, status=STATUS_GC_PENDING, error=""):
     """
     Adds a main agreement to Airtable.
@@ -1138,10 +1187,20 @@ class ValidateGCMainAgreement(Step):
             return
 
         if context.gc_main_agreement:
-            adobe_client = get_adobe_client()
-            context.customer_deployments = adobe_client.get_customer_deployments_active_status(
-                context.authorization_id, context.gc_main_agreement.customer_id
-            )
+            if are_deployments_already_synchronized(context.order, context.existing_deployments):
+                logger.info(
+                    "%s: Global customer deployments already synchronized in Airtable, "
+                    "reusing them instead of fetching from Adobe",
+                    context,
+                )
+                context.customer_deployments = build_customer_deployments_from_airtable(
+                    context.existing_deployments
+                )
+            else:
+                adobe_client = get_adobe_client()
+                context.customer_deployments = adobe_client.get_customer_deployments_active_status(
+                    context.authorization_id, context.gc_main_agreement.customer_id
+                )
             context.order = save_gc_parameters(client, context.order, context.customer_deployments)
 
         if not _check_pending_deployments(
