@@ -27,9 +27,11 @@ from adobe_vipm.airtable.models import (
     create_offers,
     get_adobe_product_by_marketplace_sku,
     get_agreement_deployment_view_link,
+    get_customer_discount_redemptions,
     get_discount_code_model,
     get_discount_redemption_model,
     get_discount_value_model,
+    get_discount_values,
     get_existing_discount_codes,
     get_gc_agreement_deployment_model,
     get_gc_agreement_deployments_by_main_agreement,
@@ -49,6 +51,7 @@ from adobe_vipm.airtable.models import (
     get_transfer_model,
     get_transfers_to_check,
     get_transfers_to_process,
+    get_visible_discount_codes,
 )
 from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
 
@@ -1331,3 +1334,114 @@ def test_adobe_product_mapping_from_short_id_retries_on_transient_server_error(r
 
     assert result.vendor_external_id == "65304578CA"
     assert result.sku == "65304578CA01A12"
+
+
+@pytest.fixture
+def discounts_settings(settings):
+    settings.EXTENSION_CONFIG = {
+        "AIRTABLE_API_TOKEN": "api_key",
+        "AIRTABLE_DISCOUNTS_ID": "discounts-base-id",
+    }
+    return settings
+
+
+def test_get_visible_discount_codes(mocker, discounts_settings):
+    rows = [mocker.MagicMock(code="OPEN"), mocker.MagicMock(code="CLOSED")]
+    mocked_discount_code_model = mocker.MagicMock()
+    mocked_discount_code_model.all.return_value = rows
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_code_model",
+        return_value=mocked_discount_code_model,
+    )
+
+    result = get_visible_discount_codes("COM", "P100")  # act
+
+    assert result == rows
+    mocked_discount_code_model.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("market_segment"), "COM"),
+            EQ(Field("retired_at"), BLANK()),
+            OR(EQ(Field("source"), "API"), EQ(Field("target_customer_id"), "P100")),
+        )
+    )
+
+
+def test_get_visible_discount_codes_without_customer(mocker, discounts_settings):
+    mocked_discount_code_model = mocker.MagicMock()
+    mocked_discount_code_model.all.return_value = []
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_code_model",
+        return_value=mocked_discount_code_model,
+    )
+
+    result = get_visible_discount_codes("COM", None)  # act
+
+    assert result == []
+    mocked_discount_code_model.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("market_segment"), "COM"),
+            EQ(Field("retired_at"), BLANK()),
+            EQ(Field("source"), "API"),
+        )
+    )
+
+
+def test_get_discount_values(mocker, discounts_settings):
+    rows = [mocker.MagicMock(code="CODE-1")]
+    mocked_discount_value_model = mocker.MagicMock()
+    mocked_discount_value_model.all.return_value = rows
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_value_model",
+        return_value=mocked_discount_value_model,
+    )
+
+    result = get_discount_values(["CODE-1", "CODE-2"], "COM")  # act
+
+    assert result == rows
+    mocked_discount_value_model.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("market_segment"), "COM"),
+            OR(EQ(Field("code"), "CODE-1"), EQ(Field("code"), "CODE-2")),
+        )
+    )
+
+
+def test_get_discount_values_without_codes(mocker, discounts_settings):
+    mocked_get_model = mocker.patch("adobe_vipm.airtable.models.get_discount_value_model")
+
+    result = get_discount_values([], "COM")  # act
+
+    assert result == []
+    mocked_get_model.assert_not_called()
+
+
+def test_get_customer_discount_redemptions(mocker, discounts_settings):
+    rows = [mocker.MagicMock(code="CODE-1")]
+    mocked_redemption_model = mocker.MagicMock()
+    mocked_redemption_model.all.return_value = rows
+    mocker.patch(
+        "adobe_vipm.airtable.models.get_discount_redemption_model",
+        return_value=mocked_redemption_model,
+    )
+
+    result = get_customer_discount_redemptions("P100", ["CODE-1", "CODE-2"])  # act
+
+    assert result == rows
+    mocked_redemption_model.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("customer_id"), "P100"),
+            OR(EQ(Field("code"), "CODE-1"), EQ(Field("code"), "CODE-2")),
+        )
+    )
+
+
+@pytest.mark.parametrize(("customer_id", "codes"), [(None, ["CODE-1"]), ("P100", [])])
+def test_get_customer_discount_redemptions_without_customer_or_codes(
+    mocker, discounts_settings, customer_id, codes
+):
+    mocked_get_model = mocker.patch("adobe_vipm.airtable.models.get_discount_redemption_model")
+
+    result = get_customer_discount_redemptions(customer_id, codes)  # act
+
+    assert result == []
+    mocked_get_model.assert_not_called()
