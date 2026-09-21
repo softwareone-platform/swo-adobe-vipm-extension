@@ -126,6 +126,7 @@ per-file-ignores = [
   "adobe_vipm/flows/utils/customer.py: WPS110 WPS202",
   "adobe_vipm/flows/utils/date.py: WPS110 WPS221",
   "adobe_vipm/flows/utils/deployment.py: WPS110",
+  "adobe_vipm/flows/utils/flex_discounts.py: WPS202 WPS210",
   "adobe_vipm/flows/utils/formatting.py: WPS237 WPS505",
   "adobe_vipm/flows/utils/notification.py: WPS336 WPS519",
   "adobe_vipm/flows/utils/order.py: WPS110 WPS202 WPS430",

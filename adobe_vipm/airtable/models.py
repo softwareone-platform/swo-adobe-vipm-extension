@@ -41,6 +41,7 @@ TYPE_3YC_LICENSE = "License"
 
 # Discount Codes store values (shared schema with the ef-extension discount store).
 DISCOUNT_CODE_FIELD = "Code"
+DISCOUNT_SOURCE_OPEN = "API"
 DISCOUNT_SOURCE_CLIENT = "Client"
 DISCOUNT_ENRICHMENT_PENDING = "PENDING"
 DISCOUNT_CATEGORY_INTRO = "INTRO"
@@ -1028,7 +1029,10 @@ def get_discount_code_model(base_info: AirTableBaseInfo):
         target_offer_ids = fields.TextField("target_offer_ids")
         qualifying_offer_ids = fields.TextField("qualifying_offer_ids")
         applicable_order_types = fields.MultipleSelectField("applicable_order_types")
+        supports_annual = fields.CheckboxField("supports_annual")
+        supports_3yc = fields.CheckboxField("supports_3yc")
         enrichment_status = fields.TextField("enrichment_status")
+        retired_at = fields.DatetimeField("retired_at")
         synchronized_at = fields.DatetimeField("synchronized_at")
         created_at = fields.DatetimeField("created_at")
         updated_at = fields.DatetimeField("updated_at")
@@ -1092,6 +1096,88 @@ def get_existing_discount_codes(codes: list[str], market_segment: str) -> set[st
         )
     )
     return {row.code for row in rows}
+
+
+def get_visible_discount_codes(market_segment: str, customer_id: str | None) -> list:
+    """
+    Returns the non-retired codes of the segment visible to the customer.
+
+    Mirrors the listing filter of the discount store: every open code
+    (synchronized from Adobe, source "API") is visible to any customer of the
+    segment, while a closed code is visible only to the customer it targets.
+    Without a customer only the open codes are returned. The SKU, order type,
+    validity window, country and redemption gates are applied in memory by
+    the caller (flows.utils.flex_discounts), as the wizard shortlist does.
+
+    Args:
+        market_segment: Adobe market segment the codes belong to (COM, GOV, EDU).
+        customer_id: Adobe customer id, None when the customer does not exist yet.
+
+    Returns:
+        list: The DiscountCode rows.
+    """
+    visibility = EQ(Field("source"), DISCOUNT_SOURCE_OPEN)
+    if customer_id:
+        visibility = OR(visibility, EQ(Field("target_customer_id"), customer_id))
+    discount_code_model = get_discount_code_model(AirTableBaseInfo.for_discounts())
+    return discount_code_model.all(
+        formula=AND(
+            EQ(Field("market_segment"), market_segment),
+            EQ(Field("retired_at"), BLANK()),
+            visibility,
+        )
+    )
+
+
+def get_discount_values(codes: list[str], market_segment: str) -> list:
+    """
+    Returns the Discount Values rows of the given codes.
+
+    One row per country for fixed types, a single country-less row for
+    percentages; the rows are the country support matrix and the amounts
+    used to price a code locally.
+
+    Args:
+        codes: The discount codes to look up.
+        market_segment: Adobe market segment the codes belong to (COM, GOV, EDU).
+
+    Returns:
+        list: The DiscountValue rows, empty when no code is given.
+    """
+    if not codes:
+        return []
+    discount_value_model = get_discount_value_model(AirTableBaseInfo.for_discounts())
+    return discount_value_model.all(
+        formula=AND(
+            EQ(Field("market_segment"), market_segment),
+            OR(*(EQ(Field("code"), code) for code in codes)),
+        )
+    )
+
+
+def get_customer_discount_redemptions(customer_id: str | None, codes: list[str]) -> list:
+    """
+    Returns the redemptions of the customer for the given codes.
+
+    Used to exclude the single-use codes the customer has already redeemed
+    (once-per-customer rule) and to surface the reusable codes it holds.
+
+    Args:
+        customer_id: Adobe customer id, None when the customer does not exist yet.
+        codes: The discount codes to look up.
+
+    Returns:
+        list: The DiscountRedemption rows, empty without customer or codes.
+    """
+    if not customer_id or not codes:
+        return []
+    redemption_model = get_discount_redemption_model(AirTableBaseInfo.for_discounts())
+    return redemption_model.all(
+        formula=AND(
+            EQ(Field("customer_id"), customer_id),
+            OR(*(EQ(Field("code"), code) for code in codes)),
+        )
+    )
 
 
 def create_client_discount_codes(
