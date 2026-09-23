@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+from copy import deepcopy
 
 import pytest
 from freezegun import freeze_time
@@ -70,8 +71,10 @@ from adobe_vipm.flows.utils import (
     get_due_date,
     set_coterm_date,
 )
+from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 from adobe_vipm.flows.utils.parameter import (
     get_adobe_order_ids_created_parameter,
+    get_flex_discounts_parameter,
     get_fulfillment_parameter,
     get_ordering_parameter,
     set_adobe_order_ids_created_parameter,
@@ -925,6 +928,7 @@ def test_submit_new_order_step(
         context.adobe_customer_id,
         preview_order,
         deployment_id=None,
+        requested_codes={},
     )
     mocked_update.assert_called_once_with(
         mock_mpt_client,
@@ -1007,6 +1011,7 @@ def test_submit_new_order_step_flex_discount(
         context.adobe_customer_id,
         preview_order,
         deployment_id=None,
+        requested_codes={},
     )
     mock_update_order.assert_has_calls([
         mocker.call(
@@ -1051,6 +1056,7 @@ def test_submit_new_order_step_with_deployment_id(
         context.adobe_customer_id,
         preview_order,
         deployment_id=deployment_id,
+        requested_codes={},
     )
     mocked_update.assert_has_calls([
         mocker.call(
@@ -4155,3 +4161,167 @@ def test_select_flex_discounts_step_store_error(mocker, order_factory, mock_mpt_
     mocked_send_exception.assert_called_once()
     assert order["id"] in mocked_send_exception.call_args.args[0]
     mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_submit_new_order_step_passes_selected_flex_discounts(
+    mocker, mock_adobe_client, mock_mpt_client, order_factory, adobe_order_factory
+):
+    order = order_factory(deployment_id=None)
+    preview_order = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    new_order = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeOrderStatus.OPEN.value)
+    mock_adobe_client.create_new_order.return_value = new_order
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        new_lines=order["lines"],
+        adobe_preview_order=preview_order,
+        flex_discount_selection={1: "NE3YC_MPQ_CY"},
+    )
+    step = SubmitNewOrder()
+
+    step(mock_mpt_client, context, mocker.MagicMock())  # act
+
+    mock_adobe_client.create_new_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        preview_order,
+        deployment_id=None,
+        requested_codes={1: "NE3YC_MPQ_CY"},
+    )
+
+
+def _preview_with_flex_discounts(preview_order, *, selection, rejections):
+    """Emulate create_preview_order leaving the cascade outcome on the context."""
+
+    def _preview(context):
+        context.flex_discount_selection = selection
+        context.flex_discount_rejections = rejections
+        return preview_order
+
+    return _preview
+
+
+@pytest.mark.parametrize("confirmed", [True, False])
+def test_submit_new_order_reconciles_pending_discounts(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    order_factory,
+    adobe_order_factory,
+    mock_update_order,
+    confirmed,
+):
+    order = order_factory(deployment_id=None)
+    preview = adobe_order_factory(order_type=ORDER_TYPE_PREVIEW)
+    line_number = preview["lineItems"][0]["extLineItemNumber"]
+    preview["lineItems"][0]["flexDiscounts"] = [{"code": "PROMO", "result": "SUCCESS"}]
+    pending = adobe_order_factory(order_type=ORDER_TYPE_NEW, status=AdobeOrderStatus.OPEN)
+    pending["lineItems"][0].pop("flexDiscounts", None)
+    completed = deepcopy(pending)
+    completed["status"] = AdobeOrderStatus.COMPLETE
+    completed["lineItems"][0]["subscriptionId"] = "confirmed-subscription"
+    completed["lineItems"][0]["flexDiscounts"] = [
+        {"code": "PROMO", "result": "SUCCESS" if confirmed else "FAILURE"},
+        {"code": "AUTO_APPLIED", "result": "SUCCESS"},
+    ]
+    mock_adobe_client.create_new_order.return_value = pending
+    mock_adobe_client.get_order.return_value = completed
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        autospec=True,
+        return_value=[],
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        new_lines=order["lines"],
+        adobe_preview_order=preview,
+        flex_discount_selection={line_number: "PROMO"},
+    )
+    step = SubmitNewOrder()
+    step(mock_mpt_client, context, mocker.Mock())
+    pending_redemptions = get_order_redeemed_codes(context)
+    retry = Context(
+        order=deepcopy(context.order),
+        order_id=order["id"],
+        new_lines=order["lines"],
+        adobe_new_order_id=pending["orderId"],
+    )
+    next_step = mocker.Mock()
+
+    step(mock_mpt_client, retry, next_step)  # act
+
+    assert pending_redemptions == []
+    expected_entries = (
+        [
+            {
+                "extLineItemNumber": line_number,
+                "offerId": completed["lineItems"][0]["offerId"],
+                "subscriptionId": "confirmed-subscription",
+                "flexDiscountCode": ["PROMO"],
+            }
+        ]
+        if confirmed
+        else []
+    )
+    assert get_flex_discounts_parameter(retry.order) == expected_entries
+    assert get_order_redeemed_codes(retry) == (["PROMO"] if confirmed else [])
+    assert mock_update_order.call_args.kwargs["parameters"] == retry.order["parameters"]
+    next_step.assert_called_once_with(mock_mpt_client, retry)
+
+
+def test_get_preview_order_step_notifies_undiscounted_lines(
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, mock_mpt_client
+):
+    order = order_factory()
+    mocked_send_warning = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_warning")
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        new_lines=order["lines"],
+    )
+    mock_adobe_client.create_preview_order.side_effect = _preview_with_flex_discounts(
+        adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
+        selection={2: "SPRING_26"},
+        rejections={1: ["EASTER_26", "BLACK_FRIDAY"], 2: ["WINTER_26"]},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = GetPreviewOrder()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_send_warning.assert_called_once()
+    title, text = mocked_send_warning.call_args.args
+    assert title == f"Flex discounts not applied on order {order['id']}"
+    assert "- Line 1: EASTER_26, BLACK_FRIDAY" in text
+    assert "Line 2" not in text
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_get_preview_order_step_no_notification_when_all_lines_discounted(
+    mocker, mock_adobe_client, order_factory, adobe_order_factory, mock_mpt_client
+):
+    order = order_factory()
+    mocked_send_warning = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_warning")
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        new_lines=order["lines"],
+    )
+    mock_adobe_client.create_preview_order.side_effect = _preview_with_flex_discounts(
+        adobe_order_factory(order_type=ORDER_TYPE_PREVIEW),
+        selection={1: "SPRING_26"},
+        rejections={1: ["EASTER_26"]},
+    )
+    step = GetPreviewOrder()
+
+    step(mock_mpt_client, context, mocker.MagicMock())  # act
+
+    mocked_send_warning.assert_not_called()

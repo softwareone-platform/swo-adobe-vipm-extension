@@ -30,6 +30,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateAssets,
@@ -61,6 +62,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     set_ordering_parameter_error,
 )
+from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 from adobe_vipm.flows.utils.market_segment import is_large_government_agency_type
 
 logger = logging.getLogger(__name__)
@@ -326,6 +328,7 @@ def fulfill_purchase_order(client, order):
         SetOrUpdateCotermDate(),
         UpdateAgreementParamsVisibility(),
         CompleteOrder(TEMPLATE_NAME_PURCHASE),
+        RecordDiscountRedemptions(get_order_redeemed_codes),
         NullifyFlexDiscountParam(),
         SyncAgreement(),
     )

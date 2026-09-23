@@ -39,7 +39,11 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    that both renewal flows run before mutating Adobe; `shared.py` holds common
    utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
    store and ranks the candidate codes of new/upsize lines (selection rules in
-   `flows/utils/flex_discounts.py`), and the flexible-discount-code-per-line validation used by
+   `flows/utils/flex_discounts.py`; the Adobe client then cascades through the
+   ranked codes on `PREVIEW` rejection and commits only the requested, confirmed
+   code on the `NEW` order, and `RecordDiscountRedemptions` records the codes the
+   completed order redeemed, read from its `flexibleDiscounts` parameter), and the
+   flexible-discount-code-per-line validation used by
    switch/renewal fulfillment.
 3. **Validation** (`flows/validation/`) — `validate_order()` in `base.py` routes to
    per-type validators (`purchase.py`, `change.py`, `transfer.py`, `termination.py`).
@@ -47,6 +51,31 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    `subscription.py`, and `asset.py`, with `price_manager.py` for pricing.
 5. **Integration clients** — the Adobe client (`adobe/`), Airtable (`airtable/`),
    and notification helpers (`notifications.py`) wrap external systems.
+
+## Normal-order flexible discounts
+
+Purchase and change validation and fulfillment rank new/upsize candidates using
+the customer's license or consumable discount level and applicable 3YC price
+window. Preview cascades through all ranked candidates; the bound is one call
+per candidate plus a final undiscounted preview, rather than a fixed retry limit.
+Candidate assembly only proposes store rows whose `enrichment_status` is
+`COMPLETE` (rows still pending curation are never used), reads the 3YC term
+from both the customer's commitment and its pending commitment request, extends a reusable code's window to its lock
+end date only for customers who already hold it, and resolves the discount
+level silently (no operations alert) because ranking is best effort.
+
+While an Adobe order is `OPEN`, the order's `flexibleDiscounts` JSON stores each
+preview-confirmed proposal as `requestedFlexDiscountCode`. On `COMPLETE`, these
+proposals are reconciled with the committed Adobe response and replaced by
+`flexDiscountCode` entries for successfully applied requested codes. Pending
+proposals and discounts auto-applied by Adobe are not recorded as redemptions.
+Previously stored `flexDiscountCode` entries can also be reconciled on retry.
+Older pending orders that retained no requested codes cannot reconstruct their
+selection from this parameter.
+
+Redemption reads and writes are best effort after order completion. Failures
+notify operations for manual backfill and allow agreement parameter cleanup and
+synchronization to continue.
 
 ## Major components
 

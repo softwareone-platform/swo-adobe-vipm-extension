@@ -18,6 +18,7 @@ from adobe_vipm.flows.fulfillment.change import (
     ValidateReturnableOrders,
     fulfill_change_order,
 )
+from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CheckManualRenewalSubscriptions,
     CompleteOrder,
@@ -480,6 +481,7 @@ def test_fulfill_change_order(mocker):
         CreateOrUpdateSubscriptions,
         CompleteOrder,
         SetSubscriptionTemplate,
+        RecordDiscountRedemptions,
         NullifyFlexDiscountParam,
         SyncAgreement,
     ]

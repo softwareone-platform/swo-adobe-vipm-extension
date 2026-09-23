@@ -37,6 +37,7 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.utils import get_fulfillment_parameter
+from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -924,6 +925,31 @@ def test_record_discount_redemptions_step(mocker, mock_mpt_client, renewal_conte
 
 
 @freeze_time("2026-08-12 10:00:00")
+def test_record_discount_redemptions_step_with_custom_code_source(
+    mocker, mock_mpt_client, renewal_context
+):
+    mocked_create_redemptions = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+    )
+    get_codes = mocker.MagicMock(return_value=["ORDER-CODE"])
+    mocked_next_step = mocker.MagicMock()
+    step = RecordDiscountRedemptions(get_codes)
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    get_codes.assert_called_once_with(renewal_context)
+    mocked_create_redemptions.assert_called_once_with([
+        {
+            "code": "ORDER-CODE",
+            "customer_id": "customer-id",
+            "order_id": renewal_context.order_id,
+            "redeemed_at": dt.datetime(2026, 8, 12, 10, 0, tzinfo=dt.UTC),
+        },
+    ])
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+@freeze_time("2026-08-12 10:00:00")
 def test_record_discount_redemptions_step_skips_inherited_codes(
     mocker, mock_mpt_client, renewal_context
 ):
@@ -1020,6 +1046,45 @@ def test_record_discount_redemptions_step_airtable_error(mocker, mock_mpt_client
     assert renewal_context.order_id in notification_text
     assert "CODE-1" in notification_text
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_record_discount_redemptions_continues_after_read_failure(mocker, mock_mpt_client):
+    context = Context(
+        order={
+            "parameters": {
+                "fulfillment": [
+                    {
+                        "externalId": "flexibleDiscounts",
+                        "value": [{"flexDiscountCode": ["PROMO"]}],
+                    }
+                ]
+            }
+        },
+        order_id="order-id",
+        adobe_customer_id="customer-id",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        autospec=True,
+        side_effect=RuntimeError("Airtable unavailable"),
+    )
+    mocked_write = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_discount_redemptions",
+        autospec=True,
+    )
+    mocked_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.send_exception",
+        autospec=True,
+    )
+    next_step = mocker.Mock()
+
+    RecordDiscountRedemptions(get_order_redeemed_codes)(mock_mpt_client, context, next_step)  # act
+
+    mocked_write.assert_not_called()
+    mocked_notify.assert_called_once()
+    assert context.order_id in mocked_notify.call_args.args[0]
+    assert context.adobe_customer_id in mocked_notify.call_args.args[1]
+    next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_record_client_discount_codes_step(

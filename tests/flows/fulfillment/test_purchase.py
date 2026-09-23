@@ -23,6 +23,7 @@ from adobe_vipm.flows.fulfillment.purchase import (
     ValidateGovernmentLGA,
     fulfill_purchase_order,
 )
+from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
     CreateOrUpdateAssets,
@@ -586,6 +587,7 @@ def test_fulfill_purchase_order(mocker, mock_mpt_client, mock_order):
         SetOrUpdateCotermDate,
         UpdateAgreementParamsVisibility,
         CompleteOrder,
+        RecordDiscountRedemptions,
         NullifyFlexDiscountParam,
         SyncAgreement,
     ]
