@@ -13,6 +13,7 @@ from adobe_vipm.flows.utils.flex_discounts import (
     get_commitment_type,
     get_discount_country,
     get_flex_discount_candidates,
+    get_order_redeemed_codes,
     matches_commitment,
     rank_candidates,
     select_flex_discounts,
@@ -144,27 +145,35 @@ def test_filter_candidates_intro_gate(category, line_type, expected):
 
 
 @pytest.mark.parametrize(
-    ("start_date", "end_date", "reusable", "lock_end_date", "expected"),
+    ("start_date", "end_date", "reusable", "lock_end_date", "held", "expected"),
     [
-        (dt.date(2026, 1, 1), dt.date(2026, 12, 31), False, None, True),
-        (dt.date(2026, 9, 10), dt.date(2026, 9, 10), False, None, True),
-        (dt.date(2026, 9, 11), dt.date(2026, 12, 31), False, None, False),
-        (dt.date(2026, 1, 1), dt.date(2026, 9, 9), False, None, False),
-        (dt.date(2026, 1, 1), dt.date(2026, 9, 9), True, dt.date(2031, 12, 31), True),
-        (dt.date(2026, 1, 1), dt.date(2026, 12, 31), True, dt.date(2026, 9, 9), False),
-        (None, None, False, None, True),
-        ("2026-01-01", "2026-12-31", False, None, True),
+        (dt.date(2026, 1, 1), dt.date(2026, 12, 31), False, None, False, True),
+        (dt.date(2026, 9, 10), dt.date(2026, 9, 10), False, None, False, True),
+        (dt.date(2026, 9, 11), dt.date(2026, 12, 31), False, None, False, False),
+        (dt.date(2026, 1, 1), dt.date(2026, 9, 9), False, None, False, False),
+        # A held reusable stays usable until the lock end date past its end date.
+        (dt.date(2026, 1, 1), dt.date(2026, 9, 9), True, dt.date(2031, 12, 31), True, True),
+        (dt.date(2026, 1, 1), dt.date(2026, 12, 31), True, dt.date(2026, 9, 9), True, False),
+        (dt.date(2026, 1, 1), dt.date(2026, 9, 9), True, None, True, False),
+        # The lock grants nothing to a customer who never redeemed the reusable.
+        (dt.date(2026, 1, 1), dt.date(2026, 9, 9), True, dt.date(2031, 12, 31), False, False),
+        (dt.date(2026, 1, 1), dt.date(2026, 12, 31), True, dt.date(2026, 9, 9), False, True),
+        (None, None, False, None, False, True),
+        ("2026-01-01", "2026-12-31", False, None, False, True),
     ],
 )
-def test_filter_candidates_window_gate(start_date, end_date, reusable, lock_end_date, expected):
+def test_filter_candidates_window_gate(  # noqa: WPS211
+    start_date, end_date, reusable, lock_end_date, held, expected
+):
     code = make_code(
         start_date=start_date,
         end_date=end_date,
         reusable=reusable,
         discount_lock_end_date=lock_end_date,
     )
+    redemptions = [make_redemption(code.code)] if held else []
 
-    result = run_filter([code])  # act
+    result = run_filter([code], redemptions=redemptions)  # act
 
     assert bool(result) is expected
 
@@ -254,10 +263,19 @@ def test_filter_candidates_applies_commitment_pre_filter():
     assert [candidate.code for candidate in result] == ["THREE_YC_ONLY", "BOTH"]
 
 
-def test_filter_candidates_keeps_pending_enrichment_rows():
-    result = run_filter([make_code(enrichment_status="PENDING", applicable_order_types=None)])
+@pytest.mark.parametrize(
+    ("enrichment_status", "expected"),
+    [
+        ("COMPLETE", True),
+        ("PENDING", False),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_filter_candidates_enrichment_gate(enrichment_status, expected):
+    result = run_filter([make_code(enrichment_status=enrichment_status)])
 
-    assert len(result) == 1
+    assert bool(result) is expected
 
 
 def test_filter_candidates_closed_code():
@@ -321,26 +339,31 @@ def test_get_discount_country(customer_data, expected):
 
 
 @pytest.mark.parametrize(
-    ("commitment_status", "three_yc_checkbox", "expected"),
+    ("commitment_status", "request_status", "three_yc_checkbox", "expected"),
     [
-        (None, ["Yes"], CommitmentType.THREE_YC),
-        ("COMMITTED", None, CommitmentType.THREE_YC),
-        ("ACTIVE", None, CommitmentType.THREE_YC),
-        ("REQUESTED", None, CommitmentType.THREE_YC),
-        ("ACCEPTED", None, CommitmentType.THREE_YC),
-        ("EXPIRED", None, CommitmentType.ANNUAL),
-        (None, None, CommitmentType.ANNUAL),
+        (None, None, ["Yes"], CommitmentType.THREE_YC),
+        ("COMMITTED", None, None, CommitmentType.THREE_YC),
+        ("ACTIVE", None, None, CommitmentType.THREE_YC),
+        # A pending commitment request lives on commitmentRequest, not on commitment.
+        (None, "REQUESTED", None, CommitmentType.THREE_YC),
+        (None, "ACCEPTED", None, CommitmentType.THREE_YC),
+        ("EXPIRED", "REQUESTED", None, CommitmentType.THREE_YC),
+        ("EXPIRED", None, None, CommitmentType.ANNUAL),
+        (None, "DECLINED", None, CommitmentType.ANNUAL),
+        (None, None, None, CommitmentType.ANNUAL),
     ],
 )
-def test_get_commitment_type(
+def test_get_commitment_type(  # noqa: WPS211
     adobe_customer_factory,
     adobe_commitment_factory,
     commitment_status,
+    request_status,
     three_yc_checkbox,
     expected,
 ):
     commitment = adobe_commitment_factory(status=commitment_status) if commitment_status else None
-    customer = adobe_customer_factory(commitment=commitment)
+    request = adobe_commitment_factory(status=request_status) if request_status else None
+    customer = adobe_customer_factory(commitment=commitment, commitment_request=request)
 
     result = get_commitment_type(customer, {"3YC": three_yc_checkbox})  # act
 
@@ -599,3 +622,152 @@ def test_select_flex_discounts_without_candidates(mocker, order_factory):
 
     assert result == {}
     mocked_get_sku_price.assert_not_called()
+
+
+@pytest.mark.parametrize("customer_level", ["01", "02"])
+def test_select_flex_discounts_ranks_using_customer_level(
+    mocker,
+    order_factory,
+    lines_factory,
+    adobe_customer_factory,
+    mock_get_adobe_product_by_marketplace_sku,
+    customer_level,
+):
+    order = order_factory(lines=lines_factory(external_vendor_id="65304578CA"))
+    context = Context(
+        order=order,
+        new_lines=order["lines"],
+        market_segment="COM",
+        currency="USD",
+        product_id="PRD-1111-1111",
+        adobe_customer_id="P100",
+        adobe_customer=adobe_customer_factory(licenses_discount_level=customer_level),
+    )
+    line_id = order["lines"][0]["id"]
+    candidates = [
+        make_candidate(code="PCT20", amount=20),
+        make_candidate(code="FIXED70", discount_type="FIXED_PRICE", amount=70, currency="USD"),
+    ]
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_flex_discount_candidates",
+        autospec=True,
+        return_value={line_id: candidates},
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_adobe_product_by_marketplace_sku",
+        autospec=True,
+        side_effect=mock_get_adobe_product_by_marketplace_sku,
+    )
+    mocked_prices = mocker.patch(
+        "adobe_vipm.airtable.models.get_prices_for_skus",
+        autospec=True,
+        return_value={"65304578CA01A12": 100, "65304578CA02A12": 80},
+    )
+
+    ranked = select_flex_discounts(context)  # act
+
+    assert ranked[line_id][0].code == {"01": "FIXED70", "02": "PCT20"}[customer_level]
+    mocked_prices.assert_called_once_with(
+        context.product_id, "USD", [f"65304578CA{customer_level}A12"]
+    )
+
+
+def _order_with_flex_discounts(value):
+    return {
+        "parameters": {
+            "fulfillment": [{"externalId": "flexibleDiscounts", "value": value}],
+        },
+    }
+
+
+def test_get_order_redeemed_codes(mocker):
+    context = Context(
+        order=_order_with_flex_discounts([
+            {"extLineItemNumber": 1, "offerId": "65304578CA01A12", "flexDiscountCode": ["NEW_10"]},
+            {"extLineItemNumber": 2, "offerId": "65304579CA01A12", "flexDiscountCode": ["HELD"]},
+            {"extLineItemNumber": 3, "offerId": "65304580CA01A12", "flexDiscountCode": ["NEW_10"]},
+        ]),
+        order_id="ORD-1",
+        adobe_customer_id="P100",
+    )
+    mocked_redemptions = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        return_value=[make_redemption("HELD")],
+    )
+
+    result = get_order_redeemed_codes(context)  # act
+
+    assert result == ["NEW_10"]
+    mocked_redemptions.assert_called_once_with("P100", ["NEW_10", "HELD"])
+
+
+def test_get_order_redeemed_codes_from_json_string(mocker):
+    context = Context(
+        order=_order_with_flex_discounts(
+            '[{"extLineItemNumber": 1, "offerId": "65304578CA01A12", "flexDiscountCode": ["A"]}]'
+        ),
+        order_id="ORD-1",
+        adobe_customer_id="P100",
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        return_value=[],
+    )
+
+    result = get_order_redeemed_codes(context)  # act
+
+    assert result == ["A"]
+
+
+@pytest.mark.parametrize("value", [None, [], [{"extLineItemNumber": 1, "flexDiscountCode": []}]])
+def test_get_order_redeemed_codes_without_applied_codes(mocker, value):
+    context = Context(order=_order_with_flex_discounts(value), adobe_customer_id="P100")
+    mocked_redemptions = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions"
+    )
+
+    result = get_order_redeemed_codes(context)  # act
+
+    assert result == []
+    mocked_redemptions.assert_not_called()
+
+
+def test_select_flex_discounts_missing_discount_level_does_not_notify(
+    mocker, order_factory, lines_factory, adobe_customer_factory
+):
+    order = order_factory(lines=lines_factory(external_vendor_id="65304578CA"))
+    customer = adobe_customer_factory()
+    customer["discounts"] = []
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id="PRD-1111-1111",
+        market_segment="COM",
+        currency="USD",
+        adobe_customer_id="P100",
+        adobe_customer=customer,
+        new_lines=order["lines"],
+        upsize_lines=[],
+    )
+    line_id = order["lines"][0]["id"]
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_flex_discount_candidates",
+        return_value={line_id: [make_candidate(code="PCT_10", amount=10)]},
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_adobe_product_by_marketplace_sku",
+        return_value=mocker.MagicMock(sku="65304578CA01A12"),
+    )
+    mocked_get_sku_price = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_sku_price",
+        return_value={"65304578CA01A12": 200.0},
+    )
+    mocked_notify = mocker.patch("adobe_vipm.flows.utils.subscription.notify_discount_level_error")
+
+    result = select_flex_discounts(context)  # act
+
+    assert [(c.code, c.net_unit_price) for c in result[line_id]] == [("PCT_10", 180.0)]
+    mocked_get_sku_price.assert_called_once_with(
+        customer, ["65304578CA01A12"], "PRD-1111-1111", "USD"
+    )
+    mocked_notify.assert_not_called()
