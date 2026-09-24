@@ -2116,6 +2116,46 @@ def test_create_customer_subscription_with_flex_discount_codes(
     assert result == {"subscriptionId": "a-sub-id", "status": "1009"}
 
 
+def test_create_customer_subscription_omits_empty_flex_discount_codes(
+    requests_mocker,
+    settings,
+    adobe_client_factory,
+    adobe_authorizations_file,
+):
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    client, authorization, _ = adobe_client_factory()
+    body_to_match = {
+        "offerId": "65322651CA01A12",
+        "autoRenewal": {
+            "enabled": True,
+            Param.RENEWAL_QUANTITY.value: 5,
+        },
+        "currencyCode": authorization.currency,
+    }
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions",
+        ),
+        status=200,
+        json={"subscriptionId": "a-sub-id", "status": "1009"},
+        match=[
+            matchers.json_params_matcher(body_to_match),
+        ],
+    )
+
+    result = client.create_customer_subscription(
+        authorization_uk,
+        customer_id,
+        "65322651CA01A12",
+        5,
+        flex_discount_codes=[],
+    )
+
+    assert result == {"subscriptionId": "a-sub-id", "status": "1009"}
+
+
 def test_create_customer_subscription_error(
     requests_mocker,
     settings,
