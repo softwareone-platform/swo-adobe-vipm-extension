@@ -170,6 +170,7 @@ def test_plan_downsize_returns_ignores_other_deployments(
 def test_submit_return_allocations_submits_each_allocation(
     mocker,
     mock_adobe_client,
+    adobe_subscription_factory,
     downsize_context,
     returnable_order_factory,
     return_plan_factory,
@@ -186,6 +187,9 @@ def test_submit_return_allocations_submits_each_allocation(
             order_type="RETURN", order_id="return-b", status=AdobeOrderStatus.COMPLETE.value
         ),
     ]
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=15, renewal_quantity=15
+    )
     context = downsize_context(old_quantity=45, quantity=15)
     context.downsize_plans = {SKU: return_plan_factory([allocation_a, allocation_b])}
     mocked_next_step = mocker.MagicMock()
@@ -288,8 +292,12 @@ def test_submit_return_allocations_fails_when_outstanding_not_covered(
     mock_adobe_client,
     downsize_context,
     return_plan_factory,
+    adobe_subscription_factory,
     mock_downsize_switch_order_to_failed,
 ):
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=25, renewal_quantity=25
+    )
     context = downsize_context(old_quantity=45, quantity=15)
     context.downsize_plans = {
         SKU: return_plan_factory([], returned_quantity=20, downsize_quantity=30)
@@ -330,3 +338,155 @@ def test_submit_return_allocations_adobe_error(
         SubmitReturnAllocations()(mocker.MagicMock(), context, mocker.MagicMock())
 
     mock_send_exception.assert_called_once()
+
+
+def test_submit_return_allocations_reconciles_after_each_return(
+    mocker,
+    mock_adobe_client,
+    downsize_context,
+    returnable_order_factory,
+    return_plan_factory,
+    adobe_order_factory,
+    adobe_subscription_factory,
+    mock_downsize_update_order,
+):
+    mock_adobe_client.create_return_order.side_effect = [
+        adobe_order_factory(
+            order_type="RETURN", order_id="return-a", status=AdobeOrderStatus.COMPLETE.value
+        ),
+        adobe_order_factory(
+            order_type="RETURN", order_id="return-b", status=AdobeOrderStatus.COMPLETE.value
+        ),
+    ]
+    mock_adobe_client.get_subscription.side_effect = [
+        adobe_subscription_factory(current_quantity=25, renewal_quantity=45),
+        adobe_subscription_factory(current_quantity=15, renewal_quantity=25),
+    ]
+    context = downsize_context(old_quantity=45, quantity=15)
+    context.downsize_plans = {
+        SKU: return_plan_factory([
+            returnable_order_factory("order_a", "2024-11-01T00:00:00Z", 20),
+            returnable_order_factory("order_b", "2024-11-05T00:00:00Z", 10),
+        ])
+    }
+
+    SubmitReturnAllocations()(mocker.MagicMock(), context, mocker.MagicMock())  # act
+
+    assert mock_adobe_client.update_subscription.call_args_list == [
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            SUBSCRIPTION_ID,
+            auto_renewal=True,
+            quantity=quantity,
+        )
+        for quantity in (25, 15)
+    ]
+
+
+def test_submit_return_allocations_keeps_lower_deferred_renewal_quantity(
+    mocker,
+    mock_adobe_client,
+    downsize_context,
+    returnable_order_factory,
+    return_plan_factory,
+    adobe_order_factory,
+    adobe_subscription_factory,
+    mock_downsize_update_order,
+):
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN", order_id="return-a", status=AdobeOrderStatus.COMPLETE.value
+    )
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=15, renewal_quantity=10
+    )
+    context = downsize_context(old_quantity=10, quantity=5)
+    context.downsize_plans = {
+        SKU: return_plan_factory([returnable_order_factory("order_a", "2024-11-01T00:00:00Z", 5)])
+    }
+    mocked_next_step = mocker.MagicMock()
+
+    SubmitReturnAllocations()(mocker.MagicMock(), context, mocked_next_step)  # act
+
+    mock_adobe_client.update_subscription.assert_not_called()
+    mocked_next_step.assert_called_once()
+
+
+def test_submit_return_allocations_reconciles_previous_returns_first(
+    mocker,
+    mock_adobe_client,
+    downsize_context,
+    returnable_order_factory,
+    return_plan_factory,
+    adobe_order_factory,
+    adobe_subscription_factory,
+    mock_downsize_update_order,
+):
+    completed_return = adobe_order_factory(
+        order_type="RETURN",
+        order_id="return-a",
+        reference_order_id="order_a",
+        status=AdobeOrderStatus.COMPLETE.value,
+    )
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=25, renewal_quantity=45
+    )
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400, {"code": "3120", "message": "Invalid renewal state"}
+    )
+    context = downsize_context(old_quantity=45, quantity=15, return_orders=[completed_return])
+    context.downsize_plans = {
+        SKU: return_plan_factory(
+            [returnable_order_factory("order_b", "2024-11-05T00:00:00Z", 10)],
+            returned_quantity=20,
+        )
+    }
+    mocked_next_step = mocker.MagicMock()
+
+    SubmitReturnAllocations()(mocker.MagicMock(), context, mocked_next_step)  # act
+
+    mock_adobe_client.update_subscription.assert_called_once()
+    mock_adobe_client.create_return_order.assert_not_called()
+    mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("error_code", "expected_notifications"),
+    [
+        ("3120", 0),
+        ("1117", 1),
+    ],
+)
+def test_submit_return_allocations_reconcile_error_stops_the_run(
+    mocker,
+    mock_adobe_client,
+    downsize_context,
+    returnable_order_factory,
+    return_plan_factory,
+    adobe_order_factory,
+    adobe_subscription_factory,
+    mock_downsize_update_order,
+    error_code,
+    expected_notifications,
+):
+    mock_notify = mocker.patch(
+        "adobe_vipm.flows.fulfillment.downsize_returns.notify_not_updated_subscriptions"
+    )
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN", order_id="return-a", status=AdobeOrderStatus.COMPLETE.value
+    )
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=15, renewal_quantity=20
+    )
+    mock_adobe_client.update_subscription.side_effect = AdobeAPIError(
+        400, {"code": error_code, "message": "An error"}
+    )
+    context = downsize_context(old_quantity=20, quantity=15)
+    context.downsize_plans = {
+        SKU: return_plan_factory([returnable_order_factory("order_a", "2024-11-01T00:00:00Z", 5)])
+    }
+    mocked_next_step = mocker.MagicMock()
+
+    SubmitReturnAllocations()(mocker.MagicMock(), context, mocked_next_step)  # act
+
+    assert (mock_notify.call_count, mocked_next_step.called) == (expected_notifications, False)

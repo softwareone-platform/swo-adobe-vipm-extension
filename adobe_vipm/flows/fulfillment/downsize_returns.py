@@ -11,16 +11,19 @@ import logging
 
 from mpt_extension_sdk.mpt_http.mpt import update_order
 
-from adobe_vipm.adobe.client import get_adobe_client
-from adobe_vipm.adobe.constants import AdobeOrderStatus
+from adobe_vipm.adobe.client import AdobeClient, get_adobe_client
+from adobe_vipm.adobe.constants import AdobeErrorCode, AdobeOrderStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.flows.constants import ERR_NO_RETURABLE_ERRORS_FOUND
+from adobe_vipm.flows.constants import ERR_NO_RETURABLE_ERRORS_FOUND, Param
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import switch_order_to_failed
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.utils.deployment import get_deployment_id
+from adobe_vipm.flows.utils.notification import notify_not_updated_subscriptions
 from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
 from adobe_vipm.flows.utils.returns import (
     DownsizeOutcome,
+    DownsizePlan,
     get_sku_returned_quantity,
     plan_downsize,
 )
@@ -89,6 +92,76 @@ class PlanDownsizeReturns(Step):
         return plan_downsize(line, subscription_id, pool, returned_quantity)
 
 
+def reconcile_renewal_quantity(
+    adobe_client: AdobeClient, context: Context, plan: DownsizePlan
+) -> bool:
+    """
+    Lower the renewal quantity of a plan's subscription to the licences it holds.
+
+    Writes ``min(currentQuantity, renewalQuantity)`` when it differs from the current
+    renewal quantity, keeping the auto-renewal flag as it is. A subscription in its
+    renewal window (Adobe error 3120) is retried on the next run; any other Adobe
+    error is notified. The returns already placed are never undone.
+
+    Args:
+        adobe_client: Adobe API client.
+        context: Order flow processing context.
+        plan: RETURN plan of the downsize line.
+
+    Returns:
+        False when the renewal quantity could not be written and the pipeline must stop.
+    """
+    subscription = adobe_client.get_subscription(
+        context.authorization_id, context.adobe_customer_id, plan.subscription_id
+    )
+    current_quantity = subscription[Param.CURRENT_QUANTITY.value]
+    renewal_quantity = subscription["autoRenewal"][Param.RENEWAL_QUANTITY.value]
+    if current_quantity >= renewal_quantity:
+        return True
+    try:
+        adobe_client.update_subscription(
+            context.authorization_id,
+            context.adobe_customer_id,
+            plan.subscription_id,
+            auto_renewal=subscription["autoRenewal"]["enabled"],
+            quantity=current_quantity,
+        )
+    except AdobeAPIError as error:
+        _handle_reconcile_error(context, plan, error)
+        return False
+    logger.info(
+        "%s: renewal quantity of %s reconciled %s -> %s",
+        context,
+        plan.subscription_id,
+        renewal_quantity,
+        current_quantity,
+    )
+    return True
+
+
+def _handle_reconcile_error(context, plan, error):
+    if error.code == AdobeErrorCode.INVALID_RENEWAL_STATE:
+        logger.info(
+            "%s: subscription %s is in its renewal window, renewal quantity "
+            "reconciliation will be retried",
+            context,
+            plan.subscription_id,
+        )
+        return
+    logger.error(
+        "%s: failed to reconcile the renewal quantity of %s",
+        context,
+        plan.subscription_id,
+    )
+    notify_not_updated_subscriptions(
+        context.order_id,
+        f"Error reconciling the renewal quantity of subscription {plan.subscription_id} "
+        f"after a return, {error}",
+        [],
+        context.product_id,
+    )
+
+
 class SubmitReturnAllocations(Step):
     """
     Submit the RETURN orders planned by PlanDownsizeReturns, one at a time.
@@ -99,6 +172,16 @@ class SubmitReturnAllocations(Step):
     stays in Processing; the next run plans again from Adobe's state, so a retry
     never re-submits or over-returns. A line that was partly returned and can no
     longer be covered by its pool fails the order.
+
+    After every completed RETURN order the renewal quantity of the subscription is
+    reconciled to ``min(currentQuantity, renewalQuantity)``: Adobe keeps an explicit
+    renewal quantity unchanged by returns, so without it the anniversary would
+    re-provision returned licences. The value never exceeds the licences held and
+    never raises an earlier deferred reduction; the line's target quantity is only
+    written once the line completes (UpdateRenewalQuantitiesDownsizes). The
+    reconciliation is idempotent and also runs before submitting the next RETURN of
+    a line already partly returned, which recovers a run interrupted between a
+    RETURN and its reconciliation.
     """
 
     def __call__(self, client, context, next_step):
@@ -116,11 +199,21 @@ class SubmitReturnAllocations(Step):
 
     def _submit_plan(self, client, adobe_client, context, plan):
         """Submit the RETURN orders of a plan; False when the pipeline must stop."""
+        return self._is_ready(client, adobe_client, context, plan) and self._submit_allocations(
+            client, adobe_client, context, plan
+        )
+
+    def _is_ready(self, client, adobe_client, context, plan):
         if self._has_pending_return_orders(context, plan.sku):
+            return False
+        if plan.returned_quantity and not reconcile_renewal_quantity(adobe_client, context, plan):
             return False
         if not plan.is_fully_allocated:
             self._fail_not_covered(client, context, plan.sku)
             return False
+        return True
+
+    def _submit_allocations(self, client, adobe_client, context, plan):
         deployment_id = get_deployment_id(context.order)
         for allocation in plan.allocations:
             return_order = self._submit_return_order(
@@ -133,6 +226,8 @@ class SubmitReturnAllocations(Step):
                     return_order["orderId"],
                     plan.sku,
                 )
+                return False
+            if not reconcile_renewal_quantity(adobe_client, context, plan):
                 return False
         return True
 
