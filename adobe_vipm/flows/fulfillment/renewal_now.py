@@ -53,7 +53,8 @@ from adobe_vipm.adobe.constants import (
     AdobeOrderStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.adobe.utils import is_flex_discount_applied
+from adobe_vipm.adobe.utils import is_flex_discount_applied, get_line_remaining_quantity
+
 from adobe_vipm.flows.constants import (
     ERR_RENEWAL_NET_NEW_FAILED,
     ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED,
@@ -797,14 +798,16 @@ class ReturnPreviousRenewalOrders(Step):
     """
     Return the previous RENEWAL order lines resolved by ResolvePreviousRenewalReturns.
 
-    Each candidate is one previous RENEWAL line of a lapsing subscription
-    (renew = false), placed within the return window. Disabling its
-    auto-renewal is not enough — the already-paid renewal must be undone, so
-    this step submits one RETURN order per line, referencing that RENEWAL
-    order and returning the candidate's quantity (the line's remaining seats,
-    or fewer when they complete the subscription's renewed quantity); other
-    lines of those orders stay renewed. Runs after SubmitRenewalNowOrder so
-    the additive operation always precedes the subtractive one.
+    Each candidate is a lapsing subscription (renew = false) already
+    committed in a previous RENEWAL order placed within the return window.
+    Disabling its auto-renewal is not enough — the already-paid renewal must
+    be undone, so this step submits a RETURN order referencing that previous
+    RENEWAL order, returning only the lapsing subscription's line (other
+    lines of that order stay renewed) for its current ``remainingQuantity``,
+    so a line already partly returned or reduced by a switch plan is not
+    rejected by Adobe; a line with nothing left to return is skipped. Runs
+    after SubmitRenewalNowOrder so the additive operation always precedes the
+    subtractive one.
 
     The RETURNs are placed one at a time: the next one only once the previous
     one has completed on Adobe's side. Adobe lowers the subscription's
@@ -824,6 +827,8 @@ class ReturnPreviousRenewalOrders(Step):
         """Return the previous RENEWAL order lines of the plan's lapsing subscriptions."""
         adobe_client = get_adobe_client()
         for candidate in context.renewal_return_candidates:
+            if self._is_already_returned(context, candidate):
+                continue
             return_order = candidate["return_order"] or self._create_return_order(
                 client, adobe_client, context, candidate
             )
@@ -839,6 +844,17 @@ class ReturnPreviousRenewalOrders(Step):
 
         next_step(client, context)
 
+    def _is_already_returned(self, context, candidate):
+        if candidate["return_order"] or get_line_remaining_quantity(candidate["returning_line"]):
+            return False
+        logger.info(
+            "%s: previous renewal order %s of subscription %s has nothing left to return",
+            context,
+            candidate["returning_order"]["orderId"],
+            candidate["subscription_id"],
+        )
+        return True
+
     def _create_return_order(self, client, adobe_client, context, candidate):
         subscription_id = candidate["subscription_id"]
         returning_order = candidate["returning_order"]
@@ -851,7 +867,7 @@ class ReturnPreviousRenewalOrders(Step):
                 returning_line,
                 context.order_id,
                 returning_line.get("deploymentId"),
-                quantity=candidate["quantity"],
+                quantity=get_line_remaining_quantity(returning_line),
             )
         except AdobeAPIError as error:
             logger.warning(

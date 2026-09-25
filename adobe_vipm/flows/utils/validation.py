@@ -27,7 +27,9 @@ def validate_subscription_and_returnable_orders(
     Validates if the subscription is active and has valid returnable orders.
 
     Returnable orders are the orders that has been created in a period
-    of 2 weeks before the current date.
+    of 2 weeks before the current date. Their returnable quantity is Adobe's current
+    ``remainingQuantity`` (or what the MPT order already returned from them), and
+    together they must cover the whole quantity of the subscription.
 
     Args:
         adobe_client (MPTClient): The Adobe client instance

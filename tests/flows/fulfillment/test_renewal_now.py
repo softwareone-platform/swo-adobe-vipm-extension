@@ -1607,6 +1607,47 @@ def test_return_previous_renewal_orders_step_no_candidates(
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
 
+@pytest.mark.parametrize(
+    ("remaining_quantity", "expected_return_calls"),
+    [
+        (6, [6]),
+        (0, []),
+    ],
+)
+def test_return_previous_renewal_orders_step_returns_remaining_quantity(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_now_context,
+    adobe_order_factory,
+    remaining_quantity,
+    expected_return_calls,
+):
+    previous_renewal = previous_renewal_order_factory(adobe_order_factory)
+    previous_renewal["lineItems"][0]["remainingQuantity"] = remaining_quantity
+    renewal_now_context.renewal_return_candidates = [
+        return_candidate(
+            returning_order=previous_renewal,
+            returning_line=previous_renewal["lineItems"][0],
+        )
+    ]
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN",
+        status=AdobeOrderStatus.COMPLETE.value,
+        order_id="ADOBE-RETURN-001",
+        reference_order_id="ADOBE-RENEWAL-PREV",
+    )
+    mocker.patch("adobe_vipm.flows.fulfillment.renewal_now.update_order")
+    mocked_next_step = mocker.MagicMock()
+
+    ReturnPreviousRenewalOrders()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    assert (
+        [call.kwargs["quantity"] for call in mock_adobe_client.create_return_order.call_args_list],
+        mocked_next_step.call_count,
+    ) == (expected_return_calls, 1)
+
+
 def test_return_previous_renewal_orders_step_creates_return(
     mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
 ):
@@ -1638,7 +1679,7 @@ def test_return_previous_renewal_orders_step_creates_return(
         previous_renewal["lineItems"][0],
         renewal_now_context.order_id,
         None,
-        quantity=4,
+        quantity=previous_renewal["lineItems"][0]["quantity"],
     )
     mocked_update_order.assert_called_once_with(
         mock_mpt_client,

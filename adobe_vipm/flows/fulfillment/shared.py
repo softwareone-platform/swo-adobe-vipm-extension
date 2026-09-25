@@ -885,9 +885,13 @@ class GetReturnOrders(Step):
 
 class SubmitReturnOrders(Step):
     """
-    Creates the return orders for each returnable order to match the downsize quantities.
+    Creates the return orders of the returnable orders of a Termination Order.
 
-    Wait for the return orders to be processed before moving to the next step.
+    Each RETURN order returns the returnable order's quantity, its current
+    ``remainingQuantity``, so a termination after an earlier partial return or a
+    switch plan does not ask Adobe for more than is left. Returnable orders already
+    returned by the MPT order reuse their existing RETURN order. Wait for the return
+    orders to be processed before moving to the next step.
     """
 
     def __call__(self, client, context, next_step):
@@ -960,6 +964,7 @@ class SubmitReturnOrders(Step):
                 returnable_order.line,
                 context.order_id,
                 deployment_id,
+                quantity=returnable_order.quantity,
             )
         except AdobeAPIError as error:
             logger.warning("%s", error)
