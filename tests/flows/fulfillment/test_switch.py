@@ -5,6 +5,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_SWITCH,
     AdobeErrorCode,
     AdobeOrderStatus,
+    AdobeSubscriptionStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE, Param
@@ -22,6 +23,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.fulfillment.switch import (
+    AlignSwitchRenewalQuantities,
     GetSwitchPreviewOrder,
     SubmitSwitchOrder,
     fulfill_switch_order,
@@ -30,6 +32,9 @@ from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateSkuAvai
 from adobe_vipm.flows.utils import get_adobe_order_id, get_ordering_parameter
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
+
+SOURCE_SUBSCRIPTION_ID = "2409029d1344028fe34b1a8cc09e8fNA"
+TARGET_SUBSCRIPTION_ID = "target-sub-id"
 
 
 @pytest.fixture
@@ -374,6 +379,167 @@ def test_submit_switch_order_step_other_adobe_error_reraised(
     mocked_next_step.assert_not_called()
 
 
+@pytest.fixture
+def completed_switch_context(switch_order, adobe_order_factory, adobe_items_factory):
+    adobe_order = adobe_order_factory(
+        order_type=ORDER_TYPE_SWITCH,
+        order_id="adobe-switch-order-id",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=adobe_items_factory(
+            offer_id="65322651CA01A12", quantity=25, subscription_id=TARGET_SUBSCRIPTION_ID
+        ),
+    )
+    return Context(
+        order=switch_order,
+        order_id=switch_order["id"],
+        product_id="PRD-1111-1111",
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_new_order=adobe_order,
+        adobe_new_order_id="adobe-switch-order-id",
+    )
+
+
+def test_align_switch_renewal_quantities_sets_source_and_target(
+    mocker, mock_adobe_client, mock_mpt_client, completed_switch_context, adobe_subscription_factory
+):
+    subscriptions = {
+        SOURCE_SUBSCRIPTION_ID: adobe_subscription_factory(
+            subscription_id=SOURCE_SUBSCRIPTION_ID, current_quantity=10, renewal_quantity=12
+        ),
+        TARGET_SUBSCRIPTION_ID: adobe_subscription_factory(
+            subscription_id=TARGET_SUBSCRIPTION_ID, current_quantity=25, renewal_quantity=20
+        ),
+    }
+    mock_adobe_client.get_subscription.side_effect = lambda *call_args: subscriptions[call_args[-1]]
+    mocked_notify = mocker.patch("adobe_vipm.flows.fulfillment.switch.send_exception")
+    mocked_next_step = mocker.MagicMock()
+    step = AlignSwitchRenewalQuantities()
+
+    step(mock_mpt_client, completed_switch_context, mocked_next_step)  # act
+
+    assert mock_adobe_client.set_renewal_quantity.call_args_list == [
+        mocker.call("authorization-id", "customer-id", SOURCE_SUBSCRIPTION_ID, 10),
+        mocker.call("authorization-id", "customer-id", TARGET_SUBSCRIPTION_ID, 25),
+    ]
+    mocked_notify.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, completed_switch_context)
+
+
+def test_align_switch_renewal_quantities_skips_inactive_source(
+    mocker, mock_adobe_client, mock_mpt_client, completed_switch_context, adobe_subscription_factory
+):
+    """A source switched in full is inactive and must not be updated."""
+    subscriptions = {
+        SOURCE_SUBSCRIPTION_ID: adobe_subscription_factory(
+            subscription_id=SOURCE_SUBSCRIPTION_ID,
+            current_quantity=0,
+            renewal_quantity=25,
+            status=AdobeSubscriptionStatus.INACTIVE.value,
+        ),
+        TARGET_SUBSCRIPTION_ID: adobe_subscription_factory(
+            subscription_id=TARGET_SUBSCRIPTION_ID, current_quantity=25, renewal_quantity=10
+        ),
+    }
+    mock_adobe_client.get_subscription.side_effect = lambda *call_args: subscriptions[call_args[-1]]
+    mocked_next_step = mocker.MagicMock()
+    step = AlignSwitchRenewalQuantities()
+
+    step(mock_mpt_client, completed_switch_context, mocked_next_step)  # act
+
+    mock_adobe_client.set_renewal_quantity.assert_called_once_with(
+        "authorization-id", "customer-id", TARGET_SUBSCRIPTION_ID, 25
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, completed_switch_context)
+
+
+def test_align_switch_renewal_quantities_skips_subscriptions_not_auto_renewing(
+    mocker, mock_adobe_client, mock_mpt_client, completed_switch_context, adobe_subscription_factory
+):
+    """Adobe ignores a renewal quantity while auto-renewal is off, so none is sent."""
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=10, renewal_quantity=12, autorenewal_enabled=False
+    )
+    mocked_notify = mocker.patch("adobe_vipm.flows.fulfillment.switch.send_exception")
+    mocked_next_step = mocker.MagicMock()
+    step = AlignSwitchRenewalQuantities()
+
+    step(mock_mpt_client, completed_switch_context, mocked_next_step)  # act
+
+    mock_adobe_client.set_renewal_quantity.assert_not_called()
+    mocked_notify.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, completed_switch_context)
+
+
+def test_align_switch_renewal_quantities_skips_subscriptions_already_aligned(
+    mocker, mock_adobe_client, mock_mpt_client, completed_switch_context, adobe_subscription_factory
+):
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=25, renewal_quantity=25
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = AlignSwitchRenewalQuantities()
+
+    step(mock_mpt_client, completed_switch_context, mocked_next_step)  # act
+
+    assert mock_adobe_client.get_subscription.call_count == 2
+    mock_adobe_client.set_renewal_quantity.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, completed_switch_context)
+
+
+def test_align_switch_renewal_quantities_failure_notifies_and_completes(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    completed_switch_context,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    """The SWITCH is already done, so a failed update is reported, never failed."""
+    mock_adobe_client.get_subscription.return_value = adobe_subscription_factory(
+        current_quantity=10, renewal_quantity=12
+    )
+    mock_adobe_client.set_renewal_quantity.side_effect = [
+        AdobeAPIError(500, adobe_api_error_factory(code="1124", message="Internal Server Error")),
+        None,
+    ]
+    mocked_notify = mocker.patch("adobe_vipm.flows.fulfillment.switch.send_exception")
+    mocked_next_step = mocker.MagicMock()
+    step = AlignSwitchRenewalQuantities()
+
+    step(mock_mpt_client, completed_switch_context, mocked_next_step)  # act
+
+    assert mock_adobe_client.set_renewal_quantity.call_count == 2
+    mocked_notify.assert_called_once()
+    title, message = mocked_notify.call_args.args
+    assert title == (
+        f"Renewal quantity not aligned after mid-term upgrade: {completed_switch_context.order_id}"
+    )
+    assert SOURCE_SUBSCRIPTION_ID in message
+    assert TARGET_SUBSCRIPTION_ID not in message
+    assert "Product ID: PRD-1111-1111" in message
+    mocked_next_step.assert_called_once_with(mock_mpt_client, completed_switch_context)
+
+
+def test_align_switch_renewal_quantities_read_failure_notifies_and_completes(
+    mocker, mock_adobe_client, mock_mpt_client, completed_switch_context, adobe_api_error_factory
+):
+    mock_adobe_client.get_subscription.side_effect = AdobeAPIError(
+        500, adobe_api_error_factory(code="1124", message="Internal Server Error")
+    )
+    mocked_notify = mocker.patch("adobe_vipm.flows.fulfillment.switch.send_exception")
+    mocked_next_step = mocker.MagicMock()
+    step = AlignSwitchRenewalQuantities()
+
+    step(mock_mpt_client, completed_switch_context, mocked_next_step)  # act
+
+    mock_adobe_client.set_renewal_quantity.assert_not_called()
+    message = mocked_notify.call_args.args[1]
+    assert SOURCE_SUBSCRIPTION_ID in message
+    assert TARGET_SUBSCRIPTION_ID in message
+    mocked_next_step.assert_called_once_with(mock_mpt_client, completed_switch_context)
+
+
 def test_fulfill_switch_order(mocker):
     mocked_pipeline_instance = mocker.MagicMock()
     mocked_pipeline_ctor = mocker.patch(
@@ -402,6 +568,7 @@ def test_fulfill_switch_order(mocker):
         UpdatePrices,
         SubmitSwitchOrder,
         CreateOrUpdateSubscriptions,
+        AlignSwitchRenewalQuantities,
         CompleteOrder,
         SetSubscriptionTemplate,
         SyncAgreement,
@@ -411,6 +578,6 @@ def test_fulfill_switch_order(mocker):
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[12].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[13].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)

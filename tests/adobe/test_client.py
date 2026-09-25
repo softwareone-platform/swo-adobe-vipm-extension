@@ -3763,6 +3763,92 @@ def test_client_wires_auth_endpoint_retrying_adapter(
     assert result.allowed_methods == frozenset(("GET", "POST"))
 
 
+def test_build_session_retry_policy_for_idempotent_writes_also_retries_patch():
+    session = adobe_client._build_retrying_session(
+        "https://auth.adobe.io/token",
+        adobe_client.ADOBE_IDEMPOTENT_WRITE_RETRY_ALLOWED_METHODS,
+    )
+
+    result = session.get_adapter("https://partners.adobe.io").max_retries
+
+    assert result.allowed_methods == frozenset(("GET", "PATCH"))
+    assert set(result.status_forcelist) == {429, 500}
+    assert result.total == 3
+
+
+def test_client_wires_idempotent_write_session(settings, mock_adobe_config, adobe_config_file):
+    client = adobe_client.AdobeClient()
+
+    result = client._idempotent_write_session.get_adapter("https://partners.adobe.io").max_retries
+
+    assert result.allowed_methods == frozenset(("GET", "PATCH"))
+    # The default session keeps retrying GET only.
+    assert client._session.get_adapter("https://partners.adobe.io").max_retries.allowed_methods == (
+        frozenset(("GET",))
+    )
+
+
+def test_set_renewal_quantity(requests_mocker, settings, adobe_client_factory):
+    client, authorization, api_token = adobe_client_factory()
+    customer_id = "a-customer"
+    sub_id = "a-sub-id"
+    requests_mocker.patch(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/subscriptions/{sub_id}",
+        ),
+        status=200,
+        json={"a": "subscription"},
+        match=[
+            matchers.header_matcher({"Authorization": f"Bearer {api_token.token}"}),
+            # Auto-renewal stays enabled and only the quantity is sent: no discount codes.
+            matchers.json_params_matcher({
+                "autoRenewal": {"enabled": True, Param.RENEWAL_QUANTITY.value: 10}
+            }),
+        ],
+    )
+
+    result = client.set_renewal_quantity(authorization.authorization_uk, customer_id, sub_id, 10)
+
+    assert result is None
+    assert len(requests_mocker.calls) == 1
+
+
+def test_set_renewal_quantity_retries_transient_500_then_succeeds(
+    requests_mocker, settings, adobe_client_factory
+):
+    client, authorization, _ = adobe_client_factory()
+    url = urljoin(
+        settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+        "/v3/customers/a-customer/subscriptions/a-sub-id",
+    )
+    requests_mocker.patch(url, status=500, json={"code": "1124", "message": "boom"})
+    requests_mocker.patch(url, status=200, json={})
+
+    client.set_renewal_quantity(authorization.authorization_uk, "a-customer", "a-sub-id", 10)  # act
+
+    assert len(requests_mocker.calls) == 2
+
+
+def test_set_renewal_quantity_raises_adobe_api_error_when_retries_exhausted(
+    requests_mocker, settings, adobe_client_factory, adobe_api_error_factory
+):
+    client, authorization, _ = adobe_client_factory()
+    url = urljoin(
+        settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+        "/v3/customers/a-customer/subscriptions/a-sub-id",
+    )
+    requests_mocker.patch(
+        url, status=500, json=adobe_api_error_factory(code="1124", message="Internal Server Error")
+    )
+
+    with pytest.raises(AdobeAPIError) as exc_info:
+        client.set_renewal_quantity(authorization.authorization_uk, "a-customer", "a-sub-id", 10)
+
+    assert exc_info.value.code == "1124"
+    assert len(requests_mocker.calls) == adobe_client.ADOBE_RETRY_TOTAL + 1
+
+
 @pytest.mark.parametrize(
     ("adapter_url", "method"),
     [
