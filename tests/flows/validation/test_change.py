@@ -1,6 +1,4 @@
-import datetime as dt
-
-from freezegun import freeze_time
+import pytest
 
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.context import Context
@@ -10,6 +8,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment, ValidateSkuAvailability
+from adobe_vipm.flows.utils.returns import DownsizeOutcome
 from adobe_vipm.flows.validation.change import (
     GetPreviewOrder,
     ValidateDownsizes,
@@ -22,256 +21,84 @@ from adobe_vipm.flows.validation.shared import (
 )
 
 
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsizes_step(
+@pytest.fixture
+def draft_downsize_context(order_factory, lines_factory, adobe_customer_factory):
+    def _context(old_quantity, quantity):
+        order = order_factory(lines=lines_factory(quantity=quantity, old_quantity=old_quantity))
+        adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
+        return Context(
+            order=order,
+            authorization_id=order["authorization"]["id"],
+            downsize_lines=order["lines"],
+            adobe_customer_id=adobe_customer["customerId"],
+            adobe_customer=adobe_customer,
+        )
+
+    return _context
+
+
+@pytest.fixture
+def returnable_orders_factory(adobe_order_factory, adobe_items_factory):
+    def _returnable(quantities):
+        returnable_orders = []
+        for index, quantity in enumerate(quantities):
+            order = adobe_order_factory(
+                order_type="NEW",
+                order_id=f"order-{index}",
+                items=adobe_items_factory(
+                    subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+                    quantity=quantity,
+                    remaining_quantity=quantity,
+                ),
+                creation_date=f"2024-11-0{index + 1}T00:00:00Z",
+            )
+            returnable_orders.append(ReturnableOrderInfo(order, order["lineItems"][0], quantity))
+        return returnable_orders
+
+    return _returnable
+
+
+@pytest.mark.parametrize(
+    ("old_quantity", "quantity", "pool_quantities", "expected_outcome"),
+    [
+        (14, 7, [1, 2, 4], DownsizeOutcome.RETURN),
+        (14, 9, [1, 2, 4], DownsizeOutcome.RETURN),
+        (14, 7, [14], DownsizeOutcome.RETURN),
+        (14, 2, [1, 2, 4], DownsizeOutcome.DEFER),
+        (14, 7, [], DownsizeOutcome.DEFER),
+    ],
+)
+def test_validate_downsizes_step_never_blocks_the_draft(
     mocker,
     mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
+    draft_downsize_context,
+    returnable_orders_factory,
+    old_quantity,
+    quantity,
+    pool_quantities,
+    expected_outcome,
 ):
-    order = order_factory(lines=lines_factory(quantity=7, old_quantity=14))
-    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
-    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
-    adobe_order_1 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=1),
+    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = (
+        returnable_orders_factory(pool_quantities)
     )
-    adobe_order_2 = adobe_order_factory(order_type="NEW", items=adobe_items_factory(quantity=2))
-    adobe_order_3 = adobe_order_factory(order_type="NEW", items=adobe_items_factory(quantity=4))
-    ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
-    )
-    ret_info_2 = ReturnableOrderInfo(
-        adobe_order_2, adobe_order_2["lineItems"][0], adobe_order_2["lineItems"][0]["quantity"]
-    )
-    ret_info_3 = ReturnableOrderInfo(
-        adobe_order_3, adobe_order_3["lineItems"][0], adobe_order_3["lineItems"][0]["quantity"]
-    )
-    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
-        ret_info_1,
-        ret_info_2,
-        ret_info_3,
-    ]
+    context = draft_downsize_context(old_quantity, quantity)
     mocked_client = mocker.MagicMock()
     mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-    )
-    step = ValidateDownsizes()
 
-    step(mocked_client, context, mocked_next_step)  # act
+    ValidateDownsizes()(mocked_client, context, mocked_next_step)  # act
 
-    assert context.validation_succeeded is True
+    assert (
+        context.validation_succeeded,
+        context.order["error"],
+        context.downsize_plans["65304578CA"].outcome,
+    ) == (True, None, expected_outcome)
     mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
         context.authorization_id,
         context.adobe_customer_id,
         "6158e1cf0e4414a9b3a06d123969fdNA",
-        context.adobe_customer["cotermDate"],
+        "2025-10-09",
     )
     mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsizes_step_no_returnable_orders(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    order = order_factory(lines=lines_factory(quantity=7, old_quantity=14))
-    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
-    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
-    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-    )
-    step = ValidateDownsizes()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert context.validation_succeeded is True
-    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        "6158e1cf0e4414a9b3a06d123969fdNA",
-        context.adobe_customer["cotermDate"],
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsizes_step_invalid_quantity(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    order = order_factory(lines=lines_factory(quantity=7, old_quantity=16))
-    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
-    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
-    adobe_order_1 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=1),
-        creation_date="2024-05-01",
-    )
-    adobe_order_2 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=2),
-        creation_date="2024-05-07",
-    )
-    adobe_order_3 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=4),
-        creation_date="2024-05-11",
-    )
-    ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
-    )
-    ret_info_2 = ReturnableOrderInfo(
-        adobe_order_2, adobe_order_2["lineItems"][0], adobe_order_2["lineItems"][0]["quantity"]
-    )
-    ret_info_3 = ReturnableOrderInfo(
-        adobe_order_3, adobe_order_3["lineItems"][0], adobe_order_3["lineItems"][0]["quantity"]
-    )
-    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
-        ret_info_1,
-        ret_info_2,
-        ret_info_3,
-    ]
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-    )
-    step = ValidateDownsizes()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert context.validation_succeeded is False
-    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        "6158e1cf0e4414a9b3a06d123969fdNA",
-        context.adobe_customer["cotermDate"],
-    )
-    assert context.order["error"] == {
-        "id": "VIPM0019",
-        "message": (
-            "Could not find suitable returnable orders for all items.\nCannot reduce item "
-            "`Awesome product` quantity by 9. Please reduce the quantity "
-            "by 1, 2, 4, or any combination of these values, or wait until 2024-05-26 "
-            "when there are no returnable "
-            "orders to modify your renewal quantity."
-        ),
-    }
-    mocked_next_step.assert_not_called()
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsizes_step_invalid_quantity_last_two_weeks(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    order = order_factory(lines=lines_factory(quantity=7, old_quantity=16))
-    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=10)
-    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-    )
-    step = ValidateDownsizes()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert context.validation_succeeded is True
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_validate_downsizes_step_invalid_quantity_initial_purchase_only(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    order = order_factory(lines=lines_factory(quantity=7, old_quantity=16))
-    coterm_date = dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=20)
-    adobe_customer = adobe_customer_factory(coterm_date=coterm_date.strftime("%Y-%m-%d"))
-    adobe_order_1 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(subscription_id="6158e1cf0e4414a9b3a06d123969fdNA", quantity=16),
-        creation_date="2024-05-01",
-    )
-    ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
-    )
-    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [ret_info_1]
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-    )
-    step = ValidateDownsizes()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert context.validation_succeeded is False
-    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        "6158e1cf0e4414a9b3a06d123969fdNA",
-        context.adobe_customer["cotermDate"],
-    )
-    assert context.order["error"] == {
-        "id": "VIPM0019",
-        "message": (
-            "Could not find suitable returnable orders for all items.\nCannot reduce item "
-            "`Awesome product` quantity by 9 and there is only one returnable order which would "
-            "reduce the quantity to zero. Consider placing a Termination order for this "
-            "subscription instead and place a new order for 7 licenses."
-        ),
-    }
-    mocked_next_step.assert_not_called()
 
 
 def test_validate_change_order(mocker):
