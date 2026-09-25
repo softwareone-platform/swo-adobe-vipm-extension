@@ -10,7 +10,7 @@ Nothing here performs I/O: the pool and the RETURN orders already placed are
 read by the caller.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
@@ -55,6 +55,10 @@ class DownsizePlan:
         """Whether the allocations cover the whole outstanding quantity."""
         allocated = sum(allocation.quantity for allocation in self.allocations)
         return allocated == self.outstanding_quantity
+
+    def as_deferred(self) -> "DownsizePlan":
+        """Return the same line resolved as a DEFER, with nothing to return."""
+        return replace(self, outcome=DownsizeOutcome.DEFER, allocations=())
 
 
 def is_returnable_offer(offer_id: str) -> bool:

@@ -521,6 +521,18 @@ ERR_RENEWAL_RETURN_WINDOW_CLOSED = ValidationError(
     "{creation_date}, outside the {window_days}-day return window, so it cannot be returned.",
 )
 
+ERR_PARTIAL_RETURN_INCOMPLETE = ValidationError(
+    "VIPM0055",
+    "The downsize could not be completed after part of it was already returned to Adobe. "
+    "Returned lines were not undone. {details}. Error: {error}.",
+)
+
+ERR_RETURN_VIOLATES_3YC = ValidationError(
+    "VIPM0056",
+    "Adobe rejected the return because it would reduce the three-year commitment below its "
+    "minimum commit quantity: {error}.",
+)
+
 ERR_EARLY_RENEWAL_IN_PROGRESS = ValidationError(
     "VIPM0051",
     "An early renewal has already been placed for this agreement, so Change, "

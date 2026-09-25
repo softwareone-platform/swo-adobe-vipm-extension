@@ -184,3 +184,20 @@ def test_plan_downsize_already_fully_returned(downsize_line):
         0,
         True,
     )
+
+
+def test_downsize_plan_as_deferred(pool_entry_factory, downsize_line):
+    plan = plan_downsize(
+        downsize_line(20, 15),
+        "SUB-1",
+        [pool_entry_factory("order_a", "2024-01-02T00:00:00Z", 20)],
+        0,
+    )
+
+    result = plan.as_deferred()
+
+    assert (result.outcome, result.allocations, result.downsize_quantity) == (
+        DownsizeOutcome.DEFER,
+        (),
+        5,
+    )
