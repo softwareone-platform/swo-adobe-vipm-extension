@@ -46,6 +46,8 @@ def _fulfill_change_order_router(client, order):
 def _fulfill_configuration_order_router(client, order):
     if is_renew_now_order(order):
         return fulfill_renewal_now_order(client, order)
+    if is_renewal_order(order):
+        return fulfill_renewal_order(client, order)
     return fulfill_configuration_order(client, order)
 
 

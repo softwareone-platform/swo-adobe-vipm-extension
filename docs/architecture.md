@@ -34,7 +34,11 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    `switchPayload` or `renewalPayload` ordering parameter are routed to
    `switch.py` (mid-term upgrades), `renewal.py` (at-anniversary renewals) and
    `renewal_now.py` (renew-now renewals, `renewalPath: "now"`, documented in
-   [renew-now.md](renew-now.md)); `renewal.py` also hosts the 3YC
+   [renew-now.md](renew-now.md)); configuration orders carrying a
+   `renewalPayload` are routed to the same two renewal flows, because the
+   renewal wizard submits a plan that changes only renew decisions as a
+   configuration order, and `renewal.py` keeps the configuration templates for
+   them; `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
    that both renewal flows run before mutating Adobe; `shared.py` holds common
    utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
