@@ -5,7 +5,6 @@ It exposes a single function that is the entrypoint for change order
 processing.
 """
 
-import itertools
 import logging
 from functools import partial
 
@@ -16,11 +15,14 @@ from adobe_vipm.adobe.constants import AdobeErrorCode, AdobeOrderStatus
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
-    ERR_NO_RETURABLE_ERRORS_FOUND,
     TEMPLATE_NAME_CHANGE,
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.downsize_returns import (
+    PlanDownsizeReturns,
+    SubmitReturnAllocations,
+)
 from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CheckManualRenewalSubscriptions,
@@ -38,7 +40,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitRenewalOrders,
-    SubmitReturnOrders,
     SyncAgreement,
     UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
@@ -57,108 +58,10 @@ from adobe_vipm.flows.utils import (
     get_subscription_by_line_and_item_id,
     notify_not_updated_subscriptions,
 )
-from adobe_vipm.flows.utils.customer import is_within_coterm_window
 from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
-from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
 from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
-
-
-class GetReturnableOrders(Step):
-    """
-    Compute a map of returnable orders.
-
-    it retrieves all the NEW or RENEWAL Adobe
-    placed at most 14 days ago (cancellation window) and not
-    after two weeks before the anniversary date.
-    The computed dictionary map a SKU to a list of ReturnableOrderInfo
-    so the sum of the quantity of such list of returnable orders match the downsize
-    quantity if a sum that match such quantity exists.
-    """
-
-    def __call__(self, client, context, next_step):  # ruff:ignore[complex-structure]
-        """Compute a map of returnable orders."""
-        adobe_client = get_adobe_client()
-        returnable_orders_count = 0
-        if is_within_coterm_window(context.adobe_customer):
-            logger.info(
-                "Downsize occurs in the last two weeks before the anniversary date. "
-                "Returnable orders are not going to be submitted, the renewal quantity "
-                "will be updated."
-            )
-            next_step(client, context)
-            return
-
-        for line in context.downsize_lines:
-            sku = line["item"]["externalIds"]["vendor"]
-            subscription_id = get_subscription_by_line_subs_id(
-                context.order["agreement"]["subscriptions"], line
-            )
-            returnable_orders = adobe_client.get_returnable_orders_by_subscription_id(
-                context.authorization_id,
-                context.adobe_customer_id,
-                subscription_id,
-                context.adobe_customer["cotermDate"],
-                return_orders=context.adobe_return_orders.get(sku),
-            )
-            if not returnable_orders:
-                logger.info("%s: no returnable orders found for sku %s", context, sku)
-                continue
-            returnable_orders_count += len(returnable_orders)
-            returnable_by_quantity = {}
-            for order in range(len(returnable_orders), 0, -1):
-                for sub in itertools.combinations(returnable_orders, order):
-                    returnable_by_quantity[sum(line_item.quantity for line_item in sub)] = sub
-
-            delta = line["oldQuantity"] - line["quantity"]
-            if delta not in returnable_by_quantity:
-                context.adobe_returnable_orders[sku] = None
-                continue
-
-            context.adobe_returnable_orders[sku] = returnable_by_quantity[delta]
-        logger.info("%s: found %s returnable orders.", context, returnable_orders_count)
-        next_step(client, context)
-
-
-class ValidateReturnableOrders(Step):
-    """
-    Validates that all the lines that should be downsized can be processed.
-
-    The sum of the quantity of one or more orders that can be returned
-    matched the downsize quantity.
-    If there are SKUs that cannot be downsized and no return order
-    has been placed previously, the order will be failed.
-    This can happen if the draft validation have been skipped or the order
-    has been switched to `Processing` if a day or more have passed after
-    the draft validation.
-    """
-
-    def __call__(self, client, context, next_step):
-        """Validates that all the lines that should be downsized can be processed."""
-        if (
-            context.adobe_returnable_orders
-            and not all(context.adobe_returnable_orders.values())
-            and not context.adobe_return_orders
-        ):
-            non_returnable_skus = [
-                key
-                for key, ord_value in context.adobe_returnable_orders.items()
-                if ord_value is None
-            ]
-            error = ERR_NO_RETURABLE_ERRORS_FOUND.to_dict(
-                non_returnable_skus=", ".join(non_returnable_skus),
-            )
-
-            switch_order_to_failed(
-                client,
-                context.order,
-                error,
-            )
-            logger.info("%s: failed due to %s", context, error["message"])
-            return
-
-        next_step(client, context)
 
 
 def _check_item_in_order(line, order_item):
@@ -349,10 +252,9 @@ def fulfill_change_order(client, order):
         ValidateRenewalWindow(),
         ValidateSkuAvailability(is_validation=False),
         GetReturnOrders(),
-        GetReturnableOrders(),
-        ValidateReturnableOrders(),
         CheckManualRenewalSubscriptions(),
         Validate3YCCommitment(),
+        PlanDownsizeReturns(),
         SelectFlexDiscounts(),
         GetPreviewOrder(),
         UpdatePrices(is_validation=False),
@@ -360,7 +262,7 @@ def fulfill_change_order(client, order):
         SubmitRenewalOrders(),
         SubmitNewOrder(),
         UpdateRenewalQuantities(),
-        SubmitReturnOrders(),
+        SubmitReturnAllocations(),
         UpdateRenewalQuantitiesDownsizes(),
         CreateOrUpdateAssets(),
         CreateOrUpdateSubscriptions(),

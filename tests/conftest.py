@@ -1530,6 +1530,7 @@ def mock_adobe_client(mocker):
     paths = [
         "adobe_vipm.flows.benefits",
         "adobe_vipm.flows.fulfillment.change",
+        "adobe_vipm.flows.fulfillment.downsize_returns",
         "adobe_vipm.flows.fulfillment.purchase",
         "adobe_vipm.flows.fulfillment.renewal",
         "adobe_vipm.flows.fulfillment.renewal_now",
