@@ -53,8 +53,7 @@ from adobe_vipm.adobe.constants import (
     AdobeOrderStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.adobe.utils import is_flex_discount_applied, get_line_remaining_quantity
-
+from adobe_vipm.adobe.utils import get_line_remaining_quantity, is_flex_discount_applied
 from adobe_vipm.flows.constants import (
     ERR_RENEWAL_NET_NEW_FAILED,
     ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED,
