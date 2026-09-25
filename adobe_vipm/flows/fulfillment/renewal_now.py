@@ -70,6 +70,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     RecordClientDiscountCodes,
     RecordDiscountRedemptions,
     Validate3YCRenewalFloor,
+    ValidateNetNewOrderLines,
 )
 from adobe_vipm.flows.fulfillment.shared import (
     CompleteOrder,
@@ -88,7 +89,6 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
-from adobe_vipm.flows.utils import get_order_line_by_sku
 from adobe_vipm.flows.utils.deployment import get_deployment_id
 from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
 from adobe_vipm.utils import get_partial_sku
@@ -1003,44 +1003,6 @@ class ResolveNetNewRenewedSubscriptions(Step):
             offer_id,
         )
         return True
-
-
-class ValidateNetNewOrderLines(Step):
-    """
-    Fail the order before any Adobe mutation when a net-new item has no MPT order line.
-
-    CreateNetNewMptSubscriptions matches each net-new item to its MPT order line by SKU
-    and skips an unmatched one. On the renew-now path that would leave Adobe having
-    created-and-invoiced the subscription while the MPT order completes without it, so
-    this step validates the mapping up front — before PREVIEW_RENEWAL — and fails the
-    order with nothing committed instead.
-    """
-
-    def __call__(self, client, context, next_step):
-        """Fail the order when a net-new item has no matching MPT order line."""
-        unmatched = [
-            net_new_item["offerId"]
-            for _, net_new_item in _iter_net_new_lines(context)
-            if not get_order_line_by_sku(context.order, net_new_item["offerId"])
-        ]
-        if unmatched:
-            unmatched_offers = ", ".join(unmatched)
-            logger.warning(
-                "%s: net-new item(s) with no matching order line: %s",
-                context,
-                unmatched_offers,
-            )
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_RENEWAL_NET_NEW_FAILED.to_dict(
-                    offer_id=unmatched_offers,
-                    error="no matching order line for the net-new item",
-                ),
-            )
-            return
-
-        next_step(client, context)
 
 
 def fulfill_renewal_now_order(client, order):

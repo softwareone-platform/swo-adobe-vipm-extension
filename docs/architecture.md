@@ -34,13 +34,16 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    `switchPayload` or `renewalPayload` ordering parameter are routed to
    `switch.py` (mid-term upgrades), `renewal.py` (at-anniversary renewals) and
    `renewal_now.py` (renew-now renewals, `renewalPath: "now"`, documented in
-   [renew-now.md](renew-now.md)); once Adobe completes a SWITCH, `switch.py` sets
-   the renewal quantity of every switched subscription that is still active and
-   set to auto-renew to its current quantity (`AlignSwitchRenewalQuantities`,
-   through the Adobe client's idempotent-write session, which also retries
-   PATCH; Adobe ignores a renewal quantity while auto-renewal is off), and a
-   failure there is reported rather than failing the order, since the SWITCH
-   cannot be undone; `renewal.py` also hosts the 3YC
+   [renew-now.md](renew-now.md)); configuration orders carrying a
+   `renewalPayload` are routed to the same two renewal flows, because the
+   renewal wizard submits a plan that changes only renew decisions as a
+   configuration order, and `renewal.py` keeps the configuration templates for
+   them; once Adobe completes a SWITCH, `switch.py` sets the renewal quantity of
+   every switched subscription that is still active and set to auto-renew to its
+   current quantity (`AlignSwitchRenewalQuantities`, through the Adobe client's
+   idempotent-write session, which also retries PATCH; Adobe ignores a renewal
+   quantity while auto-renewal is off), and a failure there is reported rather
+   than failing the order, since the SWITCH cannot be undone; `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
    that both renewal flows run before mutating Adobe, the discount-code
    first-successful-use backfill step (`RecordClientDiscountCodes`) that persists
