@@ -18,6 +18,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     RecordClientDiscountCodes,
     RecordDiscountRedemptions,
     Validate3YCRenewalFloor,
+    ValidateNetNewOrderLines,
 )
 from adobe_vipm.flows.fulfillment.renewal_now import (
     DisableLapsingSubscriptions,
@@ -27,7 +28,6 @@ from adobe_vipm.flows.fulfillment.renewal_now import (
     ResolvePreviousRenewalReturns,
     ReturnPreviousRenewalOrders,
     SubmitRenewalNowOrder,
-    ValidateNetNewOrderLines,
     fulfill_renewal_now_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -2016,39 +2016,6 @@ def test_resolve_net_new_renewed_subscriptions_step_missing_subscription_id(
     step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
 
     mock_adobe_client.get_subscription.assert_not_called()
-    mocked_switch_to_failed.assert_called_once()
-    assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
-    mocked_next_step.assert_not_called()
-
-
-def test_validate_net_new_order_lines_step_passes_when_all_matched(
-    mocker, mock_mpt_client, renewal_now_context_net_new
-):
-    """Every net-new item has a matching order line, so the step proceeds."""
-    mocked_next_step = mocker.MagicMock()
-    step = ValidateNetNewOrderLines()
-
-    step(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
-
-    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
-
-
-def test_validate_net_new_order_lines_step_fails_when_line_missing(
-    mocker, mock_mpt_client, renewal_now_context
-):
-    """A net-new item without a matching MPT order line fails the order before commit."""
-    # The default renewal_now_context order has no line for 65322651CA.
-    renewal_now_context.renewal_payload["netNewItems"] = [
-        {"offerId": "65322651CA01A12", "quantity": 5},
-    ]
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
-    )
-    mocked_next_step = mocker.MagicMock()
-    step = ValidateNetNewOrderLines()
-
-    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
-
     mocked_switch_to_failed.assert_called_once()
     assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
     mocked_next_step.assert_not_called()

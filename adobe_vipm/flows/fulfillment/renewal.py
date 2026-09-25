@@ -40,6 +40,7 @@ from adobe_vipm.flows.constants import (
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     MARKET_SEGMENTS,
     TEMPLATE_NAME_CHANGE,
+    OrderType,
     Param,
 )
 from adobe_vipm.flows.context import Context
@@ -54,6 +55,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     UpdateAgreementParamsVisibility,
     ValidateDuplicateLines,
     ValidateRenewalWindow,
+    get_configuration_template_name,
     get_flex_discount_limit_error,
     switch_order_to_failed,
 )
@@ -296,6 +298,49 @@ class Validate3YCRenewalFloor(Step):
                     "status": AdobeSubscriptionStatus.SCHEDULED,
                     "autoRenewal": auto_renewal,
                 })
+
+
+class ValidateNetNewOrderLines(Step):
+    """
+    Fail the order before any Adobe mutation when a net-new item has no MPT order line.
+
+    CreateNetNewMptSubscriptions matches each net-new item to its MPT order line by SKU
+    and skips an unmatched one. That would leave Adobe holding the new subscription
+    (scheduled at the anniversary, or created and invoiced on the renew-now path) while
+    the MPT order completes without it, so both renewal flows validate the mapping up
+    front, before any Adobe call, and fail the order with nothing changed instead. The
+    check does not depend on the order type: a payload that carries net-new items on a
+    Configuration order, which has no lines, fails here too.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Fail the order when a net-new item has no matching MPT order line."""
+        net_new_items = (
+            context.renewal_payload.get("netNewItems", []) if context.renewal_payload else []
+        )
+        unmatched = [
+            net_new_item["offerId"]
+            for net_new_item in net_new_items
+            if not get_order_line_by_sku(context.order, net_new_item["offerId"])
+        ]
+        if unmatched:
+            unmatched_offers = ", ".join(unmatched)
+            logger.warning(
+                "%s: net-new item(s) with no matching order line: %s",
+                context,
+                unmatched_offers,
+            )
+            switch_order_to_failed(
+                client,
+                context.order,
+                ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+                    offer_id=unmatched_offers,
+                    error="no matching order line for the net-new item",
+                ),
+            )
+            return
+
+        next_step(client, context)
 
 
 class CreateNetNewSubscriptions(Step):
@@ -1020,14 +1065,21 @@ class RecordDiscountRedemptions(Step):
 
 def fulfill_renewal_order(client, order):
     """
-    Fulfills a change order that carries an at-anniversary renewal payload.
+    Fulfills an order that carries an at-anniversary renewal payload.
 
     It validates the resulting renewing aggregate against the 3YC committed
     minimum, creates the scheduled net-new subscriptions first (additive
     before subtractive, so the 3YC committed minimum is never breached) and
     then applies the auto-renewal preferences to the existing subscriptions
-    (enable, increase, decrease, disable). Nothing is invoiced and no Adobe
-    order is placed: the plan takes effect at the coterm date.
+    (enable, increase, decrease, disable), including their flexible discount
+    codes. Nothing is invoiced and no Adobe order is placed: the plan takes
+    effect at the coterm date.
+
+    The renewal wizard submits the plan as a Change order when a quantity moves
+    or a net-new product is added, and as a Configuration order when only
+    renew decisions change; both carry the same payload and run this pipeline.
+    A Configuration order keeps the configuration templates its order type
+    uses elsewhere.
 
     Args:
         client (MPTClient): An instance of the MPT client used for communication
@@ -1037,21 +1089,27 @@ def fulfill_renewal_order(client, order):
     Returns:
         None
     """
+    template_name = (
+        get_configuration_template_name(order)
+        if order["type"] == OrderType.CONFIGURATION
+        else TEMPLATE_NAME_CHANGE
+    )
     pipeline = Pipeline(
         SetupContext(),
-        StartOrderProcessing(TEMPLATE_NAME_CHANGE),
+        StartOrderProcessing(template_name),
         SetupDueDate(),
         ValidateDuplicateLines(),
         SetOrUpdateCotermDate(),
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
         SetupRenewalPlan(),
+        ValidateNetNewOrderLines(),
         Validate3YCRenewalFloor(),
         CreateNetNewSubscriptions(),
         UpdateRenewalSubscriptions(),
         CreateNetNewMptSubscriptions(),
         RecordFlexDiscounts(),
-        CompleteOrder(TEMPLATE_NAME_CHANGE),
+        CompleteOrder(template_name),
         RecordClientDiscountCodes(),
         RecordDiscountRedemptions(),
         SetSubscriptionTemplate(),

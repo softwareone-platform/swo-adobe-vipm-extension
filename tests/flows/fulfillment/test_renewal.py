@@ -10,7 +10,13 @@ from adobe_vipm.adobe.constants import (
     ThreeYearCommitmentStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError
-from adobe_vipm.flows.constants import TEMPLATE_NAME_CHANGE, Param
+from adobe_vipm.flows.constants import (
+    ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
+    TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
+    TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
+    TEMPLATE_NAME_CHANGE,
+    Param,
+)
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.renewal import (
     CreateNetNewMptSubscriptions,
@@ -22,6 +28,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     SetupRenewalPlan,
     UpdateRenewalSubscriptions,
     Validate3YCRenewalFloor,
+    ValidateNetNewOrderLines,
     fulfill_renewal_order,
 )
 from adobe_vipm.flows.fulfillment.shared import (
@@ -1218,7 +1225,7 @@ def test_fulfill_renewal_order(mocker):
         "adobe_vipm.flows.fulfillment.renewal.Context", return_value=mocked_context
     )
     mocked_client = mocker.MagicMock()
-    mocked_order = mocker.MagicMock()
+    mocked_order = {"type": "Change"}
 
     fulfill_renewal_order(mocked_client, mocked_order)  # act
 
@@ -1231,6 +1238,7 @@ def test_fulfill_renewal_order(mocker):
         UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
         SetupRenewalPlan,
+        ValidateNetNewOrderLines,
         Validate3YCRenewalFloor,
         CreateNetNewSubscriptions,
         UpdateRenewalSubscriptions,
@@ -1247,10 +1255,100 @@ def test_fulfill_renewal_order(mocker):
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[8].include_net_new_items is True
-    assert pipeline_args[13].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[9].include_net_new_items is True
+    assert pipeline_args[14].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
+
+
+@pytest.mark.parametrize(
+    ("auto_renew", "expected_template"),
+    [
+        (True, TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE),
+        (False, TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE),
+    ],
+)
+def test_fulfill_renewal_order_configuration_order_uses_configuration_template(
+    mocker, auto_renew, expected_template
+):
+    mocked_pipeline_ctor = mocker.patch("adobe_vipm.flows.fulfillment.renewal.Pipeline")
+    mocker.patch("adobe_vipm.flows.fulfillment.renewal.Context")
+    order = {"type": "Configuration", "subscriptions": [{"autoRenew": auto_renew}]}
+
+    fulfill_renewal_order(mocker.MagicMock(), order)  # act
+
+    pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
+    assert pipeline_args[1].template_name == expected_template
+    assert pipeline_args[14].template_name == expected_template
+
+
+def test_validate_net_new_order_lines_step_passes_when_all_matched(
+    mocker, mock_mpt_client, renewal_context
+):
+    mocked_next_step = mocker.MagicMock()
+    step = ValidateNetNewOrderLines()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_validate_net_new_order_lines_step_fails_when_line_missing(
+    mocker, mock_mpt_client, renewal_context
+):
+    renewal_context.renewal_payload["netNewItems"] = [
+        {"offerId": "99999999CA01A12", "quantity": 5},
+    ]
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ValidateNetNewOrderLines()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    assert "99999999CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_net_new_order_lines_step_fails_net_new_items_on_a_configuration_order(
+    mocker, mock_mpt_client, renewal_context
+):
+    renewal_context.order["type"] = "Configuration"
+    renewal_context.order["lines"] = []
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ValidateNetNewOrderLines()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    assert "65322651CA01A12" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    mocked_next_step.assert_not_called()
+
+
+def test_create_net_new_mpt_subscriptions_step_ignores_the_no_change_placeholder(
+    mocker, mock_mpt_client, renewal_context, lines_factory
+):
+    renewal_context.order["lines"] = lines_factory(
+        external_vendor_id=ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
+        old_quantity=0,
+        quantity=1,
+    )
+    renewal_context.renewal_net_new_subscriptions = {}
+    mocked_create_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_subscription"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = CreateNetNewMptSubscriptions()
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    mocked_create_subscription.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
 
 
 @pytest.fixture
