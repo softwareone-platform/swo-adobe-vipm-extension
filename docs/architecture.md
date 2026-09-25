@@ -38,7 +38,12 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    `renewalPayload` are routed to the same two renewal flows, because the
    renewal wizard submits a plan that changes only renew decisions as a
    configuration order, and `renewal.py` keeps the configuration templates for
-   them; `renewal.py` also hosts the 3YC
+   them; once Adobe completes a SWITCH, `switch.py` sets the renewal quantity of
+   every switched subscription that is still active and set to auto-renew to its
+   current quantity (`AlignSwitchRenewalQuantities`, through the Adobe client's
+   idempotent-write session, which also retries PATCH; Adobe ignores a renewal
+   quantity while auto-renewal is off), and a failure there is reported rather
+   than failing the order, since the SWITCH cannot be undone; `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
    that both renewal flows run before mutating Adobe; `shared.py` holds common
    utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
