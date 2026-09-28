@@ -187,6 +187,49 @@ class SubscriptionClientMixin:
         return self.get_subscription(authorization_id, customer_id, subscription_id)
 
     @wrap_http_error
+    def set_renewal_quantity(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        subscription_id: str,
+        renewal_quantity: int,
+    ) -> None:
+        """
+        Set the explicit renewal quantity of a subscription set to auto-renew.
+
+        Only ``autoRenewal.renewalQuantity`` changes: auto-renewal stays enabled and
+        no discount codes are sent, so resending the request leaves the same state.
+        It therefore goes through the idempotent-write session, which retries
+        transient failures (429/500, dropped connections) the way GET requests are
+        retried. Call it only for a subscription whose auto-renewal is enabled:
+        while it is disabled Adobe accepts the request but ignores the quantity.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer to which the subscription belongs to.
+            subscription_id: Identifier of the subscription to update.
+            renewal_quantity: The quantity of licenses to renew on the anniversary date.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        headers = self._get_headers(authorization)
+        payload = {
+            "autoRenewal": {
+                "enabled": True,
+                Param.RENEWAL_QUANTITY.value: renewal_quantity,
+            },
+        }
+        response = self._idempotent_write_session.patch(
+            urljoin(
+                self._config.api_base_url,
+                f"/v3/customers/{customer_id}/subscriptions/{subscription_id}",
+            ),
+            headers=headers,
+            json=payload,
+            timeout=self._TIMEOUT,
+        )
+        response.raise_for_status()
+
+    @wrap_http_error
     def create_customer_subscription(
         self,
         authorization_id: str,

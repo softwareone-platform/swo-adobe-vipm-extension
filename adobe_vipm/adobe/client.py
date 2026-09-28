@@ -35,6 +35,11 @@ ADOBE_RETRY_ALLOWED_METHODS = frozenset(("GET",))
 # The auth endpoint only mints a bearer token, so resending its POST has no
 # effect on customer or order data and is safe to retry.
 ADOBE_AUTH_RETRY_ALLOWED_METHODS = frozenset(("GET", "POST"))
+# A PATCH that only sets absolute values leaves the same state however many
+# times Adobe receives it, so the idempotent-write session also resends it.
+# Only calls built to be idempotent use that session; every other write keeps
+# the GET-only policy.
+ADOBE_IDEMPOTENT_WRITE_RETRY_ALLOWED_METHODS = frozenset(("GET", "PATCH"))
 
 
 def _build_retry(allowed_methods: frozenset[str]) -> Retry:
@@ -67,16 +72,21 @@ def _build_retry(allowed_methods: frozenset[str]) -> Retry:
     )
 
 
-def _build_retrying_session(auth_endpoint_url: str) -> requests.Session:
+def _build_retrying_session(
+    auth_endpoint_url: str,
+    api_allowed_methods: frozenset[str] = ADOBE_RETRY_ALLOWED_METHODS,
+) -> requests.Session:
     """Build a requests Session that retries transient Adobe failures.
 
-    The API adapter retries idempotent GET requests only. The auth endpoint gets
-    its own adapter that also retries its token POST, which carries no
-    side effect on customer or order data.
+    The API adapter retries idempotent GET requests only, unless the session is
+    built for idempotent writes. The auth endpoint gets its own adapter that
+    also retries its token POST, which carries no side effect on customer or
+    order data.
 
     Args:
         auth_endpoint_url: Adobe authentication endpoint URL, mounted with its
             own retry adapter.
+        api_allowed_methods: HTTP methods the API adapter retries.
 
     Returns:
         requests.Session: Session with the retrying HTTP adapters mounted.
@@ -84,7 +94,7 @@ def _build_retrying_session(auth_endpoint_url: str) -> requests.Session:
     session = requests.Session()
     # The Adobe API and auth endpoints are always HTTPS; the retry adapters are
     # only mounted on https:// so no clear-text scheme is used.
-    session.mount("https://", HTTPAdapter(max_retries=_build_retry(ADOBE_RETRY_ALLOWED_METHODS)))
+    session.mount("https://", HTTPAdapter(max_retries=_build_retry(api_allowed_methods)))
     session.mount(
         auth_endpoint_url,
         HTTPAdapter(max_retries=_build_retry(ADOBE_AUTH_RETRY_ALLOWED_METHODS)),
@@ -112,6 +122,10 @@ class AdobeClient(
         self._logger = logger
         self._TIMEOUT = 60
         self._session = _build_retrying_session(self._config.auth_endpoint_url)
+        self._idempotent_write_session = _build_retrying_session(
+            self._config.auth_endpoint_url,
+            ADOBE_IDEMPOTENT_WRITE_RETRY_ALLOWED_METHODS,
+        )
 
     def _get_headers(
         self, authorization: Authorization, correlation_id=None, recommendation_tracker_id=None
