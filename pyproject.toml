@@ -25,7 +25,7 @@ app_config = "adobe_vipm.apps:ExtensionConfig"
 
 [dependency-groups]
 dev = [
-  "flake8==7.3.*", # force flake8 version to have same formatting everywhere, also update in pre-commit config
+  "flake8==7.4.*", # force flake8 version to have same formatting everywhere, also update in pre-commit config
   "flake8-aaa==0.17.*", # also update pre-commit config
   "flake8-pyproject==1.2.*", # also update pre-commit config
   "freezegun==1.5.*",
