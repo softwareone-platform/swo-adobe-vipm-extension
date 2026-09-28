@@ -1966,6 +1966,9 @@ class SetupRenewalPlan(Step):
             "renew": entry["renew"],
             "renewal_quantity": entry.get(Param.RENEWAL_QUANTITY.value) or 0,
             "flex_discount_codes": entry.get("flexDiscountCodes") or [],
+            # Set by the wizard's Undo: the customer removed the code, so the codes
+            # stored on the subscription are cleared rather than left untouched.
+            "clear_flex_discount_codes": bool(entry.get("clearFlexDiscountCodes")),
             "snapshot": {
                 "enabled": auto_renewal.get("enabled", False),
                 "renewal_quantity": auto_renewal.get(Param.RENEWAL_QUANTITY.value),

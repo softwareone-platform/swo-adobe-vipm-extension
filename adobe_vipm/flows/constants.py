@@ -541,6 +541,12 @@ ERR_FLEX_DISCOUNT_CODE_LIMIT = ValidationError(
     "Only one flexible discount code per line item is allowed: {error}.",
 )
 
+ERR_RENEWAL_FLEX_DISCOUNT_REFUSED = ValidationError(
+    "VIPM0055",
+    "Adobe did not confirm the flexible discount code(s) of the renewal plan, "
+    "so nothing was changed: {refusals}.",
+)
+
 
 class AssetStatus(StrEnum):
     """MPT asset statuses."""
