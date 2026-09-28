@@ -43,7 +43,20 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    current quantity (`AlignSwitchRenewalQuantities`, through the Adobe client's
    idempotent-write session, which also retries PATCH; Adobe ignores a renewal
    quantity while auto-renewal is off), and a failure there is reported rather
-   than failing the order, since the SWITCH cannot be undone; `renewal.py` also hosts the 3YC
+   than failing the order, since the SWITCH cannot be undone; the at-anniversary
+   flow in `renewal.py` enables auto-renewal, stores the plan's discount codes and
+   confirms them with Adobe before it creates any net-new scheduled subscription
+   (`ValidateRenewalDiscountCodes`: Adobe validates codes only through
+   `PREVIEW_RENEWAL`, so an automated preview judges the codes stored on the
+   existing subscriptions and a line-item preview judges the net-new offers'
+   codes; any code without `result: SUCCESS` fails the order), then increases,
+   decreases and disables the renewal quantities; a confirmed failure at any step
+   restores every subscription it changed to its snapshot, clearing an added code
+   with `reset-flex-discount-codes` because an empty list does not clear it, and
+   any other error that escapes before the order completes (for example a
+   transport failure, after which the order is retried) reverses the same
+   changes first (`ReverseRenewalChangesOnError`), so a retry starts from the
+   customer's own state; only the confirmed codes are recorded as redeemed; `renewal.py` also hosts the 3YC
    committed-minimum floor guard (`Validate3YCRenewalFloor`)
    that both renewal flows run before mutating Adobe; `shared.py` holds common
    utilities, the `SelectFlexDiscounts` step that reads the Airtable discount
