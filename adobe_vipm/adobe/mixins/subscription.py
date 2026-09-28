@@ -215,7 +215,8 @@ class SubscriptionClientMixin:
             recommendations call, replayed so Adobe can attribute the outcome.
             flex_discount_codes: The flexible discount codes selected for the net-new
             offer, stored on the scheduled subscription's autoRenewal so they apply at
-            the anniversary renewal. None leaves the field off the request entirely.
+            the anniversary renewal. None or an empty list leaves the field off the
+            request entirely, because Adobe rejects an empty flexDiscountCodes list.
 
         Returns:
             dict: The created subscription.
@@ -232,7 +233,7 @@ class SubscriptionClientMixin:
             },
             "currencyCode": authorization.currency,
         }
-        if flex_discount_codes is not None:
+        if flex_discount_codes:
             payload["autoRenewal"]["flexDiscountCodes"] = flex_discount_codes
         if deployment_id:
             payload["deploymentId"] = deployment_id
