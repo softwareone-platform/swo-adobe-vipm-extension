@@ -15,6 +15,7 @@ from adobe_vipm.adobe.constants import (
     ORDER_STATUS_DESCRIPTION,
     UNRECOVERABLE_ORDER_STATUSES,
     AdobeOrderStatus,
+    AdobeSubscriptionStatus,
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.flows.constants import (
@@ -23,6 +24,7 @@ from adobe_vipm.flows.constants import (
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
     TEMPLATE_NAME_CHANGE,
+    Param,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
@@ -43,6 +45,7 @@ from adobe_vipm.flows.helpers import SetupContext, UpdatePrices, ValidateSkuAvai
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import get_switch_payload, set_adobe_order_id
 from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
+from adobe_vipm.notifications import send_exception
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +218,108 @@ class SubmitSwitchOrder(Step):
             return None
 
 
+class AlignSwitchRenewalQuantities(Step):
+    """
+    Set the renewal quantity of the switched subscriptions to their current quantity.
+
+    A SWITCH cancels seats on the source subscriptions (cancellingItems) and adds
+    them to the target subscriptions (the order's line items), but Adobe keeps an
+    explicitly set ``autoRenewal.renewalQuantity`` through both, so the anniversary
+    would renew the switched-away seats as well as the new ones. Once Adobe has
+    completed the SWITCH, each switched subscription that is still active and set
+    to auto-renew gets its renewal quantity set to its current quantity. Skipped:
+    a source switched in full, which is inactive (1004); a subscription with
+    auto-renewal off, where Adobe accepts but ignores a renewal quantity and has
+    already reset any explicit one (re-enabling renews the current quantity); and
+    a subscription already renewing its current quantity, so a retried order
+    changes nothing twice.
+
+    The SWITCH itself cannot be undone at this point, so a failure never fails the
+    order: it is logged, reported through an exception notification listing the
+    subscriptions for a manual correction, and the order still completes.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Set the renewal quantity of the switched subscriptions to their current quantity."""
+        adobe_client = get_adobe_client()
+        not_updated = []
+        for subscription_id in self._switched_subscription_ids(context):
+            try:
+                self._align(adobe_client, context, subscription_id)
+            except AdobeError as error:
+                logger.warning(
+                    "%s: failed to set the renewal quantity of switched subscription %s: %s",
+                    context,
+                    subscription_id,
+                    error,
+                )
+                not_updated.append(f"{subscription_id}: {error}")
+
+        if not_updated:
+            send_exception(
+                f"Renewal quantity not aligned after mid-term upgrade: {context.order_id}",
+                "The mid-term upgrade completed, but the renewal quantity of these "
+                "subscriptions could not be set to their current quantity and needs "
+                "a manual correction:\n"
+                + "".join(f"  - {line}\n" for line in not_updated)
+                + f"\n- Product ID: {context.product_id}\n",
+            )
+        next_step(client, context)
+
+    def _switched_subscription_ids(self, context):
+        """Return the source and target subscription ids of the SWITCH, without duplicates."""
+        switch_payload = get_switch_payload(context.order) or {}
+        source_ids = [
+            cancelling_item["subscriptionId"]
+            for cancelling_item in switch_payload.get("cancellingItems", [])
+            if cancelling_item.get("subscriptionId")
+        ]
+        target_ids = [
+            line_item["subscriptionId"]
+            for line_item in (context.adobe_new_order or {}).get("lineItems", [])
+            if line_item.get("subscriptionId")
+        ]
+        return list(dict.fromkeys(source_ids + target_ids))
+
+    def _align(self, adobe_client, context, subscription_id):
+        subscription = adobe_client.get_subscription(
+            context.authorization_id,
+            context.adobe_customer_id,
+            subscription_id,
+        )
+        if subscription["status"] != AdobeSubscriptionStatus.ACTIVE:
+            logger.info(
+                "%s: switched subscription %s is not active (status %s), renewal quantity left",
+                context,
+                subscription_id,
+                subscription["status"],
+            )
+            return
+        auto_renewal = subscription["autoRenewal"]
+        if not auto_renewal.get("enabled"):
+            logger.info(
+                "%s: switched subscription %s does not auto-renew, renewal quantity left",
+                context,
+                subscription_id,
+            )
+            return
+        current_quantity = subscription[Param.CURRENT_QUANTITY.value]
+        if auto_renewal.get(Param.RENEWAL_QUANTITY.value) == current_quantity:
+            return
+        adobe_client.set_renewal_quantity(
+            context.authorization_id,
+            context.adobe_customer_id,
+            subscription_id,
+            current_quantity,
+        )
+        logger.info(
+            "%s: renewal quantity of switched subscription %s set to %s",
+            context,
+            subscription_id,
+            current_quantity,
+        )
+
+
 def fulfill_switch_order(client, order):
     """
     Fulfills a change order that carries a mid-term upgrade (SWITCH) payload.
@@ -222,8 +327,9 @@ def fulfill_switch_order(client, order):
     It validates the switch through a PREVIEW_SWITCH order, submits the actual
     SWITCH order and creates or updates the agreement subscriptions with the
     new Adobe subscriptions. The quantities of the subscriptions being switched
-    from are cancelled by Adobe (cancellingItems) and synchronized back to the
-    agreement at the end of the pipeline.
+    from are cancelled by Adobe (cancellingItems); the renewal quantity of every
+    switched subscription is then set to its current quantity, and everything is
+    synchronized back to the agreement at the end of the pipeline.
 
     Args:
         client (MPTClient): An instance of the MPT client used for communication
@@ -246,6 +352,7 @@ def fulfill_switch_order(client, order):
         UpdatePrices(is_validation=False),
         SubmitSwitchOrder(),
         CreateOrUpdateSubscriptions(),
+        AlignSwitchRenewalQuantities(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
         SetSubscriptionTemplate(),
         SyncAgreement(),
