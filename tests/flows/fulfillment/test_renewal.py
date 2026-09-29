@@ -274,6 +274,7 @@ def test_enable_renewal_subscriptions_step_adobe_error_reverses_and_fails(
                 message="Invalid renewal state",
             ),
         ),
+        {"subscriptionId": "second-sub-id"},
         {"subscriptionId": "first-sub-id"},
     ]
     mocked_switch_to_failed = mocker.patch(
@@ -284,15 +285,28 @@ def test_enable_renewal_subscriptions_step_adobe_error_reverses_and_fails(
 
     step(mock_mpt_client, renewal_context, mocked_next_step)  # act
 
-    assert mock_adobe_client.update_subscription.mock_calls[2] == mocker.call(
-        renewal_context.authorization_id,
-        renewal_context.adobe_customer_id,
-        "first-sub-id",
-        auto_renewal=False,
-        quantity=2,
-        flex_discount_codes=None,
-        reset_flex_discount_codes=False,
-    )
+    # The failed call may still have been applied (update_subscription PATCHes, then
+    # re-reads), so its subscription is restored too, newest first.
+    assert mock_adobe_client.update_subscription.mock_calls[2:] == [
+        mocker.call(
+            renewal_context.authorization_id,
+            renewal_context.adobe_customer_id,
+            "second-sub-id",
+            auto_renewal=False,
+            quantity=10,
+            flex_discount_codes=None,
+            reset_flex_discount_codes=False,
+        ),
+        mocker.call(
+            renewal_context.authorization_id,
+            renewal_context.adobe_customer_id,
+            "first-sub-id",
+            auto_renewal=False,
+            quantity=2,
+            flex_discount_codes=None,
+            reset_flex_discount_codes=False,
+        ),
+    ]
     mocked_switch_to_failed.assert_called_once()
     message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
     assert "second-sub-id" in message
@@ -380,6 +394,7 @@ def test_apply_renewal_discount_codes_step_adobe_error_reverses_and_fails(
                 message="Some Fields are Invalid",
             ),
         ),
+        {"subscriptionId": "second-sub-id"},
         {"subscriptionId": "first-sub-id"},
     ]
     mocked_switch_to_failed = mocker.patch(
@@ -390,19 +405,48 @@ def test_apply_renewal_discount_codes_step_adobe_error_reverses_and_fails(
 
     step(mock_mpt_client, renewal_context, mocked_next_step)  # act
 
-    # The snapshot held no code, so the added one is cleared with the reset flag.
-    assert mock_adobe_client.update_subscription.mock_calls[2] == mocker.call(
-        renewal_context.authorization_id,
-        renewal_context.adobe_customer_id,
-        "first-sub-id",
-        auto_renewal=True,
-        quantity=10,
-        flex_discount_codes=None,
-        reset_flex_discount_codes=True,
-    )
+    # Both snapshots held no code, so each (possibly) added one is cleared with the
+    # reset flag; the failed call's subscription is included because the PATCH may
+    # have been applied before the call raised.
+    assert mock_adobe_client.update_subscription.mock_calls[2:] == [
+        mocker.call(
+            renewal_context.authorization_id,
+            renewal_context.adobe_customer_id,
+            subscription_id,
+            auto_renewal=True,
+            quantity=10,
+            flex_discount_codes=None,
+            reset_flex_discount_codes=True,
+        )
+        for subscription_id in ("second-sub-id", "first-sub-id")
+    ]
     mocked_switch_to_failed.assert_called_once()
     assert "second-sub-id" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
     mocked_next_step.assert_not_called()
+
+
+def test_apply_renewal_discount_codes_step_records_the_change_before_the_call(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context
+):
+    plan = plan_entry(subscription_id="coded-sub-id", flex_discount_codes=["CODE-1"])
+    renewal_context.renewal_plan_subscriptions = [plan]
+    # The PATCH may be applied before the call raises (update_subscription re-reads the
+    # subscription afterwards), so the change must already be recorded for the reversal.
+    error = AdobeTransportError("GET https://partners.adobe.io/v3", "Read timed out.")
+    mock_adobe_client.update_subscription.side_effect = error
+    step = ApplyRenewalDiscountCodes()
+
+    with pytest.raises(AdobeTransportError):
+        step(mock_mpt_client, renewal_context, mocker.MagicMock())  # act
+
+    assert renewal_context.renewal_applied_changes == [
+        {
+            "subscription_id": "coded-sub-id",
+            "snapshot": plan["snapshot"],
+            "new_quantity": 15,
+            "codes_changed": True,
+        },
+    ]
 
 
 def test_reverse_renewal_changes_restores_snapshot_codes(
@@ -1243,6 +1287,7 @@ def test_update_renewal_subscriptions_step_reverses_every_change_of_the_run_on_f
                 message="Invalid renewal state",
             ),
         ),
+        {"subscriptionId": "increase-sub-id"},
         {"subscriptionId": "coded-sub-id"},
         {"subscriptionId": "enable-sub-id"},
         {"subscriptionId": "net-new-sub-id"},
@@ -1255,8 +1300,18 @@ def test_update_renewal_subscriptions_step_reverses_every_change_of_the_run_on_f
 
     step(mock_mpt_client, renewal_context, mocked_next_step)  # act
 
-    # Reversed newest first; the added code is cleared with the reset flag, never with [].
+    # Reversed newest first, starting with the failed call's subscription (its PATCH
+    # may have been applied); the added code is cleared with the reset flag, never with [].
     assert mock_adobe_client.update_subscription.mock_calls[1:] == [
+        mocker.call(
+            renewal_context.authorization_id,
+            renewal_context.adobe_customer_id,
+            "increase-sub-id",
+            auto_renewal=True,
+            quantity=10,
+            flex_discount_codes=None,
+            reset_flex_discount_codes=False,
+        ),
         mocker.call(
             renewal_context.authorization_id,
             renewal_context.adobe_customer_id,

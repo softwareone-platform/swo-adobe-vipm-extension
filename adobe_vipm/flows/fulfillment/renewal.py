@@ -109,7 +109,12 @@ def record_renewal_change(context, plan, *, codes_changed=False):
 
     Every change is reversed to the subscription's pre-mutation snapshot, so one
     entry per subscription is enough; a later change to the same subscription
-    only widens what the reversal restores (its codes).
+    only widens what the reversal restores (its codes). Callers record the
+    change *before* the Adobe call: ``update_subscription`` PATCHes and then
+    re-reads the subscription, so it can raise after Adobe applied the change
+    (a failed re-read, or a response timeout on a committed PATCH). Restoring a
+    subscription the call did not change is harmless: it re-sends the
+    snapshot's own values, or a reset on a subscription that holds no code.
     """
     for change in context.renewal_applied_changes:
         if change["subscription_id"] == plan["subscription_id"]:
@@ -216,6 +221,7 @@ class EnableRenewalSubscriptions(Step):
         for plan in context.renewal_plan_subscriptions:
             if not plan["renew"] or plan["snapshot"]["enabled"]:
                 continue
+            record_renewal_change(context, plan)
             try:
                 adobe_client.update_subscription(
                     context.authorization_id,
@@ -241,7 +247,6 @@ class EnableRenewalSubscriptions(Step):
                     ),
                 )
                 return
-            record_renewal_change(context, plan)
             logger.info(
                 "%s: auto-renewal enabled for subscription %s (quantity=%s)",
                 context,
@@ -272,6 +277,7 @@ class ApplyRenewalDiscountCodes(Step):
             update = self._codes_update(plan)
             if update is None:
                 continue
+            record_renewal_change(context, plan, codes_changed=True)
             try:
                 adobe_client.update_subscription(
                     context.authorization_id,
@@ -298,7 +304,6 @@ class ApplyRenewalDiscountCodes(Step):
                     ),
                 )
                 return
-            record_renewal_change(context, plan, codes_changed=True)
             logger.info(
                 "%s: discount codes of subscription %s set to %s",
                 context,
@@ -891,6 +896,7 @@ class UpdateRenewalSubscriptions(Step):
         adobe_client = get_adobe_client()
         operations = self._build_operations(context)
         for plan, operation in operations:
+            record_renewal_change(context, plan)
             try:
                 self._apply_operation(adobe_client, context, operation)
             except AdobeAPIError as error:
@@ -910,7 +916,6 @@ class UpdateRenewalSubscriptions(Step):
                     ),
                 )
                 return
-            record_renewal_change(context, plan)
 
         logger.info(
             "%s: auto-renewal preferences applied (%s operation(s))",
