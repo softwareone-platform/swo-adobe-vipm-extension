@@ -24,6 +24,7 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.fulfillment.switch import (
     AlignSwitchRenewalQuantities,
+    FailSwitchWhileRenewalInPlace,
     GetSwitchPreviewOrder,
     SubmitSwitchOrder,
     fulfill_switch_order,
@@ -43,6 +44,82 @@ def switch_order(order_factory, order_parameters_factory, switch_payload):
         order_type="Change",
         order_parameters=order_parameters_factory(switch_payload=switch_payload),
     )
+
+
+@pytest.fixture
+def renewal_in_place(mocker):
+    """Patch both renewal-in-place reads, no renewal in place by default."""
+    early = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.get_pending_early_renewal", return_value=None
+    )
+    staged = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.has_pending_staged_renewal", return_value=False
+    )
+    return early, staged
+
+
+@pytest.fixture
+def switch_context(switch_order):
+    return Context(
+        order=switch_order,
+        order_id=switch_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+    )
+
+
+def test_fail_switch_while_renewal_in_place_continues_without_a_renewal(
+    mocker, mock_mpt_client, switch_context, renewal_in_place
+):
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    FailSwitchWhileRenewalInPlace()(mock_mpt_client, switch_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, switch_context)
+
+
+@pytest.mark.parametrize(
+    ("early_renewal", "staged", "error_id"),
+    [
+        ({"orderId": "P-RENEWAL", "creationDate": "2026-09-28T10:00:00Z"}, False, "VIPM0051"),
+        (None, True, "VIPM0054"),
+    ],
+)
+def test_fail_switch_while_renewal_in_place_fails_the_order(  # noqa: WPS211
+    mocker, mock_mpt_client, switch_context, renewal_in_place, early_renewal, staged, error_id
+):
+    early, staged_check = renewal_in_place
+    early.return_value = early_renewal
+    staged_check.return_value = staged
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.switch.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    FailSwitchWhileRenewalInPlace()(mock_mpt_client, switch_context, mocked_next_step)  # act
+
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == error_id
+    mocked_next_step.assert_not_called()
+
+
+def test_fail_switch_while_renewal_in_place_skipped_once_the_switch_exists(
+    mocker, mock_mpt_client, switch_context, renewal_in_place
+):
+    """A retry after the Adobe SWITCH was submitted has nothing left to protect."""
+    early, staged_check = renewal_in_place
+    switch_context.adobe_new_order_id = "adobe-order-id"
+    mocked_next_step = mocker.MagicMock()
+
+    FailSwitchWhileRenewalInPlace()(mock_mpt_client, switch_context, mocked_next_step)  # act
+
+    early.assert_not_called()
+    staged_check.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, switch_context)
 
 
 def test_get_switch_preview_order_step(
@@ -564,6 +641,7 @@ def test_fulfill_switch_order(mocker):
         UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
         ValidateSkuAvailability,
+        FailSwitchWhileRenewalInPlace,
         GetSwitchPreviewOrder,
         UpdatePrices,
         SubmitSwitchOrder,
@@ -578,6 +656,6 @@ def test_fulfill_switch_order(mocker):
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[13].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[14].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
