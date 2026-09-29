@@ -66,11 +66,20 @@ discovering that an old one cannot be returned would leave a committed and
 invoiced Adobe order behind a Failed MPT order, with no way to reverse it.
 
 After the commit, `ReturnPreviousRenewalOrders` creates one `RETURN` per line,
-each for that line's resolved quantity. `RETURN` orders created by an earlier
-attempt of the same MPT order are matched to the `RENEWAL` order and line they
-reference, reused as-is whatever the window says today, and their seats count
-towards the total, so retries neither return a line twice nor fail the seat
-check.
+each for that line's resolved quantity, **one at a time**: the next `RETURN` is
+placed only once the previous one has completed. Adobe lowers `renewedQuantity`
+as each `RETURN` completes, and two `RETURN`s in flight together can lose one of
+the decrements (sandbox, 29 Sep 2026: two placed 2 seconds apart left
+`renewedQuantity` at 2 instead of 0, for good, so every later attempt failed the
+seat check). A `RETURN` still open stops the pipeline with the MPT order in
+Processing, and the next fulfilment attempt carries on from there, so each
+hand-over re-reads the state from Adobe and survives a restart. A removal of
+several early renewals therefore takes one fulfilment attempt per `RETURN`.
+
+`RETURN` orders created by an earlier attempt of the same MPT order are matched
+to the `RENEWAL` order and line they reference, reused as-is whatever the window
+says today, and their seats count towards the total, so retries neither return a
+line twice nor fail the seat check.
 
 ## Flex discount codes committed
 
