@@ -1644,6 +1644,79 @@ def test_create_return_order(
     assert result == {"orderId": "adobe-order-id"}
 
 
+def test_create_return_order_with_a_partial_quantity(
+    mocker,
+    settings,
+    requests_mocker,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+    mocker.patch(
+        "adobe_vipm.adobe.client.uuid4",
+        return_value="uuid-1",
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    customer_id = "a-customer"
+    deployment_id = "a_deployment_id"
+    client, authorization, api_token = adobe_client_factory()
+    returning_order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        external_id="ORD-1234",
+        order_id="returning-order-id",
+        status=AdobeOrderStatus.COMPLETE.value,
+        deployment_id=deployment_id,
+    )
+    returning_item = returning_order["lineItems"][0]
+    ext_ref_prefix = "ext-ref-prefix"
+    ext_reference_id = returning_order["externalReferenceId"]
+    ext_item_number = returning_item["extLineItemNumber"]
+    expected_external_id = f"{ext_ref_prefix}_{ext_reference_id}_{ext_item_number}"
+    expected_body = adobe_order_factory(
+        ORDER_TYPE_RETURN,
+        reference_order_id=returning_order["orderId"],
+        external_id=expected_external_id,
+        items=adobe_items_factory(deployment_id=deployment_id, deployment_currency_code="USD"),
+        deployment_id=deployment_id,
+    )
+    # A partly returned line: only its remaining seats are returned.
+    expected_body["lineItems"][0]["quantity"] = 2
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            f"/v3/customers/{customer_id}/orders",
+        ),
+        status=202,
+        json={"orderId": "adobe-order-id"},
+        match=[
+            matchers.header_matcher(
+                {
+                    "X-Api-Key": authorization.client_id,
+                    "Authorization": f"Bearer {api_token.token}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-Request-Id": "uuid-1",
+                    "x-correlation-id": expected_external_id,
+                },
+            ),
+            matchers.json_params_matcher(expected_body),
+        ],
+    )
+
+    result = client.create_return_order(
+        authorization_uk,
+        customer_id,
+        returning_order,
+        returning_item,
+        ext_ref_prefix,
+        deployment_id=deployment_id,
+        quantity=2,
+    )
+
+    assert result == {"orderId": "adobe-order-id"}
+
+
 def test_create_return_order_bad_request(
     requests_mocker,
     settings,
