@@ -1066,13 +1066,20 @@ def previous_renewal_order_factory(
     creation_date="2026-08-01T10:00:00Z",
     subscription_id="lapsing-sub-id",
     deployment_id=None,
+    quantity=10,
+    remaining_quantity=None,
+    line_status=None,
 ):
     line_item = {
         "extLineItemNumber": 1,
         "offerId": "77777777CA01A12",
         "subscriptionId": subscription_id,
-        "quantity": 10,
+        "quantity": quantity,
     }
+    if remaining_quantity is not None:
+        line_item["remainingQuantity"] = remaining_quantity
+    if line_status:
+        line_item["status"] = line_status
     if deployment_id:
         line_item["deploymentId"] = deployment_id
     return adobe_order_factory(
@@ -1085,18 +1092,39 @@ def previous_renewal_order_factory(
     )
 
 
-def return_candidate(
+def return_candidate(  # noqa: WPS211
     returning_order=None,
     returning_line=None,
     return_order=None,
     subscription_id="lapsing-sub-id",
+    quantity=None,
 ):
     return {
         "subscription_id": subscription_id,
         "return_order": return_order,
         "returning_order": returning_order,
         "returning_line": returning_line,
+        "quantity": quantity,
     }
+
+
+def this_order_return_factory(  # noqa: WPS211
+    adobe_order_factory,
+    reference_order_id="ADOBE-RENEWAL-PREV",
+    quantity=10,
+    status=AdobeOrderStatus.COMPLETE.value,
+    order_id="ADOBE-RETURN-EXISTING",
+    line_number=1,
+):
+    return adobe_order_factory(
+        order_type="RETURN",
+        status=status,
+        order_id=order_id,
+        reference_order_id=reference_order_id,
+        items=[
+            {"extLineItemNumber": line_number, "offerId": "77777777CA01A12", "quantity": quantity}
+        ],
+    )
 
 
 def test_resolve_previous_renewal_returns_step_no_candidates(
@@ -1142,13 +1170,14 @@ def test_resolve_previous_renewal_returns_step_resolves_line(
         renewal_now_context.adobe_customer_id,
         filters={
             "order-type": ORDER_TYPE_RENEWAL,
-            "status": AdobeOrderStatus.COMPLETE,
+            "status": [AdobeOrderStatus.COMPLETE, AdobeOrderStatus.CANCELLED],
         },
     )
     assert renewal_now_context.renewal_return_candidates == [
         return_candidate(
             returning_order=previous_renewal,
             returning_line=previous_renewal["lineItems"][0],
+            quantity=10,
         )
     ]
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
@@ -1159,15 +1188,14 @@ def test_resolve_previous_renewal_returns_step_existing_return_reused(
     mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
 ):
     # The previous renewal order is outside the return window by now, but the
-    # RETURN was already created by a previous attempt of this order: reused as-is.
+    # RETURN was already created by a previous attempt of this order (still
+    # pending, so renewedQuantity is not lowered yet): reused as-is.
     renewal_now_context.renewal_plan_subscriptions = [lapsing_renewed_plan_entry()]
     mock_adobe_client.get_orders.return_value = [
         previous_renewal_order_factory(adobe_order_factory)
     ]
-    existing_return = adobe_order_factory(
-        order_type="RETURN",
-        status=AdobeOrderStatus.COMPLETE.value,
-        order_id="ADOBE-RETURN-EXISTING",
+    existing_return = this_order_return_factory(
+        adobe_order_factory, status=AdobeOrderStatus.OPEN.value
     )
     mock_adobe_client.get_return_orders_by_external_reference.return_value = {
         "77777777CA": [existing_return],
@@ -1251,10 +1279,12 @@ def test_resolve_previous_renewal_returns_step_picks_most_recent_order(
 
     step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
 
+    # The newest line already holds all 10 renewed seats, so the older one is untouched.
     assert renewal_now_context.renewal_return_candidates == [
         return_candidate(
             returning_order=newer_renewal,
             returning_line=newer_renewal["lineItems"][0],
+            quantity=10,
         )
     ]
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
@@ -1316,6 +1346,255 @@ def test_resolve_previous_renewal_returns_step_outside_return_window(
     mocked_next_step.assert_not_called()
 
 
+def run_resolve_step(mocker, context, renewal_orders, returns_by_sku=None):
+    """Run ResolvePreviousRenewalReturns against the given Adobe order history."""
+    adobe_client = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.get_adobe_client"
+    ).return_value
+    adobe_client.get_orders.return_value = renewal_orders
+    adobe_client.get_return_orders_by_external_reference.return_value = returns_by_sku or {}
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    ResolvePreviousRenewalReturns()(mocker.MagicMock(), context, mocked_next_step)
+    return mocked_switch_to_failed, mocked_next_step
+
+
+@freeze_time("2026-08-10 10:00:00")
+def test_resolve_previous_renewal_returns_step_returns_every_renewal(
+    mocker, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=5)
+    ]
+    first = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-1",
+        external_id="ORD-1",
+        creation_date="2026-08-02T10:00:00Z",
+        quantity=3,
+    )
+    second = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-2",
+        external_id="ORD-2",
+        creation_date="2026-08-05T10:00:00Z",
+        quantity=2,
+    )
+
+    switch_to_failed, next_step = run_resolve_step(
+        mocker, renewal_now_context, [first, second]
+    )  # act
+
+    assert renewal_now_context.renewal_return_candidates == [
+        return_candidate(returning_order=second, returning_line=second["lineItems"][0], quantity=2),
+        return_candidate(returning_order=first, returning_line=first["lineItems"][0], quantity=3),
+    ]
+    switch_to_failed.assert_not_called()
+    next_step.assert_called_once()
+
+
+@freeze_time("2026-08-10 10:00:00")
+def test_resolve_previous_renewal_returns_step_returns_the_remaining_quantity(
+    mocker, renewal_now_context, adobe_order_factory
+):
+    # 1 of the first RENEWAL's 3 seats was already returned: its line stays 1000
+    # with remainingQuantity 2, and renewedQuantity dropped to 4.
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=4)
+    ]
+    first = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-1",
+        external_id="ORD-1",
+        creation_date="2026-08-02T10:00:00Z",
+        quantity=3,
+        remaining_quantity=2,
+    )
+    second = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-2",
+        external_id="ORD-2",
+        creation_date="2026-08-05T10:00:00Z",
+        quantity=2,
+    )
+
+    run_resolve_step(mocker, renewal_now_context, [first, second])  # act
+
+    assert [c["quantity"] for c in renewal_now_context.renewal_return_candidates] == [2, 2]
+    assert renewal_now_context.renewal_return_candidates[1]["returning_order"] is first
+
+
+@freeze_time("2026-08-10 10:00:00")
+def test_resolve_previous_renewal_returns_step_skips_a_returned_line(
+    mocker, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=3)
+    ]
+    returned = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-RETURNED",
+        external_id="ORD-R",
+        creation_date="2026-08-06T10:00:00Z",
+        quantity=4,
+        line_status=AdobeOrderStatus.CANCELLED.value,
+    )
+    kept = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-KEPT",
+        external_id="ORD-K",
+        creation_date="2026-08-02T10:00:00Z",
+        quantity=3,
+    )
+
+    run_resolve_step(mocker, renewal_now_context, [returned, kept])  # act
+
+    assert renewal_now_context.renewal_return_candidates == [
+        return_candidate(returning_order=kept, returning_line=kept["lineItems"][0], quantity=3),
+    ]
+
+
+@freeze_time("2026-08-20 10:00:00")
+def test_resolve_previous_renewal_returns_step_fails_on_an_older_line_outside_the_window(
+    mocker, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=5)
+    ]
+    recent = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-RECENT",
+        external_id="ORD-RECENT",
+        creation_date="2026-08-18T10:00:00Z",
+        quantity=2,
+    )
+    old = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-OLD",
+        external_id="ORD-OLD",
+        creation_date="2026-08-01T10:00:00Z",
+        quantity=3,
+    )
+
+    switch_to_failed, next_step = run_resolve_step(
+        mocker, renewal_now_context, [recent, old]
+    )  # act
+
+    error = switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == "VIPM0053"
+    assert "ADOBE-RENEWAL-OLD" in error["message"]
+    assert "2026-08-01" in error["message"]
+    next_step.assert_not_called()
+
+
+@freeze_time("2026-08-10 10:00:00")
+def test_resolve_previous_renewal_returns_step_fails_when_the_seats_do_not_add_up(
+    mocker, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=5)
+    ]
+    only = previous_renewal_order_factory(adobe_order_factory, quantity=3)
+
+    switch_to_failed, next_step = run_resolve_step(mocker, renewal_now_context, [only])  # act
+
+    message = switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "lapsing-sub-id" in message
+    assert "3 of its 5 early-renewed seats" in message
+    assert renewal_now_context.renewal_return_candidates == []
+    next_step.assert_not_called()
+
+
+@freeze_time("2026-08-10 10:00:00")
+def test_resolve_previous_renewal_returns_step_retry_returns_only_the_other_line(
+    mocker, renewal_now_context, adobe_order_factory
+):
+    # A previous attempt returned the first RENEWAL's 3 seats (completed, so the line
+    # is 1008 and renewedQuantity dropped from 5 to 2); only the second remains.
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=2)
+    ]
+    first = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-1",
+        external_id="ORD-1",
+        creation_date="2026-08-02T10:00:00Z",
+        quantity=3,
+        line_status=AdobeOrderStatus.CANCELLED.value,
+    )
+    second = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-2",
+        external_id="ORD-2",
+        creation_date="2026-08-05T10:00:00Z",
+        quantity=2,
+    )
+    done = this_order_return_factory(
+        adobe_order_factory, reference_order_id="ADOBE-RENEWAL-1", quantity=3
+    )
+
+    switch_to_failed, next_step = run_resolve_step(
+        mocker, renewal_now_context, [first, second], {"77777777CA": [done]}
+    )  # act
+
+    assert renewal_now_context.renewal_return_candidates == [
+        return_candidate(return_order=done),
+        return_candidate(returning_order=second, returning_line=second["lineItems"][0], quantity=2),
+    ]
+    switch_to_failed.assert_not_called()
+    next_step.assert_called_once()
+
+
+@freeze_time("2026-08-10 10:00:00")
+def test_resolve_previous_renewal_returns_step_leaves_the_anniversary_renewal_alone(
+    mocker, renewal_now_context, adobe_order_factory
+):
+    # Last year's automatic anniversary RENEWAL also lists the subscription, but this
+    # term's early renewal already holds every renewed seat, so it is never reached.
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=4)
+    ]
+    anniversary = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-ANNIVERSARY",
+        external_id="",
+        creation_date="2025-09-01T00:00:00Z",
+        quantity=10,
+    )
+    early = previous_renewal_order_factory(
+        adobe_order_factory,
+        order_id="ADOBE-RENEWAL-EARLY",
+        external_id="ORD-EARLY",
+        creation_date="2026-08-05T10:00:00Z",
+        quantity=4,
+    )
+
+    switch_to_failed, _ = run_resolve_step(mocker, renewal_now_context, [anniversary, early])  # act
+
+    assert renewal_now_context.renewal_return_candidates == [
+        return_candidate(returning_order=early, returning_line=early["lineItems"][0], quantity=4),
+    ]
+    switch_to_failed.assert_not_called()
+
+
+def test_resolve_previous_renewal_returns_step_zero_renewed_quantity_is_a_plain_lapse(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context
+):
+    # Every early-renewed seat was already returned: Adobe keeps renewedQuantity at 0.
+    renewal_now_context.renewal_plan_subscriptions = [
+        lapsing_renewed_plan_entry(renewed_quantity=0)
+    ]
+    mocked_next_step = mocker.MagicMock()
+
+    ResolvePreviousRenewalReturns()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    assert renewal_now_context.renewal_return_candidates == []
+    mock_adobe_client.get_orders.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
 def test_return_previous_renewal_orders_step_no_candidates(
     mocker, mock_adobe_client, mock_mpt_client, renewal_now_context
 ):
@@ -1337,6 +1616,7 @@ def test_return_previous_renewal_orders_step_creates_return(
         return_candidate(
             returning_order=previous_renewal,
             returning_line=previous_renewal["lineItems"][0],
+            quantity=4,
         )
     ]
     return_order = adobe_order_factory(
@@ -1359,6 +1639,7 @@ def test_return_previous_renewal_orders_step_creates_return(
         previous_renewal["lineItems"][0],
         renewal_now_context.order_id,
         None,
+        quantity=4,
     )
     mocked_update_order.assert_called_once_with(
         mock_mpt_client,

@@ -511,6 +511,7 @@ class OrderClientMixin:
         returning_item: dict,
         external_reference: str,
         deployment_id: str | None = None,
+        quantity: int | None = None,
     ) -> dict:
         """
         Creates an order of type RETURN for a given `item` that was purchased.
@@ -524,6 +525,9 @@ class OrderClientMixin:
             returning_item: The item that must be returned.
             external_reference: External reference for the return order.
             deployment_id: Deployment ID if the return is for a deployment.
+            quantity: Seats to return; defaults to the item's full quantity. Adobe rejects
+                more than the line's remaining quantity (2120), so a partly returned line
+                needs its remaining seats here.
 
         Returns:
             dict: The RETURN order.
@@ -544,7 +548,7 @@ class OrderClientMixin:
         line_item = {
             "extLineItemNumber": line_number,
             "offerId": returning_item["offerId"],
-            "quantity": returning_item["quantity"],
+            "quantity": returning_item["quantity"] if quantity is None else quantity,
         }
         if deployment_id:
             line_item["deploymentId"] = deployment_id

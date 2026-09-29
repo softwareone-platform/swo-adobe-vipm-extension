@@ -93,7 +93,6 @@ from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils.deployment import get_deployment_id
 from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
-from adobe_vipm.utils import get_partial_sku
 
 logger = logging.getLogger(__name__)
 
@@ -103,12 +102,13 @@ def _is_already_renewed(plan):
     Return True for a renewing entry already committed in a previous renewal order.
 
     A plan entry with renew=true but no requested renewal quantity whose
-    Adobe subscription already carries a renewedQuantity (snapshotted by
+    Adobe subscription already carries a renewedQuantity above 0 (snapshotted by
     SetupRenewalPlan before any mutation) was committed by a previous
     RENEWAL order and requests no change, so there is nothing to submit
     for it.
     """
-    return not plan["renewal_quantity"] and plan["snapshot"]["renewed_quantity"] is not None
+    renewed_quantity = plan["snapshot"]["renewed_quantity"] or 0
+    return not plan["renewal_quantity"] and renewed_quantity > 0
 
 
 def _get_renewing_plans(context):
@@ -561,50 +561,54 @@ def _is_within_return_window(order):
 
 class ResolvePreviousRenewalReturns(Step):
     """
-    Resolve, before anything is committed, the previous RENEWAL order lines to return.
+    Resolve, before anything is committed, every previous RENEWAL line to return.
 
-    A lapsing subscription (renew = false) whose pre-mutation snapshot
-    (taken by SetupRenewalPlan) carries a renewedQuantity was already
-    committed in a previous RENEWAL order, so ReturnPreviousRenewalOrders
-    has to return that order's line once this order's RENEWAL commits.
-    Adobe only accepts a RETURN within CANCELLATION_WINDOW_DAYS of the order
-    placement, so the previous order is located here and its creation date
-    checked against the window while nothing has been committed yet: a line
-    outside the window, or a previous order that cannot be found, fails the
-    MPT order with nothing to reverse instead of leaving a committed and
-    invoiced RENEWAL behind a Failed order. A RETURN already created by a
-    previous attempt of this MPT order (detected by its external reference
-    prefix) is reused as-is, whatever the window says today, so retries stay
-    idempotent. The resolved candidates are stored on the context for
-    ReturnPreviousRenewalOrders.
+    A lapsing subscription (renew = false) whose pre-mutation snapshot (taken by
+    SetupRenewalPlan) carries a renewedQuantity above 0 still holds early-renewed
+    seats, possibly from several RENEWAL orders of this term: Adobe keeps
+    renewedQuantity as their running total and lowers it as seats are returned.
+    Its RENEWAL lines are walked newest first, skipping lines already fully
+    returned (1008, or no remaining quantity), and each contributes its
+    remainingQuantity until the seats add up to what is still renewed. Adobe only
+    accepts a RETURN within CANCELLATION_WINDOW_DAYS of the order, so the window
+    is checked for every line here, while nothing has been committed: a line
+    outside the window, or seats that do not add up, fail the MPT order with
+    nothing to reverse instead of leaving a committed and invoiced RENEWAL behind
+    a Failed order. RETURNs already created by a previous attempt of this MPT
+    order are matched to the order and line they reference, reused as-is whatever
+    the window says today, and their seats count towards the total, so retries
+    neither return a line twice nor fail the seat check. The resolved candidates
+    (one per RETURN) are stored on the context for ReturnPreviousRenewalOrders.
     """
 
     def __call__(self, client, context, next_step):
-        """Resolve the previous RENEWAL order lines of the plan's lapsing subscriptions."""
+        """Resolve the previous RENEWAL lines of the plan's lapsing subscriptions."""
         context.renewal_return_candidates = []
         lapsing_renewed = [
             plan
             for plan in context.renewal_plan_subscriptions
-            if not plan["renew"] and plan["snapshot"]["renewed_quantity"] is not None
+            if not plan["renew"] and (plan["snapshot"]["renewed_quantity"] or 0) > 0
         ]
         if not lapsing_renewed:
             next_step(client, context)
             return
 
         adobe_client = get_adobe_client()
-        existing_return_orders = adobe_client.get_return_orders_by_external_reference(
-            context.authorization_id,
-            context.adobe_customer_id,
-            context.order_id,
-        )
-        renewal_orders = self._get_completed_renewal_orders(adobe_client, context)
-        for plan in lapsing_renewed:
-            candidate = self._resolve_candidate(
-                client, context, plan, renewal_orders, existing_return_orders
+        existing_returns = _returns_by_referenced_line(
+            adobe_client.get_return_orders_by_external_reference(
+                context.authorization_id,
+                context.adobe_customer_id,
+                context.order_id,
             )
-            if candidate is None:
+        )
+        renewal_orders = self._get_renewal_orders(adobe_client, context)
+        for plan in lapsing_renewed:
+            candidates = self._resolve_candidates(
+                client, context, plan, renewal_orders, existing_returns
+            )
+            if candidates is None:
                 return
-            context.renewal_return_candidates.append(candidate)
+            context.renewal_return_candidates.extend(candidates)
 
         logger.info(
             "%s: %s previous renewal line(s) resolved for return",
@@ -613,105 +617,192 @@ class ResolvePreviousRenewalReturns(Step):
         )
         next_step(client, context)
 
-    def _get_completed_renewal_orders(self, adobe_client, context):
+    def _get_renewal_orders(self, adobe_client, context):
+        """Return this customer's RENEWAL orders, newest first, fully returned ones included.
+
+        Fully returned orders (1008) hold nothing to return, but they are what a
+        RETURN created by a previous attempt of this MPT order may reference.
+        """
         orders = adobe_client.get_orders(
             context.authorization_id,
             context.adobe_customer_id,
             filters={
                 "order-type": ORDER_TYPE_RENEWAL,
-                "status": AdobeOrderStatus.COMPLETE,
+                "status": [AdobeOrderStatus.COMPLETE, AdobeOrderStatus.CANCELLED],
             },
         )
         return sorted(orders, key=itemgetter("creationDate"), reverse=True)
 
-    def _resolve_candidate(  # noqa: WPS211
-        self, client, context, plan, renewal_orders, existing_return_orders
+    def _resolve_candidates(  # noqa: WPS211
+        self, client, context, plan, renewal_orders, existing_returns
     ):
         subscription_id = plan["subscription_id"]
-        candidate = {
-            "subscription_id": subscription_id,
-            "return_order": None,
-            "returning_order": None,
-            "returning_line": None,
-        }
-        existing_returns = existing_return_orders.get(get_partial_sku(plan["offer_id"]))
-        if existing_returns:
-            logger.info(
-                "%s: return order %s already exists for subscription %s",
-                context,
-                existing_returns[0]["orderId"],
-                subscription_id,
-            )
-            return {**candidate, "return_order": existing_returns[0]}
-
-        returning_order, returning_line = self._find_previous_renewal_line(
-            context, renewal_orders, subscription_id
+        lines = _subscription_lines(context, renewal_orders, subscription_id)
+        reused, returned_seats = _reused_returns(subscription_id, lines, existing_returns)
+        # Adobe lowers renewedQuantity only once a RETURN completes.
+        seats_to_return = plan["snapshot"]["renewed_quantity"] + returned_seats
+        covered = sum(_returned_quantity(candidate["return_order"]) for candidate in reused)
+        new_returns = _new_returns(
+            subscription_id, lines, existing_returns, seats_to_return - covered
         )
-        if returning_order is None:
-            logger.warning(
-                "%s: no previous renewal order found for subscription %s",
-                context,
-                subscription_id,
-            )
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_RENEWAL_RETURN_FAILED.to_dict(
-                    subscription_id=subscription_id,
-                    error="previous renewal order not found",
-                ),
-            )
+        covered += sum(candidate["quantity"] for candidate in new_returns)
+        if covered < seats_to_return:
+            self._fail_history_mismatch(client, context, subscription_id, covered, seats_to_return)
             return None
+        for candidate in new_returns:
+            if not _is_within_return_window(candidate["returning_order"]):
+                self._fail_outside_window(client, context, subscription_id, candidate)
+                return None
+        return reused + new_returns
 
-        if not _is_within_return_window(returning_order):
-            creation_date = _get_creation_date(returning_order).isoformat()
-            logger.warning(
-                "%s: previous renewal order %s for subscription %s was placed on %s, "
-                "outside the %s-day return window",
-                context,
-                returning_order["orderId"],
-                subscription_id,
-                creation_date,
-                CANCELLATION_WINDOW_DAYS,
-            )
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_RENEWAL_RETURN_WINDOW_CLOSED.to_dict(
-                    order_id=returning_order["orderId"],
-                    subscription_id=subscription_id,
-                    creation_date=creation_date,
-                    window_days=CANCELLATION_WINDOW_DAYS,
+    def _fail_history_mismatch(  # noqa: WPS211
+        self, client, context, subscription_id, found, expected
+    ):
+        logger.warning(
+            "%s: the renewal orders of subscription %s hold %s of its %s early-renewed seats",
+            context,
+            subscription_id,
+            found,
+            expected,
+        )
+        switch_order_to_failed(
+            client,
+            context.order,
+            ERR_RENEWAL_RETURN_FAILED.to_dict(
+                subscription_id=subscription_id,
+                error=(
+                    "the renewal history does not add up: its RENEWAL orders hold "
+                    f"{found} of its {expected} early-renewed seats"
                 ),
+            ),
+        )
+
+    def _fail_outside_window(self, client, context, subscription_id, candidate):
+        returning_order = candidate["returning_order"]
+        creation_date = _get_creation_date(returning_order).isoformat()
+        logger.warning(
+            "%s: previous renewal order %s for subscription %s was placed on %s, "
+            "outside the %s-day return window",
+            context,
+            returning_order["orderId"],
+            subscription_id,
+            creation_date,
+            CANCELLATION_WINDOW_DAYS,
+        )
+        switch_order_to_failed(
+            client,
+            context.order,
+            ERR_RENEWAL_RETURN_WINDOW_CLOSED.to_dict(
+                order_id=returning_order["orderId"],
+                subscription_id=subscription_id,
+                creation_date=creation_date,
+                window_days=CANCELLATION_WINDOW_DAYS,
+            ),
+        )
+
+
+def _subscription_lines(context, renewal_orders, subscription_id):
+    """Return the (order, line) pairs holding the subscription, newest order first.
+
+    The RENEWAL committed by this very MPT order is never one to return.
+    """
+    return [
+        (order, line_item)
+        for order in renewal_orders
+        if order["externalReferenceId"] != context.order_id
+        for line_item in order["lineItems"]
+        if line_item.get("subscriptionId") == subscription_id
+    ]
+
+
+def _reused_returns(subscription_id, lines, existing_returns):
+    """Return this MPT order's RETURNs for the subscription's lines, and their completed seats."""
+    reused = []
+    completed_seats = 0
+    for order, line_item in lines:
+        return_order = existing_returns.get(_line_key(order, line_item))
+        if return_order is None:
+            continue
+        reused.append(_return_candidate(subscription_id, return_order=return_order))
+        if return_order["status"] == AdobeOrderStatus.COMPLETE:
+            completed_seats += _returned_quantity(return_order)
+    return reused, completed_seats
+
+
+def _new_returns(subscription_id, lines, existing_returns, seats_needed):
+    """Pick the lines to return, newest first, until the needed seats are covered."""
+    new_returns = []
+    for order, line_item in lines:
+        if seats_needed <= 0:
+            break
+        remaining = _remaining_quantity(line_item)
+        if not remaining or _line_key(order, line_item) in existing_returns:
+            continue
+        quantity = min(remaining, seats_needed)
+        new_returns.append(
+            _return_candidate(
+                subscription_id,
+                returning_order=order,
+                returning_line=line_item,
+                quantity=quantity,
             )
-            return None
+        )
+        seats_needed -= quantity
+    return new_returns
 
-        return {
-            **candidate,
-            "returning_order": returning_order,
-            "returning_line": returning_line,
-        }
 
-    def _find_previous_renewal_line(self, context, renewal_orders, subscription_id):
-        for order in renewal_orders:
-            if order["externalReferenceId"] == context.order_id:
-                continue
-            for line_item in order["lineItems"]:
-                if line_item.get("subscriptionId") == subscription_id:
-                    return order, line_item
-        return None, None
+def _line_key(order, line_item):
+    """Identify a RENEWAL line by its order and line number, as a RETURN references it."""
+    return order["orderId"], str(line_item["extLineItemNumber"])
+
+
+def _returns_by_referenced_line(returns_by_sku):
+    """Index this MPT order's RETURN orders by the RENEWAL order and line they reference."""
+    indexed = {}
+    for return_orders in returns_by_sku.values():
+        for return_order in return_orders:
+            for line_item in return_order.get("lineItems", []):
+                key = (return_order.get("referenceOrderId"), str(line_item["extLineItemNumber"]))
+                indexed[key] = return_order
+    return indexed
+
+
+def _returned_quantity(return_order):
+    line_items = return_order.get("lineItems", [])
+    return sum(line_item.get("quantity", 0) for line_item in line_items)
+
+
+def _remaining_quantity(line_item):
+    """Return the seats still returnable on a RENEWAL line (0 once fully returned)."""
+    if line_item.get("status") == AdobeOrderStatus.CANCELLED:
+        return 0
+    remaining = line_item.get("remainingQuantity")
+    return line_item.get("quantity", 0) if remaining is None else remaining
+
+
+def _return_candidate(  # noqa: WPS211
+    subscription_id, *, return_order=None, returning_order=None, returning_line=None, quantity=None
+):
+    return {
+        "subscription_id": subscription_id,
+        "return_order": return_order,
+        "returning_order": returning_order,
+        "returning_line": returning_line,
+        "quantity": quantity,
+    }
 
 
 class ReturnPreviousRenewalOrders(Step):
     """
     Return the previous RENEWAL order lines resolved by ResolvePreviousRenewalReturns.
 
-    Each candidate is a lapsing subscription (renew = false) already
-    committed in a previous RENEWAL order placed within the return window.
-    Disabling its auto-renewal is not enough — the already-paid renewal must
-    be undone, so this step submits a RETURN order referencing that previous
-    RENEWAL order, returning only the lapsing subscription's line (other
-    lines of that order stay renewed). Runs after SubmitRenewalNowOrder so
+    Each candidate is one previous RENEWAL line of a lapsing subscription
+    (renew = false), placed within the return window. Disabling its
+    auto-renewal is not enough — the already-paid renewal must be undone, so
+    this step submits one RETURN order per line, referencing that RENEWAL
+    order and returning the candidate's quantity (the line's remaining seats,
+    or fewer when they complete the subscription's renewed quantity); other
+    lines of those orders stay renewed. Runs after SubmitRenewalNowOrder so
     the additive operation always precedes the subtractive one.
 
     Idempotent: a RETURN order already created by this MPT order is carried
@@ -753,6 +844,7 @@ class ReturnPreviousRenewalOrders(Step):
                 returning_line,
                 context.order_id,
                 returning_line.get("deploymentId"),
+                quantity=candidate["quantity"],
             )
         except AdobeAPIError as error:
             logger.warning(
@@ -850,7 +942,7 @@ class NormalizeRenewedSubscriptions(Step):
             return self._fail(client, context, subscription_id, error)
 
         renewed_quantity = subscription.get(Param.RENEWED_QUANTITY.value)
-        if renewed_quantity is None:
+        if not renewed_quantity:
             logger.info(
                 "%s: subscription %s has no renewedQuantity yet, skipping normalisation",
                 context,
