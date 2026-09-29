@@ -8,8 +8,13 @@ from adobe_vipm.adobe.constants import (
 
 
 def is_flex_discount_applied(flex_discount: dict) -> bool:
-    """Return whether Adobe applied a line flex discount (a missing result counts as SUCCESS)."""
-    return flex_discount.get("result", FLEX_DISCOUNT_RESULT_SUCCESS) == FLEX_DISCOUNT_RESULT_SUCCESS
+    """Return whether Adobe applied a line flex discount.
+
+    Only an explicit ``result: SUCCESS`` confirms it; a missing result is not a
+    confirmation, so a code Adobe did not report on is never committed or recorded
+    as redeemed.
+    """
+    return flex_discount.get("result") == FLEX_DISCOUNT_RESULT_SUCCESS
 
 
 def get_item_by_partial_sku(line_items, sku):

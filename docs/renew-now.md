@@ -75,7 +75,12 @@ Only a discount code that the renewal plan **explicitly selected** for a line,
 and that the `PREVIEW_RENEWAL` response then **confirmed** with result
 `SUCCESS`, is submitted on the real `RENEWAL` order.
 
-- Requested codes the preview did not apply successfully are dropped and logged.
+- A selected code the preview did not confirm fails the order **before** the
+  `RENEWAL` is committed, with `VIPM0056` naming each refused code, its line and
+  Adobe's result. Only an explicit `result: SUCCESS` confirms a code; a missing
+  result or a missing `flexDiscounts` entry does not. The renew-now `RENEWAL` is
+  invoiced immediately, so committing without the code would bill the renewal at
+  full price. Lines are matched to the request by `extLineItemNumber`.
 - Reusable discounts the customer already holds are auto-applied by Adobe at
   renewal without any opt-in. The preview reports them alongside the requested
   ones, but they are never echoed back on the commit, so they are not

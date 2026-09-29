@@ -177,7 +177,16 @@ def test_preview_renewal_now_order_step_validates_preview(
     renewal_now_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
     mock_adobe_client.get_orders.return_value = []
     preview_order = adobe_order_factory(
-        order_type="PREVIEW_RENEWAL", status=AdobeOrderStatus.COMPLETE.value
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 15,
+                "flexDiscounts": [{"code": "CODE-1", "result": "SUCCESS"}],
+            },
+        ],
     )
     mock_adobe_client.create_renewal_order.return_value = preview_order
     mocked_next_step = mocker.MagicMock()
@@ -338,6 +347,113 @@ def test_preview_renewal_now_order_step_preview_failed(
     assert "Invalid discount code" in mocked_switch_to_failed.mock_calls[0].args[2]["message"]
     assert renewal_now_context.preview_renewal_order is None
     mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("flex_discounts", "reported"),
+    [
+        (
+            [{"code": "CODE-1", "result": "FAILURE"}],
+            "CODE-1 on subscription renewing-sub-id (FAILURE)",
+        ),
+        ([{"code": "CODE-1"}], "CODE-1 on subscription renewing-sub-id (no result)"),
+        (None, "CODE-1 on subscription renewing-sub-id (no result)"),
+    ],
+)
+def test_preview_renewal_now_order_step_fails_on_an_unconfirmed_selected_code(  # noqa: WPS211
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    renewal_now_context,
+    adobe_order_factory,
+    flex_discounts,
+    reported,
+):
+    """A selected code the preview did not confirm fails the order before the commit."""
+    renewal_now_context.renewal_plan_subscriptions = [plan_entry(flex_discount_codes=["CODE-1"])]
+    mock_adobe_client.get_orders.return_value = []
+    # The response echoes no subscriptionId and a different offer level: the line is
+    # still matched to the request by its extLineItemNumber.
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA14A12",
+                "subscriptionId": "",
+                "quantity": 15,
+                "flexDiscounts": flex_discounts,
+            },
+        ],
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    PreviewRenewalNowOrder()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == "VIPM0056"
+    assert reported in error["message"]
+    mock_adobe_client.create_renewal_order.assert_called_once()
+    mocked_next_step.assert_not_called()
+
+
+def test_preview_renewal_now_order_step_fails_on_an_unconfirmed_net_new_code(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
+):
+    """A refused code on a new product names the product in the failure."""
+    renewal_now_context_net_new.renewal_plan_subscriptions = []
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65322651CA01A12",
+                "quantity": 5,
+                "flexDiscounts": [{"code": "CODE-3", "result": "FAILURE"}],
+            },
+        ],
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal_now.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    PreviewRenewalNowOrder()(mock_mpt_client, renewal_now_context_net_new, mocked_next_step)  # act
+
+    message = mocked_switch_to_failed.mock_calls[0].args[2]["message"]
+    assert "CODE-3 on new product 65322651CA01A12 (FAILURE)" in message
+    mocked_next_step.assert_not_called()
+
+
+def test_preview_renewal_now_order_step_ignores_an_unselected_code(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    """A code the plan did not select never blocks the order, whatever its result."""
+    renewal_now_context.renewal_plan_subscriptions = [plan_entry()]
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 15,
+                "flexDiscounts": [{"code": "HELD-REUSABLE", "result": "FAILURE"}],
+            },
+        ],
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    PreviewRenewalNowOrder()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
 
 def test_submit_renewal_now_order_step_no_renewing_subscriptions(
@@ -1881,8 +1997,18 @@ def test_preview_renewal_now_order_step_appends_net_new_line(
         order_type="PREVIEW_RENEWAL",
         status=AdobeOrderStatus.COMPLETE.value,
         items=[
-            {"extLineItemNumber": 1, "offerId": "65304578CA01A12", "quantity": 15},
-            {"extLineItemNumber": 2, "offerId": "65322651CA01A12", "quantity": 5},
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 15,
+                "flexDiscounts": [{"code": "CODE-1", "result": "SUCCESS"}],
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65322651CA01A12",
+                "quantity": 5,
+                "flexDiscounts": [{"code": "CODE-3", "result": "SUCCESS"}],
+            },
         ],
     )
     mocked_next_step = mocker.MagicMock()
@@ -1918,7 +2044,14 @@ def test_preview_renewal_now_order_step_net_new_only(
     mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
         order_type="PREVIEW_RENEWAL",
         status=AdobeOrderStatus.COMPLETE.value,
-        items=[{"extLineItemNumber": 1, "offerId": "65322651CA01A12", "quantity": 5}],
+        items=[
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65322651CA01A12",
+                "quantity": 5,
+                "flexDiscounts": [{"code": "CODE-3", "result": "SUCCESS"}],
+            },
+        ],
     )
     mocked_next_step = mocker.MagicMock()
     step = PreviewRenewalNowOrder()
