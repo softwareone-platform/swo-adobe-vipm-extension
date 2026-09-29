@@ -26,7 +26,9 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.utils import is_flex_discount_applied
 from adobe_vipm.flows.constants import (
+    ERR_EARLY_RENEWAL_IN_PROGRESS,
     ERR_FLEX_DISCOUNT_CODE_LIMIT,
+    ERR_RENEWAL_STAGED,
     ERR_UNEXPECTED_ADOBE_ERROR_STATUS,
     ERR_UNRECOVERABLE_ADOBE_ORDER_STATUS,
     ERR_VIPM_UNHANDLED_EXCEPTION,
@@ -58,6 +60,10 @@ from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 from adobe_vipm.flows.utils.parameter import (
     set_adobe_order_ids_created_parameter,
     set_flex_discounts_parameter,
+)
+from adobe_vipm.flows.utils.renewal_lock import (
+    get_pending_early_renewal,
+    has_pending_staged_renewal,
 )
 from adobe_vipm.notifications import send_exception, send_warning
 
@@ -171,6 +177,46 @@ def _build_committed_line_item(line_item, confirmed_codes):
             line_number,
         )
     return committed_line_item
+
+
+class FailSwitchWhileRenewalInPlace(Step):
+    """
+    Fail the switch order while a renewal is in place for the agreement.
+
+    A mid-term upgrade moves seats between the subscriptions an early renewal
+    already placed, or a renewal staged for the anniversary, depends on, so it is
+    held to the same signal that refuses native Change, Configuration and
+    Termination orders at validation. The upgrade wizard creates the order
+    directly in Processing, so draft validation never runs for it; this step is
+    where the rule holds whatever route created the order. Once the Adobe SWITCH
+    exists (a retry after it was submitted) there is nothing left to protect, so
+    the check is skipped.
+    """
+
+    def __call__(self, mpt_client, context, next_step):
+        """Fail the order when an early renewal is pending or a renewal is staged."""
+        if context.adobe_new_order_id:
+            next_step(mpt_client, context)
+            return
+
+        early_renewal = get_pending_early_renewal(context)
+        if early_renewal:
+            logger.info(
+                "%s: switch refused, early renewal order %s is pending effect",
+                context,
+                early_renewal["orderId"],
+            )
+            switch_order_to_failed(
+                mpt_client, context.order, ERR_EARLY_RENEWAL_IN_PROGRESS.to_dict()
+            )
+            return
+
+        if has_pending_staged_renewal(context):
+            logger.info("%s: switch refused, a renewal is staged for the agreement", context)
+            switch_order_to_failed(mpt_client, context.order, ERR_RENEWAL_STAGED.to_dict())
+            return
+
+        next_step(mpt_client, context)
 
 
 class GetSwitchPreviewOrder(Step):
@@ -484,7 +530,10 @@ def fulfill_switch_order(client, order):
     """
     Fulfills a change order that carries a mid-term upgrade (SWITCH) payload.
 
-    It validates the switch through a PREVIEW_SWITCH order, submits the actual
+    It fails the order while a renewal is in place for the agreement (an early
+    renewal pending effect or a staged at-anniversary renewal), exactly as native
+    Change orders are refused at validation. Otherwise it validates the switch
+    through a PREVIEW_SWITCH order, submits the actual
     SWITCH order and creates or updates the agreement subscriptions with the
     new Adobe subscriptions. The quantities of the subscriptions being switched
     from are cancelled by Adobe (cancellingItems) and synchronized back to the
@@ -508,6 +557,7 @@ def fulfill_switch_order(client, order):
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
         ValidateSkuAvailability(is_validation=False),
+        FailSwitchWhileRenewalInPlace(),
         GetSwitchPreviewOrder(),
         UpdatePrices(is_validation=False),
         SubmitSwitchOrder(),

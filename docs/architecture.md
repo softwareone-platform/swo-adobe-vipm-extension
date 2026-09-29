@@ -38,7 +38,13 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    `renewalPayload` are routed to the same two renewal flows, because the
    renewal wizard submits a plan that changes only renew decisions as a
    configuration order, and `renewal.py` keeps the configuration templates for
-   them; once Adobe completes a SWITCH, `switch.py` sets the renewal quantity of
+   them; `switch.py` fails a mid-term upgrade while a renewal is in place for the
+   agreement (`FailSwitchWhileRenewalInPlace`: an early renewal pending effect,
+   `VIPM0051`, or an at-anniversary renewal staged, `VIPM0054`), from the same
+   reads in `flows/utils/renewal_lock.py` that refuse native Change,
+   Configuration and Termination orders at validation, because the upgrade
+   wizard creates its order directly in Processing and draft validation never
+   runs for it; once Adobe completes a SWITCH, `switch.py` sets the renewal quantity of
    every switched subscription that is still active and set to auto-renew to its
    current quantity (`AlignSwitchRenewalQuantities`, through the Adobe client's
    idempotent-write session, which also retries PATCH; Adobe ignores a renewal

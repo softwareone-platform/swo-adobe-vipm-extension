@@ -1542,6 +1542,7 @@ def mock_adobe_client(mocker):
         "adobe_vipm.flows.global_customer",
         "adobe_vipm.flows.helpers",
         "adobe_vipm.flows.migration",
+        "adobe_vipm.flows.utils.renewal_lock",
         "adobe_vipm.flows.validation.termination",
         "adobe_vipm.flows.validation.change",
         "adobe_vipm.flows.validation.shared",
