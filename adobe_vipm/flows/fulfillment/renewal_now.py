@@ -806,30 +806,36 @@ class ReturnPreviousRenewalOrders(Step):
     lines of those orders stay renewed. Runs after SubmitRenewalNowOrder so
     the additive operation always precedes the subtractive one.
 
+    The RETURNs are placed one at a time: the next one only once the previous
+    one has completed on Adobe's side. Adobe lowers the subscription's
+    renewedQuantity as each RETURN completes, and two RETURNs in flight at once
+    can lose one of the two decrements (seen on the sandbox, 29 Sep 2026), which
+    leaves renewedQuantity too high for good and fails the seat check of every
+    later attempt. A RETURN still OPEN therefore stops the pipeline, keeping
+    the MPT order in Processing, and the next fulfillment attempt picks the
+    sequence up where it left off.
+
     Idempotent: a RETURN order already created by this MPT order is carried
-    by the candidate and reused instead of re-submitted. A RETURN order
-    still pending on Adobe's side keeps the MPT order in Processing to be
-    retried on the next fulfillment attempt.
+    by the candidate and reused instead of re-submitted, and the id of a new
+    one is recorded on the order as soon as Adobe accepts it.
     """
 
     def __call__(self, client, context, next_step):
         """Return the previous RENEWAL order lines of the plan's lapsing subscriptions."""
-        if not context.renewal_return_candidates:
-            next_step(client, context)
-            return
-
         adobe_client = get_adobe_client()
-        return_orders = []
         for candidate in context.renewal_return_candidates:
             return_order = candidate["return_order"] or self._create_return_order(
                 client, adobe_client, context, candidate
             )
             if return_order is None:
                 return
-            return_orders.append(return_order)
-
-        if not self._ensure_not_pending_return_orders(context, return_orders):
-            return
+            if return_order["status"] != AdobeOrderStatus.COMPLETE:
+                logger.info(
+                    "%s: return order %s still pending; the next return waits for it",
+                    context,
+                    return_order["orderId"],
+                )
+                return
 
         next_step(client, context)
 
@@ -875,21 +881,6 @@ class ReturnPreviousRenewalOrders(Step):
         context.order = set_adobe_order_ids_created_parameter(context, [return_order["orderId"]])
         update_order(client, context.order_id, parameters=context.order["parameters"])
         return return_order
-
-    def _ensure_not_pending_return_orders(self, context, return_orders):
-        pending_orders = [
-            return_order["orderId"]
-            for return_order in return_orders
-            if return_order["status"] != AdobeOrderStatus.COMPLETE
-        ]
-        if pending_orders:
-            logger.info(
-                "%s: return order(s) %s still pending",
-                context,
-                ", ".join(pending_orders),
-            )
-            return False
-        return True
 
 
 class NormalizeRenewedSubscriptions(Step):

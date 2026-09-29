@@ -1694,6 +1694,111 @@ def test_return_previous_renewal_orders_step_pending_return(
     mocked_next_step.assert_not_called()
 
 
+def _two_return_candidates(adobe_order_factory, first_return=None, second_return=None):
+    older = previous_renewal_order_factory(
+        adobe_order_factory, order_id="ADOBE-RENEWAL-OLDER", quantity=3
+    )
+    newer = previous_renewal_order_factory(
+        adobe_order_factory, order_id="ADOBE-RENEWAL-NEWER", quantity=2
+    )
+    return [
+        return_candidate(
+            returning_order=newer,
+            returning_line=newer["lineItems"][0],
+            return_order=first_return,
+            quantity=2,
+        ),
+        return_candidate(
+            returning_order=older,
+            returning_line=older["lineItems"][0],
+            return_order=second_return,
+            quantity=3,
+        ),
+    ]
+
+
+def test_return_previous_renewal_orders_step_places_the_next_return_only_once_one_completes(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    """Two RETURNs in flight at once can lose a renewedQuantity decrement."""
+    renewal_now_context.renewal_return_candidates = _two_return_candidates(adobe_order_factory)
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN", status=AdobeOrderStatus.OPEN.value, order_id="ADOBE-RETURN-NEWER"
+    )
+    mocker.patch("adobe_vipm.flows.fulfillment.renewal_now.update_order")
+    mocked_next_step = mocker.MagicMock()
+
+    ReturnPreviousRenewalOrders()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_called_once()
+    assert mock_adobe_client.create_return_order.mock_calls[0].args[2]["orderId"] == (
+        "ADOBE-RENEWAL-NEWER"
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_return_previous_renewal_orders_step_waits_on_an_open_return_from_a_previous_attempt(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    open_return = adobe_order_factory(
+        order_type="RETURN", status=AdobeOrderStatus.OPEN.value, order_id="ADOBE-RETURN-NEWER"
+    )
+    renewal_now_context.renewal_return_candidates = _two_return_candidates(
+        adobe_order_factory, first_return=open_return
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    ReturnPreviousRenewalOrders()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_not_called()
+    mocked_next_step.assert_not_called()
+
+
+def test_return_previous_renewal_orders_step_places_the_next_return_after_a_completed_one(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    completed_return = adobe_order_factory(
+        order_type="RETURN", status=AdobeOrderStatus.COMPLETE.value, order_id="ADOBE-RETURN-NEWER"
+    )
+    renewal_now_context.renewal_return_candidates = _two_return_candidates(
+        adobe_order_factory, first_return=completed_return
+    )
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN", status=AdobeOrderStatus.OPEN.value, order_id="ADOBE-RETURN-OLDER"
+    )
+    mocker.patch("adobe_vipm.flows.fulfillment.renewal_now.update_order")
+    mocked_next_step = mocker.MagicMock()
+
+    ReturnPreviousRenewalOrders()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_called_once()
+    assert mock_adobe_client.create_return_order.mock_calls[0].args[2]["orderId"] == (
+        "ADOBE-RENEWAL-OLDER"
+    )
+    assert mock_adobe_client.create_return_order.mock_calls[0].kwargs == {"quantity": 3}
+    mocked_next_step.assert_not_called()
+
+
+def test_return_previous_renewal_orders_step_continues_once_every_return_completed(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_return_candidates = _two_return_candidates(
+        adobe_order_factory,
+        first_return=adobe_order_factory(
+            order_type="RETURN", status=AdobeOrderStatus.COMPLETE.value, order_id="R-NEWER"
+        ),
+        second_return=adobe_order_factory(
+            order_type="RETURN", status=AdobeOrderStatus.COMPLETE.value, order_id="R-OLDER"
+        ),
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    ReturnPreviousRenewalOrders()(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
 def test_return_previous_renewal_orders_step_return_failed(
     mocker,
     mock_adobe_client,
