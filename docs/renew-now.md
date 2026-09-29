@@ -36,28 +36,38 @@ mutation has been made in Adobe, so there is nothing to reverse.
 ## 14-day return window (VIPM0053)
 
 A lapsing subscription (`renew = false`) whose pre-mutation snapshot carries a
-`renewedQuantity` was already committed in a previous `RENEWAL` order. That
-order's line has to be returned, so the customer is not left paying for a
-renewal that is being toggled off.
+`renewedQuantity` above 0 still holds early-renewed seats, possibly from several
+`RENEWAL` orders of this term: Adobe keeps `renewedQuantity` as their running
+total and lowers it as seats are returned (a `renewedQuantity` of 0 is a plain
+lapse, with nothing to return). Those seats have to be returned, so the customer
+is not left paying for a renewal that is being toggled off.
 
-Adobe only accepts a `RETURN` within `CANCELLATION_WINDOW_DAYS` (14 days) of the
-original order placement. The `ResolvePreviousRenewalReturns` step therefore
-locates the previous renewal line and checks its creation date against that
-window **before anything is committed**. Two outcomes fail the MPT order at that
-point, while nothing has been mutated in Adobe:
+The `ResolvePreviousRenewalReturns` step walks the customer's `RENEWAL` orders
+newest first, skips lines already fully returned (status 1008, or no
+`remainingQuantity` left) and takes each remaining line's `remainingQuantity`
+until the seats add up to what is still renewed, returning fewer from the last
+line if that completes the total. Adobe only accepts a `RETURN` within
+`CANCELLATION_WINDOW_DAYS` (14 days) of the original order placement, so every
+line is checked against that window **before anything is committed**. Two
+outcomes fail the MPT order at that point, while nothing has been mutated in
+Adobe:
 
-- the previous renewal order cannot be found, which fails with
+- the seats on the `RENEWAL` lines do not add up to the renewed quantity
+  (including when no previous renewal order is found), which fails with
   `ERR_RENEWAL_RETURN_FAILED` (`VIPM0050`);
-- the previous renewal order was placed outside the 14-day window, which fails
-  with `ERR_RENEWAL_RETURN_WINDOW_CLOSED` (`VIPM0053`).
+- a line to return was placed outside the 14-day window, which fails with
+  `ERR_RENEWAL_RETURN_WINDOW_CLOSED` (`VIPM0053`).
 
 Failing up front is deliberate. Committing the new `RENEWAL` first and only then
-discovering that the old one cannot be returned would leave a committed and
+discovering that an old one cannot be returned would leave a committed and
 invoiced Adobe order behind a Failed MPT order, with no way to reverse it.
 
-A `RETURN` order created by an earlier attempt of the same MPT order is detected
-by its external reference prefix and reused as-is, whatever the window says
-today, so retries stay idempotent.
+After the commit, `ReturnPreviousRenewalOrders` creates one `RETURN` per line,
+each for that line's resolved quantity. `RETURN` orders created by an earlier
+attempt of the same MPT order are matched to the `RENEWAL` order and line they
+reference, reused as-is whatever the window says today, and their seats count
+towards the total, so retries neither return a line twice nor fail the seat
+check.
 
 ## Flex discount codes committed
 

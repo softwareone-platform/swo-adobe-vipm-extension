@@ -653,13 +653,13 @@ class Validate3YCRenewalFloor(Step):
         """
         Return the quantity a renewing plan entry will renew.
 
-        An entry already committed by a previous renewal order with no
-        requested quantity change keeps that order's renewedQuantity (the
+        An entry already committed by a previous renewal order (renewedQuantity
+        above 0) with no requested quantity change keeps that renewedQuantity (the
         renew-now flow submits nothing for it); otherwise the plan's
         renewal quantity applies.
         """
         renewed_quantity = plan["snapshot"].get("renewed_quantity")
-        if not plan["renewal_quantity"] and renewed_quantity is not None:
+        if not plan["renewal_quantity"] and renewed_quantity:
             return renewed_quantity
         return plan["renewal_quantity"]
 
