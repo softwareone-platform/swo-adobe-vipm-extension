@@ -1600,9 +1600,9 @@ def test_create_return_order(
     )
     returning_item = returning_order["lineItems"][0]
     ext_ref_prefix = "ext-ref-prefix"
-    ext_reference_id = returning_order["externalReferenceId"]
+    returning_order_id = returning_order["orderId"]
     ext_item_number = returning_item["extLineItemNumber"]
-    expected_external_id = f"{ext_ref_prefix}_{ext_reference_id}_{ext_item_number}"
+    expected_external_id = f"{ext_ref_prefix}_{returning_order_id}_{ext_item_number}"
     expected_body = adobe_order_factory(
         ORDER_TYPE_RETURN,
         reference_order_id=returning_order["orderId"],
@@ -1644,8 +1644,7 @@ def test_create_return_order(
     assert result == {"orderId": "adobe-order-id"}
 
 
-def test_create_return_order_with_a_partial_quantity(
-    mocker,
+def test_create_return_order_partial_quantity(
     settings,
     requests_mocker,
     adobe_client_factory,
@@ -1653,35 +1652,23 @@ def test_create_return_order_with_a_partial_quantity(
     adobe_order_factory,
     adobe_items_factory,
 ):
-    mocker.patch(
-        "adobe_vipm.adobe.client.uuid4",
-        return_value="uuid-1",
-    )
     authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
     customer_id = "a-customer"
-    deployment_id = "a_deployment_id"
-    client, authorization, api_token = adobe_client_factory()
+    client, _, _ = adobe_client_factory()
     returning_order = adobe_order_factory(
         ORDER_TYPE_NEW,
         external_id="ORD-1234",
-        order_id="returning-order-id",
+        order_id="P9202197700",
+        items=adobe_items_factory(quantity=15, remaining_quantity=10),
         status=AdobeOrderStatus.COMPLETE.value,
-        deployment_id=deployment_id,
     )
-    returning_item = returning_order["lineItems"][0]
-    ext_ref_prefix = "ext-ref-prefix"
-    ext_reference_id = returning_order["externalReferenceId"]
-    ext_item_number = returning_item["extLineItemNumber"]
-    expected_external_id = f"{ext_ref_prefix}_{ext_reference_id}_{ext_item_number}"
+    expected_external_id = "ORD-2222-3333-4444_P9202197700_1"
     expected_body = adobe_order_factory(
         ORDER_TYPE_RETURN,
-        reference_order_id=returning_order["orderId"],
+        reference_order_id="P9202197700",
         external_id=expected_external_id,
-        items=adobe_items_factory(deployment_id=deployment_id, deployment_currency_code="USD"),
-        deployment_id=deployment_id,
+        items=adobe_items_factory(quantity=10),
     )
-    # A partly returned line: only its remaining seats are returned.
-    expected_body["lineItems"][0]["quantity"] = 2
     requests_mocker.post(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
@@ -1689,29 +1676,16 @@ def test_create_return_order_with_a_partial_quantity(
         ),
         status=202,
         json={"orderId": "adobe-order-id"},
-        match=[
-            matchers.header_matcher(
-                {
-                    "X-Api-Key": authorization.client_id,
-                    "Authorization": f"Bearer {api_token.token}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                    "X-Request-Id": "uuid-1",
-                    "x-correlation-id": expected_external_id,
-                },
-            ),
-            matchers.json_params_matcher(expected_body),
-        ],
+        match=[matchers.json_params_matcher(expected_body)],
     )
 
     result = client.create_return_order(
         authorization_uk,
         customer_id,
         returning_order,
-        returning_item,
-        ext_ref_prefix,
-        deployment_id=deployment_id,
-        quantity=2,
+        returning_order["lineItems"][0],
+        "ORD-2222-3333-4444",
+        quantity=10,
     )
 
     assert result == {"orderId": "adobe-order-id"}
@@ -3254,6 +3228,158 @@ def test_get_returnable_orders_by_subscription_id_with_returning_orders(
             "end-date": "2024-03-03",
         },
     )
+
+
+@freeze_time("2024-01-10")
+def test_get_returnable_orders_by_subscription_id_uses_remaining_quantity(
+    mocker,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_client_factory,
+    adobe_authorizations_file,
+):
+    newest_order = adobe_order_factory(
+        order_id="newest_order",
+        order_type=ORDER_TYPE_NEW,
+        items=adobe_items_factory(
+            subscription_id="SUB-1000-2000-3000",
+            quantity=10,
+            remaining_quantity=10,
+            status=AdobeOrderStatus.COMPLETE.value,
+        ),
+        status=AdobeOrderStatus.COMPLETE.value,
+        creation_date="2024-01-08T00:00:00Z",
+    )
+    oldest_order = adobe_order_factory(
+        order_id="oldest_order",
+        order_type=ORDER_TYPE_NEW,
+        items=adobe_items_factory(
+            subscription_id="SUB-1000-2000-3000",
+            quantity=15,
+            remaining_quantity=10,
+            status=AdobeOrderStatus.COMPLETE.value,
+        ),
+        status=AdobeOrderStatus.COMPLETE.value,
+        creation_date="2024-01-02T00:00:00Z",
+    )
+    exhausted_order = adobe_order_factory(
+        order_id="exhausted_order",
+        order_type=ORDER_TYPE_NEW,
+        items=adobe_items_factory(
+            subscription_id="SUB-1000-2000-3000",
+            quantity=5,
+            remaining_quantity=0,
+            status=AdobeOrderStatus.COMPLETE.value,
+        ),
+        status=AdobeOrderStatus.COMPLETE.value,
+        creation_date="2024-01-05T00:00:00Z",
+    )
+    mocker.patch.object(
+        adobe_client.AdobeClient,
+        "get_orders",
+        return_value=[newest_order, exhausted_order, oldest_order],
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    client, _, _ = adobe_client_factory()
+
+    result = client.get_returnable_orders_by_subscription_id(
+        authorization_uk,
+        "a-customer",
+        "SUB-1000-2000-3000",
+        "2024-03-03",
+    )
+
+    assert result == [
+        ReturnableOrderInfo(order=oldest_order, line=oldest_order["lineItems"][0], quantity=10),
+        ReturnableOrderInfo(order=newest_order, line=newest_order["lineItems"][0], quantity=10),
+    ]
+
+
+@freeze_time("2024-01-10")
+def test_get_returnable_orders_by_subscription_id_returning_order_uses_returned_quantity(
+    mocker,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_client_factory,
+    adobe_authorizations_file,
+):
+    returning_order = adobe_order_factory(
+        order_id="returning_order",
+        order_type=ORDER_TYPE_NEW,
+        items=adobe_items_factory(
+            subscription_id="SUB-1000-2000-3000",
+            quantity=20,
+            remaining_quantity=0,
+            status=AdobeOrderStatus.CANCELLED.value,
+        ),
+        status=AdobeOrderStatus.CANCELLED.value,
+        creation_date="2024-01-02T00:00:00Z",
+    )
+    return_orders = [
+        adobe_order_factory(
+            ORDER_TYPE_RETURN,
+            reference_order_id="returning_order",
+            items=adobe_items_factory(quantity=15),
+        ),
+        adobe_order_factory(
+            ORDER_TYPE_RETURN,
+            reference_order_id="returning_order",
+            items=adobe_items_factory(quantity=5),
+        ),
+    ]
+    mocker.patch.object(adobe_client.AdobeClient, "get_orders", return_value=[returning_order])
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    client, _, _ = adobe_client_factory()
+
+    result = client.get_returnable_orders_by_subscription_id(
+        authorization_uk,
+        "a-customer",
+        "SUB-1000-2000-3000",
+        "2024-03-03",
+        return_orders=return_orders,
+    )
+
+    assert result == [
+        ReturnableOrderInfo(
+            order=returning_order, line=returning_order["lineItems"][0], quantity=20
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("ext_line_item_number", "expected_quantity"),
+    [
+        (1, 10),
+        (2, 0),
+    ],
+)
+def test_get_remaining_quantity(
+    mocker,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_client_factory,
+    adobe_authorizations_file,
+    ext_line_item_number,
+    expected_quantity,
+):
+    order = adobe_order_factory(
+        ORDER_TYPE_NEW,
+        order_id="an-order-id",
+        items=adobe_items_factory(quantity=15, remaining_quantity=10),
+        status=AdobeOrderStatus.COMPLETE.value,
+    )
+    mocked_get_order = mocker.patch.object(
+        adobe_client.AdobeClient, "get_order", return_value=order
+    )
+    authorization_uk = adobe_authorizations_file["authorizations"][0]["authorization_uk"]
+    client, _, _ = adobe_client_factory()
+
+    result = client.get_remaining_quantity(
+        authorization_uk, "a-customer", "an-order-id", ext_line_item_number
+    )
+
+    assert result == expected_quantity
+    mocked_get_order.assert_called_once_with(authorization_uk, "a-customer", "an-order-id")
 
 
 def test_get_return_orders_by_external_reference(

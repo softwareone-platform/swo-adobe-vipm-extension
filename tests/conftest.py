@@ -1530,6 +1530,7 @@ def mock_adobe_client(mocker):
     paths = [
         "adobe_vipm.flows.benefits",
         "adobe_vipm.flows.fulfillment.change",
+        "adobe_vipm.flows.fulfillment.downsize_returns",
         "adobe_vipm.flows.fulfillment.purchase",
         "adobe_vipm.flows.fulfillment.renewal",
         "adobe_vipm.flows.fulfillment.renewal_now",
@@ -1573,12 +1574,15 @@ def adobe_items_factory():  # ruff:ignore[complex-structure]
         currency_code=None,
         deployment_currency_code=None,
         pricing=None,
+        remaining_quantity=None,
     ):
         item = {
             "extLineItemNumber": line_number,
             "offerId": offer_id,
             "quantity": quantity,
         }
+        if remaining_quantity is not None:
+            item["remainingQuantity"] = remaining_quantity
         if currency_code:
             item["currencyCode"] = currency_code
         if deployment_id:

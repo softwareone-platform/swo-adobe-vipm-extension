@@ -621,6 +621,7 @@ def test_submit_return_orders_step(
         ret_info_1.line,
         context.order["id"],
         "",
+        quantity=ret_info_1.quantity,
     )
     mocked_next_step.assert_not_called()
 
@@ -743,6 +744,7 @@ def test_submit_return_orders_step_with_deployment_id(
         ret_info_1.line,
         context.order["id"],
         deployment_id,
+        quantity=ret_info_1.quantity,
     )
     mocked_next_step.assert_not_called()
 
@@ -897,6 +899,7 @@ def test_submit_return_orders_step_error_creating_return_order(
         ret_info_1.line,
         context.order["id"],
         "",
+        quantity=ret_info_1.quantity,
     )
     mock_send_exception.assert_called_once()
     mocked_next_step.assert_not_called()

@@ -31,6 +31,7 @@ class Context:
     adobe_new_order: dict | None = None
     adobe_returnable_orders: dict = field(default_factory=dict)
     adobe_return_orders: dict = field(default_factory=dict)
+    downsize_plans: dict = field(default_factory=dict)
     manual_renewal_lines: dict = field(default_factory=dict)
     diverted_renewal_lines: dict = field(default_factory=dict)
     adobe_renewal_orders: dict = field(default_factory=dict)
