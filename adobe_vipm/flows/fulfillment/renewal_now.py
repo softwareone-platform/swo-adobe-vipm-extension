@@ -45,6 +45,7 @@ from mpt_extension_sdk.mpt_http.mpt import update_order
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
     CANCELLATION_WINDOW_DAYS,
+    FLEX_DISCOUNT_RESULT_SUCCESS,
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_RENEWAL,
@@ -54,6 +55,7 @@ from adobe_vipm.adobe.constants import (
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_RENEWAL_NET_NEW_FAILED,
+    ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED,
     ERR_RENEWAL_ORDER_FAILED,
     ERR_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_RETURN_FAILED,
@@ -219,6 +221,28 @@ def _get_requested_flex_discount_codes(context):
     return requested
 
 
+def _unconfirmed_code_refusals(context, preview_lines):
+    """Describe each code the plan selected that its preview line did not confirm."""
+    labels = {
+        number: f"subscription {plan['subscription_id']}"
+        for number, plan in enumerate(_get_renewing_plans(context), start=1)
+    }
+    for number, net_new_item in _iter_net_new_lines(context):
+        labels[number] = f"new product {net_new_item['offerId']}"
+    refusals = []
+    for number, codes in _get_requested_flex_discount_codes(context).items():
+        preview_line = preview_lines.get(number) or {}
+        outcome_by_code = {
+            flex_discount.get("code"): flex_discount.get("result") or "no result"
+            for flex_discount in preview_line.get("flexDiscounts") or []
+        }
+        for code in codes:
+            outcome = outcome_by_code.get(code, "no result")
+            if outcome != FLEX_DISCOUNT_RESULT_SUCCESS:
+                refusals.append(f"{code} on {labels[number]} ({outcome})")
+    return refusals
+
+
 def _get_committed_flex_discount_codes(preview_line_item, requested_codes):
     """
     Pick the flex discount code to commit for a PREVIEW_RENEWAL response line item.
@@ -234,7 +258,7 @@ def _get_committed_flex_discount_codes(preview_line_item, requested_codes):
     """
     flex_discounts = preview_line_item.get("flexDiscounts") or []
     line_number = preview_line_item.get("extLineItemNumber")
-    successful = (fd for fd in flex_discounts if fd.get("result", "SUCCESS") == "SUCCESS")
+    successful = (fd for fd in flex_discounts if fd.get("result") == FLEX_DISCOUNT_RESULT_SUCCESS)
     confirmed = {fd["code"] for fd in successful}
     committed = [code for code in requested_codes if code in confirmed]
     dropped = [code for code in requested_codes if code not in confirmed]
@@ -359,10 +383,39 @@ class PreviewRenewalNowOrder(Step):
         if not self._ensure_net_new_previewed(client, context):
             return False
 
+        if not self._ensure_selected_codes_confirmed(client, context):
+            return False
+
         logger.info(
             "%s: renewal preview validated for %s subscription(s)", context, len(line_items)
         )
         return True
+
+    def _ensure_selected_codes_confirmed(self, client, context):
+        """
+        Fail the order before commit when a code the plan selected was not confirmed.
+
+        A selected code counts only when the preview reports ``result: SUCCESS`` for
+        it on its line (matched by extLineItemNumber). The renew-now RENEWAL is
+        invoiced immediately, so committing without the code would invoice the
+        renewal at full price. Discounts Adobe auto-applied that the plan did not
+        select never block the order.
+        """
+        preview_lines = {
+            line_item["extLineItemNumber"]: line_item
+            for line_item in context.preview_renewal_order["lineItems"]
+        }
+        refusals = _unconfirmed_code_refusals(context, preview_lines)
+        if not refusals:
+            return True
+
+        logger.warning("%s: renewal preview did not confirm %s", context, "; ".join(refusals))
+        switch_order_to_failed(
+            client,
+            context.order,
+            ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED.to_dict(refusals="; ".join(refusals)),
+        )
+        return False
 
     def _ensure_net_new_previewed(self, client, context):
         """

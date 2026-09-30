@@ -547,6 +547,12 @@ ERR_RENEWAL_FLEX_DISCOUNT_REFUSED = ValidationError(
     "so nothing was changed: {refusals}.",
 )
 
+ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED = ValidationError(
+    "VIPM0056",
+    "Adobe did not confirm the flexible discount code(s) selected for the early renewal, "
+    "so nothing was renewed or invoiced: {refusals}.",
+)
+
 
 class AssetStatus(StrEnum):
     """MPT asset statuses."""

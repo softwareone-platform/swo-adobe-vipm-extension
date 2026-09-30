@@ -141,6 +141,9 @@ class OfferType(StrEnum):
 
 CANCELLATION_WINDOW_DAYS = 14
 
+# The only flexDiscounts[].result that confirms Adobe applied a code.
+FLEX_DISCOUNT_RESULT_SUCCESS = "SUCCESS"
+
 MPT_NOTIFY_CATEGORIES = json.loads(
     os.getenv("MPT_NOTIFY_CATEGORIES", '{"ORDERS": "NTC-0000-0006"}')
 )
