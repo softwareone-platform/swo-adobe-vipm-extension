@@ -99,6 +99,15 @@ Redemption reads and writes are best effort after order completion. Failures
 notify operations for manual backfill and allow agreement parameter cleanup and
 synchronization to continue.
 
+Mid-term upgrade (`SWITCH`) orders do not select candidates from the store: the
+`switchPayload` already carries at most one `flexDiscountCodes` entry per line
+item. `PREVIEW_SWITCH` validates those codes, and the `SWITCH` order commits
+only the requested codes the preview applied (result `SUCCESS`). A code the
+preview did not apply is dropped from its line and operations are warned; the
+order is not failed. Auto-applied reusable discounts are not echoed back. The
+applied codes follow the same `flexibleDiscounts` pending/complete lifecycle and
+redemption recording described above.
+
 ## Major components
 
 | Package / module | Responsibility |

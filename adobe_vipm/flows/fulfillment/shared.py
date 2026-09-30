@@ -247,6 +247,24 @@ def get_flex_discount_limit_error(error: Exception) -> dict | None:
     return None
 
 
+def refresh_flex_discounts_parameter(client, context: Context) -> None:
+    """
+    Reconcile the flexibleDiscounts parameter with the completed Adobe order.
+
+    The codes recorded when the order was submitted (pending proposals or
+    applied codes) are the requested ones: only those Adobe applied on the
+    completed order (context.adobe_new_order) are kept. The MPT order is only
+    updated when the parameter changed.
+    """
+    requested_codes = get_requested_flex_discount_codes(context.order)
+    updated_order = set_flex_discounts_parameter(
+        context.order, context.adobe_new_order, requested_codes=requested_codes
+    )
+    if updated_order != context.order:
+        context.order = updated_order
+        update_order(client, context.order_id, parameters=context.order["parameters"])
+
+
 def switch_order_to_query(client, order, template_name=None):
     """
     Switches the status of an MPT order to 'query' and resetting due date.
@@ -1143,17 +1161,8 @@ class SubmitNewOrder(Step):
             switch_order_to_failed(client, context.order, error)
             logger.warning("%s: the order has been failed due to %s.", context, error["message"])
             return
-        self._refresh_flex_discounts(client, context)
+        refresh_flex_discounts_parameter(client, context)
         next_step(client, context)
-
-    def _refresh_flex_discounts(self, client, context: Context) -> None:
-        requested_codes = get_requested_flex_discount_codes(context.order)
-        updated_order = set_flex_discounts_parameter(
-            context.order, context.adobe_new_order, requested_codes=requested_codes
-        )
-        if updated_order != context.order:
-            context.order = updated_order
-            update_order(client, context.order_id, parameters=context.order["parameters"])
 
 
 class CreateOrUpdateAssets(Step):
