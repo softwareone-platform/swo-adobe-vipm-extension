@@ -260,6 +260,7 @@ class AgreementSyncer:  # noqa: WPS214
             if subsc["subscriptionId"] not in mpt_entitlements_external_ids
             and subsc["status"]
             in {AdobeSubscriptionStatus.ACTIVE.value, AdobeSubscriptionStatus.SCHEDULED.value}
+            and not _is_rolled_back_scheduled_subscription(subsc)
         )
         if not missing_adobe_subscriptions:
             logger.info("> No missing subscriptions found")
@@ -1154,6 +1155,13 @@ def _check_adobe_deployment_id(deployment_id: str, adobe_deployment: dict) -> bo
 
 def _is_subscription_in_set(subscription_ids: set, subscription: dict) -> bool:
     return subscription["subscriptionId"] in subscription_ids
+
+
+def _is_rolled_back_scheduled_subscription(subscription: dict) -> bool:
+    return (
+        subscription["status"] == AdobeSubscriptionStatus.SCHEDULED.value
+        and not subscription["autoRenewal"]["enabled"]
+    )
 
 
 def sync_agreements_by_3yc_end_date(
