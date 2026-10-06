@@ -3413,6 +3413,103 @@ def test_add_missing_subscriptions_scheduled(
 
 
 @freeze_time("2025-07-24")
+def test_add_missing_subscriptions_scheduled_auto_renewal_disabled(
+    items_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_get_product_items_by_period,
+    mock_mpt_create_asset,
+    mock_mpt_create_agreement_subscription,
+    mock_mpt_get_asset_template_by_name,
+    mock_get_template_data_by_adobe_subscription,
+    mocked_agreement_syncer,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="9e5b9c974c4ea1bcabdb0fe697a2f1NA",
+            offer_id="65304578CA01A12",
+            current_quantity=0,
+            renewal_quantity=0,
+            autorenewal_enabled=False,
+            status=AdobeSubscriptionStatus.SCHEDULED.value,
+            renewal_date="2025-08-05",
+        ),
+    ]
+    agreement = agreement_factory()
+    agreement["subscriptions"] = []
+    agreement["assets"] = []
+    mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
+    mocked_agreement_syncer._agreement = agreement
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 12.14}
+    mock_get_product_items_by_skus.return_value = items_factory()
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Expiring",
+    }
+
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
+
+    mock_mpt_create_agreement_subscription.assert_not_called()
+    mock_mpt_create_asset.assert_not_called()
+    mock_get_product_items_by_skus.assert_not_called()
+
+
+@freeze_time("2025-07-24")
+def test_add_missing_subscriptions_active_auto_renewal_disabled(
+    items_factory,
+    mock_mpt_client,
+    mock_adobe_client,
+    agreement_factory,
+    adobe_customer_factory,
+    mock_get_prices_for_skus,
+    adobe_subscription_factory,
+    mock_get_product_items_by_skus,
+    mock_get_product_items_by_period,
+    mock_mpt_create_asset,
+    mock_mpt_create_agreement_subscription,
+    mock_mpt_get_asset_template_by_name,
+    mock_get_template_data_by_adobe_subscription,
+    mocked_agreement_syncer,
+):
+    active_external_id = "8e5b9c974c4ea1bcabdb0fe697a2f1NA"
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id=active_external_id,
+            offer_id="65304578CA01A12",
+            current_quantity=10,
+            renewal_quantity=10,
+            autorenewal_enabled=False,
+            status=AdobeSubscriptionStatus.ACTIVE.value,
+        ),
+    ]
+    agreement = agreement_factory()
+    agreement["subscriptions"] = []
+    agreement["assets"] = []
+    mocked_agreement_syncer._adobe_subscriptions = adobe_subscriptions
+    mocked_agreement_syncer._agreement = agreement
+    mocked_agreement_syncer._adobe_customer = adobe_customer_factory()
+    mock_get_prices_for_skus.return_value = {"65304578CA01A12": 12.14}
+    mock_get_product_items_by_skus.return_value = items_factory()
+    mock_get_template_data_by_adobe_subscription.return_value = {
+        "id": "TPL-1234",
+        "name": "Expiring",
+    }
+
+    mocked_agreement_syncer._add_missing_subscriptions_and_assets()  # act
+
+    mock_mpt_create_agreement_subscription.assert_called_once()
+    create_payload = mock_mpt_create_agreement_subscription.call_args[0][1]
+    assert create_payload["externalIds"]["vendor"] == active_external_id
+    assert create_payload["autoRenew"] is False
+
+
+@freeze_time("2025-07-24")
 def test_add_missing_subscriptions_scheduled_already_in_mpt(
     agreement_factory,
     adobe_subscription_factory,
