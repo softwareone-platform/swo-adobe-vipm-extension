@@ -890,14 +890,15 @@ class SubmitReturnOrders(Step):
     Each RETURN order returns the returnable order's quantity, its current
     ``remainingQuantity``, so a termination after an earlier partial return or a
     switch plan does not ask Adobe for more than is left. Returnable orders already
-    returned by the MPT order reuse their existing RETURN order. Wait for the return
-    orders to be processed before moving to the next step.
+    returned by the MPT order reuse their existing RETURN order. The RETURN orders are
+    placed one at a time: the next one is placed only once the previous one is
+    complete. While a RETURN order is open the step stops, and the next fulfillment
+    attempt carries on from there.
     """
 
     def __call__(self, client, context, next_step):
         """Creates the return orders for each returnable order to match the downsize quantities."""
         adobe_client = get_adobe_client()
-        all_return_orders = []
         deployment_id = get_deployment_id(context.order)
         is_returnable = False
 
@@ -910,7 +911,7 @@ class SubmitReturnOrders(Step):
 
         for sku, returnable_orders in context.adobe_returnable_orders.items():
             return_orders = context.adobe_return_orders.get(sku, [])
-            for returnable_order, return_order in map_returnable_to_return_orders(
+            for returnable_order, existing_return_order in map_returnable_to_return_orders(
                 returnable_orders or [], return_orders
             ):
                 returnable_order_deployment_id = returnable_order.line.get("deploymentId", None)
@@ -925,35 +926,35 @@ class SubmitReturnOrders(Step):
                     returnable_order.order.get("orderId", None),
                     returnable_order_deployment_id,
                     is_returnable,
-                    bool(return_order),
+                    bool(existing_return_order),
                 )
 
                 if not is_returnable:
                     continue
 
-                if return_order:
-                    all_return_orders.append(return_order)
-                    continue
-
-                return_order_created = self._create_return_order(
-                    adobe_client, context, returnable_order, deployment_id
+                return_order = existing_return_order or self._submit_return_order(
+                    client, adobe_client, context, returnable_order, deployment_id
                 )
-                context.order = set_adobe_order_ids_created_parameter(
-                    context,
-                    [return_order_created.get("orderId")],
-                )
-                update_order(
-                    client,
-                    context.order_id,
-                    parameters=context.order["parameters"],
-                )
-
-                all_return_orders.append(return_order_created)
-
-        if not self._ensure_not_pending_return_orders(context, all_return_orders):
-            return
+                if return_order["status"] != AdobeOrderStatus.COMPLETE:
+                    logger.info("%s: return order %s is pending", context, return_order["orderId"])
+                    return
 
         next_step(client, context)
+
+    def _submit_return_order(self, client, adobe_client, context, returnable_order, deployment_id):
+        return_order = self._create_return_order(
+            adobe_client, context, returnable_order, deployment_id
+        )
+        context.order = set_adobe_order_ids_created_parameter(
+            context,
+            [return_order.get("orderId")],
+        )
+        update_order(
+            client,
+            context.order_id,
+            parameters=context.order["parameters"],
+        )
+        return return_order
 
     def _create_return_order(self, adobe_client, context, returnable_order, deployment_id):
         try:
@@ -970,21 +971,6 @@ class SubmitReturnOrders(Step):
             logger.warning("%s", error)
             send_exception(title=f"Error creating return order {context.order_id}", text=str(error))
             raise
-
-    def _ensure_not_pending_return_orders(self, context, all_return_orders):
-        pending_orders = [
-            return_order["orderId"]
-            for return_order in all_return_orders
-            if return_order["status"] != AdobeOrderStatus.COMPLETE
-        ]
-        if pending_orders:
-            logger.info(
-                "%s: There are pending return orders %s",
-                context,
-                ", ".join(pending_orders),
-            )
-            return False
-        return True
 
 
 class SelectFlexDiscounts(Step):
