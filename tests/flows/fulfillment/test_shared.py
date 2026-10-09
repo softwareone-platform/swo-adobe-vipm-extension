@@ -905,6 +905,197 @@ def test_submit_return_orders_step_error_creating_return_order(
     mocked_next_step.assert_not_called()
 
 
+def test_submit_return_orders_step_waits_for_open_return_order(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_order_factory,
+    returnable_order_factory,
+):
+    ret_info_1 = returnable_order_factory("P0000000001", "2026-10-01T10:00:00Z", 2)
+    ret_info_2 = returnable_order_factory("P0000000002", "2026-10-02T10:00:00Z", 3)
+    sku = ret_info_1.line["offerId"][:10]
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN",
+        order_id="P0000000011",
+        reference_order_id=ret_info_1.order["orderId"],
+        status=AdobeOrderStatus.OPEN.value,
+    )
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1, ret_info_2)},
+        adobe_return_orders={},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitReturnOrders()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        ret_info_1.order,
+        ret_info_1.line,
+        context.order["id"],
+        "",
+        quantity=ret_info_1.quantity,
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_return_orders_step_continues_after_complete_return_order(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_order_factory,
+    returnable_order_factory,
+):
+    ret_info_1 = returnable_order_factory("P0000000001", "2026-10-01T10:00:00Z", 2)
+    ret_info_2 = returnable_order_factory("P0000000002", "2026-10-02T10:00:00Z", 3)
+    sku = ret_info_1.line["offerId"][:10]
+    mock_adobe_client.create_return_order.side_effect = [
+        adobe_order_factory(
+            order_type="RETURN",
+            order_id="P0000000011",
+            reference_order_id=ret_info_1.order["orderId"],
+            status=AdobeOrderStatus.COMPLETE.value,
+        ),
+        adobe_order_factory(
+            order_type="RETURN",
+            order_id="P0000000012",
+            reference_order_id=ret_info_2.order["orderId"],
+            status=AdobeOrderStatus.COMPLETE.value,
+        ),
+    ]
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1, ret_info_2)},
+        adobe_return_orders={},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitReturnOrders()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    assert mock_adobe_client.create_return_order.mock_calls == [
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            ret_info_1.order,
+            ret_info_1.line,
+            context.order["id"],
+            "",
+            quantity=ret_info_1.quantity,
+        ),
+        mocker.call(
+            context.authorization_id,
+            context.adobe_customer_id,
+            ret_info_2.order,
+            ret_info_2.line,
+            context.order["id"],
+            "",
+            quantity=ret_info_2.quantity,
+        ),
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_submit_return_orders_step_retry_with_open_return_order(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_order_factory,
+    returnable_order_factory,
+):
+    ret_info_1 = returnable_order_factory("P0000000001", "2026-10-01T10:00:00Z", 2)
+    ret_info_2 = returnable_order_factory("P0000000002", "2026-10-02T10:00:00Z", 3)
+    sku = ret_info_1.line["offerId"][:10]
+    open_return_order = adobe_order_factory(
+        order_type="RETURN",
+        order_id="P0000000011",
+        reference_order_id=ret_info_1.order["orderId"],
+        status=AdobeOrderStatus.OPEN.value,
+    )
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN",
+        order_id="P0000000012",
+        reference_order_id=ret_info_2.order["orderId"],
+        status=AdobeOrderStatus.OPEN.value,
+    )
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1, ret_info_2)},
+        adobe_return_orders={sku: [open_return_order]},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitReturnOrders()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_not_called()
+    mocked_next_step.assert_not_called()
+
+
+def test_submit_return_orders_step_retry_with_complete_return_order(
+    mocker,
+    mock_adobe_client,
+    mock_mpt_client,
+    mock_order,
+    adobe_order_factory,
+    returnable_order_factory,
+):
+    ret_info_1 = returnable_order_factory("P0000000001", "2026-10-01T10:00:00Z", 2)
+    ret_info_2 = returnable_order_factory("P0000000002", "2026-10-02T10:00:00Z", 3)
+    sku = ret_info_1.line["offerId"][:10]
+    complete_return_order = adobe_order_factory(
+        order_type="RETURN",
+        order_id="P0000000011",
+        reference_order_id=ret_info_1.order["orderId"],
+        status=AdobeOrderStatus.COMPLETE.value,
+    )
+    mock_adobe_client.create_return_order.return_value = adobe_order_factory(
+        order_type="RETURN",
+        order_id="P0000000012",
+        reference_order_id=ret_info_2.order["orderId"],
+        status=AdobeOrderStatus.OPEN.value,
+    )
+    context = Context(
+        order=mock_order,
+        order_id=mock_order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        adobe_returnable_orders={sku: (ret_info_1, ret_info_2)},
+        adobe_return_orders={sku: [complete_return_order]},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = SubmitReturnOrders()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_return_order.assert_called_once_with(
+        context.authorization_id,
+        context.adobe_customer_id,
+        ret_info_2.order,
+        ret_info_2.line,
+        context.order["id"],
+        "",
+        quantity=ret_info_2.quantity,
+    )
+    mocked_next_step.assert_not_called()
+
+
 def test_submit_new_order_step(
     mocker, mock_adobe_client, mock_mpt_client, order_factory, adobe_order_factory
 ):

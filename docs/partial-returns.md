@@ -89,5 +89,9 @@ sent and the agreement is synced so MPT quantities match Adobe.
 
 Termination Orders still require the whole subscription quantity to be
 returnable (`VIPM0033`). They now return each line's `remainingQuantity`.
+When a termination returns more than one order line, it places the RETURN
+orders one at a time: the next RETURN is placed only after the previous one is
+complete, and while one is open the order stays in Processing until the next
+fulfilment attempt.
 Renew-now returns the previous RENEWAL line's `remainingQuantity` and skips a
 line with nothing left to return.
