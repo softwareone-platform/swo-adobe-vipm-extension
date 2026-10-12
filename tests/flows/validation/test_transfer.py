@@ -2,6 +2,7 @@ import datetime as dt
 from unittest.mock import ANY
 
 import pytest
+from freezegun import freeze_time
 from mpt_extension_sdk.mpt_http.wrap_http_error import MPTAPIError
 
 from adobe_vipm.adobe.constants import (
@@ -560,6 +561,7 @@ def test_validate_transfer_already_migrated_all_items_expired(
     assert len(validated_order["lines"]) == len(lines)
 
 
+@freeze_time("2025-10-10")
 @pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_all_items_expired_with_one_time_item_active(
     mocker,
@@ -1060,6 +1062,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_with_one_time_
     ]
 
 
+@freeze_time("2025-10-10")
 @pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_error(
     mocker,
@@ -1144,6 +1147,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_add_new_line_e
     assert validated_order["lines"] == lines
 
 
+@freeze_time("2025-10-10")
 @pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_partial_items_expired_update_line_error(
     mocker,
@@ -1214,6 +1218,7 @@ def test_validate_transfer_already_migrated_partial_items_expired_update_line_er
     assert validated_order["lines"] == lines
 
 
+@freeze_time("2025-10-10")
 @pytest.mark.usefixtures("mock_get_agreement")
 def test_validate_transfer_already_migrated_partial_items_expired_remove_line_error(
     mocker,
