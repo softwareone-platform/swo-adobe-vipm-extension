@@ -1175,7 +1175,7 @@ def fulfill_renewal_now_order(client, order):
         ValidateRenewalWindow(),
         SetupRenewalPlan(),
         ValidateNetNewOrderLines(),
-        Validate3YCRenewalFloor(include_net_new_items=True),
+        Validate3YCRenewalFloor(include_net_new_items=True, renewal_quantity_is_delta=True),
         ResolvePreviousRenewalReturns(),
         PreviewRenewalNowOrder(),
         SubmitRenewalNowOrder(),
