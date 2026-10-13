@@ -364,6 +364,49 @@ class OrderClientMixin:
         response.raise_for_status()
         return response.json()
 
+    def create_preview_renewal_order(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        external_reference_id: str,
+        line_items: list[dict],
+        cascade: FlexDiscountCascade,
+    ) -> dict:
+        """
+        Create a priced PREVIEW_RENEWAL order, cascading through the flex discount candidates.
+
+        Adobe prices the preview (fetch-price), so its lines carry the pricing
+        the renewal is charged at. Each line proposes the code its line items carry (the head of the
+        cascade's candidates for that line); a code Adobe rejects is replaced
+        by the line's next candidate, as for the PREVIEW of new lines (see
+        get_preview_order). The codes finally accepted per line number land on
+        cascade.selection and the rejected ones on cascade.rejections.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer.
+            external_reference_id: External reference ID for the order.
+            line_items: Renewal line items with offerId, quantity, subscriptionId
+                and the proposed flexDiscountCodes.
+            cascade: Ranked candidate codes per line number; updated in place.
+
+        Returns:
+            dict: The Preview Renewal order, with the pricing of each line.
+
+        Raises:
+            AdobeError: If the cascade ceiling is hit with codes still rejected, or on
+            any other Adobe error.
+        """
+        authorization = self._config.get_authorization(authorization_id)
+        payload = {
+            "externalReferenceId": external_reference_id,
+            "orderType": adobe_constants.ORDER_TYPE_PREVIEW_RENEWAL,
+            "lineItems": line_items,
+        }
+        if not any(line_item.get("deploymentId") for line_item in line_items):
+            payload["currencyCode"] = authorization.currency
+        return self.get_preview_order(authorization, customer_id, payload, cascade)
+
     @wrap_http_error
     def create_switch_preview_order(
         self,

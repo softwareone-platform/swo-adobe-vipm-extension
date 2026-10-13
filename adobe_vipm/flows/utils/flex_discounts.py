@@ -1,5 +1,5 @@
 """
-Candidate flexible discounts for the normal order flow (NEW and upsize lines).
+Candidate flexible discounts for the normal order flow (NEW, upsize and late-renewal lines).
 
 Retrieval and filtering of the codes the Airtable discount store offers a
 line, per the "Improve flex discounts in normal order flow" design: the
@@ -7,6 +7,8 @@ candidate set is the store shortlist matched to the line SKU (open, closed
 and reusable codes, the reusable codes the customer already holds included),
 gated on order type, category, validity window, country and the
 once-per-customer rule, then pre-filtered against the customer's commitment.
+A late-renewal line (an expired subscription renewed through an Adobe RENEWAL
+order) is matched to the store's Renewal codes, the other lines to its New codes.
 
 Every gate keeps a code whose data is absent (the subsystem's asymmetry
 rule): an over-permissive set shows a code Adobe's preview later rejects,
@@ -36,6 +38,7 @@ from adobe_vipm.airtable.models import (
     DISCOUNT_ENRICHMENT_COMPLETE,
     DISCOUNT_OFFER_IDS_SEPARATOR,
     DISCOUNT_ORDER_TYPE_NEW,
+    DISCOUNT_ORDER_TYPE_RENEWAL,
     DISCOUNT_SOURCE_OPEN,
     DISCOUNT_TYPE_PERCENTAGE,
     get_adobe_product_by_marketplace_sku,
@@ -86,6 +89,7 @@ class LineType(StrEnum):
 
     NEW = "NEW"
     UPSIZE = "UPSIZE"
+    RENEWAL = "RENEWAL"
 
 
 @dataclass(frozen=True)
@@ -223,17 +227,7 @@ def get_flex_discount_candidates(  # noqa: WPS211
     """
     if not new_lines and not upsize_lines:
         return {}
-    discount_codes = get_visible_discount_codes(market_segment, customer_id)
-    codes = [row.code for row in discount_codes]
-    discount_values = get_discount_values(codes, market_segment)
-    redemptions = get_customer_discount_redemptions(customer_id, codes)
-    logger.info(
-        "Flex discounts: %s visible code(s) for segment %s and customer %s: %s",
-        len(codes),
-        market_segment,
-        customer_id or "-",
-        ", ".join(codes),
-    )
+    discount_codes, discount_values, redemptions = _read_store(market_segment, customer_id)
     candidates_by_line = {}
     typed_lines = [(line, LineType.NEW) for line in new_lines]
     typed_lines.extend((line, LineType.UPSIZE) for line in upsize_lines)
@@ -251,6 +245,66 @@ def get_flex_discount_candidates(  # noqa: WPS211
         if candidates:
             candidates_by_line[line["id"]] = candidates
     return candidates_by_line
+
+
+def get_renewal_flex_discount_candidates(
+    *,
+    market_segment: str,
+    customer_id: str,
+    country: str,
+    commitment: CommitmentType,
+    renewal_lines: dict[str, dict],
+) -> dict[str, list[FlexDiscountCandidate]]:
+    """
+    Retrieve and filter the candidate codes of every late-renewal line.
+
+    A late-renewal line renews an expired subscription through an Adobe
+    RENEWAL order, so only the store's Renewal codes apply to it; every other
+    gate is the one of the new and upsize lines.
+
+    Args:
+        market_segment: Adobe market segment (COM, GOV, EDU).
+        customer_id: Adobe customer id.
+        country: Country the discounts are looked up for (see get_discount_country).
+        commitment: The customer's commitment term (see get_commitment_type).
+        renewal_lines: Late-renewal info per partial SKU (context.manual_renewal_lines).
+
+    Returns:
+        dict: Candidates per partial SKU, unranked; SKUs without candidates are absent.
+    """
+    if not renewal_lines:
+        return {}
+    discount_codes, discount_values, redemptions = _read_store(market_segment, customer_id)
+    candidates_by_sku = {}
+    for sku in renewal_lines:
+        candidates = filter_candidates(
+            discount_codes,
+            discount_values,
+            redemptions,
+            line_partial_sku=sku,
+            line_type=LineType.RENEWAL,
+            country=country,
+            commitment=commitment,
+        )
+        if candidates:
+            candidates_by_sku[sku] = candidates
+    return candidates_by_sku
+
+
+def _read_store(market_segment: str, customer_id: str | None) -> tuple[list, list, list]:
+    """Read the codes visible to the customer, their values and the customer's redemptions."""
+    discount_codes = get_visible_discount_codes(market_segment, customer_id)
+    codes = [row.code for row in discount_codes]
+    discount_values = get_discount_values(codes, market_segment)
+    redemptions = get_customer_discount_redemptions(customer_id, codes)
+    logger.info(
+        "Flex discounts: %s visible code(s) for segment %s and customer %s: %s",
+        len(codes),
+        market_segment,
+        customer_id or "-",
+        ", ".join(codes),
+    )
+    return discount_codes, discount_values, redemptions
 
 
 def filter_candidates(  # noqa: WPS211
@@ -273,7 +327,7 @@ def filter_candidates(  # noqa: WPS211
         discount_values: DiscountValue rows of those codes.
         redemptions: DiscountRedemption rows of the customer for those codes.
         line_partial_sku: The line's 10-char partial SKU.
-        line_type: NEW or UPSIZE.
+        line_type: NEW, UPSIZE or RENEWAL.
         country: Country the discounts are looked up for.
         commitment: The customer's commitment term.
         owned_partial_skus: Partial SKUs the customer already owns, None when unknown.
@@ -320,7 +374,7 @@ def _is_eligible(  # noqa: WPS211
         is_enriched(row),
         matches_target_sku(row, line_partial_sku),
         matches_qualifying_skus(row, owned_partial_skus),
-        allows_order_type(row),
+        allows_order_type(row, line_type),
         allows_category(row, line_type),
         is_within_window(row, today, held=bool(row.reusable) and redeemed),
         is_offered_in_country(amounts, country),
@@ -349,10 +403,18 @@ def matches_qualifying_skus(row, owned_partial_skus: set[str] | None) -> bool:
     return bool(qualifying & owned_partial_skus)
 
 
-def allows_order_type(row) -> bool:
-    """Keep a code applicable to NEW orders (an empty list is any order type)."""
+def allows_order_type(row, line_type: LineType = LineType.NEW) -> bool:
+    """
+    Keep a code applicable to the order type of the line (an empty list is any order type).
+
+    A late-renewal line is placed as an Adobe RENEWAL order and needs a Renewal
+    code; new and upsize lines are placed as a NEW order and need a New code.
+    """
     applicable = row.applicable_order_types or []
-    return not applicable or DISCOUNT_ORDER_TYPE_NEW in applicable
+    order_type = (
+        DISCOUNT_ORDER_TYPE_RENEWAL if line_type is LineType.RENEWAL else DISCOUNT_ORDER_TYPE_NEW
+    )
+    return not applicable or order_type in applicable
 
 
 def allows_category(row, line_type: LineType) -> bool:
@@ -517,6 +579,47 @@ def select_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
     }
 
 
+def select_renewal_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
+    """
+    Retrieve, filter and rank the candidate codes of every late-renewal line of an order.
+
+    The late-renewal lines are the ones CheckManualRenewalSubscriptions moved
+    to context.manual_renewal_lines; each renews the Adobe subscription it
+    names, so its candidates are ranked against the base partner price of that
+    subscription's offer (see rank_candidates). The head of each list is the
+    code to propose first to Adobe's renewal preview.
+
+    Args:
+        context: Order processing context (customer, late-renewal lines, segment, currency).
+
+    Returns:
+        dict: Ranked candidates per partial SKU; SKUs without candidates are absent.
+    """
+    customer_data = context.customer_data
+    candidates_by_sku = get_renewal_flex_discount_candidates(
+        market_segment=context.market_segment,
+        customer_id=context.adobe_customer_id,
+        country=get_discount_country(customer_data),
+        commitment=get_commitment_type(context.adobe_customer, customer_data),
+        renewal_lines=context.manual_renewal_lines,
+    )
+    if not candidates_by_sku:
+        return {}
+    offer_ids_by_sku = {
+        sku: context.manual_renewal_lines[sku]["offer_id"] for sku in candidates_by_sku
+    }
+    base_prices = get_sku_price(
+        context.adobe_customer or {},
+        list(offer_ids_by_sku.values()),
+        context.product_id,
+        context.currency,
+    )
+    return {
+        sku: rank_candidates(candidates, base_prices.get(offer_ids_by_sku[sku]), context.currency)
+        for sku, candidates in candidates_by_sku.items()
+    }
+
+
 def rank_candidates(
     candidates: list[FlexDiscountCandidate],
     base_unit_price: float | None,
@@ -622,11 +725,12 @@ def get_order_redeemed_codes(context) -> list[str]:
 
     The source is the order's flexibleDiscounts parameter, written by
     SubmitNewOrder from the committed Adobe NEW order with the codes the order
-    requested and Adobe applied; it survives the fulfilment retries between the
-    order submission and its completion, unlike the in-memory selection. A code
-    the customer had already redeemed (a reusable discount applied again) is not
-    a fresh once-per-customer redemption, so codes with a redemption row for
-    the customer are left out.
+    requested and Adobe applied (and, for late renewals, by
+    RecordRenewalFlexDiscounts from the committed RENEWAL order); it survives
+    the fulfilment retries between the order submission and its completion,
+    unlike the in-memory selection. A code the customer had already redeemed
+    (a reusable discount applied again) is not a fresh once-per-customer
+    redemption, so codes with a redemption row for the customer are left out.
 
     Args:
         context: Order processing context (order, adobe_customer_id).

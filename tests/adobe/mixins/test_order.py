@@ -8,6 +8,7 @@ from responses import matchers
 
 from adobe_vipm.adobe.constants import (
     ORDER_TYPE_PREVIEW,
+    ORDER_TYPE_PREVIEW_RENEWAL,
     ORDER_TYPE_PREVIEW_SWITCH,
     ORDER_TYPE_SWITCH,
     AdobeErrorCode,
@@ -744,3 +745,64 @@ def test_get_preview_order_http_error_without_code(
         mocked_client.get_preview_order(authorization, "test-customer", payload)  # act
 
     assert err.value is error
+
+
+RENEWAL_LINE = {
+    "extLineItemNumber": 1,
+    "offerId": "65304578CA01A12",
+    "quantity": 5,
+    "subscriptionId": "a-sub-id",
+}
+
+
+def _renewal_preview_payload(currency, code):
+    return {
+        "externalReferenceId": "ORD-1_RENEWAL",
+        "orderType": ORDER_TYPE_PREVIEW_RENEWAL,
+        "lineItems": [{**RENEWAL_LINE, "flexDiscountCodes": [code]}],
+        "currencyCode": currency,
+    }
+
+
+def _renewal_preview_response(code, result):
+    return {
+        "externalReferenceId": "ORD-1_RENEWAL",
+        "lineItems": [{**RENEWAL_LINE, "flexDiscounts": [{"code": code, "result": result}]}],
+    }
+
+
+def test_create_preview_renewal_order_cascades_to_next_candidate(
+    adobe_client_factory, requests_mocker, settings
+):
+    client, authorization, _ = adobe_client_factory()
+    accepted_response = _renewal_preview_response("BONUS_5", "SUCCESS")
+    for code, response_json in (
+        ("BONUS_10", _renewal_preview_response("BONUS_10", "FAILURE")),
+        ("BONUS_5", accepted_response),
+    ):
+        requests_mocker.post(
+            urljoin(
+                settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+                "/v3/customers/a-customer/orders",
+            ),
+            json=response_json,
+            match=[
+                matchers.json_params_matcher(
+                    _renewal_preview_payload(authorization.currency, code)
+                ),
+                matchers.query_param_matcher({"fetch-price": "true"}),
+            ],
+        )
+    cascade = FlexDiscountCascade(candidates={1: ["BONUS_10", "BONUS_5"]})
+
+    result = client.create_preview_renewal_order(
+        authorization.authorization_uk,
+        "a-customer",
+        "ORD-1_RENEWAL",
+        [{**RENEWAL_LINE, "flexDiscountCodes": ["BONUS_10"]}],
+        cascade,
+    )  # act
+
+    assert result == accepted_response
+    assert cascade.selection == {1: "BONUS_5"}
+    assert cascade.rejections == {1: ["BONUS_10"]}

@@ -3,11 +3,18 @@ import pytest
 from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
+    CheckManualRenewalSubscriptions,
+    PreviewRenewalOrders,
     SelectFlexDiscounts,
     SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
-from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment, ValidateSkuAvailability
+from adobe_vipm.flows.helpers import (
+    SetupContext,
+    UpdatePrices,
+    Validate3YCCommitment,
+    ValidateSkuAvailability,
+)
 from adobe_vipm.flows.utils.returns import DownsizeOutcome
 from adobe_vipm.flows.validation.change import (
     GetPreviewOrder,
@@ -115,7 +122,6 @@ def test_validate_change_order(mocker):
 
     validate_change_order(mocked_client, mocked_order)  # act
 
-    assert len(mocked_pipeline_ctor.mock_calls[0].args) == 12
     expected_steps = [
         SetupContext,
         ValidateDuplicateLines,
@@ -125,11 +131,18 @@ def test_validate_change_order(mocker):
         ValidateNoStagedRenewal,
         ValidateSkuAvailability,
         ValidateDownsizes,
+        CheckManualRenewalSubscriptions,
         Validate3YCCommitment,
         SelectFlexDiscounts,
         GetPreviewOrder,
+        PreviewRenewalOrders,
+        UpdatePrices,
     ]
-    actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args[:11]]
+    pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
+    actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
+    assert pipeline_args[8].is_validation is True
+    assert pipeline_args[12].select_flex_discounts is True
+    assert pipeline_args[12].is_validation is True
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
