@@ -119,6 +119,52 @@ def test_get_returnable_orders_step(
         assert context.adobe_returnable_orders[sku] == returnable_orders
 
 
+def test_get_returnable_orders_step_after_partial_return(
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    lines_factory,
+    adobe_customer_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+):
+    order = order_factory(lines=lines_factory(quantity=0, old_quantity=15))
+    adobe_order = adobe_order_factory(
+        order_type="NEW",
+        items=adobe_items_factory(
+            quantity=20,
+            remaining_quantity=15,
+            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
+        ),
+    )
+    returnable_orders = [ReturnableOrderInfo(adobe_order, adobe_order["lineItems"][0], 15)]
+    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.termination.switch_order_to_failed",
+    )
+    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = returnable_orders
+    mock_adobe_client.get_subscriptions.return_value = {
+        "items": [{"status": "1000", "offerId": sku}]
+    }
+    adobe_customer = adobe_customer_factory()
+    context = Context(
+        order=order,
+        authorization_id=order["authorization"]["id"],
+        downsize_lines=order["lines"],
+        adobe_customer_id=adobe_customer["customerId"],
+        adobe_customer=adobe_customer,
+    )
+    mocked_next_step = mocker.MagicMock()
+
+    GetReturnableOrders()(mocker.MagicMock(), context, mocked_next_step)  # act
+
+    assert (
+        mocked_switch_to_failed.called,
+        mocked_next_step.called,
+        context.adobe_returnable_orders[sku],
+    ) == (False, True, returnable_orders)
+
+
 def test_switch_autorenewal_off(
     mocker,
     mock_adobe_client,

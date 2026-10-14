@@ -30,7 +30,9 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
 1. **Entry layer** (`extension.py`) — receives order events and validation requests.
 2. **Fulfilment** (`flows/fulfillment/`) — `fulfill_order()` in `base.py` routes by
    order type to `purchase.py`, `change.py`, `transfer.py`, `reseller_transfer.py`,
-   `termination.py`, and `configuration.py`; change orders carrying a
+   `termination.py`, and `configuration.py` (change-order downsizes use Adobe
+   partial returns through `downsize_returns.py` and `return_submission.py`,
+   documented in [partial-returns.md](partial-returns.md)); change orders carrying a
    `switchPayload` or `renewalPayload` ordering parameter are routed to
    `switch.py` (mid-term upgrades), `renewal.py` (at-anniversary renewals) and
    `renewal_now.py` (renew-now renewals, `renewalPath: "now"`, documented in
@@ -168,4 +170,7 @@ started via `swoext run`. See [deployment.md](deployment.md) for configuration.
 - [external-integrations.md](external-integrations.md) — external systems
 - [renew-now.md](renew-now.md) — renew-now fulfilment flow: return window and
   committed flex discount codes
+- [partial-returns.md](partial-returns.md) — change-order downsizes: returnable
+  pool, per-line return or deferral, renewal quantity reconciliation and error
+  handling
 - [migrations.md](migrations.md) — migration workflow

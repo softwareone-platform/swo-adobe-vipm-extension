@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 
-from adobe_vipm.flows.constants import LAST_TWO_WEEKS_DAYS, Param
+from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import (
     get_coterm_date,
     get_fulfillment_parameter,
@@ -84,23 +84,6 @@ def reset_due_date(order: dict) -> dict:
     param["value"] = None
 
     return order
-
-
-def is_within_last_two_weeks(coterm_date: str) -> bool:
-    """
-    Checks if date is within two weeks from now.
-
-    Args:
-        coterm_date: Date to check.
-
-    Returns:
-        True if provided date is within two weeks from now.
-    """
-    last_two_weeks = (
-        dt.datetime.fromisoformat(coterm_date) - dt.timedelta(days=LAST_TWO_WEEKS_DAYS)
-    ).date()
-
-    return dt.datetime.now(tz=dt.UTC).date() >= last_two_weeks
 
 
 def is_coterm_date_within_order_creation_window(order: dict) -> bool:

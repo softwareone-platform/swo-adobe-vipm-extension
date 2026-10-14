@@ -249,12 +249,6 @@ def test_set_flex_discounts_parameter_records_applied_codes_only():
             "subscriptionId": "sub-1",
             "flexDiscountCode": ["APPLIED"],
         },
-        {
-            "extLineItemNumber": 3,
-            "offerId": "65304580CA01A12",
-            "subscriptionId": "sub-3",
-            "flexDiscountCode": ["NO_RESULT"],
-        },
     ]
 
 

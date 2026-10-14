@@ -15,6 +15,8 @@ from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError, ProcessingUp
 from adobe_vipm.adobe.utils import (  # noqa: WPS347
     find_first,
     get_item_by_subcription_id,
+    get_line_remaining_quantity,
+    get_returned_quantity,
     is_flex_discount_applied,
     to_adobe_line_id,
 )
@@ -460,24 +462,31 @@ class OrderClientMixin:
         subscription_id: str,
         customer_coterm_date: str,
         return_orders: list | None = None,
-    ) -> list[dict]:
+    ) -> list[ReturnableOrderInfo]:
         """
-        Retrieve RETURN orders filter by sku.
+        Retrieve the NEW and RENEWAL order lines of a subscription that can be returned.
+
+        Only orders placed within the cancellation window, and on or after the latest
+        RENEWAL order in that window, are considered. The returnable quantity of a line
+        is its ``remainingQuantity``: lines with nothing left to return are dropped.
+        Lines already referenced by ``return_orders`` are kept, whatever their status,
+        with the quantity those RETURN orders returned, so a caller can match them with
+        the RETURN orders it already placed.
 
         Args:
             authorization_id: Id of the authorization to use.
             customer_id: Identifier of the customer that place the RETURN order.
             subscription_id: Adobe Subscription ID
             customer_coterm_date: customer coterm date
-            return_orders: orders to return
+            return_orders: RETURN orders already placed by the caller.
 
         Returns:
-            list(dict): The RETURN order.
+            The returnable order lines, oldest order first.
         """
         current_date = dt.datetime.now(tz=dt.UTC).date()
         start_date = current_date - dt.timedelta(days=adobe_constants.CANCELLATION_WINDOW_DAYS)
-
-        returning_order_ids = [order["referenceOrderId"] for order in (return_orders or [])]
+        return_orders = return_orders or []
+        returning_order_ids = {order["referenceOrderId"] for order in return_orders}
 
         orders = self.get_orders(
             authorization_id,
@@ -519,16 +528,56 @@ class OrderClientMixin:
                 order_items,
             )
 
-        return_orders = []
+        returnable_orders = []
         for order, line_item in order_items:
-            return_orders.append(
-                ReturnableOrderInfo(
-                    order=order,
-                    line=line_item,
-                    quantity=line_item["quantity"],
+            if order["orderId"] in returning_order_ids:
+                quantity = get_returned_quantity(return_orders, order["orderId"], line_item)
+            else:
+                quantity = get_line_remaining_quantity(line_item)
+            if quantity > 0:
+                returnable_orders.append(
+                    ReturnableOrderInfo(order=order, line=line_item, quantity=quantity)
                 )
+        return sorted(
+            returnable_orders,
+            key=lambda returnable_order: returnable_order.order.get("creationDate", ""),
+        )
+
+    def get_remaining_quantity(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        order_id: str,
+        ext_line_item_number: int,
+    ) -> int:
+        """
+        Read from Adobe the quantity of an order line item that can still be returned.
+
+        Uses Get Order Details, which Adobe documents as the way to confirm the updated
+        returnable quantity of an order after returns and switch plan cancellations.
+
+        Args:
+            authorization_id: Id of the authorization to use.
+            customer_id: Identifier of the customer that placed the order.
+            order_id: Adobe identifier of the NEW or RENEWAL order.
+            ext_line_item_number: Line item number of the order line.
+
+        Returns:
+            The returnable quantity of the line item, 0 when the order has no such line.
+        """
+        order = self.get_order(authorization_id, customer_id, order_id)
+        line_item = find_first(
+            lambda order_line: order_line["extLineItemNumber"] == ext_line_item_number,
+            order["lineItems"],
+        )
+        if not line_item:
+            logger.warning(
+                "Adobe order %s has no line item %s, nothing to return",
+                order_id,
+                ext_line_item_number,
             )
-        return return_orders
+            return 0
+        return get_line_remaining_quantity(line_item)
 
     def get_return_orders_by_external_reference(
         self,
@@ -580,14 +629,18 @@ class OrderClientMixin:
         """
         Creates an order of type RETURN for a given `item` that was purchased.
 
-        In the order identified by `returning_order_id`.
+        In the order identified by `returning_order_id`. The RETURN order external
+        reference is ``{external_reference}_{returning Adobe order id}_{line number}``,
+        for example ``ORD-2222-3333-4444_P9202197700_1``: it stays within Adobe's
+        35-character limit and starts with the MPT order id, which is how the RETURN
+        orders of an MPT order are found again.
 
         Args:
             authorization_id: Id of the authorization to use.
             customer_id: Identifier of the customer that place the RETURN order.
             returning_order: The order that contains the item to return.
             returning_item: The item that must be returned.
-            external_reference: External reference for the return order.
+            external_reference: External reference for the return order, the MPT order id.
             deployment_id: Deployment ID if the return is for a deployment.
             quantity: Seats to return; defaults to the item's full quantity. Adobe rejects
                 more than the line's remaining quantity (2120), so a partly returned line
@@ -597,7 +650,7 @@ class OrderClientMixin:
             dict: The RETURN order.
         """
         line_number = returning_item["extLineItemNumber"]
-        external_id = f"{external_reference}_{returning_order['externalReferenceId']}_{line_number}"
+        external_id = f"{external_reference}_{returning_order['orderId']}_{line_number}"
 
         payload = {
             "externalReferenceId": external_id,
