@@ -14,9 +14,11 @@ from adobe_vipm.flows.utils.flex_discounts import (
     get_discount_country,
     get_flex_discount_candidates,
     get_order_redeemed_codes,
+    get_renewal_flex_discount_candidates,
     matches_commitment,
     rank_candidates,
     select_flex_discounts,
+    select_renewal_flex_discounts,
 )
 
 TODAY = dt.date(2026, 9, 10)
@@ -121,11 +123,24 @@ def test_filter_candidates_qualifying_sku_gate(qualifying_offer_ids, owned, expe
 
 
 @pytest.mark.parametrize(
-    ("applicable_order_types", "expected"),
-    [(["NEW"], True), (["NEW", "RENEWAL"], True), ([], True), (None, True), (["RENEWAL"], False)],
+    ("applicable_order_types", "line_type", "expected"),
+    [
+        (["NEW"], LineType.NEW, True),
+        (["NEW", "RENEWAL"], LineType.NEW, True),
+        ([], LineType.NEW, True),
+        (None, LineType.NEW, True),
+        (["RENEWAL"], LineType.NEW, False),
+        (["RENEWAL"], LineType.UPSIZE, False),
+        (["RENEWAL"], LineType.RENEWAL, True),
+        (["NEW", "RENEWAL"], LineType.RENEWAL, True),
+        ([], LineType.RENEWAL, True),
+        (["NEW"], LineType.RENEWAL, False),
+    ],
 )
-def test_filter_candidates_order_type_gate(applicable_order_types, expected):
-    result = run_filter([make_code(applicable_order_types=applicable_order_types)])  # act
+def test_filter_candidates_order_type_gate(applicable_order_types, line_type, expected):
+    result = run_filter(
+        [make_code(applicable_order_types=applicable_order_types)], line_type=line_type
+    )  # act
 
     assert bool(result) is expected
 
@@ -135,11 +150,14 @@ def test_filter_candidates_order_type_gate(applicable_order_types, expected):
     [
         ("INTRO", LineType.NEW, True),
         ("INTRO", LineType.UPSIZE, False),
+        ("INTRO", LineType.RENEWAL, False),
         ("STANDARD", LineType.UPSIZE, True),
     ],
 )
 def test_filter_candidates_intro_gate(category, line_type, expected):
-    result = run_filter([make_code(category=category)], line_type=line_type)  # act
+    result = run_filter(
+        [make_code(category=category, applicable_order_types=[])], line_type=line_type
+    )  # act
 
     assert bool(result) is expected
 
@@ -426,6 +444,58 @@ def test_get_flex_discount_candidates_without_lines(mocker):
         commitment=CommitmentType.ANNUAL,
         new_lines=[],
         upsize_lines=[],
+    )  # act
+
+    assert result == {}
+    mocked_codes.assert_not_called()
+
+
+def test_get_renewal_flex_discount_candidates(mocker):
+    codes = [
+        make_code(code="NEW_ONLY"),
+        make_code(code="BONUS_10", applicable_order_types=["RENEWAL"]),
+        make_code(code="OTHER_SKU", applicable_order_types=["RENEWAL"], target_offer_ids="X"),
+    ]
+    mocked_codes = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_visible_discount_codes",
+        return_value=codes,
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_discount_values",
+        return_value=[make_value("BONUS_10", value=10)],
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        return_value=[],
+    )
+    renewal_lines = {
+        "65304578CA": {"offer_id": "65304578CA01A12"},
+        "65304000CA": {"offer_id": "65304000CA01A12"},
+    }
+
+    result = get_renewal_flex_discount_candidates(
+        market_segment="COM",
+        customer_id="P100",
+        country="US",
+        commitment=CommitmentType.ANNUAL,
+        renewal_lines=renewal_lines,
+    )  # act
+
+    assert {sku: [c.code for c in cands] for sku, cands in result.items()} == {
+        "65304578CA": ["BONUS_10"],
+    }
+    mocked_codes.assert_called_once_with("COM", "P100")
+
+
+def test_get_renewal_flex_discount_candidates_without_lines(mocker):
+    mocked_codes = mocker.patch("adobe_vipm.flows.utils.flex_discounts.get_visible_discount_codes")
+
+    result = get_renewal_flex_discount_candidates(
+        market_segment="COM",
+        customer_id="P100",
+        country="US",
+        commitment=CommitmentType.ANNUAL,
+        renewal_lines={},
     )  # act
 
     assert result == {}
@@ -771,3 +841,71 @@ def test_select_flex_discounts_missing_discount_level_does_not_notify(
         customer, ["65304578CA01A12"], "PRD-1111-1111", "USD"
     )
     mocked_notify.assert_not_called()
+
+
+def test_select_renewal_flex_discounts(mocker, order_factory, adobe_customer_factory):
+    order = order_factory()
+    manual_renewal_lines = {
+        "65304578CA": {"offer_id": "65304578CA01A12", "adobe_subscription_id": "a-sub-id"},
+    }
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        product_id="PRD-1111-1111",
+        market_segment="COM",
+        currency="USD",
+        adobe_customer_id="P100",
+        adobe_customer=adobe_customer_factory(),
+        manual_renewal_lines=manual_renewal_lines,
+    )
+    candidates = [
+        make_candidate(code="PCT_10", amount=10),
+        make_candidate(code="PCT_20", amount=20),
+    ]
+    mocked_get_candidates = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_renewal_flex_discount_candidates",
+        return_value={"65304578CA": candidates},
+    )
+    mocked_get_sku_price = mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_sku_price",
+        return_value={"65304578CA01A12": 200.0},
+    )
+
+    result = select_renewal_flex_discounts(context)  # act
+
+    assert [(c.code, c.net_unit_price) for c in result["65304578CA"]] == [
+        ("PCT_20", 160.0),
+        ("PCT_10", 180.0),
+    ]
+    mocked_get_candidates.assert_called_once_with(
+        market_segment="COM",
+        customer_id="P100",
+        country=mocker.ANY,
+        commitment=mocker.ANY,
+        renewal_lines=manual_renewal_lines,
+    )
+    mocked_get_sku_price.assert_called_once_with(
+        context.adobe_customer, ["65304578CA01A12"], "PRD-1111-1111", "USD"
+    )
+
+
+def test_select_renewal_flex_discounts_without_candidates(mocker, order_factory):
+    order = order_factory()
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        market_segment="COM",
+        currency="USD",
+        adobe_customer_id="P100",
+        manual_renewal_lines={"65304578CA": {"offer_id": "65304578CA01A12"}},
+    )
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_renewal_flex_discount_candidates",
+        return_value={},
+    )
+    mocked_get_sku_price = mocker.patch("adobe_vipm.flows.utils.flex_discounts.get_sku_price")
+
+    result = select_renewal_flex_discounts(context)  # act
+
+    assert result == {}
+    mocked_get_sku_price.assert_not_called()

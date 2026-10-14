@@ -2,6 +2,7 @@
 
 import datetime as dt
 import logging
+from dataclasses import dataclass
 from operator import itemgetter
 
 from dateutil import parser
@@ -586,78 +587,185 @@ class Validate3YCCommitment(Step):
         return True
 
 
+# Decimals of a late-renewal line unit price blended with its excess quantity.
+UNIT_PRICE_DECIMALS = 2
+
+
+@dataclass(frozen=True)
+class LinePrice:
+    """The unit price UpdatePrices sets on an order line, and where it comes from."""
+
+    unit_price: float
+    source: str
+
+
 class UpdatePrices(Step):
-    """Update prices based on airtable and adobe discount level."""
+    """
+    Update the order line prices from Adobe's previews.
+
+    Two sources price the lines:
+
+    - the PREVIEW of the new and upsize lines (pricing.discountedPartnerPrice),
+      until the NEW order is placed;
+    - the late-renewal lines (context.manual_renewal_lines), priced at the
+      renewal price PreviewRenewalOrders read from the priced PREVIEW_RENEWAL
+      (renewal_unit_price). The price is kept on the lateRenewalsInfo parameter,
+      so a retry prices the lines again without repeating the renewal preview.
+
+    A late-renewal line whose requested quantity exceeds the subscription's
+    renews part of it and buys the excess as a new line: its unit price is the
+    quantity-weighted blend of both prices, so the line total matches what
+    Adobe charges. Such a line is only repriced when both prices are known, so
+    a retry never blends an already blended price. Lines without a price from
+    either source keep theirs.
+
+    Every order line is logged with its quantity, its previous and new unit
+    price and the source of the new one (preview, quantity, flex discount
+    code), so the prices of the renewal and new lines can be checked.
+    """
 
     def __init__(self, *, is_validation: bool) -> None:
         self.is_validation = is_validation
 
     def __call__(self, client, context, next_step):
-        """Update prices based on airtable and adobe discount level."""
-        if context.adobe_new_order or not context.adobe_preview_order:
+        """Update the order line prices from Adobe's previews."""
+        new_prices = self._get_new_line_prices(context)
+        prices = {**new_prices, **self._get_renewal_line_prices(context, new_prices)}
+        if not prices:
             next_step(client, context)
             return
 
-        self._client = client
-        self._context = context
-        self._actual_skus = self._get_actual_skus()
-        logger.info("Actual SKUs: %s", self._actual_skus)
-        prices = self._get_prices_for_skus()
-        updated_lines = self._create_updated_lines(prices)
-        self._context.order["lines"] = updated_lines
-        if not self.is_validation:
-            self._update_order(updated_lines)
+        self._log_prices(context, prices)
+        updated_lines = sorted(
+            (
+                {
+                    "id": line["id"],
+                    "price": {"unitPP": self._get_unit_price(prices, line)},
+                }
+                for line in context.order["lines"]
+            ),
+            key=itemgetter("id"),
+        )
+        if self.is_validation:
+            context.order["lines"] = updated_lines
+        else:
+            for line in context.order["lines"]:
+                line_price = prices.get(line["id"])
+                if line_price is not None:
+                    line["price"] = {**line["price"], "unitPP": line_price.unit_price}
+            update_order(client, context.order_id, lines=updated_lines)
+            logger.info("%s: order lines prices updated successfully", context)
 
-        next_step(self._client, self._context)
+        next_step(client, context)
 
-    def _get_actual_skus(self):
-        """Extract SKUs from either new order or preview order."""
-        return [item["offerId"] for item in self._context.adobe_preview_order["lineItems"]]
+    def _get_unit_price(self, prices: dict, line: dict) -> float:
+        line_price = prices.get(line["id"])
+        return line["price"]["unitPP"] if line_price is None else line_price.unit_price
 
-    def _get_prices_for_skus(self):
-        """Get prices for SKUs."""
-        preview_prices = {
-            line_items["offerId"]: line_items["pricing"]["discountedPartnerPrice"]
-            for line_items in self._context.adobe_preview_order["lineItems"]
-        }
-        logger.info("Preview prices: %s", preview_prices)
-        return {sku: preview_prices[sku] for sku in self._actual_skus}
-
-    def _create_updated_lines(self, prices):
-        """Create updated order lines with new prices."""
-        updated_lines = []
-
-        # Update lines for actual SKUs
-        for sku in self._actual_skus:
-            line = get_order_line_by_sku(self._context.order, sku)
-            new_price_item = get_price_item_by_line_sku(
-                prices, line["item"]["externalIds"]["vendor"]
+    def _log_prices(self, context, prices: dict) -> None:
+        """Log the previous and new unit price of every order line and where it comes from."""
+        for line in sorted(context.order["lines"], key=itemgetter("id")):
+            sku = ((line.get("item") or {}).get("externalIds") or {}).get("vendor", "-")
+            previous_price = line["price"]["unitPP"]
+            line_price = prices.get(line["id"])
+            if line_price is None:
+                logger.info(
+                    "%s: price of line %s (sku %s, quantity %s) unchanged at %s: "
+                    "no preview prices it",
+                    context,
+                    line["id"],
+                    sku,
+                    line.get("quantity"),
+                    previous_price,
+                )
+                continue
+            logger.info(
+                "%s: price of line %s (sku %s, quantity %s) updated from %s to %s, from %s",
+                context,
+                line["id"],
+                sku,
+                line.get("quantity"),
+                previous_price,
+                line_price.unit_price,
+                line_price.source,
             )
-            updated_lines.append({
-                "id": line["id"],
-                "price": {"unitPP": new_price_item[1]},
-            })
 
-        # Add remaining lines with unchanged prices
-        updated_lines_ids = {line["id"] for line in updated_lines}
-        order_lines = [
-            line for line in self._context.order["lines"] if line["id"] not in updated_lines_ids
-        ]
-        mapped_lines = [
-            {
-                "id": line["id"],
-                "price": {"unitPP": line["price"]["unitPP"]},
-            }
-            for line in order_lines
-        ]
-        updated_lines.extend(mapped_lines)
+    def _get_new_line_prices(self, context) -> dict:
+        """Return the price of each line the PREVIEW of the new/upsize lines priced."""
+        if context.adobe_new_order or not context.adobe_preview_order:
+            return {}
+        line_items = context.adobe_preview_order["lineItems"]
+        preview_prices = {
+            line_item["offerId"]: line_item["pricing"]["discountedPartnerPrice"]
+            for line_item in line_items
+        }
+        prices = {}
+        for line_item in line_items:
+            line = get_order_line_by_sku(context.order, line_item["offerId"])
+            price_item = get_price_item_by_line_sku(
+                preview_prices, line["item"]["externalIds"]["vendor"]
+            )
+            prices[line["id"]] = LinePrice(
+                unit_price=price_item[1],
+                source=(f"PREVIEW {self._describe_preview_line(line_item, price_item[1])}"),
+            )
+        return prices
 
-        return sorted(updated_lines, key=itemgetter("id"))
+    def _get_renewal_line_prices(self, context, new_prices: dict) -> dict:
+        """Return the price of each late-renewal line, blended with its excess quantity."""
+        prices = {}
+        for sku, info in context.manual_renewal_lines.items():
+            renewal_price = info.get("renewal_unit_price")
+            if renewal_price is None:
+                logger.info(
+                    "%s: no renewal price for late-renewal sku %s (subscription %s)",
+                    context,
+                    sku,
+                    info["adobe_subscription_id"],
+                )
+                continue
+            line_id = info["line"]["id"]
+            excess_qty = info.get("excess_qty") or 0
+            renewal_source = self._describe_renewal(info, renewal_price)
+            new_price = new_prices.get(line_id)
+            if not excess_qty:
+                prices[line_id] = LinePrice(unit_price=renewal_price, source=renewal_source)
+            elif new_price is not None:
+                prices[line_id] = LinePrice(
+                    unit_price=self._blend(
+                        info["renewal_qty"], renewal_price, excess_qty, new_price.unit_price
+                    ),
+                    source=f"blend of {renewal_source} and {new_price.source}",
+                )
+            else:
+                logger.info(
+                    "%s: no new-line price for the excess quantity %s of late-renewal sku %s "
+                    "(%s), line price left unchanged",
+                    context,
+                    excess_qty,
+                    sku,
+                    renewal_source,
+                )
+        return prices
 
-    def _update_order(self, lines):
-        """Update the order with new prices."""
-        update_order(self._client, self._context.order_id, lines=lines)
-        logger.info("%s: order lines prices updated successfully", self._context)
+    def _describe_preview_line(self, line_item: dict, unit_price: float) -> str:
+        codes = ",".join(line_item.get("flexDiscountCodes") or []) or "none"
+        return (
+            f"line {line_item.get('extLineItemNumber')} offer {line_item['offerId']} "
+            f"quantity {line_item.get('quantity')} at {unit_price} (flex discount {codes})"
+        )
+
+    def _describe_renewal(self, info: dict, renewal_price: float) -> str:
+        code = info.get("flex_discount_code") or "none"
+        return (
+            f"PREVIEW_RENEWAL subscription {info['adobe_subscription_id']} "
+            f"offer {info['offer_id']} quantity {info['renewal_qty']} at {renewal_price} "
+            f"(flex discount {code})"
+        )
+
+    def _blend(self, renewal_qty, renewal_price, excess_qty, new_price) -> float:
+        total = renewal_qty * renewal_price + excess_qty * new_price
+        return round(total / (renewal_qty + excess_qty), UNIT_PRICE_DECIMALS)
 
 
 class FetchResellerChangeData(Step):
