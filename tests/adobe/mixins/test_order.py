@@ -3,6 +3,7 @@ from hashlib import sha256
 from urllib.parse import urljoin
 
 import pytest
+import responses
 from responses import matchers
 
 from adobe_vipm.adobe.constants import (
@@ -11,7 +12,8 @@ from adobe_vipm.adobe.constants import (
     ORDER_TYPE_SWITCH,
     AdobeErrorCode,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
+from adobe_vipm.adobe.dataclasses import FlexDiscountCascade
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import to_adobe_line_id
 from adobe_vipm.flows.constants import MARKET_SEGMENT_COMMERCIAL
@@ -26,13 +28,9 @@ def test_create_preview_order_processing_upsize_lines_error(
     adobe_authorizations_file,
     adobe_api_error_factory,
     adobe_client_factory,
-    flex_discounts_factory,
     requests_mocker,
 ):
     mocked_client, _, _ = adobe_client_factory()
-    mock_get_flex_discounts_per_base_offer = mocker.patch.object(
-        mocked_client, "get_flex_discounts_per_base_offer", return_value=flex_discounts_factory()
-    )
     mock_get_subscriptions_for_offers = mocker.patch.object(
         mocked_client,
         "get_subscriptions_for_offers",
@@ -57,7 +55,6 @@ def test_create_preview_order_processing_upsize_lines_error(
     with pytest.raises(AdobeCreatePreviewError, match="Subscription has not been found in Adobe"):
         mocked_client.create_preview_order(context)
 
-    mock_get_flex_discounts_per_base_offer.assert_called_once()
     mock_get_subscriptions_for_offers.assert_called_once()
 
 
@@ -140,7 +137,7 @@ def test_get_preview_order_discounts(
     adobe_customer_id = "test-customer"
     payload = preview_discounts_payload_factory()
     second_payload = preview_discounts_payload_factory()
-    second_payload["lineItems"][1]["flexDiscountCodes"] = []
+    del second_payload["lineItems"][1]["flexDiscountCodes"]
     discounts_resp_ok = order_preview_discounts_resp_factory()
     del discounts_resp_ok["lineItems"][1]["flexDiscounts"]
     for payload_to_match, json_body in (
@@ -228,36 +225,125 @@ def test_get_preview_order_discounts(
     }
 
 
-def test_get_preview_order_too_many_failed_discounts(
+def _reject_requested_code(order_preview_discounts_resp_factory, accepted_code=None):
+    """Build a responses callback that rejects whatever code the second line proposes."""
+
+    def callback(request):
+        codes = json.loads(request.body)["lineItems"][1].get("flexDiscountCodes") or []
+        response_json = order_preview_discounts_resp_factory()
+        response_json["lineItems"][1]["flexDiscounts"] = [
+            {"code": code, "result": "SUCCESS" if code == accepted_code else "FAILURE"}
+            for code in codes
+        ]
+        return 200, {}, json.dumps(response_json)
+
+    return callback
+
+
+@pytest.mark.parametrize("accepted_code", [None, "CODE_12"])
+def test_get_preview_order_exhausts_ranked_candidates(
     adobe_client_factory,
     requests_mocker,
     settings,
     order_preview_discounts_resp_factory,
     preview_discounts_payload_factory,
     mock_send_exception,
+    accepted_code,
 ):
     mocked_client, authorization, _ = adobe_client_factory()
     adobe_customer_id = "test-customer"
     payload = preview_discounts_payload_factory()
+    del payload["lineItems"][0]["flexDiscountCodes"]
+    candidates = [f"CODE_{index}" for index in range(1, 13)]
+    payload["lineItems"][1]["flexDiscountCodes"] = [candidates[0]]
+    cascade = FlexDiscountCascade(candidates={3: list(candidates)})
+    requests_mocker.add_callback(
+        responses.POST,
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/test-customer/orders",
+        ),
+        callback=_reject_requested_code(order_preview_discounts_resp_factory, accepted_code),
+        content_type="application/json",
+    )
+
+    mocked_client.get_preview_order(authorization, adobe_customer_id, payload, cascade)  # act
+
+    assert cascade.rejections == {3: [code for code in candidates if code != accepted_code]}
+    assert cascade.selection == ({3: accepted_code} if accepted_code else {})
+    assert len(requests_mocker.calls) == len(cascade.rejections[3]) + 1
+    mock_send_exception.assert_not_called()
+
+
+def test_get_preview_order_cascades_to_next_candidate(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    order_preview_discounts_resp_factory,
+    preview_discounts_payload_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    payload = preview_discounts_payload_factory()
+    second_payload = preview_discounts_payload_factory()
+    second_payload["lineItems"][1]["flexDiscountCodes"] = ["SPRING_26"]
+    discounts_resp_ok = order_preview_discounts_resp_factory()
+    discounts_resp_ok["lineItems"][1]["flexDiscounts"][0].update({
+        "code": "SPRING_26",
+        "result": "SUCCESS",
+    })
+    for payload_to_match, json_body in (
+        (payload, order_preview_discounts_resp_factory()),
+        (second_payload, discounts_resp_ok),
+    ):
+        requests_mocker.post(
+            urljoin(
+                settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+                "/v3/customers/test-customer/orders",
+            ),
+            json=json_body,
+            match=[
+                matchers.json_params_matcher(payload_to_match),
+                matchers.query_param_matcher({"fetch-price": "true"}),
+            ],
+        )
+    cascade = FlexDiscountCascade(
+        candidates={2: ["EASTER_26"], 3: ["BLACK_FRIDAY", "SPRING_26"]},
+    )
+
+    result = mocked_client.get_preview_order(authorization, "test-customer", payload, cascade)
+
+    assert result == discounts_resp_ok
+    assert cascade.selection == {2: "EASTER_26", 3: "SPRING_26"}
+    assert cascade.rejections == {3: ["BLACK_FRIDAY"]}
+    assert payload["lineItems"][1]["flexDiscountCodes"] == ["SPRING_26"]
+
+
+def test_get_preview_order_ignores_unrequested_rejections(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    order_preview_discounts_resp_factory,
+    preview_discounts_payload_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    payload = preview_discounts_payload_factory()
+    del payload["lineItems"][1]["flexDiscountCodes"]
+    response_json = order_preview_discounts_resp_factory()
     requests_mocker.post(
         urljoin(
             settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
             "/v3/customers/test-customer/orders",
         ),
-        json=order_preview_discounts_resp_factory(),
-        match=[
-            matchers.json_params_matcher(payload),
-            matchers.query_param_matcher({"fetch-price": "true"}),
-        ],
+        json=response_json,
+        match=[matchers.json_params_matcher(payload)],
     )
+    cascade = FlexDiscountCascade(candidates={2: ["EASTER_26"]})
 
-    with pytest.raises(AdobeError):
-        mocked_client.get_preview_order(authorization, adobe_customer_id, payload)
+    result = mocked_client.get_preview_order(authorization, "test-customer", payload, cascade)
 
-    mock_send_exception.assert_called_once_with(
-        "Failed applying discount codes",
-        "After 5 attempts still finding failed discount codes: {'BLACK_FRIDAY'}.",
-    )
+    assert result == response_json
+    assert cascade.selection == {2: "EASTER_26"}
+    assert cascade.rejections == {}
 
 
 def test_get_preview_order_not_qualified(
@@ -271,7 +357,7 @@ def test_get_preview_order_not_qualified(
     mocked_client, authorization, _ = adobe_client_factory()
     payload = preview_discounts_payload_factory()
     second_payload = preview_discounts_payload_factory()
-    second_payload["lineItems"][1]["flexDiscountCodes"] = []
+    del second_payload["lineItems"][1]["flexDiscountCodes"]
     discounts_resp_ok = order_preview_discounts_resp_factory()
     del discounts_resp_ok["lineItems"][1]["flexDiscounts"]
     for payload_to_match, response in (
@@ -311,6 +397,36 @@ def test_get_preview_order_not_qualified(
         "2141 - Customer is not qualified for the Flexible Discount: Line Item: 3, Reason: Invalid "
         "Flexible Discount" in caplog.messages
     )
+
+
+def test_get_preview_order_not_qualified_on_undiscounted_line(
+    adobe_client_factory,
+    requests_mocker,
+    settings,
+    preview_discounts_payload_factory,
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    payload = preview_discounts_payload_factory()
+    requests_mocker.post(
+        urljoin(
+            settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"],
+            "/v3/customers/test-customer/orders",
+        ),
+        match=[matchers.json_params_matcher(payload)],
+        body=AdobeAPIError(
+            status_code=int(AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT),
+            payload={
+                "code": "2141",
+                "message": "Customer is not qualified for the Flexible Discount",
+                "additionalDetails": ["Line Item: 4, Reason: Invalid Flexible Discount"],
+            },
+        ),
+    )
+
+    with pytest.raises(AdobeAPIError) as err:
+        mocked_client.get_preview_order(authorization, "test-customer", payload)
+
+    assert err.value.code == "2141"
 
 
 def test_get_preview_order_unexpected_message(
@@ -381,148 +497,6 @@ def test_get_preview_order_line_item(
         "flexDiscountCodes": ["FLEX_DISCOUNT"],
         "offerId": "65304578CA01A12",
         "quantity": 2,
-    }
-
-
-def test_get_flex_discounts_per_base_offer_invalid_country(
-    adobe_client_factory,
-    requests_mocker,
-    settings,
-    order_preview_discounts_resp_factory,
-    preview_discounts_payload_factory,
-    mock_order,
-    flex_discounts_factory,
-    adobe_api_error_factory,
-):
-    mocked_client, authorization, _ = adobe_client_factory()
-    payload = preview_discounts_payload_factory()
-    payload["lineItems"][1]["flexDiscountCodes"] = []
-    response_json = order_preview_discounts_resp_factory()
-    del response_json["lineItems"][1]["flexDiscounts"]
-    requests_mocker.get(
-        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
-        status=400,
-        json=adobe_api_error_factory(
-            AdobeErrorCode.INVALID_COUNTRY_FOR_PARTNER, "Invalid Country for Partner"
-        ),
-        match=[
-            matchers.query_param_matcher({
-                "market-segment": "COM",
-                "country": "US",
-                "offer-ids": "99999999CA01A12,99999999CA01A12",
-            })
-        ],
-    )
-    context = Context(order=mock_order, market_segment="COM")
-
-    flex_discounts = mocked_client.get_flex_discounts_per_base_offer(
-        authorization,
-        context,
-        ("99999999CA01A12", "99999999CA01A12"),
-    )  # act
-
-    assert flex_discounts == {}
-
-
-def test_get_flex_discounts_per_base_offer_error(
-    adobe_client_factory,
-    requests_mocker,
-    settings,
-    order_preview_discounts_resp_factory,
-    preview_discounts_payload_factory,
-    mock_order,
-    flex_discounts_factory,
-    adobe_api_error_factory,
-):
-    mocked_client, authorization, _ = adobe_client_factory()
-    payload = preview_discounts_payload_factory()
-    payload["lineItems"][1]["flexDiscountCodes"] = []
-    response_json = order_preview_discounts_resp_factory()
-    del response_json["lineItems"][1]["flexDiscounts"]
-    requests_mocker.get(
-        urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts"),
-        status=400,
-        json=adobe_api_error_factory(AdobeErrorCode.INTERNAL_SERVER_ERROR, "Internal server error"),
-        match=[
-            matchers.query_param_matcher({
-                "market-segment": "COM",
-                "country": "US",
-                "offer-ids": "99999999CA01A12,99999999CA01A12",
-            })
-        ],
-    )
-    context = Context(order=mock_order, market_segment="COM")
-
-    with pytest.raises(AdobeError):
-        mocked_client.get_flex_discounts_per_base_offer(
-            authorization,
-            context,
-            ("99999999CA01A12", "99999999CA01A12"),
-        )  # act
-
-
-def test_get_flex_discounts_per_base_offer_collects_all_pages(
-    adobe_client_factory,
-    requests_mocker,
-    settings,
-    mock_order,
-    flex_discounts_factory,
-):
-    mocked_client, authorization, _ = adobe_client_factory()
-    full = flex_discounts_factory()
-    base_url = urljoin(settings.EXTENSION_CONFIG["ADOBE_API_BASE_URL"], "/v3/flex-discounts")
-    page_one = {
-        **full,
-        "flexDiscounts": full["flexDiscounts"][:1],
-        "links": {
-            "next": {
-                "uri": "/v3/flex-discounts?market-segment=COM&country=US"
-                "&offer-ids=99999999CA01A12,99999999CA01A12&offset=50",
-                "method": "GET",
-                "headers": [],
-            }
-        },
-    }
-    page_two = {
-        **full,
-        "flexDiscounts": full["flexDiscounts"][1:],
-        "links": {"self": full["links"]["self"]},
-    }
-    requests_mocker.get(
-        base_url,
-        json=page_one,
-        match=[
-            matchers.query_param_matcher({
-                "market-segment": "COM",
-                "country": "US",
-                "offer-ids": "99999999CA01A12,99999999CA01A12",
-            })
-        ],
-    )
-    requests_mocker.get(
-        base_url,
-        json=page_two,
-        match=[
-            matchers.query_param_matcher({
-                "market-segment": "COM",
-                "country": "US",
-                "offer-ids": "99999999CA01A12,99999999CA01A12",
-                "offset": "50",
-            })
-        ],
-    )
-    context = Context(order=mock_order, market_segment="COM")
-
-    result = mocked_client.get_flex_discounts_per_base_offer(
-        authorization,
-        context,
-        ("99999999CA01A12", "99999999CA01A12"),
-    )  # act
-
-    assert result == {
-        "65304768CA01A12": "BLACK_FRIDAY_22_FAILURE_3",
-        "65304769CA01A12": "EASTER_26",
-        "65304770CA01A12": "ADOBE_ALL_PROMOTION",
     }
 
 
@@ -756,3 +730,17 @@ def test_create_switch_order_without_recommendation_tracker_id(
     )  # act
 
     assert result == adobe_order
+
+
+def test_get_preview_order_http_error_without_code(
+    mocker, adobe_client_factory, preview_discounts_payload_factory
+):
+    mocked_client, authorization, _ = adobe_client_factory()
+    payload = preview_discounts_payload_factory()
+    error = AdobeHttpError(504, "<html>Gateway Timeout</html>")
+    mocker.patch.object(mocked_client, "_get_preview_order", side_effect=error)
+
+    with pytest.raises(AdobeHttpError) as err:
+        mocked_client.get_preview_order(authorization, "test-customer", payload)  # act
+
+    assert err.value is error

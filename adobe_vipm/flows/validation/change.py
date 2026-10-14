@@ -12,6 +12,7 @@ from adobe_vipm.flows.constants import (
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.shared import (
+    SelectFlexDiscounts,
     SetOrUpdateCotermDate,
     ValidateRenewalWindow,
 )
@@ -132,6 +133,7 @@ def validate_change_order(client, order):
         ValidateSkuAvailability(is_validation=True),
         ValidateDownsizes(),
         Validate3YCCommitment(is_validation=True),
+        SelectFlexDiscounts(),
         GetPreviewOrder(),
         UpdatePrices(is_validation=True),
     )

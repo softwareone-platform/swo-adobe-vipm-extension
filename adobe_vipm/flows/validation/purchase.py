@@ -43,6 +43,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.shared import SelectFlexDiscounts
 from adobe_vipm.flows.helpers import (
     PrepareCustomerData,
     SetupContext,
@@ -323,6 +324,7 @@ def validate_purchase_order(client, order):
         ValidateDuplicateLines(),
         ValidateQuantitiesLGA(),
         Validate3YCCommitment(is_validation=True),
+        SelectFlexDiscounts(),
         GetPreviewOrder(),
         UpdatePrices(is_validation=True),
     )

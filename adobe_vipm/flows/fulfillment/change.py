@@ -21,6 +21,7 @@ from adobe_vipm.flows.constants import (
     Param,
 )
 from adobe_vipm.flows.context import Context
+from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
     CheckManualRenewalSubscriptions,
     CompleteOrder,
@@ -30,6 +31,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     GetReturnOrders,
     NullifyFlexDiscountParam,
     PreviewRenewalOrders,
+    SelectFlexDiscounts,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
     SetupDueDate,
@@ -56,6 +58,7 @@ from adobe_vipm.flows.utils import (
     notify_not_updated_subscriptions,
 )
 from adobe_vipm.flows.utils.customer import is_within_coterm_window
+from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 from adobe_vipm.flows.utils.subscription import get_subscription_by_line_subs_id
 from adobe_vipm.utils import get_partial_sku
 
@@ -350,6 +353,7 @@ def fulfill_change_order(client, order):
         ValidateReturnableOrders(),
         CheckManualRenewalSubscriptions(),
         Validate3YCCommitment(),
+        SelectFlexDiscounts(),
         GetPreviewOrder(),
         UpdatePrices(is_validation=False),
         PreviewRenewalOrders(),
@@ -362,6 +366,7 @@ def fulfill_change_order(client, order):
         CreateOrUpdateSubscriptions(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
         SetSubscriptionTemplate(),
+        RecordDiscountRedemptions(get_order_redeemed_codes),
         NullifyFlexDiscountParam(),
         SyncAgreement(),
     )

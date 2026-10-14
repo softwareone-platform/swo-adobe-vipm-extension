@@ -6,8 +6,11 @@ from pytest_mock import MockerFixture
 
 from adobe_vipm.flows.constants import Param
 from adobe_vipm.flows.utils.parameter import (
+    get_flex_discounts_parameter,
+    get_fulfillment_parameter,
     get_renewal_payload,
     get_switch_payload,
+    set_flex_discounts_parameter,
     update_agreement_params_visibility,
 )
 
@@ -199,3 +202,157 @@ def test_get_renewal_payload_not_set(order_factory):
     result = get_renewal_payload(order)  # act
 
     assert result is None
+
+
+def test_set_flex_discounts_parameter_records_applied_codes_only():
+    order = {
+        "parameters": {
+            Param.PHASE_FULFILLMENT.value: [
+                {"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None},
+            ],
+        },
+    }
+    adobe_order = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "sub-1",
+                "flexDiscounts": [
+                    {"code": "APPLIED", "result": "SUCCESS"},
+                    {"code": "REJECTED", "result": "FAILURE"},
+                ],
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65304579CA01A12",
+                "subscriptionId": "sub-2",
+                "flexDiscounts": [{"code": "REJECTED_ONLY", "result": "FAILURE"}],
+            },
+            {
+                "extLineItemNumber": 3,
+                "offerId": "65304580CA01A12",
+                "subscriptionId": "sub-3",
+                "flexDiscounts": [{"code": "NO_RESULT"}],
+            },
+            {"extLineItemNumber": 4, "offerId": "65304581CA01A12", "subscriptionId": "sub-4"},
+        ]
+    }
+
+    result = set_flex_discounts_parameter(order, adobe_order)  # act
+
+    param = get_fulfillment_parameter(result, Param.FLEXIBLE_DISCOUNTS.value)
+    assert param["value"] == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "sub-1",
+            "flexDiscountCode": ["APPLIED"],
+        },
+        {
+            "extLineItemNumber": 3,
+            "offerId": "65304580CA01A12",
+            "subscriptionId": "sub-3",
+            "flexDiscountCode": ["NO_RESULT"],
+        },
+    ]
+
+
+def test_set_flex_discounts_parameter_without_applied_codes():
+    order = {
+        "parameters": {
+            Param.PHASE_FULFILLMENT.value: [
+                {"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": "stale"},
+            ],
+        },
+    }
+    adobe_order = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "flexDiscounts": [{"code": "REJECTED", "result": "FAILURE"}],
+            },
+        ]
+    }
+
+    result = set_flex_discounts_parameter(order, adobe_order)  # act
+
+    assert get_fulfillment_parameter(result, Param.FLEXIBLE_DISCOUNTS.value)["value"] is None
+
+
+def test_set_flex_discounts_parameter_restricted_to_requested_codes():
+    order = {
+        "parameters": {
+            Param.PHASE_FULFILLMENT.value: [
+                {"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": None},
+            ],
+        },
+    }
+    adobe_order = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "sub-1",
+                "flexDiscounts": [
+                    {"code": "AUTO_APPLIED", "result": "SUCCESS"},
+                    {"code": "REQUESTED", "result": "SUCCESS"},
+                ],
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65304579CA01A12",
+                "subscriptionId": "sub-2",
+                "flexDiscounts": [{"code": "ONLY_AUTO_APPLIED", "result": "SUCCESS"}],
+            },
+        ]
+    }
+
+    result = set_flex_discounts_parameter(order, adobe_order, requested_codes={1: "REQUESTED"})
+
+    assert get_fulfillment_parameter(result, Param.FLEXIBLE_DISCOUNTS.value)["value"] == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "sub-1",
+            "flexDiscountCode": ["REQUESTED"],
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, []),
+        ([], []),
+        ("", []),
+        ("   ", []),
+        (
+            [{"extLineItemNumber": 1, "flexDiscountCode": ["A"]}],
+            [{"extLineItemNumber": 1, "flexDiscountCode": ["A"]}],
+        ),
+        (
+            '[{"extLineItemNumber": 1, "flexDiscountCode": ["A"]}]',
+            [{"extLineItemNumber": 1, "flexDiscountCode": ["A"]}],
+        ),
+    ],
+)
+def test_get_flex_discounts_parameter(value, expected):
+    order = {
+        "parameters": {
+            Param.PHASE_FULFILLMENT.value: [
+                {"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": value},
+            ],
+        },
+    }
+
+    result = get_flex_discounts_parameter(order)  # act
+
+    assert result == expected
+
+
+def test_get_flex_discounts_parameter_without_parameter():
+    result = get_flex_discounts_parameter({"parameters": {Param.PHASE_FULFILLMENT.value: []}})
+
+    assert result == []

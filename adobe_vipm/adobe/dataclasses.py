@@ -1,5 +1,5 @@
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -73,6 +73,41 @@ class ReturnableOrderInfo:
     order: dict
     line: dict
     quantity: int
+
+
+@dataclass
+class FlexDiscountCascade:
+    """
+    Ranked flexible discount codes a PREVIEW order cascades through, per Adobe line number.
+
+    ``candidates`` holds, per ``extLineItemNumber``, the codes still to try
+    (head = the code currently proposed); ``selection`` the code each line
+    carried when the preview accepted it; ``rejections`` the codes Adobe
+    rejected per line, in order. Lines absent from ``candidates`` carry no
+    proposal.
+    """
+
+    candidates: dict[int, list[str]] = field(default_factory=dict)
+    selection: dict[int, str] = field(default_factory=dict)
+    rejections: dict[int, list[str]] = field(default_factory=dict)
+
+    @property
+    def remaining_codes(self) -> int:
+        """Number of codes still to try across every line."""
+        return sum(len(codes) for codes in self.candidates.values())
+
+    def current_code(self, line_number: int) -> str | None:
+        """Return the code currently proposed for the line, None when none is left."""
+        codes = self.candidates.get(line_number) or []
+        return codes[0] if codes else None
+
+    def reject(self, line_number: int, code: str) -> str | None:
+        """Record the rejection of the line's proposed code and return the next one, if any."""
+        self.rejections.setdefault(line_number, []).append(code)
+        codes = self.candidates.get(line_number) or []
+        if codes and codes[0] == code:
+            codes.pop(0)
+        return self.current_code(line_number)
 
 
 def _wrap_secret(secret: str) -> str:

@@ -65,6 +65,7 @@ from adobe_vipm.flows.constants import (
     TEMPLATE_SUBSCRIPTION_AUTORENEWAL_ENABLE,
     Param,
 )
+from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.pipeline import Step
 from adobe_vipm.flows.sync.agreement import sync_agreements_by_agreement_ids
 from adobe_vipm.flows.utils import (
@@ -94,8 +95,10 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
+from adobe_vipm.flows.utils.flex_discounts import select_flex_discounts
 from adobe_vipm.flows.utils.parameter import (
     get_ordering_parameter,
+    get_requested_flex_discount_codes,
     set_adobe_order_ids_created_parameter,
     set_flex_discounts_parameter,
     set_ordering_parameter_error,
@@ -104,7 +107,7 @@ from adobe_vipm.flows.utils.parameter import (
 )
 from adobe_vipm.flows.utils.template import get_template_data_by_adobe_subscription
 from adobe_vipm.flows.utils.three_yc import set_adobe_3yc
-from adobe_vipm.notifications import mpt_notify, send_exception
+from adobe_vipm.notifications import mpt_notify, send_exception, send_warning
 from adobe_vipm.utils import get_3yc_commitment, get_partial_sku
 
 logger = logging.getLogger(__name__)
@@ -948,6 +951,51 @@ class SubmitReturnOrders(Step):
             raise
 
 
+class SelectFlexDiscounts(Step):
+    """
+    Select the flexible discount candidates of the new/upsize lines from the store.
+
+    Reads the Airtable discount store and leaves, per line, the ranked list of
+    codes eligible for it on context.flex_discount_candidates (best first), for
+    the preview to propose and cascade through. Skipped when the order has no
+    new or upsize lines, or when the Adobe NEW order already exists (retry of a
+    later step). Best effort: Adobe's preview stays the authority and the order
+    is worth placing without a discount, so a store failure is logged and
+    notified and the order proceeds with no candidates.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Select the flexible discount candidates of the new/upsize lines."""
+        if (context.new_lines or context.upsize_lines) and not context.adobe_new_order_id:
+            context.flex_discount_candidates = self._select_candidates(context)
+        next_step(client, context)
+
+    def _select_candidates(self, context):
+        try:
+            candidates_by_line = select_flex_discounts(context)
+        except Exception:
+            logger.exception("%s: failed to select the flex discount candidates", context)
+            send_exception(
+                f"Error selecting the flex discount candidates of order {context.order_id}",
+                "The flexible discount store could not be read or the candidates could "
+                "not be ranked; the order proceeds without a proposed discount and "
+                "Adobe's preview decides the price:\n"
+                f"- Customer ID: {context.adobe_customer_id or '-'}\n"
+                f"- Order ID: {context.order_id}\n",
+            )
+            return {}
+        for line_id, candidates in candidates_by_line.items():
+            logger.info(
+                "%s: flex discount candidates for line %s: %s",
+                context,
+                line_id,
+                ", ".join(candidate.code for candidate in candidates),
+            )
+        if not candidates_by_line:
+            logger.info("%s: no flex discount candidates for the new/upsize lines", context)
+        return candidates_by_line
+
+
 class GetPreviewOrder(Step):
     """
     Retrieve a preview order for the upsize/new lines.
@@ -972,8 +1020,37 @@ class GetPreviewOrder(Step):
                     ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
                 )
                 return
+            self._notify_undiscounted_lines(context)
 
         next_step(mpt_client, context)
+
+    def _notify_undiscounted_lines(self, context):
+        """Signal the lines that lost every candidate discount at Adobe's preview."""
+        undiscounted = {
+            line_number: codes
+            for line_number, codes in context.flex_discount_rejections.items()
+            if line_number not in context.flex_discount_selection
+        }
+        if not undiscounted:
+            return
+        details = "\n".join(
+            f"- Line {line_number}: {', '.join(codes)}"
+            for line_number, codes in sorted(undiscounted.items())
+        )
+        logger.warning(
+            "%s: Adobe rejected every flex discount candidate of line(s) %s, "
+            "they proceed undiscounted",
+            context,
+            sorted(undiscounted),
+        )
+        send_warning(
+            f"Flex discounts not applied on order {context.order_id}",
+            "Adobe's preview rejected every candidate discount code of the following "
+            "lines, which proceed undiscounted (codes tried, in order):\n"
+            f"{details}\n"
+            f"- Customer ID: {context.adobe_customer_id or '-'}\n"
+            f"- Order ID: {context.order_id}\n",
+        )
 
 
 class SubmitNewOrder(Step):
@@ -999,11 +1076,18 @@ class SubmitNewOrder(Step):
                 context.adobe_customer_id,
                 context.adobe_preview_order,
                 deployment_id=deployment_id,
+                requested_codes=context.flex_discount_selection,
             )
             logger.info("%s: new adobe order created: %s", context, adobe_order["orderId"])
             context.order = set_adobe_order_id(context.order, adobe_order["orderId"])
             context.order = set_adobe_order_ids_created_parameter(context, [adobe_order["orderId"]])
-            context.order = set_flex_discounts_parameter(context.order, adobe_order)
+            pending = adobe_order["status"] == AdobeOrderStatus.OPEN
+            context.order = set_flex_discounts_parameter(
+                context.order,
+                context.adobe_preview_order if pending else adobe_order,
+                requested_codes=context.flex_discount_selection,
+                pending=pending,
+            )
             update_order(
                 client,
                 context.order_id,
@@ -1046,7 +1130,17 @@ class SubmitNewOrder(Step):
             switch_order_to_failed(client, context.order, error)
             logger.warning("%s: the order has been failed due to %s.", context, error["message"])
             return
+        self._refresh_flex_discounts(client, context)
         next_step(client, context)
+
+    def _refresh_flex_discounts(self, client, context: Context) -> None:
+        requested_codes = get_requested_flex_discount_codes(context.order)
+        updated_order = set_flex_discounts_parameter(
+            context.order, context.adobe_new_order, requested_codes=requested_codes
+        )
+        if updated_order != context.order:
+            context.order = updated_order
+            update_order(client, context.order_id, parameters=context.order["parameters"])
 
 
 class CreateOrUpdateAssets(Step):

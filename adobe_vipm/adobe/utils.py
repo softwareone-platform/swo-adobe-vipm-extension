@@ -1,9 +1,15 @@
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.constants import (
+    FLEX_DISCOUNT_RESULT_SUCCESS,
     REGEX_SANITIZE_COMPANY_NAME,
     REGEX_SANITIZE_FIRST_LAST_NAME,
 )
+
+
+def is_flex_discount_applied(flex_discount: dict) -> bool:
+    """Return whether Adobe applied a line flex discount (a missing result counts as SUCCESS)."""
+    return flex_discount.get("result", FLEX_DISCOUNT_RESULT_SUCCESS) == FLEX_DISCOUNT_RESULT_SUCCESS
 
 
 def get_item_by_partial_sku(line_items, sku):

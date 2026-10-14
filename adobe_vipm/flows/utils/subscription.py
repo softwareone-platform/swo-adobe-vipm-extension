@@ -135,13 +135,16 @@ def is_consumables_sku(sku: str) -> bool:
     return sku[10] == "T"
 
 
-def get_sku_with_discount_level(sku: str, customer: dict) -> str:
+def get_sku_with_discount_level(sku: str, customer: dict, *, notify: bool = True) -> str:
     """
     Converts cutted sku (MPT Item sku) to Adobe sku with discount level.
 
     Args:
         sku: cutted Adobe sku without discount level.
         customer: Adobe customer
+        notify: Whether to notify operations when the customer has no discount
+            level and the base level is assumed. Best-effort callers that run on
+            every draft validation pass False to avoid repeated alerts.
 
     Returns:
         Sku with proper discount level based on Adobe customer's discount level.
@@ -163,7 +166,8 @@ def get_sku_with_discount_level(sku: str, customer: dict) -> str:
             customer.get("customerId"),
             discount_level,
         )
-        notify_discount_level_error(sku, customer)
+        if notify:
+            notify_discount_level_error(sku, customer)
 
     return f"{sku[0:10]}{discount_level}{sku[12:]}"
 
