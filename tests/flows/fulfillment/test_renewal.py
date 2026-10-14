@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 
 import pytest
 from freezegun import freeze_time
@@ -48,6 +49,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.pipeline import Cursor
 from adobe_vipm.flows.utils import get_fulfillment_parameter
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
@@ -1819,6 +1821,7 @@ def test_fulfill_renewal_order(mocker):
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
     assert pipeline_args[9].include_net_new_items is True
+    assert pipeline_args[9].renewal_quantity_is_delta is False
     assert pipeline_args[18].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
@@ -2092,16 +2095,22 @@ def test_validate_3yc_renewal_floor_step_plan_respects_floor(
     mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
 
 
+@pytest.mark.parametrize("renewal_quantity_is_delta", [False, True])
 def test_validate_3yc_renewal_floor_step_lapsing_breaches_floor(
-    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    renewal_quantity_is_delta,
 ):
     # The lapsing consumable stops renewing: 0 consumables < 5.
     set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, consumables=5)
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
     )
-    mocked_next_step = mocker.MagicMock()
-    step = Validate3YCRenewalFloor()
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
 
     step(mock_mpt_client, floor_context, mocked_next_step)  # act
 
@@ -2138,6 +2147,7 @@ def test_validate_3yc_renewal_floor_step_decrease_breaches_floor(
     mocked_next_step.assert_not_called()
 
 
+@pytest.mark.parametrize("renewal_quantity_is_delta", [False, True])
 @pytest.mark.parametrize(
     ("include_net_new_items", "expected_failure"),
     [(True, False), (False, True)],
@@ -2150,15 +2160,19 @@ def test_validate_3yc_renewal_floor_step_net_new_items(
     adobe_commitment_factory,
     include_net_new_items,
     expected_failure,
+    renewal_quantity_is_delta,
 ):
     # 18 licenses + 2 net-new licenses reach the floor of 20 only when net-new items count.
     floor_context.renewal_payload["netNewItems"] = [{"offerId": "65304578CA01A12", "quantity": 2}]
     set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=20)
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
     )
-    mocked_next_step = mocker.MagicMock()
-    step = Validate3YCRenewalFloor(include_net_new_items=include_net_new_items)
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(
+        include_net_new_items=include_net_new_items,
+        renewal_quantity_is_delta=renewal_quantity_is_delta,
+    )
 
     step(mock_mpt_client, floor_context, mocked_next_step)  # act
 
@@ -2166,6 +2180,7 @@ def test_validate_3yc_renewal_floor_step_net_new_items(
     assert mocked_next_step.called is not expected_failure
 
 
+@pytest.mark.parametrize("renewal_quantity_is_delta", [False, True])
 def test_validate_3yc_renewal_floor_step_net_new_reuses_scheduled_subscription(
     mocker,
     mock_mpt_client,
@@ -2173,6 +2188,7 @@ def test_validate_3yc_renewal_floor_step_net_new_reuses_scheduled_subscription(
     adobe_customer_factory,
     adobe_commitment_factory,
     adobe_subscription_factory,
+    renewal_quantity_is_delta,
 ):
     # A scheduled subscription created by a previous attempt already holds the
     # net-new offer: it is counted once (18 + 2 = 20 < 21), not twice.
@@ -2187,10 +2203,10 @@ def test_validate_3yc_renewal_floor_step_net_new_reuses_scheduled_subscription(
     floor_context.renewal_payload["netNewItems"] = [{"offerId": "65304578CA01A12", "quantity": 2}]
     set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=21)
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
     )
-    mocked_next_step = mocker.MagicMock()
-    step = Validate3YCRenewalFloor()
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
 
     step(mock_mpt_client, floor_context, mocked_next_step)  # act
 
@@ -2230,6 +2246,388 @@ def test_validate_3yc_renewal_floor_step_already_renewed_entry_keeps_renewed_qua
     mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
 
 
+def test_validate_3yc_renewal_floor_step_renew_now_adds_renewed(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    caplog,
+):
+    floor_context.adobe_customer_subscriptions = [
+        subscription
+        for subscription in floor_context.adobe_customer_subscriptions
+        if subscription["subscriptionId"] != "other-sub-id"
+    ]
+    floor_context.renewal_plan_subscriptions[0] = {
+        **plan_entry(renewal_quantity=2),
+        "snapshot": {
+            "enabled": True,
+            "renewal_quantity": 10,
+            "flex_discount_codes": [],
+            "renewed_quantity": 10,
+        },
+    }
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=True)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert "licenses=12" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("renewal_quantity", "renewed_quantity", "renewal_quantity_is_delta"),
+    [
+        pytest.param(2, 10, True, id="renew-now-10-renewed-plus-2"),
+        pytest.param(12, 0, False, id="anniversary-12"),
+    ],
+)
+def test_validate_3yc_renewal_floor_step_counts_renewing_consumables(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    caplog,
+    renewal_quantity,
+    renewed_quantity,
+    renewal_quantity_is_delta,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="renewing-sub-id", offer_id="77777777CA01A12", renewal_quantity=10
+        )
+    ]
+    plan_subscriptions = [
+        {
+            **plan_entry(offer_id="77777777CA01A12", renewal_quantity=renewal_quantity),
+            "snapshot": {
+                "enabled": True,
+                "renewal_quantity": 10,
+                "flex_discount_codes": [],
+                "renewed_quantity": renewed_quantity,
+            },
+        }
+    ]
+    floor_context.adobe_customer_subscriptions = adobe_subscriptions
+    floor_context.renewal_plan_subscriptions = plan_subscriptions
+    set_3yc_customer(
+        floor_context, adobe_customer_factory, adobe_commitment_factory, consumables=10
+    )
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert "consumables=12" in caplog.text
+
+
+def test_validate_3yc_renewal_floor_step_renew_now_counts_outside_plan(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    caplog,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="renewing-sub-id", offer_id="65304578CA01A12", renewal_quantity=10
+        ),
+        adobe_subscription_factory(
+            subscription_id="outside-plan-sub-id",
+            offer_id="65304578CA01A12",
+            renewal_quantity=5,
+            status=AdobeSubscriptionStatus.ACTIVE.value,
+        ),
+    ]
+    plan_subscriptions = [
+        {
+            **plan_entry(renewal_quantity=2),
+            "snapshot": {
+                "enabled": True,
+                "renewal_quantity": 10,
+                "flex_discount_codes": [],
+                "renewed_quantity": 10,
+            },
+        }
+    ]
+    floor_context.adobe_customer_subscriptions = adobe_subscriptions
+    floor_context.renewal_plan_subscriptions = plan_subscriptions
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=17)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=True)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert "licenses=17" in caplog.text
+
+
+def test_validate_3yc_renewal_floor_step_renew_now_breaches_floor(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+):
+    floor_context.adobe_customer_subscriptions = [
+        subscription
+        for subscription in floor_context.adobe_customer_subscriptions
+        if subscription["subscriptionId"] != "other-sub-id"
+    ]
+    floor_context.renewal_plan_subscriptions[0] = {
+        **plan_entry(renewal_quantity=2),
+        "snapshot": {
+            "enabled": True,
+            "renewal_quantity": 7,
+            "flex_discount_codes": [],
+            "renewed_quantity": 7,
+        },
+    }
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=True)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == "VIPM0034"
+    assert error["message"] == (
+        "The quantity selected of 9 would place the account below the minimum "
+        "commitment of 10 licenses for the three-year commitment."
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_3yc_renewal_floor_step_renew_now_first_renewal(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    caplog,
+):
+    floor_context.adobe_customer_subscriptions = [
+        subscription
+        for subscription in floor_context.adobe_customer_subscriptions
+        if subscription["subscriptionId"] != "other-sub-id"
+    ]
+    floor_context.renewal_plan_subscriptions[0] = plan_entry(renewal_quantity=10)
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=True)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert "licenses=10" in caplog.text
+
+
+def test_validate_3yc_renewal_floor_step_anniversary_counts_total(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    caplog,
+):
+    floor_context.adobe_customer_subscriptions = [
+        subscription
+        for subscription in floor_context.adobe_customer_subscriptions
+        if subscription["subscriptionId"] != "other-sub-id"
+    ]
+    floor_context.renewal_plan_subscriptions[0] = plan_entry(renewal_quantity=12)
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert "licenses=12" in caplog.text
+
+
+def test_validate_3yc_renewal_floor_step_anniversary_counts_outside_plan(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    caplog,
+):
+    floor_context.adobe_customer_subscriptions[2]["autoRenewal"]["renewalQuantity"] = 5
+    floor_context.renewal_plan_subscriptions[0] = plan_entry(renewal_quantity=6)
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert "licenses=11" in caplog.text
+
+
+def test_validate_3yc_renewal_floor_step_anniversary_outside_plan_breaches_floor(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+):
+    floor_context.adobe_customer_subscriptions[2]["autoRenewal"]["renewalQuantity"] = 5
+    floor_context.renewal_plan_subscriptions[0] = plan_entry(renewal_quantity=4)
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor()
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == "VIPM0034"
+    assert error["message"] == (
+        "The quantity selected of 9 would place the account below the minimum "
+        "commitment of 10 licenses for the three-year commitment."
+    )
+    mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize("renewal_quantity_is_delta", [False, True])
+@pytest.mark.parametrize(
+    "status",
+    [AdobeSubscriptionStatus.SCHEDULED.value, AdobeSubscriptionStatus.ACTIVE.value],
+)
+def test_validate_3yc_renewal_floor_step_counts_auto_renewing_outside_plan(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    caplog,
+    status,
+    renewal_quantity_is_delta,
+):
+    floor_context.adobe_customer_subscriptions[2] = adobe_subscription_factory(
+        subscription_id="other-sub-id",
+        offer_id="65304578CA01A12",
+        renewal_quantity=5,
+        status=status,
+    )
+    floor_context.renewal_plan_subscriptions[0] = plan_entry(renewal_quantity=6)
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert "licenses=11" in caplog.text
+
+
+@pytest.mark.parametrize("renewal_quantity_is_delta", [False, True])
+def test_validate_3yc_renewal_floor_step_skips_outside_plan_without_auto_renewal(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    renewal_quantity_is_delta,
+):
+    floor_context.adobe_customer_subscriptions[2] = adobe_subscription_factory(
+        subscription_id="other-sub-id",
+        offer_id="65304578CA01A12",
+        renewal_quantity=5,
+        autorenewal_enabled=False,
+    )
+    floor_context.renewal_plan_subscriptions[0] = plan_entry(renewal_quantity=6)
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == "VIPM0034"
+    assert error["message"] == (
+        "The quantity selected of 6 would place the account below the minimum "
+        "commitment of 10 licenses for the three-year commitment."
+    )
+    mocked_next_step.assert_not_called()
+
+
+def test_validate_3yc_renewal_floor_step_renew_now_no_change(
+    mocker, mock_mpt_client, floor_context, adobe_customer_factory, adobe_commitment_factory
+):
+    floor_context.renewal_plan_subscriptions[0] = {
+        **plan_entry(renewal_quantity=0),
+        "snapshot": {
+            "enabled": True,
+            "renewal_quantity": 8,
+            "flex_discount_codes": [],
+            "renewed_quantity": 8,
+        },
+    }
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=11)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=True)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+
+
+@pytest.mark.parametrize("renewal_quantity_is_delta", [False, True])
 def test_validate_3yc_renewal_floor_step_ignores_inactive_subscriptions(
     mocker,
     mock_mpt_client,
@@ -2237,6 +2635,7 @@ def test_validate_3yc_renewal_floor_step_ignores_inactive_subscriptions(
     adobe_customer_factory,
     adobe_commitment_factory,
     adobe_subscription_factory,
+    renewal_quantity_is_delta,
 ):
     # An inactive subscription never renews, whatever its auto-renewal says.
     floor_context.adobe_customer_subscriptions.append(
@@ -2249,10 +2648,10 @@ def test_validate_3yc_renewal_floor_step_ignores_inactive_subscriptions(
     )
     set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=20)
     mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
     )
-    mocked_next_step = mocker.MagicMock()
-    step = Validate3YCRenewalFloor()
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
 
     step(mock_mpt_client, floor_context, mocked_next_step)  # act
 
@@ -2262,6 +2661,174 @@ def test_validate_3yc_renewal_floor_step_ignores_inactive_subscriptions(
         "The quantity selected of 18 would place the account below the minimum "
         "commitment of 20 licenses for the three-year commitment."
     )
+    mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    (
+        "renewal_quantity",
+        "renewed_quantity",
+        "renewal_quantity_is_delta",
+        "outside_subscriptions",
+        "expected_quantity",
+    ),
+    [
+        pytest.param(10, 0, True, [], 10, id="renew-now-first-10"),
+        pytest.param(2, 10, True, [], 12, id="renew-now-10-renewed-plus-2"),
+        pytest.param(12, 0, False, [], 12, id="anniversary-12"),
+        pytest.param(
+            6,
+            0,
+            False,
+            [{"status": AdobeSubscriptionStatus.SCHEDULED.value}],
+            11,
+            id="plan-6-scheduled-5-outside",
+        ),
+        pytest.param(
+            6,
+            0,
+            False,
+            [{"status": AdobeSubscriptionStatus.ACTIVE.value}],
+            11,
+            id="plan-6-active-5-outside",
+        ),
+    ],
+)
+def test_validate_3yc_renewal_floor_step_passes_like_ef(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    caplog,
+    renewal_quantity,
+    renewed_quantity,
+    renewal_quantity_is_delta,
+    outside_subscriptions,
+    expected_quantity,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="renewing-sub-id", offer_id="65304578CA01A12", renewal_quantity=10
+        )
+    ] + [
+        adobe_subscription_factory(
+            subscription_id="outside-plan-sub-id",
+            offer_id="65304578CA01A12",
+            renewal_quantity=5,
+            **outside_subscription,
+        )
+        for outside_subscription in outside_subscriptions
+    ]
+    plan_subscriptions = [
+        {
+            **plan_entry(renewal_quantity=renewal_quantity),
+            "snapshot": {
+                "enabled": True,
+                "renewal_quantity": 10,
+                "flex_discount_codes": [],
+                "renewed_quantity": renewed_quantity,
+            },
+        }
+    ]
+    floor_context.adobe_customer_subscriptions = adobe_subscriptions
+    floor_context.renewal_plan_subscriptions = plan_subscriptions
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    caplog.set_level(logging.INFO)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, floor_context)
+    assert f"licenses={expected_quantity}" in caplog.text
+
+
+@pytest.mark.parametrize(
+    (
+        "renewal_quantity",
+        "renewed_quantity",
+        "renewal_quantity_is_delta",
+        "outside_subscriptions",
+        "expected_quantity",
+    ),
+    [
+        pytest.param(2, 7, True, [], 9, id="renew-now-7-renewed-plus-2"),
+        pytest.param(
+            6,
+            0,
+            False,
+            [{"status": AdobeSubscriptionStatus.ACTIVE.value, "autorenewal_enabled": False}],
+            6,
+            id="plan-6-outside-5-auto-renew-off",
+        ),
+        pytest.param(
+            4,
+            0,
+            False,
+            [{"status": AdobeSubscriptionStatus.ACTIVE.value}],
+            9,
+            id="plan-4-active-5-outside",
+        ),
+    ],
+)
+def test_validate_3yc_renewal_floor_step_blocks_like_ef(
+    mocker,
+    mock_mpt_client,
+    floor_context,
+    adobe_customer_factory,
+    adobe_commitment_factory,
+    adobe_subscription_factory,
+    renewal_quantity,
+    renewed_quantity,
+    renewal_quantity_is_delta,
+    outside_subscriptions,
+    expected_quantity,
+):
+    adobe_subscriptions = [
+        adobe_subscription_factory(
+            subscription_id="renewing-sub-id", offer_id="65304578CA01A12", renewal_quantity=10
+        )
+    ] + [
+        adobe_subscription_factory(
+            subscription_id="outside-plan-sub-id",
+            offer_id="65304578CA01A12",
+            renewal_quantity=5,
+            **outside_subscription,
+        )
+        for outside_subscription in outside_subscriptions
+    ]
+    plan_subscriptions = [
+        {
+            **plan_entry(renewal_quantity=renewal_quantity),
+            "snapshot": {
+                "enabled": True,
+                "renewal_quantity": 10,
+                "flex_discount_codes": [],
+                "renewed_quantity": renewed_quantity,
+            },
+        }
+    ]
+    floor_context.adobe_customer_subscriptions = adobe_subscriptions
+    floor_context.renewal_plan_subscriptions = plan_subscriptions
+    set_3yc_customer(floor_context, adobe_customer_factory, adobe_commitment_factory, licenses=10)
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed", autospec=True
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    step = Validate3YCRenewalFloor(renewal_quantity_is_delta=renewal_quantity_is_delta)
+
+    step(mock_mpt_client, floor_context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once()
+    error = mocked_switch_to_failed.mock_calls[0].args[2]
+    assert error["id"] == "VIPM0034"
+    assert f"of {expected_quantity} " in error["message"]
     mocked_next_step.assert_not_called()
 
 

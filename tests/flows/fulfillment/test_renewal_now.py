@@ -43,6 +43,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateRenewalWindow,
 )
 from adobe_vipm.flows.helpers import SetupContext
+from adobe_vipm.flows.pipeline import Cursor
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
 
@@ -246,6 +247,40 @@ def test_preview_renewal_now_order_step_includes_already_renewed_subscription(
                 "quantity": 15,
             },
         ],
+        order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+        recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
+    )
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+def test_preview_renewal_now_order_step_orders_only_added_seats(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    renewal_now_context.renewal_plan_subscriptions = [
+        plan_entry(renewal_quantity=2, snapshot_renewed_quantity=10)
+    ]
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL", status=AdobeOrderStatus.COMPLETE.value
+    )
+    mocked_next_step = mocker.MagicMock(spec=Cursor)
+    expected_items = [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "renewing-sub-id",
+            "quantity": 2,
+        },
+    ]
+    step = PreviewRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    mock_adobe_client.create_renewal_order.assert_called_once_with(
+        renewal_now_context.authorization_id,
+        renewal_now_context.adobe_customer_id,
+        renewal_now_context.order_id,
+        expected_items,
         order_type=ORDER_TYPE_PREVIEW_RENEWAL,
         recommendation_tracker_id=renewal_now_context.renewal_payload["recommendationTrackerId"],
     )
@@ -2086,6 +2121,7 @@ def test_fulfill_renewal_now_order(mocker):
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
     assert pipeline_args[9].include_net_new_items is True
+    assert pipeline_args[9].renewal_quantity_is_delta is True
     assert pipeline_args[18].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
