@@ -52,7 +52,12 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    idempotent-write session, which also retries PATCH; Adobe ignores a renewal
    quantity while auto-renewal is off), and a failure there is reported rather
    than failing the order, since the SWITCH cannot be undone; the at-anniversary
-   flow in `renewal.py` enables auto-renewal, stores the plan's discount codes and
+   flow in `renewal.py` first fails the order with `VIPM0057`, before any Adobe
+   change, when the payload's `plannedCotermDate` (the coterm date the wizard
+   built the plan for) differs from Adobe's current coterm date
+   (`ValidatePlannedCotermDate`: an order still processing after the anniversary
+   would otherwise apply the plan to the following year's renewal; a payload
+   without the date skips the check), then enables auto-renewal, stores the plan's discount codes and
    confirms them with Adobe before it creates any net-new scheduled subscription
    (`ValidateRenewalDiscountCodes`: Adobe validates codes only through
    `PREVIEW_RENEWAL`, so an automated preview judges the codes stored on the
