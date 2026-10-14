@@ -41,6 +41,7 @@ from adobe_vipm.flows.constants import (
     ERR_COMMITMENT_3YC_VALIDATION,
     ERR_RENEWAL_FLEX_DISCOUNT_REFUSED,
     ERR_RENEWAL_NET_NEW_FAILED,
+    ERR_RENEWAL_PLANNED_DATE_PASSED,
     ERR_RENEWAL_PREVIEW_FAILED,
     ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED,
     MARKET_SEGMENTS,
@@ -68,7 +69,9 @@ from adobe_vipm.flows.fulfillment.shared import (
 from adobe_vipm.flows.helpers import SetupContext, Validate3YCCommitment
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils import (
+    get_coterm_date,
     get_order_line_by_sku,
+    get_renewal_payload,
     get_subscription_by_line_and_item_id,
     is_3yc_commitment_ending_before_coterm,
     notify_not_updated_subscriptions,
@@ -688,6 +691,47 @@ class Validate3YCRenewalFloor(Step):
                     "status": AdobeSubscriptionStatus.SCHEDULED,
                     "autoRenewal": auto_renewal,
                 })
+
+
+class ValidatePlannedCotermDate(Step):
+    """
+    Fail the order before any Adobe mutation when the plan's anniversary has moved on.
+
+    The renewal wizard builds the plan for one anniversary and records the Adobe coterm
+    date it saw as ``plannedCotermDate``. The plan is applied as auto-renewal preferences,
+    which Adobe honours at whatever coterm date is next when fulfilment runs: an order
+    still processing after the anniversary (retries, a stuck queue) would otherwise carry
+    the plan into the following year's renewal and complete without an error. This step
+    runs after SetOrUpdateCotermDate refreshed the order's coterm date from Adobe, so the
+    two dates are compared like for like. A payload without the planned date (orders
+    placed before it was recorded) keeps the previous behaviour.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Fail the order when Adobe's coterm date differs from the planned one."""
+        planned_date = (get_renewal_payload(context.order) or {}).get("plannedCotermDate")
+        coterm_date = get_coterm_date(context.order)
+        if planned_date and coterm_date:
+            planned = dt.datetime.fromisoformat(planned_date).date()
+            current = dt.datetime.fromisoformat(coterm_date).date()
+            if planned != current:
+                logger.warning(
+                    "%s: renewal plan built for coterm date %s, Adobe coterm date is now %s",
+                    context,
+                    planned.isoformat(),
+                    current.isoformat(),
+                )
+                switch_order_to_failed(
+                    client,
+                    context.order,
+                    ERR_RENEWAL_PLANNED_DATE_PASSED.to_dict(
+                        planned_date=planned.isoformat(),
+                        coterm_date=current.isoformat(),
+                    ),
+                )
+                return
+
+        next_step(client, context)
 
 
 class ValidateNetNewOrderLines(Step):
@@ -1438,6 +1482,7 @@ def fulfill_renewal_order(client, order):
         SetOrUpdateCotermDate(),
         UpdateAgreementParamsVisibility(),
         ValidateRenewalWindow(),
+        ValidatePlannedCotermDate(),
         SetupRenewalPlan(),
         ValidateNetNewOrderLines(),
         Validate3YCRenewalFloor(),
