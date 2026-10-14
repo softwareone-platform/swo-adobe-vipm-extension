@@ -46,6 +46,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     GetReturnOrders,
     NullifyFlexDiscountParam,
     PreviewRenewalOrders,
+    RecordRenewalFlexDiscounts,
     SelectFlexDiscounts,
     SetOrUpdateCotermDate,
     SetSubscriptionTemplate,
@@ -59,6 +60,7 @@ from adobe_vipm.flows.fulfillment.shared import (
     ValidateDuplicateLines,
     ValidateRenewalWindow,
     add_asset,
+    build_committed_renewal_line_items,
     build_renewal_line_items,
     check_processing_template,
     is_renewal_unsupported_error,
@@ -4519,3 +4521,635 @@ def test_get_preview_order_step_no_notification_when_all_lines_discounted(
     step(mock_mpt_client, context, mocker.MagicMock())  # act
 
     mocked_send_warning.assert_not_called()
+
+
+def _renewal_context(order, **overrides):
+    manual_renewal_lines = {
+        "65304578CA": {
+            "line": order["lines"][0],
+            "adobe_subscription_id": "a-sub-id",
+            "offer_id": "65304578CA01A12",
+            "renewal_qty": 5,
+        },
+    }
+    kwargs = {
+        "order": order,
+        "order_id": order["id"],
+        "authorization_id": "authorization-id",
+        "adobe_customer_id": "customer-id",
+        "manual_renewal_lines": manual_renewal_lines,
+    }
+    kwargs.update(overrides)
+    return Context(**kwargs)
+
+
+def _renewal_preview(code=None, result="SUCCESS"):
+    line_item = {
+        "extLineItemNumber": 1,
+        "offerId": "65304578CA01A12",
+        "quantity": 5,
+        "subscriptionId": "a-sub-id",
+    }
+    if code:
+        line_item["flexDiscountCodes"] = [code]
+        line_item["flexDiscounts"] = [{"code": code, "result": result}]
+    return {"externalReferenceId": "ORD_RENEWAL", "lineItems": [line_item]}
+
+
+def _cascade_preview(preview, rejected_code, selected_code=None):
+    """Return a create_preview_renewal_order side effect resolving the cascade of line 1."""
+
+    def preview_renewal(*args):
+        cascade = args[4]
+        cascade.reject(1, rejected_code)
+        cascade.selection = {1: selected_code} if selected_code else {}
+        return preview
+
+    return preview_renewal
+
+
+def test_build_renewal_line_items_with_proposed_codes():
+    manual_renewal_lines = {
+        "65304578CA": {
+            "adobe_subscription_id": "a-sub-id",
+            "offer_id": "65304578CA01A12",
+            "renewal_qty": 5,
+        },
+        "65304579CA": {
+            "adobe_subscription_id": "a-sub-id-2",
+            "offer_id": "65304579CA01A12",
+            "renewal_qty": 3,
+        },
+    }
+
+    result = build_renewal_line_items(manual_renewal_lines, {"65304579CA": "BONUS_10"})  # act
+
+    assert result == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "quantity": 5,
+            "subscriptionId": "a-sub-id",
+        },
+        {
+            "extLineItemNumber": 2,
+            "offerId": "65304579CA01A12",
+            "quantity": 3,
+            "subscriptionId": "a-sub-id-2",
+            "flexDiscountCodes": ["BONUS_10"],
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ("preview_line_extra", "requested_codes", "expected_codes"),
+    [
+        (
+            {"flexDiscounts": [{"code": "BONUS_10", "result": "SUCCESS"}]},
+            {"a-sub-id": "BONUS_10"},
+            ["BONUS_10"],
+        ),
+        (
+            {"flexDiscounts": [{"code": "BONUS_10", "result": "FAILURE"}]},
+            {"a-sub-id": "BONUS_10"},
+            None,
+        ),
+        (
+            {"flexDiscounts": [{"code": "AUTO_APPLIED", "result": "SUCCESS"}]},
+            {},
+            None,
+        ),
+        ({}, {}, None),
+    ],
+)
+def test_build_committed_renewal_line_items(preview_line_extra, requested_codes, expected_codes):
+    preview_line = {
+        "extLineItemNumber": 1,
+        "offerId": "65304578CA01A12",
+        "quantity": 5,
+        "subscriptionId": "a-sub-id",
+        "flexDiscountCodes": ["ANY"],
+        **preview_line_extra,
+    }
+
+    result = build_committed_renewal_line_items([preview_line], requested_codes)  # act
+
+    expected_line = {
+        "extLineItemNumber": 1,
+        "offerId": "65304578CA01A12",
+        "quantity": 5,
+        "subscriptionId": "a-sub-id",
+    }
+    if expected_codes:
+        expected_line["flexDiscountCodes"] = expected_codes
+    assert result == [expected_line]
+
+
+def test_preview_renewal_orders_proposes_renewal_codes(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_orders.return_value = []
+    context = _renewal_context(order)
+    context.preview_late_renewal_order = _renewal_preview()
+    mocked_select = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
+        return_value={
+            "65304578CA": [mocker.MagicMock(code="BONUS_10"), mocker.MagicMock(code="BONUS_5")]
+        },
+    )
+    preview_with_code = _renewal_preview("BONUS_5")
+    preview_with_code["lineItems"][0]["pricing"] = {"discountedPartnerPrice": 95.0}
+    mock_adobe_client.create_preview_renewal_order.side_effect = _cascade_preview(
+        preview_with_code, "BONUS_10", "BONUS_5"
+    )
+
+    PreviewRenewalOrders(select_flex_discounts=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    mocked_select.assert_called_once_with(context)
+    mock_adobe_client.create_preview_renewal_order.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        f"{order['id']}_RENEWAL",
+        [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 5,
+                "subscriptionId": "a-sub-id",
+                "flexDiscountCodes": ["BONUS_10"],
+            }
+        ],
+        mocker.ANY,
+    )
+    mock_adobe_client.create_renewal_order.assert_not_called()
+    assert context.preview_late_renewal_order == preview_with_code
+    assert context.manual_renewal_lines["65304578CA"]["flex_discount_code"] == "BONUS_5"
+    assert context.manual_renewal_lines["65304578CA"]["renewal_unit_price"] == pytest.approx(95.0)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_preview_renewal_orders_all_codes_rejected_notifies(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_send_warning = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_warning")
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_orders.return_value = []
+    context = _renewal_context(order)
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
+        return_value={"65304578CA": [mocker.MagicMock(code="BONUS_10")]},
+    )
+    undiscounted_preview = _renewal_preview()
+    mock_adobe_client.create_preview_renewal_order.side_effect = _cascade_preview(
+        undiscounted_preview, "BONUS_10"
+    )
+
+    PreviewRenewalOrders(select_flex_discounts=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    assert context.preview_late_renewal_order == undiscounted_preview
+    assert "flex_discount_code" not in context.manual_renewal_lines["65304578CA"]
+    mocked_send_warning.assert_called_once()
+    assert "Renewal line 1: BONUS_10" in mocked_send_warning.call_args.args[1]
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+UNDISCOUNTED_RENEWAL_LINE_ITEMS = (
+    {
+        "extLineItemNumber": 1,
+        "offerId": "65304578CA01A12",
+        "quantity": 5,
+        "subscriptionId": "a-sub-id",
+    },
+)
+
+
+def test_preview_renewal_orders_without_candidates_previews_priced_renewal(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_orders.return_value = []
+    context = _renewal_context(order)
+    context.preview_late_renewal_order = _renewal_preview()
+    priced_preview = _renewal_preview()
+    mock_adobe_client.create_preview_renewal_order.return_value = priced_preview
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
+        return_value={},
+    )
+
+    PreviewRenewalOrders(select_flex_discounts=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    mock_adobe_client.create_preview_renewal_order.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        f"{order['id']}_RENEWAL",
+        list(UNDISCOUNTED_RENEWAL_LINE_ITEMS),
+        mocker.ANY,
+    )
+    mock_adobe_client.create_renewal_order.assert_not_called()
+    assert context.preview_late_renewal_order is priced_preview
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_preview_renewal_orders_selection_failure_proceeds_without_codes(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_send_exception = mocker.patch("adobe_vipm.flows.fulfillment.shared.send_exception")
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_orders.return_value = []
+    context = _renewal_context(order)
+    context.preview_late_renewal_order = _renewal_preview()
+    priced_preview = _renewal_preview()
+    mock_adobe_client.create_preview_renewal_order.return_value = priced_preview
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
+        side_effect=RuntimeError("store down"),
+    )
+
+    PreviewRenewalOrders(select_flex_discounts=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    mocked_send_exception.assert_called_once()
+    mock_adobe_client.create_preview_renewal_order.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        f"{order['id']}_RENEWAL",
+        list(UNDISCOUNTED_RENEWAL_LINE_ITEMS),
+        mocker.ANY,
+    )
+    assert context.preview_late_renewal_order is priced_preview
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_preview_renewal_orders_without_flag_does_not_select(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_orders.return_value = []
+    context = _renewal_context(order)
+    context.preview_late_renewal_order = _renewal_preview()
+    mocked_select = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts"
+    )
+
+    PreviewRenewalOrders()(mocked_client, context, mocked_next_step)  # act
+
+    mocked_select.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_submit_renewal_orders_commits_requested_code(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_order_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    ext_ref = f"{order['id']}_RENEWAL"
+    renewal_order = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        external_id=ext_ref,
+    )
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = renewal_order
+    context = _renewal_context(order)
+    context.manual_renewal_lines["65304578CA"]["flex_discount_code"] = "BONUS_10"
+    context.preview_late_renewal_order = _renewal_preview("BONUS_10")
+
+    SubmitRenewalOrders()(mocked_client, context, mocked_next_step)  # act
+
+    mock_adobe_client.create_renewal_order.assert_called_once_with(
+        "authorization-id",
+        "customer-id",
+        ext_ref,
+        [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "quantity": 5,
+                "subscriptionId": "a-sub-id",
+                "flexDiscountCodes": ["BONUS_10"],
+            }
+        ],
+    )
+    late_renewals_info = get_ordering_parameter(context.order, Param.LATE_RENEWALS_INFO.value)[
+        "value"
+    ]
+    assert late_renewals_info["renewals"]["65304578CA"]["flex_discount_code"] == "BONUS_10"
+    mocked_update_order.assert_called_once_with(
+        mocked_client, context.order_id, parameters=context.order["parameters"]
+    )
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_record_renewal_flex_discounts(mocker, order_factory, lines_factory):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch(
+        "adobe_vipm.flows.utils.flex_discounts.get_customer_discount_redemptions",
+        return_value=[],
+    )
+    order = order_factory(lines=lines_factory(quantity=5))
+    context = _renewal_context(order)
+    context.manual_renewal_lines["65304578CA"]["flex_discount_code"] = "BONUS_10"
+    context.adobe_renewal_orders = {"ORD_RENEWAL": _renewal_preview("BONUS_10")}
+
+    RecordRenewalFlexDiscounts()(mocked_client, context, mocked_next_step)  # act
+
+    assert get_flex_discounts_parameter(context.order) == [
+        {
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "a-sub-id",
+            "flexDiscountCode": ["BONUS_10"],
+        }
+    ]
+    assert get_order_redeemed_codes(context) == ["BONUS_10"]
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_record_renewal_flex_discounts_without_requested_codes(
+    mocker, order_factory, lines_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=5))
+    context = _renewal_context(order)
+    context.adobe_renewal_orders = {"ORD_RENEWAL": _renewal_preview("AUTO_APPLIED")}
+    original_order = context.order
+
+    RecordRenewalFlexDiscounts()(mocked_client, context, mocked_next_step)  # act
+
+    assert context.order is original_order
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_build_committed_renewal_line_items_keeps_request_fields_only():
+    preview_line = {
+        "extLineItemNumber": 1,
+        "offerId": "65304578CA01A12",
+        "quantity": 5,
+        "subscriptionId": "a-sub-id",
+        "deploymentId": "deployment-id",
+        "currencyCode": "EUR",
+        "status": "1000",
+        "pricing": {"discountedPartnerPrice": 90.0},
+        "flexDiscounts": [{"code": "BONUS_10", "result": "SUCCESS"}],
+    }
+
+    result = build_committed_renewal_line_items([preview_line], {"a-sub-id": "BONUS_10"})  # act
+
+    assert result == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "quantity": 5,
+            "subscriptionId": "a-sub-id",
+            "deploymentId": "deployment-id",
+            "currencyCode": "EUR",
+            "flexDiscountCodes": ["BONUS_10"],
+        }
+    ]
+
+
+def test_preview_renewal_orders_without_pricing_warns(
+    mocker, mock_adobe_client, order_factory, lines_factory, caplog
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_preview_renewal_order.return_value = _renewal_preview()
+    context = _renewal_context(order)
+    context.manual_renewal_lines["65304578CA"]["renewal_unit_price"] = 80.0
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
+        return_value={},
+    )
+
+    with caplog.at_level("WARNING"):
+        PreviewRenewalOrders(select_flex_discounts=True)(
+            mocked_client, context, mocked_next_step
+        )  # act
+
+    assert "renewal_unit_price" not in context.manual_renewal_lines["65304578CA"]
+    assert "the renewal preview did not price late-renewal sku 65304578CA" in caplog.text
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_submit_renewal_orders_persists_renewal_price(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_order_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=5))
+    ext_ref = f"{order['id']}_RENEWAL"
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        external_id=ext_ref,
+    )
+    context = _renewal_context(order)
+    context.manual_renewal_lines["65304578CA"]["renewal_unit_price"] = 90.0
+    context.preview_late_renewal_order = _renewal_preview()
+
+    SubmitRenewalOrders()(mocked_client, context, mocked_next_step)  # act
+
+    late_renewals_info = get_ordering_parameter(context.order, Param.LATE_RENEWALS_INFO.value)[
+        "value"
+    ]
+    assert late_renewals_info["renewals"]["65304578CA"]["renewal_unit_price"] == pytest.approx(90.0)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def _manual_renewal_subscription(adobe_subscription_factory):
+    return {
+        **adobe_subscription_factory(current_quantity=10, subscription_id="a-sub-id"),
+        "allowedActions": ["MANUAL_RENEWAL"],
+    }
+
+
+def test_check_manual_renewal_subscriptions_validation_does_not_persist(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_subscription_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_update_order = mocker.patch("adobe_vipm.flows.fulfillment.shared.update_order")
+    order = order_factory(lines=lines_factory(quantity=15))
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {
+        "items": [_manual_renewal_subscription(adobe_subscription_factory)]
+    }
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        new_lines=list(order["lines"]),
+    )
+
+    CheckManualRenewalSubscriptions(is_validation=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    assert context.manual_renewal_lines["65304578CA"]["renewal_qty"] == 10
+    assert [line["quantity"] for line in context.new_lines] == [5]
+    assert context.order == order
+    mocked_update_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_check_manual_renewal_subscriptions_validation_preview_error_sets_draft_error(  # noqa: WPS211
+    mocker,
+    mock_adobe_client,
+    order_factory,
+    lines_factory,
+    adobe_subscription_factory,
+    adobe_api_error_factory,
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {
+        "items": [_manual_renewal_subscription(adobe_subscription_factory)]
+    }
+    mock_adobe_client.create_renewal_order.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("9999", "internal error")
+    )
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        upsize_lines=list(order["lines"]),
+    )
+
+    CheckManualRenewalSubscriptions(is_validation=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
+        subscription_id=f"{order['id']}_RENEWAL", error="internal error"
+    )
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_not_called()
+
+
+def test_check_manual_renewal_subscriptions_validation_without_customer(
+    mocker, mock_adobe_client, order_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory()
+    context = Context(order=order, order_id=order["id"], new_lines=list(order["lines"]))
+
+    CheckManualRenewalSubscriptions(is_validation=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    mock_adobe_client.get_subscriptions_by_deployment.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_preview_renewal_orders_validation_skips_existing_order_lookup(
+    mocker, mock_adobe_client, order_factory, lines_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory(lines=lines_factory(quantity=5))
+    priced_preview = _renewal_preview()
+    priced_preview["lineItems"][0]["pricing"] = {"discountedPartnerPrice": 90.0}
+    mock_adobe_client.create_preview_renewal_order.return_value = priced_preview
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
+        return_value={},
+    )
+    context = _renewal_context(order)
+
+    PreviewRenewalOrders(select_flex_discounts=True, is_validation=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    mock_adobe_client.get_orders.assert_not_called()
+    assert context.manual_renewal_lines["65304578CA"]["renewal_unit_price"] == pytest.approx(90.0)
+    mocked_next_step.assert_called_once_with(mocked_client, context)
+
+
+def test_preview_renewal_orders_validation_error_sets_draft_error(
+    mocker, mock_adobe_client, order_factory, lines_factory, adobe_api_error_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.switch_order_to_failed"
+    )
+    order = order_factory(lines=lines_factory(quantity=5))
+    mock_adobe_client.create_preview_renewal_order.side_effect = AdobeAPIError(
+        400, adobe_api_error_factory("9999", "preview error")
+    )
+    mocker.patch(
+        "adobe_vipm.flows.fulfillment.shared.select_renewal_flex_discounts",
+        return_value={},
+    )
+    context = _renewal_context(order)
+
+    PreviewRenewalOrders(select_flex_discounts=True, is_validation=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    assert context.validation_succeeded is False
+    assert context.order["error"] == ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
+        subscription_id=f"{order['id']}_RENEWAL", error="preview error"
+    )
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_not_called()
+
+
+def test_check_manual_renewal_subscriptions_validation_without_manual_renewal(
+    mocker, mock_adobe_client, order_factory, adobe_subscription_factory
+):
+    mocked_client = mocker.MagicMock()
+    mocked_next_step = mocker.MagicMock()
+    order = order_factory()
+    mock_adobe_client.get_subscriptions_by_deployment.return_value = {
+        "items": [adobe_subscription_factory(subscription_id="a-sub-id")]
+    }
+    context = Context(
+        order=order,
+        order_id=order["id"],
+        authorization_id="authorization-id",
+        adobe_customer_id="customer-id",
+        new_lines=list(order["lines"]),
+    )
+
+    CheckManualRenewalSubscriptions(is_validation=True)(
+        mocked_client, context, mocked_next_step
+    )  # act
+
+    assert context.manual_renewal_lines == {}
+    assert context.new_lines == order["lines"]
+    mock_adobe_client.create_renewal_order.assert_not_called()
+    mocked_next_step.assert_called_once_with(mocked_client, context)

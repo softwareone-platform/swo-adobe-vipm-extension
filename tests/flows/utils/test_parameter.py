@@ -9,8 +9,10 @@ from adobe_vipm.flows.utils.parameter import (
     get_flex_discounts_parameter,
     get_fulfillment_parameter,
     get_renewal_payload,
+    get_requested_flex_discount_codes,
     get_switch_payload,
     set_flex_discounts_parameter,
+    set_renewal_flex_discounts_parameter,
     update_agreement_params_visibility,
 )
 
@@ -350,3 +352,83 @@ def test_get_flex_discounts_parameter_without_parameter():
     result = get_flex_discounts_parameter({"parameters": {Param.PHASE_FULFILLMENT.value: []}})
 
     assert result == []
+
+
+def _order_with_flex_discounts(value):
+    return {
+        "parameters": {
+            Param.PHASE_FULFILLMENT.value: [
+                {"externalId": Param.FLEXIBLE_DISCOUNTS.value, "value": value},
+            ],
+        },
+    }
+
+
+def test_set_renewal_flex_discounts_parameter_adds_applied_requested_codes():
+    new_order_entry = {
+        "extLineItemNumber": 1,
+        "offerId": "65304999CA01A12",
+        "subscriptionId": "new-sub",
+        "flexDiscountCode": ["NEW_10"],
+    }
+    order = _order_with_flex_discounts([
+        new_order_entry,
+        {"offerId": "65304578CA01A12", "subscriptionId": "sub-1", "flexDiscountCode": ["OLD"]},
+    ])
+    renewal_order = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "sub-1",
+                "flexDiscounts": [
+                    {"code": "BONUS_10", "result": "SUCCESS"},
+                    {"code": "AUTO_APPLIED", "result": "SUCCESS"},
+                ],
+            },
+            {
+                "extLineItemNumber": 2,
+                "offerId": "65304579CA01A12",
+                "subscriptionId": "sub-2",
+                "flexDiscounts": [{"code": "REFUSED", "result": "FAILURE"}],
+            },
+        ]
+    }
+
+    result = set_renewal_flex_discounts_parameter(
+        order, renewal_order, {"sub-1": "BONUS_10", "sub-2": "REFUSED"}
+    )  # act
+
+    assert get_flex_discounts_parameter(result) == [
+        new_order_entry,
+        {"offerId": "65304578CA01A12", "subscriptionId": "sub-1", "flexDiscountCode": ["BONUS_10"]},
+    ]
+
+
+def test_set_renewal_flex_discounts_parameter_without_applied_codes():
+    order = _order_with_flex_discounts(None)
+    renewal_order = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": "65304578CA01A12",
+                "subscriptionId": "sub-1",
+                "flexDiscounts": [{"code": "AUTO_APPLIED", "result": "SUCCESS"}],
+            },
+        ]
+    }
+
+    result = set_renewal_flex_discounts_parameter(order, renewal_order, {"sub-1": "BONUS_10"})
+
+    assert result is order
+
+
+def test_get_requested_flex_discount_codes_skips_renewal_entries():
+    order = _order_with_flex_discounts([
+        {"extLineItemNumber": 1, "offerId": "A", "requestedFlexDiscountCode": "NEW_10"},
+        {"offerId": "B", "subscriptionId": "sub-1", "flexDiscountCode": ["BONUS_10"]},
+    ])
+
+    result = get_requested_flex_discount_codes(order)  # act
+
+    assert result == {1: "NEW_10"}
