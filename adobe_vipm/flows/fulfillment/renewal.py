@@ -555,18 +555,20 @@ class Validate3YCRenewalFloor(Step):
     with the committed floor, and the renewal orders are created directly in
     Processing so the draft validation guard never runs for them. This step
     projects the plan onto the customer's Adobe subscriptions snapshotted by
-    SetupRenewalPlan (a renewing entry takes the plan's renewal quantity, a
-    lapsing entry stops renewing, a subscription outside the plan keeps its
-    current auto-renewal and inactive subscriptions never count), adds the
-    net-new items when the flow creates them, and validates the resulting
-    licenses and consumables aggregate with the same 3YC guard used by the
-    other order types. It runs before any mutation, so a breach fails the
-    order with nothing to reverse. The floor is enforced only for a
-    COMMITTED/ACTIVE commitment that does not end before the coterm date.
+    SetupRenewalPlan (a renewing entry takes the plan's renewal quantity, plus
+    the seats already renewed on renew now, a lapsing entry stops renewing, a
+    subscription outside the plan keeps its current auto-renewal and inactive
+    subscriptions never count), adds the net-new items when the flow creates
+    them, and validates the resulting licenses and consumables aggregate with
+    the same 3YC guard used by the other order types. It runs before any
+    mutation, so a breach fails the order with nothing to reverse. The floor is
+    enforced only for a COMMITTED/ACTIVE commitment that does not end before
+    the coterm date.
     """
 
-    def __init__(self, *, include_net_new_items=True):
+    def __init__(self, *, include_net_new_items=True, renewal_quantity_is_delta=False):
         self.include_net_new_items = include_net_new_items
+        self.renewal_quantity_is_delta = renewal_quantity_is_delta
         self.commitment_validator = Validate3YCCommitment()
 
     def __call__(self, client, context, next_step):
@@ -651,14 +653,15 @@ class Validate3YCRenewalFloor(Step):
 
     def _renewing_quantity(self, plan):
         """
-        Return the quantity a renewing plan entry will renew.
+        Return the seats a renewing plan entry will renew.
 
-        An entry already committed by a previous renewal order (renewedQuantity
-        above 0) with no requested quantity change keeps that renewedQuantity (the
-        renew-now flow submits nothing for it); otherwise the plan's
-        renewal quantity applies.
+        On renew now, add the seats already renewed to the new seats.
+        At the anniversary, use the plan's quantity. If the plan asks for
+        no change and seats are already renewed, keep the renewed seats.
         """
-        renewed_quantity = plan["snapshot"].get("renewed_quantity")
+        renewed_quantity = plan["snapshot"].get("renewed_quantity") or 0
+        if self.renewal_quantity_is_delta:
+            return renewed_quantity + plan["renewal_quantity"]
         if not plan["renewal_quantity"] and renewed_quantity:
             return renewed_quantity
         return plan["renewal_quantity"]
