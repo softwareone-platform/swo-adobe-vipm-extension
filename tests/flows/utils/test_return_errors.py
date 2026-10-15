@@ -5,6 +5,7 @@ from adobe_vipm.flows.utils.return_errors import (
     ReturnErrorAction,
     build_return_report,
     classify_return_error,
+    is_transient_error,
 )
 from adobe_vipm.flows.utils.returns import DownsizeOutcome, DownsizePlan
 
@@ -46,6 +47,22 @@ def test_classify_return_error(error, is_line_credited, can_replan, expected_act
     result = classify_return_error(error, is_line_credited=is_line_credited, can_replan=can_replan)
 
     assert result == expected_action
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (AdobeError("connection reset"), True),
+        (_api_error("1124", 500), True),
+        (_api_error("1124", 503), True),
+        (_api_error("9999", 400), False),
+        (_api_error("9999", 422), False),
+    ],
+)
+def test_is_transient_error(error, expected):
+    result = is_transient_error(error)
+
+    assert result is expected
 
 
 def test_build_return_report(downsize_plan_factory):

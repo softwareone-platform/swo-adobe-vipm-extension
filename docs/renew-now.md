@@ -11,11 +11,81 @@ at-anniversary path see `renewal.py`. For the surrounding layers and routing see
 The resulting renewing aggregate of the plan is first validated against the 3YC
 committed minimum, then the renewing subscriptions — and any net-new items — are
 validated with an Adobe `PREVIEW_RENEWAL` order and committed as an actual Adobe
-`RENEWAL` order, invoiced immediately. After the commit, previous renewal lines
-are returned, the MPT subscriptions for net-new items are created, renewed
-subscriptions have their auto-renewal normalised, lapsing subscriptions have
-their auto-renewal disabled, and the redeemed flex discount codes are recorded on
-the AirTable redemptions table.
+`RENEWAL` order, invoiced immediately. After the commit, lapsing subscriptions
+have their auto-renewal disabled, previous renewal lines are returned, the MPT
+subscriptions for net-new items are created, renewed subscriptions have their
+auto-renewal normalised, and the redeemed flex discount codes are recorded on the
+AirTable redemptions table. None of the post-commit steps fails the MPT order (see
+[Post-commit steps](#post-commit-steps)).
+
+## Retries after the commit
+
+A fulfilment attempt can stop with the MPT order still in Processing after the
+`RENEWAL` was placed, for example when Adobe answers `OPEN` (1002) or a `RETURN`
+is still pending, and the next attempt runs the pipeline from the top.
+`DetectCommittedRenewal` runs right after `StartOrderProcessing` and looks up the
+`RENEWAL` this MPT order placed (by its external reference id, the MPT order id).
+Once Adobe holds it as `OPEN` or `COMPLETE` it is invoiced, so the checks that only
+guard the commit are skipped (`SkipOnceRenewalCommitted`):
+
+- the due date (`SetupDueDate`, `VIPM0025`);
+- duplicated or existing items (`ValidateDuplicateLines`);
+- the last 24 hours before the coterm date (`ValidateRenewalWindow`);
+- the net-new order lines (`ValidateNetNewOrderLines`);
+- the 3YC committed minimum (`Validate3YCRenewalFloor`, `VIPM0034`);
+- the 14-day return window in `ResolvePreviousRenewalReturns` (`VIPM0053`): the
+  `RETURN` candidates are still resolved and the seat check still applies, but the
+  `RETURN` is submitted and Adobe decides whether it still accepts it.
+
+These checks depend on today's date or on the agreement's current state, so on a
+retry they could otherwise fail an order whose `RENEWAL` Adobe has already
+invoiced. A `RENEWAL` Adobe failed was never invoiced and does not count as
+committed: the checks still run. `PreviewRenewalNowOrder` and
+`SubmitRenewalNowOrder` reuse the order found instead of querying Adobe again, and
+`SubmitRenewalNowOrder` carries it forward even when the plan no longer yields a
+line to submit (a renewing subscription's `renewedQuantity` is populated after the
+commit, see `_is_already_renewed`).
+
+## Post-commit steps
+
+Once the `RENEWAL` is committed it is invoiced, so a Failed MPT order would only
+hide what Adobe holds. The post-commit steps therefore never fail the MPT order.
+They run in this order:
+
+1. `DisableLapsingSubscriptions` — first, so nothing else can delay it: a lapsing
+   subscription left enabled would renew a second time at the anniversary.
+2. `ReturnPreviousRenewalOrders`.
+3. `ResolveNetNewRenewedSubscriptions`, then `CreateNetNewMptSubscriptions` for the
+   subscriptions resolved.
+4. `NormalizeRenewedSubscriptions`.
+5. `HoldOnOutstandingSteps`, then `CompleteOrder`.
+
+A step that cannot complete records what is outstanding on the context and lets
+the next step run; within a step, one subscription or line failing does not stop
+the others. `HoldOnOutstandingSteps` then completes the order when nothing is
+outstanding, and otherwise stops with the MPT order in Processing. The next
+fulfilment attempt runs every step again: they are idempotent (existing `RETURN`s
+are reused, the auto-renewal `PATCH`es are re-applied, net-new subscriptions are
+re-resolved by line number), so the order completes once the outstanding step
+succeeds. What is outstanding is told apart as follows:
+
+| Outstanding | Examples | Operations notified |
+| --- | --- | --- |
+| Waiting | a `RETURN` still open | no |
+| Transient Adobe error | transport error, timeout, Adobe 5xx | no |
+| Refusal | Adobe 4xx on a `RETURN` or `PATCH`, a `RETURN` that ended failed, a committed net-new line missing or without `subscriptionId` | yes |
+
+A refusal sends one Teams error (`notify_renewal_now_outstanding_steps`) naming
+the MPT order, the Adobe orders it created (`adobeOrderIdsCreated`) and each
+refused step with Adobe's message. The notification is cached, so the same
+refusals of the same order are notified once per worker process although the
+order is retried on every cycle; a worker restart notifies them again once.
+Operations resolves the refusal in Adobe and the next attempt completes the
+order. Once the `RENEWAL` is committed the due date no longer applies, so such an
+order stays in Processing until then.
+
+A plan with no line to commit (only lapsing subscriptions) runs the same
+post-commit steps; with no `RENEWAL` committed the due date still applies to it.
 
 ## 3YC committed minimum floor (VIPM0034)
 
@@ -31,7 +101,9 @@ The floor is enforced only for a 3YC renewal, that is a customer with a
 `COMMITTED`/`ACTIVE` commitment that does not end before the coterm date;
 otherwise the step is a no-op. A breach fails the MPT order with
 `ERR_COMMITMENT_3YC_VALIDATION` (`VIPM0034`) and processing stops before any
-mutation has been made in Adobe, so there is nothing to reverse.
+mutation has been made in Adobe, so there is nothing to reverse. The check is
+skipped on a retry once the `RENEWAL` is committed (see
+[Retries after the commit](#retries-after-the-commit)).
 
 ## 14-day return window (VIPM0053)
 
@@ -68,15 +140,20 @@ placed only once the previous one has completed. Adobe lowers `renewedQuantity`
 as each `RETURN` completes, and two `RETURN`s in flight together can lose one of
 the decrements (sandbox, 29 Sep 2026: two placed 2 seconds apart left
 `renewedQuantity` at 2 instead of 0, for good, so every later attempt failed the
-seat check). A `RETURN` still open stops the pipeline with the MPT order in
-Processing, and the next fulfilment attempt carries on from there, so each
-hand-over re-reads the state from Adobe and survives a restart. A removal of
-several early renewals therefore takes one fulfilment attempt per `RETURN`.
+seat check). A `RETURN` still open stops the sequence of `RETURN`s (the other
+post-commit steps still run) and keeps the MPT order in Processing, and the next
+fulfilment attempt carries on from there, so each hand-over re-reads the state
+from Adobe and survives a restart. A removal of several early renewals therefore
+takes one fulfilment attempt per `RETURN`. A `RETURN` Adobe refuses, or that ended
+failed, stops the sequence the same way and is notified (see
+[Post-commit steps](#post-commit-steps)).
 
 `RETURN` orders created by an earlier attempt of the same MPT order are matched
 to the `RENEWAL` order and line they reference, reused as-is whatever the window
 says today, and their seats count towards the total, so retries neither return a
-line twice nor fail the seat check.
+line twice nor fail the seat check. On a retry that finds this order's `RENEWAL`
+already committed, the window is not checked for the `RETURN`s still to place
+either (see [Retries after the commit](#retries-after-the-commit)).
 
 ## Flex discount codes committed
 

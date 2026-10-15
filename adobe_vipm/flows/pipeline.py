@@ -42,6 +42,21 @@ def get_failed_step(error: Exception) -> str | None:
     return getattr(error, FAILED_STEP_ATTRIBUTE, None)
 
 
+def get_step_name(step: Step) -> str:
+    """
+    Return the name a step is reported under when it raises.
+
+    A step that wraps another one sets ``step_name`` so the wrapped step is reported.
+
+    Args:
+        step: A pipeline step.
+
+    Returns:
+        The step's ``step_name`` attribute, or its class name.
+    """
+    return getattr(step, "step_name", None) or type(step).__name__
+
+
 class Cursor:
     def __init__(self, steps, error_handler):
         self.queue = steps
@@ -59,7 +74,7 @@ class Cursor:
             # The innermost cursor annotates first, so the step that actually raised wins
             # over the outer steps the error propagates through.
             if not get_failed_step(error):
-                setattr(error, FAILED_STEP_ATTRIBUTE, type(current_step).__name__)
+                setattr(error, FAILED_STEP_ATTRIBUTE, get_step_name(current_step))
             self.error_handler(error, context, next_step)
 
 
