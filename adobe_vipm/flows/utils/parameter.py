@@ -494,10 +494,61 @@ def get_flex_discounts_parameter(order: dict) -> list[dict]:
     return list(value or [])
 
 
+def set_renewal_flex_discounts_parameter(
+    order: dict, adobe_order: dict, requested_codes: dict[str, str]
+) -> dict:
+    """
+    Add the flex discount codes a late-renewal RENEWAL order applied to the order parameter.
+
+    One entry per renewed subscription whose requested code Adobe applied
+    (result SUCCESS). The entries carry no extLineItemNumber: the RENEWAL lines
+    are numbered apart from the NEW order lines the other entries describe.
+    Entries previously recorded for the same subscriptions are replaced, so
+    the step is idempotent across retries; the other entries are kept.
+
+    Args:
+        order: MPT order.
+        adobe_order: The completed Adobe RENEWAL order.
+        requested_codes: Flex discount code requested per renewed Adobe subscription id.
+
+    Returns:
+        Updated MPT order, unchanged when the RENEWAL applied no requested code.
+    """
+    renewal_entries = []
+    for line in adobe_order["lineItems"]:
+        subscription_id = line.get("subscriptionId")
+        requested_code = requested_codes.get(subscription_id)
+        applied = _get_applied_flex_discount_codes(line, None)
+        if requested_code and requested_code in applied:
+            renewal_entries.append({
+                "offerId": line.get("offerId"),
+                "subscriptionId": subscription_id,
+                "flexDiscountCode": [requested_code],
+            })
+    if not renewal_entries:
+        return order
+    renewed_ids = {entry["subscriptionId"] for entry in renewal_entries}
+    kept_entries = [
+        entry
+        for entry in get_flex_discounts_parameter(order)
+        if entry.get("subscriptionId") not in renewed_ids
+    ]
+    return update_fulfillment_parameter_value(
+        order, Param.FLEXIBLE_DISCOUNTS.value, kept_entries + renewal_entries
+    )
+
+
 def get_requested_flex_discount_codes(order: dict) -> dict[int, str]:
-    """Read pending proposals or previously recorded codes for completion reconciliation."""
+    """
+    Read pending proposals or previously recorded codes for completion reconciliation.
+
+    Only the entries of the NEW order count; the late-renewal entries carry no
+    extLineItemNumber (see set_renewal_flex_discounts_parameter).
+    """
     requested_codes = {}
     for entry in get_flex_discounts_parameter(order):
+        if entry.get("extLineItemNumber") is None:
+            continue
         code = entry.get("requestedFlexDiscountCode")
         if not code:
             applied_codes = entry.get("flexDiscountCode") or []

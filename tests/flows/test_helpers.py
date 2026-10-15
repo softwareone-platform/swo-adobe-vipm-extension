@@ -2896,3 +2896,150 @@ def test_validate_government_transfer_government_error_validation_mode(
     )
     assert context.validation_succeeded is False
     mock_next_step.assert_not_called()
+
+
+def _late_renewal_context(order, *, excess_qty=0, renewal_unit_price=749.16, preview=None):
+    info = {
+        "line": order["lines"][0],
+        "adobe_subscription_id": "a-sub-id",
+        "offer_id": "65304578CA01A12",
+        "renewal_qty": 5,
+        "excess_qty": excess_qty,
+    }
+    if renewal_unit_price is not None:
+        info["renewal_unit_price"] = renewal_unit_price
+    return Context(
+        order=order,
+        order_id=order["id"],
+        adobe_preview_order=preview,
+        manual_renewal_lines={"65304578CA": info},
+    )
+
+
+def test_update_prices_step_prices_late_renewal_line(
+    mock_mpt_client, mock_next_step, mock_update_order, order_factory, lines_factory
+):
+    order = order_factory(lines=lines_factory(quantity=5, unit_purchase_price=1000.0))
+    context = _late_renewal_context(order)
+    step = UpdatePrices(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    line = context.order["lines"][0]
+    assert line["price"]["unitPP"] == pytest.approx(749.16)
+    assert line["item"]["externalIds"]["vendor"] == "65304578CA"
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        lines=[{"id": line["id"], "price": {"unitPP": 749.16}}],
+    )
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_blends_late_renewal_excess(  # noqa: WPS211
+    mock_mpt_client,
+    mock_next_step,
+    mock_update_order,
+    order_factory,
+    lines_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_pricing_factory,
+):
+    order = order_factory(lines=lines_factory(quantity=10, unit_purchase_price=1000.0))
+    preview = adobe_order_factory(
+        order_type=ORDER_TYPE_PREVIEW,
+        items=adobe_items_factory(quantity=5, pricing=adobe_pricing_factory()),
+    )
+    context = _late_renewal_context(order, excess_qty=5, preview=preview)
+    step = UpdatePrices(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_update_order.assert_called_once_with(
+        mock_mpt_client,
+        context.order_id,
+        lines=[{"id": order["lines"][0]["id"], "price": {"unitPP": 799.16}}],
+    )
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_late_renewal_excess_without_new_price(
+    mock_mpt_client, mock_next_step, mock_update_order, order_factory, lines_factory
+):
+    order = order_factory(lines=lines_factory(quantity=10, unit_purchase_price=799.16))
+    context = _late_renewal_context(order, excess_qty=5)
+    step = UpdatePrices(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.order["lines"][0]["price"]["unitPP"] == pytest.approx(799.16)
+    mock_update_order.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_late_renewal_without_renewal_price(
+    mock_mpt_client, mock_next_step, mock_update_order, order_factory, lines_factory
+):
+    order = order_factory(lines=lines_factory(quantity=5, unit_purchase_price=1000.0))
+    context = _late_renewal_context(order, renewal_unit_price=None)
+    step = UpdatePrices(is_validation=False)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    mock_update_order.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_late_renewal_validation_only(
+    mock_mpt_client, mock_next_step, mock_update_order, order_factory, lines_factory
+):
+    order = order_factory(lines=lines_factory(quantity=5, unit_purchase_price=1000.0))
+    line_id = order["lines"][0]["id"]
+    context = _late_renewal_context(order)
+    step = UpdatePrices(is_validation=True)
+
+    step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert context.order["lines"] == [{"id": line_id, "price": {"unitPP": 749.16}}]
+    mock_update_order.assert_not_called()
+    mock_next_step.assert_called_once_with(mock_mpt_client, context)
+
+
+def test_update_prices_step_logs_price_sources(  # noqa: WPS211
+    mock_mpt_client,
+    mock_next_step,
+    mock_update_order,
+    order_factory,
+    lines_factory,
+    adobe_order_factory,
+    adobe_items_factory,
+    adobe_pricing_factory,
+    caplog,
+):
+    renewal_line = lines_factory(quantity=10, unit_purchase_price=1000.0)[0]
+    other_line = lines_factory(
+        line_id=2, item_id=2, external_vendor_id="65322572CA", unit_purchase_price=500.0
+    )[0]
+    order = order_factory(lines=[renewal_line, other_line])
+    preview = adobe_order_factory(
+        order_type=ORDER_TYPE_PREVIEW,
+        items=adobe_items_factory(quantity=5, pricing=adobe_pricing_factory()),
+    )
+    context = _late_renewal_context(order, excess_qty=5, preview=preview)
+    context.manual_renewal_lines["65304578CA"]["flex_discount_code"] = "BONUS_10"
+    step = UpdatePrices(is_validation=False)
+
+    with caplog.at_level("INFO"):
+        step(mock_mpt_client, context, mock_next_step)  # act
+
+    assert (
+        f"price of line {renewal_line['id']} (sku 65304578CA, quantity 10) updated from "
+        "1000.0 to 799.16, from blend of PREVIEW_RENEWAL subscription a-sub-id offer "
+        "65304578CA01A12 quantity 5 at 749.16 (flex discount BONUS_10) and PREVIEW line 1 "
+        "offer 65304578CA01A12 quantity 5 at 849.16 (flex discount none)"
+    ) in caplog.text
+    assert (
+        f"price of line {other_line['id']} (sku 65322572CA, quantity 170) unchanged at 500.0: "
+        "no preview prices it"
+    ) in caplog.text

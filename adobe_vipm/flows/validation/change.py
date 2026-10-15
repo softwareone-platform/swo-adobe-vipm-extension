@@ -4,6 +4,8 @@ from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.return_submission import plan_downsize_line
 from adobe_vipm.flows.fulfillment.shared import (
+    CheckManualRenewalSubscriptions,
+    PreviewRenewalOrders,
     SelectFlexDiscounts,
     SetOrUpdateCotermDate,
     ValidateRenewalWindow,
@@ -67,9 +69,11 @@ def validate_change_order(client, order):
         ValidateNoStagedRenewal(),
         ValidateSkuAvailability(is_validation=True),
         ValidateDownsizes(),
+        CheckManualRenewalSubscriptions(is_validation=True),
         Validate3YCCommitment(is_validation=True),
         SelectFlexDiscounts(),
         GetPreviewOrder(),
+        PreviewRenewalOrders(select_flex_discounts=True, is_validation=True),
         UpdatePrices(is_validation=True),
     )
     context = Context(order=order)

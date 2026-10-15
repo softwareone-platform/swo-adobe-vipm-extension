@@ -545,6 +545,13 @@ ERR_RENEWAL_NOW_FLEX_DISCOUNT_REFUSED = ValidationError(
     "so nothing was renewed or invoiced: {refusals}.",
 )
 
+ERR_RENEWAL_PLANNED_DATE_PASSED = ValidationError(
+    "VIPM0057",
+    "This renewal plan was built for the {planned_date} renewal date, but the customer's "
+    "renewal date is now {coterm_date}, so nothing was changed. Please re-open the renewal "
+    "wizard to plan the next renewal.",
+)
+
 
 class AssetStatus(StrEnum):
     """MPT asset statuses."""

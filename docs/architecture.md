@@ -52,7 +52,12 @@ extension (`pyproject.toml` `[project.entry-points."swo.mpt.ext"]` ->
    idempotent-write session, which also retries PATCH; Adobe ignores a renewal
    quantity while auto-renewal is off), and a failure there is reported rather
    than failing the order, since the SWITCH cannot be undone; the at-anniversary
-   flow in `renewal.py` enables auto-renewal, stores the plan's discount codes and
+   flow in `renewal.py` first fails the order with `VIPM0057`, before any Adobe
+   change, when the payload's `plannedCotermDate` (the coterm date the wizard
+   built the plan for) differs from Adobe's current coterm date
+   (`ValidatePlannedCotermDate`: an order still processing after the anniversary
+   would otherwise apply the plan to the following year's renewal; a payload
+   without the date skips the check), then enables auto-renewal, stores the plan's discount codes and
    confirms them with Adobe before it creates any net-new scheduled subscription
    (`ValidateRenewalDiscountCodes`: Adobe validates codes only through
    `PREVIEW_RENEWAL`, so an automated preview judges the codes stored on the
@@ -115,6 +120,39 @@ preview did not apply is dropped from its line and operations are warned; the
 order is not failed. Auto-applied reusable discounts are not echoed back. The
 applied codes follow the same `flexibleDiscounts` pending/complete lifecycle and
 redemption recording described above.
+
+Change-order late renewals (lines `CheckManualRenewalSubscriptions` moves to an
+Adobe `RENEWAL` because the subscription is in `MANUAL_RENEWAL`) get the same
+automatic best-code choice, restricted to store codes whose
+`applicable_order_types` include `RENEWAL` (or are blank); `INTRO` codes never
+apply. The renewal is first probed without codes, so an offer Adobe cannot renew
+is still diverted to a new order; `PreviewRenewalOrders` then proposes the best
+candidate on each `PREVIEW_RENEWAL` line and cascades on rejection, and
+`SubmitRenewalOrders` commits only the requested code the preview applied,
+re-shaping each preview line into a request line (no `pricing` or
+`flexDiscounts`). That preview is priced (`fetch-price`), and `UpdatePrices`,
+which runs after both previews, prices each late-renewal line at its
+`discountedPartnerPrice`; a line with an excess quantity gets the
+quantity-weighted blend of the renewal price and its new-line price, rounded to
+2 decimals, and is only repriced when both prices are known, so a retry never
+re-blends it. The accepted code and the renewal price are kept on the line's
+`lateRenewalsInfo` entry (`flex_discount_code`, `renewal_unit_price`) across
+retries, and `RecordRenewalFlexDiscounts` adds the
+applied codes to `flexibleDiscounts` as entries without `extLineItemNumber`
+(the `RENEWAL` lines are numbered apart from the `NEW` order lines), from which
+the redemptions are recorded. An excess quantity above the subscription's
+current quantity stays a new line and gets `NEW` codes.
+
+Change-order validation runs the same split and priced renewal preview in
+validation mode (`is_validation=True`), so the draft shows the renewal price and
+discount the order will be fulfilled with: the split is always read from Adobe
+and never persisted to `lateRenewalsInfo`, no existing `RENEWAL` order is looked
+up, and a failed renewal preview is a draft error (`VIPM0043`) instead of a
+failed order. Each validation of a draft with new or upsize lines therefore
+reads the customer's subscriptions and runs one or more `PREVIEW_RENEWAL` calls
+when a line is in `MANUAL_RENEWAL`. Fulfillment reads the state again and stays
+authoritative if the subscription changed in between. Transfer and
+reseller-transfer late renewals do not select renewal codes.
 
 ## Major components
 

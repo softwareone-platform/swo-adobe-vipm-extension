@@ -28,6 +28,7 @@ from mpt_extension_sdk.mpt_http.wrap_http_error import MPTError as SDKMPTError
 
 from adobe_vipm.adobe.client import get_adobe_client
 from adobe_vipm.adobe.constants import (
+    FLEX_DISCOUNT_RESULT_SUCCESS,
     MANUAL_RENEWAL_ACTION,
     ORDER_STATUS_DESCRIPTION,
     ORDER_TYPE_PREVIEW_RENEWAL,
@@ -37,6 +38,7 @@ from adobe_vipm.adobe.constants import (
     AdobeOrderStatus,
     AdobeSubscriptionStatus,
 )
+from adobe_vipm.adobe.dataclasses import FlexDiscountCascade
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeError
 from adobe_vipm.adobe.mixins.errors import AdobeCreatePreviewError
 from adobe_vipm.adobe.utils import (
@@ -95,13 +97,17 @@ from adobe_vipm.flows.utils import (
     split_phone_number,
 )
 from adobe_vipm.flows.utils.customer import has_coterm_date, set_agency_type
-from adobe_vipm.flows.utils.flex_discounts import select_flex_discounts
+from adobe_vipm.flows.utils.flex_discounts import (
+    select_flex_discounts,
+    select_renewal_flex_discounts,
+)
 from adobe_vipm.flows.utils.parameter import (
     get_ordering_parameter,
     get_requested_flex_discount_codes,
     set_adobe_order_ids_created_parameter,
     set_flex_discounts_parameter,
     set_ordering_parameter_error,
+    set_renewal_flex_discounts_parameter,
     update_agreement_params_visibility,
     update_ordering_parameter_value,
 )
@@ -661,10 +667,22 @@ def get_existing_renewal_order(adobe_client, context, ext_ref) -> dict | None:
     return None
 
 
-def build_renewal_line_items(manual_renewal_lines: dict) -> list[dict]:
-    """Build PREVIEW_RENEWAL/RENEWAL line items from manual renewal lines."""
+def build_renewal_line_items(
+    manual_renewal_lines: dict, proposed_codes: dict[str, str] | None = None
+) -> list[dict]:
+    """
+    Build PREVIEW_RENEWAL/RENEWAL line items from manual renewal lines.
+
+    Args:
+        manual_renewal_lines: Late-renewal info per partial SKU (context.manual_renewal_lines).
+        proposed_codes: Flex discount code to propose per partial SKU, None for none.
+
+    Returns:
+        list[dict]: The line items, numbered from 1 in the order of the renewal lines.
+    """
+    proposed_codes = proposed_codes or {}
     line_items = []
-    for line_item, info in enumerate(manual_renewal_lines.values(), start=1):
+    for line_item, (sku, info) in enumerate(manual_renewal_lines.items(), start=1):
         entry = {
             "extLineItemNumber": line_item,
             "offerId": info["offer_id"],
@@ -674,8 +692,112 @@ def build_renewal_line_items(manual_renewal_lines: dict) -> list[dict]:
         if info.get("deployment_id"):
             entry["deploymentId"] = info["deployment_id"]
             entry["currencyCode"] = info["currency_code"]
+        if proposed_codes.get(sku):
+            entry["flexDiscountCodes"] = [proposed_codes[sku]]
         line_items.append(entry)
     return line_items
+
+
+def get_renewal_line_numbers(manual_renewal_lines: dict) -> dict[str, int]:
+    """Return the extLineItemNumber of each late-renewal SKU (see build_renewal_line_items)."""
+    return {sku: number for number, sku in enumerate(manual_renewal_lines, start=1)}
+
+
+def get_requested_renewal_codes(manual_renewal_lines: dict) -> dict[str, str]:
+    """Return the flex discount code requested per renewed Adobe subscription id."""
+    return {
+        info["adobe_subscription_id"]: info["flex_discount_code"]
+        for info in manual_renewal_lines.values()
+        if info.get("flex_discount_code")
+    }
+
+
+# Fields a RENEWAL order request line takes (see build_committed_renewal_line_items).
+RENEWAL_REQUEST_LINE_FIELDS = (
+    "extLineItemNumber",
+    "offerId",
+    "quantity",
+    "subscriptionId",
+    "deploymentId",
+    "currencyCode",
+)
+
+
+def build_committed_renewal_line_items(
+    preview_line_items: list[dict], requested_codes: dict[str, str]
+) -> list[dict]:
+    """
+    Turn PREVIEW_RENEWAL lines into RENEWAL lines, committing only the requested confirmed code.
+
+    The preview lines are response-shaped (pricing, flexDiscounts results), so
+    each is re-shaped into a request line with the fields a RENEWAL takes:
+    line number, offer, quantity, renewed subscription and, for a deployment,
+    its id and currency. A line carries flexDiscountCodes only when the order
+    requested a code for the subscription it renews and the preview applied it
+    (result SUCCESS); a discount Adobe auto-applied on its own is not echoed
+    back, since Adobe applies it itself and echoing it could put two codes on
+    the line.
+
+    Args:
+        preview_line_items: Line items of the PREVIEW_RENEWAL response.
+        requested_codes: Flex discount code requested per renewed Adobe subscription id.
+
+    Returns:
+        list[dict]: The RENEWAL line items.
+    """
+    line_items = []
+    for preview_line_item in preview_line_items:
+        line_item = {
+            key: preview_line_item[key]
+            for key in RENEWAL_REQUEST_LINE_FIELDS
+            if preview_line_item.get(key) is not None
+        }
+        requested_code = requested_codes.get(preview_line_item.get("subscriptionId"))
+        confirmed_codes = {
+            flex_discount.get("code")
+            for flex_discount in preview_line_item.get("flexDiscounts") or []
+            if flex_discount.get("result") == FLEX_DISCOUNT_RESULT_SUCCESS
+        }
+        if requested_code and requested_code in confirmed_codes:
+            line_item["flexDiscountCodes"] = [requested_code]
+        elif requested_code:
+            logger.warning(
+                "Flex discounts: requested code %s on renewal line %s was not confirmed by "
+                "the preview, committing the line without it",
+                requested_code,
+                preview_line_item.get("extLineItemNumber"),
+            )
+        line_items.append(line_item)
+    return line_items
+
+
+def fail_manual_renewal_preview(client, context, error, *, is_validation: bool) -> None:
+    """
+    Report a failed late-renewal preview: a draft error on validation, a failed order otherwise.
+
+    Args:
+        client: MPT client.
+        context: Order processing context.
+        error: The Adobe error the renewal preview raised.
+        is_validation: Whether the order is a draft being validated.
+    """
+    error_data = ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
+        subscription_id=f"{context.order_id}_RENEWAL",
+        error=getattr(error, "message", str(error)),
+    )
+    if is_validation:
+        context.validation_succeeded = False
+        context.order = set_order_error(context.order, error_data)
+        return
+    switch_order_to_failed(client, context.order, error_data)
+
+
+def get_late_renewals_info(context) -> dict:
+    """Return the lateRenewalsInfo parameter payload of the context's renewal/diverted split."""
+    return {
+        "renewals": context.manual_renewal_lines,
+        "diverted": context.diverted_renewal_lines,
+    }
 
 
 # Adobe stamps MANUAL_RENEWAL on inactive (status 1004) subscriptions, including one-time
@@ -1042,37 +1164,50 @@ class GetPreviewOrder(Step):
                     ERR_VIPM_UNHANDLED_EXCEPTION.to_dict(error=str(error)),
                 )
                 return
-            self._notify_undiscounted_lines(context)
+            notify_undiscounted_lines(
+                context, context.flex_discount_selection, context.flex_discount_rejections
+            )
 
         next_step(mpt_client, context)
 
-    def _notify_undiscounted_lines(self, context):
-        """Signal the lines that lost every candidate discount at Adobe's preview."""
-        undiscounted = {
-            line_number: codes
-            for line_number, codes in context.flex_discount_rejections.items()
-            if line_number not in context.flex_discount_selection
-        }
-        if not undiscounted:
-            return
-        details = "\n".join(
-            f"- Line {line_number}: {', '.join(codes)}"
-            for line_number, codes in sorted(undiscounted.items())
-        )
-        logger.warning(
-            "%s: Adobe rejected every flex discount candidate of line(s) %s, "
-            "they proceed undiscounted",
-            context,
-            sorted(undiscounted),
-        )
-        send_warning(
-            f"Flex discounts not applied on order {context.order_id}",
-            "Adobe's preview rejected every candidate discount code of the following "
-            "lines, which proceed undiscounted (codes tried, in order):\n"
-            f"{details}\n"
-            f"- Customer ID: {context.adobe_customer_id or '-'}\n"
-            f"- Order ID: {context.order_id}\n",
-        )
+
+def notify_undiscounted_lines(
+    context, selection: dict[int, str], rejections: dict[int, list[str]], label: str = "Line"
+) -> None:
+    """
+    Signal the lines that lost every candidate discount at Adobe's preview.
+
+    Args:
+        context: Order processing context.
+        selection: Code accepted per Adobe line number.
+        rejections: Codes Adobe rejected per Adobe line number, in order.
+        label: How the lines are named in the notification.
+    """
+    undiscounted = {
+        line_number: codes
+        for line_number, codes in rejections.items()
+        if line_number not in selection
+    }
+    if not undiscounted:
+        return
+    details = "\n".join(
+        f"- {label} {line_number}: {', '.join(codes)}"
+        for line_number, codes in sorted(undiscounted.items())
+    )
+    logger.warning(
+        "%s: Adobe rejected every flex discount candidate of %s(s) %s, they proceed undiscounted",
+        context,
+        label.lower(),
+        sorted(undiscounted),
+    )
+    send_warning(
+        f"Flex discounts not applied on order {context.order_id}",
+        "Adobe's preview rejected every candidate discount code of the following "
+        "lines, which proceed undiscounted (codes tried, in order):\n"
+        f"{details}\n"
+        f"- Customer ID: {context.adobe_customer_id or '-'}\n"
+        f"- Order ID: {context.order_id}\n",
+    )
 
 
 class SubmitNewOrder(Step):
@@ -1580,10 +1715,21 @@ class CheckManualRenewalSubscriptions(Step):
       - The renewal quantity is set to min(requested_qty, adobe current_qty).
       - Any excess quantity (requested > current) is re-added as a new line for
         a regular purchase order.
+
+    On validation (is_validation) the split is always computed from Adobe and
+    never persisted, so the draft is priced as the order will be fulfilled; a
+    failed renewal preview is reported as a draft error.
     """
+
+    def __init__(self, *, is_validation: bool = False):
+        self.is_validation = is_validation
 
     def __call__(self, client, context, next_step):
         """Identify MANUAL_RENEWAL subscriptions and split them from normal flow."""
+        if self.is_validation:
+            self._validate(client, context, next_step)
+            return
+
         stored = self._load_late_renewals_info(context)
         if stored:
             logger.info(
@@ -1598,18 +1744,26 @@ class CheckManualRenewalSubscriptions(Step):
                     self._isolate_unsupported_renewals(context)
                 except AdobeAPIError as error:
                     logger.exception("%s: manual renewal preview failed", context)
-                    switch_order_to_failed(
-                        client,
-                        context.order,
-                        ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
-                            subscription_id=f"{context.order_id}_RENEWAL",
-                            error=error.message,
-                        ),
-                    )
+                    fail_manual_renewal_preview(client, context, error, is_validation=False)
                     return
             if context.manual_renewal_lines or context.diverted_renewal_lines:
                 self._persist_late_renewals_info(client, context)
 
+        next_step(client, context)
+
+    def _validate(self, client, context, next_step):
+        """Split the late-renewal lines of a draft from Adobe, without persisting the split."""
+        if not context.adobe_customer_id or not (context.upsize_lines or context.new_lines):
+            next_step(client, context)
+            return
+        try:
+            self._compute_from_adobe(context)
+            if context.manual_renewal_lines:
+                self._isolate_unsupported_renewals(context)
+        except AdobeAPIError as error:
+            logger.exception("%s: manual renewal preview failed", context)
+            fail_manual_renewal_preview(client, context, error, is_validation=True)
+            return
         next_step(client, context)
 
     def _load_late_renewals_info(self, context) -> dict | None:
@@ -1637,14 +1791,10 @@ class CheckManualRenewalSubscriptions(Step):
 
     def _persist_late_renewals_info(self, client, context) -> None:
         """Serialize the post-isolation renewal/diverted split and save to ordering parameter."""
-        payload = {
-            "renewals": context.manual_renewal_lines,
-            "diverted": context.diverted_renewal_lines,
-        }
         context.order = update_ordering_parameter_value(
             context.order,
             Param.LATE_RENEWALS_INFO.value,
-            payload,
+            get_late_renewals_info(context),
         )
         update_order(client, context.order_id, parameters=context.order["parameters"])
         logger.info(
@@ -1851,6 +2001,28 @@ class CheckManualRenewalSubscriptions(Step):
         )
 
 
+class RecordRenewalFlexDiscounts(Step):
+    """
+    Record the flex discount codes the completed late-renewal RENEWAL order applied.
+
+    The codes PreviewRenewalOrders requested per renewed subscription (kept on
+    the late-renewal info) that the RENEWAL applied are added to the order's
+    flexibleDiscounts parameter, next to the codes of the NEW order, so the
+    redemptions are recorded from it. Runs after SubmitNewOrder, which rewrites
+    the parameter from the NEW order, and before CompleteOrder, which persists it.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Record the flex discount codes of the completed RENEWAL order."""
+        requested_codes = get_requested_renewal_codes(context.manual_renewal_lines)
+        if requested_codes:
+            for adobe_order in context.adobe_renewal_orders.values():
+                context.order = set_renewal_flex_discounts_parameter(
+                    context.order, adobe_order, requested_codes
+                )
+        next_step(client, context)
+
+
 class SetupRenewalPlan(Step):
     """
     Resolve the renewal payload against the customer's Adobe subscriptions.
@@ -1980,7 +2152,30 @@ class SetupRenewalPlan(Step):
 
 
 class PreviewRenewalOrders(Step):
-    """Preview renewal orders."""
+    """
+    Preview renewal orders.
+
+    With select_flex_discounts, the step always previews the renewal itself,
+    priced by Adobe: the price of each line (renewal_unit_price on its
+    late-renewal info) is what UpdatePrices charges the late-renewal line at.
+    The late-renewal lines also get the automatic best-code choice of the new
+    lines: the store's Renewal codes eligible for
+    each line are ranked (see select_renewal_flex_discounts), the best one is
+    proposed on the PREVIEW_RENEWAL line and a code Adobe rejects is replaced by
+    the next one. The accepted code of each line is left on its late-renewal
+    info (flex_discount_code) for SubmitRenewalOrders to commit. The selection
+    is best effort, as for the new lines: a store failure is notified and the
+    renewal proceeds without a proposed code. CheckManualRenewalSubscriptions
+    probes the renewal without codes first, so an offer Adobe can't renew is
+    still told apart from a refused code.
+
+    On validation (is_validation) no RENEWAL order can exist yet, so it is not
+    looked up, and a failed preview is reported as a draft error.
+    """
+
+    def __init__(self, *, select_flex_discounts: bool = False, is_validation: bool = False):
+        self.select_flex_discounts = select_flex_discounts
+        self.is_validation = is_validation
 
     def __call__(self, client, context, next_step):
         """Preview renewal orders."""
@@ -1991,47 +2186,130 @@ class PreviewRenewalOrders(Step):
         adobe_client = get_adobe_client()
         ext_ref = f"{context.order_id}_RENEWAL"
 
-        existing_order = get_existing_renewal_order(adobe_client, context, ext_ref)
+        existing_order = (
+            None
+            if self.is_validation
+            else get_existing_renewal_order(adobe_client, context, ext_ref)
+        )
         if existing_order:
             logger.info("%s: renewal order %s already exists", context, existing_order["orderId"])
             next_step(client, context)
             return
 
+        candidates_by_sku = self._select_candidates(context) if self.select_flex_discounts else {}
         # CheckManualRenewalSubscriptions usually validates and stores the survivors' preview
-        # already; only build it here when it wasn't produced upstream.
-        if context.preview_late_renewal_order is None:
+        # already (unpriced); only build it here when it wasn't produced upstream or when
+        # the priced preview, with the proposed codes, is required.
+        if self.select_flex_discounts or context.preview_late_renewal_order is None:
             try:
                 context.preview_late_renewal_order = self._validate_preview(
-                    adobe_client, context, ext_ref
+                    adobe_client, context, ext_ref, candidates_by_sku
                 )
-            except AdobeAPIError as error:
+            except AdobeError as error:
                 logger.exception("%s: preview renewal failed", context)
-                switch_order_to_failed(
-                    client,
-                    context.order,
-                    ERR_MANUAL_RENEWAL_PREVIEW_FAILED.to_dict(
-                        subscription_id=ext_ref,
-                        error=error.message,
-                    ),
+                fail_manual_renewal_preview(
+                    client, context, error, is_validation=self.is_validation
                 )
                 return
 
         next_step(client, context)
 
-    def _validate_preview(self, adobe_client, context, ext_ref):
+    def _select_candidates(self, context) -> dict:
+        """Return the ranked flex discount candidates per late-renewal SKU, {} on failure."""
+        for info in context.manual_renewal_lines.values():
+            info.pop("flex_discount_code", None)
+            info.pop("renewal_unit_price", None)
+        try:
+            candidates_by_sku = select_renewal_flex_discounts(context)
+        except Exception:
+            logger.exception(
+                "%s: failed to select the late-renewal flex discount candidates", context
+            )
+            send_exception(
+                f"Error selecting the flex discount candidates of order {context.order_id}",
+                "The flexible discount store could not be read or the candidates of the "
+                "late-renewal lines could not be ranked; the renewal proceeds without a "
+                "proposed discount and Adobe's preview decides the price:\n"
+                f"- Customer ID: {context.adobe_customer_id or '-'}\n"
+                f"- Order ID: {context.order_id}\n",
+            )
+            return {}
+        for sku, candidates in candidates_by_sku.items():
+            logger.info(
+                "%s: flex discount candidates for late-renewal sku %s: %s",
+                context,
+                sku,
+                ", ".join(candidate.code for candidate in candidates),
+            )
+        if not candidates_by_sku:
+            logger.info("%s: no flex discount candidates for the late-renewal lines", context)
+        return candidates_by_sku
+
+    def _validate_preview(self, adobe_client, context, ext_ref, candidates_by_sku=None):
         """Validate all subscriptions via a single PREVIEW_RENEWAL request."""
-        line_items = self._build_line_items(context)
-        preview = adobe_client.create_renewal_order(
-            context.authorization_id,
-            context.adobe_customer_id,
-            ext_ref,
-            line_items,
-            order_type=ORDER_TYPE_PREVIEW_RENEWAL,
-        )
+        if self.select_flex_discounts:
+            preview = self._preview_with_codes(
+                adobe_client, context, ext_ref, candidates_by_sku or {}
+            )
+        else:
+            preview = adobe_client.create_renewal_order(
+                context.authorization_id,
+                context.adobe_customer_id,
+                ext_ref,
+                self._build_line_items(context),
+                order_type=ORDER_TYPE_PREVIEW_RENEWAL,
+            )
         logger.info(
             "%s: preview renewal validated for %s subscription(s)",
             context,
-            len(line_items),
+            len(context.manual_renewal_lines),
+        )
+        return preview
+
+    def _preview_with_codes(self, adobe_client, context, ext_ref, candidates_by_sku):
+        """Preview the priced renewal with the best candidate per line, cascading on rejection."""
+        line_numbers = get_renewal_line_numbers(context.manual_renewal_lines)
+        codes_by_sku = {
+            sku: [candidate.code for candidate in candidates]
+            for sku, candidates in candidates_by_sku.items()
+        }
+        cascade = FlexDiscountCascade(
+            candidates={line_numbers[sku]: list(codes) for sku, codes in codes_by_sku.items()}
+        )
+        preview = adobe_client.create_preview_renewal_order(
+            context.authorization_id,
+            context.adobe_customer_id,
+            ext_ref,
+            build_renewal_line_items(
+                context.manual_renewal_lines,
+                {sku: codes[0] for sku, codes in codes_by_sku.items()},
+            ),
+            cascade,
+        )
+        prices = {
+            line_item.get("extLineItemNumber"): line_item["pricing"]["discountedPartnerPrice"]
+            for line_item in preview["lineItems"]
+            if (line_item.get("pricing") or {}).get("discountedPartnerPrice") is not None
+        }
+        for sku, info in context.manual_renewal_lines.items():
+            code = cascade.selection.get(line_numbers[sku])
+            if code:
+                info["flex_discount_code"] = code
+            price = prices.get(line_numbers[sku])
+            if price is not None:
+                info["renewal_unit_price"] = price
+            else:
+                logger.warning(
+                    "%s: the renewal preview did not price late-renewal sku %s", context, sku
+                )
+        logger.info(
+            "%s: late-renewal flex discounts selected=%s rejected=%s",
+            context,
+            cascade.selection,
+            cascade.rejections,
+        )
+        notify_undiscounted_lines(
+            context, cascade.selection, cascade.rejections, label="Renewal line"
         )
         return preview
 
@@ -2095,6 +2373,18 @@ class SubmitRenewalOrders(Step):
             return None
 
         context.order = set_adobe_order_ids_created_parameter(context, [order["orderId"]])
+        if any(
+            info.get("flex_discount_code") or info.get("renewal_unit_price") is not None
+            for info in context.manual_renewal_lines.values()
+        ):
+            # Keep the requested codes and the renewal prices across retries: once the
+            # RENEWAL exists the preview is not repeated, yet UpdatePrices reprices the
+            # lines and the codes are recorded on completion.
+            context.order = update_ordering_parameter_value(
+                context.order,
+                Param.LATE_RENEWALS_INFO.value,
+                get_late_renewals_info(context),
+            )
         update_order(
             client,
             context.order_id,
@@ -2109,7 +2399,10 @@ class SubmitRenewalOrders(Step):
                 context.authorization_id,
                 context.adobe_customer_id,
                 ext_ref,
-                preview["lineItems"],
+                build_committed_renewal_line_items(
+                    preview["lineItems"],
+                    get_requested_renewal_codes(context.manual_renewal_lines),
+                ),
             )
             logger.info("%s: renewal order %s created", context, order.get("orderId"))
         except AdobeAPIError as error:

@@ -12,6 +12,7 @@ from adobe_vipm.adobe.constants import (
 )
 from adobe_vipm.adobe.errors import AdobeAPIError, AdobeTransportError
 from adobe_vipm.flows.constants import (
+    ERR_RENEWAL_PLANNED_DATE_PASSED,
     ITEM_EXTERNAL_ID_EARLY_RENEWAL_NO_CHANGE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_DISABLE,
     TEMPLATE_CONFIGURATION_AUTORENEWAL_ENABLE,
@@ -32,6 +33,7 @@ from adobe_vipm.flows.fulfillment.renewal import (
     UpdateRenewalSubscriptions,
     Validate3YCRenewalFloor,
     ValidateNetNewOrderLines,
+    ValidatePlannedCotermDate,
     ValidateRenewalDiscountCodes,
     fulfill_renewal_order,
     record_renewal_change,
@@ -50,7 +52,7 @@ from adobe_vipm.flows.fulfillment.shared import (
 )
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Cursor
-from adobe_vipm.flows.utils import get_fulfillment_parameter
+from adobe_vipm.flows.utils import get_fulfillment_parameter, set_coterm_date
 from adobe_vipm.flows.utils.flex_discounts import get_order_redeemed_codes
 
 pytestmark = pytest.mark.usefixtures("mock_adobe_config")
@@ -1863,6 +1865,7 @@ def test_fulfill_renewal_order(mocker):
         SetOrUpdateCotermDate,
         UpdateAgreementParamsVisibility,
         ValidateRenewalWindow,
+        ValidatePlannedCotermDate,
         SetupRenewalPlan,
         ValidateNetNewOrderLines,
         Validate3YCRenewalFloor,
@@ -1885,9 +1888,9 @@ def test_fulfill_renewal_order(mocker):
     actual_steps = [type(step) for step in pipeline_args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[9].include_net_new_items is True
-    assert pipeline_args[9].renewal_quantity_is_delta is False
-    assert pipeline_args[18].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[10].include_net_new_items is True
+    assert pipeline_args[10].renewal_quantity_is_delta is False
+    assert pipeline_args[19].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 
@@ -1910,7 +1913,73 @@ def test_fulfill_renewal_order_configuration_order_uses_configuration_template(
 
     pipeline_args = mocked_pipeline_ctor.mock_calls[0].args
     assert pipeline_args[1].template_name == expected_template
-    assert pipeline_args[18].template_name == expected_template
+    assert pipeline_args[19].template_name == expected_template
+
+
+@pytest.fixture
+def planned_renewal_order(order_factory, order_parameters_factory, renewal_payload):
+    def factory(planned_date, coterm_date):
+        payload = {**renewal_payload}
+        if planned_date is not None:
+            payload["plannedCotermDate"] = planned_date
+        order = order_factory(
+            order_type="Change",
+            order_parameters=order_parameters_factory(renewal_payload=payload),
+        )
+        return set_coterm_date(order, coterm_date) if coterm_date else order
+
+    return factory
+
+
+def test_validate_planned_coterm_date_step_fails_when_the_anniversary_has_moved_on(
+    mocker, mock_mpt_client, planned_renewal_order
+):
+    order = planned_renewal_order("2026-10-20", "2027-10-20")
+    context = Context(order=order, order_id=order["id"])
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ValidatePlannedCotermDate()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_called_once_with(
+        mock_mpt_client,
+        order,
+        ERR_RENEWAL_PLANNED_DATE_PASSED.to_dict(
+            planned_date="2026-10-20",
+            coterm_date="2027-10-20",
+        ),
+    )
+    mocked_next_step.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("planned_date", "coterm_date"),
+    [
+        ("2026-10-20", "2026-10-20"),
+        ("2026-10-20T00:00:00", "2026-10-20"),
+        (None, "2027-10-20"),
+        ("", "2027-10-20"),
+        ("2026-10-20", None),
+    ],
+)
+def test_validate_planned_coterm_date_step_continues(
+    mocker, mock_mpt_client, planned_renewal_order, planned_date, coterm_date
+):
+    order = planned_renewal_order(planned_date, coterm_date)
+    context = Context(order=order, order_id=order["id"])
+    mocked_switch_to_failed = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.switch_order_to_failed"
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = ValidatePlannedCotermDate()
+
+    step(mock_mpt_client, context, mocked_next_step)  # act
+
+    mocked_switch_to_failed.assert_not_called()
+    mocked_next_step.assert_called_once_with(mock_mpt_client, context)
 
 
 def test_validate_net_new_order_lines_step_passes_when_all_matched(
