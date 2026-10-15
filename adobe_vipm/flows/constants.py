@@ -128,7 +128,6 @@ VALID_GOVERNMENT_AGENCY_TYPES = {GOVERNMENT_AGENCY_TYPE_FEDERAL, GOVERNMENT_AGEN
 CANCELLATION_WINDOW_DAYS = 14
 EARLY_RENEWAL_LOOKBACK_DAYS = 30
 GLOBAL_SUFFIX = "_global"
-LAST_TWO_WEEKS_DAYS = 13
 NUMBER_OF_DAYS_ALLOW_DOWNSIZE_IF_3YC = 365
 
 ADOBE_ERR_MSG = "The `{title}` is not valid: {details}."
@@ -326,30 +325,11 @@ FAKE_CUSTOMERS_IDS = {
     MARKET_SEGMENT_LARGE_GOVERNMENT_AGENCY: "1234567890GOV",
 }
 
-ERR_INVALID_DOWNSIZE_QUANTITY = ValidationError(
-    "VIPM0019", "Could not find suitable returnable orders for all items.\n{messages}"
-)
-
-ERR_INVALID_ITEM_DOWNSIZE_QUANTITY_ANY_COMBINATION = " or any combination of these values,"
-
-ERR_INVALID_ITEM_DOWNSIZE_QUANTITY = (
-    "Cannot reduce item `{item}` quantity by {delta}. "
-    "Please reduce the quantity by {available_quantities},{any_combination} or wait until {date} "
-    "when there are no returnable orders to modify your renewal quantity."
-)
-
 ERR_INVALID_TERMINATION_ORDER_QUANTITY = ValidationError(
     "VIPM0033",
     "Cannot return the entire quantity of all subscriptions in this order. "
     "Consider disabling auto-renewal for these subscriptions "
     "instead using a Configuration Order.",
-)
-
-ERR_INVALID_ITEM_DOWNSIZE_FIRST_PO = (
-    "Cannot reduce item `{item}` quantity by {delta} and there "
-    "is only one returnable order which would reduce the quantity to zero. "
-    "Consider placing a Termination order for this subscription instead and "
-    "place a new order for {quantity} licenses."
 )
 
 ERR_DOWNSIZE_MINIMUM_3YC_LICENSES = (
@@ -519,6 +499,18 @@ ERR_RENEWAL_RETURN_WINDOW_CLOSED = ValidationError(
     "VIPM0053",
     "The previous renewal order {order_id} of subscription {subscription_id} was placed on "
     "{creation_date}, outside the {window_days}-day return window, so it cannot be returned.",
+)
+
+ERR_PARTIAL_RETURN_INCOMPLETE = ValidationError(
+    "VIPM0055",
+    "The downsize could not be completed after part of it was already returned to Adobe. "
+    "Returned lines were not undone. {details}. Error: {error}.",
+)
+
+ERR_RETURN_VIOLATES_3YC = ValidationError(
+    "VIPM0056",
+    "Adobe rejected the return because it would reduce the three-year commitment below its "
+    "minimum commit quantity: {error}.",
 )
 
 ERR_EARLY_RENEWAL_IN_PROGRESS = ValidationError(

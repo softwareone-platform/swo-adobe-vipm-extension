@@ -1,22 +1,19 @@
-import pytest
-from freezegun import freeze_time
-
 from adobe_vipm.adobe.constants import AdobeErrorCode, AdobeOrderStatus
-from adobe_vipm.adobe.dataclasses import ReturnableOrderInfo
 from adobe_vipm.adobe.errors import AdobeAPIError
 from adobe_vipm.flows.constants import (
     ERR_INVALID_RENEWAL_STATE,
-    ERR_NO_RETURABLE_ERRORS_FOUND,
     TEMPLATE_NAME_CHANGE,
 )
 from adobe_vipm.flows.context import Context
 from adobe_vipm.flows.fulfillment.change import (
-    GetReturnableOrders,
     UpdateRenewalQuantities,
     UpdateRenewalQuantitiesDownsizes,
     ValidateDuplicateLines,
-    ValidateReturnableOrders,
     fulfill_change_order,
+)
+from adobe_vipm.flows.fulfillment.downsize_returns import (
+    PlanDownsizeReturns,
+    SubmitReturnAllocations,
 )
 from adobe_vipm.flows.fulfillment.renewal import RecordDiscountRedemptions
 from adobe_vipm.flows.fulfillment.shared import (
@@ -35,7 +32,6 @@ from adobe_vipm.flows.fulfillment.shared import (
     StartOrderProcessing,
     SubmitNewOrder,
     SubmitRenewalOrders,
-    SubmitReturnOrders,
     SyncAgreement,
     UpdateAgreementParamsVisibility,
     ValidateRenewalWindow,
@@ -46,278 +42,6 @@ from adobe_vipm.flows.helpers import (
     Validate3YCCommitment,
     ValidateSkuAvailability,
 )
-
-
-@pytest.mark.parametrize(
-    "return_orders",
-    [
-        None,
-        [{"orderId": "a"}, {"orderId": "b"}],
-    ],
-)
-@freeze_time("2024-11-09 12:30:00")
-def test_get_returnable_orders_step(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-    return_orders,
-):
-    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
-    adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
-    adobe_order_1 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(
-            quantity=1,
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-        ),
-    )
-    adobe_order_2 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(
-            quantity=2,
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-        ),
-    )
-    adobe_order_3 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(
-            quantity=4,
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-        ),
-    )
-    ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
-    )
-    ret_info_2 = ReturnableOrderInfo(
-        adobe_order_2, adobe_order_2["lineItems"][0], adobe_order_2["lineItems"][0]["quantity"]
-    )
-    ret_info_3 = ReturnableOrderInfo(
-        adobe_order_3, adobe_order_3["lineItems"][0], adobe_order_3["lineItems"][0]["quantity"]
-    )
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
-        ret_info_1,
-        ret_info_2,
-        ret_info_3,
-    ]
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={sku: return_orders},
-    )
-    step = GetReturnableOrders()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert context.adobe_returnable_orders[sku] == (ret_info_3,)
-    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        "6158e1cf0e4414a9b3a06d123969fdNA",
-        context.adobe_customer["cotermDate"],
-        return_orders=return_orders,
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_get_returnable_orders_step_no_returnable_order(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
-    adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = []
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={sku: []},
-    )
-    step = GetReturnableOrders()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert sku not in context.adobe_returnable_orders
-    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        "6158e1cf0e4414a9b3a06d123969fdNA",
-        context.adobe_customer["cotermDate"],
-        return_orders=[],
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2024-11-09 12:30:00")
-def test_get_returnable_orders_step_quantity_mismatch(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    order = order_factory(lines=lines_factory(quantity=7, old_quantity=16))
-    adobe_customer = adobe_customer_factory(coterm_date="2025-10-09")
-    adobe_order_1 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(
-            quantity=1,
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-        ),
-    )
-    adobe_order_2 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(
-            quantity=2,
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-        ),
-    )
-    adobe_order_3 = adobe_order_factory(
-        order_type="NEW",
-        items=adobe_items_factory(
-            quantity=4,
-            subscription_id="6158e1cf0e4414a9b3a06d123969fdNA",
-        ),
-    )
-    ret_info_1 = ReturnableOrderInfo(
-        adobe_order_1, adobe_order_1["lineItems"][0], adobe_order_1["lineItems"][0]["quantity"]
-    )
-    ret_info_2 = ReturnableOrderInfo(
-        adobe_order_2, adobe_order_2["lineItems"][0], adobe_order_2["lineItems"][0]["quantity"]
-    )
-    ret_info_3 = ReturnableOrderInfo(
-        adobe_order_3, adobe_order_3["lineItems"][0], adobe_order_3["lineItems"][0]["quantity"]
-    )
-    sku = order["lines"][0]["item"]["externalIds"]["vendor"]
-    mock_adobe_client.get_returnable_orders_by_subscription_id.return_value = [
-        ret_info_1,
-        ret_info_2,
-        ret_info_3,
-    ]
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={},
-    )
-    step = GetReturnableOrders()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert context.adobe_returnable_orders[sku] is None
-    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_called_once_with(
-        context.authorization_id,
-        context.adobe_customer_id,
-        "6158e1cf0e4414a9b3a06d123969fdNA",
-        context.adobe_customer["cotermDate"],
-        return_orders=None,
-    )
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-@freeze_time("2025-02-14 12:30:00")
-def test_get_returnable_orders_step_last_two_weeks(
-    mocker,
-    mock_adobe_client,
-    order_factory,
-    lines_factory,
-    adobe_customer_factory,
-    adobe_order_factory,
-    adobe_items_factory,
-):
-    order = order_factory(lines=lines_factory(quantity=3, old_quantity=7))
-    adobe_customer = adobe_customer_factory(coterm_date="2025-02-20")
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    context = Context(
-        order=order,
-        authorization_id=order["authorization"]["id"],
-        downsize_lines=order["lines"],
-        adobe_customer_id=adobe_customer["customerId"],
-        adobe_customer=adobe_customer,
-        adobe_return_orders={},
-    )
-    step = GetReturnableOrders()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    assert context.adobe_returnable_orders == {}
-    mock_adobe_client.get_returnable_orders_by_subscription_id.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_validate_returnable_orders_step(mocker, order_factory):
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
-    )
-    context = Context(
-        order=order_factory(),
-        adobe_returnable_orders={
-            "sku1": (mocker.MagicMock(),),
-            "sku2": (mocker.MagicMock(),),
-        },
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    step = ValidateReturnableOrders()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    mocked_switch_to_failed.assert_not_called()
-    mocked_next_step.assert_called_once_with(mocked_client, context)
-
-
-def test_validate_returnable_orders_step_invalid(mocker, order_factory):
-    mocked_switch_to_failed = mocker.patch(
-        "adobe_vipm.flows.fulfillment.change.switch_order_to_failed",
-    )
-    context = Context(
-        order=order_factory(),
-        adobe_returnable_orders={
-            "sku1": (mocker.MagicMock(),),
-            "sku2": None,
-        },
-    )
-    mocked_client = mocker.MagicMock()
-    mocked_next_step = mocker.MagicMock()
-    step = ValidateReturnableOrders()
-
-    step(mocked_client, context, mocked_next_step)  # act
-
-    mocked_switch_to_failed.assert_called_once_with(
-        mocked_client,
-        context.order,
-        ERR_NO_RETURABLE_ERRORS_FOUND.to_dict(
-            non_returnable_skus="sku2",
-        ),
-    )
-    mocked_next_step.assert_not_called()
 
 
 def test_update_renewal_quantities_step(
@@ -464,10 +188,9 @@ def test_fulfill_change_order(mocker):
         ValidateRenewalWindow,
         ValidateSkuAvailability,
         GetReturnOrders,
-        GetReturnableOrders,
-        ValidateReturnableOrders,
         CheckManualRenewalSubscriptions,
         Validate3YCCommitment,
+        PlanDownsizeReturns,
         SelectFlexDiscounts,
         GetPreviewOrder,
         UpdatePrices,
@@ -475,7 +198,7 @@ def test_fulfill_change_order(mocker):
         SubmitRenewalOrders,
         SubmitNewOrder,
         UpdateRenewalQuantities,
-        SubmitReturnOrders,
+        SubmitReturnAllocations,
         UpdateRenewalQuantitiesDownsizes,
         CreateOrUpdateAssets,
         CreateOrUpdateSubscriptions,
@@ -490,7 +213,7 @@ def test_fulfill_change_order(mocker):
     actual_steps = [type(step) for step in mocked_pipeline_ctor.mock_calls[0].args]
     assert actual_steps == expected_steps
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
-    assert pipeline_args[24].template_name == TEMPLATE_NAME_CHANGE
+    assert pipeline_args[23].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
 

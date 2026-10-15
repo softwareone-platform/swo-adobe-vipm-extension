@@ -1,3 +1,5 @@
+import logging
+
 from mpt_extension_sdk.mpt_http.utils import find_first
 
 from adobe_vipm.adobe.constants import (
@@ -6,10 +8,17 @@ from adobe_vipm.adobe.constants import (
     REGEX_SANITIZE_FIRST_LAST_NAME,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def is_flex_discount_applied(flex_discount: dict) -> bool:
-    """Return whether Adobe applied a line flex discount (a missing result counts as SUCCESS)."""
-    return flex_discount.get("result", FLEX_DISCOUNT_RESULT_SUCCESS) == FLEX_DISCOUNT_RESULT_SUCCESS
+    """Return whether Adobe applied a line flex discount.
+
+    Only an explicit ``result: SUCCESS`` confirms it; a missing result is not a
+    confirmation, so a code Adobe did not report on is never committed or recorded
+    as redeemed.
+    """
+    return flex_discount.get("result") == FLEX_DISCOUNT_RESULT_SUCCESS
 
 
 def get_item_by_partial_sku(line_items, sku):
@@ -47,6 +56,53 @@ def get_item_by_subcription_id(line_items, subscription_id):
         lambda line_item: line_item["subscriptionId"] == subscription_id,
         line_items,
         default={},
+    )
+
+
+def get_line_remaining_quantity(line_item: dict) -> int:
+    """
+    Get the quantity of an Adobe NEW or RENEWAL order line item that can still be returned.
+
+    Adobe reports it as ``remainingQuantity``: the line quantity minus the returns and
+    mid-term switch plan cancellations placed against the line. When the field is missing
+    (environment without the partial returns release) the whole line quantity is used.
+
+    Args:
+        line_item: Adobe order line item.
+
+    Returns:
+        The returnable quantity of the line item.
+    """
+    remaining_quantity = line_item.get("remainingQuantity")
+    if remaining_quantity is None:
+        logger.warning(
+            "Adobe line item %s (offer %s) has no remainingQuantity, using its quantity %s",
+            line_item.get("extLineItemNumber"),
+            line_item.get("offerId"),
+            line_item["quantity"],
+        )
+        return line_item["quantity"]
+    return remaining_quantity
+
+
+def get_returned_quantity(return_orders: list[dict], order_id: str, line_item: dict) -> int:
+    """
+    Get the quantity that some RETURN orders returned from a line item of an order.
+
+    Args:
+        return_orders: Adobe RETURN orders.
+        order_id: Adobe identifier of the returned NEW or RENEWAL order.
+        line_item: Line item of the returned order.
+
+    Returns:
+        The total quantity returned from the line item.
+    """
+    return sum(
+        return_line["quantity"]
+        for return_order in return_orders
+        if return_order["referenceOrderId"] == order_id
+        for return_line in return_order["lineItems"]
+        if return_line["extLineItemNumber"] == line_item["extLineItemNumber"]
     )
 
 

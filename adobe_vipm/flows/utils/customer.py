@@ -6,7 +6,6 @@ from adobe_vipm.adobe.constants import (
     OfferType,
 )
 from adobe_vipm.flows.constants import Param
-from adobe_vipm.flows.utils.date import is_within_last_two_weeks
 from adobe_vipm.flows.utils.market_segment import is_large_government_agency_type
 from adobe_vipm.flows.utils.parameter import (
     get_fulfillment_parameter,
@@ -195,19 +194,6 @@ def set_global_customer(order: dict, global_sales_enabled: str) -> dict:
     )
     global_customer_param["value"] = [global_sales_enabled]
     return updated_order
-
-
-def is_within_coterm_window(customer: dict) -> bool:
-    """
-    Checks if the current date is within the last two weeks before the cotermination date.
-
-    Args:
-        customer: Adobe customer.
-
-    Returns:
-        True if within the window, False otherwise
-    """
-    return customer.get("cotermDate") and is_within_last_two_weeks(customer["cotermDate"])
 
 
 def has_coterm_date(customer: dict) -> bool:
