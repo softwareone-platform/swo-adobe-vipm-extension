@@ -45,9 +45,11 @@ class Context:
     renewal_net_new_subscriptions: dict = field(default_factory=dict)
     renewal_created_net_new_subscriptions: dict = field(default_factory=dict)
     renewal_applied_changes: list = field(default_factory=list)
+    renewal_outstanding_steps: list = field(default_factory=list)
     renewal_confirmed_flex_discount_codes: set | None = None
     adobe_customer_subscriptions: list = field(default_factory=list)
     preview_renewal_order: dict | None = None
+    existing_renewal_order: dict | None = None
     adobe_renewal_order: dict | None = None
     flex_discount_candidates: dict = field(default_factory=dict)
     flex_discount_selection: dict = field(default_factory=dict)

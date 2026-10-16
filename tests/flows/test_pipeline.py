@@ -86,6 +86,23 @@ def test_pipeline_records_the_step_that_raised(mocker, mock_mpt_client):
     assert get_failed_step(cv.value) == "FailingStep"
 
 
+def test_pipeline_records_the_step_name_of_a_wrapping_step(mocker, mock_mpt_client):
+    class WrappingStep(Step):
+        step_name = "WrappedStep"
+
+        # BL
+        def __call__(self, client, context, next_step):
+            raise ValueError("boom")
+
+    # BL
+    pipeline = Pipeline(WrappingStep())
+
+    with pytest.raises(ValueError) as cv:
+        pipeline.run(mock_mpt_client, mocker.MagicMock())
+
+    assert get_failed_step(cv.value) == "WrappedStep"
+
+
 def test_get_failed_step_returns_none_outside_a_pipeline():
     result = get_failed_step(ValueError("boom"))
 

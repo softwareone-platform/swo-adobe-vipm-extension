@@ -1,7 +1,7 @@
 import datetime as dt
 import functools
 
-from adobe_vipm.notifications import send_exception
+from adobe_vipm.notifications import send_error, send_exception
 
 
 @functools.cache
@@ -23,6 +23,31 @@ def notify_unhandled_exception_in_teams(
         f"An unhandled exception has been raised while performing {process} "
         f"of the order **{order_id}**{failed_step}:\n\n"
         f"```{traceback}```",
+    )
+
+
+@functools.cache
+def notify_renewal_now_outstanding_steps(
+    order_id: str, adobe_order_ids: str, outstanding: str
+) -> None:
+    """
+    Notify that a renew-now order with a committed RENEWAL has steps Adobe refused.
+
+    Cached, so the same refusals of the same order are notified once per worker process
+    even though the order is retried on every fulfillment cycle.
+
+    Args:
+        order_id: MPT order id.
+        adobe_order_ids: Adobe order ids the MPT order created, comma separated.
+        outstanding: One line per outstanding step, naming the step and Adobe's error.
+    """
+    send_error(
+        "Renew-now order needs attention",
+        f"The renew-now order **{order_id}** has committed its Adobe RENEWAL, which is "
+        f"already invoiced (Adobe orders: {adobe_order_ids}), but Adobe refused these "
+        "steps. The order stays in Processing, retries them on every fulfillment cycle "
+        "and completes once they succeed:\n\n"
+        f"{outstanding}",
     )
 
 
