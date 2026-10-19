@@ -19,6 +19,7 @@ from adobe_vipm.flows.utils import (
     set_order_error,
     split_phone_number,
 )
+from adobe_vipm.flows.utils.notification import notify_renewal_now_outstanding_steps
 
 
 def test_notify_unhandled_exception_in_teams(mocker):
@@ -32,6 +33,34 @@ def test_notify_unhandled_exception_in_teams(mocker):
         "of the order **ORD-0000**:\n\n"
         "```exception-traceback```",
     )
+
+
+def test_notify_renewal_now_outstanding_steps(mocker):
+    notify_renewal_now_outstanding_steps.cache_clear()
+    mocked_send_error = mocker.patch("adobe_vipm.flows.utils.notification.send_error")
+
+    notify_renewal_now_outstanding_steps(  # act
+        "ORD-0000", "ADOBE-RENEWAL-001", "- **ReturnPreviousRenewalOrders**: return refused"
+    )
+
+    mocked_send_error.assert_called_once_with(
+        "Renew-now order needs attention",
+        "The renew-now order **ORD-0000** has committed its Adobe RENEWAL, which is "
+        "already invoiced (Adobe orders: ADOBE-RENEWAL-001), but Adobe refused these "
+        "steps. The order stays in Processing, retries them on every fulfillment cycle "
+        "and completes once they succeed:\n\n"
+        "- **ReturnPreviousRenewalOrders**: return refused",
+    )
+
+
+def test_notify_renewal_now_outstanding_steps_notifies_the_same_refusals_once(mocker):
+    notify_renewal_now_outstanding_steps.cache_clear()
+    mocked_send_error = mocker.patch("adobe_vipm.flows.utils.notification.send_error")
+    notify_renewal_now_outstanding_steps("ORD-0001", "ADOBE-RENEWAL-001", "- refused")
+
+    notify_renewal_now_outstanding_steps("ORD-0001", "ADOBE-RENEWAL-001", "- refused")  # act
+
+    mocked_send_error.assert_called_once()
 
 
 def test_notify_agreement_unhandled_exception_in_teams(mocker):

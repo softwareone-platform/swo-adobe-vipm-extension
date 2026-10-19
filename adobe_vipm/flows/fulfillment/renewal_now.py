@@ -52,7 +52,7 @@ from adobe_vipm.adobe.constants import (
     UNRECOVERABLE_ORDER_STATUSES,
     AdobeOrderStatus,
 )
-from adobe_vipm.adobe.errors import AdobeAPIError
+from adobe_vipm.adobe.errors import AdobeAPIError, AdobeHttpError, AdobeTransportError
 from adobe_vipm.adobe.utils import get_line_remaining_quantity, is_flex_discount_applied
 from adobe_vipm.flows.constants import (
     ERR_RENEWAL_NET_NEW_FAILED,
@@ -93,9 +93,106 @@ from adobe_vipm.flows.fulfillment.shared import (
 from adobe_vipm.flows.helpers import SetupContext
 from adobe_vipm.flows.pipeline import Pipeline, Step
 from adobe_vipm.flows.utils.deployment import get_deployment_id
-from adobe_vipm.flows.utils.parameter import set_adobe_order_ids_created_parameter
+from adobe_vipm.flows.utils.notification import notify_renewal_now_outstanding_steps
+from adobe_vipm.flows.utils.parameter import (
+    get_adobe_order_ids_created_parameter,
+    set_adobe_order_ids_created_parameter,
+)
+from adobe_vipm.flows.utils.return_errors import is_transient_error
 
 logger = logging.getLogger(__name__)
+
+# Statuses of a RENEWAL order Adobe has accepted: it is invoiced and cannot be undone.
+COMMITTED_RENEWAL_STATUSES = frozenset((AdobeOrderStatus.OPEN, AdobeOrderStatus.COMPLETE))
+
+# Adobe failures a post-commit step holds on instead of propagating: an HTTP error
+# response (an Adobe API error or not) or a call that got no response at all.
+POST_COMMIT_ADOBE_ERRORS = (AdobeHttpError, AdobeTransportError)
+
+
+def _is_renewal_committed(context):
+    """Return True once Adobe holds this MPT order's RENEWAL as OPEN or COMPLETE."""
+    existing_order = context.existing_renewal_order
+    return existing_order is not None and existing_order["status"] in COMMITTED_RENEWAL_STATUSES
+
+
+class DetectCommittedRenewal(Step):
+    """
+    Look up, once per fulfillment attempt, the RENEWAL this MPT order already placed.
+
+    The RENEWAL is found by its external reference id (the MPT order id). Once
+    Adobe holds it as OPEN or COMPLETE it is invoiced, so the checks that guard
+    the commit (SkipOnceRenewalCommitted) no longer apply: they depend on today's
+    date or on the agreement's current state, and on a retry they would fail an
+    order Adobe has already invoiced. The order found is stored on the context
+    for PreviewRenewalNowOrder and SubmitRenewalNowOrder, so they reuse it
+    instead of querying Adobe again.
+    """
+
+    def __call__(self, client, context, next_step):
+        """Look up the RENEWAL this MPT order already placed."""
+        context.existing_renewal_order = get_existing_renewal_order(
+            get_adobe_client(), context, context.order_id
+        )
+        if _is_renewal_committed(context):
+            logger.info(
+                "%s: renewal order %s already committed (status %s), pre-commit checks skipped",
+                context,
+                context.existing_renewal_order["orderId"],
+                context.existing_renewal_order["status"],
+            )
+        next_step(client, context)
+
+
+class SkipOnceRenewalCommitted(Step):
+    """
+    Run a pre-commit check only while this MPT order's RENEWAL is not committed yet.
+
+    The wrapped step guards the commit: it fails the MPT order while nothing has
+    been placed in Adobe, so there is nothing to reverse. Once DetectCommittedRenewal
+    finds the RENEWAL committed, the step is skipped and the order carries on to
+    the post-commit steps.
+    """
+
+    def __init__(self, step):
+        self.step = step
+        # Report the wrapped step, not this wrapper, when it raises (see get_step_name).
+        self.step_name = type(step).__name__
+
+    def __call__(self, client, context, next_step):
+        """Run the wrapped step unless the RENEWAL is already committed."""
+        if _is_renewal_committed(context):
+            logger.info("%s: renewal order already committed, %s skipped", context, self.step_name)
+            next_step(client, context)
+            return
+
+        self.step(client, context, next_step)
+
+
+def _hold_step(context, step, message, *, notify):
+    """
+    Record a post-commit step that could not complete in this attempt.
+
+    The MPT order is not failed: HoldOnOutstandingSteps keeps it in Processing and
+    the next fulfillment attempt runs the step again (the post-commit steps are
+    idempotent). ``notify`` marks a refusal operations has to look at, as opposed to
+    a transient error or a RETURN still pending, which only need another attempt.
+    """
+    context.renewal_outstanding_steps.append({
+        "step": type(step).__name__,
+        "message": message,
+        "notify": notify,
+    })
+
+
+def _hold_step_on_error(context, step, error_message, cause):
+    """Record a post-commit step Adobe failed; only a refusal (not a 5xx) is notified."""
+    _hold_step(context, step, error_message, notify=not is_transient_error(cause))
+
+
+def _get_error_message(error):
+    """Return the Adobe error message, or the exception text when it carries none."""
+    return getattr(error, "message", None) or str(error)
 
 
 def _is_already_renewed(plan):
@@ -336,11 +433,21 @@ class PreviewRenewalNowOrder(Step):
     The preview is the authoritative source of discount-code and SKU
     validation and runs before SubmitRenewalNowOrder commits anything, so a
     rejected basket fails the order with nothing to reverse. Skipped once
-    the real RENEWAL order already exists (idempotent retries).
+    the real RENEWAL order already exists (idempotent retries), as found by
+    DetectCommittedRenewal.
     """
 
     def __call__(self, client, context, next_step):
         """Validate the renew-now plan with a PREVIEW_RENEWAL order."""
+        if context.existing_renewal_order:
+            logger.info(
+                "%s: renewal order %s already exists",
+                context,
+                context.existing_renewal_order["orderId"],
+            )
+            next_step(client, context)
+            return
+
         line_items = _build_renewing_line_items(context)
         if not line_items:
             logger.info("%s: no renewing subscriptions, skipping renewal preview", context)
@@ -355,11 +462,6 @@ class PreviewRenewalNowOrder(Step):
     def _validate_preview(self, client, context, line_items):
         """Validate the plan via PREVIEW_RENEWAL, returning False on a confirmed failure."""
         adobe_client = get_adobe_client()
-        existing_order = get_existing_renewal_order(adobe_client, context, context.order_id)
-        if existing_order:
-            logger.info("%s: renewal order %s already exists", context, existing_order["orderId"])
-            return True
-
         try:
             context.preview_renewal_order = adobe_client.create_renewal_order(
                 context.authorization_id,
@@ -457,8 +559,12 @@ class SubmitRenewalNowOrder(Step):
     Uses the line items validated by PreviewRenewalNowOrder — the renewal
     counterpart of how the PURCHASE flow turns its PREVIEW order into a NEW
     order. It is invoiced immediately and takes effect now. The existing
-    Adobe RENEWAL order is detected by its external reference id, so a
-    retry of this step is idempotent.
+    Adobe RENEWAL order is detected by its external reference id
+    (DetectCommittedRenewal), so a retry of this step is idempotent. It is
+    reused even when the plan no longer has a line to submit: after the
+    commit a renewing subscription's renewedQuantity is populated, so on a
+    retry it drops out of the submitted lines (see _is_already_renewed),
+    while the existing order still has to be waited on and carried forward.
 
     Net-new lines (offerId + quantity, no subscriptionId) ride this same order;
     their MPT subscriptions are created afterwards by
@@ -467,20 +573,20 @@ class SubmitRenewalNowOrder(Step):
 
     def __call__(self, client, context, next_step):
         """Commit the renew-now plan as an actual Adobe RENEWAL order."""
-        if not _build_renewing_line_items(context):
-            next_step(client, context)
-            return
-
-        adobe_client = get_adobe_client()
-        existing_order = get_existing_renewal_order(adobe_client, context, context.order_id)
-        if not existing_order and context.preview_renewal_order is None:
-            logger.info("%s: no renewal preview available, skipping renewal order", context)
-            next_step(client, context)
-            return
-
-        order = existing_order or self._submit_order(client, context, adobe_client)
+        order = context.existing_renewal_order
         if order is None:
-            return
+            if not _build_renewing_line_items(context):
+                next_step(client, context)
+                return
+
+            if context.preview_renewal_order is None:
+                logger.info("%s: no renewal preview available, skipping renewal order", context)
+                next_step(client, context)
+                return
+
+            order = self._submit_order(client, context, get_adobe_client())
+            if order is None:
+                return
 
         if not self._is_order_complete(client, context, order):
             return
@@ -578,8 +684,16 @@ class ResolvePreviousRenewalReturns(Step):
     a Failed order. RETURNs already created by a previous attempt of this MPT
     order are matched to the order and line they reference, reused as-is whatever
     the window says today, and their seats count towards the total, so retries
-    neither return a line twice nor fail the seat check. The resolved candidates
-    (one per RETURN) are stored on the context for ReturnPreviousRenewalOrders.
+    neither return a line twice nor fail the seat check. Once this order's RENEWAL
+    is committed (a retry, see DetectCommittedRenewal) neither check fails the
+    order: failing would leave the invoiced RENEWAL behind a Failed order. The
+    window is no longer checked, so the RETURN is submitted and Adobe decides
+    whether it still accepts it; seats that do not add up (for instance a
+    renewedQuantity left too high by a lost decrement, see
+    ReturnPreviousRenewalOrders) are notified to operations through
+    HoldOnOutstandingSteps, while the lines found are still returned. The
+    resolved candidates (one per RETURN) are stored on the context for
+    ReturnPreviousRenewalOrders.
     """
 
     def __call__(self, client, context, next_step):
@@ -647,6 +761,10 @@ class ResolvePreviousRenewalReturns(Step):
             subscription_id, lines, existing_returns, seats_to_return - covered
         )
         covered += sum(candidate["quantity"] for candidate in new_returns)
+        if _is_renewal_committed(context):
+            if covered < seats_to_return:
+                self._hold_history_mismatch(context, subscription_id, covered, seats_to_return)
+            return reused + new_returns
         if covered < seats_to_return:
             self._fail_history_mismatch(client, context, subscription_id, covered, seats_to_return)
             return None
@@ -659,6 +777,18 @@ class ResolvePreviousRenewalReturns(Step):
     def _fail_history_mismatch(  # noqa: WPS211
         self, client, context, subscription_id, found, expected
     ):
+        switch_order_to_failed(
+            client,
+            context.order,
+            self._history_mismatch_error(context, subscription_id, found, expected),
+        )
+
+    def _hold_history_mismatch(self, context, subscription_id, found, expected):
+        """Notify a seat mismatch found once the RENEWAL is invoiced, keeping the order."""
+        error = self._history_mismatch_error(context, subscription_id, found, expected)
+        _hold_step(context, self, error["message"], notify=True)
+
+    def _history_mismatch_error(self, context, subscription_id, found, expected):
         logger.warning(
             "%s: the renewal orders of subscription %s hold %s of its %s early-renewed seats",
             context,
@@ -666,15 +796,11 @@ class ResolvePreviousRenewalReturns(Step):
             found,
             expected,
         )
-        switch_order_to_failed(
-            client,
-            context.order,
-            ERR_RENEWAL_RETURN_FAILED.to_dict(
-                subscription_id=subscription_id,
-                error=(
-                    "the renewal history does not add up: its RENEWAL orders hold "
-                    f"{found} of its {expected} early-renewed seats"
-                ),
+        return ERR_RENEWAL_RETURN_FAILED.to_dict(
+            subscription_id=subscription_id,
+            error=(
+                "the renewal history does not add up: its RENEWAL orders hold "
+                f"{found} of its {expected} early-renewed seats"
             ),
         )
 
@@ -813,9 +939,12 @@ class ReturnPreviousRenewalOrders(Step):
     renewedQuantity as each RETURN completes, and two RETURNs in flight at once
     can lose one of the two decrements (seen on the sandbox, 29 Sep 2026), which
     leaves renewedQuantity too high for good and fails the seat check of every
-    later attempt. A RETURN still OPEN therefore stops the pipeline, keeping
-    the MPT order in Processing, and the next fulfillment attempt picks the
-    sequence up where it left off.
+    later attempt. A RETURN still OPEN therefore stops the sequence: the
+    other post-commit steps still run, the MPT order is kept in Processing
+    (HoldOnOutstandingSteps), and the next fulfillment attempt picks the
+    sequence up where it left off. A RETURN Adobe refuses, or that ended
+    failed, stops the sequence the same way and is notified to operations;
+    the MPT order is never failed here, since the RENEWAL is already invoiced.
 
     Idempotent: a RETURN order already created by this MPT order is carried
     by the candidate and reused instead of re-submitted, and the id of a new
@@ -831,17 +960,43 @@ class ReturnPreviousRenewalOrders(Step):
             return_order = candidate["return_order"] or self._create_return_order(
                 client, adobe_client, context, candidate
             )
-            if return_order is None:
-                return
-            if return_order["status"] != AdobeOrderStatus.COMPLETE:
-                logger.info(
-                    "%s: return order %s still pending; the next return waits for it",
-                    context,
-                    return_order["orderId"],
-                )
-                return
+            if return_order is None or not self._is_return_complete(context, return_order):
+                break
 
         next_step(client, context)
+
+    def _is_return_complete(self, context, return_order):
+        """Return True once the RETURN completed, holding this step otherwise."""
+        status = return_order["status"]
+        if status == AdobeOrderStatus.COMPLETE:
+            return True
+        if status == AdobeOrderStatus.OPEN:
+            logger.info(
+                "%s: return order %s still pending; the next return waits for it",
+                context,
+                return_order["orderId"],
+            )
+            _hold_step(
+                context,
+                self,
+                f"return order {return_order['orderId']} is still pending",
+                notify=False,
+            )
+            return False
+
+        logger.warning(
+            "%s: return order %s ended with status %s",
+            context,
+            return_order["orderId"],
+            status,
+        )
+        _hold_step(
+            context,
+            self,
+            f"return order {return_order['orderId']} ended with Adobe status {status}",
+            notify=True,
+        )
+        return False
 
     def _is_already_returned(self, context, candidate):
         if candidate["return_order"] or get_line_remaining_quantity(candidate["returning_line"]):
@@ -868,7 +1023,7 @@ class ReturnPreviousRenewalOrders(Step):
                 returning_line.get("deploymentId"),
                 quantity=get_line_remaining_quantity(returning_line),
             )
-        except AdobeAPIError as error:
+        except POST_COMMIT_ADOBE_ERRORS as error:
             logger.warning(
                 "%s: failed to return renewal order %s for subscription %s: %s",
                 context,
@@ -876,14 +1031,11 @@ class ReturnPreviousRenewalOrders(Step):
                 subscription_id,
                 error,
             )
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_RENEWAL_RETURN_FAILED.to_dict(
-                    subscription_id=subscription_id,
-                    error=error.message,
-                ),
-            )
+            error_message = ERR_RENEWAL_RETURN_FAILED.to_dict(
+                subscription_id=subscription_id,
+                error=_get_error_message(error),
+            )["message"]
+            _hold_step_on_error(context, self, error_message, error)
             return None
 
         logger.info(
@@ -915,7 +1067,9 @@ class NormalizeRenewedSubscriptions(Step):
     never the full customer subscription list — so it can't clobber an
     auto-renewal preference a customer explicitly turned off on another
     subscription. Idempotent: a retry re-fetches and reapplies the same
-    value.
+    value. An Adobe error on one subscription does not stop the others: it
+    is recorded for HoldOnOutstandingSteps, which keeps the MPT order in
+    Processing so the next attempt applies it again.
 
     Renewing subscriptions already committed in a previous renewal order
     with no requested quantity change (see _is_already_renewed) are
@@ -932,12 +1086,11 @@ class NormalizeRenewedSubscriptions(Step):
             if plan["renew"] and not _is_already_renewed(plan)
         ]
         for plan in renewing:
-            if not self._normalize(client, adobe_client, context, plan):
-                return
+            self._normalize(adobe_client, context, plan)
 
         next_step(client, context)
 
-    def _normalize(self, client, adobe_client, context, plan):
+    def _normalize(self, adobe_client, context, plan):
         subscription_id = plan["subscription_id"]
         try:
             subscription = adobe_client.get_subscription(
@@ -945,8 +1098,9 @@ class NormalizeRenewedSubscriptions(Step):
                 context.adobe_customer_id,
                 subscription_id,
             )
-        except AdobeAPIError as error:
-            return self._fail(client, context, subscription_id, error)
+        except POST_COMMIT_ADOBE_ERRORS as error:
+            self._hold(context, subscription_id, error)
+            return
 
         renewed_quantity = subscription.get(Param.RENEWED_QUANTITY.value)
         if not renewed_quantity:
@@ -955,7 +1109,7 @@ class NormalizeRenewedSubscriptions(Step):
                 context,
                 subscription_id,
             )
-            return True
+            return
 
         try:
             adobe_client.update_subscription(
@@ -965,8 +1119,9 @@ class NormalizeRenewedSubscriptions(Step):
                 auto_renewal=True,
                 quantity=renewed_quantity,
             )
-        except AdobeAPIError as error:
-            return self._fail(client, context, subscription_id, error)
+        except POST_COMMIT_ADOBE_ERRORS as error:
+            self._hold(context, subscription_id, error)
+            return
 
         logger.info(
             "%s: autoRenewal normalised for subscription %s (renewalQuantity=%s)",
@@ -974,34 +1129,34 @@ class NormalizeRenewedSubscriptions(Step):
             subscription_id,
             renewed_quantity,
         )
-        return True
 
-    def _fail(self, client, context, subscription_id, error):
+    def _hold(self, context, subscription_id, error):
         logger.warning(
             "%s: failed to normalise autoRenewal for subscription %s: %s",
             context,
             subscription_id,
             error,
         )
-        switch_order_to_failed(
-            client,
-            context.order,
-            ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED.to_dict(
-                subscription_id=subscription_id,
-                error=error.message,
-            ),
-        )
-        return False
+        error_message = ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED.to_dict(
+            subscription_id=subscription_id,
+            error=_get_error_message(error),
+        )["message"]
+        _hold_step_on_error(context, self, error_message, error)
 
 
 class DisableLapsingSubscriptions(Step):
     """
     Disable auto-renewal for the plan's lapsing subscriptions (renew = false).
 
-    Runs once the renew-now RENEWAL order has committed, so the subtractive
-    operation never precedes the additive one. A subscription already
-    disabled is skipped (using the snapshot SetupRenewalPlan took before any
-    mutation), so retries are safe.
+    Runs right after the renew-now RENEWAL order has committed, so the
+    subtractive operation never precedes the additive one, and before the
+    RETURNs and the other post-commit steps, so none of them can delay it: a
+    lapsing subscription left enabled would renew a second time at the
+    anniversary. A subscription already disabled is skipped (using the
+    snapshot SetupRenewalPlan took before any mutation), so retries are safe.
+    An Adobe error on one subscription does not stop the others: it is
+    recorded for HoldOnOutstandingSteps, which keeps the MPT order in
+    Processing so the next attempt disables it again.
     """
 
     def __call__(self, client, context, next_step):
@@ -1011,12 +1166,11 @@ class DisableLapsingSubscriptions(Step):
             if plan["renew"] or not plan["snapshot"]["enabled"]:
                 continue
 
-            if not self._disable(client, adobe_client, context, plan):
-                return
+            self._disable(adobe_client, context, plan)
 
         next_step(client, context)
 
-    def _disable(self, client, adobe_client, context, plan):
+    def _disable(self, adobe_client, context, plan):
         try:
             adobe_client.update_subscription(
                 context.authorization_id,
@@ -1024,27 +1178,23 @@ class DisableLapsingSubscriptions(Step):
                 plan["subscription_id"],
                 auto_renewal=False,
             )
-        except AdobeAPIError as error:
+        except POST_COMMIT_ADOBE_ERRORS as error:
             logger.warning(
                 "%s: failed to disable auto-renewal for subscription %s: %s",
                 context,
                 plan["subscription_id"],
                 error,
             )
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED.to_dict(
-                    subscription_id=plan["subscription_id"],
-                    error=error.message,
-                ),
-            )
-            return False
+            error_message = ERR_RENEWAL_SUBSCRIPTION_UPDATE_FAILED.to_dict(
+                subscription_id=plan["subscription_id"],
+                error=_get_error_message(error),
+            )["message"]
+            _hold_step_on_error(context, self, error_message, error)
+            return
 
         logger.info(
             "%s: auto-renewal disabled for subscription %s", context, plan["subscription_id"]
         )
-        return True
 
 
 class ResolveNetNewRenewedSubscriptions(Step):
@@ -1060,7 +1210,9 @@ class ResolveNetNewRenewedSubscriptions(Step):
     keyed by the payload offerId so CreateNetNewMptSubscriptions can create the MPT
     subscription. No-op when the plan has no net-new items or no RENEWAL order was
     committed. Idempotent: a retry reuses the existing RENEWAL order and re-resolves
-    the same subscriptions.
+    the same subscriptions. A line that cannot be resolved does not stop the others:
+    it is recorded for HoldOnOutstandingSteps, which keeps the MPT order in
+    Processing, and only the resolved subscriptions are created.
     """
 
     def __call__(self, client, context, next_step):
@@ -1071,43 +1223,36 @@ class ResolveNetNewRenewedSubscriptions(Step):
             return
 
         adobe_client = get_adobe_client()
-        resolved_lines = set()
+        committed_lines = set()
         for line_item in context.adobe_renewal_order.get("lineItems", []):
             net_new_item = net_new_by_line.get(line_item["extLineItemNumber"])
             if not net_new_item:
                 continue
-            if not self._resolve(client, adobe_client, context, line_item, net_new_item):
-                return
-            resolved_lines.add(line_item["extLineItemNumber"])
+            committed_lines.add(line_item["extLineItemNumber"])
+            self._resolve(adobe_client, context, line_item, net_new_item)
 
-        if not self._ensure_all_resolved(client, context, resolved_lines):
-            return
-
+        self._hold_missing_lines(context, committed_lines)
         next_step(client, context)
 
-    def _ensure_all_resolved(self, client, context, resolved_lines):
-        """Fail the order when the committed order omitted a requested net-new line."""
-        missing_offers = _missing_net_new_offers(context, resolved_lines)
+    def _hold_missing_lines(self, context, committed_lines):
+        """Hold the order when the committed order omitted a requested net-new line."""
+        missing_offers = _missing_net_new_offers(context, committed_lines)
         if not missing_offers:
-            return True
+            return
 
         logger.warning(
             "%s: committed renewal order is missing net-new line(s) for offer(s): %s",
             context,
             missing_offers,
         )
-        switch_order_to_failed(
-            client,
-            context.order,
-            ERR_RENEWAL_NET_NEW_FAILED.to_dict(
-                offer_id=missing_offers,
-                error="line not present on the committed renewal order",
-            ),
-        )
-        return False
+        error_message = ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+            offer_id=missing_offers,
+            error="line not present on the committed renewal order",
+        )["message"]
+        _hold_step(context, self, error_message, notify=True)
 
-    def _resolve(self, client, adobe_client, context, line_item, net_new_item):
-        """Fetch and store the Adobe subscription of a committed net-new line, False on failure."""
+    def _resolve(self, adobe_client, context, line_item, net_new_item):
+        """Fetch and store the Adobe subscription of a committed net-new line."""
         offer_id = net_new_item["offerId"]
         subscription_id = line_item.get("subscriptionId")
         if not subscription_id:
@@ -1116,15 +1261,12 @@ class ResolveNetNewRenewedSubscriptions(Step):
                 context,
                 offer_id,
             )
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_RENEWAL_NET_NEW_FAILED.to_dict(
-                    offer_id=offer_id,
-                    error="committed renewal line has no subscriptionId",
-                ),
-            )
-            return False
+            error_message = ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+                offer_id=offer_id,
+                error="committed renewal line has no subscriptionId",
+            )["message"]
+            _hold_step(context, self, error_message, notify=True)
+            return
 
         try:
             subscription = adobe_client.get_subscription(
@@ -1132,7 +1274,7 @@ class ResolveNetNewRenewedSubscriptions(Step):
                 context.adobe_customer_id,
                 subscription_id,
             )
-        except AdobeAPIError as error:
+        except POST_COMMIT_ADOBE_ERRORS as error:
             logger.warning(
                 "%s: failed to resolve net-new subscription %s for offer %s: %s",
                 context,
@@ -1140,12 +1282,11 @@ class ResolveNetNewRenewedSubscriptions(Step):
                 offer_id,
                 error,
             )
-            switch_order_to_failed(
-                client,
-                context.order,
-                ERR_RENEWAL_NET_NEW_FAILED.to_dict(offer_id=offer_id, error=error.message),
-            )
-            return False
+            error_message = ERR_RENEWAL_NET_NEW_FAILED.to_dict(
+                offer_id=offer_id, error=_get_error_message(error)
+            )["message"]
+            _hold_step_on_error(context, self, error_message, error)
+            return
 
         context.renewal_net_new_subscriptions[offer_id] = subscription
         logger.info(
@@ -1154,7 +1295,42 @@ class ResolveNetNewRenewedSubscriptions(Step):
             subscription["subscriptionId"],
             offer_id,
         )
-        return True
+
+
+class HoldOnOutstandingSteps(Step):
+    """
+    Keep the MPT order in Processing while a post-commit step is outstanding.
+
+    The post-commit steps (disabling, returning, resolving net-new subscriptions,
+    normalising) never fail the MPT order: the RENEWAL is already invoiced, so a
+    Failed order would only hide what Adobe holds. Each records what it could not
+    complete instead, and the next fulfillment attempt runs it again. With nothing
+    outstanding the order carries on to CompleteOrder. Otherwise it stops here; the
+    refusals (anything but a transient error or a RETURN still pending) are notified
+    to operations, naming the Adobe orders this MPT order created, once per worker
+    process for the same refusals (notify_renewal_now_outstanding_steps is cached).
+    """
+
+    def __call__(self, client, context, next_step):
+        """Complete the order unless a post-commit step is outstanding."""
+        outstanding = context.renewal_outstanding_steps
+        if not outstanding:
+            next_step(client, context)
+            return
+
+        logger.info(
+            "%s: order kept in processing, %s post-commit step(s) outstanding: %s",
+            context,
+            len(outstanding),
+            "; ".join(f"{entry['step']}: {entry['message']}" for entry in outstanding),
+        )
+        refusals = [entry for entry in outstanding if entry["notify"]]
+        if refusals:
+            notify_renewal_now_outstanding_steps(
+                context.order_id,
+                ", ".join(get_adobe_order_ids_created_parameter(context.order)) or "-",
+                "\n".join(f"- **{entry['step']}**: {entry['message']}" for entry in refusals),
+            )
 
 
 def fulfill_renewal_now_order(client, order):
@@ -1165,13 +1341,18 @@ def fulfill_renewal_now_order(client, order):
     and committed as an actual Adobe RENEWAL order, invoiced immediately.
     Before that, the previous RENEWAL order lines of the lapsing
     subscriptions already committed are resolved and checked against the
-    return window, so nothing is committed that cannot be undone. Net-new
+    return window, so nothing is committed that cannot be undone. Those
+    pre-commit checks are skipped on a retry that finds this order's RENEWAL
+    already committed (DetectCommittedRenewal), so an invoiced RENEWAL is not
+    failed by a check that only guards the commit. Net-new
     items ride the same RENEWAL order as extra lines and their MPT
     subscriptions are created after it commits. Once it
-    completes, the previous lines are returned, the renewed
-    subscriptions (renew = true) have their autoRenewal normalised and the
-    plan's lapsing subscriptions (renew = false) have their auto-renewal
-    disabled.
+    completes, the plan's lapsing subscriptions (renew = false) have their
+    auto-renewal disabled, the previous lines are returned and the renewed
+    subscriptions (renew = true) have their autoRenewal normalised. None of
+    these post-commit steps fails the MPT order: one that cannot complete
+    keeps it in Processing for the next attempt (HoldOnOutstandingSteps),
+    notifying operations when Adobe refused it.
 
     Args:
         client (MPTClient): An instance of the MPT client used for communication
@@ -1184,22 +1365,26 @@ def fulfill_renewal_now_order(client, order):
     pipeline = Pipeline(
         SetupContext(),
         StartOrderProcessing(TEMPLATE_NAME_CHANGE),
-        SetupDueDate(),
-        ValidateDuplicateLines(),
+        DetectCommittedRenewal(),
+        SkipOnceRenewalCommitted(SetupDueDate()),
+        SkipOnceRenewalCommitted(ValidateDuplicateLines()),
         SetOrUpdateCotermDate(),
         UpdateAgreementParamsVisibility(),
-        ValidateRenewalWindow(),
+        SkipOnceRenewalCommitted(ValidateRenewalWindow()),
         SetupRenewalPlan(),
-        ValidateNetNewOrderLines(),
-        Validate3YCRenewalFloor(include_net_new_items=True, renewal_quantity_is_delta=True),
+        SkipOnceRenewalCommitted(ValidateNetNewOrderLines()),
+        SkipOnceRenewalCommitted(
+            Validate3YCRenewalFloor(include_net_new_items=True, renewal_quantity_is_delta=True)
+        ),
         ResolvePreviousRenewalReturns(),
         PreviewRenewalNowOrder(),
         SubmitRenewalNowOrder(),
+        DisableLapsingSubscriptions(),
         ReturnPreviousRenewalOrders(),
         ResolveNetNewRenewedSubscriptions(),
         CreateNetNewMptSubscriptions(),
         NormalizeRenewedSubscriptions(),
-        DisableLapsingSubscriptions(),
+        HoldOnOutstandingSteps(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),
         RecordClientDiscountCodes(),
         RecordDiscountRedemptions(),
