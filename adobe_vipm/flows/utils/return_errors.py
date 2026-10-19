@@ -51,7 +51,7 @@ def classify_return_error(
     Returns:
         The action to take.
     """
-    if error is not None and _is_transient(error):
+    if error is not None and is_transient_error(error):
         return ReturnErrorAction.RETRY
     error_code = getattr(error, "code", None)
     if error_code == AdobeErrorCode.RETURN_VIOLATES_3YC_MCQ:
@@ -62,7 +62,19 @@ def classify_return_error(
     return ReturnErrorAction.FAIL if is_line_credited else ReturnErrorAction.DEFER
 
 
-def _is_transient(error: Exception) -> bool:
+def is_transient_error(error: Exception) -> bool:
+    """
+    Return True for an error worth retrying on the next run as is.
+
+    Transport errors, non-API HTTP errors and Adobe 5xx are transient; an Adobe 4xx
+    is a refusal that a retry alone does not fix.
+
+    Args:
+        error: Exception raised by the Adobe client.
+
+    Returns:
+        Whether the error is transient.
+    """
     return (
         not isinstance(error, AdobeAPIError)
         or error.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
