@@ -33,7 +33,8 @@ additional lines on the same RENEWAL order, carrying offerId + quantity and no
 subscriptionId: Adobe creates-and-renews the new subscription in one shot,
 invoiced immediately, and returns its new subscriptionId on the committed order.
 Their MPT subscriptions are created after the order commits
-(ResolveNetNewRenewedSubscriptions then CreateNetNewMptSubscriptions).
+(ResolveNetNewRenewedSubscriptions then CreateNetNewMptSubscriptions), starting
+at their Adobe creation date since they are active from the order, not the anniversary.
 """
 
 import datetime as dt
@@ -1382,7 +1383,7 @@ def fulfill_renewal_now_order(client, order):
         DisableLapsingSubscriptions(),
         ReturnPreviousRenewalOrders(),
         ResolveNetNewRenewedSubscriptions(),
-        CreateNetNewMptSubscriptions(),
+        CreateNetNewMptSubscriptions(active_on_creation=True),
         NormalizeRenewedSubscriptions(),
         HoldOnOutstandingSteps(),
         CompleteOrder(TEMPLATE_NAME_CHANGE),

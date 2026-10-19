@@ -2852,6 +2852,7 @@ def test_fulfill_renewal_now_order(mocker):
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
     assert pipeline_args[10].step.include_net_new_items is True
     assert pipeline_args[10].step.renewal_quantity_is_delta is True
+    assert pipeline_args[17].active_on_creation is True
     assert pipeline_args[20].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
