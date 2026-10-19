@@ -1445,6 +1445,64 @@ def test_create_net_new_mpt_subscriptions_step_missing_renewal_values(
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
 
 
+def test_create_net_new_mpt_subscriptions_step_active_on_creation(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context, adobe_subscription_factory
+):
+    adobe_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        current_quantity=2,
+        renewal_quantity=2,
+        status=AdobeSubscriptionStatus.ACTIVE.value,
+        renewal_date="2026-11-05",
+    )
+    adobe_sub["creationDate"] = "2026-10-16T11:42:00Z"
+    renewal_context.renewal_net_new_subscriptions = {"65322651CA01A12": adobe_sub}
+    mocked_create_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_subscription",
+        return_value={"id": "SUB-1000-2000-3000"},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = CreateNetNewMptSubscriptions(active_on_creation=True)
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    subscription_data = mocked_create_subscription.mock_calls[0].args[2]
+    parameters = {
+        param["externalId"]: param["value"]
+        for param in subscription_data["parameters"]["fulfillment"]
+    }
+    assert subscription_data["startDate"] == "2026-10-16T11:42:00Z"
+    assert subscription_data["commitmentDate"] == "2026-11-05"
+    assert parameters[Param.RENEWAL_DATE.value] == "2026-11-05"
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
+def test_create_net_new_mpt_subscriptions_step_active_on_creation_missing_renewal_date(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_context, adobe_subscription_factory
+):
+    adobe_sub = adobe_subscription_factory(
+        subscription_id="net-new-sub-id",
+        offer_id="65322651CA01A12",
+        status=AdobeSubscriptionStatus.ACTIVE.value,
+    )
+    adobe_sub.pop("renewalDate")
+    renewal_context.renewal_net_new_subscriptions = {"65322651CA01A12": adobe_sub}
+    mocked_create_subscription = mocker.patch(
+        "adobe_vipm.flows.fulfillment.renewal.create_subscription",
+        return_value={"id": "SUB-1000-2000-3000"},
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = CreateNetNewMptSubscriptions(active_on_creation=True)
+
+    step(mock_mpt_client, renewal_context, mocked_next_step)  # act
+
+    subscription_data = mocked_create_subscription.mock_calls[0].args[2]
+    assert subscription_data["startDate"] == adobe_sub["creationDate"]
+    assert subscription_data["commitmentDate"] is None
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_context)
+
+
 def test_record_flex_discounts_step(mocker, mock_mpt_client, renewal_context):
     renewal_context.renewal_plan_subscriptions = [
         plan_entry(flex_discount_codes=["CODE-1"]),
@@ -1889,6 +1947,7 @@ def test_fulfill_renewal_order(mocker):
     assert pipeline_args[1].template_name == TEMPLATE_NAME_CHANGE
     assert pipeline_args[10].include_net_new_items is True
     assert pipeline_args[10].renewal_quantity_is_delta is False
+    assert pipeline_args[17].active_on_creation is False
     assert pipeline_args[19].template_name == TEMPLATE_NAME_CHANGE
     mocked_context_ctor.assert_called_once_with(order=mocked_order)
     mocked_pipeline_instance.run.assert_called_once_with(mocked_client, mocked_context)
