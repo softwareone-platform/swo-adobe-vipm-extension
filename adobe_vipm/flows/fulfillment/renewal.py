@@ -1057,16 +1057,22 @@ def disable_net_new_subscriptions(adobe_client, context):
 
 class CreateNetNewMptSubscriptions(Step):
     """
-    Create the MPT subscriptions for the scheduled net-new Adobe subscriptions.
+    Create the MPT subscriptions for the net-new Adobe subscriptions.
 
-    Each subscription is attached to its net-new order line and carries the
-    future start date: it is created directly in Active status and activates
-    commercially only at the anniversary. The step is idempotent: a line that
-    already holds a subscription is skipped.
+    Each subscription is attached to its net-new order line and created directly
+    in Active status. At the anniversary the Adobe subscription is scheduled (1009)
+    and activates commercially only then, so it carries the renewal date as its
+    start date. On renew now (active_on_creation) Adobe activates and invoices the
+    subscription immediately while its renewalDate still holds the pre-early-renewal
+    anniversary, so it starts at its Adobe creation date instead. The step is
+    idempotent: a line that already holds a subscription is skipped.
     """
 
+    def __init__(self, *, active_on_creation=False):
+        self.active_on_creation = active_on_creation
+
     def __call__(self, client, context, next_step):
-        """Create the MPT subscriptions for the scheduled net-new Adobe subscriptions."""
+        """Create the MPT subscriptions for the net-new Adobe subscriptions."""
         for offer_id, adobe_subscription in context.renewal_net_new_subscriptions.items():
             order_line = get_order_line_by_sku(context.order, offer_id)
             if not order_line:
@@ -1110,7 +1116,11 @@ class CreateNetNewMptSubscriptions(Step):
         auto_renewal = adobe_subscription.get("autoRenewal", {})
         renewal_quantity = auto_renewal.get(Param.RENEWAL_QUANTITY.value)
         renewal_date = adobe_subscription.get("renewalDate")
-        start_date = renewal_date or adobe_subscription["creationDate"]
+        start_date = (
+            adobe_subscription["creationDate"]
+            if self.active_on_creation
+            else renewal_date or adobe_subscription["creationDate"]
+        )
         item_name = order_line["item"]["name"]
         return {
             "name": f"Subscription for {item_name}",
