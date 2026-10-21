@@ -102,6 +102,13 @@ MANUAL_RENEWAL_ACTION = "MANUAL_RENEWAL"
 # ``flexDiscounts[].result``; a preview cascades through the ranked candidates of a
 # line on rejection, bounded by the number of candidates in the order.
 FLEX_DISCOUNT_RESULT_SUCCESS = "SUCCESS"
+# Adobe errors that refuse a flexible discount code proposed on a line item (the
+# line is named in the error details) rather than the order itself.
+FLEX_DISCOUNT_REFUSAL_ERROR_CODES = frozenset((
+    AdobeErrorCode.CUSTOMER_NOT_QUALIFIED_FOR_FLEX_DISCOUNT,
+    AdobeErrorCode.INVALID_FLEX_DISCOUNT_CODE,
+    AdobeErrorCode.FLEX_DISCOUNT_CODE_LIMIT_EXCEEDED,
+))
 
 
 MINLEN_COMPANY_NAME = 4
