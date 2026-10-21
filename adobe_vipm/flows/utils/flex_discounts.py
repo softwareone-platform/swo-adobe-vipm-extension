@@ -247,13 +247,14 @@ def get_flex_discount_candidates(  # noqa: WPS211
     return candidates_by_line
 
 
-def get_renewal_flex_discount_candidates(
+def get_renewal_flex_discount_candidates(  # noqa: WPS211
     *,
     market_segment: str,
     customer_id: str,
     country: str,
     commitment: CommitmentType,
     renewal_lines: dict[str, dict],
+    owned_partial_skus: set[str] | None = None,
 ) -> dict[str, list[FlexDiscountCandidate]]:
     """
     Retrieve and filter the candidate codes of every late-renewal line.
@@ -268,6 +269,7 @@ def get_renewal_flex_discount_candidates(
         country: Country the discounts are looked up for (see get_discount_country).
         commitment: The customer's commitment term (see get_commitment_type).
         renewal_lines: Late-renewal info per partial SKU (context.manual_renewal_lines).
+        owned_partial_skus: Partial SKUs the customer already owns, None when unknown.
 
     Returns:
         dict: Candidates per partial SKU, unranked; SKUs without candidates are absent.
@@ -285,6 +287,7 @@ def get_renewal_flex_discount_candidates(
             line_type=LineType.RENEWAL,
             country=country,
             commitment=commitment,
+            owned_partial_skus=owned_partial_skus,
         )
         if candidates:
             candidates_by_sku[sku] = candidates
@@ -524,7 +527,9 @@ def _to_date(raw_date) -> dt.date | None:
     return dt.date.fromisoformat(str(raw_date)[:10])
 
 
-def select_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
+def select_flex_discounts(
+    context, owned_partial_skus: set[str] | None = None
+) -> dict[str, list[FlexDiscountCandidate]]:
     """
     Retrieve, filter and rank the candidate codes of every NEW and upsize line of an order.
 
@@ -536,6 +541,7 @@ def select_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
 
     Args:
         context: Order processing context (customer, lines, segment, currency).
+        owned_partial_skus: Partial SKUs the customer already owns, None when unknown.
 
     Returns:
         dict: Ranked candidates per MPT line id; lines without candidates are absent.
@@ -548,6 +554,7 @@ def select_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
         commitment=get_commitment_type(context.adobe_customer, customer_data),
         new_lines=context.new_lines,
         upsize_lines=context.upsize_lines,
+        owned_partial_skus=owned_partial_skus,
     )
     if not candidates_by_line:
         return {}
@@ -579,7 +586,9 @@ def select_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
     }
 
 
-def select_renewal_flex_discounts(context) -> dict[str, list[FlexDiscountCandidate]]:
+def select_renewal_flex_discounts(
+    context, owned_partial_skus: set[str] | None = None
+) -> dict[str, list[FlexDiscountCandidate]]:
     """
     Retrieve, filter and rank the candidate codes of every late-renewal line of an order.
 
@@ -591,6 +600,7 @@ def select_renewal_flex_discounts(context) -> dict[str, list[FlexDiscountCandida
 
     Args:
         context: Order processing context (customer, late-renewal lines, segment, currency).
+        owned_partial_skus: Partial SKUs the customer already owns, None when unknown.
 
     Returns:
         dict: Ranked candidates per partial SKU; SKUs without candidates are absent.
@@ -602,6 +612,7 @@ def select_renewal_flex_discounts(context) -> dict[str, list[FlexDiscountCandida
         country=get_discount_country(customer_data),
         commitment=get_commitment_type(context.adobe_customer, customer_data),
         renewal_lines=context.manual_renewal_lines,
+        owned_partial_skus=owned_partial_skus,
     )
     if not candidates_by_sku:
         return {}
