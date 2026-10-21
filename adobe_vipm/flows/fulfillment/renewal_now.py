@@ -39,6 +39,7 @@ at their Adobe creation date since they are active from the order, not the anniv
 
 import datetime as dt
 import logging
+from itertools import starmap
 from operator import itemgetter
 
 from mpt_extension_sdk.mpt_http.mpt import update_order
@@ -264,6 +265,22 @@ def _missing_net_new_offers(context, present_line_numbers):
     return ", ".join(net_new["offerId"] for net_new in missing)
 
 
+def _build_renewing_subscription_line_item(number, plan):
+    """Build the line item of a renewing subscription, with its deployment fields if any."""
+    line_item = {
+        "extLineItemNumber": number,
+        "offerId": plan["offer_id"],
+        "subscriptionId": plan["subscription_id"],
+        "quantity": plan["renewal_quantity"],
+    }
+    if plan["flex_discount_codes"]:
+        line_item["flexDiscountCodes"] = plan["flex_discount_codes"]
+    if plan["deployment_id"]:
+        line_item["deploymentId"] = plan["deployment_id"]
+        line_item["currencyCode"] = plan["currency_code"]
+    return line_item
+
+
 def _build_renewing_line_items(context):
     """
     Build PREVIEW_RENEWAL/RENEWAL line items for the renewing subscriptions and net-new items.
@@ -273,19 +290,13 @@ def _build_renewing_line_items(context):
     are appended after them, each carrying offerId + quantity and no subscriptionId:
     Adobe creates-and-renews the new subscription in the same order. Their
     extLineItemNumber continues after the renewing lines so the committed order can
-    be matched back to the payload item (see _get_net_new_line_map).
+    be matched back to the payload item (see _get_net_new_line_map). A renewing line
+    whose Adobe subscription belongs to a deployment carries that subscription's
+    deploymentId and currencyCode; a net-new line carries the order's deploymentId,
+    and the Adobe client adds the deployment currency to it.
     """
-    line_items = []
-    for number, plan in enumerate(_get_renewing_plans(context), start=1):
-        line_item = {
-            "extLineItemNumber": number,
-            "offerId": plan["offer_id"],
-            "subscriptionId": plan["subscription_id"],
-            "quantity": plan["renewal_quantity"],
-        }
-        if plan["flex_discount_codes"]:
-            line_item["flexDiscountCodes"] = plan["flex_discount_codes"]
-        line_items.append(line_item)
+    renewing_plans = enumerate(_get_renewing_plans(context), start=1)
+    line_items = list(starmap(_build_renewing_subscription_line_item, renewing_plans))
 
     deployment_id = get_deployment_id(context.order)
     for number, net_new_item in _iter_net_new_lines(context):

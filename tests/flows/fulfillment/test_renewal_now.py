@@ -129,6 +129,8 @@ def plan_entry(
     snapshot_quantity=10,
     snapshot_codes=None,
     snapshot_renewed_quantity=None,
+    deployment_id=None,
+    currency_code=None,
 ):
     return {
         "subscription_id": subscription_id,
@@ -136,6 +138,8 @@ def plan_entry(
         "renew": renew,
         "renewal_quantity": renewal_quantity,
         "flex_discount_codes": flex_discount_codes or [],
+        "deployment_id": deployment_id,
+        "currency_code": currency_code,
         "snapshot": {
             "enabled": snapshot_enabled,
             "renewal_quantity": snapshot_quantity,
@@ -3147,7 +3151,11 @@ def test_resolve_net_new_renewed_subscriptions_step_non_api_error_is_held(  # no
 def test_preview_renewal_now_order_step_net_new_deployment_and_no_flex(
     mocker, mock_adobe_client, mock_mpt_client, renewal_now_context_net_new, adobe_order_factory
 ):
-    """A net-new line with no flex code carries the order's deploymentId when present."""
+    """
+    A net-new line with no flex code carries the order's deploymentId when present.
+
+    Its currencyCode is added by the Adobe client (see test_create_renewal_order_*).
+    """
     renewal_now_context_net_new.renewal_plan_subscriptions = []
     renewal_now_context_net_new.renewal_payload["netNewItems"] = [
         {"offerId": "65322651CA01A12", "quantity": 5},
@@ -3176,6 +3184,80 @@ def test_preview_renewal_now_order_step_net_new_deployment_and_no_flex(
         },
     ]
     mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context_net_new)
+
+
+def test_preview_renewal_now_order_step_renewing_deployment_subscription(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    """A renewing line carries its Adobe subscription's deploymentId and currencyCode."""
+    renewal_now_context.renewal_plan_subscriptions = [
+        plan_entry(deployment_id="deployment-123", currency_code="EUR")
+    ]
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[{"extLineItemNumber": 1, "offerId": "65304578CA01A12", "quantity": 15}],
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = PreviewRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    line_items = mock_adobe_client.create_renewal_order.mock_calls[0].args[3]
+    assert line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "renewing-sub-id",
+            "quantity": 15,
+            "deploymentId": "deployment-123",
+            "currencyCode": "EUR",
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
+
+
+def test_preview_renewal_now_order_step_mixed_deployment_subscriptions(
+    mocker, mock_adobe_client, mock_mpt_client, renewal_now_context, adobe_order_factory
+):
+    """Each renewing line carries only its own subscription's deployment fields."""
+    renewal_now_context.renewal_plan_subscriptions = [
+        plan_entry(deployment_id="deployment-123", currency_code="EUR"),
+        plan_entry(subscription_id="other-sub-id", offer_id="77777777CA01A12", renewal_quantity=3),
+    ]
+    mock_adobe_client.get_orders.return_value = []
+    mock_adobe_client.create_renewal_order.return_value = adobe_order_factory(
+        order_type="PREVIEW_RENEWAL",
+        status=AdobeOrderStatus.COMPLETE.value,
+        items=[
+            {"extLineItemNumber": 1, "offerId": "65304578CA01A12", "quantity": 15},
+            {"extLineItemNumber": 2, "offerId": "77777777CA01A12", "quantity": 3},
+        ],
+    )
+    mocked_next_step = mocker.MagicMock()
+    step = PreviewRenewalNowOrder()
+
+    step(mock_mpt_client, renewal_now_context, mocked_next_step)  # act
+
+    line_items = mock_adobe_client.create_renewal_order.mock_calls[0].args[3]
+    assert line_items == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304578CA01A12",
+            "subscriptionId": "renewing-sub-id",
+            "quantity": 15,
+            "deploymentId": "deployment-123",
+            "currencyCode": "EUR",
+        },
+        {
+            "extLineItemNumber": 2,
+            "offerId": "77777777CA01A12",
+            "subscriptionId": "other-sub-id",
+            "quantity": 3,
+        },
+    ]
+    mocked_next_step.assert_called_once_with(mock_mpt_client, renewal_now_context)
 
 
 def test_preview_renewal_now_order_step_fails_when_net_new_missing_from_preview(
